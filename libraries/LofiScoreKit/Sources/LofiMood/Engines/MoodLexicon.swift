@@ -31,9 +31,9 @@ enum MoodLexicon {
         ],
         .hopeful: [
             "hope*", "dawn*", "sunrise", "bright*", "joy*", "triumph*", "victor*", "freedom", "free", "smil*",
-            "bless*", "promis*", "spring", "bloom*", "future", "dream*", "rescu*", "saved", "reunit*",
+            "bless*", "promis*", "spring", "bloom*", "future", "rescu*", "saved", "reunit*",
             "together", "courag*", "brave*", "glori*", "radian*", "rejoic*", "cheer*", "heal*", "renew*",
-            "succeed*", "success*", "won", "win", "proud", "pride", "faith*", "wonder*", "marvel*", "glow*",
+            "succeed*", "success*", "won", "win", "proud", "pride", "faith*", "glow*",
             "rainbow", "light", "relief", "relieved", "grateful", "gratitude",
         ],
         .melancholy: [
@@ -66,6 +66,29 @@ enum MoodLexicon {
             "widow*", "orphan*", "toll*", "knell", "black", "darkness", "cold", "dread*", "fate", "fatal*",
             "perish*", "slain", "sacrific*", "suffer*", "agony", "misery", "miserable", "wretch*", "hopeless*",
             "condemn*", "execution*", "gallows", "cemetery", "churchyard", "requiem", "lament*", "mortal*",
+        ],
+        // Added 9 Nov 2026. Stems are chosen to avoid common false friends:
+        // "quest" not "quest*" (question), "stars" not "star*" (started).
+        .romantic: [
+            "kiss*", "lover", "lovers", "beloved", "sweetheart*", "romanc*", "romantic*", "passion*",
+            "tender*", "caress*", "blush*", "adore", "adored", "adoring", "adoration", "love", "loved",
+            "lovingly", "betroth*", "courtship", "suitor*", "bride*", "wedding*", "honeymoon",
+            "flirt*", "swoon*", "desire*", "embrac*", "lips", "gaze*", "heartbeat", "valentine*",
+            "roses", "longed", "yearn*",
+        ],
+        .dreamy: [
+            "dream*", "dreamt", "marvel*", "wondrous", "wonderment", "wonderland", "enchant*", "magic*",
+            "fairy", "fairies", "faerie*", "stars", "starlight", "starlit", "starry", "moonlight", "moonlit",
+            "moonbeam*", "shimmer*", "glitter*", "sparkl*", "luminous", "float*", "ethereal", "celestial",
+            "reverie", "trance", "haze", "hazy", "silvery", "crystal*", "dazzl*", "awe", "awestruck",
+            "otherworld*", "spellbound", "unicorn*", "mermaid*", "iridescen*", "twinkl*", "gossamer",
+        ],
+        .adventurous: [
+            "adventur*", "journey*", "voyag*", "quest", "quests", "questing", "expedition*", "explor*",
+            "sail*", "horizon*", "map", "maps", "treasure*", "pirate*", "gallop*", "rode", "riding",
+            "mountain*", "climb*", "summit*", "cliff*", "jungle*", "compass*", "daring", "dare", "dared",
+            "bold", "boldly", "hero", "heroes", "heroic*", "wilderness", "trek*", "onward*",
+            "thrill*", "exhilarat*", "excit*", "ventur*", "uncharted", "frontier*", "galleon*", "caravan*",
         ],
     ]
 

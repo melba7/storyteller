@@ -27,6 +27,14 @@ struct MoodLineTests {
             // Seen from Apple's on-device model in 17 of 1,360 answers.
             ("bucket=tension; valence=-0.5; arousal=0.7; confidence=0.8", .tense),
             ("bucket=Sadness; valence=-0.5", .melancholy),
+            // The three moods added on 9 Nov 2026.
+            ("bucket=romantic; valence=0.7; arousal=0.4; confidence=0.8", .romantic),
+            ("bucket=Romance", .romantic),
+            ("bucket=tender; valence=0.6", .romantic),
+            ("bucket=dreamlike; valence=0.4; arousal=0.4", .dreamy),
+            ("bucket=enchanted; arousal=0.4", .dreamy),
+            ("bucket=adventure; valence=0.3; arousal=0.8; confidence=0.7", .adventurous),
+            ("bucket=thrilling", .adventurous),
         ]
         for (answer, expected) in cases {
             #expect(try MoodLine.parse(answer, engineID: "t").bucket == expected, "\(answer)")
