@@ -167,6 +167,15 @@ for f in "$OUT"/readings/*.jsonl; do
   case "$f" in *.masked.jsonl) ;; *) PLAIN+=("$f") ;; esac
 done
 python3 -I Tools/eval/score.py --windows "$T" --labels "$GOLD" --confusion "${PLAIN[@]}" | tee "$OUT/scores.txt"
+# The plausible-set labels: "fits" counts any acceptable mood, and --compare
+# puts by-book 95% intervals on each engine and on its difference from word-2.
+SETS="$L/claude-g2-test-sets.jsonl"
+if [ -s "$SETS" ]; then
+  ORDERED=()
+  for f in "${PLAIN[@]}"; do case "$f" in *embed-word-2*) ORDERED=("$f" "${ORDERED[@]}") ;; *) ORDERED+=("$f") ;; esac; done
+  python3 -I Tools/eval/score.py --windows "$T" --labels "$SETS" --compare "${ORDERED[@]}" \
+    | sed -n '/^## Compared/,/^## Pairwise/p' | tee "$OUT/scores-sets.txt"
+fi
 if [ -s "$OUT/readings/claude-haiku.masked.jsonl" ]; then
   python3 -I Tools/eval/score.py --windows "$T" --masked-pair "$OUT/readings/claude-haiku.jsonl" "$OUT/readings/claude-haiku.masked.jsonl" | tee -a "$OUT/scores.txt"
 fi
