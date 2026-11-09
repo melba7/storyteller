@@ -34,6 +34,7 @@ let package = Package(
         .library(name: "LofiPlaceholders", targets: ["LofiPlaceholders"]),
         .library(name: "LofiDemoKit", targets: ["LofiDemoKit"]),
         .library(name: "LofiScoreHost", targets: ["LofiScoreHost"]),
+        .library(name: "LofiAtmosphere", targets: ["LofiAtmosphere"]),
         .executable(name: "lofi-eval", targets: ["LofiEvalCLI"]),
         .executable(name: "lofi-train", targets: ["LofiTrainCLI"]),
         .executable(name: "lofi-replay", targets: ["lofi-replay"]),
@@ -41,6 +42,7 @@ let package = Package(
         .executable(name: "lofi-demo", targets: ["lofi-demo"]),
         .executable(name: "lofi-render", targets: ["lofi-render"]),
         .executable(name: "lofi-import", targets: ["lofi-import"]),
+        .executable(name: "lofi-atmosphere", targets: ["lofi-atmosphere"]),
     ],
     targets: [
         // Shared value types: MoodBucket, MoodReading, MoodObservation.
@@ -84,13 +86,33 @@ let package = Package(
             swiftSettings: swift5
         ),
 
+        // MARK: Atmosphere
+
+        // Ambient sounds under the music: the scene at each sentence (scored ahead of time
+        // by Claude into a per-book atmosphere track, with a memory of the places met so
+        // far), a director that holds a scene until the story moves on, and a layered
+        // player that loops recordings seamlessly under the voice. Synthesised stand-ins
+        // until real recordings are imported.
+        .target(
+            name: "LofiAtmosphere",
+            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders"],
+            swiftSettings: swift5
+        ),
+        // Scores a book's atmosphere track with Claude, prints a track's scenes, writes
+        // the synthesised stand-in sounds.
+        .executableTarget(
+            name: "lofi-atmosphere",
+            dependencies: ["LofiAtmosphere", "LofiText", "LofiMood", "LofiPlaceholders"],
+            swiftSettings: swift5
+        ),
+
         // MARK: App integration
 
         // What the Storyteller app's native module drives: follows the narrator's events,
         // opens each book's text, imports music folders, keeps the settings.
         .target(
             name: "LofiScoreHost",
-            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders"],
+            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders", "LofiAtmosphere"],
             swiftSettings: swift5
         ),
 
@@ -132,8 +154,13 @@ let package = Package(
             swiftSettings: swift5
         ),
         .testTarget(
+            name: "LofiAtmosphereTests",
+            dependencies: ["LofiAtmosphere", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiPlaceholders"],
+            swiftSettings: swift5
+        ),
+        .testTarget(
             name: "LofiScoreHostTests",
-            dependencies: ["LofiScoreHost", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiScoreCore"],
+            dependencies: ["LofiScoreHost", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiScoreCore", "LofiAtmosphere"],
             swiftSettings: swift5
         ),
     ]
