@@ -33,6 +33,71 @@ export function describeMusic(status: LofiMusicStatus): string {
   return "Starting…"
 }
 
+/** "heavyRain" → "heavy rain", with a few sounds named for what you hear. */
+export function soundName(sound: string): string {
+  const named: Record<string, string> = {
+    rainIndoors: "rain on the windows",
+    seaShore: "waves",
+    openSea: "the open sea",
+    oldTown: "an old town",
+    clock: "a ticking clock",
+    fireplace: "a fire",
+    campfire: "a campfire",
+  }
+  return named[sound] ?? sound.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
+}
+
+/** "rain, wind and a fire", capitalised. */
+export function soundList(sounds: string[]): string {
+  const names = sounds.map(soundName)
+  const text =
+    names.length <= 1
+      ? (names[0] ?? "")
+      : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
+/** One line on what the atmosphere is doing, for the player's music panel. */
+export function describeAtmosphere(status: LofiMusicStatus): string {
+  const atmosphere = status.atmosphere
+  if (!atmosphere?.available) return "Not in this version of the app"
+  if (!atmosphere.enabled) return "Atmosphere is off"
+  if (atmosphere.preparing) return "Getting the sounds ready…"
+  if (atmosphere.source === "none") return "No sounds yet"
+  const book = status.book
+  if (!book) {
+    return "Plays with readaloud books that have an atmosphere track"
+  }
+  if (book.text === "unavailable") {
+    return "This book has no text for the sounds to follow"
+  }
+  if (book.text !== "ready") return "Reading the book…"
+  if (!atmosphere.track) return "This book has no atmosphere track yet"
+  if (status.playback.routeMuted) return "Off in the car"
+  if (!status.playback.narrating) return "Plays with the narration"
+  if (atmosphere.playing.length === 0) return "Quiet here"
+  const sounds = soundList(atmosphere.playing)
+  return atmosphere.musicYielding ? `${sounds}, with the music paused` : sounds
+}
+
+/** Where the atmosphere's sounds come from, for Settings. */
+export function atmosphereSourceLabel(
+  atmosphere: NonNullable<LofiMusicStatus["atmosphere"]>,
+): string {
+  switch (atmosphere.source) {
+    case "imported":
+      return `${atmosphere.sounds} of ${atmosphere.totalSounds} sounds, imported`
+    case "mixed":
+      return `${atmosphere.sounds} sounds: imported recordings, with stand-ins for the rest`
+    case "standIns":
+      return "Stand-in sounds. Import recordings (an Atmosphere folder in the music folder) for the real thing."
+    case "none":
+      return atmosphere.preparing
+        ? "Getting the sounds ready…"
+        : "No sounds yet"
+  }
+}
+
 /** The music level, as the slider shows it. */
 export function musicLevelLabel(levelDB: number): string {
   const under = Math.round(-levelDB)

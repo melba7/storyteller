@@ -19,6 +19,7 @@ Pod::Spec.new do |s|
   s.dependency 'LofiDirector'
   s.dependency 'LofiAudio'
   s.dependency 'LofiPlaceholders'
+  s.dependency 'LofiAtmosphere'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
   s.source_files = 'Sources/LofiScoreHost/**/*.swift'

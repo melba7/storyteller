@@ -1,0 +1,195 @@
+import Foundation
+import LofiMood
+import LofiText
+
+/// A book's scenes, scored once ahead of time: where the story is and what it sounds
+/// like, every couple of hundred narrated words and at every turn of scene.
+///
+/// Spoiler safety, the same rule as ``MoodTrack``: every entry was judged from
+/// `SpoilerGuard.window(at:)` for its own sentence plus the ``PlaceMemory`` of the
+/// entries before it, which were judged the same way. Playback only ever uses the
+/// newest entry at or before the sentence being narrated. So the sounds at any moment
+/// depend only on text the listener has already heard.
+public struct AtmosphereTrack: Codable, Sendable, Hashable {
+    public static let currentFormat = 1
+    /// File names end in this, e.g. "Dracula.atmosphere.json".
+    public static let fileSuffix = ".atmosphere.json"
+
+    public struct Entry: Codable, Sendable, Hashable {
+        public let chapterOrdinal: Int
+        public let sentenceIndex: Int
+        public let globalIndex: Int
+        /// Digest of the entry's own sentence (``TextDigest``), so a track made for an
+        /// older alignment of the book is never applied to a newer one.
+        public let sentenceDigest: String
+        public let scene: StoryScene
+        /// What the scorer had worked out about the book's world so far ("Victorian
+        /// London, autumn"), carried forward to later entries.
+        public let world: String?
+
+        public init(position: SentencePosition, sentence: String, scene: StoryScene, world: String? = nil) {
+            chapterOrdinal = position.chapterOrdinal
+            sentenceIndex = position.sentenceIndex
+            globalIndex = position.globalIndex
+            sentenceDigest = TextDigest.fnv1a64(sentence)
+            self.scene = scene
+            self.world = world
+        }
+
+        init(copying entry: Entry, scene: StoryScene) {
+            chapterOrdinal = entry.chapterOrdinal
+            sentenceIndex = entry.sentenceIndex
+            globalIndex = entry.globalIndex
+            sentenceDigest = entry.sentenceDigest
+            self.scene = scene
+            world = entry.world
+        }
+    }
+
+    public var format: Int
+    /// The engine that scored it, e.g. "claude.sonnet-5-5/a1".
+    public var engineID: String
+    /// Whatever the tool was given to name the book. The app matches tracks by sentence
+    /// digests, not by this.
+    public var bookID: String
+    public var wordsBetweenEntries: Int
+    /// Global index of each chapter's first narrated sentence, so playback can let the
+    /// sounds settle at a chapter break. Says nothing about the story.
+    public var chapterStarts: [Int]
+    /// Sorted by position.
+    public private(set) var entries: [Entry]
+
+    public init(engineID: String, bookID: String, wordsBetweenEntries: Int, chapterStarts: [Int] = [], entries: [Entry] = []) {
+        format = Self.currentFormat
+        self.engineID = engineID
+        self.bookID = bookID
+        self.wordsBetweenEntries = wordsBetweenEntries
+        self.chapterStarts = chapterStarts.sorted()
+        self.entries = []
+        entries.forEach { insert($0) }
+    }
+
+    /// Adds or replaces the entry for its sentence.
+    public mutating func insert(_ entry: Entry) {
+        let index = firstIndex(notBefore: entry.globalIndex)
+        if index < entries.count, entries[index].globalIndex == entry.globalIndex {
+            entries[index] = entry
+        } else {
+            entries.insert(entry, at: index)
+        }
+    }
+
+    public func contains(_ position: SentencePosition) -> Bool {
+        let index = firstIndex(notBefore: position.globalIndex)
+        return index < entries.count && entries[index].globalIndex == position.globalIndex
+    }
+
+    /// The newest entry at or before the sentence, never one after it.
+    public func entry(atOrBefore globalIndex: Int) -> Entry? {
+        let index = firstIndex(notBefore: globalIndex)
+        if index < entries.count, entries[index].globalIndex == globalIndex { return entries[index] }
+        return index > 0 ? entries[index - 1] : nil
+    }
+
+    /// Entries strictly before the sentence, oldest first.
+    public func entries(before globalIndex: Int) -> ArraySlice<Entry> {
+        entries[..<firstIndex(notBefore: globalIndex)]
+    }
+
+    /// The chapter break at or before the sentence (the global index of that chapter's
+    /// first sentence), if any.
+    public func chapterStart(atOrBefore globalIndex: Int) -> Int? {
+        chapterStarts.last { $0 <= globalIndex }
+    }
+
+    /// Renames place ids everywhere (used when two ids turn out to be the same place).
+    public mutating func renamePlaces(_ mapping: [String: String]) {
+        guard !mapping.isEmpty else { return }
+        entries = entries.map { entry in
+            guard let id = entry.scene.placeID, let renamed = mapping[id] else { return entry }
+            var scene = entry.scene
+            scene.placeID = renamed
+            return Entry(copying: entry, scene: scene)
+        }
+    }
+
+    private func firstIndex(notBefore globalIndex: Int) -> Int {
+        var low = 0
+        var high = entries.count
+        while low < high {
+            let mid = (low + high) / 2
+            if entries[mid].globalIndex < globalIndex { low = mid + 1 } else { high = mid }
+        }
+        return low
+    }
+
+    // MARK: - Files
+
+    public static func load(from url: URL) throws -> AtmosphereTrack {
+        try decode(Data(contentsOf: url))
+    }
+
+    /// Writes the track atomically, so a crash mid-save keeps the old file.
+    public func save(to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoded().write(to: url, options: .atomic)
+    }
+
+    public func encoded() throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(self)
+    }
+
+    public static func decode(_ data: Data) throws -> AtmosphereTrack {
+        let track = try JSONDecoder().decode(AtmosphereTrack.self, from: data)
+        guard track.format == currentFormat else {
+            throw AtmosphereTrackError.unsupportedFormat(track.format)
+        }
+        // Re-sort in case the file was edited by hand.
+        return AtmosphereTrack(
+            engineID: track.engineID, bookID: track.bookID, wordsBetweenEntries: track.wordsBetweenEntries,
+            chapterStarts: track.chapterStarts, entries: track.entries
+        )
+    }
+}
+
+public enum AtmosphereTrackError: Error, Sendable, Equatable {
+    case unsupportedFormat(Int)
+}
+
+/// A track that grows while it is being built; readers see whatever is there.
+public final class AtmosphereTrackStore: @unchecked Sendable {
+    private let lock = NSLock()
+    private var track: AtmosphereTrack
+
+    public init(_ track: AtmosphereTrack) {
+        self.track = track
+    }
+
+    public var snapshot: AtmosphereTrack {
+        lock.lock()
+        defer { lock.unlock() }
+        return track
+    }
+
+    public var count: Int { snapshot.entries.count }
+
+    public func insert(_ entry: AtmosphereTrack.Entry) {
+        lock.lock()
+        track.insert(entry)
+        lock.unlock()
+    }
+
+    public func contains(_ position: SentencePosition) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return track.contains(position)
+    }
+
+    public func update(_ body: (inout AtmosphereTrack) -> Void) {
+        lock.lock()
+        body(&track)
+        lock.unlock()
+    }
+}

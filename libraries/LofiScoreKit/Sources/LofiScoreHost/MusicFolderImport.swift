@@ -1,4 +1,5 @@
 import Foundation
+import LofiAtmosphere
 import LofiAudio
 import LofiScoreCore
 
@@ -11,8 +12,10 @@ import LofiScoreCore
 /// at the top,
 /// mood tracks and book scores (`*.json` in `MoodTracks/`, and `*.track.json` or
 /// `*.score.json` anywhere, gathered into `MoodTracks/`), and the Fast mood models at the top (embedding models named
-/// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). Nothing else: an
-/// audiobook unpacked somewhere in the folder is left behind.
+/// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). For the
+/// atmosphere: `Atmosphere/<Sound>/` audio with `Atmosphere/sounds.json`, `SOURCES.csv` and
+/// `CREDITS.md`, and atmosphere tracks (`*.atmosphere.json` anywhere, gathered into
+/// `AtmosphereTracks/`). Nothing else: an audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
     public struct Summary: Sendable, Hashable, Codable {
         public var folderName: String
@@ -21,6 +24,9 @@ public enum MusicFolderImport {
         public var hasClassifier: Bool
         /// Files that were still only in iCloud and could not be read.
         public var notDownloaded: Int
+        /// Atmosphere recordings and atmosphere tracks copied.
+        public var atmosphereRecordings: Int = 0
+        public var atmosphereTracks: Int = 0
     }
 
     public enum ImportError: Error, Equatable, CustomStringConvertible {
@@ -38,6 +44,8 @@ public enum MusicFolderImport {
     }
 
     public static let moodTracksFolderName = "MoodTracks"
+    /// The atmosphere's sounds, one folder per sound (see `AmbienceLibrary`).
+    public static let atmosphereFolderName = "Atmosphere"
     /// The attribution the music's licences ask for (CC BY and BY-SA tracks), shown in Settings.
     public static let creditsFileName = "CREDITS.md"
 
@@ -89,7 +97,12 @@ public enum MusicFolderImport {
             tracks: library.tracks.count,
             moodTracks: plan.items.filter { $0.relativePath.hasPrefix(moodTracksFolderName + "/") }.count,
             hasClassifier: plan.items.contains { isClassifier($0.url) || isEmbeddingModel($0.url) },
-            notDownloaded: plan.notDownloaded
+            notDownloaded: plan.notDownloaded,
+            atmosphereRecordings: plan.items.filter {
+                $0.relativePath.hasPrefix(atmosphereFolderName + "/")
+                    && AmbienceLibrary.audioExtensions.contains($0.url.pathExtension.lowercased())
+            }.count,
+            atmosphereTracks: plan.items.filter { $0.relativePath.hasPrefix(AtmosphereTrackFinder.tracksFolderName + "/") }.count
         )
     }
 
@@ -152,6 +165,14 @@ public enum MusicFolderImport {
             return components.count == 2 && MoodBucket(lenient: components[0]) != nil
                 || listed.contains(components.joined(separator: "/"))
         }
+        // An atmosphere recording: `Atmosphere/<Sound>/<file>`.
+        func isAtmosphere(_ components: [String]) -> Bool {
+            guard components.count == 3, components[0].lowercased() == atmosphereFolderName.lowercased(),
+                  AmbientSound(lenient: components[1]) != nil,
+                  let name = components.last
+            else { return false }
+            return AmbienceLibrary.audioExtensions.contains((name as NSString).pathExtension.lowercased())
+        }
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -172,7 +193,8 @@ public enum MusicFolderImport {
                 // An iCloud placeholder (".Song.mp3.icloud") means the file is not on the device.
                 if name.hasSuffix(".icloud") {
                     let original = String(name.dropFirst().dropLast(".icloud".count))
-                    if isMusic(components.dropLast() + [original]) {
+                    let parts = Array(components.dropLast()) + [original]
+                    if isMusic(parts) || isAtmosphere(parts) {
                         plan.notDownloaded += 1
                     }
                 }
@@ -192,6 +214,19 @@ public enum MusicFolderImport {
                 // Claude mood tracks and book scores from the Mac (`make-tracks.sh`), wherever they sit:
                 // they all go to MoodTracks/, where the app looks for them.
                 plan.items.append(Item(url: resolved, relativePath: moodTracksFolderName + "/" + name, isDirectory: false))
+                continue
+            }
+            if name.lowercased().hasSuffix(".atmosphere.json") {
+                plan.items.append(Item(url: resolved, relativePath: AtmosphereTrackFinder.tracksFolderName + "/" + name, isDirectory: false))
+                continue
+            }
+            if isAtmosphere(components)
+                || components.count == 2 && components[0].lowercased() == atmosphereFolderName.lowercased()
+                && [AmbienceLibrary.manifestName, "sources.csv", creditsFileName.lowercased()].contains(name.lowercased())
+            {
+                // Under one spelling of the folder, where the host looks.
+                let rest = components.dropFirst().joined(separator: "/")
+                plan.items.append(Item(url: resolved, relativePath: atmosphereFolderName + "/" + rest, isDirectory: false))
                 continue
             }
             let ext = resolved.pathExtension.lowercased()

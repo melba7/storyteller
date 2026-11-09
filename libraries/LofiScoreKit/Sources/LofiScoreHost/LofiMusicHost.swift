@@ -1,4 +1,5 @@
 import Foundation
+import LofiAtmosphere
 import LofiAudio
 import LofiDirector
 import LofiMood
@@ -7,7 +8,8 @@ import LofiScoreCore
 import LofiText
 
 /// Everything the app needs for the music, in one object: the music library, the player,
-/// the narrator follower, each book's text and mood engine, and the settings.
+/// the narrator follower, each book's text and mood engine, the atmosphere sounds, and the
+/// settings.
 ///
 /// The app's native module creates one at launch, forwards the audiobook player's events
 /// (``narratorLoadedBook(id:trackFile:)``, ``narratorPlayingChanged(_:)``,
@@ -34,6 +36,15 @@ public final class LofiMusicHost: @unchecked Sendable {
         /// The live mood engine for places no mood track covers.
         /// The live mood engine, from the Fast models in the music folder (best first).
         public var makeLiveEngine: (_ moodModels: [URL]) -> any MoodEngine
+        /// Makes the atmosphere's audio. Nil leaves the atmosphere out.
+        public var makeAmbienceBackend: (() -> AmbienceBackend)?
+        public var makeAtmosphereScheduler: () -> LofiScheduler
+        public var atmosphereConfig: AtmosphereConfig
+        /// Where synthesised stand-in sounds go for the sounds not imported. Nil plays
+        /// imported sounds only.
+        public var atmospherePlaceholderFolder: URL?
+        /// More places to look for atmosphere tracks, besides `AtmosphereTracks/` in the music folder.
+        public var atmosphereTrackFolders: [URL]
 
         public init(
             settings: MusicSettings,
@@ -45,7 +56,12 @@ public final class LofiMusicHost: @unchecked Sendable {
             makeBackend: @escaping () -> LofiAudioBackend,
             makePlayerScheduler: @escaping () -> LofiScheduler = { DispatchScheduler(label: "LofiScore.player") },
             followerScheduler: LofiScheduler = DispatchScheduler(label: "LofiScore.follower"),
-            makeLiveEngine: @escaping (_ moodModels: [URL]) -> any MoodEngine = { MoodEngineCatalog.fastEngine(modelURLs: $0) }
+            makeLiveEngine: @escaping (_ moodModels: [URL]) -> any MoodEngine = { MoodEngineCatalog.fastEngine(modelURLs: $0) },
+            makeAmbienceBackend: (() -> AmbienceBackend)? = nil,
+            makeAtmosphereScheduler: @escaping () -> LofiScheduler = { DispatchScheduler(label: "LofiScore.atmosphere") },
+            atmosphereConfig: AtmosphereConfig = AtmosphereConfig(),
+            atmospherePlaceholderFolder: URL? = nil,
+            atmosphereTrackFolders: [URL] = []
         ) {
             self.settings = settings
             self.musicFolder = musicFolder
@@ -57,6 +73,11 @@ public final class LofiMusicHost: @unchecked Sendable {
             self.makePlayerScheduler = makePlayerScheduler
             self.followerScheduler = followerScheduler
             self.makeLiveEngine = makeLiveEngine
+            self.makeAmbienceBackend = makeAmbienceBackend
+            self.makeAtmosphereScheduler = makeAtmosphereScheduler
+            self.atmosphereConfig = atmosphereConfig
+            self.atmospherePlaceholderFolder = atmospherePlaceholderFolder
+            self.atmosphereTrackFolders = atmosphereTrackFolders
         }
     }
 
@@ -90,6 +111,17 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var lastError: String?
     private var recentEvents: [String] = []
 
+    // The atmosphere, on `queue` too.
+    private let sinks = NarrationFanOut()
+    private let musicYield: MusicYield
+    private var atmosphere: AmbiencePlayer?
+    private var retiringAtmosphere: [AmbiencePlayer] = []
+    private var preparingAtmosphere = false
+    private var atmosphereGeneration = 0
+    private var atmosphereSource = "none"
+    private var atmosphereSounds = 0
+    private var atmosphereTrack: (bookID: String, track: AtmosphereTrack?, origin: String?)?
+
     private enum BookTextState: Equatable {
         case none
         case loading(String)
@@ -100,16 +132,29 @@ public final class LofiMusicHost: @unchecked Sendable {
     public init(environment: Environment) {
         self.environment = environment
         follower = NarrationFollower(scheduler: environment.followerScheduler)
+        musicYield = MusicYield(scheduler: DispatchScheduler(label: "LofiScore.musicYield"), fade: environment.atmosphereConfig.musicYieldFade)
+        follower.attach(sinks)
     }
 
-    /// Loads the music if it is on. Call once, at launch.
+    /// Loads the music and the atmosphere if they are on. Call once, at launch.
     public func start() {
         queue.async { [self] in
             guard !started else { return }
             started = true
-            HostLog.note("started, music \(settings.enabled ? "on" : "off")")
+            HostLog.note("started, music \(settings.enabled ? "on" : "off"), atmosphere \(atmosphereOn ? "on" : "off")")
             if settings.enabled { prepareLibrary() }
+            if atmosphereOn { prepareAtmosphere() }
         }
+    }
+
+    /// The atmosphere is switched on and this build can play it.
+    private var atmosphereOn: Bool {
+        settings.atmosphereEnabled && environment.makeAmbienceBackend != nil
+    }
+
+    /// The narration needs following: for the music, the atmosphere or both.
+    private var followingOn: Bool {
+        settings.enabled || atmosphereOn
     }
 
     // MARK: - Narrator events
@@ -121,7 +166,8 @@ public final class LofiMusicHost: @unchecked Sendable {
             guard book?.id != id else { return }
             book = (id, trackFile)
             bookText = .none
-            if settings.enabled { loadBookText() }
+            atmosphereTrack = nil
+            if followingOn { loadBookText() }
         }
     }
 
@@ -155,7 +201,37 @@ public final class LofiMusicHost: @unchecked Sendable {
         await onQueue { [self] in
             settings.mutedInCar = muted
             player?.setMutedRoutes(settings.mutedRoutes)
+            atmosphere?.setMutedRoutes(settings.mutedRoutes)
         }
+    }
+
+    /// Switches the atmosphere sounds on or off.
+    public func setAtmosphereEnabled(_ enabled: Bool) async {
+        await onQueue { [self] in
+            settings.atmosphereEnabled = enabled
+            if enabled {
+                if let atmosphere {
+                    atmosphere.setEnabled(true)
+                } else {
+                    prepareAtmosphere()
+                }
+                if book != nil, bookText == .none { loadBookText() }
+            } else {
+                atmosphere?.setEnabled(false)
+            }
+        }
+    }
+
+    /// The atmosphere's level under the voice in dB; nil goes back to the default.
+    public func setAtmosphereLevel(dB: Double?) async {
+        await onQueue { [self] in
+            settings.atmosphereLevelDB = dB
+            atmosphere?.setLevel(dB: atmosphereLevelDB)
+        }
+    }
+
+    private var atmosphereLevelDB: Double {
+        settings.atmosphereLevelDB ?? environment.atmosphereConfig.bedLevelDB
     }
 
     /// The music's level under the voice in dB; nil goes back to the default.
@@ -184,6 +260,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         await onQueue { [self] in
             settings.importedFolderName = summary.folderName
             reloadLibrary()
+            reloadAtmosphere()
         }
         return summary
     }
@@ -199,12 +276,24 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
     }
 
+    /// The imported sounds' credits (`Atmosphere/CREDITS.md`), if the folder had them.
+    public func atmosphereCredits() async -> String? {
+        let folder = environment.musicFolder.appendingPathComponent(MusicFolderImport.atmosphereFolderName, isDirectory: true)
+        return await withCheckedContinuation { continuation in
+            work.async {
+                let text = MusicFolderImport.creditsFile(in: folder).flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+                continuation.resume(returning: text)
+            }
+        }
+    }
+
     /// Deletes the imported music and goes back to the stand-ins.
     public func removeImportedMusic() async {
         await onQueue { [self] in
             try? FileManager.default.removeItem(at: environment.musicFolder)
             settings.importedFolderName = nil
             reloadLibrary()
+            reloadAtmosphere()
         }
     }
 
@@ -214,12 +303,24 @@ public final class LofiMusicHost: @unchecked Sendable {
         let followerStatus = await withCheckedContinuation { continuation in
             follower.status { continuation.resume(returning: $0) }
         }
-        let (status, player) = await onQueue { [self] in (makeStatus(followerStatus), player) }
-        guard let player else { return status }
+        let (status, player, atmosphere) = await onQueue { [self] in (makeStatus(followerStatus), player, atmosphere) }
+        var result = status
+        if let atmosphere {
+            let ambience = await withCheckedContinuation { continuation in
+                atmosphere.snapshot { continuation.resume(returning: $0) }
+            }
+            result.atmosphere.place = ambience.scene?.placeName ?? ambience.scene?.placeID
+            result.atmosphere.playing = ambience.voices.filter { $0.playing && !$0.fadingOut }.map(\.sound.rawValue)
+            result.atmosphere.musicYielding = ambience.musicYielding
+            result.atmosphere.chapterDip = ambience.dipped
+            result.atmosphere.missingSounds = ambience.missingSounds.map(\.rawValue)
+            result.atmosphere.engineRunning = ambience.engineRunning
+            result.atmosphere.lastError = ambience.lastError
+        }
+        guard let player else { return result }
         let snapshot = await withCheckedContinuation { continuation in
             player.snapshot { continuation.resume(returning: $0) }
         }
-        var result = status
         result.playback.musicMood = snapshot.musicMood?.rawValue
         result.playback.engineRunning = snapshot.engineRunning
         result.playback.routeMuted = snapshot.routeMuted
@@ -259,6 +360,8 @@ public final class LofiMusicHost: @unchecked Sendable {
         if let player {
             retire(player)
             self.player = nil
+            sinks.setMusic(nil)
+            musicYield.setPlayer(nil)
         }
         library = nil
         source = .none
@@ -302,7 +405,10 @@ public final class LofiMusicHost: @unchecked Sendable {
         self.source = source
         lastError = nil
         HostLog.note("\(source) music: \(library.tracks.count) tracks")
-        follower.attach(player)
+        musicYield.setPlayer(player)
+        // Brings the new player up to date with the book and the narrator, without
+        // reopening the book for the atmosphere already playing.
+        follower.catchUp(player, reading: true) { [sinks] in sinks.setMusic(player) }
         prepareContextualAssetsIfNeeded()
     }
 
@@ -345,6 +451,12 @@ public final class LofiMusicHost: @unchecked Sendable {
         let live = liveEngineForBooks()
         work.async { [weak self] in
             let outcome = Self.openText(bookID: id, trackFile: book.trackFile, environment: environment, live: live)
+            let found: (track: AtmosphereTrack, origin: String)?
+            if case let .success((text, _)) = outcome, environment.makeAmbienceBackend != nil {
+                found = Self.findAtmosphere(bookID: id, trackFile: book.trackFile, environment: environment, spoilerGuard: text.spoilerGuard)
+            } else {
+                found = nil
+            }
             guard let host = self else { return }
             host.queue.async {
                 let `self` = host
@@ -352,11 +464,19 @@ public final class LofiMusicHost: @unchecked Sendable {
                 switch outcome {
                 case let .success((text, hasTrack)):
                     HostLog.note("book \(id): following the text with \(hasTrack ? "a mood track over " : "")\(text.engineID)")
+                    if let found {
+                        HostLog.note("book \(id): atmosphere track by \(found.track.engineID) from \(found.origin)")
+                    }
                     self.bookText = .ready(id, engineID: text.engineID, moodTrack: hasTrack)
+                    // The atmosphere's track first, so it is there when the book opens.
+                    self.atmosphereTrack = (id, found?.track, found?.origin)
+                    self.atmosphere?.setTrack(found?.track, forBook: id)
                     self.follower.attachText(text, toBook: id)
                 case let .failure(error):
                     HostLog.note("book \(id): no music, \(error)")
                     self.bookText = .unavailable(id, reason: "\(error)")
+                    self.atmosphereTrack = (id, nil, nil)
+                    self.atmosphere?.setTrack(nil, forBook: id)
                 }
             }
         }
@@ -427,6 +547,115 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
     }
 
+    // MARK: - Atmosphere
+
+    private func prepareAtmosphere() {
+        guard !preparingAtmosphere, atmosphere == nil, let makeBackend = environment.makeAmbienceBackend else { return }
+        preparingAtmosphere = true
+        atmosphereGeneration += 1
+        let generation = atmosphereGeneration
+        let environment = environment
+        work.async { [weak self] in
+            let (library, source) = Self.loadAmbience(environment)
+            guard let host = self else { return }
+            host.queue.async {
+                guard generation == host.atmosphereGeneration else { return }
+                host.preparingAtmosphere = false
+                host.installAtmosphere(library, source: source, backend: makeBackend())
+            }
+        }
+    }
+
+    private func reloadAtmosphere() {
+        preparingAtmosphere = false
+        atmosphereGeneration += 1
+        if let old = atmosphere {
+            atmosphere = nil
+            sinks.setAtmosphere(nil)
+            old.setEnabled(false)
+            old.closeBook()
+            retiringAtmosphere.append(old)
+            queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+                self?.retiringAtmosphere.removeAll { $0 === old }
+            }
+        }
+        atmosphereSource = "none"
+        atmosphereSounds = 0
+        if atmosphereOn { prepareAtmosphere() }
+    }
+
+    /// The imported sounds (`Atmosphere/` in the music folder), with synthesised stand-ins
+    /// for the sounds not imported.
+    static func loadAmbience(_ environment: Environment) -> (AmbienceLibrary, String) {
+        let importedFolder = environment.musicFolder.appendingPathComponent(MusicFolderImport.atmosphereFolderName, isDirectory: true)
+        let imported = (try? AmbienceLibrary.load(from: importedFolder)) ?? .empty(at: importedFolder)
+        guard imported.sounds.count < AmbientSound.allCases.count,
+              let folder = environment.atmospherePlaceholderFolder,
+              let standIns = try? AmbienceSynth.prepare(at: folder, seconds: 20, sampleRate: 24_000)
+        else {
+            return (imported, imported.recordings.isEmpty ? "none" : "imported")
+        }
+        return (imported.filling(from: standIns), imported.recordings.isEmpty ? "standIns" : "mixed")
+    }
+
+    private func installAtmosphere(_ library: AmbienceLibrary, source: String, backend: AmbienceBackend) {
+        var config = environment.atmosphereConfig
+        config.bedLevelDB = atmosphereLevelDB
+        let player = AmbiencePlayer(library: library, backend: backend, scheduler: environment.makeAtmosphereScheduler(), config: config)
+        player.setMutedRoutes(settings.mutedRoutes)
+        player.setEnabled(settings.atmosphereEnabled)
+        player.onMusicYieldChanged = { [weak self] yielding in
+            self?.musicYield.setYielding(yielding)
+        }
+        player.onEvent = { [weak self] event in
+            self?.recordAtmosphere(event)
+        }
+        if let given = atmosphereTrack {
+            player.setTrack(given.track, forBook: given.bookID)
+        }
+        atmosphere = player
+        atmosphereSource = source
+        atmosphereSounds = library.sounds.count
+        HostLog.note("atmosphere: \(library.sounds.count) of \(AmbientSound.allCases.count) sounds (\(source))")
+        // Brings the atmosphere up to date without reopening the book for the music.
+        follower.catchUp(player, reading: false) { [sinks] in sinks.setAtmosphere(player) }
+    }
+
+    private func recordAtmosphere(_ event: AmbienceEvent) {
+        let line: String
+        switch event {
+        case let .sceneChanged(scene):
+            line = "atmosphere: \(scene.isSilent ? "quiet" : scene.sounds.map(\.rawValue).joined(separator: ", "))"
+        case let .musicYield(yielding):
+            line = yielding ? "music steps aside for a crowd" : "music back"
+        case let .missingSound(sound):
+            line = "no \(sound.rawValue) sound"
+        case let .error(message):
+            line = "atmosphere error: \(message)"
+        }
+        if case .error = event { HostLog.error(line) } else { HostLog.note(line) }
+        queue.async { [self] in
+            recentEvents.append(line)
+            if recentEvents.count > 20 { recentEvents.removeFirst() }
+        }
+    }
+
+    static func findAtmosphere(
+        bookID: String,
+        trackFile: URL?,
+        environment: Environment,
+        spoilerGuard: SpoilerGuard
+    ) -> (track: AtmosphereTrack, origin: String)? {
+        let epub = BookTextLocator.epubDirectory(bookID: bookID, booksFolder: environment.booksFolder, trackFile: trackFile)
+        let scoreFolders = [environment.musicFolder.appendingPathComponent(MusicFolderImport.moodTracksFolderName, isDirectory: true)]
+            + environment.moodTrackFolders
+        let trackFolders = [environment.musicFolder.appendingPathComponent(AtmosphereTrackFinder.tracksFolderName, isDirectory: true)]
+            + environment.atmosphereTrackFolders
+        return AtmosphereTrackFinder.find(
+            bookID: bookID, epubDirectory: epub, scoreFolders: scoreFolders, trackFolders: trackFolders, spoilerGuard: spoilerGuard
+        )
+    }
+
     // MARK: - Helpers
 
     private func makeStatus(_ followerStatus: NarrationFollower.Status) -> LofiMusicStatus {
@@ -438,7 +667,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         if let book {
             switch bookText {
             case .none:
-                text = .init(id: book.id, text: settings.enabled ? "waiting" : "off", detail: nil, engine: nil, moodTrack: false)
+                text = .init(id: book.id, text: followingOn ? "waiting" : "off", detail: nil, engine: nil, moodTrack: false)
             case .loading:
                 text = .init(id: book.id, text: "loading", detail: nil, engine: nil, moodTrack: false)
             case let .ready(_, engineID, moodTrack):
@@ -473,6 +702,26 @@ public final class LofiMusicHost: @unchecked Sendable {
                 engineRunning: false,
                 routeMuted: false,
                 recentMoods: []
+            ),
+            atmosphere: .init(
+                enabled: settings.atmosphereEnabled,
+                available: environment.makeAmbienceBackend != nil,
+                levelDB: atmosphereLevelDB,
+                defaultLevelDB: environment.atmosphereConfig.bedLevelDB,
+                levelRange: [MusicSettings.atmosphereLevelRange.lowerBound, MusicSettings.atmosphereLevelRange.upperBound],
+                source: atmosphereSource,
+                preparing: preparingAtmosphere,
+                sounds: atmosphereSounds,
+                totalSounds: AmbientSound.allCases.count,
+                track: book != nil && atmosphereTrack?.bookID == book?.id && atmosphereTrack?.track != nil,
+                trackOrigin: atmosphereTrack?.bookID == book?.id ? atmosphereTrack?.origin : nil,
+                place: nil,
+                playing: [],
+                musicYielding: false,
+                chapterDip: false,
+                missingSounds: [],
+                engineRunning: false,
+                lastError: nil
             ),
             recentEvents: recentEvents,
             lastError: lastError
@@ -528,9 +777,38 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
     public var musicLevelDB: Double
     public var defaultMusicLevelDB: Double
     public var musicLevelRange: [Double]
+    /// The atmosphere sounds.
+    public struct Atmosphere: Codable, Sendable, Hashable {
+        public var enabled: Bool
+        /// False when this build cannot play them.
+        public var available: Bool
+        public var levelDB: Double
+        public var defaultLevelDB: Double
+        public var levelRange: [Double]
+        /// "imported", "standIns" (synthesised), "mixed" or "none".
+        public var source: String
+        public var preparing: Bool
+        /// Sounds with a recording, of `totalSounds`.
+        public var sounds: Int
+        public var totalSounds: Int
+        /// The open book has an atmosphere track, and where it came from.
+        public var track: Bool
+        public var trackOrigin: String?
+        /// The place playing now and its sounds. Only the present: never anything ahead
+        /// of the narration.
+        public var place: String?
+        public var playing: [String]
+        public var musicYielding: Bool
+        public var chapterDip: Bool
+        public var missingSounds: [String]
+        public var engineRunning: Bool
+        public var lastError: String?
+    }
+
     public var library: Library
     public var book: Book?
     public var playback: Playback
+    public var atmosphere: Atmosphere
     public var recentEvents: [String]
     public var lastError: String?
 

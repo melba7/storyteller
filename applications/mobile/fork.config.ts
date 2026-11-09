@@ -50,6 +50,7 @@ const lofiScorePods = [
   "LofiDirector",
   "LofiAudio",
   "LofiPlaceholders",
+  "LofiAtmosphere",
   "LofiScoreHost",
 ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" }))
 

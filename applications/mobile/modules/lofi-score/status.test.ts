@@ -3,11 +3,15 @@ import { describe, expect, it } from "vitest"
 
 import type { LofiMusicStatus } from "./index"
 import {
+  atmosphereSourceLabel,
+  describeAtmosphere,
   describeMusic,
   moodCounts,
   musicLevelLabel,
   musicSourceLabel,
   plainCredits,
+  soundList,
+  soundName,
 } from "./status"
 
 function status(overrides: Partial<LofiMusicStatus> = {}): LofiMusicStatus {
@@ -113,5 +117,74 @@ describe("plainCredits", () => {
         "Source: https://example.com and SOURCES.csv",
       ].join("\n"),
     )
+  })
+})
+
+describe("describeAtmosphere", () => {
+  const atmosphere: NonNullable<LofiMusicStatus["atmosphere"]> = {
+    enabled: true,
+    available: true,
+    levelDB: -28,
+    defaultLevelDB: -28,
+    levelRange: [-40, -16],
+    source: "standIns",
+    preparing: false,
+    sounds: 26,
+    totalSounds: 26,
+    track: true,
+    trackOrigin: "the book's score",
+    place: "the tavern",
+    playing: ["rainIndoors", "fireplace"],
+    musicYielding: false,
+    chapterDip: false,
+    missingSounds: [],
+    engineRunning: true,
+  }
+
+  it("names the sounds playing", () => {
+    expect(describeAtmosphere(status({ atmosphere }))).toBe(
+      "Rain on the windows and a fire",
+    )
+    expect(
+      describeAtmosphere(
+        status({
+          atmosphere: {
+            ...atmosphere,
+            playing: ["crowd"],
+            musicYielding: true,
+          },
+        }),
+      ),
+    ).toBe("Crowd, with the music paused")
+  })
+
+  it("explains why nothing is playing", () => {
+    expect(describeAtmosphere(status())).toBe("Not in this version of the app")
+    expect(
+      describeAtmosphere(
+        status({ atmosphere: { ...atmosphere, enabled: false } }),
+      ),
+    ).toBe("Atmosphere is off")
+    expect(
+      describeAtmosphere(
+        status({ atmosphere: { ...atmosphere, track: false } }),
+      ),
+    ).toBe("This book has no atmosphere track yet")
+    expect(
+      describeAtmosphere(
+        status({ atmosphere: { ...atmosphere, playing: [] } }),
+      ),
+    ).toBe("Quiet here")
+  })
+
+  it("names sounds and their source", () => {
+    expect(soundName("heavyRain")).toBe("heavy rain")
+    expect(soundName("seaShore")).toBe("waves")
+    expect(soundList(["wind", "rain", "clock"])).toBe(
+      "Wind, rain and a ticking clock",
+    )
+    expect(
+      atmosphereSourceLabel({ ...atmosphere, source: "imported", sounds: 12 }),
+    ).toBe("12 of 26 sounds, imported")
   })
 })

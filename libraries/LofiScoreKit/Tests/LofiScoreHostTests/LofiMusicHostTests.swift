@@ -147,13 +147,28 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/LofiMood-embed-word+contextual-3.json")
         try touch("Picked Music/Old.mlmodel")
         try touch("Picked Music/tracks/LofiMood-embed-stray.json")
+        // The atmosphere's sounds and tracks.
+        try touch("Picked Music/Atmosphere/Rain/rain-1.m4a")
+        try touch("Picked Music/Atmosphere/Rain/.rain-2.m4a.icloud")
+        try touch("Picked Music/Atmosphere/Rain/notes.txt")
+        try touch("Picked Music/Atmosphere/Bagpipes/drone.wav")
+        try touch("Picked Music/Atmosphere/sounds.json")
+        try touch("Picked Music/Atmosphere/SOURCES.csv")
+        try touch("Picked Music/tracks/The Green Lantern.atmosphere.json")
 
         let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
         try touch("app/Music/Old/old.mp3")
 
         let summary = try MusicFolderImport.importFolder(source, into: destination)
-        XCTAssertEqual(summary, .init(folderName: "Picked Music", tracks: 3, moodTracks: 3, hasClassifier: true, notDownloaded: 1))
+        XCTAssertEqual(summary, .init(
+            folderName: "Picked Music", tracks: 3, moodTracks: 3, hasClassifier: true, notDownloaded: 2,
+            atmosphereRecordings: 1, atmosphereTracks: 1
+        ))
         XCTAssertEqual(files(under: destination), [
+            "Atmosphere/Rain/rain-1.m4a",
+            "Atmosphere/SOURCES.csv",
+            "Atmosphere/sounds.json",
+            "AtmosphereTracks/The Green Lantern.atmosphere.json",
             "Calm/rain 70bpm.mp3",
             "Cozy/fire.m4a",
             "Credits.md",
