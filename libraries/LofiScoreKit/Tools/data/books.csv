@@ -33,3 +33,122 @@ pg_id,slug,title,author,group
 21489,secret-of-the-island,Secret of the Island,W. H. G. Kingston,obscure
 8155,colonel-thorndykes-secret,Colonel Thorndyke's Secret,G. A. Henty,obscure
 30299,romance-of-a-plain-man,The Romance of a Plain Man,Ellen Glasgow,obscure
+161,sense-and-sensibility,Sense and Sensibility,Jane Austen,famous
+514,little-women,Little Women,Louisa May Alcott,famous
+60,the-scarlet-pimpernel,The Scarlet Pimpernel,Baroness Orczy,famous
+2641,a-room-with-a-view,A Room with a View,E. M. Forster,famous
+4276,north-and-south,North and South,Elizabeth Gaskell,famous
+421,kidnapped,Kidnapped,Robert Louis Stevenson,famous
+2166,king-solomons-mines,King Solomon's Mines,H. Rider Haggard,famous
+103,around-the-world-in-80-days,Around the World in Eighty Days,Jules Verne,famous
+95,prisoner-of-zenda,The Prisoner of Zenda,Anthony Hope,famous
+62,a-princess-of-mars,A Princess of Mars,Edgar Rice Burroughs,famous
+708,princess-and-the-goblin,The Princess and the Goblin,George MacDonald,famous
+778,five-children-and-it,Five Children and It,E. Nesbit,famous
+236,the-jungle-book,The Jungle Book,Rudyard Kipling,famous
+174,dorian-gray,The Picture of Dorian Gray,Oscar Wilde,famous
+155,the-moonstone,The Moonstone,Wilkie Collins,famous
+43,jekyll-and-hyde,The Strange Case of Dr Jekyll and Mr Hyde,Robert Louis Stevenson,famous
+1448,heidi,Heidi,Johanna Spyri,famous
+498,rebecca-of-sunnybrook-farm,Rebecca of Sunnybrook Farm,Kate Douglas Wiggin,famous
+175,phantom-of-the-opera,The Phantom of the Opera,Gaston Leroux,famous
+158,emma,Emma,Jane Austen,classic
+141,mansfield-park,Mansfield Park,Jane Austen,classic
+121,northanger-abbey,Northanger Abbey,Jane Austen,classic
+1400,great-expectations,Great Expectations,Charles Dickens,classic
+46675,oliver-twist,Oliver Twist,Charles Dickens,classic
+766,david-copperfield,David Copperfield,Charles Dickens,classic
+98,a-tale-of-two-cities,A Tale of Two Cities,Charles Dickens,classic
+1023,bleak-house,Bleak House,Charles Dickens,classic
+700,the-old-curiosity-shop,The Old Curiosity Shop,Charles Dickens,classic
+963,little-dorrit,Little Dorrit,Charles Dickens,classic
+145,middlemarch,Middlemarch,George Eliot,classic
+6688,the-mill-on-the-floss,The Mill on the Floss,George Eliot,classic
+507,adam-bede,Adam Bede,George Eliot,classic
+110,tess,Tess of the d'Urbervilles,Thomas Hardy,classic
+107,far-from-the-madding-crowd,Far from the Madding Crowd,Thomas Hardy,classic
+143,mayor-of-casterbridge,The Mayor of Casterbridge,Thomas Hardy,classic
+153,jude-the-obscure,Jude the Obscure,Thomas Hardy,classic
+599,vanity-fair,Vanity Fair,William Makepeace Thackeray,classic
+1184,count-of-monte-cristo,The Count of Monte Cristo,Alexandre Dumas,classic
+1257,three-musketeers,The Three Musketeers,Alexandre Dumas,classic
+164,twenty-thousand-leagues,Twenty Thousand Leagues under the Sea,Jules Verne,classic
+1268,mysterious-island,The Mysterious Island,Jules Verne,classic
+2701,moby-dick,Moby Dick,Herman Melville,classic
+33,scarlet-letter,The Scarlet Letter,Nathaniel Hawthorne,classic
+77,house-of-seven-gables,The House of the Seven Gables,Nathaniel Hawthorne,classic
+940,last-of-the-mohicans,The Last of the Mohicans,James Fenimore Cooper,classic
+203,uncle-toms-cabin,Uncle Tom's Cabin,Harriet Beecher Stowe,classic
+463,red-badge-of-courage,The Red Badge of Courage,Stephen Crane,classic
+244,study-in-scarlet,A Study in Scarlet,Arthur Conan Doyle,classic
+2097,sign-of-the-four,The Sign of the Four,Arthur Conan Doyle,classic
+1661,adventures-of-sherlock-holmes,The Adventures of Sherlock Holmes,Arthur Conan Doyle,classic
+3289,valley-of-fear,The Valley of Fear,Arthur Conan Doyle,classic
+5230,invisible-man,The Invisible Man,H. G. Wells,classic
+1013,first-men-in-the-moon,The First Men in the Moon,H. G. Wells,classic
+219,heart-of-darkness,Heart of Darkness,Joseph Conrad,classic
+5658,lord-jim,Lord Jim,Joseph Conrad,classic
+583,woman-in-white,The Woman in White,Wilkie Collins,classic
+829,gullivers-travels,Gulliver's Travels,Jonathan Swift,classic
+82,ivanhoe,Ivanhoe,Walter Scott,classic
+2226,kim,Kim,Rudyard Kipling,classic
+2186,captains-courageous,Captains Courageous,Rudyard Kipling,classic
+47,anne-of-avonlea,Anne of Avonlea,L. M. Montgomery,classic
+51,anne-of-the-island,Anne of the Island,L. M. Montgomery,classic
+544,annes-house-of-dreams,Anne's House of Dreams,L. M. Montgomery,classic
+1450,pollyanna,Pollyanna,Eleanor H. Porter,classic
+157,daddy-long-legs,Daddy-Long-Legs,Jean Webster,classic
+479,little-lord-fauntleroy,Little Lord Fauntleroy,Frances Hodgson Burnett,classic
+848,black-arrow,The Black Arrow,Robert Louis Stevenson,classic
+2610,notre-dame-de-paris,Notre-Dame de Paris,Victor Hugo,classic
+1399,anna-karenina,Anna Karenina,Leo Tolstoy,classic
+2554,crime-and-punishment,Crime and Punishment,Fyodor Dostoevsky,classic
+2413,madame-bovary,Madame Bovary,Gustave Flaubert,classic
+41659,swiss-family-robinson,The Swiss Family Robinson,Johann David Wyss,classic
+840,lorna-doone,Lorna Doone,R. D. Blackmore,classic
+57539,cranford,Cranford,Elizabeth Gaskell,classic
+4274,wives-and-daughters,Wives and Daughters,Elizabeth Gaskell,classic
+767,agnes-grey,Agnes Grey,Anne Bronte,classic
+9182,villette,Villette,Charlotte Bronte,classic
+3268,mysteries-of-udolpho,The Mysteries of Udolpho,Ann Radcliffe,classic
+78,tarzan-of-the-apes,Tarzan of the Apes,Edgar Rice Burroughs,classic
+2360,riddle-of-the-sands,The Riddle of the Sands,Erskine Childers,classic
+1695,man-who-was-thursday,The Man Who Was Thursday,G. K. Chesterton,classic
+24,o-pioneers,O Pioneers!,Willa Cather,classic
+242,my-antonia,My Antonia,Willa Cather,classic
+910,white-fang,White Fang,Jack London,classic
+1300,riders-of-the-purple-sage,Riders of the Purple Sage,Zane Grey,classic
+140,the-jungle,The Jungle,Upton Sinclair,classic
+217,sons-and-lovers,Sons and Lovers,D. H. Lawrence,classic
+2946,howards-end,Howards End,E. M. Forster,classic
+559,greenmantle,Greenmantle,John Buchan,classic
+2145,ben-hur,Ben-Hur,Lew Wallace,classic
+2853,quo-vadis,Quo Vadis,Henryk Sienkiewicz,classic
+25564,water-babies,The Water-Babies,Charles Kingsley,classic
+836,phoenix-and-the-carpet,The Phoenix and the Carpet,E. Nesbit,classic
+770,treasure-seekers,The Story of the Treasure Seekers,E. Nesbit,classic
+3536,enchanted-castle,The Enchanted Castle,E. Nesbit,classic
+225,back-of-the-north-wind,At the Back of the North Wind,George MacDonald,classic
+12,through-the-looking-glass,Through the Looking-Glass,Lewis Carroll,classic
+36612,princess-and-curdie,The Princess and Curdie,George MacDonald,classic
+764,hans-brinker,Hans Brinker,Mary Mapes Dodge,classic
+2788,little-men,Little Men,Louisa May Alcott,classic
+2726,eight-cousins,Eight Cousins,Louisa May Alcott,classic
+8994,what-katy-did,What Katy Did,Susan Coolidge,classic
+2818,beautiful-joe,Beautiful Joe,Marshall Saunders,classic
+794,wouldbegoods,The Wouldbegoods,E. Nesbit,classic
+5164,the-beetle,The Beetle,Richard Marsh,classic
+1188,lair-of-the-white-worm,The Lair of the White Worm,Bram Stoker,classic
+8954,lady-audleys-secret,Lady Audley's Secret,Mary Elizabeth Braddon,classic
+551,land-that-time-forgot,The Land That Time Forgot,Edgar Rice Burroughs,classic
+123,at-the-earths-core,At the Earth's Core,Edgar Rice Burroughs,classic
+3409,barchester-towers,Barchester Towers,Anthony Trollope,classic
+1860,westward-ho,Westward Ho!,Charles Kingsley,classic
+646,coral-island,The Coral Island,R. M. Ballantyne,classic
+3155,she,She,H. Rider Haggard,classic
+711,allan-quatermain,Allan Quatermain,H. Rider Haggard,classic
+1441,story-of-an-african-farm,The Story of an African Farm,Olive Schreiner,classic
+1845,zuleika-dobson,Zuleika Dobson,Max Beerbohm,classic
+32224,tom-browns-school-days,Tom Brown's School Days,Thomas Hughes,classic
+166,summer,Summer,Edith Wharton,classic
+26654,peter-and-wendy,Peter and Wendy,J. M. Barrie,classic

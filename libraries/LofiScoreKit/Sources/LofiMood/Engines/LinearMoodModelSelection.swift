@@ -33,6 +33,26 @@ public enum LinearMoodModelSelection {
         public var scores: AgreementScores
     }
 
+    /// What "best" means when choosing among candidates.
+    public enum Criterion: String, CaseIterable, Codable, Sendable {
+        /// Exact agreement, then kappa. The default: in Mac round 6 the
+        /// kappa pick (class-weighted) did worse on the held-out books by
+        /// every measure, and named the rarer moods far too often.
+        case exact
+        /// Cohen's kappa, then exact.
+        case kappa
+        /// Macro-F1 (every mood counts equally), then kappa.
+        case macroF1 = "macro-f1"
+
+        func key(_ s: AgreementScores) -> (Double, Double) {
+            switch self {
+            case .kappa: (s.kappa, s.exact)
+            case .exact: (s.exact, s.kappa)
+            case .macroF1: (s.macroF1, s.kappa)
+            }
+        }
+    }
+
     public struct CurvePoint: Codable, Sendable, Equatable {
         public var books: Int
         /// Mean training examples over the repeats.
@@ -65,6 +85,7 @@ public enum LinearMoodModelSelection {
         settings: [LinearMoodModel.TrainingOptions],
         earlierWeights: [Double],
         folds count: Int,
+        criterion: Criterion = .exact,
         progress: ((String) -> Void)? = nil
     ) -> [Candidate] {
         guard !examples.isEmpty else { return [] }
@@ -111,7 +132,7 @@ public enum LinearMoodModelSelection {
                     scores: AgreementScores(gold: gold, predicted: predicted)
                 )
                 candidates.append(candidate)
-                if best.map({ isBetter(candidate, than: $0) }) ?? true { best = candidate }
+                if best.map({ isBetter(candidate, than: $0, by: criterion) }) ?? true { best = candidate }
             }
             if let best {
                 progress?("balanced=\(options.balanced) l2=\(options.l2): best with earlier weight \(best.previousChunkWeight): \(best.scores.summary)")
@@ -120,13 +141,13 @@ public enum LinearMoodModelSelection {
         return candidates
     }
 
-    /// Highest exact agreement, then kappa.
-    public static func best(_ candidates: [Candidate]) -> Candidate? {
-        candidates.reduce(nil) { best, c in best.map { isBetter(c, than: $0) ? c : $0 } ?? c }
+    /// The best candidate by `criterion` (the first one on a tie).
+    public static func best(_ candidates: [Candidate], by criterion: Criterion = .exact) -> Candidate? {
+        candidates.reduce(nil) { best, c in best.map { isBetter(c, than: $0, by: criterion) ? c : $0 } ?? c }
     }
 
-    static func isBetter(_ a: Candidate, than b: Candidate) -> Bool {
-        (a.scores.exact, a.scores.kappa) > (b.scores.exact, b.scores.kappa)
+    static func isBetter(_ a: Candidate, than b: Candidate, by criterion: Criterion) -> Bool {
+        criterion.key(a.scores) > criterion.key(b.scores)
     }
 
     /// Test agreement when training on only some of the books: for each count,
