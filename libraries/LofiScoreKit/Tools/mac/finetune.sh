@@ -110,6 +110,23 @@ if [ -n "$CONVERT" ]; then
   xcrun coremlcompiler compile "$OUT/coreml/$NAME.mlpackage" "$OUT/coreml" > "$OUT/compile.log" 2>&1 \
     || { tail -5 "$OUT/compile.log"; die "coremlcompiler failed"; }
   du -sh "$OUT/coreml/"* | sed 's/^/  /'
+
+  step "The app's path: Swift tokenizer + Core ML (lofi-eval lm:) against PyTorch on the 320 test windows"
+  swift build -c release --product lofi-eval > "$OUT/build.log" 2>&1 || { grep -E "error" "$OUT/build.log" | head -5; die "lofi-eval build failed"; }
+  .build/release/lofi-eval run --engine "lm:$OUT/coreml/$NAME.json" --in "$W/train/test-windows.jsonl" \
+    --out "$OUT/coreml/swift-test.jsonl" 2> "$OUT/swift-test.log" || { tail -5 "$OUT/swift-test.log"; die "lofi-eval lm: failed"; }
+  "$PY" -I Tools/eval/finetune_mood.py read --model "$CONVERT" --in "$W/train/test-windows.jsonl" \
+    --out "$OUT/coreml/python-test.jsonl" 2>> "$OUT/swift-test.log" || die "python read failed"
+  python3 -I -c '
+import json, statistics, sys
+a = {r["id"]: r for r in map(json.loads, open(sys.argv[1])) if r.get("bucket")}
+b = {r["id"]: r for r in map(json.loads, open(sys.argv[2])) if r.get("bucket")}
+ids = sorted(set(a) & set(b))
+same = sum(a[i]["bucket"] == b[i]["bucket"] for i in ids)
+dv = max(abs(a[i]["valence"] - b[i]["valence"]) for i in ids)
+ms = statistics.median(a[i]["latencyMs"] for i in ids)
+print(f"Swift + Core ML vs PyTorch: same mood on {same} of {len(ids)} windows; largest valence difference {dv:.3f}; Swift median {ms:.1f} ms a window")
+' "$OUT/coreml/swift-test.jsonl" "$OUT/coreml/python-test.jsonl" | tee "$OUT/swift-check.txt"
   step "Done"
   echo "Core ML model: $OUT/coreml ($NAME.mlmodelc and $NAME.json). Nothing was shipped."
   exit 0

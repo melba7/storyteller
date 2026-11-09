@@ -307,8 +307,17 @@ without the earlier words at 0.2; a paired comparison with the shipped
 recipe's rows from try-recipes.sh; a model per variant trained on every
 book; and the people's-ratings check against the shipped model. The base
 is sentence-transformers/all-MiniLM-L6-v2 (22.7M parameters, Apache-2.0,
-about 45 MB in 16-bit). It ships only if it passes the same rule; then it
-needs a Core ML conversion and a WordPiece tokenizer in the app.
+about 45 MB in 16-bit). It ships only if it passes the same rule.
+
+The app side is ready for it: `finetune.sh --convert RESULTS/models/lm-soft`
+writes `LofiMood-lm-soft.mlmodelc` (an ML program, 16-bit, fixed 256
+tokens) and `LofiMood-lm-soft.json` (word pieces and settings), checks Core
+ML against PyTorch, then runs the app's own path (`lofi-eval
+--engine lm:…json`: `WordPieceTokenizer`, which matches Hugging Face's
+`BertTokenizerFast` and is tested on Linux, and `TransformerMoodEngine`)
+against PyTorch on the 320 test windows. `MoodEngineCatalog.fastEngine`
+puts a `LofiMood-lm-*.json` first wherever it is listed, with the embedding
+model as its fallback; the two files must sit in the same folder.
 
 ## Labels
 

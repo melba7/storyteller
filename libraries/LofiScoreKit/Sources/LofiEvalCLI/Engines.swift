@@ -12,6 +12,7 @@ import LofiText
 ///     fast:<model>             Create ML classifier (.mlmodel or .mlmodelc)
 ///     fm+fast:<model>          on-device model, falling back to the classifier
 ///     embed:<model.json>       Apple's on-device embeddings + a model from `lofi-train embed`
+///     lm:<LofiMood-lm-*.json>  a fine-tuned transformer through Core ML (Tools/mac/finetune.sh --convert)
 ///     recommended[:<model>]    what the app would pick on this machine
 ///     claude[:<model>]         Claude (default claude-opus-5-5); LOFI_CLAUDE_EFFORT sets the effort,
 ///                              LOFI_CLAUDE_PROMPT the prompt version (2, or 3 for also-fits).
@@ -22,7 +23,7 @@ import LofiText
 ///                              (LOFI_CLAUDE_CODE names the executable if not on PATH).
 ///                              Unset: the API when a key is set, otherwise the plan.
 enum EngineFactory {
-    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "embed:<model.json>", "recommended[:<model>]", "claude[:<model>]"]
+    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "embed:<model.json>", "lm:<config.json>", "recommended[:<model>]", "claude[:<model>]"]
 
     /// Token counts for every Claude engine made in this process.
     static let claudeUsage = ClaudeUsage()
@@ -49,6 +50,13 @@ enum EngineFactory {
             return try EmbeddingMoodEngine(modelURL: url, version: url.deletingPathExtension().lastPathComponent)
             #else
             throw unavailable(name, "NaturalLanguage is not available on this platform")
+            #endif
+        case "lm":
+            guard let argument, !argument.isEmpty else { throw unavailable(name, "give the settings file, e.g. lm:Models/LofiMood-lm-soft.json") }
+            #if canImport(CoreML)
+            return try TransformerMoodEngine(configURL: URL(fileURLWithPath: argument))
+            #else
+            throw unavailable(name, "Core ML is not available on this platform")
             #endif
         case "fm+fast":
             return FallbackMoodEngine(primary: try foundationModels(tagging: false), fallback: try classifier(argument, name: name))
