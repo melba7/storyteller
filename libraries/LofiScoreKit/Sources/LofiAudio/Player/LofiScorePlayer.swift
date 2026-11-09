@@ -194,6 +194,43 @@ public final class LofiScorePlayer: @unchecked Sendable {
         }
     }
 
+    /// The listener says the mood playing is wrong (the music panel's "Wrong mood" button).
+    /// With `mood`, the music moves there; without, to the director's next guess. The change
+    /// is a quick crossfade, held for the usual dwell, and the rejected mood stays out until
+    /// the text moves on (``MoodDirector/listenerOverride(to:)``). `completion` gets what
+    /// happened, on the player's context, or nil when no book is open or nothing changed.
+    public func overrideMood(to mood: MoodBucket? = nil, completion: @escaping (MoodOverride?) -> Void) {
+        scheduler.perform { [self] in
+            let now = scheduler.now
+            guard bookID != nil else {
+                completion(nil)
+                return
+            }
+            let current = director.currentBucket
+            let playing = decks[crossfader.targetDeck].track?.id
+            let correcting = director.recentDecisions.last.map { $0.reason == .listener && now - $0.time < 120 } ?? false
+            var excluded: Set<MoodBucket> = [current]
+            if correcting, let rejected = director.rejectedBucket { excluded.insert(rejected) }
+            let library = self.library
+            guard let chosen = mood ?? director.nextGuess(excluding: excluded, hasTracks: { !library.tracks(in: $0).isEmpty }),
+                  let decision = director.listenerOverride(to: chosen)
+            else {
+                completion(nil)
+                return
+            }
+            handle(decision, at: now)
+            completion(MoodOverride(
+                rejected: current,
+                chosen: chosen,
+                picked: mood != nil,
+                correction: correcting,
+                sentence: director.playheadIndex ?? director.lastObservation?.globalSentenceIndex,
+                readingSource: director.lastObservation?.source,
+                trackID: playing
+            ))
+        }
+    }
+
     // MARK: - Settings
 
     /// Turns the music on or off (the toolbar button, or the per-book opt-out).
@@ -297,7 +334,7 @@ public final class LofiScorePlayer: @unchecked Sendable {
         }
         let target = crossfader.targetDeck
         if decks[target].track == nil {
-            guard load(director.currentBucket, on: target) else { return false }
+            guard load(director.currentBucket, on: target, entering: true) else { return false }
         }
         let moving = crossfader.isMoving(at: now)
         for deck in Deck.allCases where decks[deck].track != nil && !decks[deck].isRunning {
@@ -505,7 +542,7 @@ public final class LofiScorePlayer: @unchecked Sendable {
         }
         let incoming = outgoing.other
         stopDeck(incoming, at: now, clear: true)
-        guard load(request.mood, on: incoming, avoiding: decks[outgoing].track?.id) else { return }
+        guard load(request.mood, on: incoming, avoiding: decks[outgoing].track?.id, entering: request.transition != .rotation) else { return }
         startDeck(incoming, from: 0, at: now)
         var duration = config.crossfadeDuration(for: request.transition)
         if request.transition == .rotation, decks[outgoing].duration > 0 {
@@ -562,7 +599,7 @@ public final class LofiScorePlayer: @unchecked Sendable {
         }
         let previous = decks[target].track?.id
         stopDeck(target, at: now, clear: true)
-        load(request.mood, on: target, avoiding: previous)
+        load(request.mood, on: target, avoiding: previous, entering: request.transition != .rotation)
     }
 
     // MARK: - Track rotation
@@ -682,34 +719,50 @@ public final class LofiScorePlayer: @unchecked Sendable {
 
     // MARK: - Decks
 
+    /// Loads a track of `mood` (or, with none, of the nearest mood that has one) on `deck`.
+    /// `entering` is true when the music moves into the mood rather than rotating within
+    /// it: the book's theme for the mood then comes first (``ScoreConfig/bookThemes``).
     @discardableResult
-    private func load(_ mood: MoodBucket, on deck: Deck, avoiding: String? = nil) -> Bool {
+    private func load(_ mood: MoodBucket, on deck: Deck, avoiding: String? = nil, entering: Bool = false) -> Bool {
         for bucket in library.fallbackOrder(for: mood) {
             var candidates = library.tracks(in: bucket).filter { !failedTracks.contains($0.id) }
+            if entering, config.bookThemes, bucket == mood, let bookID,
+               let theme = BookThemes.theme(bookID: bookID, bucket: bucket, candidates: candidates),
+               theme.id != avoiding {
+                if place(theme, mood: mood, bucket: bucket, on: deck) { return true }
+                candidates.removeAll { $0.id == theme.id }
+            }
             while let track = rotation.pick(from: candidates, playing: avoiding) {
-                do {
-                    let duration = try backend.load(library.url(for: track), on: deck)
-                    rotation.notePlayed(track.id)
-                    var slot = DeckSlot()
-                    slot.track = track
-                    slot.mood = mood
-                    slot.duration = duration > 0 ? duration : (track.duration ?? 0)
-                    slot.bedGain = config.ducking.bedGain(forTrackLoudness: library.loudness(of: track))
-                    slot.grid = track.barGrid
-                    decks[deck] = slot
-                    if bucket != mood {
-                        emit(.fallback(requested: mood, used: bucket))
-                    }
-                    return true
-                } catch {
-                    failedTracks.insert(track.id)
-                    report(LofiAudioError.loadFailed(trackID: track.id, reason: "\(error)").description)
-                    candidates.removeAll { $0.id == track.id }
-                }
+                if place(track, mood: mood, bucket: bucket, on: deck) { return true }
+                candidates.removeAll { $0.id == track.id }
             }
         }
         report(LofiAudioError.emptyLibrary.description)
         return false
+    }
+
+    /// Opens `track` on `deck` for `mood`. False, with the track marked as broken, when it
+    /// will not open.
+    private func place(_ track: LibraryTrack, mood: MoodBucket, bucket: MoodBucket, on deck: Deck) -> Bool {
+        do {
+            let duration = try backend.load(library.url(for: track), on: deck)
+            rotation.notePlayed(track.id)
+            var slot = DeckSlot()
+            slot.track = track
+            slot.mood = mood
+            slot.duration = duration > 0 ? duration : (track.duration ?? 0)
+            slot.bedGain = config.ducking.bedGain(forTrackLoudness: library.loudness(of: track))
+            slot.grid = track.barGrid
+            decks[deck] = slot
+            if bucket != mood {
+                emit(.fallback(requested: mood, used: bucket))
+            }
+            return true
+        } catch {
+            failedTracks.insert(track.id)
+            report(LofiAudioError.loadFailed(trackID: track.id, reason: "\(error)").description)
+            return false
+        }
     }
 
     private func startDeck(_ deck: Deck, from offset: TimeInterval, at now: TimeInterval) {
@@ -861,6 +914,24 @@ extension LofiScorePlayer: LofiAudioBackendDelegate {
             self?.routeChanged(route, previousOutputLost: previousOutputLost)
         }
     }
+}
+
+/// What ``LofiScorePlayer/overrideMood(to:completion:)`` did.
+public struct MoodOverride: Sendable, Hashable {
+    /// The mood that was playing, which the listener said was wrong.
+    public var rejected: MoodBucket
+    /// The mood the music moved to.
+    public var chosen: MoodBucket
+    /// True when the listener named the mood; false when it was the director's next guess.
+    public var picked: Bool
+    /// True when this replaced a guess made moments before (the same miss, not a new one).
+    public var correction: Bool
+    /// The sentence being narrated, across the whole book.
+    public var sentence: Int?
+    /// Where the latest reading came from: the book's mood track or a live engine.
+    public var readingSource: ReadingSource?
+    /// The track that was playing.
+    public var trackID: String?
 }
 
 /// A request to move the music to a mood.

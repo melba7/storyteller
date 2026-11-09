@@ -56,6 +56,11 @@ public struct MoodEvidence: Sendable, Hashable {
         weights = weights.mapValues { $0 * kept }
     }
 
+    /// Drops one bucket's evidence.
+    public mutating func clear(_ bucket: MoodBucket) {
+        weights[bucket] = nil
+    }
+
     /// Drops all evidence. The time stays, so later fading continues from here.
     public mutating func removeAll() {
         weights.removeAll()

@@ -18,6 +18,9 @@ public struct MoodDecision: Sendable, Hashable, Codable {
         case bigJump
         /// Narration reached the sentence where the book's mood track turns to a new mood.
         case trackTurn
+        /// The listener said the mood was wrong (the music panel's "Wrong mood" button) and
+        /// the music moved to the engine's next guess, or to the mood they picked.
+        case listener
     }
 
     /// How fast the music should get there.

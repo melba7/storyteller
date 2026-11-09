@@ -79,11 +79,19 @@ public struct MusicLibrary: Sendable {
             }
             let listed = Set(manifest.tracks.map(\.file))
             let unlisted = scannedTracks(in: folder, fileManager: fileManager).filter { !listed.contains($0.file) }
-            let tracks = manifest.tracks + unlisted
+            var tracks = manifest.tracks + unlisted
             guard !tracks.isEmpty else { throw LoadError.noTracks(folder.path) }
+            if let sources = TrackSources.load(from: folder) { tracks = sources.filling(tracks) }
             return MusicLibrary(root: folder, tracks: tracks, defaultLoudness: manifest.targetLoudness ?? -16)
         }
-        return try scan(folder: folder, fileManager: fileManager)
+        let scanned = try scan(folder: folder, fileManager: fileManager)
+        guard let sources = TrackSources.load(from: folder) else { return scanned }
+        return MusicLibrary(root: folder, tracks: sources.filling(scanned.tracks), defaultLoudness: scanned.defaultLoudness)
+    }
+
+    /// The track with this id, if the library has it.
+    public func track(id: String) -> LibraryTrack? {
+        tracks.first { $0.id == id }
     }
 
     /// Builds a library from one subfolder per mood. Folder names match buckets loosely

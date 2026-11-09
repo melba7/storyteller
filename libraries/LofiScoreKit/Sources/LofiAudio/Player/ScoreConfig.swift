@@ -47,6 +47,11 @@ public struct ScoreConfig: Sendable, Hashable {
     /// How many recently played tracks to avoid when choosing the next one.
     public var avoidRecentTracks = 3
 
+    /// Give each book a theme per mood (``BookThemes``): when the music moves into a mood,
+    /// it starts with that book's theme for it, so a mood the story comes back to sounds
+    /// familiar. Tracks that follow in the same mood rotate as usual.
+    public var bookThemes = true
+
     /// Seconds to wait before retrying when the engine will not start (during a call, say).
     public var engineRetryDelay: TimeInterval = 1
     public var engineRetryLimit = 5

@@ -32,6 +32,13 @@ public struct LibraryTrack: Codable, Hashable, Sendable, Identifiable {
     public var license: String?
     public var prompt: String?
     public var seed: LooseString?
+    /// The track's name and artist, for the music panel's "now playing" line. Filled in from
+    /// `SOURCES.csv` when `library.json` leaves them out (see ``MusicLibrary/load(from:fileManager:)``),
+    /// and guessed from a "Title - Artist" file name when neither has them (``displayTitle``).
+    public var title: String?
+    public var artist: String?
+    /// The license's short name, such as "CC BY 4.0".
+    public var licenseName: String?
 
     public init(
         id: String,
@@ -50,7 +57,10 @@ public struct LibraryTrack: Codable, Hashable, Sendable, Identifiable {
         source: String? = nil,
         license: String? = nil,
         prompt: String? = nil,
-        seed: LooseString? = nil
+        seed: LooseString? = nil,
+        title: String? = nil,
+        artist: String? = nil,
+        licenseName: String? = nil
     ) {
         self.id = id
         self.file = file
@@ -69,6 +79,9 @@ public struct LibraryTrack: Codable, Hashable, Sendable, Identifiable {
         self.license = license
         self.prompt = prompt
         self.seed = seed
+        self.title = title
+        self.artist = artist
+        self.licenseName = licenseName
     }
 
     /// The track's bar grid, when its tempo is known.
@@ -105,6 +118,32 @@ public struct LibraryTrack: Codable, Hashable, Sendable, Identifiable {
         license = try container.decodeIfPresent(String.self, forKey: .license)
         prompt = try container.decodeIfPresent(String.self, forKey: .prompt)
         seed = try container.decodeIfPresent(LooseString.self, forKey: .seed)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        artist = try container.decodeIfPresent(String.self, forKey: .artist)
+        licenseName = try container.decodeIfPresent(String.self, forKey: .licenseName)
+    }
+
+    /// The name to show: `title`, else the file name before " - Artist", else the file name.
+    public var displayTitle: String {
+        if let title = title?.trimmingCharacters(in: .whitespaces), !title.isEmpty { return title }
+        return Self.fileNameParts(file).title
+    }
+
+    /// The artist to show: `artist`, else the part of a "Title - Artist" file name after the
+    /// last " - ", else nil.
+    public var displayArtist: String? {
+        if let artist = artist?.trimmingCharacters(in: .whitespaces), !artist.isEmpty { return artist }
+        return Self.fileNameParts(file).artist
+    }
+
+    /// "Calm/Calm Waters - Purrple Cat.mp3" → ("Calm Waters", "Purrple Cat").
+    static func fileNameParts(_ file: String) -> (title: String, artist: String?) {
+        let name = ((file as NSString).lastPathComponent as NSString).deletingPathExtension
+        guard let range = name.range(of: " - ", options: .backwards) else { return (name, nil) }
+        let title = name[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+        let artist = name[range.upperBound...].trimmingCharacters(in: .whitespaces)
+        guard !title.isEmpty, !artist.isEmpty else { return (name, nil) }
+        return (title, artist)
     }
 }
 

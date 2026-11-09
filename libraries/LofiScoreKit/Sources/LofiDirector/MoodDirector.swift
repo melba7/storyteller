@@ -24,6 +24,9 @@ import LofiScoreCore
 ///   after a seek or at a chapter start, where the first reading decides at once.
 /// - It only ever reacts to readings at or before the sentence being narrated; a reading
 ///   for a later sentence is refused (``IgnoredReason/aheadOfPlayhead``).
+/// - When the listener says the mood is wrong (``listenerOverride(to:)``), the music moves at
+///   once and the rejected mood is kept out until the text names a third mood, a chapter
+///   starts or the listener jumps.
 ///
 /// Not thread-safe: use it from one queue (``LofiScorePlayer`` does).
 public final class MoodDirector {
@@ -62,6 +65,10 @@ public final class MoodDirector {
     public private(set) var ignoredCounts: [IgnoredReason: Int] = [:]
     /// The most recent decisions, oldest first (at most 50).
     public private(set) var recentDecisions: [MoodDecision] = []
+    /// A mood the listener said was wrong. Readings naming it are not followed until the
+    /// text names another mood (not the one now playing), a chapter starts or the listener
+    /// jumps.
+    public private(set) var rejectedBucket: MoodBucket?
 
     /// A mood that is winning but has not changed the music yet.
     private struct Pending {
@@ -104,6 +111,7 @@ public final class MoodDirector {
         lastAcceptedIndex = nil
         lastReadingTime = nil
         recentDecisions.removeAll()
+        rejectedBucket = nil
     }
 
     /// Whether narration is playing. Evidence fades only while it plays, so a pause does
@@ -193,6 +201,7 @@ public final class MoodDirector {
               dwellAllows(config.minimumDwell, at: now)
         else { return nil }
         evidence.decay(to: listening.time(at: now), timeConstant: config.evidenceTimeConstant)
+        dropRejectedEvidence()
         guard evidence.leader(current: currentBucket, config: config) == pending.bucket else {
             self.pending = nil
             return nil
@@ -205,6 +214,58 @@ public final class MoodDirector {
             provisional: false,
             at: now
         )
+    }
+
+    /// The listener said the music's mood is wrong and chose `bucket` instead (or accepted
+    /// the next guess, ``nextGuess(excluding:hasTracks:)``). The music changes at once with a
+    /// quick crossfade and then keeps `bucket` for the usual dwell. The mood that was playing
+    /// is rejected: its evidence is dropped, and readings naming it are not followed until
+    /// the text names a third mood, a chapter starts or the listener jumps. Returns nil when
+    /// `bucket` is already playing.
+    @discardableResult
+    public func listenerOverride(to bucket: MoodBucket) -> MoodDecision? {
+        let now = clock.now
+        guard bucket != currentBucket else { return nil }
+        // Picking again within two minutes of a guess replaces the guess; the mood first
+        // rejected stays rejected, unless the listener picked it back.
+        let correcting = recentDecisions.last.map { $0.reason == .listener && now - $0.time < 120 } ?? false
+        if let rejected = rejectedBucket, correcting {
+            rejectedBucket = rejected == bucket ? currentBucket : rejected
+        } else {
+            rejectedBucket = currentBucket
+        }
+        if let rejectedBucket { evidence.clear(rejectedBucket) }
+        pending = nil
+        jumpRun = nil
+        // Not a provisional change: the dwell holds the listener's choice.
+        let decision = change(
+            to: bucket,
+            reason: .listener,
+            transition: .quick,
+            observation: lastObservation,
+            provisional: false,
+            at: now
+        )
+        return decision
+    }
+
+    /// The director's best guess other than the moods in `excluding`: the bucket the
+    /// evidence favours most, ties broken by closeness to the evidence's centre on the
+    /// valence/arousal map. `hasTracks` limits it to moods the library can play.
+    public func nextGuess(excluding: Set<MoodBucket>, hasTracks: (MoodBucket) -> Bool = { _ in true }) -> MoodBucket? {
+        var faded = evidence
+        faded.decay(to: listening.time(at: clock.now), timeConstant: config.evidenceTimeConstant)
+        let shares = faded.shares(neutralPrior: config.neutralPrior)
+        let centre = faded.centroid(neutralPrior: config.neutralPrior)
+        let candidates = MoodBucket.allCases.filter { !excluding.contains($0) }
+        let playable = candidates.filter(hasTracks)
+        let pool = playable.isEmpty ? candidates : playable
+        return pool.min { lhs, rhs in
+            let left = shares[lhs] ?? 0
+            let right = shares[rhs] ?? 0
+            if abs(left - right) > 0.01 { return left > right }
+            return lhs.anchor.distance(to: centre) < rhs.anchor.distance(to: centre)
+        }
     }
 
     /// When ``tick()`` may next return a decision, if anything is waiting.
@@ -251,7 +312,8 @@ public final class MoodDirector {
             phase: phase,
             lastReading: lastObservation?.reading,
             lastDecision: recentDecisions.last,
-            ignoredCounts: ignoredCounts
+            ignoredCounts: ignoredCounts,
+            rejectedBucket: rejectedBucket
         )
     }
 
@@ -289,6 +351,7 @@ public final class MoodDirector {
         lastReadingTime = now
         pending = nil
         jumpRun = nil
+        rejectedBucket = nil
         evidence.removeAll()
         evidence.add(
             observation.reading.evidence(config: config),
@@ -311,6 +374,7 @@ public final class MoodDirector {
     /// The first reading a few sentences into a new chapter: most old evidence is dropped,
     /// and the result decides at once, without waiting for the dwell or a second reading.
     private func acceptChapterStart(_ observation: MoodObservation, at now: TimeInterval) -> MoodDecision? {
+        rejectedBucket = nil
         lastAcceptedIndex = observation.globalSentenceIndex
         lastObservation = observation
         lastReadingTime = now
@@ -346,12 +410,15 @@ public final class MoodDirector {
         let time = listening.time(at: now)
         let weight = readingWeight(at: now)
         lastReadingTime = now
+        noteRejection(reading.bucket)
         evidence.add(scaled(reading.evidence(config: config), by: weight), at: time, timeConstant: config.evidenceTimeConstant)
+        dropRejectedEvidence()
 
         // Very confident readings far from where the music is: react now. One reading is
         // enough at the slow cadence; read every sentence, a few in a row are needed.
         if reading.confidence >= config.bigJumpConfidence,
            reading.bucket != currentBucket,
+           reading.bucket != rejectedBucket,
            reading.point.distance(to: currentBucket.anchor) >= config.bigJumpDistance {
             if let run = jumpRun, run.bucket == reading.bucket {
                 jumpRun = (run.bucket, run.weight + weight)
@@ -417,12 +484,15 @@ public final class MoodDirector {
         let time = listening.time(at: now)
         let weight = readingWeight(at: now)
         lastReadingTime = now
+        noteRejection(reading.bucket)
         // Track readings feed the evidence too, so a live engine taking over where the
         // track ends starts from what the track said.
         evidence.add(scaled(reading.evidence(config: config), by: weight), at: time, timeConstant: config.evidenceTimeConstant)
+        dropRejectedEvidence()
 
         let bucket = reading.bucket
-        guard bucket != currentBucket else {
+        // The listener said this mood was wrong here: stay where they put the music.
+        guard bucket != currentBucket, bucket != rejectedBucket else {
             pending = nil
             return nil
         }
@@ -469,6 +539,18 @@ public final class MoodDirector {
             provisional: false,
             at: now
         )
+    }
+
+    /// A reading naming a third mood (neither the rejected one nor the one playing) means
+    /// the text has moved on: the rejection ends.
+    private func noteRejection(_ named: MoodBucket) {
+        guard let rejected = rejectedBucket, named != rejected, named != currentBucket else { return }
+        rejectedBucket = nil
+    }
+
+    /// Keeps a rejected mood from winning on evidence while the rejection lasts.
+    private func dropRejectedEvidence() {
+        if let rejectedBucket { evidence.clear(rejectedBucket) }
     }
 
     private func dwellAllows(_ minimum: TimeInterval, at now: TimeInterval) -> Bool {
@@ -533,6 +615,8 @@ public struct DirectorSnapshot: Sendable, Hashable {
     public var lastReading: MoodReading?
     public var lastDecision: MoodDecision?
     public var ignoredCounts: [MoodDirector.IgnoredReason: Int]
+    /// A mood the listener said was wrong, kept out until the text moves on.
+    public var rejectedBucket: MoodBucket? = nil
 }
 
 /// Listening time: a stopwatch that only runs while narration plays.
