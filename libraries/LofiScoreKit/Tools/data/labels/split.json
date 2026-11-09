@@ -1,0 +1,13 @@
+{
+  "note": "Books held out of training. Their 320 sampled windows are the test set: Mo labels them blind (gold), and Claude's labels on them are scored against the gold too. Do not train on them until the engine choice is made.",
+  "test_books": [
+    "a-christmas-carol",
+    "anne-of-green-gables",
+    "dracula",
+    "heart-of-a-mystery",
+    "hound-of-the-baskervilles",
+    "polly-of-lady-gay-cottage",
+    "turn-of-the-screw",
+    "wind-in-the-willows"
+  ]
+}
