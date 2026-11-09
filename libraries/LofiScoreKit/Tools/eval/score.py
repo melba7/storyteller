@@ -25,7 +25,11 @@ import pathlib
 import statistics
 import sys
 
-BUCKETS = ["calm", "cozy", "playful", "hopeful", "melancholy", "mysterious", "tense", "somber"]
+BUCKETS = [
+    "calm", "cozy", "playful", "hopeful", "melancholy", "mysterious", "tense", "somber",
+    # Added 9 Nov 2026; older label files simply never use them.
+    "romantic", "dreamy", "adventurous",
+]
 # Kept in step with MoodBucket.anchor in LofiScoreCore.
 ANCHORS = {
     "calm": (0.25, 0.15),
@@ -36,6 +40,9 @@ ANCHORS = {
     "mysterious": (-0.10, 0.50),
     "tense": (-0.55, 0.85),
     "somber": (-0.70, 0.45),
+    "romantic": (0.75, 0.40),
+    "dreamy": (0.45, 0.45),
+    "adventurous": (0.35, 0.78),
 }
 DARK = {"melancholy", "mysterious", "tense", "somber"}
 BOOKS_CSV = pathlib.Path(__file__).resolve().parent.parent / "data" / "books.csv"
