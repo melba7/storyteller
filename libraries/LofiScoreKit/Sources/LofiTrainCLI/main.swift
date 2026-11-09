@@ -38,14 +38,15 @@ import CreateML
 //       ModelParameters.maxIterations (its default is used otherwise).
 //
 //   lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
-//                    [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+//                    [--choose kappa|exact|macro-f1] [--version V] [--out-dir DIR]
+//                    [--iterations N] [--all] [--curve]
 //       macOS only. A Fast engine on Apple's on-device embeddings instead of a
 //       bag of words; see Embed.swift.
 
 let usage = """
     usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
-           lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+           lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--choose kappa|exact|macro-f1] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())

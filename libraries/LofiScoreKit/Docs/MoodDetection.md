@@ -218,6 +218,8 @@ $B/lofi-train train --algorithm bert --version 3      # optional; see the result
 # 5-fold cross-validation over the 26 training books, then it trains on all
 # 26; --curve adds a learning curve, --all also trains on the test books
 $B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve
+# the model that ships: the chosen kind, trained on all 34 books
+$B/lofi-train embed --kinds word --version 5 --all
 for m in maxent bert; do
   $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done
@@ -281,6 +283,10 @@ supported iPhone, and agrees best with Mo's labels. So:
 | embed:sentence v1 | 320 | 24.7% | 0.145 | 0.132 | 117 ms |
 | embed:word v1 (26 books) | 320 | 35.6% | 0.289 | 0.237 | 10 ms |
 | embed:contextual v1 (26 books) | 320 | **36.2%** | **0.318** | **0.251** | 52 ms |
+| **Mac round 5, settings by 5-fold cross-validation over the 26 training books** | | | | | |
+| embed:word v2 | 320 | 35.3% | 0.295 | 0.234 | 10 ms |
+| embed:contextual v2 | 320 | 34.4% | 0.287 | 0.232 | 47 ms |
+| embed:word+contextual v2 | 320 | 34.4% | 0.329 | 0.234 | 56 ms |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
 scored against Claude's labels. Round 1 used the first 1,360 windows and
@@ -357,6 +363,22 @@ settings (neighbouring settings swung by 5 points), so `lofi-train embed`
 now cross-validates over all 26 training books, and it scores the test books
 exactly as the engine reads them. The new moods still have only 1 or 2 test
 windows each, so their scores mean little yet.
+
+Round 5 ran that. Cross-validated over the 26 training books, word scored
+37.6% exact (kappa 0.255), contextual 37.5% (0.257) and the two side by side
+35.4% (0.239); on the test books 35.3%, 34.4% and 34.4%, the same numbers
+`lofi-eval` gives, so the trainer and the engine now agree. All three chose
+l2 0.1 and the earlier 160 words at weight 0.2. Word ships: it is as good as
+the others, five times quicker (10 ms) and built into every iPhone, while
+contextual needs an asset download. Its learning curve is still climbing:
+on the test books it scored 26.5% trained on 6 books, 31.2% on 13, 33.0% on
+19 and 35.3% on 26, about 4 points per doubling, so labelled windows from
+more books are the next lever. (Contextual levelled off near 34% from 13
+books.) Choosing settings by exact agreement picked unweighted moods; the
+class-weighted setting had 2.4 points less exact agreement but macro-F1
+0.291 instead of 0.229 and the same kappa, so it names somber, cozy and
+hopeful far more often. `lofi-train embed` now chooses by kappa
+(`--choose`), which does not trade the rarer moods away for calm.
 
 By the rule above, **the Fast engine is the default**: it is the best
 engine, deterministic, quick and plot-blind. Since round 4 the embedding

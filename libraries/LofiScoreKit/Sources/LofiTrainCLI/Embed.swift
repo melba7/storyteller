@@ -6,7 +6,8 @@ import NaturalLanguage
 #endif
 
 // lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
-//                  [--version V] [--out-dir Models] [--iterations N] [--all] [--curve]
+//                  [--choose kappa|exact|macro-f1] [--version V] [--out-dir Models]
+//                  [--iterations N] [--all] [--curve]
 //     macOS only (Apple's embeddings). For each kind ("+" puts kinds side by
 //     side in one feature vector), computes features for the newest words of
 //     every exported window and for the words before them (DIR/earlier.json),
@@ -15,6 +16,11 @@ import NaturalLanguage
 //     the training books (train.json plus valid.json) are dealt into --folds
 //     groups, and each setting is scored on every group by a model trained on
 //     the others, reading each window exactly as EmbeddingMoodEngine does.
+//     --choose says what "best" means. The default, kappa, discounts the
+//     agreement that naming the commonest moods gets anyway; choosing by
+//     exact agreement favours settings that rarely name the rarer moods (in
+//     Mac round 5 the exact pick won 2.4 points of exact agreement but lost
+//     0.06 macro-F1, with no better kappa).
 //     Then trains on all the training books (and the test books too with
 //     --all, for the model that ships), scores DIR/test.json, and writes
 //     OUT/LofiMood-embed-<kind>-<V>.json with a .report.json beside it.
@@ -30,6 +36,7 @@ struct EmbedReport: Codable {
     var trainExamples: Int
     var testExamples: Int
     var folds: Int
+    var criterion: String
     var iterations: Int
     var candidates: [LinearMoodModelSelection.Candidate]
     var chosen: LinearMoodModelSelection.Candidate
@@ -51,11 +58,15 @@ func embedCommand(_ options: Options) throws {
     let iterations = options.int("iterations", default: 300)
     let folds = options.int("folds", default: 5)
     if folds < 2 { fail("--folds must be 2 or more") }
+    let choose = options.string("choose") ?? "kappa"
+    guard let criterion = LinearMoodModelSelection.Criterion(rawValue: choose) else {
+        fail("--choose must be kappa, exact or macro-f1")
+    }
     #if canImport(NaturalLanguage)
     try embedExperiment(dataDir: dataDir, kinds: kinds, version: version, outDir: outDir, iterations: iterations,
-                        folds: folds, includeTest: options.flag("all"), curve: options.flag("curve"))
+                        folds: folds, criterion: criterion, includeTest: options.flag("all"), curve: options.flag("curve"))
     #else
-    _ = (dataDir, version, outDir, iterations)
+    _ = (dataDir, version, outDir, iterations, criterion)
     fail("embed needs Apple's NaturalLanguage embeddings; run it on the Mac")
     #endif
 }
@@ -74,7 +85,7 @@ struct FeatureCache: Codable {
 }
 
 func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL, iterations: Int,
-                     folds: Int, includeTest: Bool, curve: Bool) throws {
+                     folds: Int, criterion: LinearMoodModelSelection.Criterion, includeTest: Bool, curve: Bool) throws {
     let train = try distinctExamples(dataDir.appendingPathComponent("train.json"))
     let validURL = dataDir.appendingPathComponent("valid.json")
     let valid = FileManager.default.fileExists(atPath: validURL.path) ? try distinctExamples(validURL) : []
@@ -172,9 +183,9 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
         }
         note("\(spec): \(settings.count) settings × \(folds) folds over \(poolBooks) books, \(dimension) features")
         let candidates = LinearMoodModelSelection.crossValidate(
-            poolX, features: featureID, settings: settings, earlierWeights: [0, 0.2, 0.35, 0.5], folds: folds
+            poolX, features: featureID, settings: settings, earlierWeights: [0, 0.2, 0.35, 0.5], folds: folds, criterion: criterion
         ) { note("  \(spec) " + $0) }
-        let chosen = LinearMoodModelSelection.best(candidates)!
+        let chosen = LinearMoodModelSelection.best(candidates, by: criterion)!
         let options = LinearMoodModel.TrainingOptions(l2: chosen.l2, iterations: iterations, balanced: chosen.balanced)
 
         // The model to keep: chosen settings, trained on every training book (and the test books with --all).
@@ -185,7 +196,7 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
             gold: testX.map(\.label),
             predicted: testX.map { LinearMoodModelSelection.predict(model, $0, earlierWeight: chosen.previousChunkWeight) }
         )
-        let settingsText = "balanced=\(chosen.balanced), l2=\(chosen.l2), earlier words weight \(chosen.previousChunkWeight)"
+        let settingsText = "best \(criterion.rawValue): balanced=\(chosen.balanced), l2=\(chosen.l2), earlier words weight \(chosen.previousChunkWeight)"
         summary.append("\(spec) (\(featureID), \(dimension) features; \(settingsText))")
         summary.append("  cross-validated on \(poolBooks) training books: \(chosen.scores.summary)")
         summary.append("  test\(includeTest ? " (trained on these books too, so not a fair score)" : ""): \(testScores.summary)")
@@ -206,7 +217,8 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
         try model.encoded().write(to: out)
         let report = EmbedReport(
             kind: spec, features: featureID, dimension: dimension,
-            trainBooks: poolBooks, trainExamples: poolX.count, testExamples: testX.count, folds: folds, iterations: iterations,
+            trainBooks: poolBooks, trainExamples: poolX.count, testExamples: testX.count, folds: folds,
+            criterion: criterion.rawValue, iterations: iterations,
             candidates: candidates, chosen: chosen, test: testScores, trainedOnTestBooks: includeTest, curve: points,
             seconds: Date().timeIntervalSince(started)
         )
@@ -216,7 +228,7 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
         note("wrote \(out.path) (\(Int(report.seconds)) s)")
     }
 
-    note("\nsummary (settings chosen by cross-validation over the training books; test = the held-out books)")
+    note("\nsummary (settings chosen by \(criterion.rawValue) in cross-validation over the training books; test = the held-out books)")
     summary.forEach { note("  " + $0) }
 }
 #endif
