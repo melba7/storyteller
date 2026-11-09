@@ -31,23 +31,25 @@ public actor MoodTracker {
     private var issued = 0
     private var delivered = 0
     private var stretch = 0
-    private var cache: [String: MoodReading] = [:]
+    private var cache: [String: (reading: MoodReading, source: ReadingSource)] = [:]
     private var cacheOrder: [String] = []
     private let cacheLimit: Int
 
     /// Readings that failed, for the debug overlay and the eval.
     public private(set) var failures: [String] = []
 
+    /// - Parameter cadence: how often to read. `nil` picks
+    ///   `MoodEngineCatalog.cadence(for:)` for the engine.
     public init(
         spoilerGuard: SpoilerGuard,
         engine: any MoodEngine,
-        cadence: ReadingCadence.Configuration = .default,
+        cadence: ReadingCadence.Configuration? = nil,
         cacheLimit: Int = 2_000,
         clock: @escaping @Sendable () -> Double = MoodTracker.uptimeSeconds
     ) {
         self.spoilerGuard = spoilerGuard
         self.engine = engine
-        self.cadence = ReadingCadence(configuration: cadence)
+        self.cadence = ReadingCadence(configuration: cadence ?? MoodEngineCatalog.cadence(for: engine))
         self.cacheLimit = cacheLimit
         self.clock = clock
     }
@@ -92,18 +94,25 @@ public actor MoodTracker {
         let myStretch = stretch
 
         let reading: MoodReading
+        let source: ReadingSource
         let key = "\(engine.id)|\(position.chapterOrdinal):\(position.sentenceIndex)"
         if let cached = cache[key] {
-            reading = cached
+            (reading, source) = cached
         } else {
             do {
                 let window = try spoilerGuard.window(at: position)
-                reading = try await engine.reading(for: window)
+                if let tracked = engine as? TrackedMoodEngine, let fromTrack = tracked.trackReading(for: window) {
+                    (reading, source) = (fromTrack, .track)
+                } else {
+                    (reading, source) = (try await engine.reading(for: window), .live)
+                }
             } catch {
                 record("\(position): \(error)")
                 return nil
             }
-            remember(reading, for: key)
+            // Track readings are not cached: the track may grow while the
+            // book plays, and a lookup is cheaper than the cache anyway.
+            if source == .live { remember(reading, for: key) }
         }
 
         // Drop results that a seek or a newer reading overtook while the engine ran.
@@ -114,7 +123,8 @@ public actor MoodTracker {
             chapterOrdinal: position.chapterOrdinal,
             sentenceIndex: position.sentenceIndex,
             globalSentenceIndex: position.globalIndex,
-            trigger: trigger
+            trigger: trigger,
+            source: source
         )
     }
 
@@ -126,7 +136,7 @@ public actor MoodTracker {
     }
 
     private func remember(_ reading: MoodReading, for key: String) {
-        cache[key] = reading
+        cache[key] = (reading, .live)
         cacheOrder.append(key)
         if cacheOrder.count > cacheLimit {
             cache[cacheOrder.removeFirst()] = nil
@@ -168,6 +178,22 @@ public enum MoodEngineCatalog {
         }
         #endif
         return nil
+    }
+
+    /// How often `MoodTracker` should read with this engine. Track lookups and
+    /// the Fast classifier answer in milliseconds, so they read every
+    /// sentence; Apple's on-device model takes a second or more per reading
+    /// and keeps the plan's 4-sentence, 20-second cadence.
+    public static func cadence(for engine: any MoodEngine) -> ReadingCadence.Configuration {
+        usesOnDeviceModel(engine) ? .default : .everySentence
+    }
+
+    static func usesOnDeviceModel(_ engine: any MoodEngine) -> Bool {
+        switch engine {
+        case let tracked as TrackedMoodEngine: usesOnDeviceModel(tracked.fallback)
+        case let chained as FallbackMoodEngine: usesOnDeviceModel(chained.primary) || usesOnDeviceModel(chained.fallback)
+        default: engine.id.hasPrefix("fm.")
+        }
     }
 
     /// The best engine that never needs Apple Intelligence or the network.

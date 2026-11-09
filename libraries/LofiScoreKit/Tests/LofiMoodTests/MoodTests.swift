@@ -175,7 +175,7 @@ struct MoodTrackerTests {
         let guardian = try SpoilerGuard(chapters: Self.chapters)
         let clock = ManualClock()
         let engine = ScriptedEngine()
-        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, clock: { clock.read() })
+        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, cadence: .default, clock: { clock.read() })
 
         var observations: [MoodObservation] = []
         for i in 0..<30 {
@@ -198,7 +198,7 @@ struct MoodTrackerTests {
         let clock = ManualClock()
         let engine = ScriptedEngine()
         await engine.setDelay(0.3, at: 0)
-        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, clock: { clock.read() })
+        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, cadence: .default, clock: { clock.read() })
 
         // The first reading is slow; a seek arrives while it is running.
         async let slow = tracker.clipChanged(textResource: "memory/c0.xhtml", fragmentId: "c0-s0")
