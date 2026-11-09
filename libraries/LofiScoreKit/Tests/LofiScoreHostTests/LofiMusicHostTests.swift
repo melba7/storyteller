@@ -89,6 +89,36 @@ final class LofiMusicHostTests: XCTestCase {
         XCTAssertNil(MoodTrackFinder.find(bookID: "abc", in: [folder.appendingPathComponent("missing")], spoilerGuard: guardian))
     }
 
+    private func score(_ mood: MoodTrack?, format: Int = 1) throws -> Data {
+        var object: [String: Any] = ["format": format, "atmosphere": ["format": 1, "cues": []]]
+        if let mood {
+            object["mood"] = try JSONSerialization.jsonObject(with: mood.encoded())
+        }
+        return try JSONSerialization.data(withJSONObject: object)
+    }
+
+    func testReadsTheMoodPartOfABookScore() throws {
+        let guardian = try Books.text().spoilerGuard
+        let tracks = folder.appendingPathComponent("MoodTracks", isDirectory: true)
+        try touch("MoodTracks/abc.score.json", contents: score(track(for: guardian, bookID: "From the Mac")))
+        XCTAssertEqual(MoodTrackFinder.find(bookID: "abc", in: [tracks], spoilerGuard: guardian)?.bookID, "From the Mac")
+        XCTAssertEqual(MoodTrackFinder.bookName(of: tracks.appendingPathComponent("abc.score.json")), "abc")
+
+        // Inside the book: used when it matches the text, and only then.
+        let book = folder.appendingPathComponent("Book", isDirectory: true)
+        try touch("Book/" + BookScore.pathInBook, contents: score(track(for: guardian, bookID: "In the book")))
+        XCTAssertEqual(MoodTrackFinder.inBook(epubDirectory: book, spoilerGuard: guardian)?.bookID, "In the book")
+        try touch("Book/" + BookScore.pathInBook, contents: score(track(for: guardian, bookID: "Stale", tamper: true)))
+        XCTAssertNil(MoodTrackFinder.inBook(epubDirectory: book, spoilerGuard: guardian))
+
+        // A score with only atmosphere cues has no mood track; a newer format is not guessed at.
+        try touch("Book/" + BookScore.pathInBook, contents: score(nil))
+        XCTAssertNil(try BookScore.moodTrack(at: book.appendingPathComponent(BookScore.pathInBook)))
+        try touch("Book/" + BookScore.pathInBook, contents: score(track(for: guardian, bookID: "Future"), format: 2))
+        XCTAssertThrowsError(try BookScore.moodTrack(at: book.appendingPathComponent(BookScore.pathInBook)))
+        XCTAssertNil(MoodTrackFinder.inBook(epubDirectory: book, spoilerGuard: guardian))
+    }
+
     // MARK: - Importing music
 
     func testImportsOnlyTheMusicAndItsCompanions() throws {
@@ -106,6 +136,7 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/MoodTracks/some-book.json")
         try touch("Picked Music/MoodTracks/readme.txt")
         try touch("Picked Music/tracks/The Green Lantern.track.json")
+        try touch("Picked Music/tracks/The Green Lantern.score.json")
         // An unpacked read-aloud book next to its track: its narration is not music.
         try touch("Picked Music/tracks/books/The Green Lantern/OEBPS/Audio/00001.mp3")
         try touch("Picked Music/tracks/books/The Green Lantern/OEBPS/Audio/.00002.mp3.icloud")
@@ -121,7 +152,7 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("app/Music/Old/old.mp3")
 
         let summary = try MusicFolderImport.importFolder(source, into: destination)
-        XCTAssertEqual(summary, .init(folderName: "Picked Music", tracks: 3, moodTracks: 2, hasClassifier: true, notDownloaded: 1))
+        XCTAssertEqual(summary, .init(folderName: "Picked Music", tracks: 3, moodTracks: 3, hasClassifier: true, notDownloaded: 1))
         XCTAssertEqual(files(under: destination), [
             "Calm/rain 70bpm.mp3",
             "Cozy/fire.m4a",
@@ -130,6 +161,7 @@ final class LofiMusicHostTests: XCTestCase {
             "LofiMood-embed-word-3.json",
             "Mood.mlmodelc/model.mil",
             "Mood.mlmodelc/weights/weight.bin",
+            "MoodTracks/The Green Lantern.score.json",
             "MoodTracks/The Green Lantern.track.json",
             "MoodTracks/some-book.json",
             "Old.mlmodel",

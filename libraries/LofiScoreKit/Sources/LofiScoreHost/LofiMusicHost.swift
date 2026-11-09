@@ -414,7 +414,12 @@ public final class LofiMusicHost: @unchecked Sendable {
             let spoilerGuard = try SpoilerGuard(epubDirectory: folder)
             let trackFolders = [environment.musicFolder.appendingPathComponent(MusicFolderImport.moodTracksFolderName, isDirectory: true)]
                 + environment.moodTrackFolders
-            let track = MoodTrackFinder.find(bookID: bookID, in: trackFolders, spoilerGuard: spoilerGuard)
+            // The score inside the book first, then the imported tracks and scores.
+            let inBook = MoodTrackFinder.inBook(epubDirectory: folder, spoilerGuard: spoilerGuard)
+            let track = inBook ?? MoodTrackFinder.find(bookID: bookID, in: trackFolders, spoilerGuard: spoilerGuard)
+            if let track {
+                HostLog.note("book \(bookID): mood track by \(track.engineID) from \(inBook != nil ? "the book's score" : "the imported tracks")")
+            }
             let engine: any MoodEngine = track.map { TrackedMoodEngine(store: MoodTrackStore($0), fallback: live) } ?? live
             return .success((BookText(spoilerGuard: spoilerGuard, engine: engine), track != nil))
         } catch {

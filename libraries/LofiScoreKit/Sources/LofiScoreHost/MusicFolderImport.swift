@@ -9,8 +9,8 @@ import LofiScoreCore
 /// What is copied: the audio `MusicLibrary` plays (files directly inside a mood folder, such
 /// as `Calm/`, and files `library.json` lists), `library.json`, `SOURCES.csv` and `CREDITS.md`
 /// at the top,
-/// mood tracks (`*.json` in `MoodTracks/`, and `*.track.json` anywhere, gathered into
-/// `MoodTracks/`), and the Fast mood models at the top (embedding models named
+/// mood tracks and book scores (`*.json` in `MoodTracks/`, and `*.track.json` or
+/// `*.score.json` anywhere, gathered into `MoodTracks/`), and the Fast mood models at the top (embedding models named
 /// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). Nothing else: an
 /// audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
@@ -188,8 +188,8 @@ public enum MusicFolderImport {
                 }
                 continue
             }
-            if name.lowercased().hasSuffix(".track.json") {
-                // Claude mood tracks from the Mac (`make-tracks.sh`), wherever they sit:
+            if name.lowercased().hasSuffix(".track.json") || name.lowercased().hasSuffix(".score.json") {
+                // Claude mood tracks and book scores from the Mac (`make-tracks.sh`), wherever they sit:
                 // they all go to MoodTracks/, where the app looks for them.
                 plan.items.append(Item(url: resolved, relativePath: moodTracksFolderName + "/" + name, isDirectory: false))
                 continue
