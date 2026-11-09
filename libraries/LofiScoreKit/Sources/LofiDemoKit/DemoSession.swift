@@ -265,7 +265,10 @@ public final class DemoSession: ObservableObject {
 }
 
 /// Reads sentences aloud with the system voice.
-final class SpeechSpeaker: NSObject, SentenceSpeaker, AVSpeechSynthesizerDelegate {
+///
+/// Used only from the main queue (the demo's narrator runs there), and the delegate
+/// callback hops back to it, so the synthesizer is never shared across threads.
+final class SpeechSpeaker: NSObject, SentenceSpeaker, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     private let synthesizer = AVSpeechSynthesizer()
     private var current: AVSpeechUtterance?
     private var completion: (() -> Void)?
