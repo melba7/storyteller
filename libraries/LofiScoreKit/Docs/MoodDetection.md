@@ -82,15 +82,16 @@ for e in lexicon nltagger fm fm-tagging; do
 done
 $B/lofi-eval run --engine fm --in $W/sample.masked.jsonl --out $W/readings/fm.masked.jsonl
 
-# 2. Train the Fast engine on the 26 training books
+# 2. Train the Fast engine on the 26 training books (3 of them held out for
+#    Create ML's validation, so balancing cannot leak copies into it)
 $B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
-  --split Tools/data/labels/split.json --balance \
+  --split Tools/data/labels/split.json --balance --validation-books 3 \
   --labels Tools/data/labels/claude-v1.jsonl --labels Tools/data/labels/claude-v2.jsonl
   # add --labels Tools/data/labels/mo-check.jsonl last once it exists
-$B/lofi-train train --algorithm maxent
-$B/lofi-train train --algorithm bert
+$B/lofi-train train --algorithm maxent --version 3
+$B/lofi-train train --algorithm bert --version 3      # optional; see the results below
 for m in maxent bert; do
-  $B/lofi-eval run --engine fast:Models/LofiMood-$m-1.mlmodel --in $W/sample.jsonl --out $W/readings/fast-$m.jsonl
+  $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done
 
 # 3. Score on the 320 held-out windows (swap in mo-gold.jsonl when it exists)
@@ -136,10 +137,19 @@ supported iPhone, and agrees best with Mo's labels. So:
 | fast:bert v1 (1,040 windows) | 320 | 23.1% | 0.114 | 0.073 | 16 ms |
 | TF-IDF + logistic regression, 1,040 train windows (Linux stand-in for `fast:maxent`) | 320 | 30.6% | 0.260 | 0.188 | n/a |
 | same, 1,998 train windows | 320 | 31.9% | 0.298 | 0.199 | n/a |
+| **Mac round 2** | | | | | |
+| fast:maxent v2 (1,998 windows, balanced) | 320 | **31.6%** | **0.278** | **0.191** | 0.9 ms |
+| fast:bert v2 (1,998 windows, balanced) | 320 | 22.2% | 0.172 | 0.071 | 17 ms |
+| fast:bert v3 (same, `--max-iterations 100`) | 320 | identical to v2 | | | 16 ms |
+| fm, prompt v2 | 319 | 19.7% | 0.180 | 0.118 | 812 ms |
+| fm, prompt v2, names masked | 319 | 22.3% | 0.215 | 0.143 | 819 ms |
 | Claude relabelling 80 test windows blind (`claude-rerun-80.jsonl`) | 80 | 67.5% | | 0.620 | |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
-scored against Claude's labels.
+scored against Claude's labels. Round 1 used the first 1,360 windows and
+prompt v1; round 2 used both label sets, `--balance` and prompt v2. The raw
+readings, models and logs are on the Mac in
+`~/Storyteller Lofi/lofi-mood-eval-results/round2/`.
 
 What the first Mac run showed:
 
@@ -160,6 +170,38 @@ What the first Mac run showed:
   obscure ones (relative to fast:bert), but it was about 81% dark everywhere,
   so the test says little until fm stops answering dark by default. Masking
   names changed 8.7% of its answers on famous books.
+
+What the second Mac run showed:
+
+- **fast:maxent v2 is the best engine so far** (31.6% exact, kappa 0.19), and
+  the only one that predicts all eight moods in useful amounts. It rarely says
+  somber (4 of 24 somber windows found) and often calls mysterious windows
+  calm. The Linux stand-in predicted it closely (31.9%).
+- **Create ML's validation accuracy was meaningless** (90.9% for maxent while
+  test was 30.6%): with `--balance`, its automatic validation split held copies
+  of training rows. `lofi-train export --validation-books N` now holds whole
+  books out for validation instead.
+- **fast:bert got worse with more data** and `--max-iterations 100` changed
+  none of its 320 answers: Create ML appears to keep the best-validation
+  checkpoint (iteration 36), and with leaked validation that is the most
+  memorised one. Not worth pursuing at this data size.
+- **fm, prompt v2** almost stopped failing to parse (1 in 320, a made-up mood
+  "reverent thankfulness") but swapped one bias for another: somber 46%,
+  hopeful 32%, and calm only 4 times in 320 (31 of the 56 calm windows came
+  back somber). The words the prompt explains are the words it answers with.
+  Masking names barely moved it (8.3% of answers changed on famous books, 8.9%
+  on obscure ones), so it shows no sign of using plot knowledge; it is simply
+  not reading mood well.
+- **More labels help less and less.** On the Linux stand-in
+  (`Tools/eval/learning_curve.py`, unigrams, C=4), 500 training
+  windows give 27.5% exact, 1,000 give 29.6%, 1,500 give 30.2% and 1,998 give
+  30.6% (mean of 8 random subsets each), so doubling the set again would add
+  perhaps a point or two. A bag-of-words model tops out far below the ceiling.
+
+By the rule above, **the Fast engine (maxent) is the default**: it is the best
+engine, deterministic, sub-millisecond and plot-blind. fm stays off. Mo's gold
+labels may still move the numbers, and the gap to the ceiling is why a
+precomputed Claude mood track is now a decision for Mo.
 
 The lexicon says "calm" for two thirds of windows; it is a floor, not a
 candidate. A bag-of-words classifier does a little better and gains from the

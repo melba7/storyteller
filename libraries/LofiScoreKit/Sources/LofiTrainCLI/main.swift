@@ -9,6 +9,7 @@ import CreateML
 //
 //   lofi-train export --windows W.jsonl [--windows W2.jsonl ...] --labels L.jsonl [--labels L2.jsonl ...]
 //                     [--split split.json] [--out-dir DIR] [--chunk-words 160] [--balance]
+//                     [--validation-books N]
 //       Joins window records (several window files are read in order; a window
 //       id seen twice is kept once) with labels (a later label file wins over an
 //       earlier one, so Mo's corrections override Claude's), keeps the newest
@@ -18,17 +19,25 @@ import CreateML
 //       moods in the training set are repeated (in order, no randomness) until
 //       every mood has as many examples as the commonest; Create ML's MaxEnt has
 //       no class weights, and without this it rarely predicts the rare moods.
-//       The test set is never changed. Runs anywhere.
+//       The test set is never changed. With --validation-books N, N training
+//       books (spread evenly through the sorted list) go to DIR/valid.json
+//       instead, unbalanced and never repeated, so Create ML validates on rows
+//       it has not trained on. Without it, Create ML splits its own validation
+//       set off train.json, and after --balance that set holds copies of
+//       training rows, so its validation accuracy means nothing. Runs anywhere.
 //
 //   lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all]
-//       macOS only. Trains on DIR/train.json (and DIR/test.json too with --all,
-//       for the model that ships once the engine choice is made), reports
+//                    [--max-iterations N]
+//       macOS only. Trains on DIR/train.json (and DIR/valid.json and
+//       DIR/test.json too with --all, for the model that ships once the engine
+//       choice is made), validates on DIR/valid.json when it exists, reports
 //       accuracy and macro-F1 on DIR/test.json, and writes the model plus a
-//       FILE.report.json beside it.
+//       FILE.report.json beside it. --max-iterations sets Create ML's
+//       ModelParameters.maxIterations (its default is used otherwise).
 
 let usage = """
-    usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance]
-           lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all]
+    usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
+           lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -83,6 +92,8 @@ func exportCommand(_ options: Options) throws {
     guard !labelPaths.isEmpty else { fail("give at least one --labels file\n\(usage)") }
     let outDir = URL(fileURLWithPath: options.string("out-dir") ?? "Tools/data/work/train", isDirectory: true)
     let chunkWords = options.int("chunk-words", default: ClassifierInput.defaultChunkWords)
+    let validationBookCount = options.int("validation-books", default: 0)
+    if validationBookCount < 0 { fail("--validation-books must be 0 or more") }
     let testBooks: Set<String>
     if let splitPath = options.string("split") {
         testBooks = Set(try JSONDecoder().decode(Split.self, from: Data(contentsOf: URL(fileURLWithPath: splitPath))).testBooks)
@@ -133,6 +144,13 @@ func exportCommand(_ options: Options) throws {
         }
     }
 
+    let validationBooks = spreadPick(Set(train.map(\.book)).sorted(), count: validationBookCount)
+    if validationBookCount > 0 && validationBooks.count < validationBookCount {
+        fail("--validation-books \(validationBookCount) would leave no training books")
+    }
+    let valid = train.filter { validationBooks.contains($0.book) }
+    train.removeAll { validationBooks.contains($0.book) }
+
     let distinctTrain = train.count
     if options.flag("balance") { train = balanced(train) }
 
@@ -141,15 +159,37 @@ func exportCommand(_ options: Options) throws {
     try encoder.encode(train).write(to: outDir.appendingPathComponent("train.json"))
     try encoder.encode(test).write(to: outDir.appendingPathComponent("test.json"))
     try testWindows.write(to: outDir.appendingPathComponent("test-windows.jsonl"))
+    let validURL = outDir.appendingPathComponent("valid.json")
+    if valid.isEmpty {
+        // A stale valid.json from an earlier export would be picked up by `train`.
+        try? FileManager.default.removeItem(at: validURL)
+    } else {
+        try encoder.encode(valid).write(to: validURL)
+    }
 
     note("train: \(distinctTrain) examples from \(Set(train.map(\.book)).count) books (\(describe(labellers["train"]!)))")
     if train.count != distinctTrain { note("  balanced to \(train.count) by repeating rarer moods") }
     note("  \(distribution(train))")
+    if valid.isEmpty {
+        if train.count != distinctTrain {
+            note("  no --validation-books: Create ML will validate on copies of training rows, so ignore its validation accuracy")
+        }
+    } else {
+        note("valid: \(valid.count) examples from \(validationBooks.count) books (\(validationBooks.sorted().joined(separator: ", ")))")
+        note("  \(distribution(valid))")
+    }
     note("test:  \(test.count) examples from \(Set(test.map(\.book)).count) books (\(describe(labellers["test"]!)))")
     note("  \(distribution(test))")
     if unlabelled > 0 { note("skipped \(unlabelled) windows with no label") }
     if duplicates > 0 { note("skipped \(duplicates) repeated window ids") }
-    note("wrote \(outDir.path)/train.json, test.json, test-windows.jsonl (newest \(chunkWords) words per window)")
+    note("wrote \(outDir.path)/train.json, \(valid.isEmpty ? "" : "valid.json, ")test.json, test-windows.jsonl (newest \(chunkWords) words per window)")
+}
+
+/// `count` items spread evenly through `items` (which should be sorted), so
+/// the same book list always gives the same choice.
+func spreadPick(_ items: [String], count: Int) -> Set<String> {
+    guard count > 0, count < items.count else { return [] }
+    return Set((0..<count).map { items[($0 * items.count + items.count / 2) / count] })
 }
 
 /// Repeats each mood's examples in order until every mood has as many as the
@@ -182,21 +222,36 @@ func trainCommand(_ options: Options) throws {
     let dataDir = URL(fileURLWithPath: options.string("data") ?? "Tools/data/work/train", isDirectory: true)
     let version = options.string("version") ?? "1"
     let out = URL(fileURLWithPath: options.string("out") ?? "Models/LofiMood-\(algorithm)-\(version).mlmodel")
+    // Create ML's `ModelParameters.maxIterations` (Int?); nil keeps its default.
+    let maxIterations = options.string("max-iterations").map { _ in options.int("max-iterations", default: 0) }
+    if let n = maxIterations, n < 1 { fail("--max-iterations must be at least 1") }
     #if canImport(CreateML)
-    try train(algorithm: algorithm, dataDir: dataDir, out: out, version: version, includeTest: options.flag("all"))
+    try train(algorithm: algorithm, dataDir: dataDir, out: out, version: version, includeTest: options.flag("all"), maxIterations: maxIterations)
     #else
-    _ = (dataDir, out, version)
+    _ = (dataDir, out, version, maxIterations)
     fail("training needs macOS with Create ML; run `lofi-train export` here and `lofi-train train` on the Mac")
     #endif
 }
 
 #if canImport(CreateML)
-func train(algorithm name: String, dataDir: URL, out: URL, version: String, includeTest: Bool) throws {
+func train(algorithm name: String, dataDir: URL, out: URL, version: String, includeTest: Bool, maxIterations: Int? = nil) throws {
     let trainURL = dataDir.appendingPathComponent("train.json")
+    let validURL = dataDir.appendingPathComponent("valid.json")
     let testURL = dataDir.appendingPathComponent("test.json")
     let test = try JSONDecoder().decode([Example].self, from: Data(contentsOf: testURL))
     var table = try MLDataTable(contentsOf: trainURL)
-    if includeTest { table.append(contentsOf: try MLDataTable(contentsOf: testURL)) }
+    let validTable = try FileManager.default.fileExists(atPath: validURL.path) ? MLDataTable(contentsOf: validURL) : nil
+    let validation: MLTextClassifier.ModelParameters.ValidationData
+    if includeTest {
+        // The shipping model learns from every labelled window.
+        table.append(contentsOf: try MLDataTable(contentsOf: testURL))
+        if let validTable { table.append(contentsOf: validTable) }
+        validation = .none
+    } else if let validTable {
+        validation = .table(validTable, textColumn: "text", labelColumn: "label")
+    } else {
+        validation = .split(strategy: .automatic)
+    }
 
     let algorithm: MLTextClassifier.ModelAlgorithmType
     switch name {
@@ -208,21 +263,20 @@ func train(algorithm name: String, dataDir: URL, out: URL, version: String, incl
         guard #available(macOS 14.0, *) else { fail("bert needs macOS 14 or later") }
         algorithm = .transferLearning(.bertEmbedding, revision: 1)
     }
-    let parameters = MLTextClassifier.ModelParameters(
-        validation: .split(strategy: .automatic), algorithm: algorithm, language: .english
-    )
+    var parameters = MLTextClassifier.ModelParameters(validation: validation, algorithm: algorithm, language: .english)
+    if let maxIterations { parameters.maxIterations = maxIterations }
 
-    note("training \(name) on \(table.rows.count) examples\(includeTest ? " (including the test books)" : "")…")
+    let validNote = includeTest ? " (including the validation and test books)" : validTable.map { ", validating on \($0.rows.count) held-out examples" } ?? ""
+    note("training \(name) on \(table.rows.count) examples\(validNote)\(maxIterations.map { ", max \($0) iterations" } ?? "")…")
     let started = Date()
     let classifier = try MLTextClassifier(trainingData: table, textColumn: "text", labelColumn: "label", parameters: parameters)
     let seconds = Date().timeIntervalSince(started)
 
     let predicted = try test.map { try classifier.prediction(from: $0.text) }
     let scores = Scores(gold: test.map(\.label), predicted: predicted)
-    note(String(format: "trained in %.0f s; training accuracy %.1f%%, validation accuracy %.1f%%",
-                seconds,
-                (1 - classifier.trainingMetrics.classificationError) * 100,
-                (1 - classifier.validationMetrics.classificationError) * 100))
+    let validationAccuracy: Double? = includeTest ? nil : 1 - classifier.validationMetrics.classificationError
+    note(String(format: "trained in %.0f s; training accuracy %.1f%%", seconds, (1 - classifier.trainingMetrics.classificationError) * 100)
+         + (validationAccuracy.map { String(format: ", validation accuracy %.1f%%", $0 * 100) } ?? ""))
     if includeTest {
         note("test books were trained on, so the test numbers below are not an estimate of quality")
     }
@@ -240,9 +294,11 @@ func train(algorithm name: String, dataDir: URL, out: URL, version: String, incl
     let report = TrainReport(
         algorithm: name, version: version, trainedOnTestBooks: includeTest,
         trainingExamples: table.rows.count, testExamples: test.count, seconds: seconds.rounded(),
+        validationExamples: includeTest ? nil : validTable?.rows.count,
         trainingAccuracy: 1 - classifier.trainingMetrics.classificationError,
-        validationAccuracy: 1 - classifier.validationMetrics.classificationError,
-        testAccuracy: scores.accuracy, testMacroF1: scores.macroF1
+        validationAccuracy: validationAccuracy,
+        testAccuracy: scores.accuracy, testMacroF1: scores.macroF1,
+        maxIterations: maxIterations
     )
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
@@ -257,10 +313,15 @@ struct TrainReport: Codable {
     var trainingExamples: Int
     var testExamples: Int
     var seconds: Double
+    /// Held-out rows from DIR/valid.json; nil when Create ML split its own.
+    var validationExamples: Int?
     var trainingAccuracy: Double
-    var validationAccuracy: Double
+    /// nil when there was no validation set (`--all`).
+    var validationAccuracy: Double?
     var testAccuracy: Double
     var testMacroF1: Double
+    /// Create ML's iteration cap when `--max-iterations` was given.
+    var maxIterations: Int? = nil
 }
 #endif
 
