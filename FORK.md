@@ -43,8 +43,8 @@ Files and folders that belong to the fork, which upstream never touches:
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
 - `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on
-  upstream's audiobook player. It is a new file inside upstream's Readium module,
-  because the player's observers and `Track` are internal to it. It adds
+  upstream's audiobook player. It is a new file inside upstream's Readium
+  module, because the player's observers and `Track` are internal to it. It adds
   observers and reads state, and holds the narration for a moment when the
   atmosphere swells at a big scene change (see the touch point below).
 - `applications/mobile/lofi/`: the React Native UI.
@@ -62,8 +62,8 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   setting.
 - `applications/mobile/app/(root)/settings.tsx` (2 markers): the music's section
   in Settings, which also imports a music folder.
-- `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift`
-  (8 markers): the narration hold. When the atmosphere swells at a big scene
+- `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift` (8
+  markers): the narration hold. When the atmosphere swells at a big scene
   change, the bridge stops the narrator at the end of the sentence for under a
   second (0.8 s by default, switchable in Settings) and then carries on. These
   one-line hooks keep that invisible: `getIsPlaying()` and the remote play and
