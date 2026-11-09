@@ -97,6 +97,8 @@ struct ObservationRecord: Codable, Sendable {
     var arousal: Double
     var confidence: Double
     var engine: String
+    /// "track" or "live" (see `ReadingSource`).
+    var source: String?
     var latencyMs: Double?
 }
 

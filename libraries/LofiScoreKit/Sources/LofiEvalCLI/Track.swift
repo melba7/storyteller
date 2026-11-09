@@ -7,7 +7,11 @@ import LofiText
 
 func trackCommand(_ args: Arguments) async throws {
     let (guardian, book) = try openBook(args)
-    let plan = MoodTrackBuilder.Plan(wordsBetweenEntries: args.int("words", default: 250))
+    let budget = args.double("refine-budget", default: 0.6)
+    let refinement = budget > 0
+        ? MoodTrackBuilder.Refinement(resolutionSentences: args.int("resolution", default: 3), probeBudget: budget)
+        : nil
+    let plan = MoodTrackBuilder.Plan(wordsBetweenEntries: args.int("words", default: 250), refinement: refinement)
     let builder = MoodTrackBuilder(spoilerGuard: guardian, plan: plan)
     let chapters = args.range("chapters")
 
@@ -18,10 +22,21 @@ func trackCommand(_ args: Arguments) async throws {
             passageWords += min(400, try guardian.window(at: position).wordCount)
         }
         let estimate = ClaudeCostEstimate(requests: positions.count, passageWords: passageWords)
+        let probes = refinement?.maxProbes(planned: positions.count) ?? 0
+        // Probes are windows of the same size as entries.
+        let withProbes = ClaudeCostEstimate(
+            requests: positions.count + probes,
+            passageWords: passageWords + Int(Double(passageWords) * Double(probes) / Double(max(1, positions.count)))
+        )
         note("\(book): \(positions.count) track entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter)")
+        if let refinement {
+            note("  plus up to \(probes) probes to pin mood changes to \(refinement.resolutionSentences) sentences (--refine-budget \(refinement.probeBudget))")
+        }
         for model in ClaudePrices.known {
-            note(String(format: "  %@: about $%.2f (%.0fk input, %.0fk output tokens; estimate)",
-                        model.name, estimate.dollars(model), estimate.inputTokens / 1000, estimate.outputTokens / 1000))
+            var line = String(format: "  %@: about $%.2f (%.0fk input, %.0fk output tokens; estimate)",
+                              model.name, estimate.dollars(model), estimate.inputTokens / 1000, estimate.outputTokens / 1000)
+            if probes > 0 { line += String(format: ", at most $%.2f with probes", withProbes.dollars(model)) }
+            note(line)
         }
         return
     }
@@ -46,10 +61,10 @@ func trackCommand(_ args: Arguments) async throws {
     let report = try await builder.build(
         into: store, engine: engine, chapters: chapters,
         concurrency: args.int("concurrency", default: 4)
-    ) { _, scored in
-        if scored % saveEvery == 0 {
+    ) { _, added in
+        if added % saveEvery == 0 {
             try? store.snapshot.encoded().write(to: outURL, options: .atomic)
-            note("  \(scored) scored")
+            note("  \(added) scored")
         }
     }
     try store.snapshot.encoded().write(to: outURL, options: .atomic)
@@ -58,6 +73,9 @@ func trackCommand(_ args: Arguments) async throws {
     let counts = Dictionary(grouping: entries, by: { $0.reading.bucket.rawValue }).mapValues(\.count)
     note(String(format: "%@ with %@: %d planned, %d already there, %d scored, %d failed, %.0f s",
                 book, engine.id, report.planned, report.alreadyScored, report.scored, report.failed, now() - started))
+    if plan.refinement != nil {
+        note("  refinement: \(report.probes) probes this run, \(report.earlierProbes) earlier, budget \(report.probeBudget); \(report.unrefinedChanges) changes left wider than the resolution")
+    }
     note("  moods: " + counts.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
     report.failures.prefix(5).forEach { note("  failed \($0)") }
     note("wrote \(outPath)")
