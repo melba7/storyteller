@@ -94,7 +94,7 @@ jobs:
     name: iOS simulator build
     needs: fork-checks
     if: needs.fork-checks.outputs.native == 'true'
-    runs-on: macos-26
+    runs-on: macos-15-intel
     timeout-minutes: 120
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
