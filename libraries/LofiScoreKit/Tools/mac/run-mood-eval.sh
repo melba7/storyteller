@@ -63,20 +63,31 @@ step "Windows"
 mkdir -p "$W"
 [ -s "$W/sample.jsonl" ] || gunzip -c Tools/data/eval/sample-v1.jsonl.gz > "$W/sample.jsonl"
 [ -s "$W/sample2.jsonl" ] || gunzip -c Tools/data/eval/sample-v2.jsonl.gz > "$W/sample2.jsonl"
-wc -l "$W/sample.jsonl" "$W/sample2.jsonl"
+[ -s "$W/sample3.jsonl" ] || gunzip -c Tools/data/eval/sample-v3.jsonl.gz > "$W/sample3.jsonl"
+wc -l "$W/sample.jsonl" "$W/sample2.jsonl" "$W/sample3.jsonl"
 
 step "Fast engine: export and train maxent v4 on the newest labels"
 # Later label files win: v1 and v2 are the eight-mood labels, the g2 files
-# carry them over to the eleven moods (guidelines v2).
+# carry them over to the eleven moods (guidelines v2), and claude-g2-v3 labels
+# the extra training windows picked for the rarer moods.
 LABELS=(--labels "$L/claude-v1.jsonl" --labels "$L/claude-v2.jsonl")
-for f in "$L/claude-g2-test.jsonl" "$L/claude-g2-train.jsonl"; do
+for f in "$L/claude-g2-test.jsonl" "$L/claude-g2-train.jsonl" "$L/claude-g2-v3.jsonl"; do
   [ -s "$f" ] && LABELS+=(--labels "$f")
 done
-$B/lofi-train export --windows "$W/sample.jsonl" --windows "$W/sample2.jsonl" \
+$B/lofi-train export --windows "$W/sample.jsonl" --windows "$W/sample2.jsonl" --windows "$W/sample3.jsonl" \
   --split "$L/split.json" --balance --validation-books 3 "${LABELS[@]}" || die "export failed"
 $B/lofi-train train --algorithm maxent --version 4 || die "training failed"
 cp Models/LofiMood-maxent-4.mlmodel* "$OUT/" 2>/dev/null || true
 cp Models/LofiMood-maxent-4.report.json "$OUT/" 2>/dev/null || true
+
+step "Fast engine: Apple's on-device embeddings with a trained softmax head"
+# Settings and the blend with maxent v4 are chosen on the 3 validation books;
+# the summary's "test" is the 320 held-out windows. The contextual kind is
+# skipped (not downloaded) if its assets are not already on this Mac.
+$B/lofi-train embed --kinds sentence,word,contextual --blend Models/LofiMood-maxent-4.mlmodel --version 1 \
+  2> "$OUT/embed.log"
+grep -A20 "^summary" "$OUT/embed.log" || tail -20 "$OUT/embed.log"
+cp Models/LofiMood-embed-*-1.report.json "$OUT/" 2>/dev/null || true
 
 step "Fast engine and baselines on the 320 held-out windows"
 T="$W/train/test-windows.jsonl"
@@ -84,6 +95,11 @@ $B/lofi-eval run --engine fast:Models/LofiMood-maxent-4.mlmodel --in "$T" --out 
 [ -s Models/LofiMood-maxent-3.mlmodel ] && \
   $B/lofi-eval run --engine fast:Models/LofiMood-maxent-3.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-3.jsonl"
 $B/lofi-eval run --engine lexicon --in "$T" --out "$OUT/readings/lexicon.jsonl"
+for m in Models/LofiMood-embed-*-1.json; do
+  [ -s "$m" ] || continue
+  k=$(basename "$m" .json)
+  $B/lofi-eval run --engine "embed:$m" --in "$T" --out "$OUT/readings/fast-${k#LofiMood-}.jsonl"
+done
 [ -s "$W/train/test.masked.jsonl" ] || python3 -I Tools/eval/mask_names.py "$T" > "$W/train/test.masked.jsonl"
 
 SPENT=0

@@ -6,7 +6,7 @@ past that sentence.
 
 ```
 EPUB 3 media overlays ──► SpoilerGuard ──► CausalWindow ──► MoodEngine ──► MoodReading ──► director (audio side)
- (LofiText)               (no lookahead)    (text ≤ now)     (LofiMood)     (8 buckets + valence/arousal)
+ (LofiText)               (no lookahead)    (text ≤ now)     (LofiMood)     (11 buckets + valence/arousal)
 ```
 
 ## Targets
@@ -34,6 +34,7 @@ after the position never changes the window. Engines receive nothing else.
 | `nltagger` | Apple's sentiment score plus the cue words | iOS/macOS NaturalLanguage |
 | `fm`, `fm-tagging` | Apple's on-device model asked for one line (`fm-tagging` does not follow the format; see results) (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
 | `fast:<model>` | Create ML text classifier trained by `lofi-train` on the newest 160 words of each window | the `.mlmodel`; BERT models need iOS 17+ and Apple's embedding assets |
+| `embed:<model.json>` | the Fast engine with Apple's on-device embeddings (`sentence`, `word` or `contextual`) instead of a bag of words: the mean vector of the newest 160 words plus the mean of their last part, fed to a small softmax model (`LinearMoodModel`, plain JSON) trained by `lofi-train embed` | iOS/macOS NaturalLanguage; `contextual` needs iOS 17+ and Apple's embedding assets |
 | `recommended[:<model>]` | what `MoodEngineCatalog` picks: the Fast classifier when given, else `nltagger` (the on-device model is opt-in only, via `onDeviceModelEngine`) | |
 | `claude[:<model>]` | Claude through the Anthropic Messages API, one window per request, answer fixed by a JSON schema (default `claude-opus-5-5`, effort low) | network and an API key; costs money, so it scores books ahead of time rather than during playback |
 | `track[…]>…` | a saved mood track played back, with a live engine wherever the track does not reach | a track file from `lofi-eval track` or the in-app builder |
@@ -113,6 +114,12 @@ Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what trac
 Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
 ```
 
+Make tracks from the read-aloud EPUB exactly as Storyteller serves it. The
+app finds a book's track by the digests of its first sentences, not by file
+name, so the sentence text must match what `SpoilerGuard` reads on the phone.
+To install them, copy the tracks folder into the music folder and import it
+in the app; the import collects every `*.track.json`.
+
 By hand:
 
 ```sh
@@ -150,6 +157,13 @@ name-masking test matters more for it than for the on-device engines.
   unchanged and still almost never predicted a new mood. So for now the
   new moods come from Claude tracks; the Fast engine needs more labelled
   examples of them first.
+- `Tools/data/eval/sample-v3.jsonl.gz` and `claude-g2-v3.jsonl`: 361 more
+  windows from the 26 training books, picked where cue words for romantic,
+  dreamy or adventurous appear in the newest words (at least 15 sentences
+  from any v1 or v2 window), labelled under guidelines v2 by Claude. They add
+  31 romantic, 24 adventurous and 19 dreamy examples. The other 287 got one
+  of the older moods, which also shows a model that a cue word alone does not
+  make a new mood.
 - `Tools/data/eval/sample-v1.jsonl.gz` is the frozen sample: 40 causal windows
   from each of 34 public-domain novels (PG-19 texts turned into readaloud
   EPUBs by `Tools/data/make_readaloud.py`), 1,360 in all. Window ids are
@@ -200,6 +214,9 @@ $B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
   # add --labels Tools/data/labels/mo-check.jsonl last once it exists
 $B/lofi-train train --algorithm maxent --version 3
 $B/lofi-train train --algorithm bert --version 3      # optional; see the results below
+# Apple's embeddings with a trained softmax head; settings and the blend
+# with maxent are chosen on the 3 validation books, then retrained on all 26
+$B/lofi-train embed --kinds sentence,word,contextual --blend Models/LofiMood-maxent-3.mlmodel --version 1
 for m in maxent bert; do
   $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done

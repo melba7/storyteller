@@ -12,6 +12,12 @@
 # network error or Ctrl-C resumes where it stopped when run again. EPUB files
 # are unpacked under "~/Storyteller Lofi/tracks/books/". Needs the key file
 # "~/Storyteller Lofi/.anthropic-key"; the key is never printed.
+#
+# Use the read-aloud EPUBs as Storyteller serves them (the synced book the
+# phone downloads): the app matches a track to its book by the digests of its
+# first sentences, so the text must be the same. To get tracks onto the
+# phone, put the tracks folder inside the music folder before importing it
+# in the app; the import picks up every *.track.json in it.
 set -uo pipefail
 
 ROOT="$HOME/Storyteller Lofi"
@@ -76,4 +82,7 @@ for book in "${BOOKS[@]}"; do
     echo "== $name skipped: the \$$CAP cap is reached"
   fi
 done
-[ "$DRY" = 1 ] || echo "Spent about \$$SPENT at list prices. Tracks: $TRACKS"
+[ "$DRY" = 1 ] || {
+  echo "Spent about \$$SPENT at list prices. Tracks: $TRACKS"
+  echo "To use them on the phone, copy that folder into the music folder and import it in the app."
+}

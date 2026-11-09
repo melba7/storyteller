@@ -11,12 +11,13 @@ import LofiText
 ///     fm-tagging               Apple's on-device model, content-tagging adapter
 ///     fast:<model>             Create ML classifier (.mlmodel or .mlmodelc)
 ///     fm+fast:<model>          on-device model, falling back to the classifier
+///     embed:<model.json>       Apple's on-device embeddings + a model from `lofi-train embed`
 ///     recommended[:<model>]    what the app would pick on this machine
 ///     claude[:<model>]         Claude via the Anthropic API (default claude-opus-5-5);
 ///                              key from ANTHROPIC_API_KEY or the file named by
 ///                              ANTHROPIC_API_KEY_FILE; LOFI_CLAUDE_EFFORT sets the effort
 enum EngineFactory {
-    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "recommended[:<model>]", "claude[:<model>]"]
+    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "embed:<model.json>", "recommended[:<model>]", "claude[:<model>]"]
 
     /// Token counts for every Claude engine made in this process.
     static let claudeUsage = ClaudeUsage()
@@ -36,6 +37,14 @@ enum EngineFactory {
             return try foundationModels(tagging: base == "fm-tagging")
         case "fast":
             return try classifier(argument, name: name)
+        case "embed":
+            guard let argument, !argument.isEmpty else { throw unavailable(name, "give the model path, e.g. embed:Models/LofiMood-embed-contextual-1.json") }
+            #if canImport(NaturalLanguage)
+            let url = URL(fileURLWithPath: argument)
+            return try EmbeddingMoodEngine(modelURL: url, version: url.deletingPathExtension().lastPathComponent)
+            #else
+            throw unavailable(name, "NaturalLanguage is not available on this platform")
+            #endif
         case "fm+fast":
             return FallbackMoodEngine(primary: try foundationModels(tagging: false), fallback: try classifier(argument, name: name))
         case "recommended":

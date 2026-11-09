@@ -34,10 +34,16 @@ import CreateML
 //       accuracy and macro-F1 on DIR/test.json, and writes the model plus a
 //       FILE.report.json beside it. --max-iterations sets Create ML's
 //       ModelParameters.maxIterations (its default is used otherwise).
+//
+//   lofi-train embed [--data DIR] [--kinds sentence,word,contextual] [--blend MODEL.mlmodel]
+//                    [--version V] [--out-dir DIR] [--iterations N] [--all]
+//       macOS only. A Fast engine on Apple's on-device embeddings instead of a
+//       bag of words; see Embed.swift.
 
 let usage = """
     usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
+           lofi-train embed [--data DIR] [--kinds sentence,word,contextual] [--blend MODEL.mlmodel] [--version V] [--out-dir DIR] [--iterations N] [--all]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -51,6 +57,7 @@ do {
     switch command {
     case "export": try exportCommand(options)
     case "train": try trainCommand(options)
+    case "embed": try embedCommand(options)
     case "help", "--help", "-h": print(usage)
     default: fail("unknown command \(command)\n\(usage)")
     }
