@@ -15,7 +15,7 @@ EPUB 3 media overlays ──► SpoilerGuard ──► CausalWindow ──► Mo
 | --- | --- | --- |
 | `LofiScoreCore` | `MoodBucket`, `MoodPoint`, `MoodReading`, `MoodObservation`, shared with the audio side | everywhere |
 | `LofiText` | EPUB/OPF/SMIL/XHTML reading with Storyteller's markup, `SpoilerGuard`, `CausalWindow`, `ReadingCadence` | everywhere (pure Foundation) |
-| `LofiMood` | `MoodEngine` and the engines, `MoodTracker`, `MoodEngineCatalog` | lexicon everywhere; the rest on Apple platforms |
+| `LofiMood` | `MoodEngine` and the engines, `MoodTracker`, `MoodEngineCatalog`, `MoodTrack` and its builder | lexicon, Claude and tracks everywhere; the rest on Apple platforms |
 | `lofi-eval` | windows from books, engine runs with latency, playback simulation | everywhere (engines as available) |
 | `lofi-train` | Create ML export and training for the Fast engine | export anywhere, training on macOS |
 
@@ -35,6 +35,56 @@ after the position never changes the window. Engines receive nothing else.
 | `fm`, `fm-tagging` | Apple's on-device model asked for one line (`fm-tagging` does not follow the format; see results) (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
 | `fast:<model>` | Create ML text classifier trained by `lofi-train` on the newest 160 words of each window | the `.mlmodel`; BERT models need iOS 17+ and Apple's embedding assets |
 | `recommended[:<model>]` | what `MoodEngineCatalog` would pick on this device | |
+| `claude[:<model>]` | Claude through the Anthropic Messages API, one window per request, answer fixed by a JSON schema (default `claude-opus-5-5`, effort low) | network and an API key; costs money, so it scores books ahead of time rather than during playback |
+| `track[…]>…` | a saved mood track played back, with a live engine wherever the track does not reach | a track file from `lofi-eval track` or the in-app builder |
+
+## Claude mood tracks (Mo's choice, 9 Nov 2026)
+
+On-device engines top out at about a third agreement with the reference
+labels, so Mo chose **Claude scoring with the Fast engine as fallback**:
+
+1. When a book is added, `MoodTrackBuilder` walks it once in reading order
+   and asks `ClaudeMoodEngine` about the causal window at one sentence every
+   ~250 narrated words, plus the third sentence of every chapter (where the
+   live cadence takes its chapter-start reading). Each request holds only
+   `SpoilerGuard.window(at:)` for that sentence: no title, no author, no other
+   answers. Entries arrive into a `MoodTrackStore` and are saved as they come,
+   so an interrupted build resumes.
+2. During playback, `TrackedMoodEngine` answers each reading with the newest
+   track entry **at or before** the sentence being narrated, never a later
+   one, so the music depends only on narrated text, as with a live engine.
+   It uses the Fast engine instead before the first entry, past the part
+   scored so far (more than 60 sentences behind), or when the entry's
+   sentence in the current window no longer matches the digest stored with it
+   (the book was re-aligned since the track was made).
+3. The system prompt is `GUIDELINES.md` in prompt form, so Claude answers the
+   question the reference labels answer. Structured outputs pin the answer to
+   the eight moods; refusals and cut-off answers throw, and
+   `FallbackMoodEngine` covers them. Requests to Opus and Sonnet carry
+   `fallbacks: "default"` so a classifier refusal is retried server-side.
+4. Rate limits, overload and 5xx are retried with `retry-after` or 2, 4, 8 s
+   backoff; a rejected key or a bad request is not retried.
+
+Cost, estimated by `lofi-eval track <book> --dry-run` before any call:
+a 41,000-word book (*The Thirty-Nine Steps*) is 157 entries, about $1.55 with
+Opus 5.5, $0.77 with Sonnet 5.5 and $0.04 with Haiku 5.5 at list prices; a
+90,000-word novel is roughly twice that. These are estimates (the thinking
+tokens at low effort are a guess) until the Mac run measures real usage;
+`lofi-eval run` and `track` print the measured tokens and cost.
+
+```sh
+export ANTHROPIC_API_KEY_FILE=~/"Storyteller Lofi"/.anthropic-key   # never commit the key
+$B/lofi-eval run --engine claude --in $W/train/test-windows.jsonl --out $W/readings/claude-opus.jsonl --concurrency 4
+$B/lofi-eval run --engine claude:haiku-5-5 --in $W/train/test-windows.jsonl --out $W/readings/claude-haiku.jsonl --concurrency 4
+$B/lofi-eval track <epub-dir> --dry-run                                       # entries and cost, no calls
+$B/lofi-eval track <epub-dir> --engine claude --out book.track.json           # resumable
+$B/lofi-eval simulate <epub-dir> --engine fast:Models/LofiMood-maxent-3.mlmodel --track book.track.json
+```
+
+Still to decide with Mo once the numbers are in: which model (Opus, Sonnet
+or Haiku), and whether to use the Batch API (half price, answers within
+hours) for whole-book scoring. Claude knows famous novels, so the
+name-masking test matters more for it than for the on-device engines.
 
 ## Labels
 

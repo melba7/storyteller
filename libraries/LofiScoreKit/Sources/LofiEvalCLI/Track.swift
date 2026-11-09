@@ -1,0 +1,136 @@
+import Foundation
+import LofiMood
+import LofiScoreCore
+import LofiText
+
+// MARK: - track
+
+func trackCommand(_ args: Arguments) async throws {
+    let (guardian, book) = try openBook(args)
+    let plan = MoodTrackBuilder.Plan(wordsBetweenEntries: args.int("words", default: 250))
+    let builder = MoodTrackBuilder(spoilerGuard: guardian, plan: plan)
+    let chapters = args.range("chapters")
+
+    if args.flag("dry-run") {
+        let positions = try builder.scoringPositions(chapters: chapters)
+        var passageWords = 0
+        for position in positions {
+            passageWords += min(400, try guardian.window(at: position).wordCount)
+        }
+        let estimate = ClaudeCostEstimate(requests: positions.count, passageWords: passageWords)
+        note("\(book): \(positions.count) track entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter)")
+        for model in ClaudePrices.known {
+            note(String(format: "  %@: about $%.2f (%.0fk input, %.0fk output tokens; estimate)",
+                        model.name, estimate.dollars(model), estimate.inputTokens / 1000, estimate.outputTokens / 1000))
+        }
+        return
+    }
+
+    guard let name = args.string("engine") else { fail("give --engine\n\(usage)") }
+    guard let outPath = args.string("out") else { fail("give --out FILE for the track\n\(usage)") }
+    let engine = try EngineFactory.make(name)
+    let outURL = URL(fileURLWithPath: outPath)
+
+    var track = MoodTrack(engineID: engine.id, bookID: book, wordsBetweenEntries: plan.wordsBetweenEntries)
+    if FileManager.default.fileExists(atPath: outPath) {
+        let existing = try MoodTrack.decode(Data(contentsOf: outURL))
+        guard existing.engineID == engine.id else {
+            fail("\(outPath) was made by \(existing.engineID), not \(engine.id); use another --out")
+        }
+        track = existing
+        note("resuming: \(existing.entries.count) entries already in \(outPath)")
+    }
+    let store = MoodTrackStore(track)
+    let started = now()
+    let saveEvery = 20
+    let report = try await builder.build(
+        into: store, engine: engine, chapters: chapters,
+        concurrency: args.int("concurrency", default: 4)
+    ) { _, scored in
+        if scored % saveEvery == 0 {
+            try? store.snapshot.encoded().write(to: outURL, options: .atomic)
+            note("  \(scored) scored")
+        }
+    }
+    try store.snapshot.encoded().write(to: outURL, options: .atomic)
+
+    let entries = store.snapshot.entries
+    let counts = Dictionary(grouping: entries, by: { $0.reading.bucket.rawValue }).mapValues(\.count)
+    note(String(format: "%@ with %@: %d planned, %d already there, %d scored, %d failed, %.0f s",
+                book, engine.id, report.planned, report.alreadyScored, report.scored, report.failed, now() - started))
+    note("  moods: " + counts.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
+    report.failures.prefix(5).forEach { note("  failed \($0)") }
+    note("wrote \(outPath)")
+    reportClaudeUsage()
+}
+
+// MARK: - Claude cost
+
+/// Anthropic list prices in dollars per million tokens, from the Claude API
+/// reference cached on 2026-10-06. Check the pricing page before relying on them.
+struct ClaudePrices {
+    let name: String
+    let input: Double
+    let output: Double
+    let cacheRead: Double
+
+    static let known = [
+        ClaudePrices(name: "claude-opus-5-5", input: 4, output: 20, cacheRead: 0.20),
+        ClaudePrices(name: "claude-sonnet-5-5", input: 2, output: 10, cacheRead: 0.20),
+        ClaudePrices(name: "claude-haiku-5-5", input: 0.10, output: 0.50, cacheRead: 0.01),
+    ]
+
+    static func forModel(_ model: String) -> ClaudePrices? {
+        known.first { model.hasPrefix($0.name) }
+    }
+
+    func dollars(input: Double, output: Double, cacheRead: Double = 0, cacheWrite: Double = 0) -> Double {
+        (input * self.input + output * self.output + cacheRead * self.cacheRead + cacheWrite * self.input * 1.25) / 1_000_000
+    }
+}
+
+/// Rough token counts for scoring `requests` windows: the system prompt
+/// (~650 tokens with the schema), ~1.4 tokens per passage word, and ~250
+/// output tokens of thinking plus the JSON answer at low effort.
+struct ClaudeCostEstimate {
+    let inputTokens: Double
+    let outputTokens: Double
+
+    init(requests: Int, passageWords: Int) {
+        inputTokens = Double(requests) * 680 + Double(passageWords) * 1.4
+        outputTokens = Double(requests) * 250
+    }
+
+    func dollars(_ prices: ClaudePrices) -> Double {
+        prices.dollars(input: inputTokens, output: outputTokens)
+    }
+}
+
+/// Prints what the Claude engines used in this process, and its list-price cost.
+func reportClaudeUsage() {
+    let t = EngineFactory.claudeUsage.totals
+    guard t.responses > 0 || t.retries > 0 else { return }
+    var line = "  claude usage: \(t.responses) responses, \(t.inputTokens) input + \(t.outputTokens) output tokens"
+    if t.cacheReadTokens + t.cacheWriteTokens > 0 {
+        line += ", cache \(t.cacheReadTokens) read / \(t.cacheWriteTokens) written"
+    }
+    line += ", \(t.retries) retries, \(t.refusals) refusals"
+    if t.otherModel > 0 { line += ", \(t.otherModel) served by a fallback model" }
+    note(line)
+    if let model = ProcessInfo.processInfo.environment["LOFI_CLAUDE_PRICE_MODEL"] ?? lastClaudeModel(),
+       let prices = ClaudePrices.forModel(model) {
+        let cost = prices.dollars(
+            input: Double(t.inputTokens), output: Double(t.outputTokens),
+            cacheRead: Double(t.cacheReadTokens), cacheWrite: Double(t.cacheWriteTokens)
+        )
+        note(String(format: "  about $%.3f at %@ list prices ($%.4f per response)", cost, prices.name, cost / Double(max(1, t.responses))))
+    }
+}
+
+/// The model of the Claude engine named on the command line, if any.
+func lastClaudeModel() -> String? {
+    guard let name = args.string("engine"), name.hasPrefix("claude") else { return nil }
+    guard let colon = name.firstIndex(of: ":") else { return "claude-opus-5-5" }
+    let model = String(name[name.index(after: colon)...])
+    return model.hasPrefix("claude-") ? model : "claude-" + model
+}

@@ -2,8 +2,8 @@ import Foundation
 import LofiScoreCore
 import LofiText
 
-/// The instructions and prompt shared by every language-model engine
-/// (Apple's on-device model today; Private Cloud Compute or Claude later).
+/// The instructions and prompt for Apple's on-device model. `ClaudeMoodPrompt`
+/// reuses `passage(for:maxWords:)` so both engines see the same text.
 ///
 /// The wording does three jobs: it defines the eight buckets in a way that
 /// separates neighbours, it tells the model to judge only the passage (no plot
@@ -47,6 +47,18 @@ public enum MoodPrompt {
 
     /// The prompt for one window, trimmed to its most recent `maxWords` words.
     public static func prompt(for window: CausalWindow, maxWords: Int = 400) -> String {
+        """
+            Passage (the last sentence is being read aloud now):
+            <<<
+            \(passage(for: window, maxWords: maxWords))
+            >>>
+            Mood line:
+            """
+    }
+
+    /// The window's most recent `maxWords` words, oldest first, with a
+    /// "[new chapter]" marker where the chapter changes.
+    public static func passage(for window: CausalWindow, maxWords: Int = 400) -> String {
         let lines = window.recentLines(maxWords: maxWords)
         var passage = ""
         var previousChapter: Int? = nil
@@ -60,12 +72,6 @@ public enum MoodPrompt {
         if lines.count == 1, TextNormalizer.wordCount(passage) > maxWords {
             passage = TextNormalizer.suffix(passage, maxWords: maxWords)
         }
-        return """
-            Passage (the last sentence is being read aloud now):
-            <<<
-            \(passage)
-            >>>
-            Mood line:
-            """
+        return passage
     }
 }
