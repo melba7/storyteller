@@ -34,6 +34,8 @@ public struct ClaudeMoodEngine: MoodEngine {
         public var endpoint: URL
         public var apiVersion: String
         public var timeout: TimeInterval
+        /// `ClaudeMoodPrompt` version: 2, or 3 (adds `about` and `also`).
+        public var prompt: Int
 
         public init(
             model: String = "claude-opus-5-5",
@@ -44,7 +46,8 @@ public struct ClaudeMoodEngine: MoodEngine {
             maxRetries: Int = 4,
             endpoint: URL = URL(string: "https://api.anthropic.com/v1/messages")!,
             apiVersion: String = "2026-10-21",
-            timeout: TimeInterval = 90
+            timeout: TimeInterval = 90,
+            prompt: Int = ClaudeMoodPrompt.version
         ) {
             self.model = model
             self.effort = effort
@@ -55,6 +58,7 @@ public struct ClaudeMoodEngine: MoodEngine {
             self.endpoint = endpoint
             self.apiVersion = apiVersion
             self.timeout = timeout
+            self.prompt = ClaudeMoodPrompt.versions.contains(prompt) ? prompt : ClaudeMoodPrompt.version
         }
 
         /// Haiku has no server-side refusal fallback; the other current models do.
@@ -84,7 +88,7 @@ public struct ClaudeMoodEngine: MoodEngine {
 
     public var id: String {
         let model = configuration.model.hasPrefix("claude-") ? String(configuration.model.dropFirst(7)) : configuration.model
-        return "claude.\(model)/p\(ClaudeMoodPrompt.version)"
+        return "claude.\(model)/p\(configuration.prompt)"
     }
 
     public func reading(for window: CausalWindow) async throws -> MoodReading {
@@ -147,7 +151,7 @@ public struct ClaudeMoodEngine: MoodEngine {
             "max_tokens": configuration.maxTokens,
             "system": [[
                 "type": "text",
-                "text": ClaudeMoodPrompt.system,
+                "text": ClaudeMoodPrompt.system(version: configuration.prompt),
                 // Identical on every request; cached when it is long enough for the model.
                 "cache_control": ["type": "ephemeral"],
             ]],
@@ -157,7 +161,7 @@ public struct ClaudeMoodEngine: MoodEngine {
             ]],
             "output_config": [
                 "effort": configuration.effort,
-                "format": ["type": "json_schema", "schema": ClaudeMoodPrompt.schema],
+                "format": ["type": "json_schema", "schema": ClaudeMoodPrompt.schema(version: configuration.prompt)],
             ],
         ]
         if configuration.usesServerFallback { body["fallbacks"] = "default" }
@@ -191,11 +195,21 @@ public struct ClaudeMoodEngine: MoodEngine {
         else {
             throw MoodEngineError.unparseable(text)
         }
+        // Prompt v3's other moods that also fit go into `scores`, after the
+        // best mood: 1 for the best and 0.5 for each other, before normalising.
+        var scores: [MoodBucket: Double]?
+        let also = (answer.also ?? []).compactMap { MoodBucket(rawValue: $0) ?? MoodBucket(lenient: $0) }.filter { $0 != bucket }
+        if !also.isEmpty {
+            var s: [MoodBucket: Double] = [bucket: 1]
+            for other in also.prefix(2) { s[other] = 0.5 }
+            scores = s
+        }
         return MoodReading(
             bucket: bucket,
             valence: answer.valence,
             arousal: answer.arousal,
             confidence: answer.confidence,
+            scores: scores,
             engineID: engineID
         )
     }
@@ -247,6 +261,8 @@ public struct ClaudeMoodEngine: MoodEngine {
     }
 
     struct Answer: Decodable {
+        let about: String?
+        let also: [String]?
         let mood: String
         let valence: Double
         let arousal: Double

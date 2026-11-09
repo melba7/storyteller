@@ -116,6 +116,20 @@ import LofiScoreCore
         #expect(best.scores.exact > alone)
     }
 
+    @Test func criteriaRankCandidatesDifferently() {
+        func candidate(_ exact: Double, _ kappa: Double, _ f1: Double) -> LinearMoodModelSelection.Candidate {
+            var scores = AgreementScores(gold: [], predicted: [])
+            scores.exact = exact; scores.kappa = kappa; scores.macroF1 = f1
+            return .init(balanced: false, l2: 0.1, previousChunkWeight: 0, scores: scores)
+        }
+        let calmHeavy = candidate(0.376, 0.255, 0.229)
+        let varied = candidate(0.352, 0.258, 0.291)
+        #expect(LinearMoodModelSelection.best([calmHeavy, varied]) == calmHeavy)
+        #expect(LinearMoodModelSelection.best([calmHeavy, varied], by: .kappa) == varied)
+        #expect(LinearMoodModelSelection.best([calmHeavy, varied], by: .macroF1) == varied)
+        #expect(LinearMoodModelSelection.Criterion(rawValue: "macro-f1") == .macroF1)
+    }
+
     @Test func learningCurveRepeatsExactly() {
         let (x, y) = Self.clusters(perClass: 20, seed: 21)
         let examples = y.indices.map { LinearMoodModelSelection.Example(group: "book\($0 % 8)", label: y[$0], recent: x[$0]) }

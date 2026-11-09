@@ -64,39 +64,59 @@ mkdir -p "$W"
 [ -s "$W/sample.jsonl" ] || gunzip -c Tools/data/eval/sample-v1.jsonl.gz > "$W/sample.jsonl"
 [ -s "$W/sample2.jsonl" ] || gunzip -c Tools/data/eval/sample-v2.jsonl.gz > "$W/sample2.jsonl"
 [ -s "$W/sample3.jsonl" ] || gunzip -c Tools/data/eval/sample-v3.jsonl.gz > "$W/sample3.jsonl"
-wc -l "$W/sample.jsonl" "$W/sample2.jsonl" "$W/sample3.jsonl"
+[ -s "$W/sample4.jsonl" ] || gunzip -c Tools/data/eval/sample-v4.jsonl.gz > "$W/sample4.jsonl"
+wc -l "$W/sample.jsonl" "$W/sample2.jsonl" "$W/sample3.jsonl" "$W/sample4.jsonl"
 
-step "Fast engine: export and train maxent v4 on the newest labels"
+step "Fast engine: export and train maxent v5 on the newest labels"
 # Later label files win: v1 and v2 are the eight-mood labels, the g2 files
-# carry them over to the eleven moods (guidelines v2), and claude-g2-v3 labels
-# the extra training windows picked for the rarer moods.
+# carry them over to the eleven moods (guidelines v2), claude-g2-v3 labels
+# the extra training windows picked for the rarer moods, and claude-g2-v4
+# labels 40 windows from each of 19 more books.
 LABELS=(--labels "$L/claude-v1.jsonl" --labels "$L/claude-v2.jsonl")
-for f in "$L/claude-g2-test.jsonl" "$L/claude-g2-train.jsonl" "$L/claude-g2-v3.jsonl"; do
+for f in "$L/claude-g2-test.jsonl" "$L/claude-g2-train.jsonl" "$L/claude-g2-v3.jsonl" "$L/claude-g2-v4.jsonl"; do
   [ -s "$f" ] && LABELS+=(--labels "$f")
 done
 $B/lofi-train export --windows "$W/sample.jsonl" --windows "$W/sample2.jsonl" --windows "$W/sample3.jsonl" \
+  --windows "$W/sample4.jsonl" \
   --split "$L/split.json" --balance --validation-books 3 "${LABELS[@]}" || die "export failed"
-$B/lofi-train train --algorithm maxent --version 4 || die "training failed"
-cp Models/LofiMood-maxent-4.mlmodel* "$OUT/" 2>/dev/null || true
-cp Models/LofiMood-maxent-4.report.json "$OUT/" 2>/dev/null || true
+$B/lofi-train train --algorithm maxent --version 5 || die "training failed"
+cp Models/LofiMood-maxent-5.mlmodel* "$OUT/" 2>/dev/null || true
+cp Models/LofiMood-maxent-5.report.json "$OUT/" 2>/dev/null || true
 
 step "Fast engine: Apple's on-device embeddings with a trained softmax head"
 # Settings (and how much the earlier words count) are chosen by 5-fold
-# cross-validation over the 26 training books; the summary's "test" is the
+# cross-validation over the 45 training books; the summary's "test" is the
 # 320 held-out windows, and the learning curve shows whether more labelled
-# windows would help. The contextual kind is skipped (not downloaded) if its
-# assets are not already on this Mac.
-$B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve 2> "$OUT/embed.log"
+# windows would help. Word embeddings only: round 5 showed the contextual
+# kinds no better on held-out books and ten times slower.
+$B/lofi-train embed --kinds word --version 6 --curve 2> "$OUT/embed.log"
 grep -A30 "^summary" "$OUT/embed.log" || tail -30 "$OUT/embed.log"
-cp Models/LofiMood-embed-*-2.report.json "$OUT/" 2>/dev/null || true
+cp Models/LofiMood-embed-*-6.report.json "$OUT/" 2>/dev/null || true
+
+step "All-books comparison: out-of-fold over every labelled book"
+# The 320 test windows cannot separate recipes less than about 4 points
+# apart. This rotates the held-out books over all of them (10 folds, 3
+# shuffles) so each recipe is scored on every labelled window, and compares
+# recipes window by window with intervals from resampling books. It reuses
+# the embed step's feature cache. The "-old" recipe trains only on the books
+# of samples v1 to v3, to show what the newer books add.
+python3 -I -c 'import json,sys; print("\n".join(sorted({json.loads(l)["book"] for l in open(sys.argv[1])})))' \
+  "$W/sample.jsonl" > "$W/old-books.txt"
+if $B/lofi-train oof --kind word --folds 10 --repeats 3 --old-books "$W/old-books.txt" \
+     --out "$OUT/oof-word.jsonl" 2> "$OUT/oof.log"; then
+  python3 -I Tools/eval/oof_compare.py "$OUT/oof-word.jsonl" | tee "$OUT/oof-compare.txt"
+else
+  tail -5 "$OUT/oof.log"
+fi
 
 step "Fast engine and baselines on the 320 held-out windows"
 T="$W/train/test-windows.jsonl"
-$B/lofi-eval run --engine fast:Models/LofiMood-maxent-4.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-4.jsonl"
-[ -s Models/LofiMood-maxent-3.mlmodel ] && \
-  $B/lofi-eval run --engine fast:Models/LofiMood-maxent-3.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-3.jsonl"
+$B/lofi-eval run --engine fast:Models/LofiMood-maxent-5.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-5.jsonl"
+[ -s Models/LofiMood-maxent-4.mlmodel ] && \
+  $B/lofi-eval run --engine fast:Models/LofiMood-maxent-4.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-4.jsonl"
 $B/lofi-eval run --engine lexicon --in "$T" --out "$OUT/readings/lexicon.jsonl"
-for m in Models/LofiMood-embed-*-2.json; do
+# word-2 is the round-5 model (26 books) for comparison, if it is still here.
+for m in Models/LofiMood-embed-word-2.json Models/LofiMood-embed-word-6.json; do
   [ -s "$m" ] || continue
   k=$(basename "$m" .json)
   $B/lofi-eval run --engine "embed:$m" --in "$T" --out "$OUT/readings/fast-${k#LofiMood-}.jsonl"
@@ -163,6 +183,15 @@ for f in "$OUT"/readings/*.jsonl; do
   case "$f" in *.masked.jsonl) ;; *) PLAIN+=("$f") ;; esac
 done
 python3 -I Tools/eval/score.py --windows "$T" --labels "$GOLD" --confusion "${PLAIN[@]}" | tee "$OUT/scores.txt"
+# The plausible-set labels: "fits" counts any acceptable mood, and --compare
+# puts by-book 95% intervals on each engine and on its difference from word-2.
+SETS="$L/claude-g2-test-sets.jsonl"
+if [ -s "$SETS" ]; then
+  ORDERED=()
+  for f in "${PLAIN[@]}"; do case "$f" in *embed-word-2*) ORDERED=("$f" "${ORDERED[@]}") ;; *) ORDERED+=("$f") ;; esac; done
+  python3 -I Tools/eval/score.py --windows "$T" --labels "$SETS" --compare "${ORDERED[@]}" \
+    | sed -n '/^## Compared/,/^## Pairwise/p' | tee "$OUT/scores-sets.txt"
+fi
 if [ -s "$OUT/readings/claude-haiku.masked.jsonl" ]; then
   python3 -I Tools/eval/score.py --windows "$T" --masked-pair "$OUT/readings/claude-haiku.jsonl" "$OUT/readings/claude-haiku.masked.jsonl" | tee -a "$OUT/scores.txt"
 fi

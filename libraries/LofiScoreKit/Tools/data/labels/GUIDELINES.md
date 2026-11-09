@@ -46,6 +46,25 @@ Tie-breaks:
 - Ordinary travel described without excitement is calm, not adventurous.
 - If the window ends on a chapter heading, label the mood the previous scene ended on.
 
+## Plausible sets (test labels)
+
+One label per passage is a noisy yardstick: two careful passes by the same
+labeller agreed on only about two passages in three, mostly on near
+neighbours (calm or mysterious, cozy or hopeful, calm or tense). So the test
+passages also carry a plausible set: the best mood first, then every other
+mood a listener would still accept as fitting the final sentences, written
+`best/alt/alt` while labelling and stored as `"accept": [...]`. Add an
+alternative only when music in that mood would clearly suit the passage, not
+merely when it is possible; most passages get one or two moods, rarely three.
+An engine's reading "fits" when it is anywhere in the set. Score fits next to
+exact agreement, and compare engines with `score.py --compare`, which puts a
+95% interval on every number by resampling whole books.
+
+`claude-g2-test-sets.jsonl` (9 Nov 2026) re-labels the 320 test passages this
+way, blind to the earlier labels: the new best mood matches the old label 82.5%
+of the time and the old label is inside the set 95.9% of the time, with 1.94
+moods per set on average.
+
 ## Versions
 
 - v1 (8 Nov 2026): the first eight moods.

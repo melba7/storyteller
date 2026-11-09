@@ -5,9 +5,12 @@ Inputs are the JSON-lines files `lofi-eval` writes:
 
   windows   lofi-eval windows ...           (id, book, book_fraction, trigger, seconds, ...)
   readings  lofi-eval run --engine X ...    (id, engine, bucket, valence, arousal, confidence, latency_ms)
-  labels    gold or Claude labels           (id, bucket[, valence, arousal, labeller])
+  labels    gold or Claude labels           (id, bucket[, accept, valence, arousal, labeller])
+            `accept` lists every mood that would also fit (the best one first);
+            "fits" counts a reading as right when it is in that list.
 
     python3 -I Tools/eval/score.py --windows w.jsonl --labels gold.jsonl readings/*.jsonl
+    python3 -I Tools/eval/score.py --windows w.jsonl --labels sets.jsonl --compare base.jsonl new.jsonl
     python3 -I Tools/eval/score.py --windows w.jsonl --drift fm.jsonl --against fast.jsonl
     python3 -I Tools/eval/score.py --windows w.jsonl --masked-pair fm.jsonl fm.masked.jsonl
     python3 -I Tools/eval/score.py --windows playback.jsonl --director readings/*.jsonl
@@ -18,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import collections
+import random
 import csv
 import json
 import math
@@ -95,6 +99,7 @@ def agreement(labels: dict[str, dict], readings: dict[str, dict]) -> dict:
     if n == 0:
         return {"n": 0}
     exact = sum(1 for g, p in pairs if g == p) / n
+    fits = sum(1 for i, r in readings.items() if i in labels and r.get("bucket") and r["bucket"] in accepted(labels[i])) / n
     # "Close": the predicted anchor is within 0.45 of the gold anchor (e.g. calm/cozy, tense/somber).
     close = sum(1 for g, p in pairs if distance(ANCHORS[g], ANCHORS[p]) <= 0.45) / n
     f1s = []
@@ -117,7 +122,7 @@ def agreement(labels: dict[str, dict], readings: dict[str, dict]) -> dict:
     ]
     by_point = sum(1 for g, p in point_pairs if g == p) / len(point_pairs) if point_pairs else float("nan")
     confusion = collections.Counter(pairs)
-    return {"n": n, "exact": exact, "close": close, "macro_f1": sum(f1s) / len(f1s), "kappa": kappa,
+    return {"n": n, "exact": exact, "fits": fits, "close": close, "macro_f1": sum(f1s) / len(f1s), "kappa": kappa,
             "by_point": by_point, "confusion": confusion}
 
 
@@ -198,11 +203,67 @@ def report_engines(windows: dict[str, dict], labels: dict[str, dict] | None, fil
         if labels:
             a = agreement(labels, readings)
             if a["n"]:
-                print(f"  vs labels (n={a['n']}): exact {pct(a['exact'])}  close {pct(a['close'])}  "
+                print(f"  vs labels (n={a['n']}): exact {pct(a['exact'])}  fits {pct(a['fits'])}  close {pct(a['close'])}  "
                       f"macro-F1 {a['macro_f1']:.3f}  kappa {a['kappa']:.3f}  nearest-point {pct(a['by_point'])}")
                 if confusion:
                     print_confusion(a["confusion"])
         print()
+
+
+def accepted(label: dict) -> list[str]:
+    return label.get("accept") or [label["bucket"]]
+
+
+def per_book_hits(windows: dict[str, dict], labels: dict[str, dict], readings: dict[str, dict]) -> dict[str, list[tuple[int, int]]]:
+    """For each book, one (exact, fits) pair of 0/1 per labelled window the engine read."""
+    out: dict[str, list[tuple[int, int]]] = collections.defaultdict(list)
+    for i, r in readings.items():
+        if i in labels and i in windows and r.get("bucket"):
+            out[windows[i]["book"]].append((int(r["bucket"] == labels[i]["bucket"]), int(r["bucket"] in accepted(labels[i]))))
+    return out
+
+
+def book_bootstrap(books: list[str], score, draws: int = 2000, seed: int = 7) -> tuple[float, float]:
+    """95% interval of score(sample) when whole books are resampled with replacement.
+    Windows from one book are not independent, so books are the unit."""
+    rng = random.Random(seed)
+    values = sorted(score([rng.choice(books) for _ in books]) for _ in range(draws))
+    return values[int(0.025 * draws)], values[int(0.975 * draws) - 1]
+
+
+def report_compare(windows: dict[str, dict], labels: dict[str, dict], files: list[str]) -> None:
+    """Each engine with a by-book 95% interval, then each one against the first file,
+    paired on the same windows and the same resampled books."""
+    print("## Compared, with 95% intervals from resampling whole books\n")
+    engines = []
+    for path in files:
+        rows = [r for r in load(path) if r["id"] in windows]
+        name = rows[0]["engine"] if rows else path
+        engines.append((name, per_book_hits(windows, labels, by_id(rows))))
+    books = sorted(set().union(*(set(h) for _, h in engines)))
+    if not books:
+        print("  (no labelled windows)\n")
+        return
+
+    def rate(hits, sample, k):
+        total = sum(len(hits.get(b, [])) for b in sample)
+        return sum(h[k] for b in sample for h in hits.get(b, [])) / total if total else float("nan")
+
+    for name, hits in engines:
+        cells = []
+        for k, label in ((0, "exact"), (1, "fits")):
+            lo, hi = book_bootstrap(books, lambda s: rate(hits, s, k))
+            cells.append(f"{label} {pct(rate(hits, books, k))} ({100 * lo:.1f} to {100 * hi:.1f})")
+        print(f"  {name:40} " + "   ".join(cells))
+    base_name, base = engines[0]
+    for name, hits in engines[1:]:
+        cells = []
+        for k, label in ((0, "exact"), (1, "fits")):
+            diff = lambda s: rate(hits, s, k) - rate(base, s, k)
+            lo, hi = book_bootstrap(books, diff)
+            cells.append(f"{label} {100 * diff(books):+.1f} points ({100 * lo:+.1f} to {100 * hi:+.1f})")
+        print(f"  {name} minus {base_name}: " + "   ".join(cells))
+    print("  (an interval that includes 0 means the difference could be luck)\n")
 
 
 def report_pairwise(files: list[str]) -> None:
@@ -298,6 +359,8 @@ def main() -> None:
     ap.add_argument("--windows", required=True)
     ap.add_argument("--labels", help="gold or Claude labels (id, bucket)")
     ap.add_argument("--confusion", action="store_true")
+    ap.add_argument("--compare", action="store_true",
+                    help="add by-book 95%% intervals and each engine's difference from the first file")
     ap.add_argument("--director", action="store_true", help="replay readings through the plan's director rules")
     ap.add_argument("--drift", help="LLM engine readings for the drift report")
     ap.add_argument("--against", help="plot-blind engine readings for the drift report")
@@ -312,6 +375,8 @@ def main() -> None:
           + (f", {len(labels)} labels" if labels else ""))
     if args.readings:
         report_engines(windows, labels, args.readings, args.confusion)
+        if labels and args.compare:
+            report_compare(windows, labels, args.readings)
         report_pairwise(args.readings)
         if args.director:
             report_director(window_rows, args.readings)

@@ -38,14 +38,21 @@ import CreateML
 //       ModelParameters.maxIterations (its default is used otherwise).
 //
 //   lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
-//                    [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+//                    [--choose exact|kappa|macro-f1] [--version V] [--out-dir DIR]
+//                    [--iterations N] [--all] [--curve]
 //       macOS only. A Fast engine on Apple's on-device embeddings instead of a
 //       bag of words; see Embed.swift.
+//
+//   lofi-train oof [--data DIR] [--kind word] [--folds 10] [--repeats 3] [--old-books FILE] [--out FILE]
+//       macOS only. Out-of-fold predictions over every labelled book for a few
+//       fixed recipes, compared window by window by Tools/eval/oof_compare.py;
+//       see OOF.swift.
 
 let usage = """
     usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
-           lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+           lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--choose exact|kappa|macro-f1] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+           lofi-train oof [--data DIR] [--kind word] [--folds 10] [--repeats 3] [--old-books FILE] [--out FILE]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -60,6 +67,12 @@ do {
     case "export": try exportCommand(options)
     case "train": try trainCommand(options)
     case "embed": try embedCommand(options)
+    case "oof":
+        #if canImport(NaturalLanguage)
+        try oofCommand(options)
+        #else
+        fail("oof needs the Mac")
+        #endif
     case "help", "--help", "-h": print(usage)
     default: fail("unknown command \(command)\n\(usage)")
     }
