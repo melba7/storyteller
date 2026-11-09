@@ -3,10 +3,11 @@ import Foundation
 /// The background sounds a scene can have. One folder of recordings per sound in the
 /// atmosphere library (see ``AmbienceLibrary``).
 ///
-/// Every sound is a steady bed that loops seamlessly. There are no one-shot effects
-/// (a door slam, a single thunderclap): listening research on the "irrelevant sound
-/// effect" finds that sudden, changing sounds pull attention away from what you are
-/// following, while smooth, steady sounds do the least harm. Sounds that would clash
+/// Every sound is a steady bed that loops seamlessly. Listening research on the
+/// "irrelevant sound effect" finds that sudden, changing sounds pull attention away from
+/// what you are following, while smooth, steady sounds do the least harm. Single sounds
+/// (a door slam, a clap of thunder) are a separate, rare extra the listener turns on:
+/// ``OneShotSound``. Sounds that would clash
 /// with the music, such as a crowd, make the music step aside while they play
 /// (``musicPolicy``).
 ///

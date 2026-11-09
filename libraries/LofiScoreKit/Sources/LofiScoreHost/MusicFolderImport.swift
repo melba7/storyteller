@@ -165,14 +165,25 @@ public enum MusicFolderImport {
             return components.count == 2 && MoodBucket(lenient: components[0]) != nil
                 || listed.contains(components.joined(separator: "/"))
         }
-        // An atmosphere recording: `Atmosphere/<Sound>/<file>`, or a variant's,
-        // `Atmosphere/<Sound>.<Variant>/<file>`.
+        // An atmosphere recording: `Atmosphere/<Sound>/<file>`, a variant's,
+        // `Atmosphere/<Sound>.<Variant>/<file>`, or a one-off sound's,
+        // `Atmosphere/OneShots/<Sound>/<file>`.
         func isAtmosphere(_ components: [String]) -> Bool {
-            guard components.count == 3, components[0].lowercased() == atmosphereFolderName.lowercased(),
-                  AmbientSound(lenient: components[1]) != nil || SoundVariant.parseFolder(components[1]) != nil,
-                  let name = components.last
+            guard components.count == 3 || components.count == 4,
+                  components[0].lowercased() == atmosphereFolderName.lowercased(),
+                  let name = components.last,
+                  AmbienceLibrary.audioExtensions.contains((name as NSString).pathExtension.lowercased())
             else { return false }
-            return AmbienceLibrary.audioExtensions.contains((name as NSString).pathExtension.lowercased())
+            if components.count == 4 {
+                return components[1].lowercased() == OneShotLibrary.folderName.lowercased() && OneShotSound(lenient: components[2]) != nil
+            }
+            return AmbientSound(lenient: components[1]) != nil || SoundVariant.parseFolder(components[1]) != nil
+        }
+        // The one-off sounds' `Atmosphere/OneShots/sounds.json`.
+        func isOneShotManifest(_ components: [String]) -> Bool {
+            components.count == 3 && components[0].lowercased() == atmosphereFolderName.lowercased()
+                && components[1].lowercased() == OneShotLibrary.folderName.lowercased()
+                && components[2].lowercased() == AmbienceLibrary.manifestName
         }
         guard let enumerator = fileManager.enumerator(
             at: root,
@@ -221,7 +232,7 @@ public enum MusicFolderImport {
                 plan.items.append(Item(url: resolved, relativePath: AtmosphereTrackFinder.tracksFolderName + "/" + name, isDirectory: false))
                 continue
             }
-            if isAtmosphere(components)
+            if isAtmosphere(components) || isOneShotManifest(components)
                 || components.count == 2 && components[0].lowercased() == atmosphereFolderName.lowercased()
                 && [AmbienceLibrary.manifestName, SoundVariantCatalog.fileName, "sources.csv", creditsFileName.lowercased()].contains(name.lowercased())
             {

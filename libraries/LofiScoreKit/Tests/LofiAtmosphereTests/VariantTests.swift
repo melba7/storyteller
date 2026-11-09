@@ -233,7 +233,7 @@ final class VariantTests: XCTestCase {
         let properties = try XCTUnwrap(ClaudeScenePrompt.schema["properties"] as? [String: Any])
         XCTAssertNotNil(properties["newSounds"])
         XCTAssertEqual((properties["moment"] as? [String: Any])?["enum"] as? [String], ["none", "swell", "hush"])
-        XCTAssertEqual(engine.id, "claude.haiku-5-5/a2")
+        XCTAssertEqual(engine.id, "claude.haiku-5-5/a3")
     }
 
     // MARK: - Builder

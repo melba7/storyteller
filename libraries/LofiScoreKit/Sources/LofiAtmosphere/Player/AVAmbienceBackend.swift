@@ -20,6 +20,10 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     private var players: [AVAudioPlayerNode] = []
     private var filters: [AVAudioUnitEQ] = []
     private var mixer = AVAudioMixerNode()
+    /// The one-off sounds' voice, on the mixer's bus after the slots.
+    private var oncePlayer = AVAudioPlayerNode()
+    private var onceFilter = AVAudioUnitEQ(numberOfBands: 3)
+    private var onceFormat: AVAudioFormat?
     private var files: [AVAudioFile?]
     private var connectedFormats: [AVAudioFormat?]
     /// Bumped whenever a slot is stopped or replaced, so its loop stops rescheduling.
@@ -107,6 +111,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
 
     public func stopEngine() {
         for slot in 0..<slotCount { stop(slot: slot) }
+        oncePlayer.stop()
         engine.stop()
     }
 
@@ -120,6 +125,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
         engine = AVAudioEngine()
         files = Array(repeating: nil, count: slotCount)
         connectedFormats = Array(repeating: nil, count: slotCount)
+        onceFormat = nil
         buildGraph()
     }
 
@@ -170,6 +176,24 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
         players[slot].volume = min(1, max(0, gain))
     }
 
+    public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
+        guard engine.isRunning else { throw LofiAudioError.engineNotRunning }
+        let file = try AVAudioFile(forReading: url)
+        let format = file.processingFormat
+        oncePlayer.stop()
+        if let connected = onceFormat, connected.sampleRate == format.sampleRate, connected.channelCount == format.channelCount {
+            // Same shape as before: keep the connection.
+        } else {
+            engine.disconnectNodeOutput(oncePlayer)
+            engine.connect(oncePlayer, to: onceFilter, format: format)
+            onceFormat = format
+        }
+        Self.configure(onceFilter, for: filter)
+        oncePlayer.volume = min(1, max(0, gain))
+        oncePlayer.scheduleFile(file, at: nil, completionHandler: nil)
+        oncePlayer.play()
+    }
+
     // MARK: - Looping
 
     private func scheduleLoop(_ slot: Int, file: AVAudioFile, token: Int) {
@@ -211,6 +235,15 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
             engine.connect(filters[slot], to: mixer, fromBus: 0, toBus: slot, format: standard)
             connectedFormats[slot] = standard
         }
+        oncePlayer = AVAudioPlayerNode()
+        onceFilter = AVAudioUnitEQ(numberOfBands: 3)
+        engine.attach(oncePlayer)
+        engine.attach(onceFilter)
+        oncePlayer.volume = 0
+        Self.configure(onceFilter, for: .standard)
+        engine.connect(oncePlayer, to: onceFilter, format: standard)
+        engine.connect(onceFilter, to: mixer, fromBus: 0, toBus: slotCount, format: standard)
+        onceFormat = standard
         connectOutput()
         engineObserver = notifications.addObserver(
             forName: .AVAudioEngineConfigurationChange,

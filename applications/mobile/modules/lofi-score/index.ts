@@ -67,6 +67,10 @@ export type LofiAtmosphereStatus = {
   /** Short narration pauses where the sound swells or hushes: the setting, and whether this app can pause its narrator. */
   pausesEnabled?: boolean
   pausesAvailable?: boolean
+  /** One-off sounds (a knock, a clap of thunder): the setting (off by default), and how many of `totalOneShots` have a recording or stand-in. */
+  oneShotsEnabled?: boolean
+  oneShots?: number
+  totalOneShots?: number
   /** The open book has an atmosphere track. */
   track: boolean
   trackOrigin?: string
@@ -189,6 +193,8 @@ type LofiScoreNativeModule = {
   setAtmosphereLevel(level: number | null): Promise<LofiMusicStatus>
   /** Short narration pauses where the sound swells (a crowded hall, a storm breaking) or hushes. */
   setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
+  /** One-off sounds on the sentences that say they happen. Off by default. */
+  setAtmosphereOneShots(enabled: boolean): Promise<LofiMusicStatus>
   /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
   getAtmosphereCredits(): Promise<string | null>
   /**

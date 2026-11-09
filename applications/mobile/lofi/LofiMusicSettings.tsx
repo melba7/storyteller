@@ -230,6 +230,24 @@ export function LofiMusicSettings() {
                   />
                 </View>
               )}
+              <View className="w-full flex-row items-center justify-between gap-4">
+                <View className="shrink gap-1">
+                  <Text maxFontSizeMultiplier={1.5}>One-off sounds</Text>
+                  <Text variant="muted">
+                    A single sound on the sentence that says it happens, like a
+                    knock at the door or a clap of thunder. Rare and quiet, and
+                    off unless you turn it on.
+                  </Text>
+                </View>
+                <Switch
+                  accessibilityLabel="One-off sounds"
+                  checked={status.atmosphere.oneShotsEnabled ?? false}
+                  disabled={!status.atmosphere.enabled}
+                  onCheckedChange={(enabled) =>
+                    void music.setAtmosphereOneShots(enabled)
+                  }
+                />
+              </View>
               {(status.atmosphere.source === "imported" ||
                 status.atmosphere.source === "mixed") && (
                 <Button

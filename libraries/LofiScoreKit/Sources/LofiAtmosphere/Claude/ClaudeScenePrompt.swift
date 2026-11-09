@@ -7,7 +7,7 @@ import LofiText
 /// sounds available and the passage as the user message; and a JSON schema for the answer.
 public enum ClaudeScenePrompt {
     /// Bump when the wording or schema changes; engine ids and saved tracks record it.
-    public static let version = 2
+    public static let version = 3
 
     /// Places listed with each passage, most recent first.
     public static let maxPlacesListed = 15
@@ -21,6 +21,7 @@ public enum ClaudeScenePrompt {
     /// the same for a whole run, so they sit here, where the prompt cache keeps them.
     public static func system(sharedVariants: [SoundVariant]) -> String {
         let sounds = AmbientSound.allCases.map { "- \($0.rawValue): \($0.guidance)" }.joined(separator: "\n")
+        let oneShots = OneShotSound.allCases.map { "- \($0.rawValue): \($0.guidance)" }.joined(separator: "\n")
         let shared = sharedVariants.isEmpty
             ? "none"
             : "\n" + sharedVariants.prefix(maxVariantsListed).map(describe).joined(separator: "\n")
@@ -92,6 +93,22 @@ public enum ClaudeScenePrompt {
             - Otherwise "none". The narration pauses for under a second at a moment, so keep \
             them for clear, audible arrivals, a few per chapter at most, and never for a place \
             that is only remembered or talked about.
+
+            One-off sounds:
+            - oneShot is a single, distinct sound that the passage says happens, right then and \
+            where the characters are: a clap of thunder, a knock at the door, a clock striking. \
+            It plays once, on the sentence that says so, if the listener has turned them on.
+            - Only when the text says the sound itself happens at that moment. Not a sound that \
+            is remembered, expected, imagined, compared to ("a laugh like breaking glass"), talked \
+            about or heard in a dream; not one that goes on and on (that is a steady sound above); \
+            not a sound that is only implied.
+            - quote: copy, word for word, the fewest words (at most eight) from the passage that \
+            say the sound happens, ending on the word for the sound, e.g. "there came a knock at \
+            the door". If several happen, take the last one in the passage.
+            - They are rare: most passages have none. Then sound is "none" and quote is "".
+
+            The one-off sounds:
+            \(oneShots)
 
             Also answer:
             - setting: indoors, outdoors, vehicle (a carriage, train, ship, spaceship) or unclear.
@@ -193,11 +210,20 @@ public enum ClaudeScenePrompt {
                     ] as [String: Any],
                 ] as [String: Any],
                 "moment": ["type": "string", "enum": ["none"] + StoryScene.Moment.allCases.map(\.rawValue)],
+                "oneShot": [
+                    "type": "object",
+                    "properties": [
+                        "sound": ["type": "string", "enum": ["none"] + OneShotSound.allCases.map(\.rawValue)],
+                        "quote": ["type": "string"],
+                    ],
+                    "required": ["sound", "quote"],
+                    "additionalProperties": false,
+                ] as [String: Any],
                 "world": ["type": "string"],
                 "cue": ["type": "string"],
                 "confidence": ["type": "number"],
             ] as [String: Any],
-            "required": ["place", "placeName", "setting", "sounds", "newSounds", "moment", "world", "cue", "confidence"],
+            "required": ["place", "placeName", "setting", "sounds", "newSounds", "moment", "oneShot", "world", "cue", "confidence"],
             "additionalProperties": false,
         ]
     }

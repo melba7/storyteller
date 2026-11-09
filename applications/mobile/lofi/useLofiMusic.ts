@@ -144,6 +144,22 @@ export function useLofiMusic(pollInterval: number | null) {
     [apply],
   )
 
+  /** One-off sounds (a knock, a clap of thunder) on their sentences. */
+  const setAtmosphereOneShots = useCallback(
+    (enabled: boolean) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? {
+                ...current,
+                atmosphere: { ...current.atmosphere, oneShotsEnabled: enabled },
+              }
+            : current,
+        () => LofiScore?.setAtmosphereOneShots(enabled),
+      ),
+    [apply],
+  )
+
   /**
    * The mood playing is wrong: move to `mood`, or to the engine's next guess,
    * and log it for the listening test.
@@ -197,6 +213,7 @@ export function useLofiMusic(pollInterval: number | null) {
     setAtmosphereLevel,
     setAtmospherePauses,
     setFollowsReading,
+    setAtmosphereOneShots,
     markWrongMood,
     getMoodFeedback,
     importMusicFolder,

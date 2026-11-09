@@ -46,6 +46,37 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         }
     }
 
+    /// A one-off sound (``OneShotSound``) on the sentence that says it happens.
+    ///
+    /// Spoiler safety: a cue is kept only when an answer judged from the text up to and
+    /// including its own sentence (and places before it) put the sound on that sentence.
+    public struct Cue: Codable, Sendable, Hashable {
+        public let globalIndex: Int
+        /// Digest of the sentence, like an entry's.
+        public let sentenceDigest: String
+        public let sound: OneShotSound
+        /// Words of the sentence up to where the sound happens, and the sentence's words,
+        /// so playback can place it inside the sentence.
+        public let wordsBefore: Int
+        public let words: Int
+        /// The words that say it happens, for reports.
+        public let quote: String?
+
+        public init(position: SentencePosition, sentence: String, sound: OneShotSound, wordsBefore: Int, words: Int, quote: String? = nil) {
+            globalIndex = position.globalIndex
+            sentenceDigest = TextDigest.fnv1a64(sentence)
+            self.sound = sound
+            self.wordsBefore = max(0, wordsBefore)
+            self.words = max(0, words)
+            self.quote = quote
+        }
+
+        /// Where in the sentence the sound falls, from 0 (its start) to 1 (its end).
+        public var fraction: Double {
+            words > 1 ? min(1, Double(wordsBefore) / Double(words - 1)) : 0
+        }
+    }
+
     public var format: Int
     /// The engine that scored it, e.g. "claude.sonnet-5-5/a1".
     public var engineID: String
@@ -61,10 +92,12 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
     /// The more specific sounds the entries use (``SoundVariant``), each with the entry
     /// that first asked for it, so the fetch script knows what to look for online.
     public private(set) var variants: [SoundVariant]
+    /// One-off sounds, sorted by position, at most one per sentence.
+    public private(set) var cues: [Cue]
 
     public init(
         engineID: String, bookID: String, wordsBetweenEntries: Int, chapterStarts: [Int] = [],
-        entries: [Entry] = [], variants: [SoundVariant] = []
+        entries: [Entry] = [], variants: [SoundVariant] = [], cues: [Cue] = []
     ) {
         format = Self.currentFormat
         self.engineID = engineID
@@ -73,12 +106,14 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         self.chapterStarts = chapterStarts.sorted()
         self.entries = []
         self.variants = []
+        self.cues = []
         entries.forEach { insert($0) }
         variants.forEach { addVariant($0) }
+        cues.forEach { insertCue($0) }
     }
 
     private enum CodingKeys: String, CodingKey {
-        case format, engineID, bookID, wordsBetweenEntries, chapterStarts, entries, variants
+        case format, engineID, bookID, wordsBetweenEntries, chapterStarts, entries, variants, cues
     }
 
     public init(from decoder: any Decoder) throws {
@@ -91,6 +126,34 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         entries = try c.decode([Entry].self, forKey: .entries)
         // Tracks made before variants existed have none.
         variants = try c.decodeIfPresent([SoundVariant].self, forKey: .variants) ?? []
+        // And before one-off sounds, none of those.
+        cues = try c.decodeIfPresent([Cue].self, forKey: .cues) ?? []
+    }
+
+    /// Adds or replaces the cue on its sentence.
+    public mutating func insertCue(_ cue: Cue) {
+        var low = 0
+        var high = cues.count
+        while low < high {
+            let mid = (low + high) / 2
+            if cues[mid].globalIndex < cue.globalIndex { low = mid + 1 } else { high = mid }
+        }
+        if low < cues.count, cues[low].globalIndex == cue.globalIndex {
+            cues[low] = cue
+        } else {
+            cues.insert(cue, at: low)
+        }
+    }
+
+    /// The cue on exactly this sentence.
+    public func cue(at globalIndex: Int) -> Cue? {
+        var low = 0
+        var high = cues.count
+        while low < high {
+            let mid = (low + high) / 2
+            if cues[mid].globalIndex < globalIndex { low = mid + 1 } else { high = mid }
+        }
+        return low < cues.count && cues[low].globalIndex == globalIndex ? cues[low] : nil
     }
 
     /// Adds a variant, or moves a known one's first use earlier.
@@ -190,7 +253,7 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         // Re-sort in case the file was edited by hand.
         return AtmosphereTrack(
             engineID: track.engineID, bookID: track.bookID, wordsBetweenEntries: track.wordsBetweenEntries,
-            chapterStarts: track.chapterStarts, entries: track.entries, variants: track.variants
+            chapterStarts: track.chapterStarts, entries: track.entries, variants: track.variants, cues: track.cues
         )
     }
 }

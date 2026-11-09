@@ -62,6 +62,13 @@ public final class MusicSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: prefix + "atmospherePausesEnabled") }
     }
 
+    /// One-off sounds (a knock at the door, a clap of thunder) on the sentence that says they
+    /// happen. Off by default: sudden sounds are not for everyone.
+    public var atmosphereOneShotsEnabled: Bool {
+        get { defaults.object(forKey: prefix + "atmosphereOneShotsEnabled") as? Bool ?? false }
+        set { defaults.set(newValue, forKey: prefix + "atmosphereOneShotsEnabled") }
+    }
+
     /// The atmosphere's level under the voice, in dB, if the listener moved the slider. Nil
     /// means the player's default.
     public var atmosphereLevelDB: Double? {

@@ -33,6 +33,9 @@ own volume.
   (stepping into a crowded hall) or falls silent (a door shutting on the noise), the
   narrator can stop for under a second while the sound swells or hushes, then carry on.
   It's a setting ("Short pauses for big scene changes"), on by default, and rare.
+- **One-off sounds, if you want them.** A single sound on the sentence that says it
+  happens: a knock at the door, a clap of thunder, a clock striking. Off by default
+  ("One-off sounds" in Settings), rare, and well under the voice.
 
 ## Spoiler safety
 
@@ -95,6 +98,34 @@ heard, and only when the setting is on and the app's narrator accepts (it refuse
 paused or already holding). `LofiMusicHost.Environment.holdNarration` is the app's side;
 the app calls `narrationHold(began:)` when the hold starts and ends.
 
+## One-off sounds
+
+15 single sounds (`OneShotSound`): thunder clap, door knock, door slam, door creak,
+doorbell, telephone ring, bell toll, clock chime, breaking glass, dog bark, owl hoot, wolf
+howl, horse neigh, train whistle, ship's horn. Loud, startling sounds (gunshots,
+explosions, screams) are left out on purpose.
+
+- **Scoring.** Each answer may name one (`oneShot`: the sound and up to eight words copied
+  from the passage that say it happens), only when the text says the sound itself happens
+  right then where the characters are: not remembered, expected, compared to or talked
+  about. The builder finds the sentence the words are in. On the passage's last sentence it
+  is kept as it is. On an earlier one the answer had seen text after that sentence, so the
+  sentence is scored again with a window that ends on it, and the cue is kept only if that
+  answer puts the same sound there (`OneShotTests` checks a knock that only the next
+  sentence explains is dropped). These checks are capped at a fifth of the planned entries.
+- **Track.** `cues` in the atmosphere track: sentence, digest, sound, and where in the
+  sentence it falls (the quote's last word), so it lands when its words are read.
+- **Playback**, only with the setting on: when the narration reaches the sentence the sound
+  waits for its place in it (sentence duration × position, at most 8 s; if the next
+  sentence starts first, it plays then). It plays 10 dB above a sound at `full`, still well
+  under the voice, with the same presence dip. At most one every 30 s, none in the first
+  3 s after play or a seek, never on a jump, and never while reading on screen (sentences
+  with no duration). Pausing, seeking or turning it off drops a waiting one.
+- **Sounds.** `Atmosphere/OneShots/<Sound>/` with `OneShots/sounds.json`, the same
+  personal and publish rules as the beds. Ten have synthesised stand-ins (thunder, knock,
+  slam, doorbell, telephone, bell, clock, owl, train whistle, ship's horn); the animals,
+  the creaking door and breaking glass stay silent until recordings are imported.
+
 ## Personal and published sounds
 
 Each recording's `use` in `sounds.json` says where it may play:
@@ -115,8 +146,8 @@ The irrelevant-sound effect: background sound that changes from moment to moment
 above all, then intermittent events) disrupts listening and reading far more than steady
 sound. So:
 
-- Every sound is a steady, seamless loop. There are no one-shot effects (no door slams,
-  no single thunderclap, no footsteps).
+- Every sound is a steady, seamless loop. One-off sounds are a separate extra, off by
+  default (see "One-off sounds").
 - A crowd is the only sound made of voices. It is filtered so words can't be made out
   (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz), and it pushes the music out.
 - Everything sits far under the voice: a sound at `full` is 28 dB under the narrator
@@ -167,6 +198,7 @@ LofiMusic/
     OldTown.ChurchBells/ …   one folder per more specific sound: <Sound>.<Variant>
     sounds.json              loudness, duration, title, author, source, licence, variant, use
     variants.json            the more specific sounds known on the Mac
+    OneShots/DoorKnock/ …    one-off sounds, with OneShots/sounds.json
     SOURCES.csv  CREDITS.md
   tracks/                    *.track.json, *.atmosphere.json, *.score.json
 ```
@@ -195,9 +227,11 @@ through the Claude plan, fetches any new sounds and copies everything into
    - `publish` uses Wikimedia Commons only, with commercial-safe licences, and writes
      `~/Storyteller Lofi/AtmospherePublish`.
 
-   It keeps up to `--per-sound 4` recordings per built-in sound and `--per-variant 2` per
+   It keeps up to `--per-sound 4` recordings per built-in sound, `--per-variant 2` per
    more specific sound (the starter set plus those the tracks in `--tracks` asked for;
-   `--no-variants` skips them, `--sound OldTown.ChurchBells` fetches only that). It checks
+   `--no-variants` skips them, `--sound OldTown.ChurchBells` fetches only that) and
+   `--per-one-shot 2` per one-off sound (`--no-one-shots` skips them; each is trimmed of
+   silence, cut to a few seconds and faded out, not looped). It checks
    each licence on the recording's own record, cuts a seamless 60 s loop from the steadiest
    part (encoded with Apple's AAC encoder so the phone loops it without a tick), measures
    loudness, and writes `sounds.json`, `variants.json`, `SOURCES.csv`, `CREDITS.md` and
