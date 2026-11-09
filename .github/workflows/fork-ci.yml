@@ -9,6 +9,14 @@ on:
   # The upstream sync starts this on its sync branches, because pull requests
   # opened with the workflow token do not trigger pull_request runs.
   workflow_dispatch:
+    inputs:
+      macos:
+        description:
+          macOS runner for the iOS build. Pick macos-15-intel when GitHub's
+          Apple-silicon Macs are too busy to take the job.
+        type: choice
+        options: [macos-26, macos-15-intel]
+        default: macos-26
 
 permissions:
   contents: read
@@ -94,7 +102,9 @@ jobs:
     name: iOS simulator build
     needs: fork-checks
     if: needs.fork-checks.outputs.native == 'true'
-    runs-on: macos-26
+    # GitHub's Apple-silicon Macs are sometimes too busy to take a job for
+    # hours; a run started by hand can pick an Intel Mac instead.
+    runs-on: ${{ inputs.macos || 'macos-26' }}
     timeout-minutes: 120
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"

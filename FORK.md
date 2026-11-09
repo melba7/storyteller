@@ -164,7 +164,12 @@ and when the upstream sync starts it:
   `pod install` it fetches Sentry's prebuilt framework with retries
   (`tools/fork/prefetch-sentry-xcframework.rb`), because `pod install` tries
   that GitHub download only once. On pull requests it only runs when the mobile
-  app, the root package files or this workflow change.
+  app, the root package files or this workflow change. It runs on GitHub's
+  Apple-silicon Macs (`macos-26`). When those are too busy, the job is cancelled
+  after 15 minutes with "The job was not acquired by Runner"; run Fork CI by
+  hand on the same branch from the Actions tab and pick `macos-15-intel` under
+  "macOS runner". Intel Macs are slower, and GitHub is phasing them out, so keep
+  `macos-26` as the default.
 
 ## One-time GitHub settings
 
@@ -229,6 +234,12 @@ One-time setup, with a paid Apple Developer Program membership:
 
 Each run uses the workflow's run number as the build number, so renaming the
 workflow file would restart the numbering and Apple would refuse the uploads.
+
+If the build job is cancelled after 15 minutes with "The job was not acquired by
+Runner", GitHub had no Apple-silicon Mac free. Run the workflow by hand and pick
+`macos-15-intel` under "macOS runner". That works while the Intel image's Xcode
+still meets Apple's minimum SDK for uploads (it has Xcode 26, which Apple will
+likely accept until spring 2027).
 
 If the upload step fails:
 

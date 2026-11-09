@@ -8,6 +8,14 @@ name: TestFlight
 
 on:
   workflow_dispatch:
+    inputs:
+      macos:
+        description:
+          macOS runner for the App Store build. Pick macos-15-intel when
+          GitHub's Apple-silicon Macs are too busy to take the job.
+        type: choice
+        options: [macos-26, macos-15-intel]
+        default: macos-26
   push:
     branches: [main]
     paths:
@@ -85,8 +93,12 @@ jobs:
     if:
       needs.check.outputs.ready == 'true' || github.event_name ==
       'workflow_dispatch'
-    runs-on: macos-26
-    timeout-minutes: 120
+    # See the macos input above. Apple refuses uploads built with an SDK older
+    # than its yearly minimum, so the Intel image only helps while its Xcode
+    # is new enough.
+    runs-on: ${{ inputs.macos || 'macos-26' }}
+    # An Intel Mac took 80 minutes for the simulator build alone.
+    timeout-minutes: 180
     env:
       READY: ${{ needs.check.outputs.ready }}
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
