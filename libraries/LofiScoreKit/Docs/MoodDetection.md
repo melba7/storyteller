@@ -180,6 +180,14 @@ other moods whose music would also suit. Those go into the reading's
 `scores` after the best mood, so playback can keep music that still fits
 instead of switching.
 
+Next for Claude's reading is a "story so far" note: a short summary of the
+chapters already read (who is who, what is at stake, the book's usual tone)
+sent with each passage, built chapter by chapter from earlier text only.
+It is not measured yet on purpose: the test labels, plausible sets included,
+were made from the passage alone, so a reading that uses the wider story
+can only look worse against them. Judging it needs labels made with the
+story in view, or Mo's listening test.
+
 ## Labels
 
 - `Tools/data/labels/GUIDELINES.md` is the one definition of the moods for
