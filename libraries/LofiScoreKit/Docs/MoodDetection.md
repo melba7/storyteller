@@ -136,6 +136,22 @@ or Haiku), and whether to use the Batch API (half price, answers within
 hours) for whole-book scoring. Claude knows famous novels, so the
 name-masking test matters more for it than for the on-device engines.
 
+### An outside check: EmoBank (9 Nov 2026)
+
+Every score above is against Claude's labels, so Claude both teaches the
+local model and grades it. `Tools/eval/emobank.py` adds a check against
+people instead: EmoBank's 2,753 fiction sentences (seven stories, CC-BY-SA
+4.0, github.com/JULIELab/EmoBank), each rated by several readers for
+valence and arousal. Each sentence becomes a window ending on it, with up to
+120 words of the story before it, so engines read it as they read a book.
+The data stays out of git (`Tools/data/work`). Scores are Spearman
+correlations of each engine's valence and arousal with the people's, with
+intervals from resampling stories, and on the sentences people clearly
+found pleasant or unpleasant, how often the engine's mood is on that side.
+It checks direction and intensity only: emotion ratings say nothing about
+calm against cozy or mysterious. Lexicon, as a floor: valence 0.19 (0.11 to
+0.25), arousal 0.16 (0.09 to 0.21), same side 71% of 386 clear sentences.
+
 ### Claude on the Max plan instead of an API key (9 Nov 2026)
 
 Mo asked whether the Claude steps could run on their Max plan. They can, on
