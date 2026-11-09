@@ -187,14 +187,34 @@ public final class NarrationFollower: @unchecked Sendable {
             }
             sink = newSink
             guard let newSink else { return }
-            if narrating { newSink.narratorDidPlay() }
-            guard let bookID, let text else { return }
-            newSink.openBook(id: bookID)
-            if let position {
-                newSink.narratorDidSeek(toGlobalSentenceIndex: position.globalIndex)
-                newSink.sentenceDidStart(globalSentenceIndex: position.globalIndex, duration: nil)
-                enqueueReading(text.tracker, position, isSeek: true)
-            }
+            replay(to: newSink, reading: true)
+        }
+    }
+
+    /// Brings one more player up to date without touching the attached sink: for a player
+    /// added behind a sink that fans out to several (the music and the atmosphere), so the
+    /// players already there are not told to reopen the book. `install` runs first, on the
+    /// follower's queue, where it should add the player to the fan-out; the narrator's
+    /// events after it then reach the player only after its catch-up. With `reading`, the
+    /// attached sink also gets a fresh mood reading for the current sentence (for a new
+    /// music player; the atmosphere needs none, and the music already playing would take
+    /// it as a seek).
+    public func catchUp(_ newSink: NarrationMusicSink, reading: Bool, install: @escaping @Sendable () -> Void) {
+        scheduler.perform { [self] in
+            install()
+            replay(to: newSink, reading: reading)
+        }
+    }
+
+    /// The open book, whether the narrator is playing, and where it is. On the scheduler.
+    private func replay(to newSink: NarrationMusicSink, reading: Bool) {
+        if narrating { newSink.narratorDidPlay() }
+        guard let bookID, let text else { return }
+        newSink.openBook(id: bookID)
+        if let position {
+            newSink.narratorDidSeek(toGlobalSentenceIndex: position.globalIndex)
+            newSink.sentenceDidStart(globalSentenceIndex: position.globalIndex, duration: nil)
+            if reading { enqueueReading(text.tracker, position, isSeek: true) }
         }
     }
 

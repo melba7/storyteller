@@ -327,6 +327,28 @@ final class NarrationFollowerTests: XCTestCase {
         XCTAssertEqual(replacement.readings, [.reading(4, .seek)], "and the new one gets a reading for where the narrator is")
     }
 
+    func testAPlayerAddedBesideTheOthersCatchesUpAlone() async throws {
+        follower.bookOpened(id: "book")
+        follower.attachText(try Books.text(), toBook: "book")
+        follower.playingChanged(true)
+        for index in 0..<5 {
+            await narrate(Books.clip(0, index))
+        }
+        let before = sink.calls.count
+        let readingsBefore = sink.readings.count
+
+        let added = RecordingSink()
+        follower.catchUp(added, reading: false) {}
+        await follower.waitUntilIdle()
+        XCTAssertEqual(added.calls, [.play, .open("book"), .seek(4), .sentence(4, duration: nil)])
+        XCTAssertEqual(sink.calls.count, before, "the players already there are not reopened")
+        XCTAssertEqual(sink.readings.count, readingsBefore, "and get no extra reading")
+
+        follower.catchUp(RecordingSink(), reading: true) {}
+        await follower.waitUntilIdle()
+        XCTAssertEqual(sink.readings.suffix(1), [.reading(4, .seek)], "a new music player behind the fan-out gets a reading")
+    }
+
     func testFrontMatterIsNotASeek() throws {
         follower.bookOpened(id: "book")
         follower.attachText(try Books.text(), toBook: "book")
