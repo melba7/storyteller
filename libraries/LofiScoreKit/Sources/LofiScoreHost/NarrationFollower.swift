@@ -47,14 +47,20 @@ public struct BookText: Sendable {
     /// The engine's id, for the status screen.
     public let engineID: String
 
+    /// - Parameter cadence: how often to take a reading; nil leaves it to the tracker,
+    ///   which picks one to suit the engine.
     public init(
         spoilerGuard: SpoilerGuard,
         engine: any MoodEngine,
-        cadence: ReadingCadence.Configuration = .default,
+        cadence: ReadingCadence.Configuration? = nil,
         clock: @escaping @Sendable () -> Double = MoodTracker.uptimeSeconds
     ) {
         self.spoilerGuard = spoilerGuard
-        tracker = MoodTracker(spoilerGuard: spoilerGuard, engine: engine, cadence: cadence, clock: clock)
+        if let cadence {
+            tracker = MoodTracker(spoilerGuard: spoilerGuard, engine: engine, cadence: cadence, clock: clock)
+        } else {
+            tracker = MoodTracker(spoilerGuard: spoilerGuard, engine: engine, clock: clock)
+        }
         engineID = engine.id
     }
 }

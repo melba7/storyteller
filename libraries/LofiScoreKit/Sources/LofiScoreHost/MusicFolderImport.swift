@@ -6,8 +6,9 @@ import LofiAudio
 /// the files downloaded.
 ///
 /// What is copied: every audio file (one subfolder per mood, as `MusicLibrary` reads them),
-/// `library.json` and `SOURCES.csv` at the top, mood tracks in `MoodTracks/`, and a Core ML
-/// mood classifier (`.mlmodel` or `.mlmodelc`) at the top. Nothing else.
+/// `library.json` and `SOURCES.csv` at the top, mood tracks (`*.json` in `MoodTracks/`, and
+/// `*.track.json` anywhere, gathered into `MoodTracks/`), and a Core ML mood classifier
+/// (`.mlmodel` or `.mlmodelc`) at the top. Nothing else.
 public enum MusicFolderImport {
     public struct Summary: Sendable, Hashable, Codable {
         public var folderName: String
@@ -140,6 +141,12 @@ public enum MusicFolderImport {
                     }
                     enumerator.skipDescendants()
                 }
+                continue
+            }
+            if name.lowercased().hasSuffix(".track.json") {
+                // Claude mood tracks from the Mac (`make-tracks.sh`), wherever they sit:
+                // they all go to MoodTracks/, where the app looks for them.
+                plan.items.append(Item(url: resolved, relativePath: moodTracksFolderName + "/" + name, isDirectory: false))
                 continue
             }
             let ext = resolved.pathExtension.lowercased()

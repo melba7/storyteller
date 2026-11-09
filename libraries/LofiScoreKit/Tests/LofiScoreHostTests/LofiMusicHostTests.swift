@@ -104,6 +104,7 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/SOURCES.csv", contents: Data("file,license\nfire.m4a,CC0\n".utf8))
         try touch("Picked Music/MoodTracks/some-book.json")
         try touch("Picked Music/MoodTracks/readme.txt")
+        try touch("Picked Music/tracks/The Green Lantern.track.json")
         try touch("Picked Music/Mood.mlmodelc/model.mil")
         try touch("Picked Music/Mood.mlmodelc/weights/weight.bin")
 
@@ -111,12 +112,13 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("app/Music/Old/old.mp3")
 
         let summary = try MusicFolderImport.importFolder(source, into: destination)
-        XCTAssertEqual(summary, .init(folderName: "Picked Music", tracks: 3, moodTracks: 1, hasClassifier: true, notDownloaded: 1))
+        XCTAssertEqual(summary, .init(folderName: "Picked Music", tracks: 3, moodTracks: 2, hasClassifier: true, notDownloaded: 1))
         XCTAssertEqual(files(under: destination), [
             "Calm/rain 70bpm.mp3",
             "Cozy/fire.m4a",
             "Mood.mlmodelc/model.mil",
             "Mood.mlmodelc/weights/weight.bin",
+            "MoodTracks/The Green Lantern.track.json",
             "MoodTracks/some-book.json",
             "SOURCES.csv",
             "Tense/storm.wav",
