@@ -150,7 +150,9 @@ intervals from resampling stories, and on the sentences people clearly
 found pleasant or unpleasant, how often the engine's mood is on that side.
 It checks direction and intensity only: emotion ratings say nothing about
 calm against cozy or mysterious. Lexicon, as a floor: valence 0.19 (0.11 to
-0.25), arousal 0.16 (0.09 to 0.21), same side 71% of 386 clear sentences.
+0.25), arousal 0.16 (0.09 to 0.21); of the 386 clear sentences it puts 31%
+on the right side and takes no side on 57% (it says calm), so its 71% "right
+when it takes a side" flatters it: compare engines on the right-side share.
 
 ### Claude on the Max plan instead of an API key (9 Nov 2026)
 
