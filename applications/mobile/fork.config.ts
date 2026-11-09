@@ -85,6 +85,19 @@ export function withLofiScorePods(plugins: PluginEntry[]): PluginEntry[] {
   })
 }
 
+/**
+ * Which atmosphere recordings the build may play, read by LofiScoreKit from
+ * the Info.plist key `LofiScoreSoundEdition`. "personal" (the default, for
+ * your own builds) may play recordings that are licensed for personal use
+ * only; "publish" leaves them out, for a build that goes on the App Store.
+ * Build with LOFI_SOUND_EDITION=publish to get the publishing edition.
+ */
+export function soundEdition(
+  value: string | undefined = process.env["LOFI_SOUND_EDITION"],
+): "personal" | "publish" {
+  return value?.trim().toLowerCase() === "publish" ? "publish" : "personal"
+}
+
 export function withForkIdentity(
   upstreamConfig: (context: ConfigContext) => ExpoConfig,
 ): (context: ConfigContext) => ExpoConfig {
@@ -100,7 +113,14 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
     ...config,
     name: isDev ? `${forkIdentity.name} (dev)` : forkIdentity.name,
     slug: forkIdentity.slug,
-    ios: { ...config.ios, bundleIdentifier: appId },
+    ios: {
+      ...config.ios,
+      bundleIdentifier: appId,
+      infoPlist: {
+        ...config.ios?.infoPlist,
+        LofiScoreSoundEdition: soundEdition(),
+      },
+    },
     android: { ...config.android, package: appId },
     plugins: withLofiScorePods(config.plugins ?? []),
   }

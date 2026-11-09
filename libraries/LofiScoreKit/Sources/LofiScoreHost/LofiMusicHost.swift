@@ -45,6 +45,14 @@ public final class LofiMusicHost: @unchecked Sendable {
         public var atmospherePlaceholderFolder: URL?
         /// More places to look for atmosphere tracks, besides `AtmosphereTracks/` in the music folder.
         public var atmosphereTrackFolders: [URL]
+        /// Which recordings this build may play: `.personal` for Mo's own builds,
+        /// `.publish` for an App Store build, which never plays a personal-use recording.
+        public var soundEdition: SoundEdition
+        /// Pauses the narrator for this many seconds at the end of the sentence playing now,
+        /// for a swell or a hush in the atmosphere. Answers false when it cannot (and the
+        /// app reports a hold that was dropped with `narrationHold(began: false)`). Nil: no
+        /// pauses.
+        public var holdNarration: (@Sendable (_ seconds: Double) -> Bool)?
 
         public init(
             settings: MusicSettings,
@@ -61,7 +69,9 @@ public final class LofiMusicHost: @unchecked Sendable {
             makeAtmosphereScheduler: @escaping () -> LofiScheduler = { DispatchScheduler(label: "LofiScore.atmosphere") },
             atmosphereConfig: AtmosphereConfig = AtmosphereConfig(),
             atmospherePlaceholderFolder: URL? = nil,
-            atmosphereTrackFolders: [URL] = []
+            atmosphereTrackFolders: [URL] = [],
+            soundEdition: SoundEdition = .personal,
+            holdNarration: (@Sendable (_ seconds: Double) -> Bool)? = nil
         ) {
             self.settings = settings
             self.musicFolder = musicFolder
@@ -78,6 +88,8 @@ public final class LofiMusicHost: @unchecked Sendable {
             self.atmosphereConfig = atmosphereConfig
             self.atmospherePlaceholderFolder = atmospherePlaceholderFolder
             self.atmosphereTrackFolders = atmosphereTrackFolders
+            self.soundEdition = soundEdition
+            self.holdNarration = holdNarration
         }
     }
 
@@ -120,6 +132,7 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var atmosphereGeneration = 0
     private var atmosphereSource = "none"
     private var atmosphereSounds = 0
+    private var atmosphereVariants = 0
     private var atmosphereTrack: (bookID: String, track: AtmosphereTrack?, origin: String?)?
 
     private enum BookTextState: Equatable {
@@ -179,6 +192,14 @@ public final class LofiMusicHost: @unchecked Sendable {
         follower.clipStarted(clip, audioTime: audioTime)
     }
 
+    /// The narrator's pause for a swell or hush (asked for through
+    /// `Environment.holdNarration`) began, or ended or was dropped.
+    public func narrationHold(began: Bool) {
+        queue.async { [self] in
+            atmosphere?.narrationHold(began: began)
+        }
+    }
+
     // MARK: - Settings
 
     public func setEnabled(_ enabled: Bool) async {
@@ -219,6 +240,14 @@ public final class LofiMusicHost: @unchecked Sendable {
             } else {
                 atmosphere?.setEnabled(false)
             }
+        }
+    }
+
+    /// Short narration pauses where the atmosphere swells or hushes.
+    public func setAtmospherePausesEnabled(_ enabled: Bool) async {
+        await onQueue { [self] in
+            settings.atmospherePausesEnabled = enabled
+            atmosphere?.setPausesEnabled(enabled)
         }
     }
 
@@ -581,14 +610,15 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
         atmosphereSource = "none"
         atmosphereSounds = 0
+        atmosphereVariants = 0
         if atmosphereOn { prepareAtmosphere() }
     }
 
-    /// The imported sounds (`Atmosphere/` in the music folder), with synthesised stand-ins
-    /// for the sounds not imported.
+    /// The imported sounds (`Atmosphere/` in the music folder) this build may play, with
+    /// synthesised stand-ins for the sounds not imported.
     static func loadAmbience(_ environment: Environment) -> (AmbienceLibrary, String) {
         let importedFolder = environment.musicFolder.appendingPathComponent(MusicFolderImport.atmosphereFolderName, isDirectory: true)
-        let imported = (try? AmbienceLibrary.load(from: importedFolder)) ?? .empty(at: importedFolder)
+        let imported = (try? AmbienceLibrary.load(from: importedFolder, edition: environment.soundEdition)) ?? .empty(at: importedFolder)
         guard imported.sounds.count < AmbientSound.allCases.count,
               let folder = environment.atmospherePlaceholderFolder,
               let standIns = try? AmbienceSynth.prepare(at: folder, seconds: 20, sampleRate: 24_000)
@@ -604,6 +634,10 @@ public final class LofiMusicHost: @unchecked Sendable {
         let player = AmbiencePlayer(library: library, backend: backend, scheduler: environment.makeAtmosphereScheduler(), config: config)
         player.setMutedRoutes(settings.mutedRoutes)
         player.setEnabled(settings.atmosphereEnabled)
+        player.setPausesEnabled(settings.atmospherePausesEnabled)
+        if let hold = environment.holdNarration {
+            player.requestNarrationHold = { hold($0) }
+        }
         player.onMusicYieldChanged = { [weak self] yielding in
             self?.musicYield.setYielding(yielding)
         }
@@ -616,7 +650,11 @@ public final class LofiMusicHost: @unchecked Sendable {
         atmosphere = player
         atmosphereSource = source
         atmosphereSounds = library.sounds.count
-        HostLog.note("atmosphere: \(library.sounds.count) of \(AmbientSound.allCases.count) sounds (\(source))")
+        atmosphereVariants = library.variants.count
+        HostLog.note(
+            "atmosphere: \(library.sounds.count) of \(AmbientSound.allCases.count) sounds (\(source)), "
+                + "\(library.variants.count) more specific sounds, \(environment.soundEdition.rawValue) edition"
+        )
         // Brings the atmosphere up to date without reopening the book for the music.
         follower.catchUp(player, reading: false) { [sinks] in sinks.setAtmosphere(player) }
     }
@@ -625,9 +663,11 @@ public final class LofiMusicHost: @unchecked Sendable {
         let line: String
         switch event {
         case let .sceneChanged(scene):
-            line = "atmosphere: \(scene.isSilent ? "quiet" : scene.sounds.map(\.rawValue).joined(separator: ", "))"
+            line = "atmosphere: \(scene.isSilent ? "quiet" : scene.layers.map(\.key).joined(separator: ", "))"
         case let .musicYield(yielding):
             line = yielding ? "music steps aside for a crowd" : "music back"
+        case let .narrationHold(moment):
+            line = "atmosphere: \(moment.rawValue), the narrator pauses briefly"
         case let .missingSound(sound):
             line = "no \(sound.rawValue) sound"
         case let .error(message):
@@ -713,6 +753,10 @@ public final class LofiMusicHost: @unchecked Sendable {
                 preparing: preparingAtmosphere,
                 sounds: atmosphereSounds,
                 totalSounds: AmbientSound.allCases.count,
+                variants: atmosphereVariants,
+                edition: environment.soundEdition.rawValue,
+                pausesEnabled: settings.atmospherePausesEnabled,
+                pausesAvailable: environment.holdNarration != nil,
                 track: book != nil && atmosphereTrack?.bookID == book?.id && atmosphereTrack?.track != nil,
                 trackOrigin: atmosphereTrack?.bookID == book?.id ? atmosphereTrack?.origin : nil,
                 place: nil,
@@ -791,6 +835,14 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         /// Sounds with a recording, of `totalSounds`.
         public var sounds: Int
         public var totalSounds: Int
+        /// More specific sounds (church bells, a waterfall) with recordings.
+        public var variants: Int
+        /// "personal" (Mo's builds, personal-use recordings allowed) or "publish".
+        public var edition: String
+        /// Short narration pauses where the sound swells or hushes: the setting, and
+        /// whether this app can pause its narrator.
+        public var pausesEnabled: Bool
+        public var pausesAvailable: Bool
         /// The open book has an atmosphere track, and where it came from.
         public var track: Bool
         public var trackOrigin: String?

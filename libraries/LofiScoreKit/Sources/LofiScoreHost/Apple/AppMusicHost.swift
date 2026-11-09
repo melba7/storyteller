@@ -14,8 +14,13 @@ extension LofiMusicHost {
     /// - AVAudioEngine for the sound, inside the narrator's own audio session,
     /// - the atmosphere: imported sounds in `Music/Atmosphere`, stand-ins synthesised into
     ///   `Caches/LofiScore/Atmosphere`, atmosphere tracks also read from
-    ///   `Application Support/LofiScore/AtmosphereTracks`, and a second AVAudioEngine of its own.
-    public static func forApp(settings: MusicSettings = MusicSettings()) -> LofiMusicHost {
+    ///   `Application Support/LofiScore/AtmosphereTracks`, and a second AVAudioEngine of its own;
+    ///   which recordings it may play comes from the Info.plist (`soundEditionInfoKey`),
+    /// - `holdNarration`, from the app's narrator, for the atmosphere's short pauses.
+    public static func forApp(
+        settings: MusicSettings = MusicSettings(),
+        holdNarration: (@Sendable (_ seconds: Double) -> Bool)? = nil
+    ) -> LofiMusicHost {
         let fileManager = FileManager.default
         let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("LofiScore", isDirectory: true)
@@ -31,7 +36,9 @@ extension LofiMusicHost {
             makeBackend: { AVAudioEngineBackend() },
             makeAmbienceBackend: { AVAmbienceBackend() },
             atmospherePlaceholderFolder: caches.appendingPathComponent("Atmosphere", isDirectory: true),
-            atmosphereTrackFolders: [support.appendingPathComponent("AtmosphereTracks", isDirectory: true)]
+            atmosphereTrackFolders: [support.appendingPathComponent("AtmosphereTracks", isDirectory: true)],
+            soundEdition: soundEdition(Bundle.main.object(forInfoDictionaryKey: soundEditionInfoKey)),
+            holdNarration: holdNarration
         ))
     }
 }

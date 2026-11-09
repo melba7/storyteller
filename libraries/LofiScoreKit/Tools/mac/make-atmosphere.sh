@@ -4,7 +4,7 @@
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
 #   Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model claude-opus-5-5|claude-sonnet-5-5|claude-haiku-5-5]
-#                                [--parallel N] [--dry-run] BOOK.epub|EPUB-DIR ...
+#                                [--parallel N] [--dry-run] [--no-fetch] [--no-copy] BOOK.epub|EPUB-DIR ...
 #
 # --via works as in make-tracks.sh. plan (the default) runs every request
 # through Claude Code (`claude -p`) on the Claude subscription it is signed in
@@ -26,6 +26,13 @@
 # back to it), so a long novel takes most of an hour. --parallel N scores N
 # books at once; the cap is then split evenly between the books.
 #
+# Claude may use the more specific sounds in "~/Storyteller Lofi/Atmosphere/variants.json"
+# (church bells, a waterfall, a cafe...) and may ask for new ones. After scoring,
+# the script runs Tools/atmosphere/fetch_ambience.py to fetch recordings for any
+# new ones (--no-fetch skips that; it needs ffmpeg), then copies the tracks and
+# the Atmosphere folder into "~/Storyteller Lofi/LofiMusic" (--no-copy skips that),
+# ready to import on the phone.
+#
 # The API key is never printed. Use the read-aloud EPUBs as Storyteller serves them: the app matches
 # a track to its book by the digests of its first sentences. To get the tracks
 # onto the phone, put the tracks folder inside the music folder before
@@ -41,6 +48,8 @@ MODEL=claude-opus-5-5
 VIA=plan
 PARALLEL=1
 DRY=0
+FETCH=1
+COPY=1
 BOOKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -49,6 +58,8 @@ while [ $# -gt 0 ]; do
     --via) VIA="$2"; shift 2 ;;
     --parallel) PARALLEL="$2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
+    --no-fetch) FETCH=0; shift ;;
+    --no-copy) COPY=0; shift ;;
     -*) echo "unknown option $1"; exit 2 ;;
     *) BOOKS+=("$1"); shift ;;
   esac
@@ -64,7 +75,9 @@ case "$PARALLEL" in ''|*[!0-9]*|0) echo "--parallel takes a whole number of book
 
 cd "$PKG"
 B=.build/release
-[ -x "$B/lofi-atmosphere" ] || swift build -c release --product lofi-atmosphere > /dev/null || { echo "build failed"; exit 1; }
+# Always build: quick when nothing changed, and never an old binary after a git pull.
+swift build -c release --product lofi-atmosphere > /dev/null || { echo "build failed"; exit 1; }
+VARIANTS="$ROOT/Atmosphere/variants.json"
 mkdir -p "$TRACKS/books" "$TRACKS/logs"
 export LOFI_CLAUDE_VIA="$VIA"
 [ "$VIA" = api ] && export ANTHROPIC_API_KEY_FILE="$KEY_FILE"
@@ -90,7 +103,7 @@ done
 
 if [ "$DRY" = 1 ]; then
   for i in "${!DIRS[@]}"; do
-    $B/lofi-atmosphere track "${DIRS[$i]}" --book "${NAMES[$i]}" --dry-run 2>&1
+    $B/lofi-atmosphere track "${DIRS[$i]}" --book "${NAMES[$i]}" --dry-run --variants "$VARIANTS" 2>&1
   done
   exit 0
 fi
@@ -107,7 +120,7 @@ score_one() {
   local dir="$1" name="$2" log="$3"
   local cap=()
   [ -n "$EACH" ] && cap=(--max-dollars "$EACH")
-  "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" \
+  "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" --variants "$VARIANTS" \
     --out "$TRACKS/$name.atmosphere.json" "${cap[@]+"${cap[@]}"}" 2> "$log"
   # One block per book, even when books finish together.
   local report
@@ -153,5 +166,26 @@ if [ "$VIA" = plan ]; then
 else
   echo "This run spent about \$$total at list prices. Tracks: $TRACKS"
 fi
-echo "To hear them on the phone, copy that folder into the music folder and import it in the app."
+
+if [ "$FETCH" = 1 ]; then
+  if command -v ffmpeg > /dev/null || [ -x /opt/homebrew/bin/ffmpeg ]; then
+    PATH="$PATH:/opt/homebrew/bin"
+    echo "Fetching recordings for any sounds still missing (new ones the books asked for too)..."
+    python3 -I "$PKG/Tools/atmosphere/fetch_ambience.py" 2>&1 | grep -vE ": already has [0-9]+$"
+  else
+    echo "Skipped fetching sounds: ffmpeg is missing (brew install ffmpeg)."
+  fi
+fi
+
+MUSIC="$ROOT/LofiMusic"
+if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
+  mkdir -p "$MUSIC/tracks"
+  for file in "$TRACKS"/*.atmosphere.json "$TRACKS"/*.score.json "$TRACKS"/*.track.json; do
+    [ -f "$file" ] && cp "$file" "$MUSIC/tracks/"
+  done
+  [ -d "$ROOT/Atmosphere" ] && rsync -a --exclude skipped.csv "$ROOT/Atmosphere/" "$MUSIC/Atmosphere/"
+  echo "Copied the tracks and sounds into $MUSIC. Put that folder in iCloud Drive and import it in the app (Settings > Import a music folder)."
+else
+  echo "To hear them on the phone, copy the tracks and the Atmosphere folder into the music folder and import it in the app."
+fi
 echo "Check a track's scenes with: $B/lofi-atmosphere show \"$TRACKS/<book>.atmosphere.json\" --places"

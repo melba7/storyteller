@@ -116,6 +116,22 @@ export function useLofiMusic(pollInterval: number | null) {
     [apply],
   )
 
+  /** Short narration pauses where the sound swells or hushes. */
+  const setAtmospherePauses = useCallback(
+    (enabled: boolean) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? {
+                ...current,
+                atmosphere: { ...current.atmosphere, pausesEnabled: enabled },
+              }
+            : current,
+        () => LofiScore?.setAtmospherePauses(enabled),
+      ),
+    [apply],
+  )
+
   const importMusicFolder =
     useCallback(async (): Promise<LofiImportSummary | null> => {
       if (!LofiScore) return null
@@ -142,6 +158,7 @@ export function useLofiMusic(pollInterval: number | null) {
     setMusicLevel,
     setAtmosphereEnabled,
     setAtmosphereLevel,
+    setAtmospherePauses,
     importMusicFolder,
     removeImportedMusic,
   }

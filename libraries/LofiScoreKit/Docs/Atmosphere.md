@@ -25,6 +25,14 @@ own volume.
 - **Changes are calm.** A new scene crossfades over 6 s, a level change over 4 s, and two
   changes are at least 20 s apart unless the listener seeks. When a new chapter starts and
   has not said where it is yet, the last scene drops 8 dB until it does.
+- **More specific sounds.** Besides the 26 built-in sounds, a scene can use a more specific
+  kind of one: church bells across a town, a waterfall, a café, a train station. Claude asks
+  for a new one when a place clearly calls for it, the Mac fetches recordings for it, and
+  until they are imported the phone plays the built-in sound it is a kind of.
+- **Short pauses for big moments.** When a sentence is the moment a scene arrives
+  (stepping into a crowded hall) or falls silent (a door shutting on the noise), the
+  narrator can stop for under a second while the sound swells or hushes, then carry on.
+  It's a setting ("Short pauses for big scene changes"), on by default, and rare.
 
 ## Spoiler safety
 
@@ -40,6 +48,66 @@ The same rules as the mood track:
 - The status screen shows only the scene playing now.
 
 `BuilderTests`, `DirectorTests` and `AtmosphereHostTests` check these rules.
+
+## More specific sounds (variants)
+
+A variant is a kind of a built-in sound (`of`) with its own recordings, e.g. `churchBells`
+of `oldTown`, `waterfall` of `river`, `cafe` of `crowd`. It behaves exactly like that sound
+(weather or place, crowd yield, level, filter) and only the recording differs. The scene
+stores it on the layer (`{"sound":"oldTown","level":"soft","variant":"churchBells"}`) and the
+track lists the book's variants with the entry that first asked for each (`firstIndex`).
+
+- **Where they come from.** `Atmosphere/variants.json` on the Mac: the fetch script's 32
+  starter variants (drizzle, blizzard, waterfall, harbour, café, tavern, feast hall, train
+  station, church bells, library, spaceship, …) plus every variant a scored book asked for,
+  with the books that asked. Shared variants go into the cached system prompt, so they cost
+  almost nothing per request.
+- **New ones.** Claude may add at most one new variant per answer, only when no built-in
+  sound or listed variant fits and the place clearly calls for it, with words to search a
+  sound library with. The CLI reports them, and the next fetch pulls recordings for them.
+- **Spoiler-safe.** A book's own variants are offered only after the entry that first asked
+  for them. A variant from the catalog that only this same book asked for (in an earlier
+  run) is left out, since it may come from a later chapter. Starter variants and other
+  books' variants say nothing about this book and are always offered.
+- **On the phone.** Recordings live in `Atmosphere/<Sound>.<Variant>/`, e.g.
+  `OldTown.ChurchBells/`. Without them the built-in sound plays, so a track never depends on
+  a fetch having run.
+
+## Short pauses for big moments
+
+Claude marks a scene with a `moment` when the passage's last sentence *is* the moment the
+sound arrives or falls silent, and refinement pins that change to the exact sentence:
+
+- **swell**: walking into a crowded hall, a market or an inn; stepping out into a storm,
+  or a storm breaking; reaching a beach, a cliff edge or a ship's deck; a train, coach or
+  ship setting off, an engine starting; coming upon a waterfall, a river or a bonfire.
+- **hush**: a door shutting on the noise, the rain stopping, an engine cutting out,
+  walking into a silent church or out onto a snowy field.
+
+When the narration reaches that sentence, the player asks the app to hold the narrator for
+0.8 s at the end of the clip being read. While it holds, a swell brings the new sounds in
+over 0.5 s and lifts them 8 dB, released over 3 s once the voice goes on; a hush cuts the
+old sounds over 0.3 s. A moment also waives the 20 s gap between changes.
+
+It stays rare and never surprises: at most one pause every 2 minutes, none in the first
+10 s after play or a seek, never while seeking, only when the moment's sound is actually
+heard, and only when the setting is on and the app's narrator accepts (it refuses while
+paused or already holding). `LofiMusicHost.Environment.holdNarration` is the app's side;
+the app calls `narrationHold(began:)` when the hold starts and ends.
+
+## Personal and published sounds
+
+Each recording's `use` in `sounds.json` says where it may play:
+
+- **personal**: licensed for personal use only (CC BY-NC, or anything fetched through the
+  Freesound API, whose terms are non-commercial). Only Mo's own builds play these.
+- **publish**: a commercial-safe stand-by (CC0, CC BY, CC BY-SA from Wikimedia Commons).
+  Mo's build skips a sound's stand-bys when it has other recordings.
+
+The app's Info.plist key `LofiScoreSoundEdition` picks the edition. `fork.config.ts` sets it
+from `LOFI_SOUND_EDITION`: `personal` by default, `publish` for an App Store build, which
+then plays only commercial-safe recordings. A published build should import the publishing
+set (`~/Storyteller Lofi/AtmospherePublish`) instead of Mo's own.
 
 ## Why these sounds, and how loud
 
@@ -96,7 +164,9 @@ LofiMusic/
   Calm/ Cozy/ …              the music
   Atmosphere/
     Rain/ rain-fs123.m4a …   one folder per sound (names match loosely: "HeavyRain", "heavy rain")
-    sounds.json              loudness, duration, title, author, source, licence
+    OldTown.ChurchBells/ …   one folder per more specific sound: <Sound>.<Variant>
+    sounds.json              loudness, duration, title, author, source, licence, variant, use
+    variants.json            the more specific sounds known on the Mac
     SOURCES.csv  CREDITS.md
   tracks/                    *.track.json, *.atmosphere.json, *.score.json
 ```
@@ -104,29 +174,46 @@ LofiMusic/
 Importing the music folder in Settings copies all of it. Sounds with no recording play the
 synthesised stand-ins, rendered on the phone into Caches the first time. Settings shows how
 many sounds are imported and has a "Sound credits" button for `Atmosphere/CREDITS.md`.
-Only CC0, CC BY and CC BY-SA recordings are used, and audio is never committed (the fork is
-public).
+Published builds play only CC0, CC BY and CC BY-SA recordings (see "Personal and published
+sounds"), and audio is never committed (the fork is public).
 
 ## On the Mac
 
 From the clone in `~/Storyteller Lofi`, in `libraries/LofiScoreKit`:
 
-1. **Recordings.** `python3 -I Tools/atmosphere/fetch_ambience.py`. With a Freesound API key
-   in `~/Storyteller Lofi/.freesound-key` (free at https://freesound.org/apiv2/apply) it
-   searches Freesound; without one it uses Wikimedia Commons. It keeps two steady recordings
-   per sound, checks each licence on the recording's own record, cuts a seamless 60 s loop
-   from the steadiest part (encoded with Apple's AAC encoder so the phone loops it without a
-   tick), measures loudness, and writes `~/Storyteller Lofi/Atmosphere` with
-   `sounds.json`, `SOURCES.csv`, `CREDITS.md` and `skipped.csv`. `--dry-run` lists what it
+The easy way: put read-aloud EPUBs in `~/Storyteller Lofi/Books` and double-click
+`~/Storyteller Lofi/Score atmosphere.command` (a copy of `Tools/mac/score-atmosphere.command`).
+It updates the tools clone in `~/Storyteller Lofi/atmosphere-tools`, scores every book
+through the Claude plan, fetches any new sounds and copies everything into
+`~/Storyteller Lofi/LofiMusic`. The steps it runs:
+
+1. **Recordings.** `python3 -I Tools/atmosphere/fetch_ambience.py [--edition personal|publish]`.
+   - `personal` (the default) searches Freesound with the API key in
+     `~/Storyteller Lofi/.freesound-key` (free at https://freesound.org/apiv2/apply),
+     allowing CC0, CC BY and CC BY-NC, and falls back to Wikimedia Commons. Every
+     Freesound recording is marked `use: personal`. It writes `~/Storyteller Lofi/Atmosphere`.
+   - `publish` uses Wikimedia Commons only, with commercial-safe licences, and writes
+     `~/Storyteller Lofi/AtmospherePublish`.
+
+   It keeps up to `--per-sound 4` recordings per built-in sound and `--per-variant 2` per
+   more specific sound (the starter set plus those the tracks in `--tracks` asked for;
+   `--no-variants` skips them, `--sound OldTown.ChurchBells` fetches only that). It checks
+   each licence on the recording's own record, cuts a seamless 60 s loop from the steadiest
+   part (encoded with Apple's AAC encoder so the phone loops it without a tick), measures
+   loudness, and writes `sounds.json`, `variants.json`, `SOURCES.csv`, `CREDITS.md` and
+   `skipped.csv`, saving as it goes so a stopped run resumes. `--dry-run` lists what it
    would fetch.
 2. **Tracks.** `Tools/mac/make-atmosphere.sh --dry-run BOOK.epub` prints the cost estimate.
-   `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] BOOK.epub …`
+   `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--no-fetch] [--no-copy] BOOK.epub …`
    writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` (and `<book>.score.json` when
-   the mood track is there too). `--via plan` (the default) runs through Claude Code on the
-   signed-in plan; `--via api` uses the key file and needs `--cap`. Runs resume.
-   `lofi-atmosphere show FILE --places` prints the scenes and places.
-3. **Phone.** Copy `Atmosphere/` and `tracks/` into the music folder, put it in iCloud Drive,
-   and import it in Settings.
+   the mood track is there too), offering the variants in `Atmosphere/variants.json`.
+   `--via plan` (the default) runs through Claude Code on the signed-in plan; `--via api`
+   uses the key file and needs `--cap`. Runs resume. Afterwards it fetches recordings for
+   new variants (unless `--no-fetch`; needs ffmpeg) and copies the tracks and `Atmosphere/`
+   into `~/Storyteller Lofi/LofiMusic` (unless `--no-copy`).
+   `lofi-atmosphere show FILE --places` prints the scenes, places and variants, and
+   `lofi-atmosphere library DIR [--edition publish]` lists what a build would play.
+3. **Phone.** Put `LofiMusic` in iCloud Drive and import it in Settings.
 
 Rough cost: one request per ~250 words plus probes, so a 100,000-word novel is ~650
 requests: about $9 with Opus 5.5 at list prices, $4.50 with Sonnet 5.5, $0.25 with Haiku 5.5.
@@ -138,5 +225,7 @@ hour; `--parallel` scores several books at once.
 `swift test --filter "LofiAtmosphereTests|LofiScoreHostTests"` (Linux in Docker or the Mac).
 The player is tested against `FakeAmbienceBackend` with a manual clock: scenes follow the
 narration, places keep their recordings, crowd yield on and off, pauses, muted routes,
-headphones pulled, media reset, the level slider. The synth tests check every sound renders
+headphones pulled, media reset, the level slider. `VariantTests` covers variant ids and
+folders, the catalog's spoiler rule, editions, Claude's new variants and moments, and the
+narration holds (swell, hush, too early, refused, dropped, setting off). The synth tests check every sound renders
 at -23 LUFS and loops without a seam.

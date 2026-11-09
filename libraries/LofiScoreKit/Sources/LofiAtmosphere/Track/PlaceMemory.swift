@@ -23,13 +23,30 @@ public struct PlaceMemory: Sendable, Hashable {
     public private(set) var current: StoryScene?
     /// The newest note about the book's world.
     public private(set) var world: String?
+    /// The more specific sounds the scorer may use: the book's own variants asked for
+    /// before this point, then those from other books and the starter set.
+    public private(set) var variants: [SoundVariant] = []
     private var lastGlobalIndex: Int?
 
     public init() {}
 
-    /// The memory as of just before `globalIndex`: every entry before it, in order.
-    public init(track: AtmosphereTrack, before globalIndex: Int) {
+    /// The memory as of just before `globalIndex`: every entry before it, in order, and
+    /// the variants first asked for before it, then `offered` ones (never this book's).
+    public init(track: AtmosphereTrack, before globalIndex: Int, offered: [SoundVariant] = []) {
         self.init(entries: track.entries(before: globalIndex))
+        offer(track.variants(before: globalIndex))
+        offer(offered)
+    }
+
+    /// Adds variants the scorer may use; one already offered under the same id stays.
+    public mutating func offer(_ more: [SoundVariant]) {
+        for variant in more where !variants.contains(where: { $0.id == variant.id }) {
+            variants.append(variant)
+        }
+    }
+
+    public func variant(_ id: String) -> SoundVariant? {
+        variants.first { $0.id == id }
     }
 
     public init<S: Sequence>(entries: S) where S.Element == AtmosphereTrack.Entry {

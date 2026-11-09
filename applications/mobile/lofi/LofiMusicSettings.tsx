@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
+import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import { LofiScore } from "@/modules/lofi-score"
 import {
@@ -153,7 +154,31 @@ export function LofiMusicSettings() {
                 They come from an Atmosphere folder inside the music folder,
                 with one subfolder per sound (Rain, Fireplace, Crowd, …), and
                 play for books with an atmosphere track.
+                {status.atmosphere.edition === "personal" &&
+                  " This build may also play recordings that are for personal use only; a published build leaves them out."}
               </Text>
+              {status.atmosphere.pausesAvailable && (
+                <View className="w-full flex-row items-center justify-between gap-4">
+                  <View className="shrink gap-1">
+                    <Text maxFontSizeMultiplier={1.5}>
+                      Short pauses for big scene changes
+                    </Text>
+                    <Text variant="muted">
+                      The narrator stops for under a second while the sound
+                      swells, like walking into a crowded hall or a storm
+                      breaking, or goes quiet, then carries on.
+                    </Text>
+                  </View>
+                  <Switch
+                    accessibilityLabel="Short pauses for big scene changes"
+                    checked={status.atmosphere.pausesEnabled ?? true}
+                    disabled={!status.atmosphere.enabled}
+                    onCheckedChange={(enabled) =>
+                      void music.setAtmospherePauses(enabled)
+                    }
+                  />
+                </View>
+              )}
               {(status.atmosphere.source === "imported" ||
                 status.atmosphere.source === "mixed") && (
                 <Button

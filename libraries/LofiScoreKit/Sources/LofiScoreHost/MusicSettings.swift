@@ -48,6 +48,13 @@ public final class MusicSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: prefix + "atmosphereEnabled") }
     }
 
+    /// Short narration pauses (under a second) where the atmosphere swells or hushes: walking
+    /// into a crowded hall, a storm breaking, a door shutting on a noisy room. On by default.
+    public var atmospherePausesEnabled: Bool {
+        get { defaults.object(forKey: prefix + "atmospherePausesEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: prefix + "atmospherePausesEnabled") }
+    }
+
     /// The atmosphere's level under the voice, in dB, if the listener moved the slider. Nil
     /// means the player's default.
     public var atmosphereLevelDB: Double? {
