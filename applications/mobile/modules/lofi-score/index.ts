@@ -10,6 +10,9 @@ export type LofiMood =
   | "mysterious"
   | "tense"
   | "somber"
+  | "romantic"
+  | "dreamy"
+  | "adventurous"
   | (string & {})
 
 /** The music's state, as the native module reports it. */
