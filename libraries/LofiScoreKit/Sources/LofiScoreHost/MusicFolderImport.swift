@@ -12,7 +12,8 @@ import LofiScoreCore
 /// at the top,
 /// mood tracks and book scores (`*.json` in `MoodTracks/`, and `*.track.json` or
 /// `*.score.json` anywhere, gathered into `MoodTracks/`), and the Fast mood models at the top (embedding models named
-/// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). For the
+/// `LofiMood-embed-*.json`, fine-tuned transformers `LofiMood-lm-*.json` with their `.mlmodelc`, Core ML classifiers
+/// `.mlmodel` or `.mlmodelc`). For the
 /// atmosphere: `Atmosphere/<Sound>/` and `Atmosphere/<Sound>.<Variant>/` audio with
 /// `Atmosphere/sounds.json`, `variants.json`, `SOURCES.csv` and `CREDITS.md`, and atmosphere tracks (`*.atmosphere.json` anywhere, gathered into
 /// `AtmosphereTracks/`). Nothing else: an audiobook unpacked somewhere in the folder is left behind.
@@ -96,7 +97,7 @@ public enum MusicFolderImport {
             folderName: source.lastPathComponent,
             tracks: library.tracks.count,
             moodTracks: plan.items.filter { $0.relativePath.hasPrefix(moodTracksFolderName + "/") }.count,
-            hasClassifier: plan.items.contains { isClassifier($0.url) || isEmbeddingModel($0.url) },
+            hasClassifier: plan.items.contains { isClassifier($0.url) || isEmbeddingModel($0.url) || isTransformerModel($0.url) },
             notDownloaded: plan.notDownloaded,
             atmosphereRecordings: plan.items.filter {
                 $0.relativePath.hasPrefix(atmosphereFolderName + "/")
@@ -108,12 +109,19 @@ public enum MusicFolderImport {
 
     /// The Fast mood models in a music folder, best first, for
     /// `MoodEngineCatalog.fastEngine(modelURLs:)`, which uses the first one that loads.
-    /// Embedding models come first (they scored better on held-out books), the contextual
-    /// ones ahead of the word one: they need Apple's downloadable assets and fall through to
-    /// the next model until those are on the phone. Then the Core ML classifiers, compiled first.
+    /// A fine-tuned transformer's settings (`LofiMood-lm-*.json`) come first: it is the most
+    /// accurate kind when its compiled model is there, and the others are its fallbacks. Its
+    /// `.mlmodelc` is not listed again as a classifier. Then the embedding models (they scored
+    /// better on held-out books), the contextual ones ahead of the word one: they need Apple's
+    /// downloadable assets and fall through to the next model until those are on the phone.
+    /// Then the Core ML classifiers, compiled first.
     public static func moodModels(in folder: URL, fileManager: FileManager = .default) -> [URL] {
         let contents = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-        return contents.filter { isEmbeddingModel($0) || isClassifier($0) }.sorted { lhs, rhs in
+        let transformers = Set(contents.filter(isTransformerModel).map { $0.deletingPathExtension().lastPathComponent.lowercased() })
+        return contents.filter { url in
+            if isTransformerModel(url) || isEmbeddingModel(url) { return true }
+            return isClassifier(url) && !transformers.contains(url.deletingPathExtension().lastPathComponent.lowercased())
+        }.sorted { lhs, rhs in
             (modelRank(lhs), lhs.lastPathComponent) < (modelRank(rhs), rhs.lastPathComponent)
         }
     }
@@ -125,6 +133,7 @@ public enum MusicFolderImport {
 
     static func modelRank(_ url: URL) -> Int {
         let name = url.lastPathComponent.lowercased()
+        if isTransformerModel(url) { return -1 }
         if isEmbeddingModel(url) {
             if name.contains("word+contextual") { return 0 }
             if name.contains("contextual") { return 1 }
@@ -137,6 +146,13 @@ public enum MusicFolderImport {
     static func isEmbeddingModel(_ url: URL) -> Bool {
         let name = url.lastPathComponent.lowercased()
         return name.hasPrefix("lofimood-embed-") && url.pathExtension.lowercased() == "json"
+    }
+
+    /// A fine-tuned transformer's settings file (`LofiMood-lm-*.json`, from
+    /// `Tools/mac/finetune.sh --convert`), which names the compiled model beside it.
+    static func isTransformerModel(_ url: URL) -> Bool {
+        let name = url.lastPathComponent.lowercased()
+        return name.hasPrefix("lofimood-lm-") && url.pathExtension.lowercased() == "json"
     }
 
     // MARK: - Internals
@@ -244,7 +260,8 @@ public enum MusicFolderImport {
             let ext = resolved.pathExtension.lowercased()
             let topLevel = components.count == 1
             if isMusic(components)
-                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || name.lowercased() == creditsFileName.lowercased() || ext == "mlmodel" || isEmbeddingModel(resolved))
+                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || name.lowercased() == creditsFileName.lowercased() || ext == "mlmodel"
+                    || isEmbeddingModel(resolved) || isTransformerModel(resolved))
                 || components.count == 2 && components[0] == moodTracksFolderName && ext == "json"
             {
                 plan.items.append(Item(url: resolved, relativePath: relative, isDirectory: false))

@@ -147,6 +147,9 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/LofiMood-embed-word+contextual-3.json")
         try touch("Picked Music/Old.mlmodel")
         try touch("Picked Music/tracks/LofiMood-embed-stray.json")
+        // A fine-tuned transformer: its settings and its compiled model.
+        try touch("Picked Music/LofiMood-lm-minilm-soft.json")
+        try touch("Picked Music/LofiMood-lm-minilm-soft.mlmodelc/model.mil")
         // The atmosphere's sounds and tracks.
         try touch("Picked Music/Atmosphere/Rain/rain-1.m4a")
         try touch("Picked Music/Atmosphere/Rain/.rain-2.m4a.icloud")
@@ -184,6 +187,8 @@ final class LofiMusicHostTests: XCTestCase {
             "Credits.md",
             "LofiMood-embed-word+contextual-3.json",
             "LofiMood-embed-word-3.json",
+            "LofiMood-lm-minilm-soft.json",
+            "LofiMood-lm-minilm-soft.mlmodelc/model.mil",
             "Mood.mlmodelc/model.mil",
             "Mood.mlmodelc/weights/weight.bin",
             "MoodTracks/The Green Lantern.score.json",
@@ -194,6 +199,7 @@ final class LofiMusicHostTests: XCTestCase {
             "Tense/storm.wav",
         ])
         XCTAssertEqual(MusicFolderImport.moodModels(in: destination).map(\.lastPathComponent), [
+            "LofiMood-lm-minilm-soft.json",
             "LofiMood-embed-word+contextual-3.json",
             "LofiMood-embed-word-3.json",
             "Mood.mlmodelc",
