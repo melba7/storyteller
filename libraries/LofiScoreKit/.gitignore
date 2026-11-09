@@ -1,0 +1,9 @@
+.build/
+.swiftpm/
+*.xcodeproj/
+DerivedData/
+Tools/data/work/
+Tools/data/books/
+*.mlmodel
+*.mlmodelc
+__pycache__/

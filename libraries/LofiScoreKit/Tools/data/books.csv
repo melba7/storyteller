@@ -1,0 +1,35 @@
+pg_id,slug,title,author,group
+345,dracula,Dracula,Bram Stoker,famous
+1342,pride-and-prejudice,Pride and Prejudice,Jane Austen,famous
+41445,frankenstein,Frankenstein,Mary Shelley,famous
+2852,hound-of-the-baskervilles,The Hound of the Baskervilles,Arthur Conan Doyle,famous
+28885,alice-in-wonderland,Alice's Adventures in Wonderland,Lewis Carroll,famous
+289,wind-in-the-willows,The Wind in the Willows,Kenneth Grahame,famous
+30368,a-christmas-carol,A Christmas Carol,Charles Dickens,famous
+120,treasure-island,Treasure Island,Robert Louis Stevenson,famous
+1260,jane-eyre,Jane Eyre,Charlotte Bronte,famous
+768,wuthering-heights,Wuthering Heights,Emily Bronte,famous
+113,the-secret-garden,The Secret Garden,Frances Hodgson Burnett,famous
+45,anne-of-green-gables,Anne of Green Gables,L. M. Montgomery,famous
+215,call-of-the-wild,The Call of the Wild,Jack London,famous
+35,the-time-machine,The Time Machine,H. G. Wells,famous
+36,war-of-the-worlds,The War of the Worlds,H. G. Wells,famous
+209,turn-of-the-screw,The Turn of the Screw,Henry James,famous
+1874,railway-children,The Railway Children,E. Nesbit,famous
+271,black-beauty,Black Beauty,Anna Sewell,famous
+550,silas-marner,Silas Marner,George Eliot,famous
+55,wizard-of-oz,The Wonderful Wizard of Oz,L. Frank Baum,famous
+37332,a-little-princess,A Little Princess,Frances Hodgson Burnett,famous
+10007,carmilla,Carmilla,J. Sheridan Le Fanu,famous
+558,thirty-nine-steps,The Thirty-Nine Steps,John Buchan,famous
+139,the-lost-world,The Lost World,Arthur Conan Doyle,famous
+4517,ethan-frome,Ethan Frome,Edith Wharton,famous
+105,persuasion,Persuasion,Jane Austen,famous
+57311,heart-of-a-mystery,The Heart of a Mystery,T. W. Speight,obscure
+29088,polly-of-lady-gay-cottage,Polly of Lady Gay Cottage,Emma C. Dowd,obscure
+34522,secret-of-the-league,The Secret of the League,Ernest Bramah,obscure
+21059,dick-maitland,The Adventures of Dick Maitland,Harry Collingwood,obscure
+58082,adventures-of-an-ugly-girl,The Adventures of an Ugly Girl,Elizabeth Burgoyne Corbett,obscure
+21489,secret-of-the-island,Secret of the Island,W. H. G. Kingston,obscure
+8155,colonel-thorndykes-secret,Colonel Thorndyke's Secret,G. A. Henty,obscure
+30299,romance-of-a-plain-man,The Romance of a Plain Man,Ellen Glasgow,obscure
