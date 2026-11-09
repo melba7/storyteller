@@ -156,8 +156,9 @@ A library is a folder with one subfolder per mood, or a `library.json`:
 
 ```
 LofiMusic/
-  Calm/        Cozy/      Playful/    Hopeful/
-  Melancholy/  Mysterious/ Tense/     Somber/
+  Calm/        Cozy/       Playful/    Hopeful/
+  Melancholy/  Mysterious/ Tense/      Somber/
+  Romantic/    Dreamy/     Adventurous/
   library.json   (optional; written by an import tool)
 ```
 
@@ -194,9 +195,16 @@ kept. Run it again after adding music. `--dry-run` only prints.
 **Placeholder music.** `swift run -c release lofi-placeholders` synthesises 22
 original tracks (two per mood, 30 to 42 s, distinct tempos and keys) normalised
 to −16 LUFS, into `PlaceholderLibrary/`. The demo makes them on first launch.
-Mo's Mac also has 32 CC0 tracks by HoliznaCC0 from Free Music Archive in
-`~/Storyteller Lofi/LofiMusic` (4 per mood, sources and licenses in
-`SOURCES.csv`), picked by title and tags, not by ear.
+
+**The library on Mo's Mac.** `~/Storyteller Lofi/LofiMusic` holds 90 instrumental
+tracks: 8 per mood, 10 for calm. They are by Purrple Cat, HoliznaCC0, FSM Team and
+nine other artists, and every one is CC0, CC BY or CC BY-SA. They were chosen from
+740 license-checked candidates by measuring and scoring, not by ear. Vocals, wide
+dynamics, holiday themes and the busiest tracks were filtered out, and steady, warm
+tracks ranked higher. `SOURCES.csv` and `CREDITS.md` in the folder give each track's
+page, its license and the credit that license asks for.
+[`Tools/library`](../Tools/library/README.md) has the scripts and the method. The
+first set (32 CC0 tracks by HoliznaCC0) is in `~/Storyteller Lofi/Retired/`.
 
 ## The demo
 
@@ -217,8 +225,8 @@ six-minute story shows its changes.
 - **iPhone:** open `Demo/LofiScoreDemo.xcodeproj` in Xcode, choose your team
   under Signing, pick the phone and run. The scheme runs the Release build so
   the first-launch synthesis takes seconds, not minutes. "Choose music folder…"
-  opens a folder of real tracks, for example the CC0 set copied to the phone
-  with the Files app.
+  opens a folder of real tracks, for example the music library copied to the
+  phone with the Files app.
 
 The same narrator and mood source run headless in `Tests/LofiDemoKitTests`,
 which plays the whole story on a manual clock and checks that no change is
