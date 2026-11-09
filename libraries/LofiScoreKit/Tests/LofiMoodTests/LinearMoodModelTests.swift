@@ -124,8 +124,8 @@ import LofiScoreCore
         }
         let calmHeavy = candidate(0.376, 0.255, 0.229)
         let varied = candidate(0.352, 0.258, 0.291)
-        #expect(LinearMoodModelSelection.best([calmHeavy, varied]) == varied)
-        #expect(LinearMoodModelSelection.best([calmHeavy, varied], by: .exact) == calmHeavy)
+        #expect(LinearMoodModelSelection.best([calmHeavy, varied]) == calmHeavy)
+        #expect(LinearMoodModelSelection.best([calmHeavy, varied], by: .kappa) == varied)
         #expect(LinearMoodModelSelection.best([calmHeavy, varied], by: .macroF1) == varied)
         #expect(LinearMoodModelSelection.Criterion(rawValue: "macro-f1") == .macroF1)
     }

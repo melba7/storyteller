@@ -35,12 +35,12 @@ public enum LinearMoodModelSelection {
 
     /// What "best" means when choosing among candidates.
     public enum Criterion: String, CaseIterable, Codable, Sendable {
-        /// Cohen's kappa, then exact: agreement beyond what always naming the
-        /// commonest moods would get, so rarer moods are not traded away for
-        /// a few more calm windows.
-        case kappa
-        /// Exact agreement, then kappa.
+        /// Exact agreement, then kappa. The default: in Mac round 6 the
+        /// kappa pick (class-weighted) did worse on the held-out books by
+        /// every measure, and named the rarer moods far too often.
         case exact
+        /// Cohen's kappa, then exact.
+        case kappa
         /// Macro-F1 (every mood counts equally), then kappa.
         case macroF1 = "macro-f1"
 
@@ -85,7 +85,7 @@ public enum LinearMoodModelSelection {
         settings: [LinearMoodModel.TrainingOptions],
         earlierWeights: [Double],
         folds count: Int,
-        criterion: Criterion = .kappa,
+        criterion: Criterion = .exact,
         progress: ((String) -> Void)? = nil
     ) -> [Candidate] {
         guard !examples.isEmpty else { return [] }
@@ -142,7 +142,7 @@ public enum LinearMoodModelSelection {
     }
 
     /// The best candidate by `criterion` (the first one on a tie).
-    public static func best(_ candidates: [Candidate], by criterion: Criterion = .kappa) -> Candidate? {
+    public static func best(_ candidates: [Candidate], by criterion: Criterion = .exact) -> Candidate? {
         candidates.reduce(nil) { best, c in best.map { isBetter(c, than: $0, by: criterion) ? c : $0 } ?? c }
     }
 

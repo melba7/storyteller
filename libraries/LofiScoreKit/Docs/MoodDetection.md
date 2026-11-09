@@ -219,7 +219,7 @@ $B/lofi-train train --algorithm bert --version 3      # optional; see the result
 # 26; --curve adds a learning curve, --all also trains on the test books
 $B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve
 # the model that ships: the chosen kind, trained on all 34 books
-$B/lofi-train embed --kinds word --version 5 --all
+$B/lofi-train embed --kinds word --version 3 --all
 for m in maxent bert; do
   $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done
@@ -287,6 +287,8 @@ supported iPhone, and agrees best with Mo's labels. So:
 | embed:word v2 | 320 | 35.3% | 0.295 | 0.234 | 10 ms |
 | embed:contextual v2 | 320 | 34.4% | 0.287 | 0.232 | 47 ms |
 | embed:word+contextual v2 | 320 | 34.4% | 0.329 | 0.234 | 56 ms |
+| **Mac round 6** | | | | | |
+| embed:word v4 (settings chosen by kappa: class-weighted) | 320 | 30.6% | 0.268 | 0.209 | 10 ms |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
 scored against Claude's labels. Round 1 used the first 1,360 windows and
@@ -375,10 +377,17 @@ on the test books it scored 26.5% trained on 6 books, 31.2% on 13, 33.0% on
 19 and 35.3% on 26, about 4 points per doubling, so labelled windows from
 more books are the next lever. (Contextual levelled off near 34% from 13
 books.) Choosing settings by exact agreement picked unweighted moods; the
-class-weighted setting had 2.4 points less exact agreement but macro-F1
-0.291 instead of 0.229 and the same kappa, so it names somber, cozy and
-hopeful far more often. `lofi-train embed` now chooses by kappa
-(`--choose`), which does not trade the rarer moods away for calm.
+class-weighted setting had 2.4 points less exact agreement in
+cross-validation but macro-F1 0.291 instead of 0.229 and the same kappa.
+
+Round 6 tested choosing by kappa, which picks that class-weighted setting.
+On the test books it lost on every measure (30.6% exact, macro-F1 0.268,
+kappa 0.209, against 35.3%, 0.295 and 0.234) and overcorrected: it named
+hopeful 45 times where the labels have 20, cozy 40 against 18, and the
+three new moods 27 times against 5. So exact agreement stays the default
+(`--choose exact|kappa|macro-f1`), and the shipped model is
+`LofiMood-embed-word-3.json`: word embeddings, unweighted, l2 0.1, earlier
+words at 0.2, trained on all 34 books.
 
 By the rule above, **the Fast engine is the default**: it is the best
 engine, deterministic, quick and plot-blind. Since round 4 the embedding

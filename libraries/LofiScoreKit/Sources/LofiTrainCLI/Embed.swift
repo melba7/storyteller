@@ -6,7 +6,7 @@ import NaturalLanguage
 #endif
 
 // lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
-//                  [--choose kappa|exact|macro-f1] [--version V] [--out-dir Models]
+//                  [--choose exact|kappa|macro-f1] [--version V] [--out-dir Models]
 //                  [--iterations N] [--all] [--curve]
 //     macOS only (Apple's embeddings). For each kind ("+" puts kinds side by
 //     side in one feature vector), computes features for the newest words of
@@ -16,11 +16,11 @@ import NaturalLanguage
 //     the training books (train.json plus valid.json) are dealt into --folds
 //     groups, and each setting is scored on every group by a model trained on
 //     the others, reading each window exactly as EmbeddingMoodEngine does.
-//     --choose says what "best" means. The default, kappa, discounts the
-//     agreement that naming the commonest moods gets anyway; choosing by
-//     exact agreement favours settings that rarely name the rarer moods (in
-//     Mac round 5 the exact pick won 2.4 points of exact agreement but lost
-//     0.06 macro-F1, with no better kappa).
+//     --choose says what "best" means (default exact agreement). Choosing by
+//     kappa looked fairer to the rarer moods in cross-validation, but in Mac
+//     round 6 its pick scored worse on the held-out books by every measure
+//     and named hopeful, cozy and the new moods far more often than the
+//     labels do.
 //     Then trains on all the training books (and the test books too with
 //     --all, for the model that ships), scores DIR/test.json, and writes
 //     OUT/LofiMood-embed-<kind>-<V>.json with a .report.json beside it.
@@ -58,9 +58,9 @@ func embedCommand(_ options: Options) throws {
     let iterations = options.int("iterations", default: 300)
     let folds = options.int("folds", default: 5)
     if folds < 2 { fail("--folds must be 2 or more") }
-    let choose = options.string("choose") ?? "kappa"
+    let choose = options.string("choose") ?? "exact"
     guard let criterion = LinearMoodModelSelection.Criterion(rawValue: choose) else {
-        fail("--choose must be kappa, exact or macro-f1")
+        fail("--choose must be exact, kappa or macro-f1")
     }
     #if canImport(NaturalLanguage)
     try embedExperiment(dataDir: dataDir, kinds: kinds, version: version, outDir: outDir, iterations: iterations,
