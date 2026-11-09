@@ -4,17 +4,6 @@ import LofiScoreCore
 import LofiText
 import NaturalLanguage
 
-/// Which of Apple's on-device text embeddings feeds a `LinearMoodModel`.
-public enum TextFeatureKind: String, CaseIterable, Sendable {
-    /// `NLEmbedding.sentenceEmbedding`: one vector per sentence (iOS 14+).
-    case sentence
-    /// `NLEmbedding.wordEmbedding`: averaged word vectors (iOS 13+).
-    case word
-    /// `NLContextualEmbedding`: Apple's BERT-style model, mean-pooled (iOS 17+,
-    /// needs its assets on the device).
-    case contextual
-}
-
 /// Turns the newest words of a window into a fixed-length feature vector.
 ///
 /// Every kind gives two halves: the mean over the whole chunk, and the mean
@@ -117,41 +106,66 @@ public final class TextFeaturizer: @unchecked Sendable {
     }
 }
 
+/// One or more featurizers side by side: the feature vector is theirs joined
+/// in order, and the id joins their ids with "+".
+public final class MoodFeaturizer: @unchecked Sendable {
+    public let parts: [TextFeaturizer]
+    public let id: String
+    public let dimension: Int
+
+    public init(kinds: [TextFeatureKind]) throws {
+        precondition(!kinds.isEmpty, "need at least one kind")
+        parts = try kinds.map { try TextFeaturizer(kind: $0) }
+        id = parts.map(\.id).joined(separator: "+")
+        dimension = parts.reduce(0) { $0 + $1.dimension }
+    }
+
+    public func features(for text: String) throws -> [Double] {
+        try parts.flatMap { try $0.features(for: text) }
+    }
+}
+
 /// The Fast engine with Apple's on-device embeddings instead of a bag of
 /// words: a `TextFeaturizer` feeding a `LinearMoodModel` trained by
 /// `lofi-train embed`. Plot-blind and deterministic like the Create ML one.
 public final class EmbeddingMoodEngine: MoodEngine, @unchecked Sendable {
     public let id: String
     public let chunkWords: Int
+    /// How much the words before the newest ones count; the model's own
+    /// choice unless the caller overrides it.
     public let previousChunkWeight: Double
     private let model: LinearMoodModel
-    private let featurizer: TextFeaturizer
+    private let featurizer: MoodFeaturizer
 
-    public init(modelURL: URL, version: String = "1", chunkWords: Int = ClassifierInput.defaultChunkWords, previousChunkWeight: Double = 0.35) throws {
+    public init(modelURL: URL, version: String = "1", chunkWords: Int = ClassifierInput.defaultChunkWords, previousChunkWeight: Double? = nil) throws {
         let model = try LinearMoodModel.load(from: modelURL)
-        guard let kindName = model.features.split(separator: ".").first, let kind = TextFeatureKind(rawValue: String(kindName)) else {
+        guard let kinds = TextFeatureKind.kinds(featureID: model.features) else {
             throw MoodEngineError.unavailable("model features \(model.features) are not a known embedding")
         }
-        let featurizer = try TextFeaturizer(kind: kind)
+        let featurizer = try MoodFeaturizer(kinds: kinds)
         guard featurizer.id == model.features, featurizer.dimension == model.dimension else {
             throw MoodEngineError.unavailable("model was trained on \(model.features), this device has \(featurizer.id)")
         }
         self.model = model
         self.featurizer = featurizer
-        self.id = "fast.embed-\(kind.rawValue)/\(version)"
+        self.id = "fast.embed-\(kinds.map(\.rawValue).joined(separator: "+"))/\(version)"
         self.chunkWords = chunkWords
-        self.previousChunkWeight = previousChunkWeight
+        self.previousChunkWeight = previousChunkWeight ?? model.previousChunkWeight ?? 0.35
     }
 
     public func reading(for window: CausalWindow) async throws -> MoodReading {
         guard window.wordCount > 0 else { throw MoodEngineError.emptyWindow }
         let recent = ClassifierInput.recentChunk(of: window.text, words: chunkWords)
         let earlier = ClassifierInput.earlierChunk(of: window.text, words: chunkWords)
-        var scores = model.scores(try featurizer.features(for: recent))
-        if earlier.split(separator: " ").count >= 40, previousChunkWeight > 0, let older = try? model.scores(featurizer.features(for: earlier)) {
-            for bucket in MoodBucket.allCases {
-                scores[bucket] = (1 - previousChunkWeight) * (scores[bucket] ?? 0) + previousChunkWeight * (older[bucket] ?? 0)
-            }
+        let recentFeatures = try featurizer.features(for: recent)
+        var earlierFeatures: [Double]?
+        if previousChunkWeight > 0, ClassifierInput.wordCount(earlier) >= ClassifierInput.minimumEarlierWords {
+            earlierFeatures = try? featurizer.features(for: earlier)
+        }
+        let p = model.probabilities(recent: recentFeatures, earlier: earlierFeatures, earlierWeight: previousChunkWeight)
+        var scores: [MoodBucket: Double] = [:]
+        for (name, q) in zip(model.classes, p) {
+            if let bucket = MoodBucket(lenient: name) { scores[bucket, default: 0] += q }
         }
         let total = scores.values.reduce(0, +)
         guard total > 0, let best = scores.max(by: { $0.value < $1.value }) else {

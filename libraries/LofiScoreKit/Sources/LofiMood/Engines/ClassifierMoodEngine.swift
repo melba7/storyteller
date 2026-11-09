@@ -44,7 +44,7 @@ public final class ClassifierMoodEngine: MoodEngine, @unchecked Sendable {
         let earlier = ClassifierInput.earlierChunk(of: window.text, words: chunkWords)
 
         var scores = hypotheses(for: recent)
-        if earlier.split(separator: " ").count >= 40, previousChunkWeight > 0 {
+        if ClassifierInput.wordCount(earlier) >= ClassifierInput.minimumEarlierWords, previousChunkWeight > 0 {
             let older = hypotheses(for: earlier)
             for bucket in MoodBucket.allCases {
                 scores[bucket] = (1 - previousChunkWeight) * (scores[bucket] ?? 0) + previousChunkWeight * (older[bucket] ?? 0)

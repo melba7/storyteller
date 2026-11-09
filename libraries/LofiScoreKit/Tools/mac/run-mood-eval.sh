@@ -81,13 +81,14 @@ cp Models/LofiMood-maxent-4.mlmodel* "$OUT/" 2>/dev/null || true
 cp Models/LofiMood-maxent-4.report.json "$OUT/" 2>/dev/null || true
 
 step "Fast engine: Apple's on-device embeddings with a trained softmax head"
-# Settings and the blend with maxent v4 are chosen on the 3 validation books;
-# the summary's "test" is the 320 held-out windows. The contextual kind is
-# skipped (not downloaded) if its assets are not already on this Mac.
-$B/lofi-train embed --kinds sentence,word,contextual --blend Models/LofiMood-maxent-4.mlmodel --version 1 \
-  2> "$OUT/embed.log"
-grep -A20 "^summary" "$OUT/embed.log" || tail -20 "$OUT/embed.log"
-cp Models/LofiMood-embed-*-1.report.json "$OUT/" 2>/dev/null || true
+# Settings (and how much the earlier words count) are chosen by 5-fold
+# cross-validation over the 26 training books; the summary's "test" is the
+# 320 held-out windows, and the learning curve shows whether more labelled
+# windows would help. The contextual kind is skipped (not downloaded) if its
+# assets are not already on this Mac.
+$B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve 2> "$OUT/embed.log"
+grep -A30 "^summary" "$OUT/embed.log" || tail -30 "$OUT/embed.log"
+cp Models/LofiMood-embed-*-2.report.json "$OUT/" 2>/dev/null || true
 
 step "Fast engine and baselines on the 320 held-out windows"
 T="$W/train/test-windows.jsonl"
@@ -95,7 +96,7 @@ $B/lofi-eval run --engine fast:Models/LofiMood-maxent-4.mlmodel --in "$T" --out 
 [ -s Models/LofiMood-maxent-3.mlmodel ] && \
   $B/lofi-eval run --engine fast:Models/LofiMood-maxent-3.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-3.jsonl"
 $B/lofi-eval run --engine lexicon --in "$T" --out "$OUT/readings/lexicon.jsonl"
-for m in Models/LofiMood-embed-*-1.json; do
+for m in Models/LofiMood-embed-*-2.json; do
   [ -s "$m" ] || continue
   k=$(basename "$m" .json)
   $B/lofi-eval run --engine "embed:$m" --in "$T" --out "$OUT/readings/fast-${k#LofiMood-}.jsonl"
@@ -157,8 +158,11 @@ step "Scores against the eleven-mood labels"
 GOLD="$L/claude-g2-test.jsonl"
 [ -s "$L/mo-gold.jsonl" ] && GOLD="$L/mo-gold.jsonl"
 echo "labels: $GOLD"
-PLAIN=$(ls "$OUT"/readings/*.jsonl | grep -v '\.masked\.jsonl$')
-python3 -I Tools/eval/score.py --windows "$T" --labels "$GOLD" --confusion $PLAIN | tee "$OUT/scores.txt"
+PLAIN=()
+for f in "$OUT"/readings/*.jsonl; do
+  case "$f" in *.masked.jsonl) ;; *) PLAIN+=("$f") ;; esac
+done
+python3 -I Tools/eval/score.py --windows "$T" --labels "$GOLD" --confusion "${PLAIN[@]}" | tee "$OUT/scores.txt"
 if [ -s "$OUT/readings/claude-haiku.masked.jsonl" ]; then
   python3 -I Tools/eval/score.py --windows "$T" --masked-pair "$OUT/readings/claude-haiku.jsonl" "$OUT/readings/claude-haiku.masked.jsonl" | tee -a "$OUT/scores.txt"
 fi

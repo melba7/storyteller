@@ -5,7 +5,7 @@ import LofiScoreCore
 
 @Suite struct LinearMoodModelTests {
     /// Three moods, each a cluster around its own corner of a 4-d space.
-    static func clusters(perClass: Int, seed: UInt64) -> ([[Double]], [String]) {
+    static func clusters(perClass: Int, seed: UInt64, spread: Double = 1) -> ([[Double]], [String]) {
         var state = seed
         func noise() -> Double {
             state = state &* 6364136223846793005 &+ 1442695040888963407
@@ -15,7 +15,7 @@ import LofiScoreCore
         var x: [[Double]] = [], y: [String] = []
         for (label, centre) in centres {
             for _ in 0..<perClass {
-                x.append(centre.map { $0 + noise() })
+                x.append(centre.map { $0 + spread * noise() })
                 y.append(label)
             }
         }
@@ -51,6 +51,81 @@ import LofiScoreCore
         let model = LinearMoodModel.train(features: "test/1", x: x, labels: y, options: .init(l2: 1e-2, iterations: 200, balanced: true))
         #expect(model.predict([0, 2, 0, 5]) == "tense")
         #expect(model.predict([2, 0, 0, 5]) == "calm")
+    }
+
+    @Test func multiplyMatchesTheDefinition() {
+        // (2×3) · (3×2)
+        var c = [Double](repeating: 9, count: 4)
+        LinearMoodModel.multiply([1, 2, 3, 4, 5, 6], [7, 8, 9, 10, 11, 12], into: &c, m: 2, n: 2, p: 3)
+        #expect(c == [58, 64, 139, 154])
+    }
+
+    @Test func featureKindSpecs() {
+        #expect(TextFeatureKind.kinds(spec: "word") == [.word])
+        #expect(TextFeatureKind.kinds(spec: "word+contextual") == [.word, .contextual])
+        #expect(TextFeatureKind.kinds(spec: "word+word") == nil)
+        #expect(TextFeatureKind.kinds(spec: "word+") == nil)
+        #expect(TextFeatureKind.kinds(spec: "glove") == nil)
+        #expect(TextFeatureKind.kinds(featureID: "word.en/1+contextual.en/1") == [.word, .contextual])
+        #expect(TextFeatureKind.kinds(featureID: "sentence.en/3") == [.sentence])
+    }
+
+    @Test func earlierWordsWeightIsStoredAndOptional() throws {
+        let (x, y) = Self.clusters(perClass: 10, seed: 5)
+        var model = LinearMoodModel.train(features: "test/1", x: x, labels: y, options: .init(iterations: 20))
+        #expect(model.previousChunkWeight == nil)
+        // Models written before the field existed still load.
+        let old = try model.encoded()
+        #expect(!String(decoding: old, as: UTF8.self).contains("previousChunkWeight"))
+        model.previousChunkWeight = 0.2
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("linear-\(UUID().uuidString).json")
+        try model.encoded().write(to: url)
+        defer { try? FileManager.default.removeItem(at: url) }
+        #expect(try LinearMoodModel.load(from: url).previousChunkWeight == 0.2)
+
+        let p = model.probabilities(x[0])
+        let q = model.probabilities(x[25])
+        let mixed = model.probabilities(recent: x[0], earlier: x[25], earlierWeight: 0.2)
+        for c in p.indices { #expect(abs(mixed[c] - (0.8 * p[c] + 0.2 * q[c])) < 1e-12) }
+        #expect(model.probabilities(recent: x[0], earlier: nil, earlierWeight: 0.2) == p)
+    }
+
+    @Test func foldsKeepBooksTogether() {
+        let groups = ["b", "a", "c", "a", "d", "b", "e"]
+        let folds = LinearMoodModelSelection.folds(groups: groups, count: 2)
+        // Sorted books a, b, c, d, e dealt into folds 0, 1, 0, 1, 0.
+        #expect(folds == [1, 0, 0, 0, 1, 1, 0])
+        #expect(Set(LinearMoodModelSelection.folds(groups: ["a", "b"], count: 5)) == [0, 1])
+    }
+
+    /// Both chunks are noisy readings of the same mood, so averaging them
+    /// beats the newest words alone, and cross-validation must find that.
+    @Test func crossValidationScoresEverySettingAndFindsTheUsefulWeight() {
+        let (recent, labels) = Self.clusters(perClass: 40, seed: 11, spread: 7)
+        let (earlier, _) = Self.clusters(perClass: 40, seed: 12, spread: 7)
+        let examples = labels.indices.map { i in
+            LinearMoodModelSelection.Example(group: "book\(i % 6)", label: labels[i], recent: recent[i], earlier: earlier[i])
+        }
+        let settings = [LinearMoodModel.TrainingOptions(l2: 1e-2, iterations: 100), .init(l2: 1, iterations: 100, balanced: false)]
+        let candidates = LinearMoodModelSelection.crossValidate(examples, features: "test/1", settings: settings, earlierWeights: [0, 0.5], folds: 3)
+        #expect(candidates.count == 4)
+        #expect(candidates.allSatisfy { $0.scores.count == examples.count })
+        let best = LinearMoodModelSelection.best(candidates)!
+        #expect(best.previousChunkWeight == 0.5)
+        let alone = candidates.filter { $0.previousChunkWeight == 0 }.map(\.scores.exact).max()!
+        #expect(best.scores.exact > alone)
+    }
+
+    @Test func learningCurveRepeatsExactly() {
+        let (x, y) = Self.clusters(perClass: 20, seed: 21)
+        let examples = y.indices.map { LinearMoodModelSelection.Example(group: "book\($0 % 8)", label: y[$0], recent: x[$0]) }
+        let options = LinearMoodModel.TrainingOptions(l2: 1e-2, iterations: 50)
+        let a = LinearMoodModelSelection.learningCurve(train: examples, test: examples, features: "t", options: options, earlierWeight: 0, bookCounts: [2, 4, 8], repeats: 3)
+        let b = LinearMoodModelSelection.learningCurve(train: examples, test: examples, features: "t", options: options, earlierWeight: 0, bookCounts: [2, 4, 8], repeats: 3)
+        #expect(a == b)
+        #expect(a.map(\.books) == [2, 4, 8])
+        #expect(a.last!.examples == Double(examples.count))
+        #expect(a.last!.exact > 0.95)
     }
 
     @Test func agreementScores() {

@@ -243,6 +243,12 @@ struct MoodTrackerTests {
         let engine = MoodEngineCatalog.recommendedEngine()
         #expect(!engine.id.isEmpty)
     }
+
+    @Test func fastModelsThatDoNotLoadFallBackToTheBaseline() throws {
+        let missing = FileManager.default.temporaryDirectory.appendingPathComponent("missing-\(UUID().uuidString)")
+        let engine = MoodEngineCatalog.fastEngine(modelURLs: [missing.appendingPathExtension("json"), missing.appendingPathExtension("mlmodelc")])
+        #expect(engine.id == MoodEngineCatalog.recommendedEngine().id)
+    }
 }
 
 @Suite("Classifier input")

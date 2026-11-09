@@ -197,17 +197,41 @@ public enum MoodEngineCatalog {
     }
 
     /// The best engine that never needs Apple Intelligence or the network.
+    /// `classifierModelURL` is a Fast model: an embedding model from
+    /// `lofi-train embed` (`.json`, the more accurate kind) or a Create ML
+    /// classifier (`.mlmodel` or `.mlmodelc`).
     public static func fastEngine(classifierModelURL: URL? = nil) -> any MoodEngine {
+        fastEngine(modelURLs: classifierModelURL.map { [$0] } ?? [])
+    }
+
+    /// The first of these Fast models that loads on this device, falling back
+    /// to the next one that loads, then to the NLTagger baseline (the lexicon
+    /// on non-Apple platforms). An embedding model fails to load where its
+    /// embedding is missing (the contextual one needs iOS 17 and its assets;
+    /// see `ClassifierMoodEngine.prepareAssets()`), so list a Create ML model
+    /// after it.
+    public static func fastEngine(modelURLs: [URL]) -> any MoodEngine {
         #if canImport(NaturalLanguage)
-        let baseline: any MoodEngine = NLTaggerMoodEngine()
+        var engine: any MoodEngine = NLTaggerMoodEngine()
         #else
-        let baseline: any MoodEngine = LexiconMoodEngine()
+        var engine: any MoodEngine = LexiconMoodEngine()
         #endif
-        #if canImport(NaturalLanguage) && canImport(CoreML)
-        if let url = classifierModelURL, let classifier = try? ClassifierMoodEngine(modelURL: url) {
-            return FallbackMoodEngine(primary: classifier, fallback: baseline)
+        for url in modelURLs.reversed() {
+            if let model = fastModelEngine(url) { engine = FallbackMoodEngine(primary: model, fallback: engine) }
+        }
+        return engine
+    }
+
+    static func fastModelEngine(_ url: URL) -> (any MoodEngine)? {
+        #if canImport(NaturalLanguage)
+        if url.pathExtension.lowercased() == "json" {
+            return try? EmbeddingMoodEngine(modelURL: url, version: url.deletingPathExtension().lastPathComponent)
         }
         #endif
-        return baseline
+        #if canImport(NaturalLanguage) && canImport(CoreML)
+        return try? ClassifierMoodEngine(modelURL: url)
+        #else
+        return nil
+        #endif
     }
 }

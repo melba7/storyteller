@@ -4,60 +4,58 @@ import LofiScoreCore
 #if canImport(NaturalLanguage)
 import NaturalLanguage
 #endif
-#if canImport(CoreML)
-import CoreML
-#endif
 
-// lofi-train embed [--data DIR] [--kinds sentence,word,contextual] [--blend MODEL.mlmodel]
-//                  [--version V] [--out-dir Models] [--iterations N] [--all]
-//     macOS only (Apple's embeddings). For each kind of on-device embedding,
-//     computes features for every exported window (cached in
-//     DIR/features-<kind>.json), trains a softmax model on DIR/train.json for
-//     a few settings, picks the one that does best on DIR/valid.json (export
-//     with --validation-books), and reports it on DIR/test.json. With --blend,
-//     also tries averaging its probabilities with a Create ML model's, again
-//     choosing the mix on the validation books. Writes the chosen model,
-//     retrained on train + valid (+ test with --all), to
+// lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
+//                  [--version V] [--out-dir Models] [--iterations N] [--all] [--curve]
+//     macOS only (Apple's embeddings). For each kind ("+" puts kinds side by
+//     side in one feature vector), computes features for the newest words of
+//     every exported window and for the words before them (DIR/earlier.json),
+//     cached in DIR/features-<kind>.json. Chooses the training settings, and
+//     how much the earlier words count, by cross-validation over whole books:
+//     the training books (train.json plus valid.json) are dealt into --folds
+//     groups, and each setting is scored on every group by a model trained on
+//     the others, reading each window exactly as EmbeddingMoodEngine does.
+//     Then trains on all the training books (and the test books too with
+//     --all, for the model that ships), scores DIR/test.json, and writes
 //     OUT/LofiMood-embed-<kind>-<V>.json with a .report.json beside it.
+//     --curve adds a learning curve (test agreement when training on a
+//     quarter, half or three quarters of the books) to show whether more
+//     labelled windows would help.
 
 struct EmbedReport: Codable {
-    struct Trial: Codable {
-        var balanced: Bool
-        var l2: Double
-        var valid: AgreementScores
-        var test: AgreementScores
-    }
-    struct Blend: Codable {
-        var embeddingWeight: Double
-        var valid: AgreementScores
-        var test: AgreementScores
-    }
     var kind: String
     var features: String
     var dimension: Int
+    var trainBooks: Int
     var trainExamples: Int
-    var validExamples: Int
     var testExamples: Int
+    var folds: Int
     var iterations: Int
-    var trials: [Trial]
-    var chosen: Trial
-    var blendModel: String?
-    var blends: [Blend]
-    var chosenBlend: Blend?
+    var candidates: [LinearMoodModelSelection.Candidate]
+    var chosen: LinearMoodModelSelection.Candidate
+    /// Agreement on the test books; meaningless when `trainedOnTestBooks`.
+    var test: AgreementScores
     var trainedOnTestBooks: Bool
+    var curve: [LinearMoodModelSelection.CurvePoint]
+    var seconds: Double
 }
 
 func embedCommand(_ options: Options) throws {
     let dataDir = URL(fileURLWithPath: options.string("data") ?? "Tools/data/work/train", isDirectory: true)
-    let kinds = (options.string("kinds") ?? "sentence,word,contextual").split(separator: ",").map(String.init)
+    let kinds = (options.string("kinds") ?? "word,contextual,word+contextual").split(separator: ",").map(String.init)
+    for spec in kinds where TextFeatureKind.kinds(spec: spec) == nil {
+        fail("unknown kind \(spec); use sentence, word or contextual, joined with + to combine them")
+    }
     let version = options.string("version") ?? "1"
     let outDir = URL(fileURLWithPath: options.string("out-dir") ?? "Models", isDirectory: true)
     let iterations = options.int("iterations", default: 300)
-    #if canImport(NaturalLanguage) && canImport(CoreML)
+    let folds = options.int("folds", default: 5)
+    if folds < 2 { fail("--folds must be 2 or more") }
+    #if canImport(NaturalLanguage)
     try embedExperiment(dataDir: dataDir, kinds: kinds, version: version, outDir: outDir, iterations: iterations,
-                        blendPath: options.string("blend"), includeTest: options.flag("all"))
+                        folds: folds, includeTest: options.flag("all"), curve: options.flag("curve"))
     #else
-    _ = (dataDir, kinds, version, outDir, iterations)
+    _ = (dataDir, version, outDir, iterations)
     fail("embed needs Apple's NaturalLanguage embeddings; run it on the Mac")
     #endif
 }
@@ -68,163 +66,157 @@ func distinctExamples(_ url: URL) throws -> [Example] {
     return try JSONDecoder().decode([Example].self, from: Data(contentsOf: url)).filter { seen.insert($0.id).inserted }
 }
 
-#if canImport(NaturalLanguage) && canImport(CoreML)
+#if canImport(NaturalLanguage)
 struct FeatureCache: Codable {
     var features: String
+    /// By window id for the newest words, and "<id>|earlier" for the words before them.
     var vectors: [String: [Float]]
 }
 
-func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL, iterations: Int, blendPath: String?, includeTest: Bool) throws {
+func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL, iterations: Int,
+                     folds: Int, includeTest: Bool, curve: Bool) throws {
     let train = try distinctExamples(dataDir.appendingPathComponent("train.json"))
     let validURL = dataDir.appendingPathComponent("valid.json")
-    guard FileManager.default.fileExists(atPath: validURL.path) else {
-        fail("no \(validURL.path): export with --validation-books 3 so settings are chosen on books the model never saw")
-    }
-    let valid = try distinctExamples(validURL)
+    let valid = FileManager.default.fileExists(atPath: validURL.path) ? try distinctExamples(validURL) : []
+    let pool = train + valid  // every training book
     let test = try distinctExamples(dataDir.appendingPathComponent("test.json"))
-    note("embed: \(train.count) train, \(valid.count) valid, \(test.count) test windows")
-
-    // The Create ML model to blend with, as probabilities per mood name.
-    var blendModel: NLModel?
-    if let blendPath {
-        var url = URL(fileURLWithPath: blendPath)
-        if url.pathExtension == "mlmodel" { url = try MLModel.compileModel(at: url) }
-        blendModel = try NLModel(contentsOf: url)
+    let earlierURL = dataDir.appendingPathComponent("earlier.json")
+    var earlierText: [String: String] = [:]
+    if FileManager.default.fileExists(atPath: earlierURL.path) {
+        earlierText = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: earlierURL))
+    } else {
+        note("no \(earlierURL.path) (export again with this lofi-train): the earlier words are left out")
     }
-    func blendScores(_ text: String) -> [String: Double] {
-        guard let blendModel else { return [:] }
-        let raw = blendModel.predictedLabelHypotheses(for: text, maximumCount: 32)
-        let total = raw.values.reduce(0, +)
-        return total > 0 ? raw.mapValues { $0 / total } : raw
-    }
-    let blendValid = valid.map { blendScores($0.text) }
-    let blendTest = test.map { blendScores($0.text) }
-
+    let poolBooks = Set(pool.map(\.book)).count
+    note("embed: \(pool.count) windows from \(poolBooks) training books, \(test.count) test windows; \(earlierText.count) windows have earlier words")
     try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
-    var summary: [String] = []
-    if blendModel != nil {
-        let v = AgreementScores(gold: valid.map(\.label), predicted: blendValid.map { argmax($0) })
-        let t = AgreementScores(gold: test.map(\.label), predicted: blendTest.map { argmax($0) })
-        summary.append("blend model alone: valid \(v.summary) | test \(t.summary)")
-    }
 
-    for kindName in kinds {
-        guard let kind = TextFeatureKind(rawValue: kindName) else { fail("unknown kind \(kindName); use sentence, word or contextual") }
+    var caches: [TextFeatureKind: FeatureCache] = [:]
+    var unavailable: Set<TextFeatureKind> = []
+    func cache(for kind: TextFeatureKind) throws -> FeatureCache? {
+        if let cache = caches[kind] { return cache }
+        if unavailable.contains(kind) { return nil }
         let featurizer: TextFeaturizer
         do {
             featurizer = try TextFeaturizer(kind: kind)
         } catch {
-            note("\(kindName): skipped (\(error))")
-            summary.append("\(kindName): unavailable (\(error))")
+            note("\(kind.rawValue): unavailable (\(error))")
+            unavailable.insert(kind)
+            return nil
+        }
+        let url = dataDir.appendingPathComponent("features-\(kind.rawValue).json")
+        var cache = (try? JSONDecoder().decode(FeatureCache.self, from: Data(contentsOf: url))) ?? FeatureCache(features: featurizer.id, vectors: [:])
+        if cache.features != featurizer.id { cache = FeatureCache(features: featurizer.id, vectors: [:]) }
+        var jobs: [(key: String, text: String)] = []
+        for example in pool + test {
+            if cache.vectors[example.id] == nil { jobs.append((example.id, example.text)) }
+            let key = example.id + "|earlier"
+            if let older = earlierText[example.id], cache.vectors[key] == nil { jobs.append((key, older)) }
+        }
+        if !jobs.isEmpty {
+            note("\(kind.rawValue): computing \(jobs.count) feature vectors (\(featurizer.id), \(featurizer.dimension) values each)…")
+            let started = Date()
+            for (n, job) in jobs.enumerated() {
+                if let v = try? featurizer.features(for: job.text) { cache.vectors[job.key] = v.map { Float($0) } }
+                if (n + 1) % 500 == 0 { note("  \(n + 1)/\(jobs.count)") }
+            }
+            note(String(format: "  %.1f ms per text", Date().timeIntervalSince(started) * 1000 / Double(jobs.count)))
+            try JSONEncoder().encode(cache).write(to: url)
+        }
+        caches[kind] = cache
+        return cache
+    }
+
+    var summary: [String] = []
+    for spec in kinds {
+        let parts = TextFeatureKind.kinds(spec: spec)!
+        var partCaches: [FeatureCache] = []
+        for kind in parts {
+            guard let c = try cache(for: kind) else { break }
+            partCaches.append(c)
+        }
+        guard partCaches.count == parts.count else {
+            summary.append("\(spec): unavailable on this Mac")
+            continue
+        }
+        let started = Date()
+        let featureID = partCaches.map(\.features).joined(separator: "+")
+        func vector(_ key: String) -> [Double]? {
+            var out: [Double] = []
+            for c in partCaches {
+                guard let v = c.vectors[key] else { return nil }
+                out += v.map { Double($0) }
+            }
+            return out
+        }
+        func selectionExamples(_ list: [Example]) -> [LinearMoodModelSelection.Example] {
+            list.compactMap { e in
+                guard let recent = vector(e.id) else { return nil }
+                let earlier = earlierText[e.id] == nil ? nil : vector(e.id + "|earlier")
+                return LinearMoodModelSelection.Example(group: e.book, label: e.label, recent: recent, earlier: earlier)
+            }
+        }
+        let poolX = selectionExamples(pool)
+        let testX = selectionExamples(test)
+        if poolX.count < pool.count || testX.count < test.count {
+            note("\(spec): no features for \(pool.count - poolX.count) training and \(test.count - testX.count) test windows; they are left out")
+        }
+        guard let dimension = poolX.first?.recent.count else {
+            summary.append("\(spec): no features")
             continue
         }
 
-        // Features, cached per featurizer id.
-        let cacheURL = dataDir.appendingPathComponent("features-\(kindName).json")
-        var cache = (try? JSONDecoder().decode(FeatureCache.self, from: Data(contentsOf: cacheURL))) ?? FeatureCache(features: featurizer.id, vectors: [:])
-        if cache.features != featurizer.id { cache = FeatureCache(features: featurizer.id, vectors: [:]) }
-        let all = train + valid + test
-        let missing = all.filter { cache.vectors[$0.id] == nil }
-        if !missing.isEmpty {
-            note("\(kindName): computing \(missing.count) feature vectors (\(featurizer.id), \(featurizer.dimension) values each)…")
-            let started = Date()
-            for (n, example) in missing.enumerated() {
-                if let v = try? featurizer.features(for: example.text) { cache.vectors[example.id] = v.map { Float($0) } }
-                if (n + 1) % 250 == 0 { note("  \(n + 1)/\(missing.count)") }
-            }
-            note(String(format: "  %.1f ms per window", Date().timeIntervalSince(started) * 1000 / Double(missing.count)))
-            try JSONEncoder().encode(cache).write(to: cacheURL)
+        // Settings by cross-validation over whole training books.
+        let settings = [true, false].flatMap { balanced in
+            [0.01, 0.03, 0.1, 0.3, 1.0, 3.0].map { LinearMoodModel.TrainingOptions(l2: $0, iterations: iterations, balanced: balanced) }
         }
-        func xy(_ examples: [Example]) -> ([[Double]], [String], [Int]) {
-            var x: [[Double]] = [], y: [String] = [], kept: [Int] = []
-            for (i, e) in examples.enumerated() {
-                guard let v = cache.vectors[e.id] else { continue }
-                x.append(v.map { Double($0) }); y.append(e.label); kept.append(i)
-            }
-            return (x, y, kept)
-        }
-        let (trX, trY, _) = xy(train)
-        let (vaX, vaY, vaKept) = xy(valid)
-        let (teX, teY, teKept) = xy(test)
-        if vaKept.count < valid.count || teKept.count < test.count {
-            note("\(kindName): no features for \(valid.count - vaKept.count) valid and \(test.count - teKept.count) test windows; they are left out")
-        }
+        note("\(spec): \(settings.count) settings × \(folds) folds over \(poolBooks) books, \(dimension) features")
+        let candidates = LinearMoodModelSelection.crossValidate(
+            poolX, features: featureID, settings: settings, earlierWeights: [0, 0.2, 0.35, 0.5], folds: folds
+        ) { note("  \(spec) " + $0) }
+        let chosen = LinearMoodModelSelection.best(candidates)!
+        let options = LinearMoodModel.TrainingOptions(l2: chosen.l2, iterations: iterations, balanced: chosen.balanced)
 
-        var trials: [EmbedReport.Trial] = []
-        var models: [LinearMoodModel] = []
-        for balanced in [true, false] {
-            for l2 in [1e-4, 1e-3, 1e-2, 1e-1] {
-                let opts = LinearMoodModel.TrainingOptions(l2: l2, iterations: iterations, balanced: balanced)
-                let model = LinearMoodModel.train(features: featurizer.id, x: trX, labels: trY, options: opts)
-                let trial = EmbedReport.Trial(
-                    balanced: balanced, l2: l2,
-                    valid: AgreementScores(gold: vaY, predicted: vaX.map(model.predict)),
-                    test: AgreementScores(gold: teY, predicted: teX.map(model.predict))
-                )
-                note("\(kindName) balanced=\(balanced) l2=\(l2): valid \(trial.valid.summary) | test \(trial.test.summary)")
-                trials.append(trial)
-                models.append(model)
-            }
-        }
-        let best = trials.indices.max { a, b in
-            (trials[a].valid.exact, trials[a].valid.macroF1) < (trials[b].valid.exact, trials[b].valid.macroF1)
-        }!
-        let chosen = trials[best]
-        summary.append("\(kindName) (\(featurizer.id), balanced=\(chosen.balanced), l2=\(chosen.l2)): valid \(chosen.valid.summary) | test \(chosen.test.summary)")
-
-        // Blend with the Create ML model, mix chosen on the validation books.
-        var blends: [EmbedReport.Blend] = []
-        if blendModel != nil {
-            let model = models[best]
-            func mixed(_ x: [[Double]], _ kept: [Int], _ other: [[String: Double]], _ a: Double) -> [String] {
-                zip(x, kept).map { v, i in
-                    var p: [String: Double] = [:]
-                    for (name, q) in zip(model.classes, model.probabilities(v)) { p[name, default: 0] += a * q }
-                    for (name, q) in other[i] { p[name, default: 0] += (1 - a) * q }
-                    return argmax(p)
-                }
-            }
-            for a in [0.25, 0.5, 0.75] {
-                let blend = EmbedReport.Blend(
-                    embeddingWeight: a,
-                    valid: AgreementScores(gold: vaY, predicted: mixed(vaX, vaKept, blendValid, a)),
-                    test: AgreementScores(gold: teY, predicted: mixed(teX, teKept, blendTest, a))
-                )
-                note("\(kindName) blended \(a) with \(blendPath ?? ""): valid \(blend.valid.summary) | test \(blend.test.summary)")
-                blends.append(blend)
-            }
-        }
-        let chosenBlend = blends.max { ($0.valid.exact, $0.valid.macroF1) < ($1.valid.exact, $1.valid.macroF1) }
-        if let chosenBlend {
-            summary.append("  blended \(chosenBlend.embeddingWeight): valid \(chosenBlend.valid.summary) | test \(chosenBlend.test.summary)")
-        }
-
-        // The model to keep: the chosen settings, retrained on more books.
-        var finalX = trX + vaX, finalY = trY + vaY
-        if includeTest { finalX += teX; finalY += teY }
-        let finalModel = LinearMoodModel.train(
-            features: featurizer.id, x: finalX, labels: finalY,
-            options: .init(l2: chosen.l2, iterations: iterations, balanced: chosen.balanced)
+        // The model to keep: chosen settings, trained on every training book (and the test books with --all).
+        let finalX = includeTest ? poolX + testX : poolX
+        var model = LinearMoodModel.train(features: featureID, x: finalX.map(\.recent), labels: finalX.map(\.label), options: options)
+        model.previousChunkWeight = chosen.previousChunkWeight
+        let testScores = AgreementScores(
+            gold: testX.map(\.label),
+            predicted: testX.map { LinearMoodModelSelection.predict(model, $0, earlierWeight: chosen.previousChunkWeight) }
         )
-        let out = outDir.appendingPathComponent("LofiMood-embed-\(kindName)-\(version).json")
-        try finalModel.encoded().write(to: out)
+        let settingsText = "balanced=\(chosen.balanced), l2=\(chosen.l2), earlier words weight \(chosen.previousChunkWeight)"
+        summary.append("\(spec) (\(featureID), \(dimension) features; \(settingsText))")
+        summary.append("  cross-validated on \(poolBooks) training books: \(chosen.scores.summary)")
+        summary.append("  test\(includeTest ? " (trained on these books too, so not a fair score)" : ""): \(testScores.summary)")
+
+        var points: [LinearMoodModelSelection.CurvePoint] = []
+        if curve && !includeTest {
+            let counts = Array(Set([poolBooks / 4, poolBooks / 2, 3 * poolBooks / 4, poolBooks].filter { $0 >= 2 })).sorted()
+            points = LinearMoodModelSelection.learningCurve(
+                train: poolX, test: testX, features: featureID, options: options,
+                earlierWeight: chosen.previousChunkWeight, bookCounts: counts, repeats: 4
+            )
+            for p in points {
+                summary.append(String(format: "  learning curve: %d books (%.0f windows): test exact %.1f%%, kappa %.3f", p.books, p.examples, p.exact * 100, p.kappa))
+            }
+        }
+
+        let out = outDir.appendingPathComponent("LofiMood-embed-\(spec)-\(version).json")
+        try model.encoded().write(to: out)
         let report = EmbedReport(
-            kind: kindName, features: featurizer.id, dimension: featurizer.dimension,
-            trainExamples: trX.count, validExamples: vaX.count, testExamples: teX.count, iterations: iterations,
-            trials: trials, chosen: chosen, blendModel: blendPath, blends: blends, chosenBlend: chosenBlend,
-            trainedOnTestBooks: includeTest
+            kind: spec, features: featureID, dimension: dimension,
+            trainBooks: poolBooks, trainExamples: poolX.count, testExamples: testX.count, folds: folds, iterations: iterations,
+            candidates: candidates, chosen: chosen, test: testScores, trainedOnTestBooks: includeTest, curve: points,
+            seconds: Date().timeIntervalSince(started)
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(report).write(to: out.deletingPathExtension().appendingPathExtension("report.json"))
-        note("wrote \(out.path)")
+        note("wrote \(out.path) (\(Int(report.seconds)) s)")
     }
 
-    note("\nsummary (settings chosen on the validation books; test = the 320 held-out windows)")
+    note("\nsummary (settings chosen by cross-validation over the training books; test = the held-out books)")
     summary.forEach { note("  " + $0) }
-}
-
-func argmax(_ scores: [String: Double]) -> String {
-    scores.max { ($0.value, $1.key) < ($1.value, $0.key) }?.key ?? "calm"
 }
 #endif
