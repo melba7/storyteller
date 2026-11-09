@@ -164,6 +164,13 @@ name-masking test matters more for it than for the on-device engines.
   31 romantic, 24 adventurous and 19 dreamy examples. The other 287 got one
   of the older moods, which also shows a model that a cue word alone does not
   make a new mood.
+- `Tools/data/eval/sample-v4.jsonl.gz` and `claude-g2-v4.jsonl`: 40 random
+  causal windows from each of 19 more public-domain novels (the "famous"
+  group at the end of `Tools/data/books.csv`, built the same way as v1),
+  760 in all, labelled under guidelines v2 by Claude. They are training data
+  only, added because the embedding model's learning curve was still
+  climbing at 26 books. With them the export has 3,119 labelled training
+  windows from 45 books (42 for training, 3 for validation).
 - `Tools/data/eval/sample-v1.jsonl.gz` is the frozen sample: 40 causal windows
   from each of 34 public-domain novels (PG-19 texts turned into readaloud
   EPUBs by `Tools/data/make_readaloud.py`), 1,360 in all. Window ids are
@@ -215,11 +222,14 @@ $B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
 $B/lofi-train train --algorithm maxent --version 3
 $B/lofi-train train --algorithm bert --version 3      # optional; see the results below
 # Apple's embeddings with a trained softmax head; settings are chosen by
-# 5-fold cross-validation over the 26 training books, then it trains on all
-# 26; --curve adds a learning curve, --all also trains on the test books
+# 5-fold cross-validation over the training books, then it trains on all of
+# them; --curve adds a learning curve, --all also trains on the test books.
+# (Add --windows $W/sample3.jsonl --windows $W/sample4.jsonl and the
+# claude-g2 label files to the export above, as run-mood-eval.sh does.)
 $B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve
-# the model that ships: the chosen kind, trained on all 34 books
-$B/lofi-train embed --kinds word --version 3 --all
+$B/lofi-train embed --kinds word --version 6 --curve     # 45 books (sample v4)
+# the model that ships: the chosen kind, trained on every labelled book
+$B/lofi-train embed --kinds word --version 7 --all
 for m in maxent bert; do
   $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done
