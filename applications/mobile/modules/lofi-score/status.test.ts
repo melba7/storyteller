@@ -4,14 +4,19 @@ import { describe, expect, it } from "vitest"
 import type { LofiMusicStatus } from "./index"
 import {
   atmosphereSourceLabel,
+  canMarkWrongMood,
   describeAtmosphere,
   describeMusic,
   moodCounts,
+  moodFeedbackLine,
+  moodFeedbackTotals,
   musicLevelLabel,
   musicSourceLabel,
+  nowPlayingLine,
   plainCredits,
   soundList,
   soundName,
+  wrongMoodResult,
 } from "./status"
 
 function status(overrides: Partial<LofiMusicStatus> = {}): LofiMusicStatus {
@@ -78,6 +83,87 @@ describe("describeMusic", () => {
         playback: { ...base.playback, routeMuted: true },
       }),
     ).toBe("Off in the car")
+  })
+})
+
+describe("reading on screen", () => {
+  it("says the music follows the pages", () => {
+    const base = status({ followsReading: true })
+    const stopped = { ...base.playback, narrating: false }
+    expect(describeMusic({ ...base, playback: stopped })).toBe(
+      "Plays with the narration, or as you turn the pages",
+    )
+    expect(
+      describeMusic({ ...base, playback: { ...stopped, reading: true } }),
+    ).toBe("Playing calm music as you read")
+    expect(
+      describeMusic({
+        ...base,
+        followsReading: false,
+        playback: stopped,
+      }),
+    ).toBe("Plays with the narration")
+  })
+})
+
+describe("wrong mood", () => {
+  it("is offered only while the music can be heard", () => {
+    const base = status()
+    expect(canMarkWrongMood(base)).toBe(true)
+    expect(canMarkWrongMood({ ...base, enabled: false })).toBe(false)
+    expect(
+      canMarkWrongMood({
+        ...base,
+        playback: { ...base.playback, narrating: false },
+      }),
+    ).toBe(false)
+    expect(
+      canMarkWrongMood({
+        ...base,
+        playback: { ...base.playback, narrating: false, reading: true },
+      }),
+    ).toBe(true)
+    const { musicMood: _, ...silent } = base.playback
+    expect(canMarkWrongMood({ ...base, playback: silent })).toBe(false)
+  })
+
+  it("reports what changed and the counts", () => {
+    expect(
+      wrongMoodResult({
+        rejected: "tense",
+        chosen: "mysterious",
+        picked: false,
+        correction: false,
+      }),
+    ).toBe("Switched to mysterious music. Still wrong? Pick the mood.")
+    const none = {
+      bookChanges: 0,
+      bookWrong: 0,
+      totalChanges: 0,
+      totalWrong: 0,
+    }
+    expect(moodFeedbackLine(none)).toBeNull()
+    expect(moodFeedbackTotals(none)).toBeNull()
+    expect(moodFeedbackLine({ ...none, bookChanges: 1, bookWrong: 1 })).toBe(
+      "You marked 1 of 1 mood change wrong in this book",
+    )
+    expect(
+      moodFeedbackTotals({ ...none, totalChanges: 31, totalWrong: 2 }),
+    ).toBe("2 of 31 mood changes marked wrong (6%)")
+  })
+})
+
+describe("now playing", () => {
+  it("names the track, its artist and licence", () => {
+    expect(
+      nowPlayingLine({
+        title: "Sky Lake",
+        artist: "Purrple Cat",
+        license: "CC BY-SA 3.0",
+        mood: "calm",
+      }),
+    ).toBe("“Sky Lake” by Purrple Cat · CC BY-SA 3.0")
+    expect(nowPlayingLine({ title: "calm-1", mood: "calm" })).toBe("“calm-1”")
   })
 })
 

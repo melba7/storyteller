@@ -277,6 +277,14 @@ public final class LofiMusicHost: @unchecked Sendable {
         return result
     }
 
+    /// ``markWrongMood(_:)`` for the app's bridge, with the mood named as the status names
+    /// it ("cozy"). An unknown name does nothing.
+    public func markWrongMood(named name: String?) async -> MoodOverride? {
+        guard let name else { return await markWrongMood(nil) }
+        guard let mood = MoodBucket(rawValue: name) else { return nil }
+        return await markWrongMood(mood)
+    }
+
     /// The wrong-mood log as text to share, or nil when nothing was marked yet.
     public func moodFeedbackText() async -> String? {
         guard let feedback else { return nil }
@@ -1027,6 +1035,20 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         guard let data = try? JSONEncoder().encode(self),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return [:] }
+        return object
+    }
+}
+
+extension MoodOverride {
+    /// What the "Wrong mood" button did, as a JSON object for the native module.
+    public func jsonObject() -> [String: Any] {
+        var object: [String: Any] = [
+            "rejected": rejected.rawValue,
+            "chosen": chosen.rawValue,
+            "picked": picked,
+            "correction": correction,
+        ]
+        if let sentence { object["sentence"] = sentence }
         return object
     }
 }

@@ -93,6 +93,37 @@ public final class LofiScoreModule: Module {
       await host.removeImportedMusic()
       return await host.status().jsonObject()
     }
+
+    // The music panel's "Wrong mood" button: the music moves to the named mood, or to the
+    // engine's next guess with null, and the tap is logged. Resolves to null when nothing
+    // was playing or nothing changed.
+    AsyncFunction("markWrongMood") { (mood: String?) async -> [String: Any]? in
+      await LofiScoreRuntime.shared.host.markWrongMood(named: mood)?.jsonObject()
+    }
+
+    // The wrong-mood log as text to share, or null when nothing was marked yet.
+    AsyncFunction("getMoodFeedback") { () async -> String? in
+      await LofiScoreRuntime.shared.host.moodFeedbackText()
+    }
+
+    // Music while reading on screen with the narration stopped.
+    AsyncFunction("setFollowsReading") { (enabled: Bool) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setFollowsReading(enabled)
+      return await host.status().jsonObject()
+    }
+
+    // The page now starts at the clip at `start` seconds into `relativeUrl` (the audio file),
+    // as the app found it to keep the audio in step with the page.
+    AsyncFunction("readerReached") { (bookUuid: String, relativeUrl: String, start: Double) async in
+      guard let clip = await AudiobookPlayerActor.shared.lofiClip(audioResource: relativeUrl, at: start) else { return }
+      LofiScoreRuntime.shared.host.readerReached(bookID: bookUuid, clip: NarratorClip(clip))
+    }
+
+    // The reader left the book or the app: the music that follows the pages stops.
+    AsyncFunction("readerStopped") {
+      LofiScoreRuntime.shared.host.readerStopped()
+    }
   }
 }
 

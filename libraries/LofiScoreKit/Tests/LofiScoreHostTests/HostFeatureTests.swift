@@ -99,8 +99,11 @@ final class HostFeatureTests: XCTestCase {
         status = try await waitFor(host) { ($0.feedback?.bookWrong ?? 0) == 1 }
         XCTAssertEqual(status.feedback?.totalWrong, 1)
         XCTAssertGreaterThanOrEqual(status.feedback?.bookChanges ?? 0, 1, "the opening mood counts as a change")
-        let picked = await host.markWrongMood(.cozy == result?.chosen ? .dreamy : .cozy)
+        let unknown = await host.markWrongMood(named: "sunny")
+        XCTAssertNil(unknown, "an unknown mood name does nothing")
+        let picked = await host.markWrongMood(named: result?.chosen == .cozy ? "dreamy" : "cozy")
         XCTAssertEqual(picked?.correction, true)
+        XCTAssertEqual(picked?.jsonObject()["picked"] as? Bool, true)
         status = await host.status()
         XCTAssertEqual(status.feedback?.bookWrong, 1, "a pick right after a guess is the same miss")
         let text = await host.moodFeedbackText()

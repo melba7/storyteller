@@ -1,5 +1,10 @@
 // LOFI-FORK: wording for the lofi music's state (see FORK.md).
-import type { LofiMusicStatus } from "./index"
+import type {
+  LofiMoodFeedback,
+  LofiMoodOverride,
+  LofiMusicStatus,
+  LofiNowPlaying,
+} from "./index"
 
 /** "calm" → "Calm", as the music library's folders are named. */
 export function moodName(mood: string) {
@@ -26,11 +31,65 @@ export function describeMusic(status: LofiMusicStatus): string {
       break
   }
   if (status.playback.routeMuted) return "Off in the car"
-  if (!status.playback.narrating) return "Plays with the narration"
+  const reading = !status.playback.narrating && status.playback.reading
+  if (!status.playback.narrating && !reading) {
+    return status.followsReading
+      ? "Plays with the narration, or as you turn the pages"
+      : "Plays with the narration"
+  }
   if (status.playback.musicMood) {
-    return `Playing ${status.playback.musicMood} music`
+    return reading
+      ? `Playing ${status.playback.musicMood} music as you read`
+      : `Playing ${status.playback.musicMood} music`
   }
   return "Starting…"
+}
+
+/** The music is audible now, so its mood can be marked wrong. */
+export function canMarkWrongMood(status: LofiMusicStatus): boolean {
+  return (
+    status.enabled &&
+    !status.playback.routeMuted &&
+    (status.playback.narrating || status.playback.reading === true) &&
+    status.playback.musicMood !== undefined
+  )
+}
+
+/** “Sky Lake” by Purrple Cat · CC BY 3.0, for the music panel. */
+export function nowPlayingLine(track: LofiNowPlaying): string {
+  let line = `“${track.title}”`
+  if (track.artist) line += ` by ${track.artist}`
+  if (track.license) line += ` · ${track.license}`
+  return line
+}
+
+/** What the "Wrong mood" button just did. */
+export function wrongMoodResult(result: LofiMoodOverride): string {
+  return `Switched to ${result.chosen} music. Still wrong? Pick the mood.`
+}
+
+/** "You marked 1 of 9 mood changes wrong in this book", or null before any. */
+export function moodFeedbackLine(feedback: LofiMoodFeedback): string | null {
+  if (feedback.bookChanges === 0 && feedback.bookWrong === 0) return null
+  const changes =
+    feedback.bookChanges === 1
+      ? "1 mood change"
+      : `${feedback.bookChanges} mood changes`
+  return `You marked ${feedback.bookWrong} of ${changes} wrong in this book`
+}
+
+/** "2 of 31 mood changes marked wrong (6%)", for Settings, or null before any. */
+export function moodFeedbackTotals(feedback: LofiMoodFeedback): string | null {
+  if (feedback.totalChanges === 0 && feedback.totalWrong === 0) return null
+  const changes =
+    feedback.totalChanges === 1
+      ? "1 mood change"
+      : `${feedback.totalChanges} mood changes`
+  const share =
+    feedback.totalChanges > 0
+      ? ` (${Math.round((100 * feedback.totalWrong) / feedback.totalChanges)}%)`
+      : ""
+  return `${feedback.totalWrong} of ${changes} marked wrong${share}`
 }
 
 /** "heavyRain" → "heavy rain", with a few sounds named for what you hear. */
@@ -74,7 +133,9 @@ export function describeAtmosphere(status: LofiMusicStatus): string {
   if (book.text !== "ready") return "Reading the book…"
   if (!atmosphere.track) return "This book has no atmosphere track yet"
   if (status.playback.routeMuted) return "Off in the car"
-  if (!status.playback.narrating) return "Plays with the narration"
+  if (!status.playback.narrating && !status.playback.reading) {
+    return "Plays with the narration"
+  }
   if (atmosphere.playing.length === 0) return "Quiet here"
   const sounds = soundList(atmosphere.playing)
   return atmosphere.musicYielding ? `${sounds}, with the music paused` : sounds

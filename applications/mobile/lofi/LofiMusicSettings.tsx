@@ -1,7 +1,7 @@
 // LOFI-FORK: the lofi music's section in Settings (see FORK.md).
 import { FolderInput } from "lucide-react-native"
 import { useState } from "react"
-import { Modal, ScrollView, View } from "react-native"
+import { Modal, ScrollView, Share, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { LofiScore } from "@/modules/lofi-score"
 import {
   atmosphereSourceLabel,
   moodCounts,
+  moodFeedbackTotals,
   moodName,
   musicSourceLabel,
   plainCredits,
@@ -75,6 +76,19 @@ export function LofiMusicSettings() {
     }
   }
 
+  async function shareMoodFeedback() {
+    try {
+      const text = await music.getMoodFeedback()
+      if (!text) {
+        setMessage("No mood has been marked wrong yet.")
+        return
+      }
+      await Share.share({ message: text })
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   async function showSoundCredits() {
     try {
       const text = await LofiScore?.getAtmosphereCredits()
@@ -100,6 +114,43 @@ export function LofiMusicSettings() {
         their volume from the music button in the player too.
       </Text>
       <LofiMusicControls music={music} />
+      {status && status.followsReading !== undefined && (
+        <View className="w-full flex-row items-center justify-between gap-4">
+          <View className="shrink gap-1">
+            <Text maxFontSizeMultiplier={1.5}>Music while reading</Text>
+            <Text variant="muted">
+              With the narration stopped, the music follows the pages as you
+              read a readaloud book on screen, judged from the top of the page.
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel="Music while reading"
+            checked={status.followsReading}
+            disabled={!status.enabled}
+            onCheckedChange={(enabled) => void music.setFollowsReading(enabled)}
+          />
+        </View>
+      )}
+      {status?.feedback && (
+        <View className="w-full gap-2">
+          <Text maxFontSizeMultiplier={1.5} className="text-lg">
+            Wrong moods
+          </Text>
+          <Text variant="muted">
+            {moodFeedbackTotals(status.feedback) ??
+              "Tap Wrong mood in the music panel when the music does not fit. Each tap is noted here, on this phone only."}
+          </Text>
+          {status.feedback.totalWrong > 0 && (
+            <Button
+              accessibilityLabel="Share the wrong-mood log"
+              variant="ghost"
+              onPress={() => void shareMoodFeedback()}
+            >
+              <Text>Share wrong-mood log</Text>
+            </Button>
+          )}
+        </View>
+      )}
       {status && (
         <View className="w-full gap-2">
           <Text maxFontSizeMultiplier={1.5} className="text-lg">

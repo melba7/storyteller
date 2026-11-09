@@ -1,5 +1,6 @@
 // LOFI-FORK: the lofi music's controls, shared by the player's music panel and
 // Settings (see FORK.md).
+import { useState } from "react"
 import { View } from "react-native"
 
 import { Button } from "@/components/ui/button"
@@ -7,9 +8,14 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import {
+  canMarkWrongMood,
   describeAtmosphere,
   describeMusic,
+  moodFeedbackLine,
+  moodName,
   musicLevelLabel,
+  nowPlayingLine,
+  wrongMoodResult,
 } from "@/modules/lofi-score/status"
 
 import { type LofiMusic } from "./useLofiMusic"
@@ -42,6 +48,11 @@ export function LofiMusicControls({ music }: Props) {
             Lofi music
           </Text>
           <Text variant="muted">{describeMusic(status)}</Text>
+          {status.enabled && status.playback.nowPlaying && (
+            <Text variant="muted" className="text-sm">
+              {nowPlayingLine(status.playback.nowPlaying)}
+            </Text>
+          )}
         </View>
         <Switch
           accessibilityLabel="Lofi music"
@@ -49,6 +60,8 @@ export function LofiMusicControls({ music }: Props) {
           onCheckedChange={(enabled) => void music.setEnabled(enabled)}
         />
       </View>
+
+      <WrongMood music={music} status={status} />
 
       <View className="w-full gap-2">
         <View className="w-full flex-row items-center justify-between gap-4">
@@ -100,6 +113,98 @@ export function LofiMusicControls({ music }: Props) {
           onCheckedChange={(muted) => void music.setMutedInCar(muted)}
         />
       </View>
+    </View>
+  )
+}
+
+/**
+ * "Wrong mood": the music moves to the engine's next guess, then you can pick
+ * the mood yourself. Every tap is logged for the listening test.
+ */
+function WrongMood({
+  music,
+  status,
+}: Props & { status: NonNullable<LofiMusic["status"]> }) {
+  const [message, setMessage] = useState<string | null>(null)
+  const [picking, setPicking] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const playing = canMarkWrongMood(status)
+  const counts = status.feedback ? moodFeedbackLine(status.feedback) : null
+  const moods = status.library.moods.filter(
+    (mood) => mood.tracks > 0 && mood.mood !== status.playback.musicMood,
+  )
+
+  async function mark(mood: string | null) {
+    setBusy(true)
+    try {
+      const result = await music.markWrongMood(mood)
+      if (result) {
+        setMessage(
+          mood
+            ? `Switched to ${result.chosen} music.`
+            : wrongMoodResult(result),
+        )
+        setPicking(mood === null)
+      } else {
+        setMessage("Nothing to change right now.")
+        setPicking(false)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!playing && !message && !counts) return null
+
+  return (
+    <View className="w-full gap-2">
+      <View className="w-full flex-row items-center justify-between gap-4">
+        <Button
+          accessibilityLabel="The music's mood is wrong. Try another"
+          accessibilityHint="Moves the music to another mood and notes the miss"
+          variant="secondary"
+          size="sm"
+          disabled={!playing || busy}
+          onPress={() => void mark(null)}
+        >
+          <Text>Wrong mood</Text>
+        </Button>
+        {playing && !picking && (
+          <Button
+            accessibilityLabel="Pick the music's mood"
+            variant="ghost"
+            size="sm"
+            disabled={busy}
+            onPress={() => {
+              setPicking(true)
+            }}
+          >
+            <Text>Pick a mood</Text>
+          </Button>
+        )}
+      </View>
+      {message && <Text variant="muted">{message}</Text>}
+      {playing && picking && (
+        <View className="w-full flex-row flex-wrap gap-2">
+          {moods.map((mood) => (
+            <Button
+              key={mood.mood}
+              accessibilityLabel={`Play ${mood.mood} music`}
+              variant="outline"
+              size="sm"
+              disabled={busy}
+              onPress={() => void mark(mood.mood)}
+            >
+              <Text>{moodName(mood.mood)}</Text>
+            </Button>
+          ))}
+        </View>
+      )}
+      {counts && (
+        <Text variant="muted" className="text-sm">
+          {counts}
+        </Text>
+      )}
     </View>
   )
 }

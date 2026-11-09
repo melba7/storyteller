@@ -46,7 +46,9 @@ Files and folders that belong to the fork, which upstream never touches:
   upstream's audiobook player. It is a new file inside upstream's Readium
   module, because the player's observers and `Track` are internal to it. It adds
   observers and reads state, and holds the narration for a moment when the
-  atmosphere swells at a big scene change (see the touch point below).
+  atmosphere swells at a big scene change (see the touch point below). It also
+  looks up the clip at the top of the page, so the music can follow the pages
+  while you read with the narration stopped.
 - `applications/mobile/lofi/`: the React Native UI.
 - Planned: `tools/lofi-library/` (music library scripts).
 
@@ -62,6 +64,11 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   setting.
 - `applications/mobile/app/(root)/settings.tsx` (2 markers): the music's section
   in Settings, which also imports a music folder.
+- `applications/mobile/store/store.ts` (1 marker): imports
+  `lofi/readerFollow.ts` for its listeners. With the narration stopped, it finds
+  the clip at the top of each page you turn to, the same way the app keeps the
+  audio in step with the page, and hands it to the music, which judges the mood
+  from there and never from further down the page.
 - `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift` (8
   markers): the narration hold. When the atmosphere swells at a big scene
   change, the bridge stops the narrator at the end of the sentence for under a

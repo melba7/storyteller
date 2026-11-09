@@ -313,3 +313,19 @@ extension AudiobookPlayerActor {
         }
     }
 }
+
+// MARK: - Reading on screen
+
+extension AudiobookPlayerActor {
+    /// The clip `position` seconds into `audioResource`, a relative URL as the app's
+    /// page-to-audio sync gives it (`getClip`), so the lofi music can follow the pages while
+    /// the narrator is stopped. Reads the player's clip lists; changes nothing.
+    public func lofiClip(audioResource: String, at position: Double) -> LofiNarratorClip? {
+        var clips = lofiClips(relativeUri: audioResource)
+        if clips.isEmpty, let normalized = RelativeURL(epubHREF: audioResource) {
+            clips = lofiClips(relativeUri: normalized.string)
+        }
+        // A plain scan: searchForClip assumes the position is inside the file's clips.
+        return clips.first { $0.start <= position && position < $0.end }.map { LofiNarratorClip($0) }
+    }
+}

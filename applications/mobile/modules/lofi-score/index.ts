@@ -107,8 +107,12 @@ export type LofiMusicStatus = {
     /** Claude has scored this book; its mood track is playing. */
     moodTrack: boolean
   }
+  /** Music while reading on screen with the narration stopped. Missing from older builds. */
+  followsReading?: boolean
   playback: {
     narrating: boolean
+    /** Following the pages you read on screen, with the narration stopped. */
+    reading?: boolean
     sentence?: number
     estimatedRate: number
     readings: number
@@ -117,11 +121,43 @@ export type LofiMusicStatus = {
     engineRunning: boolean
     routeMuted: boolean
     recentMoods: LofiMood[]
+    /** The track playing now, for the "now playing" line and its credit. */
+    nowPlaying?: LofiNowPlaying
   }
+  /** The "Wrong mood" button's counts, for the listening test. */
+  feedback?: LofiMoodFeedback
   /** Missing from builds before the atmosphere sounds. */
   atmosphere?: LofiAtmosphereStatus
   recentEvents: string[]
   lastError?: string
+}
+
+/** The track playing now. */
+export type LofiNowPlaying = {
+  title: string
+  artist?: string
+  /** The track's licence, such as "CC BY 4.0", when the music folder lists it. */
+  license?: string
+  mood: LofiMood
+}
+
+/** Mood changes the music made, and how many of them you marked wrong. */
+export type LofiMoodFeedback = {
+  bookChanges: number
+  bookWrong: number
+  totalChanges: number
+  totalWrong: number
+}
+
+/** What the "Wrong mood" button did. */
+export type LofiMoodOverride = {
+  rejected: LofiMood
+  chosen: LofiMood
+  /** You chose the mood; false when it was the engine's next guess. */
+  picked: boolean
+  /** It replaced a guess made moments before: the same miss, not a new one. */
+  correction: boolean
+  sentence?: number
 }
 
 export type LofiImportSummary = {
@@ -155,6 +191,23 @@ type LofiScoreNativeModule = {
   setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
   /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
   getAtmosphereCredits(): Promise<string | null>
+  /**
+   * The music's mood is wrong: move to `mood`, or to the engine's next guess
+   * with null, and log it. null when nothing was playing or nothing changed.
+   */
+  markWrongMood(mood: LofiMood | null): Promise<LofiMoodOverride | null>
+  /** The wrong-mood log as text to share, or null when nothing was marked. */
+  getMoodFeedback(): Promise<string | null>
+  /** Music while reading on screen with the narration stopped. */
+  setFollowsReading(enabled: boolean): Promise<LofiMusicStatus>
+  /** The page you are reading now starts at this clip (as `getClip` finds it). */
+  readerReached(
+    bookUuid: string,
+    relativeUrl: string,
+    start: number,
+  ): Promise<void>
+  /** You stopped reading on screen (left the app or the book). */
+  readerStopped(): Promise<void>
 }
 
 /**
