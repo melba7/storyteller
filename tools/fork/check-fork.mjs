@@ -14,14 +14,16 @@
  *
  * Usage: node tools/fork/check-fork.mjs [--base <upstream ref>] [--list]
  *
- * Without --base, the base is the newest stable upstream `mobile-vX.Y.Z` tag
- * that HEAD contains. Plain Node, no dependencies, so it runs before
- * `yarn install`.
+ * Without --base, the base is the newest stable upstream `mobile-vX.Y.Z`
+ * release that HEAD contains (see upstream-base.mjs). Plain Node, no
+ * dependencies, so it runs before `yarn install`.
  */
 
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
+
+import { findUpstreamBase } from "./upstream-base.mjs"
 
 const AUDIO_EXTENSIONS = new Set([
   "aac",
@@ -43,8 +45,6 @@ const AUDIO_EXTENSIONS = new Set([
   "weba",
   "wma",
 ])
-
-const STABLE_MOBILE_TAG = /^mobile-v(\d+)\.(\d+)\.(\d+)$/
 
 const STATUS_WORDS = {
   A: "adds",
@@ -103,20 +103,6 @@ function isAudio(path) {
 
 function countOccurrences(text, needle) {
   return text.split(needle).length - 1
-}
-
-function findBaseTag() {
-  const tags = gitLines("tag", "--merged", "HEAD", "--list", "mobile-v*")
-    .map((name) => ({ name, match: STABLE_MOBILE_TAG.exec(name) }))
-    .filter(({ match }) => match !== null)
-    .map(({ name, match }) => ({ name, version: match.slice(1).map(Number) }))
-    .sort((a, b) => {
-      for (let i = 0; i < 3; i++) {
-        if (a.version[i] !== b.version[i]) return a.version[i] - b.version[i]
-      }
-      return 0
-    })
-  return tags.at(-1)?.name
 }
 
 function parseArgs(argv) {
@@ -189,12 +175,15 @@ for (const file of forkFiles) {
 }
 
 // 4. Measured against upstream, the fork only touches what it registered.
-const base = options.base ?? findBaseTag()
+const upstreamBase =
+  options.base === undefined ? findUpstreamBase(root) : undefined
+const base = options.base ?? upstreamBase?.commit
+const baseName = options.base ?? upstreamBase?.name
 const footprint = { forkOwned: [], touchpoints: [], allowed: [] }
 if (base === undefined) {
-  print(
-    "Skipping the upstream footprint check: HEAD contains no stable mobile-v* tag. Fetch upstream tags or pass --base <ref>.",
-  )
+  const message =
+    "Skipped the upstream footprint check: found no upstream mobile-v* release in HEAD's history. Is gitlab.com reachable? Or pass --base <ref>."
+  print(inActions ? `::warning title=Fork check::${message}` : message)
 } else {
   const fields = git(
     "diff",
@@ -234,7 +223,9 @@ if (base === undefined) {
   }
 }
 
-print(`Fork checks${base === undefined ? "" : ` against upstream ${base}`}`)
+print(
+  `Fork checks${baseName === undefined ? "" : ` against upstream ${baseName}`}`,
+)
 print(
   `- ${manifest.touchpoints.length} touch point(s), ${markerCount} ${marker} marker(s) expected`,
 )

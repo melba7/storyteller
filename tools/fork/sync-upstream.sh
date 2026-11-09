@@ -105,10 +105,7 @@ else
   exit 1
 fi
 
-base_tag=$(git tag --merged "$base" --list 'mobile-v*' | newest_stable)
-if [ "$base_tag" = "mobile-v" ]; then
-  base_tag=""
-fi
+base_tag=$(node tools/fork/upstream-base.mjs "$base")
 
 output tag "$target"
 output base_tag "$base_tag"

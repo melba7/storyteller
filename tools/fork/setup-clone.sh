@@ -39,9 +39,7 @@ else
   echo "Install the GitHub CLI and run: gh repo set-default $fork"
 fi
 
-base_tag=$(git tag --merged HEAD --list 'mobile-v*' |
-  sed -n 's#^mobile-v\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$#\1#p' |
-  sort -t. -k1,1n -k2,2n -k3,3n | tail -n 1)
+base_tag=$(node tools/fork/upstream-base.mjs HEAD)
 if [ -n "$base_tag" ]; then
-  echo "This branch is based on upstream mobile-v$base_tag."
+  echo "This branch is based on upstream $base_tag."
 fi

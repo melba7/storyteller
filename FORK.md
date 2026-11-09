@@ -97,9 +97,11 @@ fork's tags, turns on `git rerere` so resolved conflicts are remembered, and
 points `gh` at this fork.
 
 `main` follows upstream releases (the `mobile-v*` tags), not upstream's `main`
-branch, so the fork only moves to versions upstream actually shipped.
-`git diff mobile-vX.Y.Z main`, with the last merged release, shows everything
-the fork changes.
+branch, so the fork only moves to versions upstream actually shipped. The fork
+doesn't need to carry upstream's tags: `node tools/fork/upstream-base.mjs` names
+the newest release `main` contains by reading upstream's tags directly, and
+`node tools/fork/check-fork.mjs --list` lists every file the fork changes since
+then.
 
 Don't press GitHub's **Sync fork** button: it merges upstream's unreleased
 `main` instead of a release.
