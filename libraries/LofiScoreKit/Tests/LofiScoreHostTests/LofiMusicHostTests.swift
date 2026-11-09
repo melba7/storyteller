@@ -102,6 +102,7 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/notes.txt")
         try touch("Picked Music/.DS_Store")
         try touch("Picked Music/SOURCES.csv", contents: Data("file,license\nfire.m4a,CC0\n".utf8))
+        try touch("Picked Music/Credits.md", contents: Data("# Music credits\n".utf8))
         try touch("Picked Music/MoodTracks/some-book.json")
         try touch("Picked Music/MoodTracks/readme.txt")
         try touch("Picked Music/tracks/The Green Lantern.track.json")
@@ -124,6 +125,7 @@ final class LofiMusicHostTests: XCTestCase {
         XCTAssertEqual(files(under: destination), [
             "Calm/rain 70bpm.mp3",
             "Cozy/fire.m4a",
+            "Credits.md",
             "LofiMood-embed-word+contextual-3.json",
             "LofiMood-embed-word-3.json",
             "Mood.mlmodelc/model.mil",
@@ -141,6 +143,7 @@ final class LofiMusicHostTests: XCTestCase {
             "Old.mlmodel",
         ])
         XCTAssertTrue(MusicFolderImport.needsContextualAssets(MusicFolderImport.moodModels(in: destination)))
+        XCTAssertEqual(MusicFolderImport.creditsFile(in: destination)?.lastPathComponent, "Credits.md")
         XCTAssertFalse(fileManager.fileExists(atPath: destination.path + ".incoming"))
     }
 

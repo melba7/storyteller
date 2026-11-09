@@ -1,15 +1,18 @@
 // LOFI-FORK: the lofi music's section in Settings (see FORK.md).
 import { FolderInput } from "lucide-react-native"
 import { useState } from "react"
-import { View } from "react-native"
+import { Modal, ScrollView, View } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { LofiScore } from "@/modules/lofi-score"
 import {
   moodCounts,
   moodName,
   musicSourceLabel,
+  plainCredits,
 } from "@/modules/lofi-score/status"
 
 import { LofiMusicControls } from "./LofiMusicControls"
@@ -19,6 +22,8 @@ export function LofiMusicSettings() {
   const music = useLofiMusic(2000)
   const [importing, setImporting] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const [credits, setCredits] = useState<string | null>(null)
+  const insets = useSafeAreaInsets()
 
   if (!music.available) return null
   const { status } = music
@@ -46,6 +51,19 @@ export function LofiMusicSettings() {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally {
       setImporting(false)
+    }
+  }
+
+  async function showCredits() {
+    try {
+      const text = await LofiScore?.getMusicCredits()
+      setCredits(
+        text
+          ? plainCredits(text)
+          : "This music folder came without a CREDITS.md file.",
+      )
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
     }
   }
 
@@ -84,6 +102,15 @@ export function LofiMusicSettings() {
           </Text>
           {status.library.source === "imported" && (
             <Button
+              accessibilityLabel="Show the music credits"
+              variant="ghost"
+              onPress={() => void showCredits()}
+            >
+              <Text>Music credits</Text>
+            </Button>
+          )}
+          {status.library.source === "imported" && (
+            <Button
               accessibilityLabel="Remove the imported music"
               variant="ghost"
               disabled={importing}
@@ -98,6 +125,34 @@ export function LofiMusicSettings() {
           )}
         </View>
       )}
+      <Modal
+        visible={credits !== null}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => {
+          setCredits(null)
+        }}
+      >
+        <View
+          className="bg-background flex-1 px-6 pt-6"
+          style={{ paddingBottom: insets.bottom + 16 }}
+        >
+          <ScrollView className="flex-1">
+            <Text selectable className="text-sm">
+              {credits}
+            </Text>
+          </ScrollView>
+          <Button
+            accessibilityLabel="Close the music credits"
+            variant="secondary"
+            onPress={() => {
+              setCredits(null)
+            }}
+          >
+            <Text>Close</Text>
+          </Button>
+        </View>
+      </Modal>
     </View>
   )
 }

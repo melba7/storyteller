@@ -7,6 +7,7 @@ import {
   moodCounts,
   musicLevelLabel,
   musicSourceLabel,
+  plainCredits,
 } from "./status"
 
 function status(overrides: Partial<LofiMusicStatus> = {}): LofiMusicStatus {
@@ -87,5 +88,30 @@ describe("labels", () => {
       "32 tracks from “LofiMusic”",
     )
     expect(moodCounts(status().library)).toBe("Calm 4 · no Tense yet")
+  })
+})
+
+describe("plainCredits", () => {
+  it("drops Markdown marks but keeps names, licences and links", () => {
+    const markdown = [
+      "# Music credits",
+      "",
+      "",
+      "",
+      "## Calm",
+      "- **Rain on Glass** by [HoliznaCC0](https://example.com/holizna), CC0",
+      "* Night Bus by Someone, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)",
+      "Source: [https://example.com](https://example.com) and `SOURCES.csv`",
+    ].join("\r\n")
+    expect(plainCredits(markdown)).toBe(
+      [
+        "Music credits",
+        "",
+        "Calm",
+        "• Rain on Glass by HoliznaCC0 (https://example.com/holizna), CC0",
+        "• Night Bus by Someone, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
+        "Source: https://example.com and SOURCES.csv",
+      ].join("\n"),
+    )
   })
 })

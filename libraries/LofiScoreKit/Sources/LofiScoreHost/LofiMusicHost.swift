@@ -188,6 +188,17 @@ public final class LofiMusicHost: @unchecked Sendable {
         return summary
     }
 
+    /// The imported music's credits (`CREDITS.md`), if the folder had them.
+    public func musicCredits() async -> String? {
+        let folder = environment.musicFolder
+        return await withCheckedContinuation { continuation in
+            work.async {
+                let text = MusicFolderImport.creditsFile(in: folder).flatMap { try? String(contentsOf: $0, encoding: .utf8) }
+                continuation.resume(returning: text)
+            }
+        }
+    }
+
     /// Deletes the imported music and goes back to the stand-ins.
     public func removeImportedMusic() async {
         await onQueue { [self] in

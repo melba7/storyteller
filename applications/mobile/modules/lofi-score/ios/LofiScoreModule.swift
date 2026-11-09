@@ -55,6 +55,11 @@ public final class LofiScoreModule: Module {
       ]
     }
 
+    // The imported music's CREDITS.md, or null.
+    AsyncFunction("getMusicCredits") { () async -> String? in
+      await LofiScoreRuntime.shared.host.musicCredits()
+    }
+
     AsyncFunction("removeImportedMusic") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.removeImportedMusic()

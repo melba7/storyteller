@@ -75,6 +75,8 @@ type LofiScoreNativeModule = {
   /** Shows the Files folder picker; null when the listener cancels. */
   importMusicFolder(): Promise<LofiImportSummary | null>
   removeImportedMusic(): Promise<LofiMusicStatus>
+  /** The imported music's CREDITS.md, or null when it had none. */
+  getMusicCredits(): Promise<string | null>
 }
 
 /**
