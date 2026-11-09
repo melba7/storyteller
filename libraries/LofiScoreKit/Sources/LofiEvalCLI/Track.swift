@@ -58,9 +58,11 @@ func trackCommand(_ args: Arguments) async throws {
     let store = MoodTrackStore(track)
     let started = now()
     let saveEvery = 20
+    let cap = SpendCap(args)
     let report = try await builder.build(
         into: store, engine: engine, chapters: chapters,
-        concurrency: args.int("concurrency", default: 4)
+        concurrency: args.int("concurrency", default: 4),
+        continueIf: { cap.allows(1) }
     ) { _, added in
         if added % saveEvery == 0 {
             try? store.snapshot.encoded().write(to: outURL, options: .atomic)
@@ -73,6 +75,9 @@ func trackCommand(_ args: Arguments) async throws {
     let counts = Dictionary(grouping: entries, by: { $0.reading.bucket.rawValue }).mapValues(\.count)
     note(String(format: "%@ with %@: %d planned, %d already there, %d scored, %d failed, %.0f s",
                 book, engine.id, report.planned, report.alreadyScored, report.scored, report.failed, now() - started))
+    if report.stoppedEarly {
+        note(String(format: "  stopped at --max-dollars %.2f (about $%.2f spent); run again with a higher cap to finish", cap.dollars ?? 0, cap.spent))
+    }
     if plan.refinement != nil {
         note("  refinement: \(report.probes) probes this run, \(report.earlierProbes) earlier, budget \(report.probeBudget); \(report.unrefinedChanges) changes left wider than the resolution")
     }
@@ -83,6 +88,47 @@ func trackCommand(_ args: Arguments) async throws {
 }
 
 // MARK: - Claude cost
+
+/// Stops a paid run before it spends more than `--max-dollars` at list prices.
+/// It checks before each new request, using the average cost so far (or a
+/// cautious guess before the first answer), so a run ends a little under the
+/// cap rather than over it.
+struct SpendCap: Sendable {
+    let dollars: Double?
+    let prices: ClaudePrices?
+
+    init(_ args: Arguments) {
+        guard let raw = args.string("max-dollars") else {
+            dollars = nil
+            prices = nil
+            return
+        }
+        guard let cap = Double(raw), cap >= 0 else { fail("--max-dollars expects a number, got \(raw)") }
+        guard let model = lastClaudeModel(), let prices = ClaudePrices.forModel(model) else {
+            fail("--max-dollars needs a claude engine with a known price")
+        }
+        dollars = cap
+        self.prices = prices
+    }
+
+    var spent: Double {
+        guard let prices else { return 0 }
+        let t = EngineFactory.claudeUsage.totals
+        return prices.dollars(
+            input: Double(t.inputTokens), output: Double(t.outputTokens),
+            cacheRead: Double(t.cacheReadTokens), cacheWrite: Double(t.cacheWriteTokens)
+        )
+    }
+
+    /// Whether `requests` more requests fit under the cap.
+    func allows(_ requests: Int) -> Bool {
+        guard let dollars, let prices else { return true }
+        let responses = EngineFactory.claudeUsage.totals.responses
+        // Before any answer: a long window with plenty of thinking.
+        let perRequest = responses > 0 ? spent / Double(responses) : prices.dollars(input: 2_000, output: 600)
+        return spent + perRequest * Double(requests) <= dollars
+    }
+}
 
 /// Anthropic list prices in dollars per million tokens, from the Claude API
 /// reference cached on 2026-10-06. Check the pricing page before relying on them.
@@ -108,14 +154,15 @@ struct ClaudePrices {
 }
 
 /// Rough token counts for scoring `requests` windows: the system prompt
-/// (~650 tokens with the schema), ~1.4 tokens per passage word, and ~250
-/// output tokens of thinking plus the JSON answer at low effort.
+/// (~1,000 tokens with the schema since prompt v2's eleven moods), ~1.4
+/// tokens per passage word, and ~250 output tokens of thinking plus the JSON
+/// answer at low effort. Too short to be cached, so no cache discount.
 struct ClaudeCostEstimate {
     let inputTokens: Double
     let outputTokens: Double
 
     init(requests: Int, passageWords: Int) {
-        inputTokens = Double(requests) * 680 + Double(passageWords) * 1.4
+        inputTokens = Double(requests) * 1_000 + Double(passageWords) * 1.4
         outputTokens = Double(requests) * 250
     }
 

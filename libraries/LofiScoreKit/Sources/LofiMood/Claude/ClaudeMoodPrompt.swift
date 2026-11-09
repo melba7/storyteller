@@ -12,7 +12,7 @@ import LofiText
 public enum ClaudeMoodPrompt {
     /// Bump when the wording or schema changes; the engine id includes it, and
     /// saved mood tracks record it.
-    public static let version = 1
+    public static let version = 2
 
     public static let system = """
         You choose background music for an audiobook. Each message holds the passage that has \
@@ -23,17 +23,23 @@ public enum ClaudeMoodPrompt {
         Judge only the words in the passage. Do not use anything you know about the book, its \
         author or its plot, and never choose a mood for what is about to happen.
 
-        The eight moods, and when to use each (judging the final sentences):
+        The eleven moods, and when to use each (judging the final sentences):
         - calm: quiet, settled or reflective; ordinary talk, travel, description, exposition; \
         nothing at stake right now
         - cozy: warm and safe: home, food, firesides, friendship, gentle affection
         - playful: light, funny, teasing or mischievous; lively banter, comic mishaps
-        - hopeful: uplifting: relief, triumph, reunion, love declared, things turning out well
+        - hopeful: uplifting: relief, triumph, reunion, things turning out well
         - melancholy: sad and quiet: loss, longing, loneliness, regret, homesickness
         - mysterious: uncertain or eerie: secrets, puzzles, strange sights or sounds, something \
         unexplained
         - tense: danger, conflict, fear, a chase, a fight, a bitter argument; urgent suspense
         - somber: grave and heavy: death, grief, funerals, solemn ritual, dread, despair
+        - romantic: love between people: courtship, a kiss, tenderness between lovers, love \
+        declared, a wedding
+        - dreamy: wonder and enchantment: magic, marvels, dreams and reveries, beautiful strange \
+        sights; nothing threatening
+        - adventurous: bold forward motion, excitement more than fear: setting out, exploring, \
+        sailing or riding into the unknown, a daring feat going well, discovery
 
         Tie-breaks:
         - When nothing in particular is going on, the answer is calm. Most of a novel is calm; \
@@ -44,6 +50,17 @@ public enum ClaudeMoodPrompt {
         - mysterious vs tense: mysterious is not knowing; tense is danger happening now.
         - A heated argument with real stakes is tense; mild disagreement or gossip is calm or \
         playful.
+        - romantic vs cozy: romantic is love or attraction between two people; cozy is the \
+        warmth of home, family and friends.
+        - romantic vs hopeful: a kiss or a love declared is romantic; relief or triumph without \
+        romance is hopeful.
+        - Love lost or unreturned, mostly sad, is melancholy, not romantic.
+        - dreamy vs mysterious: dreamy is wonder and beauty; mysterious is not knowing, with unease.
+        - dreamy vs calm: dreamy needs magic, enchantment or awe on the page, not just a quiet scene.
+        - adventurous vs tense: adventurous is excitement and momentum; tense is fear with a real \
+        threat now.
+        - adventurous vs playful: playful is humour; adventurous is daring and discovery.
+        - Ordinary travel described without excitement is calm, not adventurous.
         - If the passage ends on a chapter heading, give the mood the previous scene ended on.
 
         Also give valence from -1 (very unpleasant) to 1 (very pleasant), arousal from 0 (still) \

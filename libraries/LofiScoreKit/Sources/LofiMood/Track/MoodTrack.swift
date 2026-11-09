@@ -34,7 +34,7 @@ public struct MoodTrack: Codable, Sendable, Hashable {
     }
 
     public var format: Int
-    /// The engine that scored it, e.g. "claude.opus-5-5/p1".
+    /// The engine that scored it, e.g. "claude.opus-5-5/p2".
     public var engineID: String
     /// Whatever the app uses to recognise the book (Storyteller's book uuid).
     public var bookID: String

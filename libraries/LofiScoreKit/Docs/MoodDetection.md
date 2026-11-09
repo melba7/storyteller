@@ -59,18 +59,61 @@ labels, so Mo chose **Claude scoring with the Fast engine as fallback**:
    (the book was re-aligned since the track was made).
 3. The system prompt is `GUIDELINES.md` in prompt form, so Claude answers the
    question the reference labels answer. Structured outputs pin the answer to
-   the eight moods; refusals and cut-off answers throw, and
+   the eleven moods; refusals and cut-off answers throw, and
    `FallbackMoodEngine` covers them. Requests to Opus and Sonnet carry
    `fallbacks: "default"` so a classifier refusal is retried server-side.
 4. Rate limits, overload and 5xx are retried with `retry-after` or 2, 4, 8 s
    backoff; a rejected key or a bad request is not retried.
+5. **Change points** (added 9 Nov 2026, for Mo's "start the music without too
+   much delay... just enough time to get to that thing"). Entries every 250
+   words alone could switch the music up to ~100 s after the text turned.
+   After scoring, the builder looks at neighbouring entries whose moods
+   differ and scores the sentence halfway between, then halfway again on the
+   side where the change fell, until the change is pinned to within 3
+   sentences (about 15 s). Probes go best first, by mood jump (anchor
+   distance) times the sentences the change could still be late by, so a
+   calm-to-tense turn is pinned before a calm-to-cozy drift. A per-book
+   budget caps probes at 0.6 x the planned entries (`--refine-budget`,
+   `--resolution`). Each probe is an ordinary entry judged only from its own
+   causal window, so the music never changes before the narrated text reads
+   as the new mood. What does depend on later text is where probes are
+   spent: only between entries that disagree. A mood that comes and goes
+   between two entries is not looked for, so a change heard in playback is
+   slightly more likely than chance to last. That is the accepted price of
+   not scoring every sentence. On the lexicon stand-in (which flips far more
+   than Claude should), the budget ran out with about half the changes
+   pinned, biggest first.
+6. **Reading on every sentence.** `MoodEngineCatalog.cadence(for:)` gives
+   `ReadingCadence.Configuration.everySentence` to track and Fast engines
+   (both answer in milliseconds) and keeps the plan's 4 sentences / 20 s for
+   Apple's on-device model. `MoodTracker` uses it unless told otherwise. The
+   chapter-start rule is unchanged (first reading on a chapter's third
+   sentence). Every `MoodObservation` now says where its reading came from:
+   `source == .track` (one reading is enough to act on) or `.live`
+   (neighbouring live readings share most of their window, so a run of them
+   agreeing proves little). The director in the audio thread weighs them
+   differently.
 
-Cost, estimated by `lofi-eval track <book> --dry-run` before any call:
-a 41,000-word book (*The Thirty-Nine Steps*) is 157 entries, about $1.55 with
-Opus 5.5, $0.77 with Sonnet 5.5 and $0.04 with Haiku 5.5 at list prices; a
-90,000-word novel is roughly twice that. These are estimates (the thinking
-tokens at low effort are a guess) until the Mac run measures real usage;
-`lofi-eval run` and `track` print the measured tokens and cost.
+Cost, estimated by `lofi-eval track <book> --dry-run` before any call (prompt
+v2, about 1,000 tokens of instructions per request): *A Christmas Carol*
+(29,000 words) is 109 entries plus up to 66 probes, about $1.21 with Opus 5.5,
+or $1.95 at most with probes; Sonnet 5.5 is half that and Haiku 5.5 about 3
+cents. A 120,000-word novel is about four times that: up to ~$8 with Opus
+and refinement, ~$4 with Sonnet, ~$0.20 with Haiku. These are estimates (the
+thinking tokens at low effort are a guess) until the Mac run measures real
+usage; `lofi-eval run` and `track` print the measured tokens and cost, and
+`--max-dollars` stops either one before it spends more.
+
+On the Mac, two scripts wrap all of this (both stay inside
+`~/Storyteller Lofi`, never print the key, and resume when run again):
+
+```sh
+Tools/mac/run-mood-eval.sh            # build, test, retrain Fast v4, score it; Claude only if the key file exists, $6 cap
+Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what tracks for these books would cost
+Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
+```
+
+By hand:
 
 ```sh
 export ANTHROPIC_API_KEY_FILE=~/"Storyteller Lofi"/.anthropic-key   # never commit the key
@@ -88,8 +131,16 @@ name-masking test matters more for it than for the on-device engines.
 
 ## Labels
 
-- `Tools/data/labels/GUIDELINES.md` is the one definition of the eight buckets
-  for people and models alike (it matches `MoodPrompt`).
+- `Tools/data/labels/GUIDELINES.md` is the one definition of the moods for
+  people and models alike (it matches `MoodPrompt` and `ClaudeMoodPrompt`).
+  Version 2 (9 Nov 2026) added romantic, dreamy and adventurous, the three
+  moods Mo asked for, and moved "love declared" from hopeful to romantic.
+- `claude-g2-test.jsonl`: the 320 held-out windows under guidelines v2. The
+  v1 labels carry over unchanged except where a window belongs to a new
+  mood; the 91 windows that might (new-mood cue words in the last 80 words,
+  or a v1 label of hopeful) were re-read, and 5 changed
+  (`v2-overrides-test.json`, applied by `Tools/data/relabel_v2.py`). The new
+  moods are rare in these eight books, so their scores rest on few windows.
 - `Tools/data/eval/sample-v1.jsonl.gz` is the frozen sample: 40 causal windows
   from each of 34 public-domain novels (PG-19 texts turned into readaloud
   EPUBs by `Tools/data/make_readaloud.py`), 1,360 in all. Window ids are

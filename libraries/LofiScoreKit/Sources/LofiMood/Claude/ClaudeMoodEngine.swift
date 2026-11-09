@@ -10,7 +10,7 @@ import LofiText
 /// Each request holds one window and nothing else: no title, no author, no
 /// earlier answers. The window comes from `SpoilerGuard`, so Claude only ever
 /// sees text that has already been narrated. The answer is constrained by a JSON
-/// schema, so it always names one of the eight moods unless Claude refuses.
+/// schema, so it always names one of the moods unless Claude refuses.
 ///
 /// This engine needs the network and an API key, and costs money per reading,
 /// so the app does not call it during playback. `MoodTrackBuilder` uses it to
