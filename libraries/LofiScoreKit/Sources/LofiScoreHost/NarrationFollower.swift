@@ -103,6 +103,11 @@ public final class NarrationFollower: @unchecked Sendable {
         public var rateSmoothing: Double = 0.35
         /// Ignore speed samples over less wall-clock time than this (timer jitter).
         public var minimumRateSample: TimeInterval = 1.0
+        /// Reading on screen with the narrator stopped: a page turn of up to this many
+        /// sentences either way is reading on (or paging back); a bigger one is a jump.
+        public var readerMaxPageStep: Int = 150
+        /// Reading on screen: after this long with no page turn, the music fades out.
+        public var readerIdleTimeout: TimeInterval = 300
 
         public init() {}
     }
@@ -114,6 +119,9 @@ public final class NarrationFollower: @unchecked Sendable {
         public var hasText: Bool
         public var engineID: String?
         public var isNarrating: Bool
+        /// The listener is reading the text on screen with the narrator stopped, and the
+        /// music follows the pages (``readerReached(_:)``).
+        public var isReading: Bool = false
         public var position: SentencePosition?
         public var estimatedRate: Double
         /// Clips that did not match a narrated sentence (front matter, audio-only parts).
@@ -138,6 +146,9 @@ public final class NarrationFollower: @unchecked Sendable {
     /// The latest clip that arrived before the book's text was ready.
     private var waitingClip: (clip: NarratorClip, audioTime: Double?)?
     private var narrating = false
+    /// Following the pages of a silent reader (``readerReached(_:)``).
+    private var reading = false
+    private var readerIdleTimer: LofiCancellable?
     private var pauseTimer: LofiCancellable?
     private var pausedAt: TimeInterval?
     private var position: SentencePosition?
@@ -172,6 +183,7 @@ public final class NarrationFollower: @unchecked Sendable {
         jobs.finish()
         consumer?.cancel()
         pauseTimer?.cancel()
+        readerIdleTimer?.cancel()
     }
 
     // MARK: - The music player
@@ -208,7 +220,7 @@ public final class NarrationFollower: @unchecked Sendable {
 
     /// The open book, whether the narrator is playing, and where it is. On the scheduler.
     private func replay(to newSink: NarrationMusicSink, reading: Bool) {
-        if narrating { newSink.narratorDidPlay() }
+        if narrating || self.reading { newSink.narratorDidPlay() }
         guard let bookID, let text else { return }
         newSink.openBook(id: bookID)
         if let position {
@@ -226,6 +238,7 @@ public final class NarrationFollower: @unchecked Sendable {
     public func bookOpened(id: String) {
         scheduler.perform { [self] in
             guard id != bookID else { return }
+            stopReading()
             if bookID != nil, text != nil { sink?.closeBook() }
             bookID = id
             text = nil
@@ -242,6 +255,7 @@ public final class NarrationFollower: @unchecked Sendable {
     public func bookClosed() {
         scheduler.perform { [self] in
             guard bookID != nil else { return }
+            stopReading()
             if text != nil { sink?.closeBook() }
             bookID = nil
             text = nil
@@ -272,6 +286,10 @@ public final class NarrationFollower: @unchecked Sendable {
                 pauseTimer?.cancel()
                 pauseTimer = nil
                 guard !narrating else { return }
+                // The narrator takes over from the pages: the music carries on.
+                readerIdleTimer?.cancel()
+                readerIdleTimer = nil
+                reading = false
                 narrating = true
                 anchor = nil
                 if let pausedAt, scheduler.now - pausedAt >= configuration.resetAfterPause, let text {
@@ -303,6 +321,104 @@ public final class NarrationFollower: @unchecked Sendable {
         }
     }
 
+    // MARK: - Reading on screen
+
+    /// The listener is reading the book's text on screen with the narrator stopped, and the
+    /// page now begins with `clip`'s sentence (the app's own page-to-audio sync finds it).
+    /// The music plays as if the narrator were reading:
+    ///
+    /// - judged from the top of the page, never from the rest of it, so nothing on the page
+    ///   the listener has not reached yet can show in the music;
+    /// - turning on a page reads every sentence between the last one reached and the new top
+    ///   of the page, in order, as narration would have;
+    /// - paging back keeps the mood, as a short rewind does; a jump of more than
+    ///   ``Configuration/readerMaxPageStep`` sentences (the table of contents, a bookmark)
+    ///   is a seek;
+    /// - after ``Configuration/readerIdleTimeout`` without a page turn, or with
+    ///   ``readerStopped()``, the music fades out as on a pause.
+    ///
+    /// Ignored while the narrator plays: it leads then.
+    public func readerReached(_ clip: NarratorClip) {
+        scheduler.perform { [self] in
+            guard bookID != nil, let text, !narrating else { return }
+            let found = try? text.spoilerGuard.position(
+                textResource: clip.textResource,
+                fragmentId: clip.fragmentId,
+                audioResource: clip.audioResource,
+                clipBegin: clip.start
+            )
+            guard let found else {
+                unmatchedClips += 1
+                return
+            }
+            if !reading {
+                reading = true
+                if let pausedAt, scheduler.now - pausedAt >= configuration.resetAfterPause {
+                    enqueue(.reset(text.tracker))
+                }
+                pausedAt = nil
+                anchor = nil
+                sink?.narratorDidPlay()
+            }
+            armReaderIdle()
+            follow(page: found, text: text)
+        }
+    }
+
+    /// The listener stopped reading on screen (left the book, or the app went to the
+    /// background). The music fades out as on a pause.
+    public func readerStopped() {
+        scheduler.perform { [self] in
+            stopReading()
+        }
+    }
+
+    private func stopReading() {
+        readerIdleTimer?.cancel()
+        readerIdleTimer = nil
+        guard reading else { return }
+        reading = false
+        pausedAt = scheduler.now
+        if !narrating { sink?.narratorDidPause() }
+    }
+
+    private func armReaderIdle() {
+        readerIdleTimer?.cancel()
+        readerIdleTimer = scheduler.schedule(after: configuration.readerIdleTimeout) { [weak self] in
+            self?.stopReading()
+        }
+    }
+
+    private func follow(page found: SentencePosition, text: BookText) {
+        let previous = position
+        let step = previous.map { found.globalIndex - $0.globalIndex }
+        guard let previous, let step, abs(step) <= configuration.readerMaxPageStep else {
+            // The first page, or a jump: decide afresh from here.
+            sink?.narratorDidSeek(toGlobalSentenceIndex: found.globalIndex)
+            sink?.sentenceDidStart(globalSentenceIndex: found.globalIndex, duration: 0)
+            position = found
+            furthest = found
+            enqueueReading(text.tracker, found, isSeek: true)
+            return
+        }
+        guard step != 0 else { return }
+        // No voice: a duration of 0 lets the music rise a little, as in a pause.
+        sink?.sentenceDidStart(globalSentenceIndex: found.globalIndex, duration: 0)
+        position = found
+        let reached = max(previous, furthest ?? previous)
+        guard found > reached else { return }
+        furthest = found
+        var cursor = reached
+        var walked = 0
+        while walked < configuration.readerMaxPageStep,
+              let next = try? text.spoilerGuard.position(after: cursor),
+              next <= found {
+            enqueueReading(text.tracker, next, isSeek: false)
+            cursor = next
+            walked += 1
+        }
+    }
+
     // MARK: - Status
 
     public func status(_ completion: @escaping (Status) -> Void) {
@@ -312,6 +428,7 @@ public final class NarrationFollower: @unchecked Sendable {
                 hasText: text != nil,
                 engineID: text?.engineID,
                 isNarrating: narrating,
+                isReading: reading,
                 position: position,
                 estimatedRate: rate,
                 unmatchedClips: unmatchedClips,
