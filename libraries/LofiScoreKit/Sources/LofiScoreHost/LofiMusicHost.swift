@@ -32,7 +32,8 @@ public final class LofiMusicHost: @unchecked Sendable {
         public var makePlayerScheduler: () -> LofiScheduler
         public var followerScheduler: LofiScheduler
         /// The live mood engine for places no mood track covers.
-        public var makeLiveEngine: (_ classifierModel: URL?) -> any MoodEngine
+        /// The live mood engine, from the Fast models in the music folder (best first).
+        public var makeLiveEngine: (_ moodModels: [URL]) -> any MoodEngine
 
         public init(
             settings: MusicSettings,
@@ -44,7 +45,7 @@ public final class LofiMusicHost: @unchecked Sendable {
             makeBackend: @escaping () -> LofiAudioBackend,
             makePlayerScheduler: @escaping () -> LofiScheduler = { DispatchScheduler(label: "LofiScore.player") },
             followerScheduler: LofiScheduler = DispatchScheduler(label: "LofiScore.follower"),
-            makeLiveEngine: @escaping (_ classifierModel: URL?) -> any MoodEngine = { MoodEngineCatalog.recommendedEngine(classifierModelURL: $0) }
+            makeLiveEngine: @escaping (_ moodModels: [URL]) -> any MoodEngine = { MoodEngineCatalog.fastEngine(modelURLs: $0) }
         ) {
             self.settings = settings
             self.musicFolder = musicFolder
@@ -83,6 +84,7 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var preparingLibrary = false
     private var retiring: [LofiScorePlayer] = []
     private var liveEngine: (any MoodEngine)?
+    private var preparingContextualAssets = false
     private var book: (id: String, trackFile: URL?)?
     private var bookText: BookTextState = .none
     private var lastError: String?
@@ -290,6 +292,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         lastError = nil
         HostLog.note("\(source) music: \(library.tracks.count) tracks")
         follower.attach(player)
+        prepareContextualAssetsIfNeeded()
     }
 
     /// Keeps a replaced player alive while it fades out.
@@ -348,10 +351,33 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
     }
 
+    /// A contextual embedding model needs Apple's English embedding assets, which iOS
+    /// downloads on request. Until they are on the phone the next model in the list plays;
+    /// once they arrive, the next book opened gets the contextual model.
+    private func prepareContextualAssetsIfNeeded() {
+        guard !preparingContextualAssets,
+              MusicFolderImport.needsContextualAssets(MusicFolderImport.moodModels(in: environment.musicFolder))
+        else { return }
+        #if canImport(NaturalLanguage) && canImport(CoreML)
+        guard #available(iOS 17.0, macOS 14.0, visionOS 1.0, *) else { return }
+        preparingContextualAssets = true
+        Task.detached(priority: .background) { [weak self] in
+            let ready = await ClassifierMoodEngine.prepareAssets()
+            guard let host = self else { return }
+            host.queue.async {
+                host.preparingContextualAssets = false
+                HostLog.note(ready ? "contextual embedding assets on the device" : "contextual embedding assets not available")
+                if ready { host.liveEngine = nil }
+            }
+        }
+        #endif
+    }
+
     private func liveEngineForBooks() -> any MoodEngine {
         if let liveEngine { return liveEngine }
-        let classifier = MusicFolderImport.classifierModel(in: environment.musicFolder)
-        let engine = environment.makeLiveEngine(classifier)
+        let models = MusicFolderImport.moodModels(in: environment.musicFolder)
+        let engine = environment.makeLiveEngine(models)
+        HostLog.note("mood models: \(models.isEmpty ? "none" : models.map(\.lastPathComponent).joined(separator: ", ")); live engine \(engine.id)")
         liveEngine = engine
         return engine
     }

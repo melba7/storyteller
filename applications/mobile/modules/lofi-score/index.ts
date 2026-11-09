@@ -60,6 +60,7 @@ export type LofiImportSummary = {
   folderName: string
   tracks: number
   moodTracks: number
+  /** True when the folder held a mood model for the phone (embedding or Core ML). */
   hasClassifier: boolean
   /** Files that were still only in iCloud and were left out. */
   notDownloaded: number

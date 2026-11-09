@@ -9,8 +9,9 @@ import LofiScoreCore
 /// What is copied: the audio `MusicLibrary` plays (files directly inside a mood folder, such
 /// as `Calm/`, and files `library.json` lists), `library.json` and `SOURCES.csv` at the top,
 /// mood tracks (`*.json` in `MoodTracks/`, and `*.track.json` anywhere, gathered into
-/// `MoodTracks/`), and a Core ML mood classifier (`.mlmodel` or `.mlmodelc`) at the top.
-/// Nothing else: an audiobook unpacked somewhere in the folder is left behind.
+/// `MoodTracks/`), and the Fast mood models at the top (embedding models named
+/// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). Nothing else: an
+/// audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
     public struct Summary: Sendable, Hashable, Codable {
         public var folderName: String
@@ -78,18 +79,42 @@ public enum MusicFolderImport {
             folderName: source.lastPathComponent,
             tracks: library.tracks.count,
             moodTracks: plan.items.filter { $0.relativePath.hasPrefix(moodTracksFolderName + "/") }.count,
-            hasClassifier: plan.items.contains { isClassifier($0.url) },
+            hasClassifier: plan.items.contains { isClassifier($0.url) || isEmbeddingModel($0.url) },
             notDownloaded: plan.notDownloaded
         )
     }
 
-    /// The Core ML classifier in a music folder, if it has one.
-    public static func classifierModel(in folder: URL, fileManager: FileManager = .default) -> URL? {
+    /// The Fast mood models in a music folder, best first, for
+    /// `MoodEngineCatalog.fastEngine(modelURLs:)`, which uses the first one that loads.
+    /// Embedding models come first (they scored better on held-out books), the contextual
+    /// ones ahead of the word one: they need Apple's downloadable assets and fall through to
+    /// the next model until those are on the phone. Then the Core ML classifiers, compiled first.
+    public static func moodModels(in folder: URL, fileManager: FileManager = .default) -> [URL] {
         let contents = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-        // A compiled model loads faster; prefer it.
-        return contents.filter(isClassifier).sorted { lhs, rhs in
-            (lhs.pathExtension == "mlmodelc" ? 0 : 1, lhs.lastPathComponent) < (rhs.pathExtension == "mlmodelc" ? 0 : 1, rhs.lastPathComponent)
-        }.first
+        return contents.filter { isEmbeddingModel($0) || isClassifier($0) }.sorted { lhs, rhs in
+            (modelRank(lhs), lhs.lastPathComponent) < (modelRank(rhs), rhs.lastPathComponent)
+        }
+    }
+
+    /// True when one of these models needs Apple's contextual embedding assets.
+    public static func needsContextualAssets(_ models: [URL]) -> Bool {
+        models.contains { isEmbeddingModel($0) && $0.lastPathComponent.lowercased().contains("contextual") }
+    }
+
+    static func modelRank(_ url: URL) -> Int {
+        let name = url.lastPathComponent.lowercased()
+        if isEmbeddingModel(url) {
+            if name.contains("word+contextual") { return 0 }
+            if name.contains("contextual") { return 1 }
+            if name.contains("word") { return 2 }
+            return 3
+        }
+        return url.pathExtension.lowercased() == "mlmodelc" ? 4 : 5
+    }
+
+    static func isEmbeddingModel(_ url: URL) -> Bool {
+        let name = url.lastPathComponent.lowercased()
+        return name.hasPrefix("lofimood-embed-") && url.pathExtension.lowercased() == "json"
     }
 
     // MARK: - Internals
@@ -163,7 +188,7 @@ public enum MusicFolderImport {
             let ext = resolved.pathExtension.lowercased()
             let topLevel = components.count == 1
             if isMusic(components)
-                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || ext == "mlmodel")
+                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || ext == "mlmodel" || isEmbeddingModel(resolved))
                 || components.count == 2 && components[0] == moodTracksFolderName && ext == "json"
             {
                 plan.items.append(Item(url: resolved, relativePath: relative, isDirectory: false))

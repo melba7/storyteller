@@ -111,6 +111,10 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/Unsorted/loose.mp3")
         try touch("Picked Music/Mood.mlmodelc/model.mil")
         try touch("Picked Music/Mood.mlmodelc/weights/weight.bin")
+        try touch("Picked Music/LofiMood-embed-word-3.json")
+        try touch("Picked Music/LofiMood-embed-word+contextual-3.json")
+        try touch("Picked Music/Old.mlmodel")
+        try touch("Picked Music/tracks/LofiMood-embed-stray.json")
 
         let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
         try touch("app/Music/Old/old.mp3")
@@ -120,14 +124,23 @@ final class LofiMusicHostTests: XCTestCase {
         XCTAssertEqual(files(under: destination), [
             "Calm/rain 70bpm.mp3",
             "Cozy/fire.m4a",
+            "LofiMood-embed-word+contextual-3.json",
+            "LofiMood-embed-word-3.json",
             "Mood.mlmodelc/model.mil",
             "Mood.mlmodelc/weights/weight.bin",
             "MoodTracks/The Green Lantern.track.json",
             "MoodTracks/some-book.json",
+            "Old.mlmodel",
             "SOURCES.csv",
             "Tense/storm.wav",
         ])
-        XCTAssertEqual(MusicFolderImport.classifierModel(in: destination)?.lastPathComponent, "Mood.mlmodelc")
+        XCTAssertEqual(MusicFolderImport.moodModels(in: destination).map(\.lastPathComponent), [
+            "LofiMood-embed-word+contextual-3.json",
+            "LofiMood-embed-word-3.json",
+            "Mood.mlmodelc",
+            "Old.mlmodel",
+        ])
+        XCTAssertTrue(MusicFolderImport.needsContextualAssets(MusicFolderImport.moodModels(in: destination)))
         XCTAssertFalse(fileManager.fileExists(atPath: destination.path + ".incoming"))
     }
 
