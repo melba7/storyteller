@@ -3,6 +3,34 @@ import LofiDirector
 import LofiScoreCore
 @testable import LofiAudio
 
+extension ScoreConfig {
+    /// The timings the player tests were written against (the first version's defaults:
+    /// 7 s crossfades, 2 s fade-in, up to 4 s bar wait, bed 12 dB under the voice, 4 dB
+    /// lift after 1.5 s of silence). The tests check the player's mechanics with these;
+    /// `DefaultsTests` checks the subtler defaults the app ships with.
+    static var mechanics: ScoreConfig {
+        var config = ScoreConfig()
+        config.gentleCrossfade = 7
+        config.rotationCrossfade = 7
+        config.fadeIn = 2
+        config.maxBarWait = 4
+        config.ducking = .mechanics
+        return config
+    }
+}
+
+extension DuckingSettings {
+    /// See ``ScoreConfig/mechanics``.
+    static var mechanics: DuckingSettings {
+        var settings = DuckingSettings()
+        settings.bedLevelDB = -12
+        settings.gapLiftDB = 4
+        settings.gapThreshold = 1.5
+        settings.liftTime = 1.5
+        return settings
+    }
+}
+
 /// A player wired to a fake backend and a manual clock, with a small library of silent
 /// tracks named "<bucket>-<n>.wav".
 final class PlayerHarness {
@@ -16,7 +44,7 @@ final class PlayerHarness {
     private(set) var lastIndex = 0
 
     init(
-        config: ScoreConfig = ScoreConfig(),
+        config: ScoreConfig = .mechanics,
         buckets: [MoodBucket] = MoodBucket.allCases,
         tracksPerBucket: Int = 4,
         bpm: Double? = nil,

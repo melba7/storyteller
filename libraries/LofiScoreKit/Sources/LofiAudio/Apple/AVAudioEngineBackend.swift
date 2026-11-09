@@ -6,14 +6,15 @@ import Foundation
 /// instead of on top of them.
 public struct PresenceEQ: Sendable, Hashable {
     public var enabled = true
-    /// Centre of the dip, in Hz (the plan: somewhere in 2 to 4 kHz).
-    public var frequency: Float = 3000
-    public var gainDB: Float = -3
-    /// Width of the dip, in octaves.
-    public var bandwidth: Float = 1.5
+    /// Centre of the dip, in Hz: the middle of the band that carries speech consonants.
+    public var frequency: Float = 2500
+    /// Deep enough that the music steps back from the voice without sounding filtered.
+    public var gainDB: Float = -4.5
+    /// Width of the dip, in octaves (2 octaves covers roughly 1.25 to 5 kHz).
+    public var bandwidth: Float = 2
     /// A soft high shelf above the presence band.
     public var shelfFrequency: Float = 7000
-    public var shelfGainDB: Float = -2
+    public var shelfGainDB: Float = -3
 
     public init() {}
 }

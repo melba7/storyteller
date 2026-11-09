@@ -16,13 +16,15 @@ public struct MoodDecision: Sendable, Hashable, Codable {
         case dwellElapsed
         /// One very confident reading far from the current mood, such as sudden violence.
         case bigJump
+        /// Narration reached the sentence where the book's mood track turns to a new mood.
+        case trackTurn
     }
 
     /// How fast the music should get there.
     public enum Transition: String, Sendable, Hashable, Codable {
-        /// A regular mood change: a long crossfade (6 to 8 seconds).
+        /// A regular mood change: a long crossfade (about 8 seconds).
         case gentle
-        /// After a seek or a sudden jump: a short crossfade (3 to 4 seconds).
+        /// After a seek or a sudden jump: a short crossfade (about 3.5 seconds).
         case quick
     }
 

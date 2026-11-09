@@ -32,6 +32,22 @@ public struct SyntheticBook: Sendable {
         public var suddenOpenings: Double = 0.1
         /// Average number of pauses per hour (each 1 to 10 minutes).
         public var pausesPerHour: Double = 0.5
+        /// Average length of a run of wrong live readings, in seconds. 0 draws each wrong
+        /// reading on its own, which suits a 20-second cadence; read every sentence,
+        /// neighbouring windows overlap and an engine stays wrong for a few sentences.
+        public var noiseEpisode: TimeInterval = 0
+
+        /// Where readings come from: a live engine reading the window, or the book's mood
+        /// track (readings marked ``ReadingSource/track``).
+        public var source: ReadingSource = .live
+        /// With a track: the most sentences after a real turn that the track marks it (the
+        /// text side pins each turn by bisection to within a few sentences).
+        public var trackPinSentences = 3
+        /// With a track: chance that it misses a turn and stays on the old mood until the next.
+        public var trackMissedTurns = 0.1
+        /// With a track: set false to send its readings unmarked, as live readings, the way
+        /// the director saw them before tracks were marked.
+        public var markTrackReadings = true
 
         public init() {}
     }
@@ -72,6 +88,28 @@ public struct SyntheticBook: Sendable {
         func storyBucket(at storyTime: TimeInterval) -> MoodBucket {
             segments.first { $0.start <= storyTime && storyTime < $0.end }?.bucket ?? segments.last?.bucket ?? .neutral
         }
+
+        // The book's mood track, as the text side would have scored it: each turn marked up
+        // to a few sentences late, now and then one missed. It draws from its own generator,
+        // so live books stay exactly as they were.
+        var trackRNG = SplitMix64(seed: seed ^ 0x5452_4143_4B00)
+        var trackTurns: [(start: TimeInterval, bucket: MoodBucket)] = []
+        if options.source == .track, let first = segments.first {
+            trackTurns.append((0, first.bucket))
+            for segment in segments.dropFirst() {
+                if trackRNG.nextUnit() < options.trackMissedTurns { continue }
+                let pinned = Double(Int(trackRNG.nextUnit() * Double(options.trackPinSentences + 1)))
+                let start = max(trackTurns[trackTurns.count - 1].start, segment.start + pinned * options.sentenceLength)
+                guard start < segment.end else { continue }
+                trackTurns.append((start, segment.bucket))
+            }
+        }
+        func trackBucket(at storyTime: TimeInterval) -> MoodBucket {
+            trackTurns.last { $0.start <= storyTime }?.bucket ?? storyBucket(at: storyTime)
+        }
+        var noiseUntil = -1.0
+        var noiseLabel = MoodBucket.neutral
+        var noiseConfidence = 0.5
 
         // The mood an honest engine would see: the most common mood in its window.
         func windowBucket(at storyTime: TimeInterval) -> MoodBucket {
@@ -128,28 +166,60 @@ public struct SyntheticBook: Sendable {
                 }
             }
 
-            let truth = windowBucket(at: storyTime)
-            let segmentIndex = segments.firstIndex { $0.start <= storyTime && storyTime < $0.end } ?? 0
-            var label = truth
-            var confidence = min(0.95, max(0.2, rng.nextGaussian(mean: 0.65, deviation: 0.12)))
-            if !openedSegments.contains(segmentIndex), storyTime - segments[segmentIndex].start < options.readingInterval * 1.5 {
-                openedSegments.insert(segmentIndex)
-                if rng.nextUnit() < options.suddenOpenings {
-                    label = segments[segmentIndex].bucket
-                    confidence = 0.9
+            let reading: ReplayReading
+            if options.source == .track {
+                let label = trackBucket(at: storyTime)
+                let confidence = min(0.95, max(0.5, trackRNG.nextGaussian(mean: 0.8, deviation: 0.07)))
+                reading = ReplayReading(
+                    bucket: label,
+                    valence: label.anchor.valence + trackRNG.nextGaussian(deviation: options.pointNoise / 2),
+                    arousal: label.anchor.arousal + trackRNG.nextGaussian(deviation: options.pointNoise / 4),
+                    confidence: (confidence * 100).rounded() / 100,
+                    source: options.markTrackReadings ? .track : nil
+                )
+            } else {
+                let truth = windowBucket(at: storyTime)
+                let segmentIndex = segments.firstIndex { $0.start <= storyTime && storyTime < $0.end } ?? 0
+                var label = truth
+                var confidence = min(0.95, max(0.2, rng.nextGaussian(mean: 0.65, deviation: 0.12)))
+                if !openedSegments.contains(segmentIndex), storyTime - segments[segmentIndex].start < options.readingInterval * 1.5 {
+                    openedSegments.insert(segmentIndex)
+                    if rng.nextUnit() < options.suddenOpenings {
+                        label = segments[segmentIndex].bucket
+                        confidence = 0.9
+                    }
                 }
+                if options.noiseEpisode > 0 {
+                    // Runs of wrong readings, about labelNoise of all readings in all.
+                    if storyTime < noiseUntil, noiseLabel != truth {
+                        label = noiseLabel
+                        confidence = min(0.9, max(0.15, noiseConfidence + rng.nextGaussian(deviation: 0.04)))
+                    } else if label == truth {
+                        // A run lasts 1 / (1 - e^(-interval / episode)) readings on average;
+                        // start runs so that labelNoise of all readings are wrong.
+                        let p = min(0.99, options.labelNoise)
+                        let runReadings = 1 / (1 - exp(-options.readingInterval / options.noiseEpisode))
+                        let startChance = p / (runReadings * (1 - p) + p)
+                        if rng.nextUnit() < startChance {
+                            noiseLabel = nextBucket(after: truth, using: &rng)
+                            noiseUntil = storyTime - log(max(rng.nextUnit(), 1e-9)) * options.noiseEpisode
+                            noiseConfidence = min(0.9, max(0.15, rng.nextGaussian(mean: 0.5, deviation: 0.12)))
+                            label = noiseLabel
+                            confidence = noiseConfidence
+                        }
+                    }
+                } else if label == truth, rng.nextUnit() < options.labelNoise {
+                    label = nextBucket(after: truth, using: &rng)
+                    confidence = min(0.9, max(0.15, rng.nextGaussian(mean: 0.5, deviation: 0.12)))
+                }
+                let anchor = label.anchor
+                reading = ReplayReading(
+                    bucket: label,
+                    valence: anchor.valence + rng.nextGaussian(deviation: options.pointNoise),
+                    arousal: anchor.arousal + rng.nextGaussian(deviation: options.pointNoise / 2),
+                    confidence: (confidence * 100).rounded() / 100
+                )
             }
-            if label == truth, rng.nextUnit() < options.labelNoise {
-                label = nextBucket(after: truth, using: &rng)
-                confidence = min(0.9, max(0.15, rng.nextGaussian(mean: 0.5, deviation: 0.12)))
-            }
-            let anchor = label.anchor
-            let reading = ReplayReading(
-                bucket: label,
-                valence: anchor.valence + rng.nextGaussian(deviation: options.pointNoise),
-                arousal: anchor.arousal + rng.nextGaussian(deviation: options.pointNoise / 2),
-                confidence: (confidence * 100).rounded() / 100
-            )
             events.append(ReplayEvent(
                 t: (wallTime * 10).rounded() / 10,
                 reading: reading,
@@ -275,13 +345,23 @@ extension ReplayResult {
     }
 
     /// Changes that broke the dwell rule: a regular change less than `minimumDwell` after
-    /// the previous change, made while the rule applied.
-    public func dwellViolations(minimumDwell: TimeInterval) -> [MoodDecision] {
+    /// the previous change (or a track turn less than `trackMinimumDwell` after it), made
+    /// while the rule applied.
+    public func dwellViolations(minimumDwell: TimeInterval, trackMinimumDwell: TimeInterval? = nil) -> [MoodDecision] {
         var violations: [MoodDecision] = []
+        let trackDwell = trackMinimumDwell ?? minimumDwell
         for (previous, decision) in zip(decisions, decisions.dropFirst()) {
-            let regular = decision.reason == .confirmed || decision.reason == .dwellElapsed
-            if regular, !decision.dwellWaived, decision.time - previous.time < minimumDwell - 1e-6 {
-                violations.append(decision)
+            let gap = decision.time - previous.time
+            switch decision.reason {
+            case .confirmed:
+                if !decision.dwellWaived, gap < minimumDwell - 1e-6 { violations.append(decision) }
+            case .trackTurn:
+                if !decision.dwellWaived, gap < trackDwell - 1e-6 { violations.append(decision) }
+            case .dwellElapsed:
+                // Released by either rule: it must at least have waited the shorter one.
+                if !decision.dwellWaived, gap < min(minimumDwell, trackDwell) - 1e-6 { violations.append(decision) }
+            default:
+                break
             }
         }
         return violations

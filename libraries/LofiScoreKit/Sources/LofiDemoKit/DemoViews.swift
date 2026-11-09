@@ -283,13 +283,14 @@ struct SettingsCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle("Music", isOn: $session.musicEnabled)
                 Toggle("Read the story aloud", isOn: $session.speakAloud)
-                Toggle("Fast demo timings (12 s smoothing, 20 s dwell)", isOn: $session.fastTimings)
+                Toggle("Follow the book's mood track (off: live readings)", isOn: $session.followMoodTrack)
+                Toggle("Fast demo timings (12 s smoothing, 20 s dwell, 15 s between track turns)", isOn: $session.fastTimings)
                 Toggle("Music off in the car (CarPlay)", isOn: $session.muteInCar)
                 LabeledSlider(title: "Bed under the voice", value: $session.bedLevelDB, range: -24...(-6), format: "%.0f dB")
                 LabeledSlider(title: "Lift in silences", value: $session.gapLiftDB, range: 0...8, format: "+%.0f dB")
                 LabeledSlider(title: "Music volume", value: $session.musicVolume, range: 0...1, format: "%.2f")
                 LabeledSlider(title: "Narrator speed", value: $session.narratorRate, range: 0.75...2, format: "%.2fx")
-                LabeledSlider(title: "Reading noise", value: $session.readingNoise, range: 0...0.5, format: "%.2f")
+                LabeledSlider(title: "Reading noise (live)", value: $session.readingNoise, range: 0...0.5, format: "%.2f")
                 HStack {
                     Button("Choose music folder…") { choosingFolder = true }
                     Button("Use placeholders") { session.preparePlaceholders() }
@@ -402,6 +403,9 @@ func color(for mood: MoodBucket?) -> Color {
     case .mysterious?: return .purple
     case .tense?: return .red
     case .somber?: return .gray
+    case .romantic?: return .pink
+    case .dreamy?: return .cyan
+    case .adventurous?: return .brown
     case nil: return .secondary
     }
 }

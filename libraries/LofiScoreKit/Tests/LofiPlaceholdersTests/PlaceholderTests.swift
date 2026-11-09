@@ -91,7 +91,7 @@ final class PlaceholderTests: XCTestCase {
 
     func testEveryMoodHasTwoDistinctRecipes() {
         let recipes = PlaceholderRecipe.defaults()
-        XCTAssertEqual(recipes.count, 16)
+        XCTAssertEqual(recipes.count, 2 * MoodBucket.allCases.count)
         for bucket in MoodBucket.allCases {
             let pair = recipes.filter { $0.bucket == bucket }
             XCTAssertEqual(pair.map(\.id), ["\(bucket.rawValue)-1", "\(bucket.rawValue)-2"])
@@ -106,7 +106,7 @@ final class PlaceholderTests: XCTestCase {
 
     func testMoreThanTwoPerMoodAreTransposedVariations() {
         let recipes = PlaceholderRecipe.defaults(perMood: 3)
-        XCTAssertEqual(recipes.count, 24)
+        XCTAssertEqual(recipes.count, 3 * MoodBucket.allCases.count)
         let calm = recipes.filter { $0.bucket == .calm }
         XCTAssertEqual(calm[2].tonic, calm[0].tonic + 2)
         XCTAssertEqual(calm[2].key, "G major")
@@ -149,8 +149,8 @@ final class PlaceholderTests: XCTestCase {
         let manifest = try PlaceholderLibrary.write(to: folder, recipes: recipes, sampleRate: 8_000) { done, _, _ in
             progress.append(done)
         }
-        XCTAssertEqual(progress, Array(1...8))
-        XCTAssertEqual(manifest.tracks.count, 8)
+        XCTAssertEqual(progress, Array(1...MoodBucket.allCases.count))
+        XCTAssertEqual(manifest.tracks.count, MoodBucket.allCases.count)
 
         let library = try MusicLibrary.load(from: folder)
         XCTAssertTrue(library.emptyBuckets.isEmpty)

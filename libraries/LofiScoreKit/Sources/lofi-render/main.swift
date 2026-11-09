@@ -3,7 +3,8 @@
 // Nothing is played out loud. Next to the audio it writes a .txt timeline to read along.
 //
 //   swift run -c release lofi-render [--music FOLDER] [--out FILE.m4a] [--voice NAME]
-//                                    [--rate WPM] [--real-timings] [--noise X] [--seed N]
+//                                    [--rate WPM] [--source track|live] [--track-lag N]
+//                                    [--real-timings] [--noise X] [--seed N]
 //
 // Without --music it uses the synthesised placeholder tracks.
 
@@ -19,15 +20,18 @@ import LofiScoreCore
 func usage() -> Never {
     print("""
     usage: lofi-render [--music FOLDER] [--out FILE.m4a] [--voice NAME] [--rate WPM]
-                       [--real-timings] [--noise X] [--seed N]
+                       [--source track|live] [--track-lag N] [--real-timings] [--noise X] [--seed N]
 
       --music FOLDER   music library: one folder per mood, or a library.json (default: placeholders)
       --out FILE       where to write the AAC file (default: green-lantern-demo.m4a)
       --voice NAME     a macOS voice, as `say -v '?'` lists them (default: the system voice)
       --rate WPM       speaking rate in words per minute (default 165)
-      --real-timings   the app's director settings (90 s dwell, 60 s smoothing) instead of the
-                       demo's faster ones; few changes happen in a five-minute story
-      --noise X        chance that a reading picks a neighbouring mood (default 0.15)
+      --source S       track: follow a mood track scored ahead of time, read every sentence
+                       (default); live: readings of the last few sentences, with noise
+      --track-lag N    with a track, mark each turn N sentences after it happens (default 0)
+      --real-timings   the app's director settings (60 s smoothing and dwell, 45 s between
+                       track turns) instead of the demo's faster ones
+      --noise X        live readings: chance of picking a neighbouring mood (default 0.15)
       --seed N         seed for readings and track choice (default 1)
     """)
     exit(2)
@@ -38,6 +42,8 @@ var outPath = "green-lantern-demo.m4a"
 var voiceName: String?
 var wordsPerMinute = 165
 var realTimings = false
+var sourceMode = ScriptedMoodSource.Mode.track
+var trackLag = 0
 var noise = 0.15
 var seed: UInt64 = 1
 var arguments = CommandLine.arguments.dropFirst()
@@ -55,6 +61,12 @@ while let argument = arguments.popFirst() {
     case "--rate":
         guard let value = arguments.popFirst().flatMap(Int.init), value >= 80, value <= 400 else { usage() }
         wordsPerMinute = value
+    case "--source":
+        guard let value = arguments.popFirst().flatMap(ScriptedMoodSource.Mode.init(rawValue:)) else { usage() }
+        sourceMode = value
+    case "--track-lag":
+        guard let value = arguments.popFirst().flatMap(Int.init), value >= 0, value <= 10 else { usage() }
+        trackLag = value
     case "--real-timings":
         realTimings = true
     case "--noise":
@@ -126,7 +138,7 @@ do {
         library: library,
         backend: recorder.backend,
         config: config,
-        moodSource: ScriptedMoodSource(noise: noise, seed: seed),
+        moodSource: ScriptedMoodSource(mode: sourceMode, noise: noise, trackLag: trackLag, seed: seed),
         rotationSeed: seed,
         voiceDuration: { text in Double(voices[text]?.count ?? 0) / sampleRate }
     )

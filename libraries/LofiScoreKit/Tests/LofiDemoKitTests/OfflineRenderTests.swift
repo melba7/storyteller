@@ -18,7 +18,10 @@ final class OfflineRenderTests: XCTestCase {
         return MusicLibrary(root: URL(fileURLWithPath: "/music"), tracks: tracks)
     }
 
-    private func makeRun(step: TimeInterval = 0.05) -> (OfflineStoryRun, FakeAudioBackend) {
+    private func makeRun(
+        step: TimeInterval = 0.05,
+        source: ScriptedMoodSource = ScriptedMoodSource(noise: 0, seed: 1)
+    ) -> (OfflineStoryRun, FakeAudioBackend) {
         let scheduler = ManualScheduler()
         let backend = FakeAudioBackend(clock: scheduler)
         backend.defaultDuration = 40
@@ -31,7 +34,7 @@ final class OfflineRenderTests: XCTestCase {
             library: library(),
             backend: backend,
             config: config,
-            moodSource: ScriptedMoodSource(noise: 0, seed: 1),
+            moodSource: source,
             scheduler: scheduler,
             options: options,
             voiceDuration: { text in Double(text.split(separator: " ").count) * 0.3 }
@@ -86,6 +89,54 @@ final class OfflineRenderTests: XCTestCase {
             XCTAssertLessThanOrEqual(reading.observation.globalSentenceIndex, current?.globalIndex ?? -1)
         }
         XCTAssertTrue(backend.calls.contains(.startEngine))
+    }
+
+    func testWithAMoodTrackTheMusicTurnsAtTheTurningSentence() {
+        let (trackRun, _) = makeRun(source: ScriptedMoodSource(mode: .track))
+        let track = trackRun.run { _, _ in }
+        let (liveRun, _) = makeRun()
+        let live = liveRun.run { _, _ in }
+        let story = DemoStory.greenLantern
+
+        let trackLag = OfflineMix.followLag(track, story: story)
+        let liveLag = OfflineMix.followLag(live, story: story)
+        XCTAssertGreaterThanOrEqual(trackLag.turns, 15)
+        print("follow lag, track: \(trackLag)\nfollow lag, live: \(liveLag)")
+        // Every turn is followed, as soon as its sentence starts, unless the last change
+        // was too recent (the demo's 15 s between track turns).
+        XCTAssertGreaterThanOrEqual(trackLag.followed.count, trackLag.turns - 3, "\(trackLag)")
+        XCTAssertEqual(trackLag.median ?? 99, 0, accuracy: 0.5)
+        XCTAssertLessThan(trackLag.median ?? 99, (liveLag.median ?? 0) - 3, "track \(trackLag), live \(liveLag)")
+        XCTAssertTrue(track.decisions.contains { $0.decision.reason == .trackTurn })
+
+        // A track never lets the music run ahead of the narration.
+        for timed in track.decisions {
+            let spoken = track.clips.filter { $0.start <= timed.time + 1e-9 }
+            XCTAssertTrue(spoken.contains { story.sentences[$0.globalIndex].mood == timed.decision.bucket })
+        }
+        for reading in track.readings {
+            let current = track.clips.last { $0.start <= reading.time + 1e-9 }
+            XCTAssertLessThanOrEqual(reading.observation.globalSentenceIndex, current?.globalIndex ?? -1)
+            XCTAssertEqual(reading.observation.source, .track)
+        }
+
+        let text = OfflineMix.timeline(track, story: story)
+        XCTAssertTrue(text.contains("after the text turned at @"), text)
+        XCTAssertTrue(text.contains("Text turns to a new mood: \(trackLag.turns)."), text)
+    }
+
+    func testALateTrackStillNeverLooksAhead() {
+        let (run, _) = makeRun(source: ScriptedMoodSource(mode: .track, trackLag: 2))
+        let report = run.run { _, _ in }
+        let story = DemoStory.greenLantern
+        for timed in report.decisions {
+            // The mood had been spoken at least two sentences before the music turned.
+            guard let index = timed.decision.globalSentenceIndex else { continue }
+            let marked = story.sentences[max(story.chapters[story.sentences[index].chapter].firstIndex, index - 2)]
+            XCTAssertEqual(marked.mood, timed.decision.bucket)
+        }
+        let lag = OfflineMix.followLag(report, story: story)
+        XCTAssertGreaterThan(lag.median ?? 0, 3, "two sentences late")
     }
 
     func testDeckCallbacksAreDeliveredBetweenSteps() {

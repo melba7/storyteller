@@ -150,9 +150,26 @@ public enum OfflineMix {
             return (track.file as NSString).lastPathComponent
         }
 
+        // Where the text turns to a new mood, by the story's own labels, to show how long
+        // the music took to follow.
+        var clipStart: [Int: TimeInterval] = [:]
+        for clip in report.clips where clipStart[clip.globalIndex] == nil {
+            clipStart[clip.globalIndex] = clip.start
+        }
+        let turns = story.sentences.filter { sentence in
+            sentence.globalIndex == 0 || story.sentences[sentence.globalIndex - 1].mood != sentence.mood
+        }
+        func follow(_ timed: OfflineStoryRun.TimedDecision) -> (index: Int, seconds: TimeInterval)? {
+            guard let turn = turns.last(where: { turn in
+                turn.mood == timed.decision.bucket && (clipStart[turn.globalIndex] ?? .infinity) <= timed.time + 1e-9
+            }), let start = clipStart[turn.globalIndex] else { return nil }
+            return (turn.globalIndex, timed.time - start)
+        }
+
         var text = "\(story.title): offline render\n"
-        text += "Times are minutes:seconds into the file. \"text\" is the mood the text side read; "
-        text += "\"music\" is when the music was told to change.\n\n"
+        text += "Times are minutes:seconds into the file. \"text\" is the mood the text side read (shown when "
+        text += "it changes); \"music\" is when the music was told to change.\n\n"
+        var shownReading: MoodBucket?
         for (time, _, line) in lines {
             let stamp = clock(time)
             switch line {
@@ -160,19 +177,78 @@ public enum OfflineMix {
                 text += "\n\(stamp)  ── \(story.chapters[index].title) ──\n"
             case let .reading(timed):
                 let reading = timed.observation.reading
+                guard reading.bucket != shownReading || timed.observation.trigger != .cadence else { continue }
+                shownReading = reading.bucket
                 text += "\(stamp)    text  @\(timed.observation.globalSentenceIndex) \(reading.bucket.rawValue) "
                 text += "\(Int((reading.confidence * 100).rounded()))% (\(timed.observation.trigger.rawValue))\n"
             case let .decision(timed):
                 let decision = timed.decision
                 text += "\(stamp)  music  \(decision.previous.rawValue) → \(decision.bucket.rawValue) "
-                text += "(\(decision.reason.rawValue), \(decision.transition.rawValue))\n"
+                text += "(\(decision.reason.rawValue), \(decision.transition.rawValue))"
+                if let follow = follow(timed), follow.index > 0 {
+                    text += String(format: ", %.1f s after the text turned at @%d", follow.seconds, follow.index)
+                }
+                text += "\n"
             case let .track(trackID, mood, first):
                 text += "\(stamp)  track  \(first ? "starts" : "now") \(mood.rawValue): \(title(of: trackID))\n"
             }
         }
         text += "\nSentences: \(report.clips.count). Music changes: \(report.decisions.count). "
         text += "Length: \(clock(report.duration)).\n"
+        let lag = followLag(report, story: story)
+        if lag.turns > 0 {
+            text += "Text turns to a new mood: \(lag.turns). The music followed \(lag.followed.count)"
+            if let median = lag.median {
+                text += String(format: ", a median %.1f s after the turning sentence began (%.1f s to %.1f s)",
+                               median, lag.followed.min() ?? 0, lag.followed.max() ?? 0)
+            }
+            text += "."
+            if lag.missed > 0 {
+                text += " \(lag.missed) passed too soon after the last change to follow."
+            }
+            text += "\n"
+        }
         return text
+    }
+
+    /// How quickly the music followed the story's turns of mood (by its own labels): for
+    /// each turn, the first music change to the new mood before the next turn, measured
+    /// from the start of the turning sentence. A turn back to the mood the music is
+    /// already playing needs no change and counts as followed at once.
+    public static func followLag(
+        _ report: OfflineStoryRun.Report,
+        story: DemoStory
+    ) -> (turns: Int, followed: [TimeInterval], missed: Int, median: TimeInterval?) {
+        var clipStart: [Int: TimeInterval] = [:]
+        for clip in report.clips where clipStart[clip.globalIndex] == nil {
+            clipStart[clip.globalIndex] = clip.start
+        }
+        let turns = story.sentences.filter { sentence in
+            sentence.globalIndex > 0 && story.sentences[sentence.globalIndex - 1].mood != sentence.mood
+        }
+        var followed: [TimeInterval] = []
+        var missed = 0
+        var counted = 0
+        for (n, turn) in turns.enumerated() {
+            guard let start = clipStart[turn.globalIndex] else { continue }
+            counted += 1
+            let end = turns.dropFirst(n + 1).first.flatMap { clipStart[$0.globalIndex] } ?? .infinity
+            let playing = report.decisions.last { $0.time < start - 1e-9 }?.decision.bucket ?? .neutral
+            if playing == turn.mood {
+                followed.append(0)
+            } else if let hit = report.decisions.first(where: {
+                $0.decision.bucket == turn.mood && $0.time >= start - 1e-9 && $0.time < end
+            }) {
+                followed.append(hit.time - start)
+            } else {
+                missed += 1
+            }
+        }
+        let sorted = followed.sorted()
+        let median: TimeInterval? = sorted.isEmpty ? nil
+            : sorted.count % 2 == 1 ? sorted[sorted.count / 2]
+            : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2
+        return (counted, followed, missed, median)
     }
 
     static func clock(_ seconds: TimeInterval) -> String {

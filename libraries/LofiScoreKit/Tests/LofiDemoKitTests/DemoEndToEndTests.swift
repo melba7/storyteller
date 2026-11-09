@@ -115,6 +115,8 @@ final class DemoEndToEndTests: XCTestCase {
         let story = DemoStory.greenLantern
         let somber = story.sentences.first { $0.mood == .somber }!.globalIndex
         decisions.removeAll()
+        // The seek lands while a track rotation is fading in; the rotation is hurried
+        // along, so the new place still gets its music within a few seconds.
         stack.narrator.seek(to: somber + 5)
         stack.scheduler.advance(by: 6)
         XCTAssertEqual(decisions.first?.decision.reason, .seek)

@@ -97,26 +97,30 @@ public struct ReplayEvent: Codable, Sendable, Hashable {
 }
 
 /// A mood reading in a replay. Valence and arousal default to the bucket's anchor,
-/// confidence to 0.7.
+/// confidence to 0.7, source to `live`.
 public struct ReplayReading: Codable, Sendable, Hashable {
     public var bucket: MoodBucket
     public var valence: Double?
     public var arousal: Double?
     public var confidence: Double?
     public var scores: [MoodBucket: Double]?
+    /// `track` for a reading from the book's mood track.
+    public var source: ReadingSource?
 
     public init(
         bucket: MoodBucket,
         valence: Double? = nil,
         arousal: Double? = nil,
         confidence: Double? = nil,
-        scores: [MoodBucket: Double]? = nil
+        scores: [MoodBucket: Double]? = nil,
+        source: ReadingSource? = nil
     ) {
         self.bucket = bucket
         self.valence = valence
         self.arousal = arousal
         self.confidence = confidence
         self.scores = scores
+        self.source = source
     }
 
     public var moodReading: MoodReading {
