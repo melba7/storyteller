@@ -139,22 +139,38 @@ public actor MoodTracker {
     }
 }
 
-/// Picks the engine for this device, following the plan's defaults: Apple's
-/// on-device model where available (falling back to the Fast engine on a
-/// refusal or parse failure), otherwise the Fast classifier if it is bundled,
-/// otherwise the NLTagger baseline (or the lexicon on non-Apple platforms).
+/// Picks engines for the app, following the choices recorded in
+/// `Docs/MoodDetection.md`: the Fast classifier is the default; a book's
+/// Claude mood track, where one exists, is played over it; Apple's on-device
+/// model is an opt-in only (it agreed with the reference labels less than the
+/// lexicon did).
 public enum MoodEngineCatalog {
+    /// The live engine for this device: the Fast classifier if it is bundled,
+    /// otherwise the NLTagger baseline (or the lexicon on non-Apple platforms).
     public static func recommendedEngine(classifierModelURL: URL? = nil) -> any MoodEngine {
-        let fast: any MoodEngine = fastEngine(classifierModelURL: classifierModelURL)
-        #if canImport(FoundationModels)
-        if #available(iOS 26.0, macOS 26.0, visionOS 26.0, *), FoundationModelsMoodEngine.availability().isAvailable {
-            return FallbackMoodEngine(primary: FoundationModelsMoodEngine(), fallback: fast)
-        }
-        #endif
-        return fast
+        fastEngine(classifierModelURL: classifierModelURL)
     }
 
-    /// The best engine that never needs Apple Intelligence.
+    /// What plays during narration: the book's mood track where it reaches,
+    /// and the recommended live engine everywhere else (or alone, with no track).
+    public static func playbackEngine(track: MoodTrackStore?, classifierModelURL: URL? = nil) -> any MoodEngine {
+        let live = recommendedEngine(classifierModelURL: classifierModelURL)
+        guard let track else { return live }
+        return TrackedMoodEngine(store: track, fallback: live)
+    }
+
+    /// Apple's on-device model with the Fast engine behind it, for an opt-in
+    /// setting; nil where the model is not available.
+    public static func onDeviceModelEngine(classifierModelURL: URL? = nil) -> (any MoodEngine)? {
+        #if canImport(FoundationModels)
+        if #available(iOS 26.0, macOS 26.0, visionOS 26.0, *), FoundationModelsMoodEngine.availability().isAvailable {
+            return FallbackMoodEngine(primary: FoundationModelsMoodEngine(), fallback: fastEngine(classifierModelURL: classifierModelURL))
+        }
+        #endif
+        return nil
+    }
+
+    /// The best engine that never needs Apple Intelligence or the network.
     public static func fastEngine(classifierModelURL: URL? = nil) -> any MoodEngine {
         #if canImport(NaturalLanguage)
         let baseline: any MoodEngine = NLTaggerMoodEngine()

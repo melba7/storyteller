@@ -12,8 +12,14 @@ import LofiText
 ///     fast:<model>             Create ML classifier (.mlmodel or .mlmodelc)
 ///     fm+fast:<model>          on-device model, falling back to the classifier
 ///     recommended[:<model>]    what the app would pick on this machine
+///     claude[:<model>]         Claude via the Anthropic API (default claude-opus-5-5);
+///                              key from ANTHROPIC_API_KEY or the file named by
+///                              ANTHROPIC_API_KEY_FILE; LOFI_CLAUDE_EFFORT sets the effort
 enum EngineFactory {
-    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "recommended[:<model>]"]
+    static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "recommended[:<model>]", "claude[:<model>]"]
+
+    /// Token counts for every Claude engine made in this process.
+    static let claudeUsage = ClaudeUsage()
 
     static func make(_ name: String) throws -> any MoodEngine {
         let (base, argument) = split(name)
@@ -34,6 +40,8 @@ enum EngineFactory {
             return FallbackMoodEngine(primary: try foundationModels(tagging: false), fallback: try classifier(argument, name: name))
         case "recommended":
             return MoodEngineCatalog.recommendedEngine(classifierModelURL: argument.map { URL(fileURLWithPath: $0) })
+        case "claude":
+            return try claude(model: argument)
         default:
             throw unavailable(name, "unknown engine; try one of \(names.joined(separator: ", "))")
         }
@@ -62,6 +70,7 @@ enum EngineFactory {
         #else
         lines.append("fast: unavailable (no CoreML on this platform)")
         #endif
+        lines.append((try? apiKey()) != nil ? "claude: available (API key found)" : "claude: unavailable (set ANTHROPIC_API_KEY or ANTHROPIC_API_KEY_FILE)")
         lines.append("recommended here: \(MoodEngineCatalog.recommendedEngine().id)")
         return lines
     }
@@ -93,6 +102,34 @@ enum EngineFactory {
         #else
         throw unavailable(name, "CoreML is not available on this platform")
         #endif
+    }
+
+    static func claude(model: String?) throws -> ClaudeMoodEngine {
+        var configuration = ClaudeMoodEngine.Configuration()
+        if let model, !model.isEmpty {
+            configuration.model = model.hasPrefix("claude-") ? model : "claude-" + model
+        }
+        if let effort = ProcessInfo.processInfo.environment["LOFI_CLAUDE_EFFORT"], !effort.isEmpty {
+            configuration.effort = effort
+        }
+        return ClaudeMoodEngine(apiKey: try apiKey(), configuration: configuration, usage: claudeUsage)
+    }
+
+    /// The Anthropic API key from the environment, or from a file it names.
+    /// Never printed.
+    static func apiKey() throws -> String {
+        let env = ProcessInfo.processInfo.environment
+        if let key = env["ANTHROPIC_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
+            return key
+        }
+        if let path = env["ANTHROPIC_API_KEY_FILE"], !path.isEmpty {
+            let expanded = (path as NSString).expandingTildeInPath
+            guard let key = try? String(contentsOfFile: expanded, encoding: .utf8)
+                .trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty
+            else { throw unavailable("claude", "could not read a key from ANTHROPIC_API_KEY_FILE") }
+            return key
+        }
+        throw unavailable("claude", "set ANTHROPIC_API_KEY, or ANTHROPIC_API_KEY_FILE to a file holding the key")
     }
 
     private static func unavailable(_ name: String, _ reason: String) -> MoodEngineError {
