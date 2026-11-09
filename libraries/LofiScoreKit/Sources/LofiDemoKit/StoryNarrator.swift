@@ -27,8 +27,9 @@ public final class StoryNarrator {
         public var paragraphPause = 2.6
         /// How long the pretend engine takes to produce a reading after play or a seek.
         public var readingDelay = 0.4
-        /// Sentences between regular readings.
-        public var readingCadence = 2
+        /// Sentences between regular readings. nil: the mood source's own cadence (every
+        /// sentence for a mood track, every other sentence for live readings).
+        public var readingCadence: Int?
         /// A new chapter's first reading comes this many sentences in.
         public var chapterStartDelay = 2
 
@@ -240,7 +241,7 @@ public final class StoryNarrator {
             }
             return
         }
-        if sentence.globalIndex - last >= settings.readingCadence {
+        if sentence.globalIndex - last >= settings.readingCadence ?? moodSource.readingCadence {
             emitReading(.cadence, at: sentence.globalIndex)
         }
     }

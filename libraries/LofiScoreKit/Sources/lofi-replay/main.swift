@@ -11,6 +11,14 @@ import LofiScoreCore
 //                                                 save a made-up book as a script
 //   --set key=value                               override a DirectorConfig value, e.g. --set minimumDwell=60
 //   --quiet                                       summaries only
+//
+// Made-up books read by default like an engine on the 20-second cadence. These change that:
+//   --every-sentence                              read every sentence (about every 5 s)
+//   --noise-episode S                             wrong readings come in runs of about S seconds
+//   --track                                       read the book's mood track, every sentence
+//   --track-unmarked                              ...but send its readings as live ones
+//   --track-pin N                                 the track marks turns up to N sentences late (default 3)
+//   --cadence S                                   read every S seconds (after the flags above)
 
 struct Options {
     var scripts: [String] = []
@@ -20,6 +28,7 @@ struct Options {
     var seeds: ClosedRange<UInt64> = 1...20
     var overrides: [String: Double] = [:]
     var quiet = false
+    var book = SyntheticBook.Options()
 }
 
 func fail(_ message: String) -> Never {
@@ -52,8 +61,28 @@ func parse(_ arguments: [String]) -> Options {
             options.overrides[String(pair[..<equals])] = value
         case "--quiet":
             options.quiet = true
+        case "--every-sentence":
+            options.book.readingInterval = options.book.sentenceLength
+        case "--noise-episode":
+            guard let value = iterator.next().flatMap(Double.init), value >= 0 else { fail("--noise-episode needs seconds") }
+            options.book.noiseEpisode = value
+        case "--track", "--track-unmarked":
+            options.book.source = .track
+            options.book.readingInterval = options.book.sentenceLength
+            options.book.markTrackReadings = argument == "--track"
+        case "--track-pin":
+            guard let value = iterator.next().flatMap(Int.init), value >= 0 else { fail("--track-pin needs a sentence count") }
+            options.book.trackPinSentences = value
+        case "--cadence":
+            guard let value = iterator.next().flatMap(Double.init), value > 0 else { fail("--cadence needs seconds") }
+            options.book.readingInterval = value
         case "-h", "--help":
-            print("usage: lofi-replay [--set key=value] [--quiet] (script.json ... | --synthetic [--hours H] [--seeds A-B] | --write-synthetic out.json [--seed N] [--hours H])")
+            print("""
+            usage: lofi-replay [--set key=value] [--quiet] (script.json ... | --synthetic [--hours H] [--seeds A-B]
+                               | --write-synthetic out.json [--seed N] [--hours H])
+                   made-up books: [--every-sentence] [--noise-episode S] [--track | --track-unmarked]
+                                  [--track-pin N] [--cadence S]
+            """)
             exit(0)
         default:
             options.scripts.append(argument)
@@ -84,7 +113,7 @@ func describe(_ seconds: TimeInterval) -> String {
 let options = parse(Array(CommandLine.arguments.dropFirst()))
 
 if let path = options.writeSynthetic {
-    var bookOptions = SyntheticBook.Options()
+    var bookOptions = options.book
     bookOptions.hours = options.hours
     let book = SyntheticBook.generate(seed: options.seeds.lowerBound, options: bookOptions)
     do {
@@ -98,7 +127,7 @@ if let path = options.writeSynthetic {
 
 if options.synthetic {
     let directorConfig = config(applying: options.overrides)
-    var bookOptions = SyntheticBook.Options()
+    var bookOptions = options.book
     bookOptions.hours = options.hours
     var changeRates: [Double] = []
     var agreements: [Double] = []
@@ -115,7 +144,10 @@ if options.synthetic {
         lagged.append(result.agreement(with: book, lag: 120))
         if let median = follow.median { delays.append(median) }
         missedShares.append(follow.missed)
-        violations += result.dwellViolations(minimumDwell: directorConfig.minimumDwell).count
+        violations += result.dwellViolations(
+            minimumDwell: directorConfig.minimumDwell,
+            trackMinimumDwell: directorConfig.trackMinimumDwell
+        ).count
         if !options.quiet {
             print(String(
                 format: "seed %3llu: %5.1f changes/h, agreement %4.0f%% (%4.0f%% allowing 2 min lag), median follow %5.0fs, missed %3.0f%%",

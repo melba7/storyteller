@@ -39,7 +39,16 @@ public struct ReadingCadence: Sendable {
             self.maxContinuousStep = max(1, maxContinuousStep)
         }
 
+        /// The plan's original cadence: every 4 sentences or 20 seconds,
+        /// whichever is later. Right for engines that take a second or more
+        /// per reading (Apple's on-device model).
         public static let `default` = Configuration()
+
+        /// A reading on every sentence. For engines that answer in
+        /// milliseconds (a mood track lookup, the Fast classifier), so a
+        /// mood change reaches the director as soon as its sentence starts.
+        /// The chapter-start rule is unchanged.
+        public static let everySentence = Configuration(sentencesBetweenReadings: 1, secondsBetweenReadings: 0)
     }
 
     public let configuration: Configuration

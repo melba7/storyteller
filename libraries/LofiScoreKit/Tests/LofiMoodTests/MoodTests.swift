@@ -27,6 +27,14 @@ struct MoodLineTests {
             // Seen from Apple's on-device model in 17 of 1,360 answers.
             ("bucket=tension; valence=-0.5; arousal=0.7; confidence=0.8", .tense),
             ("bucket=Sadness; valence=-0.5", .melancholy),
+            // The three moods added on 9 Nov 2026.
+            ("bucket=romantic; valence=0.7; arousal=0.4; confidence=0.8", .romantic),
+            ("bucket=Romance", .romantic),
+            ("bucket=tender; valence=0.6", .romantic),
+            ("bucket=dreamlike; valence=0.4; arousal=0.4", .dreamy),
+            ("bucket=enchanted; arousal=0.4", .dreamy),
+            ("bucket=adventure; valence=0.3; arousal=0.8; confidence=0.7", .adventurous),
+            ("bucket=thrilling", .adventurous),
         ]
         for (answer, expected) in cases {
             #expect(try MoodLine.parse(answer, engineID: "t").bucket == expected, "\(answer)")
@@ -70,6 +78,20 @@ struct MoodPromptTests {
         }
         let short = MoodPrompt.prompt(for: window, maxWords: 4)
         #expect(!short.contains("The end of one."))
+    }
+
+    @Test func everyMoodIsDefinedInBothPromptsAndTheGuidelines() throws {
+        let guidelines = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Tools/data/labels/GUIDELINES.md"),
+            encoding: .utf8
+        )
+        for bucket in MoodBucket.allCases {
+            #expect(MoodPrompt.instructions.contains("\n\(bucket.rawValue): "), "on-device prompt lacks \(bucket)")
+            #expect(ClaudeMoodPrompt.system.contains("- \(bucket.rawValue): "), "Claude prompt lacks \(bucket)")
+            #expect(guidelines.contains("| \(bucket.rawValue) |"), "guidelines lack \(bucket)")
+        }
     }
 }
 
@@ -167,7 +189,7 @@ struct MoodTrackerTests {
         let guardian = try SpoilerGuard(chapters: Self.chapters)
         let clock = ManualClock()
         let engine = ScriptedEngine()
-        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, clock: { clock.read() })
+        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, cadence: .default, clock: { clock.read() })
 
         var observations: [MoodObservation] = []
         for i in 0..<30 {
@@ -190,7 +212,7 @@ struct MoodTrackerTests {
         let clock = ManualClock()
         let engine = ScriptedEngine()
         await engine.setDelay(0.3, at: 0)
-        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, clock: { clock.read() })
+        let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, cadence: .default, clock: { clock.read() })
 
         // The first reading is slow; a seek arrives while it is running.
         async let slow = tracker.clipChanged(textResource: "memory/c0.xhtml", fragmentId: "c0-s0")

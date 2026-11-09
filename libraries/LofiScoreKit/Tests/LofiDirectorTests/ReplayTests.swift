@@ -41,6 +41,45 @@ final class ReplayTests: XCTestCase {
         XCTAssertLessThanOrEqual(mean, 8, "changes per hour: \(rates)")
     }
 
+    func testBooksWithAMoodTrackFollowEachTurnWithinSeconds() {
+        let config = DirectorConfig()
+        var options = SyntheticBook.Options()
+        options.hours = 10
+        options.source = .track
+        options.readingInterval = options.sentenceLength
+        for seed in UInt64(1)...4 {
+            let book = SyntheticBook.generate(seed: seed, options: options)
+            let result = ReplayRunner.run(book.script, config: config)
+            let violations = result.dwellViolations(minimumDwell: config.minimumDwell, trackMinimumDwell: config.trackMinimumDwell)
+            XCTAssertTrue(violations.isEmpty, "seed \(seed): \(violations)")
+            XCTAssertTrue(result.decisions.contains { $0.reason == .trackTurn }, "seed \(seed)")
+            let follow = result.followDelay(in: book)
+            XCTAssertLessThan(follow.median ?? .infinity, 20, "seed \(seed)")
+            // The made-up track misses about one turn in ten; the music cannot follow those.
+            XCTAssertLessThan(follow.missed, 0.2, "seed \(seed)")
+            XCTAssertLessThanOrEqual(result.changesPerHour, 8, "seed \(seed)")
+        }
+    }
+
+    func testReadingEverySentenceStaysAsCalmAsTheSlowCadence() {
+        // A live engine read every sentence, wrong for a few sentences at a time.
+        var options = SyntheticBook.Options()
+        options.hours = 10
+        options.readingInterval = options.sentenceLength
+        options.noiseEpisode = 15
+        let config = DirectorConfig()
+        var rates: [Double] = []
+        for seed in UInt64(1)...4 {
+            let book = SyntheticBook.generate(seed: seed, options: options)
+            let result = ReplayRunner.run(book.script, config: config)
+            rates.append(result.changesPerHour)
+            XCTAssertTrue(result.dwellViolations(minimumDwell: config.minimumDwell).isEmpty, "seed \(seed)")
+            XCTAssertGreaterThan(result.agreement(with: book, lag: 120), 0.9, "seed \(seed)")
+        }
+        let mean = rates.reduce(0, +) / Double(rates.count)
+        XCTAssertLessThanOrEqual(mean, 9, "changes per hour: \(rates)")
+    }
+
     func testReplaysAreDeterministic() {
         let book = SyntheticBook.generate(seed: 42, options: SyntheticBook.Options())
         let first = ReplayRunner.run(book.script)
@@ -77,6 +116,34 @@ final class ReplayTests: XCTestCase {
             let before = original.decisions.filter { $0.time <= cut }
             let after = replayed.decisions.filter { $0.time <= cut }
             XCTAssertEqual(before, after, "seed \(seed), cut at \(cut)")
+        }
+    }
+
+    /// The same for a book read from its mood track, every sentence.
+    func testTrackDecisionsNeverDependOnLaterEvents() {
+        var rng = SplitMix64(seed: 11)
+        for seed in UInt64(200)..<206 {
+            var options = SyntheticBook.Options()
+            options.hours = 2
+            options.source = .track
+            options.readingInterval = options.sentenceLength
+            let book = SyntheticBook.generate(seed: seed, options: options)
+            let original = ReplayRunner.run(book.script)
+            let cut = rng.nextUnit() * (book.script.duration ?? 3600)
+            var rewritten = book.script
+            rewritten.events = rewritten.events.map { event in
+                guard event.t > cut, event.reading != nil else { return event }
+                var changed = event
+                let bucket = MoodBucket.allCases.randomElement(using: &rng) ?? .tense
+                changed.reading = ReplayReading(bucket: bucket, confidence: rng.nextUnit(), source: .track)
+                return changed
+            }
+            let replayed = ReplayRunner.run(rewritten)
+            XCTAssertEqual(
+                original.decisions.filter { $0.time <= cut },
+                replayed.decisions.filter { $0.time <= cut },
+                "seed \(seed), cut at \(cut)"
+            )
         }
     }
 

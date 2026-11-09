@@ -37,10 +37,15 @@ public final class DemoSession: ObservableObject {
     @Published public var fastTimings = true { didSet { if oldValue != fastTimings { rebuild() } } }
     @Published public var narratorRate = 1.0 { didSet { narrator?.settings.rate = narratorRate } }
     @Published public var readingNoise = 0.15 { didSet { narrator?.moodSource.noise = readingNoise } }
+    /// Follow a mood track scored ahead of time (turns at the sentence where they happen),
+    /// or live readings of the last few sentences.
+    @Published public var followMoodTrack = true {
+        didSet { narrator?.moodSource.mode = followMoodTrack ? .track : .live }
+    }
     @Published public var musicEnabled = true { didSet { player?.setEnabled(musicEnabled) } }
     @Published public var muteInCar = false { didSet { player?.setMutedRoutes(muteInCar ? [.carPlay] : []) } }
-    @Published public var bedLevelDB = -12.0 { didSet { pushDucking() } }
-    @Published public var gapLiftDB = 4.0 { didSet { pushDucking() } }
+    @Published public var bedLevelDB = DuckingSettings().bedLevelDB { didSet { pushDucking() } }
+    @Published public var gapLiftDB = DuckingSettings().gapLiftDB { didSet { pushDucking() } }
     @Published public var musicVolume = 1.0 { didSet { player?.setMusicVolume(musicVolume) } }
 
     public let story = DemoStory.greenLantern
@@ -164,7 +169,11 @@ public final class DemoSession: ObservableObject {
             story: story,
             player: player,
             scheduler: DispatchScheduler(queue: .main),
-            moodSource: ScriptedMoodSource(noise: readingNoise, seed: UInt64(Date().timeIntervalSince1970))
+            moodSource: ScriptedMoodSource(
+                mode: followMoodTrack ? .track : .live,
+                noise: readingNoise,
+                seed: UInt64(Date().timeIntervalSince1970)
+            )
         )
         narrator.settings.rate = narratorRate
         narrator.speaker = speakAloud ? speaker : nil

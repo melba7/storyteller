@@ -28,7 +28,7 @@ public struct DemoChapter: Sendable, Hashable {
     public var range: Range<Int> { firstIndex..<(firstIndex + count) }
 }
 
-/// A short original story whose mood moves through all eight buckets, so the demo shows
+/// A short original story whose mood moves through every bucket, so the demo shows
 /// every kind of change: gentle drifts, a sudden turn, a chapter boundary and an ending.
 public struct DemoStory: Sendable {
     public let title: String
@@ -108,7 +108,16 @@ public struct DemoStory: Sendable {
                 "It held no greeting, only a drawing of the pier and a mark beneath it.",
                 "Beside the mark someone had written her grandfather's initials.",
                 "Mara had never heard of anything beneath the pier but water and stones.",
-                "That evening she walked out to the end of the boards and listened.",
+            ]),
+            (.adventurous, [
+                "She folded the drawing into her coat, took the smallest lantern from the window and locked the shop behind her.",
+                "The wind was at her back as she strode out along the sea wall, past the nets and the drying sails.",
+                "She took the cliff steps two at a time, the lantern swinging and her scarf streaming out behind her.",
+                "From the top she could see the whole curve of the bay and the long dark line of the pier.",
+                "Whatever her grandfather had hidden down there, she meant to find it before the tide turned.",
+            ]),
+            (.mysterious, [
+                "At the end of the boards she stopped and listened.",
                 "Under the slap of the tide there was a faint, hollow knocking.",
                 "A narrow hatch, crusted with salt, lay half hidden under a coil of rope.",
             ]),
@@ -146,6 +155,13 @@ public struct DemoStory: Sendable {
                 "She wiped the green lens with her sleeve.",
                 "It was the only one of his lanterns she had never seen.",
             ]),
+            (.dreamy, [
+                "She struck a match and lit it.",
+                "Green light spilled across the walls, slow and rippling, as if the whole room had sunk beneath the sea.",
+                "Shapes swam in it: boats and stars, and the curve of the bay drawn in light across the ceiling.",
+                "For a while she seemed to float among them, weightless, a long way from anything sad.",
+                "It was the most beautiful thing she had ever seen.",
+            ]),
         ]),
         ("Morning Tide", [
             (.melancholy, [
@@ -161,6 +177,13 @@ public struct DemoStory: Sendable {
                 "Behind him came Mr. Pell, and half the harbour with him.",
                 "They had seen the hatch, and they had been searching all night.",
                 "Mara held up the green lantern so they could see it.",
+            ]),
+            (.romantic, [
+                "Tomas, the ferryman, reached her first and wrapped his coat around her shoulders.",
+                "He had walked her home from school once, years ago, and had never quite stopped looking at her that way.",
+                "His hand stayed on her arm a moment longer than it needed to.",
+                "She leaned against him and let herself be held.",
+                "Neither of them said anything, and neither of them needed to.",
             ]),
             (.cozy, [
                 "Back at the shop, someone lit the stove and someone else found biscuits.",

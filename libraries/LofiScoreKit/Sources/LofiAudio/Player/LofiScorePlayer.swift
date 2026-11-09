@@ -450,6 +450,19 @@ public final class LofiScorePlayer: @unchecked Sendable {
             }
             queued = request
             pendingStart = nil
+            // A mood change should not wait behind a slow fade: a rotation between two
+            // tracks of the old mood, or any fade when the change is a quick one (a seek or
+            // a big jump), finishes at the quick speed instead.
+            let rotating = decks[target].mood == decks[target.other].mood
+            if rotating || request.transition == .quick {
+                var hurried = crossfader
+                hurried.move(toward: target, fullDuration: config.quickCrossfade, at: now)
+                if hurried.endTime < crossfader.endTime - 1e-6 {
+                    crossfader = hurried
+                    scheduleCrossfadeEnd(at: now)
+                    pushGains()
+                }
+            }
             return
         }
         if request.transition != .rotation, decks[target].mood == request.mood {

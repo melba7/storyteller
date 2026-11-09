@@ -8,12 +8,20 @@ import LofiScoreCore
 /// ``receive(_:)``; when a change it held back may go ahead later, ``nextDeadline``
 /// says when to call ``tick()``.
 ///
-/// The rules, from the plan:
-/// - Evidence per mood fades over about 60 seconds of listening (``MoodEvidence``).
-/// - A new mood must win two readings in a row, or one reading at least 0.8 confident
-///   that lands far from the current mood (a big jump).
-/// - The music keeps a mood for at least 90 seconds, except right after a seek or at a
-///   chapter start, where the first reading decides at once.
+/// The rules:
+/// - A book's mood track (readings marked ``ReadingSource/track``) pins each turn of mood to
+///   the sentence where the text first reads as the new mood. When narration reaches it,
+///   the music follows at once, unless it changed less than
+///   ``DirectorConfig/trackMinimumDwell`` ago; then it follows when that time is up, if
+///   the track still says so.
+/// - Live readings are smoothed: evidence per mood fades over about a minute of
+///   listening (``MoodEvidence``), each reading weighted by the time since the one before,
+///   so reading every sentence smooths no more and no less than reading every 20 seconds.
+/// - A new mood must win two live readings in a row and lead for 20 seconds, or be named by
+///   readings at least 0.8 confident that land far from the current mood (a big jump): one
+///   such reading at the slow cadence, a few seconds' worth when readings come every sentence.
+/// - The music keeps a mood for at least 60 seconds after a live change, except right
+///   after a seek or at a chapter start, where the first reading decides at once.
 /// - It only ever reacts to readings at or before the sentence being narrated; a reading
 ///   for a later sentence is refused (``IgnoredReason/aheadOfPlayhead``).
 ///
@@ -55,8 +63,22 @@ public final class MoodDirector {
     /// The most recent decisions, oldest first (at most 50).
     public private(set) var recentDecisions: [MoodDecision] = []
 
-    private var pending: (bucket: MoodBucket, count: Int)?
+    /// A mood that is winning but has not changed the music yet.
+    private struct Pending {
+        var bucket: MoodBucket
+        var count: Int
+        /// Clock time of the first reading in the run.
+        var since: TimeInterval
+        /// True when the run is made of mood-track readings.
+        var fromTrack: Bool
+    }
+
+    private var pending: Pending?
+    /// Confident, far live readings in a row naming the same mood, and their summed weight.
+    private var jumpRun: (bucket: MoodBucket, weight: Double)?
     private var lastAcceptedIndex: Int?
+    /// Clock time of the last reading used, for weighting the next one.
+    private var lastReadingTime: TimeInterval?
     private var listening: ListeningTime
 
     public init(config: DirectorConfig = DirectorConfig(), clock: LofiClock, initialBucket: MoodBucket = .neutral) {
@@ -78,7 +100,9 @@ public final class MoodDirector {
         lastObservation = nil
         playheadIndex = nil
         pending = nil
+        jumpRun = nil
         lastAcceptedIndex = nil
+        lastReadingTime = nil
         recentDecisions.removeAll()
     }
 
@@ -98,6 +122,7 @@ public final class MoodDirector {
     public func noteSeek(toGlobalSentenceIndex target: Int?) {
         phase = .awaitingSeekReading(target: target, since: clock.now)
         pending = nil
+        jumpRun = nil
         lastAcceptedIndex = nil
         if playheadIndex != nil, let target {
             playheadIndex = target
@@ -154,9 +179,17 @@ public final class MoodDirector {
     @discardableResult
     public func tick() -> MoodDecision? {
         let now = clock.now
-        guard case .following = phase,
-              let pending,
-              pending.count >= requiredReadings,
+        guard case .following = phase, let pending else { return nil }
+        if pending.fromTrack {
+            // The run is cleared as soon as the track names another mood, so a pending
+            // track turn that is still here still stands.
+            guard pending.count >= requiredTrackReadings,
+                  dwellAllows(config.trackMinimumDwell, at: now)
+            else { return nil }
+            return trackTurn(to: pending.bucket, reason: .dwellElapsed, transition: .gentle, observation: lastObservation, at: now)
+        }
+        guard pending.count >= requiredReadings,
+              now - pending.since >= config.confirmationTime - 1e-9,
               dwellAllows(config.minimumDwell, at: now)
         else { return nil }
         evidence.decay(to: listening.time(at: now), timeConstant: config.evidenceTimeConstant)
@@ -176,13 +209,18 @@ public final class MoodDirector {
 
     /// When ``tick()`` may next return a decision, if anything is waiting.
     public var nextDeadline: TimeInterval? {
-        guard case .following = phase,
-              let pending,
-              pending.count >= requiredReadings,
-              !dwellWaived,
-              let lastChangeTime
-        else { return nil }
-        return lastChangeTime + config.minimumDwell
+        guard case .following = phase, let pending else { return nil }
+        if pending.fromTrack {
+            guard pending.count >= requiredTrackReadings, !dwellWaived, let lastChangeTime else { return nil }
+            return lastChangeTime + config.trackMinimumDwell
+        }
+        guard pending.count >= requiredReadings else { return nil }
+        let confirmed = pending.since + config.confirmationTime
+        guard !dwellWaived, let lastChangeTime else {
+            // Only the confirmation time is left to wait for.
+            return confirmed > clock.now ? confirmed : nil
+        }
+        return max(lastChangeTime + config.minimumDwell, confirmed)
     }
 
     // MARK: - Inspection
@@ -192,10 +230,11 @@ public final class MoodDirector {
         var faded = evidence
         faded.decay(to: listening.time(at: now), timeConstant: config.evidenceTimeConstant)
         let dwellRemaining: TimeInterval
+        let dwell = pending?.fromTrack == true ? config.trackMinimumDwell : config.minimumDwell
         if dwellWaived {
             dwellRemaining = 0
         } else if let lastChangeTime {
-            dwellRemaining = max(0, lastChangeTime + config.minimumDwell - now)
+            dwellRemaining = max(0, lastChangeTime + dwell - now)
         } else {
             dwellRemaining = 0
         }
@@ -222,6 +261,22 @@ public final class MoodDirector {
         max(1, config.confirmationReadings)
     }
 
+    private var requiredTrackReadings: Int {
+        max(1, config.trackConfirmationReadings)
+    }
+
+    /// How much a reading taken now counts: in full when at least
+    /// ``DirectorConfig/evidenceReferenceInterval`` passed since the previous reading,
+    /// proportionally less when readings come faster.
+    private func readingWeight(at now: TimeInterval) -> Double {
+        guard config.evidenceReferenceInterval > 0, let last = lastReadingTime else { return 1 }
+        return min(1, max(0.05, (now - last) / config.evidenceReferenceInterval))
+    }
+
+    private func scaled(_ contribution: [MoodBucket: Double], by weight: Double) -> [MoodBucket: Double] {
+        weight == 1 ? contribution : contribution.mapValues { $0 * weight }
+    }
+
     /// The first reading after a book opened or a seek: it alone sets the mood.
     private func acceptBoundary(
         _ observation: MoodObservation,
@@ -231,7 +286,9 @@ public final class MoodDirector {
         phase = .following
         lastAcceptedIndex = observation.globalSentenceIndex
         lastObservation = observation
+        lastReadingTime = now
         pending = nil
+        jumpRun = nil
         evidence.removeAll()
         evidence.add(
             observation.reading.evidence(config: config),
@@ -256,7 +313,9 @@ public final class MoodDirector {
     private func acceptChapterStart(_ observation: MoodObservation, at now: TimeInterval) -> MoodDecision? {
         lastAcceptedIndex = observation.globalSentenceIndex
         lastObservation = observation
+        lastReadingTime = now
         pending = nil
+        jumpRun = nil
         let time = listening.time(at: now)
         evidence.decay(to: time, timeConstant: config.evidenceTimeConstant)
         evidence.scale(by: config.chapterCarryOver)
@@ -274,25 +333,43 @@ public final class MoodDirector {
         )
     }
 
-    /// A regular reading: smoothing, two-reading confirmation and the dwell rule apply.
+    /// A regular reading: mood-track readings follow the track's turns; live readings go
+    /// through smoothing, confirmation and the dwell rule.
     private func acceptCadence(_ observation: MoodObservation, at now: TimeInterval) -> MoodDecision? {
+        if observation.source == .track,
+           observation.reading.confidence >= config.trackMinimumConfidence {
+            return acceptTrack(observation, at: now)
+        }
         lastAcceptedIndex = observation.globalSentenceIndex
         lastObservation = observation
         let reading = observation.reading
         let time = listening.time(at: now)
-        evidence.add(reading.evidence(config: config), at: time, timeConstant: config.evidenceTimeConstant)
+        let weight = readingWeight(at: now)
+        lastReadingTime = now
+        evidence.add(scaled(reading.evidence(config: config), by: weight), at: time, timeConstant: config.evidenceTimeConstant)
 
-        // One very confident reading far from where the music is: react now.
+        // Very confident readings far from where the music is: react now. One reading is
+        // enough at the slow cadence; read every sentence, a few in a row are needed.
         if reading.confidence >= config.bigJumpConfidence,
            reading.bucket != currentBucket,
-           reading.point.distance(to: currentBucket.anchor) >= config.bigJumpDistance,
+           reading.point.distance(to: currentBucket.anchor) >= config.bigJumpDistance {
+            if let run = jumpRun, run.bucket == reading.bucket {
+                jumpRun = (run.bucket, run.weight + weight)
+            } else {
+                jumpRun = (reading.bucket, weight)
+            }
+        } else {
+            jumpRun = nil
+        }
+        if let run = jumpRun,
+           run.weight >= config.bigJumpWeight - 1e-9,
            dwellAllows(config.bigJumpMinimumDwell, at: now) {
             // Start the evidence over from this reading, so the old mood does not
             // immediately win the music back.
             evidence.removeAll()
             evidence.add(reading.evidence(config: config), at: time, timeConstant: config.evidenceTimeConstant)
             return change(
-                to: reading.bucket,
+                to: run.bucket,
                 reason: .bigJump,
                 transition: .quick,
                 observation: observation,
@@ -306,9 +383,16 @@ public final class MoodDirector {
             pending = nil
             return nil
         }
-        let count = (pending?.bucket == leader ? pending?.count ?? 0 : 0) + 1
-        pending = (leader, count)
-        guard count >= requiredReadings, dwellAllows(config.minimumDwell, at: now) else {
+        var run = Pending(bucket: leader, count: 1, since: now, fromTrack: false)
+        if let pending, !pending.fromTrack, pending.bucket == leader {
+            run.count = pending.count + 1
+            run.since = pending.since
+        }
+        pending = run
+        guard run.count >= requiredReadings,
+              now - run.since >= config.confirmationTime - 1e-9,
+              dwellAllows(config.minimumDwell, at: now)
+        else {
             // Either not confirmed yet, or confirmed and waiting out the dwell (see tick()).
             return nil
         }
@@ -316,6 +400,71 @@ public final class MoodDirector {
             to: leader,
             reason: .confirmed,
             transition: .gentle,
+            observation: observation,
+            provisional: false,
+            at: now
+        )
+    }
+
+    /// A reading from the book's mood track. The track already pins each turn to the
+    /// sentence where the text first reads as the new mood, so the music follows as soon
+    /// as narration gets there, without smoothing it again.
+    private func acceptTrack(_ observation: MoodObservation, at now: TimeInterval) -> MoodDecision? {
+        lastAcceptedIndex = observation.globalSentenceIndex
+        lastObservation = observation
+        jumpRun = nil
+        let reading = observation.reading
+        let time = listening.time(at: now)
+        let weight = readingWeight(at: now)
+        lastReadingTime = now
+        // Track readings feed the evidence too, so a live engine taking over where the
+        // track ends starts from what the track said.
+        evidence.add(scaled(reading.evidence(config: config), by: weight), at: time, timeConstant: config.evidenceTimeConstant)
+
+        let bucket = reading.bucket
+        guard bucket != currentBucket else {
+            pending = nil
+            return nil
+        }
+        var run = Pending(bucket: bucket, count: 1, since: now, fromTrack: true)
+        if let pending, pending.fromTrack, pending.bucket == bucket {
+            run.count = pending.count + 1
+            run.since = pending.since
+        }
+        pending = run
+        guard run.count >= requiredTrackReadings else { return nil }
+
+        // A confident turn far from the current mood (sudden violence) may come sooner
+        // and crossfades quickly, as a live big jump does.
+        if reading.confidence >= config.bigJumpConfidence,
+           reading.point.distance(to: currentBucket.anchor) >= config.bigJumpDistance,
+           dwellAllows(config.bigJumpMinimumDwell, at: now) {
+            return trackTurn(to: bucket, reason: .bigJump, transition: .quick, observation: observation, at: now)
+        }
+        guard dwellAllows(config.trackMinimumDwell, at: now) else {
+            // Waits for the dwell; tick() goes ahead then if the track still says so.
+            return nil
+        }
+        return trackTurn(to: bucket, reason: .trackTurn, transition: .gentle, observation: observation, at: now)
+    }
+
+    /// Changes to a mood the track turned to, and restarts the evidence from it so a live
+    /// reading that follows does not pull the music straight back.
+    private func trackTurn(
+        to bucket: MoodBucket,
+        reason: MoodDecision.Reason,
+        transition: MoodDecision.Transition,
+        observation: MoodObservation?,
+        at now: TimeInterval
+    ) -> MoodDecision {
+        if let reading = observation?.reading {
+            evidence.removeAll()
+            evidence.add(reading.evidence(config: config), at: listening.time(at: now), timeConstant: config.evidenceTimeConstant)
+        }
+        return change(
+            to: bucket,
+            reason: reason,
+            transition: transition,
             observation: observation,
             provisional: false,
             at: now
@@ -349,6 +498,7 @@ public final class MoodDirector {
         currentBucket = bucket
         lastChangeTime = now
         pending = nil
+        jumpRun = nil
         dwellWaived = provisional
         recentDecisions.append(decision)
         if recentDecisions.count > 50 {

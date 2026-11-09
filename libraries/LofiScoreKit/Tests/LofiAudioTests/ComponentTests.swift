@@ -86,24 +86,26 @@ final class BarGridTests: XCTestCase {
 final class DuckerTests: XCTestCase {
     func testBedGainPutsTracksAtTheBedLevel() {
         let settings = DuckingSettings()
-        // Voice −18 LUFS, bed 12 dB under it: a −16 LUFS track needs −14 dB.
-        XCTAssertEqual(settings.bedGain(forTrackLoudness: -16), Gain.linear(fromDB: -14), accuracy: 1e-12)
+        // Voice −18 LUFS, bed 16 dB under it: a −16 LUFS track needs −18 dB.
+        XCTAssertEqual(settings.bedGain(forTrackLoudness: -16), Gain.linear(fromDB: -18), accuracy: 1e-12)
         XCTAssertEqual(settings.bedGain(forTrackLoudness: -40), 1, "never boosts above unity")
     }
 
     func testLiftOnlyAfterTheSilenceIsLongEnough() {
+        // Defaults: 2 s of silence, then a gentle 2 dB rise over 2.5 s.
         let settings = DuckingSettings()
         var ducker = Ducker()
         ducker.sentenceStarted(at: 0, duration: 2, settings: settings)
-        XCTAssertEqual(ducker.gapCheckTime(settings: settings), 3.5)
-        ducker.checkGap(at: 3, settings: settings)
-        XCTAssertEqual(ducker.offsetDB(at: 3), 0)
+        XCTAssertEqual(ducker.gapCheckTime(settings: settings), 4)
         ducker.checkGap(at: 3.5, settings: settings)
+        XCTAssertEqual(ducker.offsetDB(at: 3.5), 0)
+        ducker.checkGap(at: 4, settings: settings)
         XCTAssertTrue(ducker.isLifted)
-        XCTAssertEqual(ducker.offsetDB(at: 5), 4, accuracy: 1e-9)
+        XCTAssertEqual(ducker.offsetDB(at: 5.25), 1, accuracy: 1e-9)
+        XCTAssertEqual(ducker.offsetDB(at: 6.5), 2, accuracy: 1e-9)
         XCTAssertNil(ducker.gapCheckTime(settings: settings), "already lifted")
-        ducker.sentenceStarted(at: 6, duration: 1, settings: settings)
-        XCTAssertEqual(ducker.offsetDB(at: 6.4), 0, accuracy: 1e-9)
+        ducker.sentenceStarted(at: 7, duration: 1, settings: settings)
+        XCTAssertEqual(ducker.offsetDB(at: 7.4), 0, accuracy: 1e-9)
     }
 
     func testNoLiftWhenTheSettingIsOff() {

@@ -16,13 +16,18 @@ import LofiText
 //       --concurrency runs several readings at once (for network engines); the
 //       output keeps the input order.
 //
-//   lofi-eval simulate <epub-dir> --engine NAME [--track track.json] [--book id] [--chapters a-b] [--out f]
+//   lofi-eval simulate <epub-dir> --engine NAME [--track track.json] [--cadence auto|plan|sentence] [--book id] [--chapters a-b] [--out f]
 //       Plays the book through MoodTracker on a simulated clock, exactly as the
 //       app would, and reports readings, mood changes per hour and latency.
 //       With --track, plays a saved mood track back and uses NAME wherever the
-//       track does not reach, as the app does.
+//       track does not reach, as the app does. --cadence auto (the default)
+//       is MoodEngineCatalog.cadence(for:): every sentence, except the plan's
+//       4 sentences / 20 s for Apple's on-device model.
 //
-//   lofi-eval track    <epub-dir> --engine NAME --out track.json [--book id] [--words 250]
+//   lofi-eval track    <epub-dir> --engine NAME --out track.json [--book id] [--words 250] [--refine-budget 0.6] [--resolution 3]
+//       Scores the book once into a mood track, then pins each mood change to
+//       within --resolution sentences, spending at most --refine-budget times
+//       the planned entries on extra readings (0 turns refinement off).
 //                      [--chapters a-b] [--concurrency 4] [--dry-run]
 //       Scores a whole book once into a mood track (see MoodTrackBuilder).
 //       Resumes from an existing --out file. --dry-run only counts the entries
@@ -33,9 +38,9 @@ import LofiText
 
 let usage = """
     usage: lofi-eval windows <epub-dir> [--book ID] [--sample N --seed S | --every-sentence] [--chapters A-B] [--max-words 400] [--out FILE]
-           lofi-eval run --engine NAME [--in FILE] [--out FILE] [--limit N] [--concurrency N]
-           lofi-eval simulate <epub-dir> --engine NAME [--track FILE] [--book ID] [--chapters A-B] [--out FILE]
-           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--chapters A-B] [--concurrency 4] [--dry-run]
+           lofi-eval run --engine NAME [--in FILE] [--out FILE] [--limit N] [--concurrency N] [--max-dollars D]
+           lofi-eval simulate <epub-dir> --engine NAME [--track FILE] [--cadence auto|plan|sentence] [--book ID] [--chapters A-B] [--out FILE]
+           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--refine-budget 0.6] [--resolution 3] [--chapters A-B] [--concurrency 4] [--max-dollars D] [--dry-run]
            lofi-eval engines
     engines: \(EngineFactory.names.joined(separator: ", "))
     """
@@ -139,9 +144,15 @@ func runCommand(_ args: Arguments) async throws {
     var counts: [String: Int] = [:]
     let started = now()
     let width = max(1, args.int("concurrency", default: 1))
+    let cap = SpendCap(args)
     var done = 0
     for batchStart in stride(from: 0, to: records.count, by: width) {
         let batch = Array(records[batchStart..<min(records.count, batchStart + width)])
+        guard cap.allows(batch.count) else {
+            note(String(format: "  stopped at --max-dollars %.2f after %d of %d windows (about $%.2f spent)",
+                        cap.dollars ?? 0, done, records.count, cap.spent))
+            break
+        }
         let windows = try batch.map(rebuild)
         // Run the batch at once, then write it in input order.
         let results = await withTaskGroup(of: (Int, Result<MoodReading, any Error>, Double).self) { group in
@@ -178,7 +189,7 @@ func runCommand(_ args: Arguments) async throws {
     let p95 = latencies.isEmpty ? 0 : latencies[min(latencies.count - 1, Int(Double(latencies.count) * 0.95))]
     note(String(
         format: "%@: %d readings, %d failures, p50 %.1f ms, p95 %.1f ms, %.1f s total",
-        engine.id, records.count - failures, failures, p50, p95, now() - started
+        engine.id, done - failures, failures, p50, p95, now() - started
     ))
     note("  buckets: " + counts.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
     reportClaudeUsage()
@@ -211,15 +222,24 @@ final class SimulatedClock: @unchecked Sendable {
 func simulateCommand(_ args: Arguments) async throws {
     guard let name = args.string("engine") else { fail("give --engine\n\(usage)") }
     let (guardian, book) = try openBook(args)
-    var live = try EngineFactory.make(name)
+    let live = try EngineFactory.make(name)
+    // Only live readings are timed; track lookups take no measurable time.
+    let timed = TimedEngine(live)
+    var engine: any MoodEngine = timed
     if let trackPath = args.string("track") {
         let track = try MoodTrack.decode(Data(contentsOf: URL(fileURLWithPath: trackPath)))
         note("playing \(track.entries.count) track entries from \(track.engineID), \(name) elsewhere")
-        live = TrackedMoodEngine(store: MoodTrackStore(track), fallback: live)
+        engine = TrackedMoodEngine(store: MoodTrackStore(track), fallback: timed)
     }
-    let engine = TimedEngine(live)
+    let cadence: ReadingCadence.Configuration
+    switch args.string("cadence") ?? "auto" {
+    case "auto": cadence = MoodEngineCatalog.cadence(for: live)
+    case "plan": cadence = .default
+    case "sentence": cadence = .everySentence
+    case let other: fail("unknown --cadence \(other); use auto, plan or sentence")
+    }
     let clock = SimulatedClock()
-    let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, clock: { clock.read() })
+    let tracker = MoodTracker(spoilerGuard: guardian, engine: engine, cadence: cadence, clock: { clock.read() })
     let writer = try JSONLWriter(path: args.string("out"))
     let positions = try allPositions(guardian, chapters: args.range("chapters"))
 
@@ -227,14 +247,14 @@ func simulateCommand(_ args: Arguments) async throws {
     var latencies: [Double] = []
     for position in positions {
         if let o = await tracker.sentenceStarted(position) {
-            let latency = engine.takeLatency()
+            let latency = timed.takeLatency()
             if let latency { latencies.append(latency) }
             let record = ObservationRecord(
                 book: book, chapter: o.chapterOrdinal, sentence: o.sentenceIndex, global: o.globalSentenceIndex,
                 seconds: (clock.read() * 10).rounded() / 10, trigger: o.trigger.rawValue,
                 bucket: o.reading.bucket.rawValue, valence: round3(o.reading.valence), arousal: round3(o.reading.arousal),
                 confidence: round3(o.reading.confidence), engine: o.reading.engineID,
-                latencyMs: latency.map { ($0 * 10).rounded() / 10 }
+                source: o.source.rawValue, latencyMs: latency.map { ($0 * 10).rounded() / 10 }
             )
             observations.append(record)
             try writer.write(record)

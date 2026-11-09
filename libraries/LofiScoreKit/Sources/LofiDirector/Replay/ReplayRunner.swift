@@ -98,7 +98,8 @@ public enum ReplayRunner {
                     chapterOrdinal: event.chapter ?? 0,
                     sentenceIndex: event.sentence ?? index,
                     globalSentenceIndex: index,
-                    trigger: event.trigger ?? .cadence
+                    trigger: event.trigger ?? .cadence,
+                    source: reading.source ?? .live
                 )
                 record(director.receive(observation))
             }

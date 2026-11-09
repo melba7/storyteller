@@ -77,6 +77,17 @@ public enum ReadingTrigger: String, Sendable, Hashable, Codable {
     case chapterStart
 }
 
+/// Where a reading came from, so the director can weigh it.
+public enum ReadingSource: String, Sendable, Hashable, Codable {
+    /// Judged just now by a live engine (the Fast classifier, the lexicon, or
+    /// the on-device model). Readings on neighbouring sentences share most of
+    /// their window, so a run of agreeing live readings is weak evidence.
+    case live
+    /// Taken from the book's precomputed mood track (Claude, scored ahead of
+    /// time from the same causal windows). One reading is enough to act on.
+    case track
+}
+
 /// A reading tied to the place in the book where it was taken.
 /// This is what the text side hands to the director.
 public struct MoodObservation: Sendable, Hashable, Codable {
@@ -88,18 +99,39 @@ public struct MoodObservation: Sendable, Hashable, Codable {
     /// Index of the sentence across the whole book, counting only sentences at or before it.
     public var globalSentenceIndex: Int
     public var trigger: ReadingTrigger
+    /// Whether the reading came from the mood track or a live engine.
+    public var source: ReadingSource
 
     public init(
         reading: MoodReading,
         chapterOrdinal: Int,
         sentenceIndex: Int,
         globalSentenceIndex: Int,
-        trigger: ReadingTrigger
+        trigger: ReadingTrigger,
+        source: ReadingSource = .live
     ) {
         self.reading = reading
         self.chapterOrdinal = chapterOrdinal
         self.sentenceIndex = sentenceIndex
         self.globalSentenceIndex = globalSentenceIndex
         self.trigger = trigger
+        self.source = source
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case reading, chapterOrdinal, sentenceIndex, globalSentenceIndex, trigger, source
+    }
+
+    /// Observations saved before `source` existed decode as `.live`.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            reading: try c.decode(MoodReading.self, forKey: .reading),
+            chapterOrdinal: try c.decode(Int.self, forKey: .chapterOrdinal),
+            sentenceIndex: try c.decode(Int.self, forKey: .sentenceIndex),
+            globalSentenceIndex: try c.decode(Int.self, forKey: .globalSentenceIndex),
+            trigger: try c.decode(ReadingTrigger.self, forKey: .trigger),
+            source: try c.decodeIfPresent(ReadingSource.self, forKey: .source) ?? .live
+        )
     }
 }

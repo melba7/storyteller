@@ -257,5 +257,44 @@ extension PlaceholderRecipe {
             bars: 8, swing: 0, drums: .halfTime, hats: 0, bass: .whole, melody: 0.2,
             brightness: 1600, crackle: 0.45, wobble: 9, intensity: 0.35, seed: 802
         ),
+        // Romantic: slow, tender major ninths and six-nines, lots of swing, soft drums.
+        PlaceholderRecipe(
+            id: "romantic-a", bucket: .romantic, bpm: 74, key: "Ab major", tonic: 56, minor: false,
+            progression: [Chord(0, Chord.maj9), Chord(4, Chord.min7), Chord(9, Chord.min9), Chord(2, Chord.min7)],
+            bars: 12, swing: 0.22, drums: .soft, hats: 0.45, bass: .halves, melody: 0.35,
+            brightness: 2700, crackle: 0.45, wobble: 6, intensity: 0.3, seed: 901
+        ),
+        PlaceholderRecipe(
+            id: "romantic-b", bucket: .romantic, bpm: 70, key: "E major", tonic: 52, minor: false,
+            progression: [Chord(5, Chord.maj7), Chord(4, Chord.min7), Chord(9, Chord.min7), Chord(0, Chord.sixNine)],
+            bars: 12, swing: 0.2, drums: .soft, hats: 0.4, bass: .halves, melody: 0.3,
+            brightness: 2600, crackle: 0.5, wobble: 7, intensity: 0.25, seed: 902
+        ),
+        // Dreamy: floating sharp-eleven and sus colours, no drums or barely any, wide wobble.
+        PlaceholderRecipe(
+            id: "dreamy-a", bucket: .dreamy, bpm: 70, key: "Db major", tonic: 49, minor: false,
+            progression: [Chord(0, Chord.maj7sharp11), Chord(5, Chord.maj9), Chord(7, Chord.sus2), Chord(9, Chord.min9)],
+            bars: 10, swing: 0.1, drums: .none, hats: 0, bass: .whole, melody: 0.4,
+            brightness: 3200, crackle: 0.3, wobble: 12, intensity: 0.25, seed: 1001
+        ),
+        PlaceholderRecipe(
+            id: "dreamy-b", bucket: .dreamy, bpm: 76, key: "B major", tonic: 59, minor: false,
+            progression: [Chord(0, Chord.add9), Chord(4, Chord.min9), Chord(5, Chord.maj7sharp11), Chord(5, Chord.min6)],
+            bars: 12, swing: 0.12, drums: .soft, hats: 0.2, bass: .whole, melody: 0.45,
+            brightness: 3400, crackle: 0.25, wobble: 11, intensity: 0.3, seed: 1002
+        ),
+        // Adventurous: forward motion, bright add9 and dominant chords, syncopated bass.
+        PlaceholderRecipe(
+            id: "adventurous-a", bucket: .adventurous, bpm: 98, key: "E minor", tonic: 52, minor: true,
+            progression: [Chord(0, Chord.min9), Chord(8, Chord.maj7), Chord(10, Chord.add9), Chord(5, Chord.sus2)],
+            bars: 16, swing: 0.08, drums: .boomBap, hats: 0.9, bass: .syncopated, melody: 0.5,
+            brightness: 4200, crackle: 0.15, wobble: 4, chordStabs: true, intensity: 0.7, seed: 1101
+        ),
+        PlaceholderRecipe(
+            id: "adventurous-b", bucket: .adventurous, bpm: 94, key: "G major", tonic: 55, minor: false,
+            progression: [Chord(0, Chord.add9), Chord(10, Chord.maj7), Chord(5, Chord.add9), Chord(7, Chord.dom7)],
+            bars: 16, swing: 0.1, drums: .driving, hats: 0.8, bass: .syncopated, melody: 0.45,
+            brightness: 4400, crackle: 0.15, wobble: 4, intensity: 0.65, seed: 1102
+        ),
     ]
 }

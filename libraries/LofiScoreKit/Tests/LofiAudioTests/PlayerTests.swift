@@ -188,6 +188,44 @@ final class PlayerTests: XCTestCase {
         XCTAssertFalse(h.backend.isPlaying(.b))
     }
 
+    func testMoodChangeDuringARotationHurriesTheRotation() {
+        let h = PlayerHarness(duration: 60)
+        h.startPlaying(in: .calm)
+        h.advance(54.2 - h.now)  // one second into a 7-second rotation
+        XCTAssertEqual(h.crossfades.count, 1)
+        h.seek(to: 500, finding: .tense)
+        XCTAssertEqual(h.snapshot().pendingMood, .tense)
+        // The 6 seconds left of the rotation now take 6/7 of the quick 3.5 s.
+        h.advance(2.9)
+        XCTAssertEqual(h.crossfades.count, 1)
+        h.advance(0.2)
+        XCTAssertEqual(h.crossfades.count, 2)
+        XCTAssertEqual(h.crossfades[1].time, 57.2, accuracy: 0.05)
+        XCTAssertEqual(h.crossfades[1].transition, .quick)
+        h.advance(3.6)
+        XCTAssertEqual(h.snapshot().musicMood, .tense)
+    }
+
+    func testGentleChangeDuringAGentleCrossfadeWaitsAtItsOwnPace() {
+        let h = PlayerHarness(duration: 300)
+        h.startPlaying(in: .calm)
+        h.advance(100)
+        h.send(.tense, confidence: 0.75)
+        h.advance(20)
+        h.send(.tense, confidence: 0.75)
+        guard let first = h.crossfades.last, first.transition == .gentle else { return XCTFail("no gentle change") }
+        h.advance(1)
+        // A chapter start may change the mood at once, but its gentle fade waits its turn.
+        h.send(.cozy, trigger: .chapterStart, confidence: 0.75)
+        XCTAssertEqual(h.decisions.last?.bucket, .cozy)
+        XCTAssertEqual(h.snapshot().pendingMood, .cozy)
+        h.advance(first.time + first.duration - h.now - 0.05)
+        XCTAssertEqual(h.crossfades.count, 1, "the first fade keeps its pace")
+        h.advance(0.1)
+        XCTAssertEqual(h.crossfades.count, 2)
+        XCTAssertEqual(h.crossfades[1].transition, .gentle)
+    }
+
     func testGainsUpdateAtLeast30TimesASecondWhileFading() {
         let h = PlayerHarness()
         h.startPlaying(in: .calm)
@@ -422,7 +460,7 @@ final class PlayerTests: XCTestCase {
     }
 
     func testMusicStaysOffOnMutedRoutes() {
-        var config = ScoreConfig()
+        var config = ScoreConfig.mechanics
         config.mutedRoutes = [.carPlay]
         let h = PlayerHarness(config: config)
         h.startPlaying(in: .calm)

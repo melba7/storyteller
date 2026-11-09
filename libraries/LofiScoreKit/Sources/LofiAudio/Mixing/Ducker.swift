@@ -2,19 +2,21 @@ import Foundation
 
 /// How loud the music sits under the narrator.
 public struct DuckingSettings: Sendable, Hashable, Codable {
-    /// Music level while the narrator speaks, in dB relative to the voice. The plan's default
-    /// is about 12 dB under. This is the "music volume" slider.
-    public var bedLevelDB: Double = -12
+    /// Music level while the narrator speaks, in dB relative to the voice. 16 dB under keeps
+    /// the music in the background (the plan started at 12; Mo asked for something subtler).
+    /// This is the "music volume" slider.
+    public var bedLevelDB: Double = -16
 
     /// How much the music rises in a silence longer than ``gapThreshold`` (a chapter break,
-    /// a long pause in the reading). 0 turns the lift off.
-    public var gapLiftDB: Double = 4
+    /// a long pause in the reading). 0 turns the lift off. Kept small so the music does not
+    /// swell at every paragraph break.
+    public var gapLiftDB: Double = 2
 
     /// How long the narrator must be silent before the music rises.
-    public var gapThreshold: TimeInterval = 1.5
+    public var gapThreshold: TimeInterval = 2
 
     /// How long the rise takes.
-    public var liftTime: TimeInterval = 1.5
+    public var liftTime: TimeInterval = 2.5
 
     /// How fast the music settles back when the narrator speaks again.
     public var settleTime: TimeInterval = 0.4

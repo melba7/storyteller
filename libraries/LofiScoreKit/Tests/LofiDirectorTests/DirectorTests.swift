@@ -88,22 +88,24 @@ final class DirectorTests: XCTestCase {
     func testMinimumDwellHoldsAChangeAndReleasesItAtTheDeadline() {
         let director = MoodDirector(clock: clock)
         clock.advance(by: 2)
-        XCTAssertEqual(director.receive(observation(.tense, index: 2, trigger: .start))?.bucket, .tense)
+        XCTAssertEqual(director.receive(observation(.tense, index: 2, confidence: 0.5, trigger: .start))?.bucket, .tense)
 
-        // Cozy wins reading after reading, but the music changed to tense at t = 2.
-        for (time, index) in [(22.0, 6), (42.0, 10), (62.0, 14)] {
+        // Cozy takes the lead at t = 22 and has held it for 20 s by t = 42: confirmed, but
+        // the music changed to tense at t = 2.
+        for (time, index) in [(12.0, 4), (22.0, 6), (32.0, 8), (42.0, 10)] {
             clock.advance(to: time)
             XCTAssertNil(director.receive(observation(.cozy, index: index, confidence: 0.75)), "t = \(time)")
         }
         XCTAssertEqual(director.currentBucket, .tense)
-        XCTAssertEqual(director.nextDeadline, 92)
-        XCTAssertEqual(director.snapshot.dwellRemaining, 30, accuracy: 1e-9)
+        XCTAssertEqual(director.snapshot.pendingBucket, .cozy)
+        XCTAssertEqual(director.nextDeadline, 62)
+        XCTAssertEqual(director.snapshot.dwellRemaining, 20, accuracy: 1e-9)
 
-        clock.advance(to: 82)
-        XCTAssertNil(director.receive(observation(.cozy, index: 18, confidence: 0.75)))
-        clock.advance(to: 91)
+        clock.advance(to: 52)
+        XCTAssertNil(director.receive(observation(.cozy, index: 12, confidence: 0.75)))
+        clock.advance(to: 61)
         XCTAssertNil(director.tick(), "still inside the dwell")
-        clock.advance(to: 92)
+        clock.advance(to: 62)
         let decision = director.tick()
         XCTAssertEqual(decision?.bucket, .cozy)
         XCTAssertEqual(decision?.reason, .dwellElapsed)
@@ -205,9 +207,9 @@ final class DirectorTests: XCTestCase {
         XCTAssertTrue(director.dwellWaived)
         clock.advance(by: 10)
         director.receive(observation(.calm, index: 10))
-        clock.advance(by: 10)
+        clock.advance(by: 20)
         let decision = director.receive(observation(.calm, index: 14))
-        XCTAssertEqual(decision?.bucket, .calm, "30 s after the last change, allowed because of the chapter start")
+        XCTAssertEqual(decision?.bucket, .calm, "40 s after the last change, allowed because of the chapter start")
         XCTAssertTrue(decision?.dwellWaived ?? false)
         XCTAssertFalse(director.dwellWaived, "the next change uses the dwell again")
     }
@@ -227,7 +229,7 @@ final class DirectorTests: XCTestCase {
         director.receive(observation(.tense, index: 504))
         clock.advance(by: 20)
         let decision = director.receive(observation(.tense, index: 508))
-        XCTAssertEqual(decision?.bucket, .tense, "a provisional mood does not hold the music for 90 s")
+        XCTAssertEqual(decision?.bucket, .tense, "a provisional mood does not hold the music for the dwell")
     }
 
     func testReadingsAheadOfThePlayheadAreRefused() {

@@ -1,6 +1,6 @@
 {
  "title": "Minimum dwell holds a confirmed change",
- "duration": 120,
+ "duration": 90,
  "events": [
   {
    "t": 0,
@@ -12,17 +12,33 @@
    "trigger": "start",
    "reading": {
     "bucket": "tense",
-    "confidence": 0.7
+    "confidence": 0.5
    },
    "expect": "tense",
    "note": "first reading sets the mood"
+  },
+  {
+   "t": 12,
+   "index": 4,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   }
   },
   {
    "t": 22,
    "index": 6,
    "reading": {
     "bucket": "cozy",
-    "confidence": 0.7
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 32,
+   "index": 8,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
    }
   },
   {
@@ -30,37 +46,29 @@
    "index": 10,
    "reading": {
     "bucket": "cozy",
-    "confidence": 0.7
-   }
-  },
-  {
-   "t": 62,
-   "index": 14,
-   "reading": {
-    "bucket": "cozy",
-    "confidence": 0.7
+    "confidence": 0.75
    },
    "expect": "tense",
-   "note": "cozy has won, but the music is only 60 s into its 90 s dwell"
+   "note": "cozy has led for 20 s, but the music is only 40 s into its 60 s dwell"
   },
   {
-   "t": 82,
-   "index": 18,
+   "t": 52,
+   "index": 12,
    "reading": {
     "bucket": "cozy",
-    "confidence": 0.7
+    "confidence": 0.75
    },
    "expect": "tense"
   },
   {
-   "t": 91,
+   "t": 61,
    "expect": "tense",
    "note": "still inside the dwell"
   },
   {
-   "t": 93,
+   "t": 63,
    "expect": "cozy",
-   "note": "the held change fires on its own when the dwell ends at 92 s"
+   "note": "the held change fires on its own when the dwell ends at 62 s"
   }
  ]
 }

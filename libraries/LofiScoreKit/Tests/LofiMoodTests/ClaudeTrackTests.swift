@@ -116,8 +116,8 @@ struct ClaudeMoodEngineTests {
 
         #expect(reading.bucket == .tense)
         #expect(reading.valence == -0.6 && reading.arousal == 0.8 && reading.confidence == 0.7)
-        #expect(reading.engineID == "claude.opus-5-5/p1")
-        #expect(engine.id == "claude.opus-5-5/p1")
+        #expect(reading.engineID == "claude.opus-5-5/p2")
+        #expect(engine.id == "claude.opus-5-5/p2")
 
         let request = try #require(transport.requests.first)
         #expect(request.url?.absoluteString == "https://api.anthropic.com/v1/messages")
@@ -157,7 +157,7 @@ struct ClaudeMoodEngineTests {
         let httpBody = try #require(request.httpBody)
         let body = try #require(JSONSerialization.jsonObject(with: httpBody) as? [String: Any])
         #expect(body["fallbacks"] == nil)
-        #expect(engine.id == "claude.haiku-5-5/p1")
+        #expect(engine.id == "claude.haiku-5-5/p2")
     }
 
     @Test func retriesRateLimitsThenSucceeds() async throws {
