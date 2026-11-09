@@ -1,0 +1,155 @@
+# Merges each new upstream Storyteller mobile release into a pull request.
+# See FORK.md ("Upstream updates"). This never writes to the upstream project:
+# it only reads upstream's tags and release notes from GitLab.
+name: Upstream sync
+
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description:
+          Upstream tag to merge. Empty means the newest stable mobile-vX.Y.Z.
+        required: false
+        default: ""
+      dry_run:
+        description: Only report what would happen.
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  # A SYNC_TOKEN secret, if set, lets sync pull requests trigger CI like any
+  # other pull request. Without it the workflow token is used.
+  GH_TOKEN: ${{ secrets.SYNC_TOKEN || github.token }}
+  HAS_SYNC_TOKEN: ${{ secrets.SYNC_TOKEN != '' }}
+  OWNER: ${{ github.repository_owner }}
+  REPO: ${{ github.repository }}
+
+jobs:
+  sync:
+    name: Merge the newest upstream mobile release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN || github.token }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26.12.1
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
+      - name: Prepare git and Yarn
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Yarn is only needed when yarn.lock conflicts.
+          npm i -g corepack && corepack enable
+
+      - name: Merge
+        id: sync
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          args=()
+          if [ -n "$INPUT_TAG" ]; then args+=(--tag "$INPUT_TAG"); fi
+          if [ "$INPUT_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          tools/fork/sync-upstream.sh "${args[@]}"
+
+      - name: Push the sync branch and open a pull request
+        if:
+          contains(fromJSON('["merged", "merged-lockfile"]'),
+          steps.sync.outputs.status)
+        env:
+          TAG: ${{ steps.sync.outputs.tag }}
+          BASE_TAG: ${{ steps.sync.outputs.base_tag }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          STATUS: ${{ steps.sync.outputs.status }}
+        run: |
+          if ! node tools/fork/check-fork.mjs; then
+            echo "::warning::Fork checks fail on $BRANCH; CI on the pull request shows why."
+          fi
+
+          # Pushing or opening the pull request can fail until the one-time
+          # settings in FORK.md are done. Report that once, in an issue.
+          blocked() {
+            echo "$1"
+            title="Upstream sync for $TAG needs a setting"
+            existing=$(gh issue list --repo "$REPO" --state open \
+              --search "\"$title\" in:title" --json number --jq '.[0].number' || true)
+            if [ -z "$existing" ]; then
+              node tools/fork/sync-notes.mjs --kind blocked --tag "$TAG" \
+                --branch "$BRANCH" --repo "$REPO" --owner "$OWNER" \
+                --error "$1" >blocked.md
+              cat blocked.md >>"$GITHUB_STEP_SUMMARY"
+              gh issue create --repo "$REPO" --title "$title" --body-file blocked.md ||
+                echo "::error::Could not open an issue either. Are Issues enabled for this repository?"
+            fi
+            exit 1
+          }
+
+          if ! log=$(git push origin "$BRANCH" 2>&1); then
+            blocked "$log"
+          fi
+          if [[ "$TAG" == mobile-v* ]]; then
+            git push origin "refs/tags/$TAG" || echo "::warning::Could not push tag $TAG."
+          fi
+
+          node tools/fork/sync-notes.mjs --kind pull-request --tag "$TAG" \
+            --base-tag "$BASE_TAG" --branch "$BRANCH" --status "$STATUS" \
+            --repo "$REPO" --owner "$OWNER" >body.md
+          if ! log=$(gh pr create --repo "$REPO" --base main --head "$BRANCH" \
+            --title "Sync upstream $TAG" --body-file body.md 2>&1); then
+            blocked "$log"
+          fi
+          echo "Opened $log" | tee -a "$GITHUB_STEP_SUMMARY"
+
+          # Pull requests opened with the workflow token start no workflows,
+          # so start fork CI on the branch directly.
+          if [ "$HAS_SYNC_TOKEN" != "true" ]; then
+            gh workflow run fork-ci.yml --repo "$REPO" --ref "$BRANCH"
+          fi
+
+      - name: Report a conflict
+        if: steps.sync.outputs.status == 'conflict'
+        env:
+          TAG: ${{ steps.sync.outputs.tag }}
+          BASE_TAG: ${{ steps.sync.outputs.base_tag }}
+          BRANCH: ${{ steps.sync.outputs.branch }}
+          CONFLICTS: ${{ steps.sync.outputs.conflicts }}
+        run: |
+          node tools/fork/sync-notes.mjs --kind conflict --tag "$TAG" \
+            --base-tag "$BASE_TAG" --branch "$BRANCH" --repo "$REPO" \
+            --owner "$OWNER" --conflicts "$CONFLICTS" >body.md
+          cat body.md >>"$GITHUB_STEP_SUMMARY"
+          title="Upstream $TAG needs a manual merge"
+          existing=$(gh issue list --repo "$REPO" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            echo "Issue #$existing already tracks this conflict."
+          elif ! gh issue create --repo "$REPO" --title "$title" --body-file body.md; then
+            echo "::error::Could not open an issue. Are Issues enabled for this repository?"
+            exit 1
+          fi
+
+      - name: Summary
+        if: always()
+        env:
+          TAG: ${{ steps.sync.outputs.tag }}
+          STATUS: ${{ steps.sync.outputs.status }}
+        run: |
+          echo "Upstream \`${TAG:-unknown}\`: **${STATUS:-did not finish}**" >>"$GITHUB_STEP_SUMMARY"

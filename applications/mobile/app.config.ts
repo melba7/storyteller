@@ -1,10 +1,12 @@
 import { type ConfigContext, type ExpoConfig } from "expo/config"
 
+import { withForkIdentity } from "./fork.config.ts" // LOFI-FORK
 import packageInfo from "./package.json"
 
 const IS_DEV = process.env["APP_VARIANT"] === "development"
 
-export default ({ config }: ConfigContext): ExpoConfig => {
+// LOFI-FORK: fork.config.ts applies the fork's identity, see the end of file.
+const upstreamConfig = ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     owner: "storyteller-platform",
@@ -246,3 +248,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
   }
 }
+
+export default withForkIdentity(upstreamConfig) // LOFI-FORK
