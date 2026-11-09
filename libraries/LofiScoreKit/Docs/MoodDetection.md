@@ -299,6 +299,10 @@ supported iPhone, and agrees best with Mo's labels. So:
 | embed:word+contextual v2 | 320 | 34.4% | 0.329 | 0.234 | 56 ms |
 | **Mac round 6** | | | | | |
 | embed:word v4 (settings chosen by kappa: class-weighted) | 320 | 30.6% | 0.268 | 0.209 | 10 ms |
+| **Mac round 7** (sample v4: 45 training books) | | | | | |
+| embed:word v6 (l2 0.03, earlier words 0.35; CV 37.6%) | 320 | 33.4% | 0.274 | 0.217 | 10 ms |
+| embed:word v2 (same run, for comparison) | 320 | 35.3% | 0.295 | 0.234 | 10 ms |
+| fast:maxent v5 (45 books) | 320 | 28.7% | 0.226 | 0.158 | 0.8 ms |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
 scored against Claude's labels. Round 1 used the first 1,360 windows and
@@ -398,6 +402,18 @@ three new moods 27 times against 5. So exact agreement stays the default
 (`--choose exact|kappa|macro-f1`), and the shipped model is
 `LofiMood-embed-word-3.json`: word embeddings, unweighted, l2 0.1, earlier
 words at 0.2, trained on all 34 books.
+
+Round 7 added sample v4 (760 windows from 19 more books) to test that
+lever, and it did not pay: word v6, trained on 45 books, scored 33.4% on
+the test books against word v2's 35.3%, and cross-validation stayed at
+37.6% although the pool grew from 26 to 45 books. One standard error on 320
+windows is about 2.7 points, so the extra books neither clearly helped nor
+clearly hurt. v6 over-predicts tense (79 against 44 in the labels; the new
+books are tense-heavy) and still under-predicts somber and hopeful. A
+linear head on averaged word embeddings looks saturated near 36%, about
+half of Claude's 67.5% self-agreement, so word-3 stays the shipped model and
+the bigger accuracy gain is the per-book Claude track, with Fast as its
+fallback.
 
 By the rule above, **the Fast engine is the default**: it is the best
 engine, deterministic, quick and plot-blind. Since round 4 the embedding
