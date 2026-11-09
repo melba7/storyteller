@@ -309,6 +309,19 @@ book; and the people's-ratings check against the shipped model. The base
 is sentence-transformers/all-MiniLM-L6-v2 (22.7M parameters, Apache-2.0,
 about 45 MB in 16-bit). It ships only if it passes the same rule.
 
+First run (Mac, 9 Nov 2026, 10 folds, 22.7M parameters, about 3.6 minutes
+a fold on the M3 Pro's GPU): against the shipped recipe
+`people-v0.5-prior-0.15`, `lm-soft-e0.2` scored exact 45.9% against 40.1%
+(+5.8, +4.6 to +7.1), fits 64.7% against 57.3% (+7.3, +5.8 to +9.0),
+kappa +0.075 and macro-F1 +0.047, all significant: the best engine yet on
+Claude's labels. But on people's ratings it put 9.6 points fewer clear
+sentences on the right side (-19.0 to -3.4) and named hopeful almost never
+(12 a pass against 386 in the labels), so it failed the ship rule, like
+word-7 before it. Round 2 adds what made the word models pass:
+`finetune_mood.py` now has leans (people's-ratings lean and prior shift,
+folded into the head) and "-mt" variants that teach the encoder people's
+ratings while it learns the moods.
+
 The app side is ready for it: `finetune.sh --convert RESULTS/models/lm-soft`
 writes `LofiMood-lm-soft.mlmodelc` (an ML program, 16-bit, fixed 256
 tokens) and `LofiMood-lm-soft.json` (word pieces and settings), checks Core

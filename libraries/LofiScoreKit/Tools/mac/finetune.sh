@@ -7,8 +7,13 @@
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
 #   Tools/mac/finetune.sh [--recipes-dir DIR] [--base NAME] [--variants hard,soft]
-#                         [--folds 10] [--epochs 3] [--out DIR] [--smoke]
-#   Tools/mac/finetune.sh --convert RESULTS/models/lm-soft [--name LofiMood-lm-minilm-soft]
+#                         [--leans V:A:P,...] [--folds 10] [--epochs 3] [--out DIR] [--smoke]
+#   Tools/mac/finetune.sh --convert RESULTS/models/lm-soft-mt1 --lean 1:0:0.3 [--name LofiMood-lm-soft-mt1]
+#
+# Variants and leans are explained in Tools/eval/finetune_mood.py: "-mt1"
+# also teaches the encoder people's ratings (EmoBank non-fiction), and a lean
+# V:A:P adds the people's-ratings lean (V pleasant, A energetic) and the
+# rare-mood prior shift (P) to the mood head. Every lean is scored both ways.
 #
 # Run Tools/mac/try-recipes.sh first: this reuses its export
 # (Tools/data/work/train), its out-of-fold rows (oof-word.jsonl) and its
@@ -30,7 +35,9 @@ VENV="$ROOT/python-mood"
 EMOBANK="$ROOT/external-data/emobank"
 RECIPES_DIR=""
 BASE="sentence-transformers/all-MiniLM-L6-v2"
-VARIANTS="hard,soft"
+VARIANTS="soft,soft-mt1"
+LEANS=""
+LEAN=""
 FOLDS=10
 EPOCHS=3
 SMOKE=0
@@ -42,6 +49,8 @@ while [ $# -gt 0 ]; do
     --recipes-dir) RECIPES_DIR="$2"; shift 2 ;;
     --base) BASE="$2"; shift 2 ;;
     --variants) VARIANTS="$2"; shift 2 ;;
+    --leans) LEANS="$2"; shift 2 ;;
+    --lean) LEAN="$2"; shift 2 ;;
     --folds) FOLDS="$2"; shift 2 ;;
     --epochs) EPOCHS="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
@@ -105,7 +114,9 @@ if [ -n "$CONVERT" ]; then
   [ -s "$CONVERT/meta.json" ] || die "no model in $CONVERT (expected meta.json)"
   "$PY" -m pip install -q coremltools >> "$OUT/pip.log" 2>&1 || { tail -3 "$OUT/pip.log"; die "installing coremltools failed"; }
   [ -n "$NAME" ] || NAME="LofiMood-lm-$(basename "$CONVERT" | sed 's/^lm-//')"
-  "$PY" -I Tools/eval/finetune_mood.py coreml --model "$CONVERT" --out "$OUT/coreml" --name "$NAME" \
+  LEAN_ARGS=()
+  [ -n "$LEAN" ] && LEAN_ARGS=(--lean "$LEAN")
+  "$PY" -I Tools/eval/finetune_mood.py coreml --model "$CONVERT" ${LEAN_ARGS[@]+"${LEAN_ARGS[@]}"} --out "$OUT/coreml" --name "$NAME" \
     --check "$W/train/test-windows.jsonl" 2> >(tee "$OUT/coreml.log" >&2) || die "conversion failed (see coreml.log)"
   xcrun coremlcompiler compile "$OUT/coreml/$NAME.mlpackage" "$OUT/coreml" > "$OUT/compile.log" 2>&1 \
     || { tail -5 "$OUT/compile.log"; die "coremlcompiler failed"; }
@@ -115,8 +126,8 @@ if [ -n "$CONVERT" ]; then
   swift build -c release --product lofi-eval > "$OUT/build.log" 2>&1 || { grep -E "error" "$OUT/build.log" | head -5; die "lofi-eval build failed"; }
   .build/release/lofi-eval run --engine "lm:$OUT/coreml/$NAME.json" --in "$W/train/test-windows.jsonl" \
     --out "$OUT/coreml/swift-test.jsonl" 2> "$OUT/swift-test.log" || { tail -5 "$OUT/swift-test.log"; die "lofi-eval lm: failed"; }
-  "$PY" -I Tools/eval/finetune_mood.py read --model "$CONVERT" --in "$W/train/test-windows.jsonl" \
-    --out "$OUT/coreml/python-test.jsonl" 2>> "$OUT/swift-test.log" || die "python read failed"
+  PYTHON_TEST=$("$PY" -I Tools/eval/finetune_mood.py read --model "$CONVERT" --in "$W/train/test-windows.jsonl" \
+    --leans "${LEAN:-0:0:0}" --out "$OUT/coreml/python-test" 2>> "$OUT/swift-test.log" | tail -1) || die "python read failed"
   python3 -I -c '
 import json, statistics, sys
 a = {r["id"]: r for r in map(json.loads, open(sys.argv[1])) if r.get("bucket")}
@@ -126,7 +137,7 @@ same = sum(a[i]["bucket"] == b[i]["bucket"] for i in ids)
 dv = max(abs(a[i]["valence"] - b[i]["valence"]) for i in ids)
 ms = statistics.median(a[i]["latencyMs"] for i in ids)
 print(f"Swift + Core ML vs PyTorch: same mood on {same} of {len(ids)} windows; largest valence difference {dv:.3f}; Swift median {ms:.1f} ms a window")
-' "$OUT/coreml/swift-test.jsonl" "$OUT/coreml/python-test.jsonl" | tee "$OUT/swift-check.txt"
+' "$OUT/coreml/swift-test.jsonl" "$PYTHON_TEST" | tee "$OUT/swift-check.txt"
   step "Done"
   echo "Core ML model: $OUT/coreml ($NAME.mlmodelc and $NAME.json). Nothing was shipped."
   exit 0
@@ -145,6 +156,17 @@ echo "shipped model: ${SHIPPED:-none} (recipe $SHIPPED_RECIPE)"
 grep -q "\"recipe\": *\"$SHIPPED_RECIPE\"" "$RECIPES_DIR/oof-word.jsonl" || die "$RECIPES_DIR/oof-word.jsonl has no rows for $SHIPPED_RECIPE"
 
 TRAIN_ARGS=(--data "$W/train" "${SETS_PY[@]}" --base "$BASE" --epochs "$EPOCHS")
+# People's ratings (EmoBank non-fiction) for the leans and the -mt variants.
+if [ ! -s "$W/emobank-people.jsonl" ] && [ -s "$EMOBANK/emobank.csv" ]; then
+  python3 -I Tools/eval/emobank.py people "$EMOBANK" > "$W/emobank-people.jsonl"
+fi
+if [ -s "$W/emobank-people.jsonl" ]; then
+  TRAIN_ARGS+=(--people "$W/emobank-people.jsonl")
+else
+  echo "no EmoBank people file: no people's-ratings leans or -mt variants"
+fi
+LEAN_LIST=()
+[ -n "$LEANS" ] && LEAN_LIST=(--leans "$LEANS")
 OOF_ARGS=(--folds "$FOLDS")
 if [ $SMOKE = 1 ]; then
   TRAIN_ARGS+=(--max-steps 20)
@@ -152,7 +174,7 @@ if [ $SMOKE = 1 ]; then
 fi
 
 step "Out of fold on every labelled book ($FOLDS folds of whole books; variants $VARIANTS)"
-"$PY" -I Tools/eval/finetune_mood.py oof "${TRAIN_ARGS[@]}" "${OOF_ARGS[@]}" --variants "$VARIANTS" --out "$OUT/oof-lm.jsonl" \
+"$PY" -I Tools/eval/finetune_mood.py oof "${TRAIN_ARGS[@]}" "${OOF_ARGS[@]}" --variants "$VARIANTS" ${LEAN_LIST[@]+"${LEAN_LIST[@]}"} --out "$OUT/oof-lm.jsonl" \
   2> >(tee "$OUT/oof.log" >&2) || die "fine-tuning failed (see oof.log)"
 
 step "Compared with the shipped recipe ($SHIPPED_RECIPE), window by window"
@@ -197,10 +219,15 @@ if [ -s "$W/emobank-windows.jsonl" ] && [ -s "$EMOBANK/emobank.csv" ]; then
   fi
   echo "people's ratings baseline: ${READINGS[0]:-none}"
   for m in ${MODELS[@]+"${MODELS[@]}"}; do
-    # (EmoBank windows are under 200 words, so the earlier words never count here.)
+    # Every lean the out-of-fold step scored, one readings file each. (EmoBank
+    # windows are under 200 words, so the earlier words never count here.)
     k=$(basename "$m")
-    "$PY" -I Tools/eval/finetune_mood.py read --model "$m" --in "$W/emobank-windows.jsonl" \
-      --engine "$k" --out "$OUT/emobank-$k.jsonl" && READINGS+=("$OUT/emobank-$k.jsonl")
+    ALL_LEANS="$LEANS"
+    [ -n "$ALL_LEANS" ] || ALL_LEANS=$("$PY" -I -c 'import sys; sys.path.insert(0, "Tools/eval"); import finetune_mood as f; print(f.DEFAULT_LEANS)')
+    while IFS= read -r path; do
+      [ -s "$path" ] && READINGS+=("$path")
+    done < <("$PY" -I Tools/eval/finetune_mood.py read --model "$m" --in "$W/emobank-windows.jsonl" \
+      --leans "$ALL_LEANS" --engine "$k" --out "$OUT/emobank-$k" 2>> "$OUT/emobank-read.log")
   done
   [ ${#READINGS[@]} -gt 1 ] && python3 -I Tools/eval/emobank.py score "$EMOBANK" "${READINGS[@]}" | tee "$OUT/emobank-score.txt"
 else

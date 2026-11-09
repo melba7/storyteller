@@ -58,15 +58,17 @@ def main() -> None:
 
     by_recipe_book: dict[str, dict[str, list[tuple[str, str]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
     repeats = set()
+    repeats_of: dict[str, set] = collections.defaultdict(set)
     for line in open(args.oof):
         r = json.loads(line)
         by_recipe_book[r["recipe"]][r["book"]].append((r["gold"], r["predicted"]))
         repeats.add(r["repeatIndex"])
+        repeats_of[r["recipe"]].add(r["repeatIndex"])
         if r["id"] in accept:
             fits_by[r["recipe"]][r["book"]].append(r["predicted"] in accept[r["id"]])
     recipes = sorted(by_recipe_book, key=lambda k: (k != args.baseline, k))
     books = sorted({b for d in by_recipe_book.values() for b in d})
-    windows = sum(len(v) for v in by_recipe_book[args.baseline].values()) // len(repeats)
+    windows = sum(len(v) for v in by_recipe_book[args.baseline].values()) // len(repeats_of[args.baseline])
     print(f"# {len(books)} books, {windows} windows, {len(repeats)} repeats; intervals: 95%, {args.boot} book resamples")
 
     def stat(recipe: str, sample: list[str]) -> tuple[float, float, float]:
@@ -114,7 +116,7 @@ def main() -> None:
 
     if fits_by:
         set_books = sorted({b for d in fits_by.values() for b in d})
-        n_sets = sum(len(v) for v in fits_by[args.baseline].values()) // len(repeats)
+        n_sets = sum(len(v) for v in fits_by[args.baseline].values()) // len(repeats_of[args.baseline])
         print(f"\n## Fits on the plausible sets ({n_sets} windows from {len(set_books)} books, held out in every fold)")
         set_samples = [[rng.choice(set_books) for _ in set_books] for _ in range(args.boot)]
 
@@ -139,9 +141,11 @@ def main() -> None:
     width = max(len(r) for r in recipes) + 1
     print("  mood        labels " + " ".join(f"{r:>{width}}" for r in recipes))
     counts = {r: collections.Counter(p for b in books for _, p in by_recipe_book[r][b]) for r in recipes}
-    k = len(repeats)
+    k = len(repeats_of[args.baseline])
+    # Each recipe divided by its own number of repeats (a fine-tuned model
+    # may have run once where the word recipes ran three times).
     for mood in sorted(gold, key=lambda m: -gold[m]):
-        print(f"  {mood:11} {gold[mood] // k:6} " + " ".join(f"{counts[r][mood] / k:{width}.0f}" for r in recipes))
+        print(f"  {mood:11} {gold[mood] // k:6} " + " ".join(f"{counts[r][mood] / len(repeats_of[r]):{width}.0f}" for r in recipes))
 
 
 if __name__ == "__main__":
