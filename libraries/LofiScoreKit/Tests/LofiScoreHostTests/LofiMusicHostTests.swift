@@ -105,6 +105,10 @@ final class LofiMusicHostTests: XCTestCase {
         try touch("Picked Music/MoodTracks/some-book.json")
         try touch("Picked Music/MoodTracks/readme.txt")
         try touch("Picked Music/tracks/The Green Lantern.track.json")
+        // An unpacked read-aloud book next to its track: its narration is not music.
+        try touch("Picked Music/tracks/books/The Green Lantern/OEBPS/Audio/00001.mp3")
+        try touch("Picked Music/tracks/books/The Green Lantern/OEBPS/Audio/.00002.mp3.icloud")
+        try touch("Picked Music/Unsorted/loose.mp3")
         try touch("Picked Music/Mood.mlmodelc/model.mil")
         try touch("Picked Music/Mood.mlmodelc/weights/weight.bin")
 
@@ -125,6 +129,18 @@ final class LofiMusicHostTests: XCTestCase {
         ])
         XCTAssertEqual(MusicFolderImport.classifierModel(in: destination)?.lastPathComponent, "Mood.mlmodelc")
         XCTAssertFalse(fileManager.fileExists(atPath: destination.path + ".incoming"))
+    }
+
+    func testImportsWhatLibraryJSONLists() throws {
+        let manifest = #"{"version":1,"tracks":[{"id":"calm/a","file":"Mastered/Calm/a.m4a","bucket":"calm"}]}"#
+        try touch("Listed/library.json", contents: Data(manifest.utf8))
+        try touch("Listed/Mastered/Calm/a.m4a")
+        try touch("Listed/Mastered/Calm/b.m4a")
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+
+        let summary = try MusicFolderImport.importFolder(folder.appendingPathComponent("Listed"), into: destination)
+        XCTAssertEqual(summary.tracks, 1)
+        XCTAssertEqual(files(under: destination), ["Mastered/Calm/a.m4a", "library.json"])
     }
 
     func testAFolderWithoutMusicChangesNothing() throws {

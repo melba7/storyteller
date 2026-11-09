@@ -1,14 +1,16 @@
 import Foundation
 import LofiAudio
+import LofiScoreCore
 
 /// Copies a music folder the listener picked (in Files or iCloud Drive) into the app's own
 /// storage, so playback never depends on a security-scoped bookmark or on iCloud keeping
 /// the files downloaded.
 ///
-/// What is copied: every audio file (one subfolder per mood, as `MusicLibrary` reads them),
-/// `library.json` and `SOURCES.csv` at the top, mood tracks (`*.json` in `MoodTracks/`, and
-/// `*.track.json` anywhere, gathered into `MoodTracks/`), and a Core ML mood classifier
-/// (`.mlmodel` or `.mlmodelc`) at the top. Nothing else.
+/// What is copied: the audio `MusicLibrary` plays (files directly inside a mood folder, such
+/// as `Calm/`, and files `library.json` lists), `library.json` and `SOURCES.csv` at the top,
+/// mood tracks (`*.json` in `MoodTracks/`, and `*.track.json` anywhere, gathered into
+/// `MoodTracks/`), and a Core ML mood classifier (`.mlmodel` or `.mlmodelc`) at the top.
+/// Nothing else: an audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
     public struct Summary: Sendable, Hashable, Codable {
         public var folderName: String
@@ -107,6 +109,15 @@ public enum MusicFolderImport {
         var plan = Plan()
         let root = source.standardizedFileURL.resolvingSymlinksInPath()
         let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        let listed = listedFiles(in: root)
+        // Audio the library will play: directly inside a mood folder, or listed in library.json.
+        func isMusic(_ components: [String]) -> Bool {
+            guard let name = components.last,
+                  MusicLibrary.audioExtensions.contains((name as NSString).pathExtension.lowercased())
+            else { return false }
+            return components.count == 2 && MoodBucket(lenient: components[0]) != nil
+                || listed.contains(components.joined(separator: "/"))
+        }
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: [.isDirectoryKey],
@@ -127,7 +138,7 @@ public enum MusicFolderImport {
                 // An iCloud placeholder (".Song.mp3.icloud") means the file is not on the device.
                 if name.hasSuffix(".icloud") {
                     let original = String(name.dropFirst().dropLast(".icloud".count))
-                    if MusicLibrary.audioExtensions.contains((original as NSString).pathExtension.lowercased()) {
+                    if isMusic(components.dropLast() + [original]) {
                         plan.notDownloaded += 1
                     }
                 }
@@ -151,7 +162,7 @@ public enum MusicFolderImport {
             }
             let ext = resolved.pathExtension.lowercased()
             let topLevel = components.count == 1
-            if MusicLibrary.audioExtensions.contains(ext) && !topLevel
+            if isMusic(components)
                 || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || ext == "mlmodel")
                 || components.count == 2 && components[0] == moodTracksFolderName && ext == "json"
             {
@@ -160,6 +171,15 @@ public enum MusicFolderImport {
         }
         plan.items.sort { $0.relativePath < $1.relativePath }
         return plan
+    }
+
+    /// The track files `library.json` names, if the folder has one that reads.
+    static func listedFiles(in root: URL) -> Set<String> {
+        let manifestURL = root.appendingPathComponent(LibraryManifest.fileName)
+        guard let data = try? Data(contentsOf: manifestURL),
+              let manifest = try? JSONDecoder().decode(LibraryManifest.self, from: data)
+        else { return [] }
+        return Set(manifest.tracks.map(\.file).filter { !$0.hasPrefix("/") && !$0.split(separator: "/").contains("..") })
     }
 
     static func isClassifier(_ url: URL) -> Bool {
