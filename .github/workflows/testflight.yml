@@ -1,0 +1,223 @@
+# Builds the app for the App Store and uploads it to TestFlight, so it installs
+# on an iPhone through the TestFlight app, without Developer Mode. Needs a paid
+# Apple Developer Program membership and the secrets listed in FORK.md
+# ("TestFlight"). Until they exist, a push only reports what is missing, and a
+# run started by hand builds the App Store archive without signing it, to show
+# the build works.
+name: TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      macos:
+        description:
+          macOS runner for the App Store build. Pick macos-15-intel when
+          GitHub's Apple-silicon Macs are too busy to take the job.
+        type: choice
+        options: [macos-26, macos-15-intel]
+        default: macos-26
+  push:
+    branches: [main]
+    paths:
+      - "applications/mobile/**"
+      - "libraries/LofiScoreKit/**"
+      - "package.json"
+      - "yarn.lock"
+      - ".github/workflows/testflight.yml"
+      - "tools/fork/asc-preflight.mjs"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testflight
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 26.12.1
+
+jobs:
+  check:
+    name: Check the App Store Connect setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
+    steps:
+      - name: Look for the four secrets
+        id: secrets
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          missing=()
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then missing+=("$name"); fi
+          done
+          if [ ${#missing[@]} -eq 0 ]; then
+            echo "ready=true" >>"$GITHUB_OUTPUT"
+          else
+            next="Nothing is built."
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              next="Building the App Store archive without signing it, to check the build. Nothing is uploaded."
+            fi
+            echo "::notice title=TestFlight is not set up yet::Missing repository secrets: ${missing[*]}. See FORK.md (TestFlight). $next"
+            echo "ready=false" >>"$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/checkout@v5
+      - if: steps.secrets.outputs.ready == 'true'
+        uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          package-manager-cache: false
+      # Fails in a minute, naming the fix, when a setup step was missed. It
+      # also registers the App ID if that step was skipped.
+      - name: Check the API key, the App ID and the App Store Connect app
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run:
+          node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON
+          tools/fork/asc-preflight.mjs
+
+  build:
+    name: App Store build
+    needs: check
+    if:
+      needs.check.outputs.ready == 'true' || github.event_name ==
+      'workflow_dispatch'
+    # See the macos input above. Apple refuses uploads built with an SDK older
+    # than its yearly minimum, so the Intel image only helps while its Xcode
+    # is new enough.
+    runs-on: ${{ inputs.macos || 'macos-26' }}
+    # An Intel Mac took 80 minutes for the simulator build alone.
+    timeout-minutes: 180
+    env:
+      READY: ${{ needs.check.outputs.ready }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      EXPO_IMAGE_UTILS_NO_SHARP: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
+      - name: Select the newest stable Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_[0-9]*.app | grep -vi beta | sort -V | tail -n 1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      # Same steps as the iOS build in fork-ci.yml and upstream's EAS build.
+      - name: Install the mobile app's dependencies
+        run: |
+          npm i -g corepack && corepack enable
+          brew install cmake pkg-config
+          (cd applications/mobile && ./scripts/pre-install.mjs)
+          yarn workspaces focus @storyteller-platform/mobile
+      - name: Cache Sentry's prebuilt framework
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/sentry-react-native/xcframeworks
+          key: sentry-xcframework-${{ hashFiles('yarn.lock') }}
+          restore-keys: sentry-xcframework-
+      - name: Fetch Sentry's prebuilt framework, with retries
+        run: ruby tools/fork/prefetch-sentry-xcframework.rb applications/mobile
+      # fork.config.ts reads FORK_BUILD_NUMBER and APPLE_TEAM_ID. Every upload
+      # needs a higher build number than the last one.
+      - name: Expo prebuild (App Store build, fork identity)
+        working-directory: applications/mobile
+        env:
+          FORK_BUILD_NUMBER: ${{ github.run_number }}
+        run: yarn expo prebuild --no-install -p ios
+      - name: Install pods
+        working-directory: applications/mobile/ios
+        run: pod install
+      # The archive below is built unsigned, and the export signs it. An
+      # unsigned archive carries no entitlements, so stop here if the app has
+      # started to need any (iCloud, push notifications, CarPlay, ...).
+      - name: Check the app needs no entitlements
+        working-directory: applications/mobile/ios
+        run: |
+          status=0
+          while IFS= read -r file; do
+            content=$(plutil -convert json -o - "$file")
+            if [ "$content" != "{}" ]; then
+              echo "::error title=The app now needs entitlements::$file asks for $content. The TestFlight workflow archives without signing, which drops entitlements. Sign the archive instead (see FORK.md, TestFlight)."
+              status=1
+            fi
+          done < <(find . -name '*.entitlements' -not -path './Pods/*' -not -path './build/*')
+          exit $status
+      # Built without signing, so the runner needs no certificate or
+      # registered device. Xcode signs it during the export, with Apple's
+      # cloud-managed distribution certificate (see "Upload to TestFlight").
+      # Signing here instead would make Xcode create a new development
+      # certificate on every run, until the account hits Apple's limit.
+      - name: Archive, unsigned
+        working-directory: applications/mobile/ios
+        run: |
+          set -o pipefail
+          workspace=$(ls -d *.xcworkspace | head -n 1)
+          scheme=$(basename "$workspace" .xcworkspace)
+          xcodebuild -workspace "$workspace" -scheme "$scheme" \
+            -configuration Release -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO archive |
+            if command -v xcbeautify >/dev/null; then
+              xcbeautify --renderer github-actions
+            else
+              tail -n 300
+            fi
+          version=$(/usr/libexec/PlistBuddy -c "Print :ApplicationProperties:CFBundleShortVersionString" "$RUNNER_TEMP/app.xcarchive/Info.plist")
+          echo "Built the App Store archive of Storyteller Lofi $version (build ${{ github.run_number }})." | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Write the App Store Connect API key
+        if: env.READY == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          key="$RUNNER_TEMP/AuthKey_$ASC_KEY_ID.p8"
+          printf '%s\n' "$ASC_KEY_P8" >"$key"
+          chmod 600 "$key"
+          echo "ASC_KEY_PATH=$key" >>"$GITHUB_ENV"
+      # Cloud signing: with the Admin API key, Xcode signs with a distribution
+      # certificate that Apple keeps, and makes the App Store profile itself.
+      # Nothing secret beyond the API key is stored, and no certificate piles up.
+      - name: Sign and upload to TestFlight
+        if: env.READY == 'true'
+        run: |
+          cat >"$RUNNER_TEMP/ExportOptions.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>upload</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>$APPLE_TEAM_ID</string>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          PLIST
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/app.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/export" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          echo "Uploaded build ${{ github.run_number }} to App Store Connect. It shows up in TestFlight once Apple has processed it, usually within 30 minutes." | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Remove the API key
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
