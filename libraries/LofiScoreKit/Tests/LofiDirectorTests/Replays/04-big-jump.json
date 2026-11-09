@@ -1,0 +1,66 @@
+{
+ "title": "A big jump switches at once",
+ "duration": 100,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.7
+   },
+   "expect": "cozy"
+  },
+  {
+   "t": 12,
+   "index": 4,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.9
+   },
+   "expect": "cozy",
+   "note": "only 20 s after the last change"
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.8
+   }
+  },
+  {
+   "t": 62,
+   "index": 14,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.8
+   }
+  },
+  {
+   "t": 82,
+   "index": 18,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.92,
+    "valence": -0.6,
+    "arousal": 0.95
+   },
+   "expect": "tense",
+   "note": "sudden violence 80 s after the last change"
+  }
+ ]
+}

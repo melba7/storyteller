@@ -1,0 +1,60 @@
+{
+ "title": "Chapter start decides at once",
+ "duration": 102,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.8
+   },
+   "expect": "tense"
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "chapter": 0,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.8
+   }
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "chapter": 0,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.8
+   }
+  },
+  {
+   "t": 62,
+   "index": 14,
+   "chapter": 0,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.8
+   }
+  },
+  {
+   "t": 77,
+   "index": 19,
+   "chapter": 1,
+   "sentence": 3,
+   "trigger": "chapterStart",
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   },
+   "expect": "cozy",
+   "note": "new chapter, 77 s after the last change"
+  }
+ ]
+}

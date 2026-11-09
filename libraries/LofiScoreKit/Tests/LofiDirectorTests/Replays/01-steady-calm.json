@@ -1,0 +1,505 @@
+{
+ "title": "Steady calm text with stray readings",
+ "duration": 1232,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.6
+   },
+   "expect": "calm"
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.55
+   }
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.52
+   }
+  },
+  {
+   "t": 62,
+   "index": 14,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.61
+   }
+  },
+  {
+   "t": 82,
+   "index": 18,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 102,
+   "index": 22,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.51
+   }
+  },
+  {
+   "t": 122,
+   "index": 26,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.52
+   }
+  },
+  {
+   "t": 142,
+   "index": 30,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 162,
+   "index": 34,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 182,
+   "index": 38,
+   "reading": {
+    "bucket": "mysterious",
+    "confidence": 0.4
+   }
+  },
+  {
+   "t": 202,
+   "index": 42,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.69
+   }
+  },
+  {
+   "t": 222,
+   "index": 46,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.67
+   }
+  },
+  {
+   "t": 242,
+   "index": 50,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.79
+   }
+  },
+  {
+   "t": 262,
+   "index": 54,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 282,
+   "index": 58,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.59
+   }
+  },
+  {
+   "t": 302,
+   "index": 62,
+   "reading": {
+    "bucket": "mysterious",
+    "confidence": 0.4
+   }
+  },
+  {
+   "t": 322,
+   "index": 66,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 342,
+   "index": 70,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.74
+   }
+  },
+  {
+   "t": 362,
+   "index": 74,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.45
+   }
+  },
+  {
+   "t": 382,
+   "index": 78,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.69
+   }
+  },
+  {
+   "t": 402,
+   "index": 82,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.66
+   }
+  },
+  {
+   "t": 422,
+   "index": 86,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 442,
+   "index": 90,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 462,
+   "index": 94,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 482,
+   "index": 98,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.59
+   }
+  },
+  {
+   "t": 502,
+   "index": 102,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.64
+   }
+  },
+  {
+   "t": 522,
+   "index": 106,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.74
+   }
+  },
+  {
+   "t": 542,
+   "index": 110,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.57
+   }
+  },
+  {
+   "t": 562,
+   "index": 114,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.66
+   }
+  },
+  {
+   "t": 582,
+   "index": 118,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.72
+   }
+  },
+  {
+   "t": 602,
+   "index": 122,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.79
+   }
+  },
+  {
+   "t": 622,
+   "index": 126,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 642,
+   "index": 130,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.73
+   }
+  },
+  {
+   "t": 662,
+   "index": 134,
+   "reading": {
+    "bucket": "mysterious",
+    "confidence": 0.4
+   }
+  },
+  {
+   "t": 682,
+   "index": 138,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.51
+   }
+  },
+  {
+   "t": 702,
+   "index": 142,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.73
+   }
+  },
+  {
+   "t": 722,
+   "index": 146,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.76
+   }
+  },
+  {
+   "t": 742,
+   "index": 150,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.71
+   }
+  },
+  {
+   "t": 762,
+   "index": 154,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.67
+   }
+  },
+  {
+   "t": 782,
+   "index": 158,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 802,
+   "index": 162,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.64
+   }
+  },
+  {
+   "t": 822,
+   "index": 166,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.52
+   }
+  },
+  {
+   "t": 842,
+   "index": 170,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.69
+   }
+  },
+  {
+   "t": 862,
+   "index": 174,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 882,
+   "index": 178,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.62
+   }
+  },
+  {
+   "t": 902,
+   "index": 182,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.51
+   }
+  },
+  {
+   "t": 922,
+   "index": 186,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.55
+   }
+  },
+  {
+   "t": 942,
+   "index": 190,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 962,
+   "index": 194,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.5
+   }
+  },
+  {
+   "t": 982,
+   "index": 198,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.54
+   }
+  },
+  {
+   "t": 1002,
+   "index": 202,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.62
+   }
+  },
+  {
+   "t": 1022,
+   "index": 206,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.52
+   }
+  },
+  {
+   "t": 1042,
+   "index": 210,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.66
+   }
+  },
+  {
+   "t": 1062,
+   "index": 214,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 1082,
+   "index": 218,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.58
+   }
+  },
+  {
+   "t": 1102,
+   "index": 222,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.61
+   }
+  },
+  {
+   "t": 1122,
+   "index": 226,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.79
+   }
+  },
+  {
+   "t": 1142,
+   "index": 230,
+   "reading": {
+    "bucket": "mysterious",
+    "confidence": 0.4
+   }
+  },
+  {
+   "t": 1162,
+   "index": 234,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.45
+   }
+  },
+  {
+   "t": 1182,
+   "index": 238,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.57
+   }
+  },
+  {
+   "t": 1202,
+   "index": 242,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.68
+   }
+  },
+  {
+   "t": 1203,
+   "expect": "calm",
+   "note": "twenty minutes of mostly calm text keeps the calm music"
+  }
+ ]
+}
