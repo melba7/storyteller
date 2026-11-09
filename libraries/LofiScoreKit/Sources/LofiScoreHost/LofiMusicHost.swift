@@ -133,6 +133,7 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var atmosphereSource = "none"
     private var atmosphereSounds = 0
     private var atmosphereVariants = 0
+    private var atmosphereOneShots = 0
     private var atmosphereTrack: (bookID: String, track: AtmosphereTrack?, origin: String?)?
 
     private enum BookTextState: Equatable {
@@ -248,6 +249,14 @@ public final class LofiMusicHost: @unchecked Sendable {
         await onQueue { [self] in
             settings.atmospherePausesEnabled = enabled
             atmosphere?.setPausesEnabled(enabled)
+        }
+    }
+
+    /// One-off sounds (a knock, a clap of thunder) on the sentences that say they happen.
+    public func setAtmosphereOneShotsEnabled(_ enabled: Bool) async {
+        await onQueue { [self] in
+            settings.atmosphereOneShotsEnabled = enabled
+            atmosphere?.setOneShotsEnabled(enabled)
         }
     }
 
@@ -586,11 +595,12 @@ public final class LofiMusicHost: @unchecked Sendable {
         let environment = environment
         work.async { [weak self] in
             let (library, source) = Self.loadAmbience(environment)
+            let oneShots = Self.loadOneShots(environment)
             guard let host = self else { return }
             host.queue.async {
                 guard generation == host.atmosphereGeneration else { return }
                 host.preparingAtmosphere = false
-                host.installAtmosphere(library, source: source, backend: makeBackend())
+                host.installAtmosphere(library, oneShots: oneShots, source: source, backend: makeBackend())
             }
         }
     }
@@ -611,6 +621,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         atmosphereSource = "none"
         atmosphereSounds = 0
         atmosphereVariants = 0
+        atmosphereOneShots = 0
         if atmosphereOn { prepareAtmosphere() }
     }
 
@@ -628,13 +639,33 @@ public final class LofiMusicHost: @unchecked Sendable {
         return (imported.filling(from: standIns), imported.recordings.isEmpty ? "standIns" : "mixed")
     }
 
-    private func installAtmosphere(_ library: AmbienceLibrary, source: String, backend: AmbienceBackend) {
+    /// The imported one-off sounds (`Atmosphere/OneShots/`) this build may play, with
+    /// synthesised stand-ins for those that have simple ones.
+    static func loadOneShots(_ environment: Environment) -> OneShotLibrary {
+        let importedFolder = environment.musicFolder
+            .appendingPathComponent(MusicFolderImport.atmosphereFolderName, isDirectory: true)
+            .appendingPathComponent(OneShotLibrary.folderName, isDirectory: true)
+        let imported = (try? OneShotLibrary.load(from: importedFolder, edition: environment.soundEdition)) ?? .empty(at: importedFolder)
+        guard !Set(AmbienceSynth.oneShotStandIns).isSubset(of: imported.sounds),
+              let beds = environment.atmospherePlaceholderFolder,
+              let standIns = try? AmbienceSynth.prepareOneShots(
+                  at: beds.deletingLastPathComponent().appendingPathComponent(beds.lastPathComponent + "OneShots", isDirectory: true),
+                  sampleRate: 24_000
+              )
+        else { return imported }
+        return imported.filling(from: standIns)
+    }
+
+    private func installAtmosphere(_ library: AmbienceLibrary, oneShots: OneShotLibrary, source: String, backend: AmbienceBackend) {
         var config = environment.atmosphereConfig
         config.bedLevelDB = atmosphereLevelDB
-        let player = AmbiencePlayer(library: library, backend: backend, scheduler: environment.makeAtmosphereScheduler(), config: config)
+        let player = AmbiencePlayer(
+            library: library, oneShots: oneShots, backend: backend, scheduler: environment.makeAtmosphereScheduler(), config: config
+        )
         player.setMutedRoutes(settings.mutedRoutes)
         player.setEnabled(settings.atmosphereEnabled)
         player.setPausesEnabled(settings.atmospherePausesEnabled)
+        player.setOneShotsEnabled(settings.atmosphereOneShotsEnabled)
         if let hold = environment.holdNarration {
             player.requestNarrationHold = { hold($0) }
         }
@@ -651,9 +682,11 @@ public final class LofiMusicHost: @unchecked Sendable {
         atmosphereSource = source
         atmosphereSounds = library.sounds.count
         atmosphereVariants = library.variants.count
+        atmosphereOneShots = oneShots.sounds.count
         HostLog.note(
             "atmosphere: \(library.sounds.count) of \(AmbientSound.allCases.count) sounds (\(source)), "
-                + "\(library.variants.count) more specific sounds, \(environment.soundEdition.rawValue) edition"
+                + "\(library.variants.count) more specific sounds, "
+                + "\(oneShots.sounds.count) of \(OneShotSound.allCases.count) one-off sounds, \(environment.soundEdition.rawValue) edition"
         )
         // Brings the atmosphere up to date without reopening the book for the music.
         follower.catchUp(player, reading: false) { [sinks] in sinks.setAtmosphere(player) }
@@ -668,6 +701,8 @@ public final class LofiMusicHost: @unchecked Sendable {
             line = yielding ? "music steps aside for a crowd" : "music back"
         case let .narrationHold(moment):
             line = "atmosphere: \(moment.rawValue), the narrator pauses briefly"
+        case let .oneShot(sound):
+            line = "atmosphere: one-off \(sound.rawValue)"
         case let .missingSound(sound):
             line = "no \(sound.rawValue) sound"
         case let .error(message):
@@ -757,6 +792,9 @@ public final class LofiMusicHost: @unchecked Sendable {
                 edition: environment.soundEdition.rawValue,
                 pausesEnabled: settings.atmospherePausesEnabled,
                 pausesAvailable: environment.holdNarration != nil,
+                oneShotsEnabled: settings.atmosphereOneShotsEnabled,
+                oneShots: atmosphereOneShots,
+                totalOneShots: OneShotSound.allCases.count,
                 track: book != nil && atmosphereTrack?.bookID == book?.id && atmosphereTrack?.track != nil,
                 trackOrigin: atmosphereTrack?.bookID == book?.id ? atmosphereTrack?.origin : nil,
                 place: nil,
@@ -843,6 +881,11 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         /// whether this app can pause its narrator.
         public var pausesEnabled: Bool
         public var pausesAvailable: Bool
+        /// One-off sounds (a knock, a clap of thunder): the setting, and how many of the
+        /// `totalOneShots` have a recording or a stand-in.
+        public var oneShotsEnabled: Bool
+        public var oneShots: Int
+        public var totalOneShots: Int
         /// The open book has an atmosphere track, and where it came from.
         public var track: Bool
         public var trackOrigin: String?

@@ -34,6 +34,13 @@ public struct AtmosphereConfig: Sendable, Hashable {
     /// starts or the listener seeks.
     public var minTimeBetweenHolds: TimeInterval = 120
     public var noHoldAfterStart: TimeInterval = 10
+    /// One-off sounds (``AtmosphereTrack/Cue``), when turned on: this far above a sound at
+    /// "full" (still well under the voice), at least this far apart, never this soon after
+    /// the narrator starts or the listener seeks, and at most this far into their sentence.
+    public var oneShotBoostDB: Double = 10
+    public var minTimeBetweenOneShots: TimeInterval = 30
+    public var noOneShotAfterStart: TimeInterval = 3
+    public var maxOneShotDelay: TimeInterval = 8
     /// A scene this many sentences old with no newer one (a track scored only part way)
     /// fades to silence.
     public var maxLagSentences: Int = 80

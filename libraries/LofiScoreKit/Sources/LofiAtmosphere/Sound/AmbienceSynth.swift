@@ -516,3 +516,205 @@ private struct Sketch {
         }
     }
 }
+
+// MARK: - One-off sounds
+
+extension AmbienceSynth {
+    /// One-off stand-ins are levelled to this, a little above the beds: they are short.
+    public static let oneShotTargetLoudness = -20.0
+
+    /// The one-off sounds a simple sketch does justice to. The others (a dog, a wolf, a
+    /// horse, a creaking door, breaking glass) stay silent until recordings are imported.
+    public static let oneShotStandIns: [OneShotSound] = [
+        .thunderClap, .doorKnock, .doorSlam, .doorbell, .phoneRing, .bellToll, .clockChime, .owlHoot, .trainWhistle, .shipHorn,
+    ]
+
+    /// Renders one one-off sound, starting at once and ending in silence.
+    public static func renderOneShot(_ sound: OneShotSound, sampleRate: Double = 32_000, seed: UInt64 = 1) -> StereoBuffer {
+        var s = Sketch(seconds: sound.sketchSeconds, rate: sampleRate, seed: seed &+ StableHash.fnv1a("one-shot." + sound.rawValue))
+        s.draw(sound)
+        var buffer = s.out
+        let loudness = Loudness.integrated(buffer)
+        if loudness.isFinite {
+            buffer.scale(by: Float(pow(10, (oneShotTargetLoudness - loudness) / 20)))
+        }
+        // The last 0.2 s fades to nothing, so no sketch ends on a click.
+        let fade = min(buffer.frames, Int(0.2 * sampleRate))
+        for k in 0..<fade {
+            let i = buffer.frames - fade + k
+            let g = Float(1 - Double(k + 1) / Double(max(1, fade)))
+            buffer.left[i] *= g
+            buffer.right[i] *= g
+        }
+        softLimit(&buffer, ceiling: 0.9)
+        return buffer
+    }
+
+    /// Writes the stand-ins into `folder` as WAV with a `sounds.json`, unless a current set
+    /// is already there. Returns the library.
+    public static func prepareOneShots(
+        at folder: URL,
+        sounds: [OneShotSound] = oneShotStandIns,
+        sampleRate: Double = 32_000
+    ) throws -> OneShotLibrary {
+        if let existing = try? OneShotLibrary.load(from: folder),
+           existing.sounds == Set(sounds),
+           existing.recordings.allSatisfy({ $0.source == generatorTag }) {
+            return existing
+        }
+        try? FileManager.default.removeItem(at: folder)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        var recordings: [OneShotRecording] = []
+        for sound in sounds {
+            let audio = renderOneShot(sound, sampleRate: sampleRate)
+            let file = "\(sound.folderName)/\(sound.rawValue)-synth.wav"
+            let url = folder.appendingPathComponent(file)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try WAVFile.write(audio, to: url)
+            recordings.append(OneShotRecording(
+                id: "\(sound.rawValue)/synth", file: file, sound: sound,
+                loudness: Loudness.integrated(audio), duration: audio.duration,
+                title: "\(sound.folderName) (synthesised stand-in)", author: "LofiScoreKit",
+                source: generatorTag, license: license
+            ))
+        }
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(OneShotLibrary.Manifest(sounds: recordings))
+            .write(to: folder.appendingPathComponent(AmbienceLibrary.manifestName), options: .atomic)
+        return try OneShotLibrary.load(from: folder)
+    }
+}
+
+extension OneShotSound {
+    /// How long its sketch runs.
+    var sketchSeconds: Double {
+        switch self {
+        case .thunderClap: 5.5
+        case .doorKnock: 1.4
+        case .doorSlam: 1.5
+        case .doorbell: 2.4
+        case .phoneRing: 3.4
+        case .bellToll: 6
+        case .clockChime: 6.5
+        case .owlHoot: 2.4
+        case .trainWhistle: 3.2
+        case .shipHorn: 4.5
+        default: 1
+        }
+    }
+}
+
+private extension Sketch {
+    /// A struck bell or chime: inharmonic partials, the higher ones dying sooner.
+    mutating func bell(at time: Double, frequency: Double, gain: Float, decay: Double, pan: Float = 0) {
+        let partials: [(ratio: Double, level: Double, decay: Double)] = [
+            (0.5, 0.35, 0.6), (1, 1, 1), (1.19, 0.45, 1.3), (1.5, 0.3, 1.6), (2, 0.4, 2), (2.67, 0.18, 2.8), (3.01, 0.12, 3.5),
+        ]
+        place(at: Int(time * rate), length: 6 / decay, gain: gain, pan: pan) { t in
+            var v = 0.0
+            for p in partials {
+                v += p.level * sin(2 * .pi * frequency * p.ratio * t) * exp(-t * decay * p.decay)
+            }
+            // A soft strike at the start.
+            return v * min(1, t / 0.004) * 0.4
+        }
+    }
+
+    /// A short, damped thud: a knock's knuckle on wood, a door hitting its frame.
+    mutating func thud(at time: Double, frequency: Double, gain: Float, decay: Double) {
+        var seed = rng.next()
+        place(at: Int(time * rate), length: 6 / decay, gain: gain, pan: 0) { t in
+            seed = seed &* 6364136223846793005 &+ 1442695040888963407
+            let noise = Double(Int64(bitPattern: seed)) / Double(Int64.max)
+            let body = sin(2 * .pi * frequency * t) + 0.5 * sin(2 * .pi * frequency * 1.6 * t)
+            return body * exp(-t * decay) + noise * 0.6 * exp(-t * decay * 6)
+        }
+    }
+
+    /// A held tone made of harmonics, with a breathy edge: a whistle or a horn.
+    mutating func blow(at time: Double, frequencies: [Double], harmonics: Int, length: Double, attack: Double, release: Double, gain: Float, vibrato: Double) {
+        place(at: Int(time * rate), length: length, gain: gain, pan: 0) { t in
+            let envelope = min(1, t / attack) * min(1, max(0, (length - t) / release))
+            // Pitch settles from a little flat, like a whistle or horn starting to sound.
+            let bend = 1 - 0.03 * exp(-t * 8) + vibrato * sin(2 * .pi * 5 * t)
+            var v = 0.0
+            for f in frequencies {
+                for n in 1...max(1, harmonics) {
+                    v += sin(2 * .pi * f * Double(n) * bend * t) / Double(n * n)
+                }
+            }
+            return v * envelope / Double(frequencies.count)
+        }
+    }
+
+    mutating func draw(_ sound: OneShotSound) {
+        switch sound {
+        case .thunderClap:
+            // The crack, then the long rumble rolling away.
+            var seed = rng.next()
+            let crack = Int(0.05 * rate)
+            place(at: crack, length: 0.6, gain: 0.5, pan: 0.1) { t in
+                seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                return Double(Int64(bitPattern: seed)) / Double(Int64.max) * exp(-t * 9)
+            }
+            out.left = lowpass(out.left, 2500)
+            out.right = lowpass(out.right, 2500)
+            let swell = wander(1.6)
+            var rumble = lowpass(lowpass(brown(), 140), 140)
+            for i in rumble.indices {
+                let t = Double(i) / rate
+                let envelope = min(1, t / 0.35) * exp(-t / 1.6)
+                rumble[i] *= Float(envelope) * (0.6 + 0.8 * swell[i])
+            }
+            add(rumble, gain: 2.2, pan: -0.1)
+        case .doorKnock:
+            for (k, time) in [0.05, 0.27, 0.49].enumerated() {
+                thud(at: time + uniform(-0.01, 0.01), frequency: 190 - Double(k) * 6, gain: 0.9, decay: 38)
+            }
+        case .doorSlam:
+            thud(at: 0.03, frequency: 75, gain: 1.2, decay: 11)
+            thud(at: 0.03, frequency: 160, gain: 0.5, decay: 25)
+            // The frame rattles a moment later.
+            thud(at: 0.13, frequency: 240, gain: 0.15, decay: 45)
+        case .doorbell:
+            bell(at: 0.02, frequency: 659, gain: 0.6, decay: 2.2, pan: 0)
+            bell(at: 0.62, frequency: 523, gain: 0.6, decay: 2.0, pan: 0)
+        case .phoneRing:
+            // An old telephone bell: a hammer between two gongs, rung twice, twice.
+            for start in [0.02, 0.62, 2.02, 2.62] {
+                place(at: Int(start * rate), length: 0.42, gain: 0.35, pan: 0) { t in
+                    let hammer = 0.5 + 0.5 * sin(2 * .pi * 20 * t)
+                    let edge = min(1, t / 0.01) * min(1, (0.42 - t) / 0.03)
+                    return (sin(2 * .pi * 1000 * t) + 0.8 * sin(2 * .pi * 1210 * t) + 0.3 * sin(2 * .pi * 2420 * t)) * hammer * edge
+                }
+            }
+        case .bellToll:
+            bell(at: 0.02, frequency: 196, gain: 0.8, decay: 0.55)
+        case .clockChime:
+            for (k, note) in [415.3, 370.0, 329.6, 246.9].enumerated() {
+                bell(at: 0.02 + Double(k) * 0.65, frequency: note, gain: 0.45, decay: 1.1)
+            }
+            bell(at: 3.2, frequency: 164.8, gain: 0.6, decay: 0.8)
+        case .owlHoot:
+            for (time, length) in [(0.05, 0.42), (0.85, 0.16), (1.1, 0.5)] {
+                place(at: Int(time * rate), length: length, gain: 0.5, pan: -0.2) { t in
+                    let x = t / length
+                    let f = 390 * (1 - 0.06 * x)
+                    return sin(2 * .pi * f * t) * sin(.pi * x) * sin(.pi * x)
+                }
+            }
+            out.left = lowpass(out.left, 1500)
+            out.right = lowpass(out.right, 1500)
+        case .trainWhistle:
+            blow(at: 0.02, frequencies: [440, 554, 659], harmonics: 4, length: 3.0, attack: 0.12, release: 0.6, gain: 0.5, vibrato: 0.002)
+            addWide(gain: 0.03) { s in s.bandpass(s.white(), center: { _ in 1200 }, q: 2) }
+        case .shipHorn:
+            blow(at: 0.02, frequencies: [98, 147], harmonics: 9, length: 4.2, attack: 0.35, release: 0.8, gain: 0.7, vibrato: 0.003)
+            out.left = lowpass(out.left, 900)
+            out.right = lowpass(out.right, 900)
+        default:
+            break
+        }
+    }
+}

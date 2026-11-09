@@ -8,6 +8,8 @@ public enum AmbienceEvent: Sendable, Hashable {
     case musicYield(Bool)
     /// A swell or hush asked the narrator to pause after the sentence.
     case narrationHold(StoryScene.Moment)
+    /// A one-off sound played on its sentence.
+    case oneShot(OneShotSound)
     case missingSound(AmbientSound)
     case error(String)
 }
@@ -36,8 +38,12 @@ public struct AmbienceSnapshot: Sendable, Hashable {
     /// Short narration pauses for swells and hushes are on, and the app can do them.
     public var pausesEnabled: Bool
     public var pausesAvailable: Bool
+    /// One-off sounds are on, and how many of them have a recording.
+    public var oneShotsEnabled: Bool
+    public var oneShotSounds: Int
     public var voices: [Voice]
     public var missingSounds: [AmbientSound]
+    public var missingOneShots: [OneShotSound]
     public var lastError: String?
 }
 
@@ -64,6 +70,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     public var requestNarrationHold: ((TimeInterval) -> Bool)?
 
     public let library: AmbienceLibrary
+    public let oneShots: OneShotLibrary
     private let backend: AmbienceBackend
     private let scheduler: LofiScheduler
     private var config: AtmosphereConfig
@@ -109,6 +116,14 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private var swell = Ramp(value: 1)
     private var holdTimer: LofiCancellable?
 
+    // One-off sounds.
+    private var oneShotsEnabled = false
+    private var lastOneShotAt: TimeInterval = -.infinity
+    private var lastOneShotIndex: Int?
+    /// A one-off sound waiting for its moment inside the sentence being narrated.
+    private var pendingCue: (cue: AtmosphereTrack.Cue, timer: LofiCancellable)?
+    private var missingOneShots: Set<OneShotSound> = []
+
     private var ticker: LofiCancellable?
     private var dwellTimer: LofiCancellable?
     private var stopSlotsTimer: LofiCancellable?
@@ -117,12 +132,14 @@ public final class AmbiencePlayer: @unchecked Sendable {
 
     public init(
         library: AmbienceLibrary,
+        oneShots: OneShotLibrary? = nil,
         backend: AmbienceBackend,
         scheduler: LofiScheduler = DispatchScheduler(label: "LofiScore.atmosphere"),
         config: AtmosphereConfig = AtmosphereConfig(),
         seed: UInt64? = nil
     ) {
         self.library = library
+        self.oneShots = oneShots ?? .empty(at: library.folder.appendingPathComponent(OneShotLibrary.folderName))
         self.backend = backend
         self.scheduler = scheduler
         self.config = config
@@ -133,7 +150,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     }
 
     deinit {
-        for timer in [ticker, dwellTimer, stopSlotsTimer, engineStopTimer, retryTimer, holdTimer] {
+        for timer in [ticker, dwellTimer, stopSlotsTimer, engineStopTimer, retryTimer, holdTimer, pendingCue?.timer] {
             timer?.cancel()
         }
     }
@@ -147,6 +164,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
             director.setTrack(givenTrack?.bookID == id ? givenTrack?.track : nil)
             missing = []
             playhead = nil
+            cancelCue()
+            lastOneShotIndex = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
             updateTransport(at: scheduler.now)
             updateYield()
@@ -159,6 +178,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             bookID = nil
             director.setTrack(nil)
             playhead = nil
+            cancelCue()
             dwellTimer?.cancel()
             dwellTimer = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
@@ -175,6 +195,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             guard bookID == id else { return }
             director.setTrack(track)
             missing = []
+            cancelCue()
             if track == nil { retireAll(over: config.sceneFade, at: scheduler.now) }
             evaluate(seek: true)
             updateTransport(at: scheduler.now)
@@ -194,6 +215,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             narrating = false
             endHold(release: config.fadeOut)
+            cancelCue()
             updateTransport(at: scheduler.now)
         }
     }
@@ -204,6 +226,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             playhead = index
             settledSince = scheduler.now
             pendingMoment = nil
+            cancelCue()
             evaluate(seek: true)
         }
     }
@@ -216,6 +239,18 @@ public final class AmbiencePlayer: @unchecked Sendable {
             playhead = globalSentenceIndex
             sentenceDuration = duration
             evaluate(seek: isJump)
+            if let pending = pendingCue, pending.cue.globalIndex != globalSentenceIndex {
+                // The narrator has read past the sound's words: play it now, unless this
+                // is a jump rather than the next sentence.
+                if !isJump, globalSentenceIndex == pending.cue.globalIndex + 1 {
+                    pending.timer.cancel()
+                    pendingCue = nil
+                    playOneShot(pending.cue)
+                } else {
+                    cancelCue()
+                }
+            }
+            considerOneShot(at: globalSentenceIndex, duration: duration, jump: isJump)
         }
     }
 
@@ -238,7 +273,10 @@ public final class AmbiencePlayer: @unchecked Sendable {
     public func setEnabled(_ isEnabled: Bool) {
         scheduler.perform { [self] in
             enabled = isEnabled
-            if !isEnabled { endHold(release: config.fadeOut) }
+            if !isEnabled {
+                endHold(release: config.fadeOut)
+                cancelCue()
+            }
             updateTransport(at: scheduler.now)
             updateYield()
         }
@@ -249,6 +287,14 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             pausesEnabled = isEnabled
             if !isEnabled { pendingMoment = nil }
+        }
+    }
+
+    /// One-off sounds (a knock, a clap of thunder) on the sentences that say they happen.
+    public func setOneShotsEnabled(_ isEnabled: Bool) {
+        scheduler.perform { [self] in
+            oneShotsEnabled = isEnabled
+            if !isEnabled { cancelCue() }
         }
     }
 
@@ -474,6 +520,58 @@ public final class AmbiencePlayer: @unchecked Sendable {
         ensureTicker()
     }
 
+    // MARK: - One-off sounds
+
+    /// Waits for the moment inside the sentence where the track's one-off sound for it
+    /// happens, when one-off sounds are on and one would not crowd the listener: only
+    /// while narrating (a sentence with a duration: never while reading on screen), not
+    /// on a jump, not right after starting or seeking, and not soon after the last one.
+    private func considerOneShot(at index: Int, duration: TimeInterval?, jump: Bool) {
+        let now = scheduler.now
+        guard oneShotsEnabled, shouldPlay, !jump,
+              let duration, duration > 0,
+              let cue = director.track?.cue(at: index),
+              pendingCue == nil, lastOneShotIndex != index,
+              now - settledSince >= config.noOneShotAfterStart,
+              now - lastOneShotAt >= config.minTimeBetweenOneShots
+        else { return }
+        let delay = min(config.maxOneShotDelay, duration * cue.fraction)
+        guard delay > 0.05 else {
+            playOneShot(cue)
+            return
+        }
+        let timer = scheduler.schedule(after: delay) { [weak self] in
+            guard let self, let pending = self.pendingCue, pending.cue == cue else { return }
+            self.pendingCue = nil
+            self.playOneShot(cue)
+        }
+        pendingCue = (cue, timer)
+    }
+
+    private func playOneShot(_ cue: AtmosphereTrack.Cue) {
+        guard oneShotsEnabled, shouldPlay, backend.isEngineRunning else { return }
+        let now = scheduler.now
+        lastOneShotIndex = cue.globalIndex
+        guard let recording = oneShots.recording(of: cue.sound, key: "\(bookID ?? "")|\(cue.globalIndex)") else {
+            missingOneShots.insert(cue.sound)
+            return
+        }
+        let targetLUFS = config.voiceLoudnessLUFS + config.bedLevelDB + config.oneShotBoostDB + cue.sound.levelOffsetDB
+        let gain = min(1, Gain.linear(fromDB: targetLUFS - oneShots.loudness(of: recording))) * transport.value(at: now)
+        do {
+            try backend.playOnce(oneShots.url(for: recording), gain: Float(gain), filter: .standard)
+            lastOneShotAt = now
+            onEvent?(.oneShot(cue.sound))
+        } catch {
+            report("could not play \(recording.file): \(error)")
+        }
+    }
+
+    private func cancelCue() {
+        pendingCue?.timer.cancel()
+        pendingCue = nil
+    }
+
     // MARK: - Engine and transport
 
     private var shouldPlay: Bool {
@@ -618,6 +716,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
             routeMuted: routeMuted,
             pausesEnabled: pausesEnabled,
             pausesAvailable: requestNarrationHold != nil,
+            oneShotsEnabled: oneShotsEnabled,
+            oneShotSounds: oneShots.sounds.count,
             voices: voices.compactMap { voice in
                 voice.map {
                     AmbienceSnapshot.Voice(
@@ -627,6 +727,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
                 }
             },
             missingSounds: missing.sorted { $0.rawValue < $1.rawValue },
+            missingOneShots: missingOneShots.sorted { $0.rawValue < $1.rawValue },
             lastError: lastError
         )
     }

@@ -260,10 +260,17 @@ public struct ClaudeSceneEngine: SceneEngine {
             // A moment needs somewhere to happen.
             moment: place == .none ? nil : raw.moment.flatMap { StoryScene.Moment(rawValue: $0.lowercased()) }
         )
+        var oneShot: OneShotMention?
+        if let item = raw.oneShot, let sound = OneShotSound(rawValue: item.sound) ?? OneShotSound(lenient: item.sound) {
+            let quote = item.quote.trimmingCharacters(in: .whitespacesAndNewlines)
+            // Without the words it cannot be placed on a sentence.
+            if !quote.isEmpty { oneShot = OneShotMention(sound: sound, quote: String(quote.prefix(120))) }
+        }
         return SceneAnswer(
             place: place, scene: scene, world: world.isEmpty ? nil : String(world.prefix(160)),
             // A new sound the scene does not use is not worth fetching.
-            newVariants: added.filter { used.contains($0.id) }
+            newVariants: added.filter { used.contains($0.id) },
+            oneShot: oneShot
         )
     }
 
@@ -327,8 +334,13 @@ public struct ClaudeSceneEngine: SceneEngine {
         let placeName: String
         let setting: String
         let sounds: [Sound]
+        struct OneShot: Decodable {
+            let sound: String
+            let quote: String
+        }
         let newSounds: [NewSound]?
         let moment: String?
+        let oneShot: OneShot?
         let world: String
         let cue: String
         let confidence: Double

@@ -43,6 +43,17 @@ public protocol AmbienceBackend: AnyObject {
     func play(slot: Int, from offset: TimeInterval) throws
     func stop(slot: Int)
     func setGain(_ gain: Float, slot: Int)
+
+    /// Plays a short recording once, at a gain, on a voice of its own beside the slots
+    /// (a one-off sound). A one-off sound still playing is cut off.
+    func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws
+}
+
+extension AmbienceBackend {
+    /// Backends without a one-off voice play none.
+    public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
+        throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "this backend plays no one-off sounds")
+    }
 }
 
 /// Records what the player asked for, for tests and the headless demo.
@@ -63,6 +74,8 @@ public final class FakeAmbienceBackend: AmbienceBackend {
 
     public private(set) var slots: [Slot]
     public private(set) var log: [String] = []
+    /// One-off sounds played, with their gains, oldest first.
+    public private(set) var oneShots: [(file: String, gain: Float)] = []
 
     public init(slotCount: Int = 8) {
         self.slotCount = slotCount
@@ -108,6 +121,15 @@ public final class FakeAmbienceBackend: AmbienceBackend {
 
     public func setGain(_ gain: Float, slot: Int) {
         slots[slot].gain = gain
+    }
+
+    public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
+        guard isEngineRunning else { throw LofiAudioError.engineNotRunning }
+        if failLoads.contains(url.lastPathComponent) {
+            throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "test")
+        }
+        oneShots.append((url.lastPathComponent, gain))
+        log.append("once \(url.lastPathComponent)")
     }
 
     /// The files playing now with their gains, by file name.

@@ -11,6 +11,8 @@ its loudness, and writes:
         OldTown.ChurchBells/...           one per more specific sound (variant)
         sounds.json                       loudness, duration, title, author, source, licence, use
         variants.json                     the more specific sounds and the books that asked for them
+        OneShots/DoorKnock/...            one-off sounds (a knock, a clap of thunder),
+        OneShots/sounds.json              played once on their sentence when the app's setting is on
         SOURCES.csv  CREDITS.md  skipped.csv
 
 Copy that Atmosphere folder into the music folder (next to Calm/, Cozy/, ...)
@@ -21,7 +23,9 @@ What it fetches:
   - the 26 built-in sounds (Rain, Fireplace, Crowd, ...), --per-sound each;
   - the more specific sounds (variants), --per-variant each: a starter set
     (STARTER_VARIANTS below) plus every variant a book's atmosphere track
-    asked for (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json).
+    asked for (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json);
+  - the 15 one-off sounds (ONE_SHOTS below), --per-one-shot each: short single
+    sounds, trimmed of silence, not looped.
 Runs add what is missing, so run it again after scoring new books.
 
 Two editions:
@@ -39,8 +43,8 @@ A published app build also refuses any recording marked personal
 (LOFI_SOUND_EDITION=publish in the app's build), whatever folder it is given.
 
     python3 -I fetch_ambience.py [--edition personal|publish] [--per-sound 4]
-                                 [--per-variant 2] [--sound Rain] [--no-variants]
-                                 [--out DIR] [--dry-run]
+                                 [--per-variant 2] [--per-one-shot 2] [--sound Rain]
+                                 [--no-variants] [--no-one-shots] [--out DIR] [--dry-run]
 
 Audio is never committed: the fork is public. Run with python3 -I and keep the
 downloads folder away from this script.
@@ -133,6 +137,27 @@ STARTER_VARIANTS = [
 
 BUILTINS = [name[0].lower() + name[1:] for name in QUERIES]
 
+# One-off sounds (the app's OneShotSound), folder name: (queries, longest kept in seconds).
+# Played once, on the sentence that says they happen, when the listener turns them on.
+ONE_SHOTS = {
+    "ThunderClap": (["thunder clap", "thunder crack", "single thunder strike"], 8),
+    "DoorKnock": (["knocking on door", "door knock"], 4),
+    "DoorSlam": (["door slam", "door slamming shut"], 3),
+    "DoorCreak": (["door creak", "creaky door opening"], 4),
+    "Doorbell": (["doorbell ding dong", "doorbell"], 4),
+    "PhoneRing": (["old telephone ring", "telephone ringing bell"], 6),
+    "BellToll": (["church bell toll single", "bell toll"], 8),
+    "ClockChime": (["clock chime hour", "grandfather clock chime"], 12),
+    "GlassBreak": (["glass break", "glass shatter"], 3),
+    "DogBark": (["dog bark", "dog barking"], 4),
+    "OwlHoot": (["owl hoot", "tawny owl call"], 4),
+    "WolfHowl": (["wolf howl"], 7),
+    "HorseNeigh": (["horse neigh", "horse whinny"], 4),
+    "TrainWhistle": (["steam train whistle", "train whistle"], 6),
+    "ShipHorn": (["ship horn", "foghorn"], 7),
+}
+ONE_SHOT_FOLDER = "OneShots"
+
 # Words in a title or tags that mean the recording would fight the narrator.
 AVOID = re.compile(
     r"\b(music|song|melody|singing|voice ?over|speech|talking|dialogue|narrat|announcement|"
@@ -141,6 +166,12 @@ AVOID = re.compile(
     re.I,
 )
 SPEECH_OK = {"crowd"}
+# For one-off sounds: no words or music, and single events rather than long beds.
+ONE_SHOT_AVOID = re.compile(
+    r"\b(music|song|melody|singing|voice ?over|speech|talking|dialogue|narrat|announcement|"
+    r"radio|tv|television|scream|synth|ambience|ambient|soundscape|loop|compilation|collection)\b",
+    re.I,
+)
 
 LABELS = {
     "cc0": "CC0 1.0",
@@ -223,13 +254,14 @@ class Freesound:
         self.key = key
         self.personal = personal
 
-    def search(self, query):
+    def search(self, query, one_shot=False):
         licences = '"Creative Commons 0" OR "Attribution"' + (' OR "Attribution NonCommercial"' if self.personal else "")
+        durations = "[0.3 TO 20]" if one_shot else "[45 TO 1200]"
         data = fetch_json(
             "https://freesound.org/apiv2/search/text/",
             {
                 "query": query,
-                "filter": f"duration:[45 TO 1200] license:({licences})",
+                "filter": f"duration:{durations} license:({licences})",
                 "sort": "rating_desc",
                 "page_size": 30,
                 "fields": "id,name,username,license,duration,url,previews,avg_rating,num_ratings,num_downloads,tags",
@@ -265,7 +297,7 @@ class Freesound:
 class Commons:
     name = "commons"
 
-    def search(self, query):
+    def search(self, query, one_shot=False):
         data = fetch_json(
             "https://commons.wikimedia.org/w/api.php",
             {
@@ -384,6 +416,34 @@ def loudness(path):
     return float(found[-1]) if found else None
 
 
+def make_one_shot(source, target, longest):
+    """A one-off sound: silence trimmed from both ends, at most `longest` seconds,
+    faded out at its end so it never stops on a click."""
+    graph = (
+        "aformat=sample_rates=44100:channel_layouts=stereo,"
+        "silenceremove=start_periods=1:start_threshold=-45dB,"
+        f"atrim=0:{longest},asetpts=PTS-STARTPTS,"
+        "areverse,silenceremove=start_periods=1:start_threshold=-55dB,afade=t=in:d=0.25,areverse"
+    )
+    wav = target.with_suffix(".once.wav")
+    subprocess.run(
+        ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source), "-af", graph, "-c:a", "pcm_s16le", str(wav)],
+        check=True,
+    )
+    try:
+        if probe_duration(wav) < 0.2:
+            raise ValueError("nothing left after trimming silence")
+        if shutil.which("afconvert"):
+            subprocess.run(["afconvert", "-f", "m4af", "-d", "aac", "-b", str(BITRATE), str(wav), str(target)], check=True)
+        else:
+            subprocess.run(
+                ["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", str(wav), "-c:a", "aac", "-b:a", f"{BITRATE // 1000}k", str(target)],
+                check=True,
+            )
+    finally:
+        wav.unlink(missing_ok=True)
+
+
 # MARK: - Variants
 
 
@@ -452,13 +512,21 @@ def mark_freesound_personal(manifest):
             entry["personalReason"] = VIA_FREESOUND
 
 
-def write_companions(out, manifest, skipped, edition):
+def write_companions(out, manifest, skipped, edition, one_shots=None):
     manifest["sounds"].sort(key=lambda e: e["file"])
     (out / "sounds.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    if one_shots is not None:
+        one_shots["sounds"].sort(key=lambda e: e["file"])
+        (out / ONE_SHOT_FOLDER).mkdir(parents=True, exist_ok=True)
+        (out / ONE_SHOT_FOLDER / "sounds.json").write_text(json.dumps(one_shots, indent=2, sort_keys=True) + "\n")
+    # Every recording, one-off sounds with their folder, for the credits.
+    everything = manifest["sounds"] + [
+        dict(e, file=f"{ONE_SHOT_FOLDER}/{e['file']}") for e in (one_shots or {"sounds": []})["sounds"]
+    ]
     with open(out / "SOURCES.csv", "w", newline="") as f:
         writer = csv.writer(f)
         writer.writerow(["file", "sound", "variant", "title", "author", "license", "use", "source", "loudness_lufs"])
-        for e in manifest["sounds"]:
+        for e in everything:
             writer.writerow([e["file"], e["sound"], e.get("variant") or "", e["title"], e["author"], e["license"],
                              e.get("use") or "any", e["source"], e["loudness"]])
     lines = ["# Atmosphere sound credits", "",
@@ -468,7 +536,7 @@ def write_companions(out, manifest, skipped, edition):
         lines += ["", "Recordings marked (personal use) are for this personal app only: they are under a",
                   "non-commercial licence or came through Freesound's API, and a published build leaves them out."]
     lines.append("")
-    for e in manifest["sounds"]:
+    for e in everything:
         mark = " (personal use)" if e.get("use") == "personal" else ""
         lines.append(f"- {e['title']} by {e['author']}, {e['license']}{mark}: {e['source']}")
     (out / "CREDITS.md").write_text("\n".join(lines) + "\n")
@@ -484,8 +552,10 @@ def main():
     parser.add_argument("--edition", choices=["personal", "publish"], default="personal")
     parser.add_argument("--per-sound", type=int, default=4, help="recordings per built-in sound")
     parser.add_argument("--per-variant", type=int, default=2, help="recordings per more specific sound")
+    parser.add_argument("--per-one-shot", type=int, default=2, help="recordings per one-off sound")
     parser.add_argument("--sound", action="append", help="only these sounds (folder names, e.g. Rain or OldTown.ChurchBells), repeatable")
-    parser.add_argument("--no-variants", action="store_true", help="only the 26 built-in sounds")
+    parser.add_argument("--no-variants", action="store_true", help="no more specific sounds")
+    parser.add_argument("--no-one-shots", action="store_true", help="no one-off sounds")
     parser.add_argument("--tracks", type=Path, default=ROOT / "tracks", help="where the atmosphere tracks are")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--downloads", type=Path, default=ROOT / "AtmosphereDownloads")
@@ -512,27 +582,34 @@ def main():
     manifest_path = out / "sounds.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {"version": 1, "sounds": []}
     mark_freesound_personal(manifest)
+    one_shot_path = out / ONE_SHOT_FOLDER / "sounds.json"
+    one_shots = json.loads(one_shot_path.read_text()) if one_shot_path.is_file() else {"version": 1, "sounds": []}
     catalog_path = out / "variants.json"
     catalog = json.loads(catalog_path.read_text()) if catalog_path.is_file() else {"version": 1, "variants": []}
     catalog = merge_catalog(catalog, STARTER_VARIANTS, track_variants(args.tracks))
     if not args.dry_run:
         catalog_path.write_text(json.dumps(catalog, indent=2, sort_keys=True) + "\n")
 
-    # What to fetch: (folder, sound, variant, queries, how many).
-    targets = [(folder, folder[0].lower() + folder[1:], None, queries, args.per_sound) for folder, queries in QUERIES.items()]
+    # What to fetch: (folder, sound, variant, queries, how many, longest one-off in seconds or None).
+    targets = [(folder, folder[0].lower() + folder[1:], None, queries, args.per_sound, None) for folder, queries in QUERIES.items()]
     if not args.no_variants:
         for v in catalog["variants"]:
             queries = list(dict.fromkeys([v["search"], f"{v['search']} ambience"]))
-            targets.append((folder_name(v["of"], v["id"]), v["of"], v["id"], queries, args.per_variant))
+            targets.append((folder_name(v["of"], v["id"]), v["of"], v["id"], queries, args.per_variant, None))
+    if not args.no_one_shots:
+        for folder, (queries, longest) in ONE_SHOTS.items():
+            targets.append((f"{ONE_SHOT_FOLDER}/{folder}", folder[0].lower() + folder[1:], None, queries, args.per_one_shot, longest))
     if args.sound:
         wanted = {s.lower() for s in args.sound}
-        targets = [t for t in targets if t[0].lower() in wanted]
+        targets = [t for t in targets if t[0].lower() in wanted or t[0].lower().removeprefix(ONE_SHOT_FOLDER.lower() + "/") in wanted]
 
-    have = {entry["id"] for entry in manifest["sounds"]}
+    have = {entry["id"] for entry in manifest["sounds"]} | {f"once.{entry['id']}" for entry in one_shots["sounds"]}
     skipped = []
     fetched = 0
-    for folder, sound, variant, queries, count in targets:
-        existing = [e for e in manifest["sounds"] if e["sound"] == sound and e.get("variant") == variant]
+    for folder, sound, variant, queries, count, longest in targets:
+        one_shot = longest is not None
+        listing = one_shots["sounds"] if one_shot else manifest["sounds"]
+        existing = [e for e in listing if e["sound"] == sound and e.get("variant") == variant]
         need = count - len(existing)
         if need <= 0:
             note(f"{folder}: already has {len(existing)}")
@@ -544,12 +621,15 @@ def main():
             seen, candidates = set(), []
             for query in queries:
                 try:
-                    for c in source.search(query):
+                    for c in source.search(query, one_shot=one_shot):
                         if c["key"] in seen or not c["audio"]:
                             continue
                         seen.add(c["key"])
                         text = f"{c['title']} {c['tags']}"
-                        if sound not in SPEECH_OK and AVOID.search(text):
+                        if one_shot and ONE_SHOT_AVOID.search(text):
+                            skipped.append((folder, c, "title or tags suggest music, speech or a long recording"))
+                            continue
+                        if not one_shot and sound not in SPEECH_OK and AVOID.search(text):
                             skipped.append((folder, c, "title or tags suggest music, speech or sudden events"))
                             continue
                         kind = licence_kind(c["licence_text"])
@@ -561,12 +641,17 @@ def main():
                     note(f"{folder}: {source.name} search '{query}' failed: {error}")
             # The best fit first, whatever its licence: in the personal edition a
             # non-commercial recording that fits better wins.
+            # A one-off sound close to the length it is kept at needs the least cutting.
+            if one_shot:
+                for c in candidates:
+                    if c["duration"] and c["duration"] > longest * 2:
+                        c["score"] -= 1
             candidates.sort(key=lambda c: -c["score"])
             for c in candidates:
                 if taken >= need:
                     break
                 rid = f"{sound}{'.' + variant if variant else ''}/{c['key']}"
-                if rid in have:
+                if (f"once.{rid}" if one_shot else rid) in have:
                     continue
                 if args.dry_run:
                     note(f"{folder}: would fetch {c['title']} by {c['author']} ({c['licence_text'].strip()}) {c['page']}")
@@ -582,15 +667,25 @@ def main():
                         download(c["audio"], raw)
                         time.sleep(1)
                     duration = probe_duration(raw)
-                    if duration < 30:
-                        skipped.append((folder, c, f"only {duration:.0f} s long"))
-                        continue
-                    length = min(LOOP_SECONDS, duration - CROSSFADE - 0.5)
-                    start = steadiest_start(raw, duration, length)
-                    file = f"{folder}/{variant or sound}-{c['key']}.m4a"
-                    target = out / file
-                    target.parent.mkdir(parents=True, exist_ok=True)
-                    make_loop(raw, target, start, length)
+                    if one_shot:
+                        if duration < 0.3 or duration > 60:
+                            skipped.append((folder, c, f"{duration:.1f} s long"))
+                            continue
+                        file = f"{folder.removeprefix(ONE_SHOT_FOLDER + '/')}/{sound}-{c['key']}.m4a"
+                        target = out / ONE_SHOT_FOLDER / file
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        make_one_shot(raw, target, longest)
+                        length = probe_duration(target)
+                    else:
+                        if duration < 30:
+                            skipped.append((folder, c, f"only {duration:.0f} s long"))
+                            continue
+                        length = min(LOOP_SECONDS, duration - CROSSFADE - 0.5)
+                        start = steadiest_start(raw, duration, length)
+                        file = f"{folder}/{variant or sound}-{c['key']}.m4a"
+                        target = out / file
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        make_loop(raw, target, start, length)
                     level = loudness(target)
                 except Exception as error:  # noqa: BLE001
                     skipped.append((folder, c, f"could not process: {error}"))
@@ -612,25 +707,28 @@ def main():
                 if reason:
                     entry["use"] = "personal"
                     entry["personalReason"] = reason
-                manifest["sounds"].append(entry)
-                have.add(rid)
+                listing.append(entry)
+                have.add(f"once.{rid}" if one_shot else rid)
                 taken += 1
                 fetched += 1
                 note(f"{folder}: {c['title']} by {c['author']}, {LABELS[kind]}{' (personal use)' if reason else ''}, {level} LUFS")
             # Save as we go, so a stopped run keeps what it fetched.
             if not args.dry_run and taken:
-                write_companions(out, manifest, skipped, args.edition)
+                write_companions(out, manifest, skipped, args.edition, one_shots)
         if taken < need:
-            note(f"{folder}: found {taken} of {need}; the app uses {'its plain sound' if variant else 'its stand-in'} for the rest")
+            fallback = "its stand-in, or nothing" if one_shot else ("its plain sound" if variant else "its stand-in")
+            note(f"{folder}: found {taken} of {need}; the app uses {fallback} for the rest")
 
     if args.dry_run:
         return
-    write_companions(out, manifest, skipped, args.edition)
+    write_companions(out, manifest, skipped, args.edition, one_shots)
     plain = {e["sound"] for e in manifest["sounds"] if not e.get("variant")}
     variants = {(e["sound"], e["variant"]) for e in manifest["sounds"] if e.get("variant")}
-    personal_count = sum(1 for e in manifest["sounds"] if e.get("use") == "personal")
-    note(f"{fetched} new; {len(manifest['sounds'])} recordings ({personal_count} personal use) for "
-         f"{len(plain)} of {len(QUERIES)} sounds and {len(variants)} of {len(catalog['variants'])} specific sounds in {out}")
+    singles = {e["sound"] for e in one_shots["sounds"]}
+    personal_count = sum(1 for e in manifest["sounds"] + one_shots["sounds"] if e.get("use") == "personal")
+    note(f"{fetched} new; {len(manifest['sounds']) + len(one_shots['sounds'])} recordings ({personal_count} personal use) for "
+         f"{len(plain)} of {len(QUERIES)} sounds, {len(variants)} of {len(catalog['variants'])} specific sounds "
+         f"and {len(singles)} of {len(ONE_SHOTS)} one-off sounds in {out}")
     note("Copy this Atmosphere folder into the music folder, then import the music folder in the app.")
 
 

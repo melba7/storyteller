@@ -19,12 +19,17 @@ public struct SceneAnswer: Sendable, Hashable {
     /// More specific sounds asked for in this answer, not offered before (no first index
     /// yet: the builder gives them this entry's).
     public var newVariants: [SoundVariant]
+    /// A one-off sound the passage says happens (a knock, a clap of thunder), if any. The
+    /// builder finds its sentence and keeps it only if the text up to that sentence alone
+    /// says so.
+    public var oneShot: OneShotMention?
 
-    public init(place: Place, scene: StoryScene, world: String?, newVariants: [SoundVariant] = []) {
+    public init(place: Place, scene: StoryScene, world: String?, newVariants: [SoundVariant] = [], oneShot: OneShotMention? = nil) {
         self.place = place
         self.scene = scene
         self.world = world
         self.newVariants = newVariants
+        self.oneShot = oneShot
     }
 }
 

@@ -182,13 +182,15 @@ func trackCommand(_ args: Arguments) async throws {
             passageWords += min(400, try spoilerGuard.window(at: position).wordCount)
         }
         let probes = plan.refinement?.maxProbes(planned: positions.count) ?? 0
-        let requests = positions.count + probes
+        // Checks of one-off sounds found before a passage's last sentence: few in practice.
+        let cueChecks = Int((Double(positions.count) * plan.oneShotCheckBudget * 0.25).rounded(.up))
+        let requests = positions.count + probes + cueChecks
         let averageWords = Double(passageWords) / Double(max(1, positions.count))
         // Passage at ~1.35 tokens a word, plus ~450 for the place list and framing;
-        // the system prompt (~2,400 tokens plus ~20 a shared variant) is read from the
+        // the system prompt (~2,700 tokens plus ~20 a shared variant) is read from the
         // cache after the first request.
         let input = Int(Double(requests) * (averageWords * 1.35 + 450))
-        let cached = requests * (2_400 + 20 * min(offered.count, ClaudeScenePrompt.maxVariantsListed))
+        let cached = requests * (2_700 + 20 * min(offered.count, ClaudeScenePrompt.maxVariantsListed))
         let output = requests * 450
         note("\(book): \(all.count) narrated sentences, \(positions.count) entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter), up to \(probes) probes, \(offered.count) shared variants offered")
         for prices in ScenePrices.known {
@@ -246,6 +248,9 @@ func trackCommand(_ args: Arguments) async throws {
     let shared = Set(offered.map(\.id))
     let asked = store.snapshot.variants.filter { !shared.contains($0.id) }
     note("  more specific sounds: \(report.variants) used, \(asked.count) new" + (asked.isEmpty ? "" : ": " + asked.map { "\($0.id) (\($0.of.rawValue))" }.joined(separator: ", ")))
+    let cueCounts = Dictionary(grouping: store.snapshot.cues, by: \.sound).map { "\($0.value.count) \($0.key.rawValue)" }.sorted()
+    note("  one-off sounds: \(report.cues)" + (cueCounts.isEmpty ? "" : " (" + cueCounts.joined(separator: ", ") + ")")
+        + ", \(report.cueChecks) checked on their own sentence, \(report.cuesRejected) not confirmed")
     if report.stoppedEarly {
         note(String(format: "  stopped at --max-dollars %.2f; run again with a higher cap to finish", cap.dollars ?? 0))
     }
@@ -267,7 +272,12 @@ func showCommand(_ args: Arguments) throws {
     }
     var previous: StoryScene?
     var previousChapter: Int?
+    var cues = track.cues[...]
     for entry in track.entries {
+        while let cue = cues.first, cue.globalIndex < entry.globalIndex {
+            cues = cues.dropFirst()
+            print("   #\(cue.globalIndex): one-off \(cue.sound.rawValue)" + (cue.quote.map { "  \"\($0)\"" } ?? ""))
+        }
         if entry.chapterOrdinal != previousChapter {
             print("-- chapter \(entry.chapterOrdinal)")
             previousChapter = entry.chapterOrdinal
@@ -278,6 +288,9 @@ func showCommand(_ args: Arguments) throws {
         let cue = entry.scene.cue.map { "  \"\($0)\"" } ?? ""
         let sure = entry.scene.confidence < 0.35 ? " (unsure, ignored)" : ""
         print("s\(entry.sentenceIndex) #\(entry.globalIndex): \(entry.scene)\(sure)\(cue)")
+    }
+    for cue in cues {
+        print("   #\(cue.globalIndex): one-off \(cue.sound.rawValue)" + (cue.quote.map { "  \"\($0)\"" } ?? ""))
     }
     if args.flag("places") {
         let memory = PlaceMemory(entries: track.entries)
@@ -347,6 +360,19 @@ func libraryCommand(_ args: Arguments) throws {
         let parts = key.split(separator: ".", maxSplits: 1).map(String.init)
         guard let sound = AmbientSound(rawValue: parts[0]) else { continue }
         print("\(SoundVariant.folderName(of: sound, id: parts[1])): \(describe(library.recordings(of: sound, variant: parts[1])))")
+    }
+    let oneShots = try OneShotLibrary.load(
+        from: URL(fileURLWithPath: path).appendingPathComponent(OneShotLibrary.folderName), edition: edition
+    )
+    print("-- one-off sounds (\(OneShotLibrary.folderName)/)")
+    for sound in OneShotSound.allCases {
+        let recordings = oneShots.recordings(of: sound)
+        let text = recordings.isEmpty ? "none" : recordings.map { r in
+            let level = r.loudness.map { String(format: " %.1f LUFS", $0) } ?? " (unmeasured)"
+            let use = r.isPersonalUseOnly ? " [personal use]" : r.isPublishStandBy ? " [publishing stand-by]" : ""
+            return r.file + level + use
+        }.joined(separator: ", ")
+        print("\(sound.folderName): \(text)")
     }
 }
 

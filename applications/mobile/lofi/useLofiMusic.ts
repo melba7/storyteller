@@ -132,6 +132,22 @@ export function useLofiMusic(pollInterval: number | null) {
     [apply],
   )
 
+  /** One-off sounds (a knock, a clap of thunder) on their sentences. */
+  const setAtmosphereOneShots = useCallback(
+    (enabled: boolean) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? {
+                ...current,
+                atmosphere: { ...current.atmosphere, oneShotsEnabled: enabled },
+              }
+            : current,
+        () => LofiScore?.setAtmosphereOneShots(enabled),
+      ),
+    [apply],
+  )
+
   const importMusicFolder =
     useCallback(async (): Promise<LofiImportSummary | null> => {
       if (!LofiScore) return null
@@ -159,6 +175,7 @@ export function useLofiMusic(pollInterval: number | null) {
     setAtmosphereEnabled,
     setAtmosphereLevel,
     setAtmospherePauses,
+    setAtmosphereOneShots,
     importMusicFolder,
     removeImportedMusic,
   }

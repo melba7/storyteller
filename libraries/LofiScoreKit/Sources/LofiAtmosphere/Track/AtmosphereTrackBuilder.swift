@@ -20,6 +20,12 @@ import LofiText
 /// as for mood tracks. Place ids are labels: a probe that finds the start of a place
 /// first named by the next entry takes that entry's id, which changes nothing audible
 /// before the text reaches the place.
+///
+/// One-off sounds (``AtmosphereTrack/Cue``): an answer may say a sound happens on one of
+/// its passage's sentences. On the passage's last sentence it is kept as it is. On an
+/// earlier one, the answer saw text after that sentence, so the sentence is scored again
+/// on its own (its window ends there) and the cue is kept only if that answer puts the
+/// same sound on it.
 public struct AtmosphereTrackBuilder: Sendable {
     public struct Plan: Sendable, Hashable {
         /// About 100 seconds of narration at 150 words a minute.
@@ -27,11 +33,20 @@ public struct AtmosphereTrackBuilder: Sendable {
         /// 1-based sentence of each chapter that always gets an entry.
         public var sentencesIntoNewChapter: Int
         public var refinement: Refinement?
+        /// Keep one-off sounds, and how many requests checking them may take, as a share of
+        /// the planned entries.
+        public var oneShots: Bool
+        public var oneShotCheckBudget: Double
 
-        public init(wordsBetweenEntries: Int = 250, sentencesIntoNewChapter: Int = 3, refinement: Refinement? = Refinement()) {
+        public init(
+            wordsBetweenEntries: Int = 250, sentencesIntoNewChapter: Int = 3, refinement: Refinement? = Refinement(),
+            oneShots: Bool = true, oneShotCheckBudget: Double = 0.2
+        ) {
             self.wordsBetweenEntries = max(20, wordsBetweenEntries)
             self.sentencesIntoNewChapter = max(1, sentencesIntoNewChapter)
             self.refinement = refinement
+            self.oneShots = oneShots
+            self.oneShotCheckBudget = max(0, oneShotCheckBudget)
         }
     }
 
@@ -65,6 +80,41 @@ public struct AtmosphereTrackBuilder: Sendable {
         /// More specific sounds the track uses, and how many of them it asked for itself.
         public var variants = 0
         public var newVariants = 0
+        /// One-off sounds in the track, the requests spent checking them, and the ones the
+        /// check did not confirm.
+        public var cues = 0
+        public var cueChecks = 0
+        public var cuesRejected = 0
+    }
+
+    /// Counts and limits the checks of one-off sounds across a run's concurrent requests.
+    final class CueLedger: @unchecked Sendable {
+        private let lock = NSLock()
+        private let budget: Int
+        private let continueIf: (@Sendable () -> Bool)?
+        private var checked: Set<String> = []
+        private(set) var checks = 0
+        private(set) var rejected = 0
+
+        init(budget: Int, continueIf: (@Sendable () -> Bool)?) {
+            self.budget = budget
+            self.continueIf = continueIf
+        }
+
+        /// True when this sound on this sentence may be checked now: not checked in this
+        /// run, within the budget and the spending cap.
+        func beginCheck(_ key: String) -> Bool {
+            if let continueIf, !continueIf() { return false }
+            return lock.withLock {
+                guard checks < budget, checked.insert(key).inserted else { return false }
+                checks += 1
+                return true
+            }
+        }
+
+        func reject() {
+            lock.withLock { rejected += 1 }
+        }
     }
 
     public let spoilerGuard: SpoilerGuard
@@ -143,6 +193,9 @@ public struct AtmosphereTrackBuilder: Sendable {
         let todo = positions.filter { !store.contains($0) }
         report.alreadyScored = positions.count - todo.count
 
+        let ledger = plan.oneShots
+            ? CueLedger(budget: Int((Double(positions.count) * plan.oneShotCheckBudget).rounded(.up)), continueIf: continueIf)
+            : nil
         var added = 0
         // First pass: strictly in order, so each request knows every place before it.
         for position in todo {
@@ -151,7 +204,7 @@ public struct AtmosphereTrackBuilder: Sendable {
                 break
             }
             do {
-                let entry = try await score(position, into: store, engine: engine, nextEntry: nil)
+                let entry = try await score(position, into: store, engine: engine, nextEntry: nil, cues: ledger)
                 added += 1
                 report.scored += 1
                 onEntry?(entry, added)
@@ -177,7 +230,7 @@ public struct AtmosphereTrackBuilder: Sendable {
                 guard budget > 0, !candidates.isEmpty else { break }
                 let round = Array(candidates.prefix(min(budget, roundSize)))
                 budget -= round.count
-                let result = await scoreProbes(round, into: store, engine: engine, concurrency: concurrency, continueIf: continueIf)
+                let result = await scoreProbes(round, into: store, engine: engine, concurrency: concurrency, continueIf: continueIf, cues: ledger)
                 for entry in result.entries {
                     added += 1
                     onEntry?(entry, added)
@@ -199,6 +252,9 @@ public struct AtmosphereTrackBuilder: Sendable {
         report.variants = track.variants.count
         let offered = Set(offeredVariants.map(\.id))
         report.newVariants = track.variants.filter { !offered.contains($0.id) }.count
+        report.cues = track.cues.count
+        report.cueChecks = ledger?.checks ?? 0
+        report.cuesRejected = ledger?.rejected ?? 0
         return report
     }
 
@@ -253,7 +309,8 @@ public struct AtmosphereTrackBuilder: Sendable {
         into store: AtmosphereTrackStore,
         engine: any SceneEngine,
         concurrency: Int,
-        continueIf: (@Sendable () -> Bool)?
+        continueIf: (@Sendable () -> Bool)?,
+        cues: CueLedger?
     ) async -> (entries: [AtmosphereTrack.Entry], failed: [(SentencePosition, String)], stopped: Bool) {
         var entries: [AtmosphereTrack.Entry] = []
         var failed: [(SentencePosition, String)] = []
@@ -272,7 +329,7 @@ public struct AtmosphereTrackBuilder: Sendable {
                 let following = store.snapshot.entries.first { $0.globalIndex > position.globalIndex }
                 group.addTask {
                     do {
-                        return (position, .success(try await self.score(position, into: store, engine: engine, nextEntry: following)))
+                        return (position, .success(try await self.score(position, into: store, engine: engine, nextEntry: following, cues: cues)))
                     } catch {
                         return (position, .failure(error))
                     }
@@ -292,13 +349,15 @@ public struct AtmosphereTrackBuilder: Sendable {
 
     /// Scores one position against the memory of the entries before it and stores it.
     /// `nextEntry` is the entry after a probe, so a new place found by the probe can take
-    /// the id that entry already gave it.
+    /// the id that entry already gave it. With `cues`, a one-off sound in the answer is
+    /// placed on its sentence (and checked, see the type's notes).
     @discardableResult
     func score(
         _ position: SentencePosition,
         into store: AtmosphereTrackStore,
         engine: any SceneEngine,
-        nextEntry: AtmosphereTrack.Entry?
+        nextEntry: AtmosphereTrack.Entry?,
+        cues: CueLedger? = nil
     ) async throws -> AtmosphereTrack.Entry {
         let window = try spoilerGuard.window(at: position)
         let memory = PlaceMemory(track: store.snapshot, before: position.globalIndex, offered: offeredVariants)
@@ -331,7 +390,54 @@ public struct AtmosphereTrackBuilder: Sendable {
             )
             track.insert(entry)
         }
+        if let cues, let mention = answer.oneShot {
+            await placeCue(mention, foundIn: window, into: store, engine: engine, ledger: cues)
+        }
         return entry
+    }
+
+    /// Puts a one-off sound on the sentence its words are in. A sentence before the
+    /// window's last is scored again on its own first, and keeps the sound only if that
+    /// answer has it on that sentence too.
+    func placeCue(
+        _ mention: OneShotMention,
+        foundIn window: CausalWindow,
+        into store: AtmosphereTrackStore,
+        engine: any SceneEngine,
+        ledger: CueLedger
+    ) async {
+        guard let spot = mention.locate(in: window) else { return }
+        let line = window.lines[spot.line]
+        guard let at = try? spoilerGuard.position(chapterOrdinal: line.chapterOrdinal, sentenceIndex: line.sentenceIndex) else { return }
+        if store.snapshot.cue(at: at.globalIndex)?.sound == mention.sound { return }
+        if spot.line == window.lines.count - 1 {
+            // Judged from the text up to its own sentence: safe as it is.
+            let cue = AtmosphereTrack.Cue(
+                position: at, sentence: line.text, sound: mention.sound,
+                wordsBefore: spot.wordsBefore, words: spot.words, quote: mention.quote
+            )
+            store.update { $0.insertCue(cue) }
+            return
+        }
+        guard ledger.beginCheck("\(at.globalIndex)|\(mention.sound.rawValue)") else { return }
+        do {
+            let own = try spoilerGuard.window(at: at)
+            let memory = PlaceMemory(track: store.snapshot, before: at.globalIndex, offered: offeredVariants)
+            let answer = try await engine.scene(for: own, memory: memory)
+            guard let confirmed = answer.oneShot, confirmed.sound == mention.sound,
+                  let place = confirmed.locate(in: own), place.line == own.lines.count - 1
+            else {
+                ledger.reject()
+                return
+            }
+            let cue = AtmosphereTrack.Cue(
+                position: at, sentence: own.lines[place.line].text, sound: confirmed.sound,
+                wordsBefore: place.wordsBefore, words: place.words, quote: confirmed.quote
+            )
+            store.update { $0.insertCue(cue) }
+        } catch {
+            ledger.reject()
+        }
     }
 
     /// A fresh id, unique in the whole track; or the id of the following entry's place
