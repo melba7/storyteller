@@ -153,7 +153,8 @@ merge cleanly without changing anything.
 `.github/workflows/fork-ci.yml` runs on every pull request, on pushes to `main`,
 and when the upstream sync starts it:
 
-- **Fork checks** (Ubuntu, under a minute): `tools/fork/check-fork.mjs`.
+- **Fork checks** (Ubuntu, under a minute): `tools/fork/check-fork.mjs`, and the
+  tests of the fork's tools (`node --test 'tools/fork/*.test.mjs'`).
 - **Mobile typecheck, tests and format** (Ubuntu): `yarn install`, a typecheck
   of the mobile app and the packages it uses, upstream's mobile tests, and the
   formatting of the fork's own files.
@@ -189,31 +190,59 @@ Developer Mode on the phone.
 `.github/workflows/testflight.yml` builds an App Store build of `main` after
 every change to the app, and on demand from the Actions tab, and uploads it to
 TestFlight. Install the TestFlight app on the iPhone once; each new build then
-arrives like an app update and keeps working for 90 days. Until the secrets
-below exist, the workflow only reports which ones are missing.
+arrives like an app update and keeps working for 90 days. It needs no Developer
+Mode, no registered device and no certificates: the archive is built unsigned,
+and Xcode signs it during the upload with a distribution certificate that Apple
+keeps (cloud signing), using an App Store Connect API key.
+
+Until the secrets below exist, a push only reports which ones are missing, and a
+run started by hand from the Actions tab builds the App Store archive without
+signing or uploading it, which shows the build itself works.
 
 One-time setup, with a paid Apple Developer Program membership:
 
-1. On developer.apple.com, under Certificates, Identifiers & Profiles →
-   Identifiers, register an App ID with the explicit bundle ID from
+1. On developer.apple.com → Account → Certificates, IDs & Profiles →
+   Identifiers, click +, choose App IDs, then App. Enter the description
+   `Storyteller Lofi` and the explicit bundle ID from
    `applications/mobile/fork.config.ts` (`io.github.melba7.storytellerlofi`).
-2. In App Store Connect → Apps, add a new iOS app with that bundle ID. Any name
-   and SKU will do.
+   Tick no capabilities, then Continue and Register.
+2. In App Store Connect → Apps, click + → New App. Tick iOS, pick that bundle
+   ID, and give it any name nobody else on the App Store uses (it is never
+   published, so `Storyteller Lofi` plus your initials is fine) and any SKU,
+   such as `storytellerlofi`.
 3. In App Store Connect → Users and Access → Integrations → App Store Connect
-   API, create a team key with the Admin role, which Xcode needs to manage
-   signing in the cloud. Download the `.p8` file (it can only be downloaded
-   once) and note the key ID and the issuer ID.
-4. In this repository's Settings → Secrets and variables → Actions, add the
-   repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the whole
-   text of the `.p8` file) and `APPLE_TEAM_ID` (from Membership details on
-   developer.apple.com).
-5. Run the TestFlight workflow from the Actions tab. When App Store Connect has
-   processed the build, add yourself as an internal tester under TestFlight and
-   accept the invitation on the iPhone.
+   API, request access if asked, then add a team key with Admin access. Admin is
+   what cloud signing needs. Download the `.p8` file (Apple offers it only once)
+   and note the key ID and the issuer ID shown above the key list.
+4. In this repository's Settings → Secrets and variables → Actions, add four
+   repository secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the whole
+   text of the `.p8` file) and `APPLE_TEAM_ID` (the Team ID under Membership
+   details on developer.apple.com).
+5. On the Actions tab, run the TestFlight workflow. Its first job checks the
+   setup in about a minute and names the fix if a step was missed
+   (`tools/fork/asc-preflight.mjs`; it registers the App ID itself if step 1 was
+   skipped). The build and upload then take about an hour.
+6. In App Store Connect → your app → TestFlight, add an internal testing group
+   with yourself in it. Install TestFlight on the iPhone, signed in with your
+   Apple Account, and accept the invitation. New builds then show up there by
+   themselves.
 
-The workflow signs with Apple-managed certificates through the API key, so no
-certificates or profiles are stored in this public repository. Each run uses its
-run number as the build number.
+Each run uses the workflow's run number as the build number, so renaming the
+workflow file would restart the numbering and Apple would refuse the uploads.
+
+If the upload step fails:
+
+- "Cloud signing permission error" or a certificate error: the API key does not
+  have Admin access. Make a new Admin key and replace the three `ASC_` secrets.
+- "No profiles for 'io.github.melba7.storytellerlofi' were found": the App ID or
+  the App Store Connect app is missing, or `APPLE_TEAM_ID` names another team.
+- An agreement error: accept the pending agreement on developer.apple.com or in
+  App Store Connect, then run the workflow again.
+- "The app now needs entitlements": something added an entitlement, such as
+  iCloud or push notifications. An unsigned archive can't carry it, so the
+  archive has to be signed. That needs a development certificate kept in the
+  secrets, because letting Xcode create one per run soon hits Apple's limit on
+  certificates.
 
 ### iOS Simulator
 

@@ -39,6 +39,8 @@ jobs:
           package-manager-cache: false
       - name: Touch points, upstream footprint and no music
         run: node tools/fork/check-fork.mjs --list
+      - name: Tests for the fork's tools
+        run: node --test 'tools/fork/*.test.mjs'
       - name: Decide whether the iOS build is needed
         id: changes
         env:
