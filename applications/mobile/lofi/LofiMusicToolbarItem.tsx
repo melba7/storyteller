@@ -1,25 +1,41 @@
 // LOFI-FORK: the lofi music button in the player's toolbar, and the panel it
 // opens (see FORK.md).
 import { Music } from "lucide-react-native"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Modal, Pressable, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
+import { LofiScore } from "@/modules/lofi-score"
 
 import { LofiMusicControls } from "./LofiMusicControls"
 import { useLofiMusic } from "./useLofiMusic"
+
+type Props = {
+  /** The toolbar's screen: the reader ("text") or the listening screen. */
+  mode: "audio" | "text"
+}
 
 /**
  * Opens the music panel: on and off, the music's volume under the voice, and
  * the car setting. Shown for readaloud books, where there is text to follow.
  */
-export function LofiMusicToolbarItem() {
+export function LofiMusicToolbarItem({ mode }: Props) {
   const [open, setOpen] = useState(false)
   const music = useLofiMusic(open ? 1500 : 15000)
   const insets = useSafeAreaInsets()
+
+  // Closing the book stops the music that follows the pages you read, instead
+  // of letting it play on until it times out. The narration's music is not
+  // affected.
+  useEffect(() => {
+    if (mode !== "text") return
+    return () => {
+      void LofiScore?.readerStopped()
+    }
+  }, [mode])
 
   if (!music.available) return null
   const enabled = music.status?.enabled ?? true

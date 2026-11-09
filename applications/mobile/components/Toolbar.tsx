@@ -60,7 +60,7 @@ export function Toolbar({ mode, activeBookmarks, vertical = false }: Props) {
           ))}
         <SpeedItem />
         {/* LOFI-FORK: lofi music for readaloud books, see FORK.md */}
-        {format === "readaloud" && <LofiMusicToolbarItem />}
+        {format === "readaloud" && <LofiMusicToolbarItem mode={mode} />}
         <NavigationItem mode={mode} />
         <BookmarkItem activeBookmarks={activeBookmarks} />
         {format === "readaloud" &&
