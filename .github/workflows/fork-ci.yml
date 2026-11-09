@@ -126,6 +126,17 @@ jobs:
         env:
           APP_VARIANT: development
         run: yarn expo prebuild --no-install -p ios
+      # pod install downloads Sentry's prebuilt framework from GitHub's release
+      # downloads once, with no retry, and those sometimes answer 504 for
+      # minutes. Keep it cached and fetch it with retries beforehand.
+      - name: Cache Sentry's prebuilt framework
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/sentry-react-native/xcframeworks
+          key: sentry-xcframework-${{ hashFiles('yarn.lock') }}
+          restore-keys: sentry-xcframework-
+      - name: Fetch Sentry's prebuilt framework, with retries
+        run: ruby tools/fork/prefetch-sentry-xcframework.rb applications/mobile
       - name: Install pods
         working-directory: applications/mobile/ios
         run: pod install
