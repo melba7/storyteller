@@ -105,6 +105,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         queue.async { [self] in
             guard !started else { return }
             started = true
+            HostLog.note("started, music \(settings.enabled ? "on" : "off")")
             if settings.enabled { prepareLibrary() }
         }
     }
@@ -168,7 +169,14 @@ public final class LofiMusicHost: @unchecked Sendable {
         let destination = environment.musicFolder
         let summary = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<MusicFolderImport.Summary, Error>) in
             work.async {
-                continuation.resume(with: Result { try MusicFolderImport.importFolder(folder, into: destination) })
+                let result = Result { try MusicFolderImport.importFolder(folder, into: destination) }
+                switch result {
+                case let .success(summary):
+                    HostLog.note("imported \(summary.folderName): \(summary.tracks) tracks, \(summary.moodTracks) mood tracks, \(summary.notDownloaded) not downloaded")
+                case let .failure(error):
+                    HostLog.error("import failed: \(error)")
+                }
+                continuation.resume(with: result)
             }
         }
         await onQueue { [self] in
@@ -227,6 +235,7 @@ public final class LofiMusicHost: @unchecked Sendable {
                     self.install(library, source: source)
                 case let .failure(error):
                     self.lastError = "\(error)"
+                    HostLog.error("no music library: \(error)")
                 }
             }
         }
@@ -279,6 +288,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         self.library = library
         self.source = source
         lastError = nil
+        HostLog.note("\(source) music: \(library.tracks.count) tracks")
         follower.attach(player)
     }
 
@@ -303,6 +313,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         default:
             return
         }
+        if case .error = event { HostLog.error(line) } else { HostLog.note(line) }
         queue.async { [self] in
             if case let .error(message) = event { lastError = message }
             recentEvents.append(line)
@@ -326,9 +337,11 @@ public final class LofiMusicHost: @unchecked Sendable {
                 guard self.book?.id == id else { return }
                 switch outcome {
                 case let .success((text, hasTrack)):
+                    HostLog.note("book \(id): following the text with \(hasTrack ? "a mood track over " : "")\(text.engineID)")
                     self.bookText = .ready(id, engineID: text.engineID, moodTrack: hasTrack)
                     self.follower.attachText(text, toBook: id)
                 case let .failure(error):
+                    HostLog.note("book \(id): no music, \(error)")
                     self.bookText = .unavailable(id, reason: "\(error)")
                 }
             }
