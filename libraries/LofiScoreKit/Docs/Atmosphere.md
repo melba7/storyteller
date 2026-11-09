@@ -231,11 +231,15 @@ through the Claude plan, fetches any new sounds and copies everything into
    more specific sound (the starter set plus those the tracks in `--tracks` asked for;
    `--no-variants` skips them, `--sound OldTown.ChurchBells` fetches only that) and
    `--per-one-shot 2` per one-off sound (`--no-one-shots` skips them; each is trimmed of
-   silence, cut to a few seconds and faded out, not looped). It checks
+   silence, cut to a few seconds and faded out, not looped). It keeps only recordings
+   whose title (or Freesound tags) names the sound, because search also matches long
+   descriptions (a pier's creaks recorded on a rainy day came up under rain). It checks
    each licence on the recording's own record, cuts a seamless 60 s loop from the steadiest
    part (encoded with Apple's AAC encoder so the phone loops it without a tick), measures
    loudness, and writes `sounds.json`, `variants.json`, `SOURCES.csv`, `CREDITS.md` and
-   `skipped.csv`, saving as it goes so a stopped run resumes. `--dry-run` lists what it
+   `skipped.csv`, saving as it goes so a stopped run resumes. Only one run writes a folder
+   at a time (a second one waits), and at the end it lists audio files that `sounds.json`
+   doesn't know: the app plays those too, without credits. `--dry-run` lists what it
    would fetch.
 2. **Tracks.** `Tools/mac/make-atmosphere.sh --dry-run BOOK.epub` prints the cost estimate.
    `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--no-fetch] [--no-copy] BOOK.epub …`

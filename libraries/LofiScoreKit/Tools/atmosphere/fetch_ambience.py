@@ -2,9 +2,9 @@
 """Fetch recordings for the atmosphere sounds, with their credits.
 
 Runs on Mo's Mac (it needs the network, python3 and ffmpeg). For every sound
-it searches for steady recordings, reads each recording's licence from its own
-record (never assumed), cuts a seamless loop from the steadiest part, measures
-its loudness, and writes:
+it searches for steady recordings whose title (or Freesound tags) names the
+sound, reads each recording's licence from its own record (never assumed), cuts
+a seamless loop from the steadiest part, measures its loudness, and writes:
 
     ~/Storyteller Lofi/Atmosphere/
         Rain/rain-fs123456.m4a ...        one folder per sound
@@ -26,7 +26,8 @@ What it fetches:
     asked for (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json);
   - the 15 one-off sounds (ONE_SHOTS below), --per-one-shot each: short single
     sounds, trimmed of silence, not looped.
-Runs add what is missing, so run it again after scoring new books.
+Runs add what is missing, so run it again after scoring new books. One run at a
+time writes a folder; a second one waits for it.
 
 Two editions:
   personal (default)  For Mo's own app. Searches Freesound (needs
@@ -52,6 +53,7 @@ downloads folder away from this script.
 
 import argparse
 import csv
+import fcntl
 import json
 import re
 import shutil
@@ -173,6 +175,41 @@ ONE_SHOT_AVOID = re.compile(
     re.I,
 )
 
+# Words too general to show that a recording is of the sound being searched for.
+GENERIC = {
+    "a", "an", "and", "at", "by", "in", "of", "on", "the", "with",
+    "ambience", "ambiance", "ambient", "atmosphere", "sound", "sounds", "sfx", "effect", "recording",
+    "field", "loop", "room", "call", "single", "light", "gentle", "steady", "soft", "strong", "heavy",
+    "distant", "quiet", "indistinct", "interior", "inside", "indoor", "indoors", "outdoors", "open",
+    "old", "day", "night", "morning", "drawn", "journey", "busy", "small", "big",
+}
+
+
+def stem(word):
+    """Enough of a word to match its other forms: "crackling" and "crackle", "bells" and "bell"."""
+    word = word.lower()
+    if len(word) > 5:
+        return word[:5]
+    return word[:-1] if len(word) > 3 and word.endswith("s") else word
+
+
+def keywords(folder, queries):
+    """Stems of the words that name a target: its own name (a variant's own part only) and its queries."""
+    own = re.split(r"[./]", folder)[-1]
+    words = re.findall(r"[A-Z]?[a-z]+", own) + [w for q in queries for w in re.findall(r"[a-z]+", q.lower())]
+    return {stem(w) for w in words if w.lower() not in GENERIC}
+
+
+def names_the_sound(candidate, keys):
+    """Whether the recording's own name (and Freesound's tags) says it is the sound searched for.
+
+    Search engines also match long descriptions, so a pier's creaks recorded on a rainy day
+    turns up under rain. The title has to name it."""
+    if not keys:
+        return True
+    return any(w.startswith(k) for w in re.findall(r"[a-z]+", candidate["match"].lower()) for k in keys)
+
+
 LABELS = {
     "cc0": "CC0 1.0",
     "by": "CC BY",
@@ -278,6 +315,7 @@ class Freesound:
                 "page": item.get("url", ""),
                 "duration": float(item.get("duration") or 0),
                 "tags": " ".join(item.get("tags") or []),
+                "match": f"{item.get('name', '')} {' '.join(item.get('tags') or [])}",
                 "score": (item.get("avg_rating") or 0) * min(1, (item.get("num_ratings") or 0) / 5)
                 + min(2, (item.get("num_downloads") or 0) / 2000),
                 "audio": (item.get("previews") or {}).get("preview-hq-ogg")
@@ -325,6 +363,8 @@ class Commons:
                 "page": info.get("descriptionurl", ""),
                 "duration": 0.0,
                 "tags": value("ImageDescription"),
+                # Commons descriptions are long and mention anything nearby: judge by the title.
+                "match": re.sub(r"\.[a-z0-9]+$", "", page.get("title", "").removeprefix("File:"), flags=re.I),
                 "score": 0.0,
                 "audio": info.get("url"),
                 "via": self.name,
@@ -579,6 +619,15 @@ def main():
 
     out.mkdir(parents=True, exist_ok=True)
     args.downloads.mkdir(parents=True, exist_ok=True)
+    # One run at a time per folder: two writing the same sounds.json would lose recordings.
+    # The lock lives with the downloads, so it never gets copied into the music folder.
+    lock = open(args.downloads / f".{out.name}.lock", "w")
+    if not args.dry_run:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            note(f"another fetch is writing {out}; waiting for it to finish")
+            fcntl.flock(lock, fcntl.LOCK_EX)
     manifest_path = out / "sounds.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {"version": 1, "sounds": []}
     mark_freesound_personal(manifest)
@@ -614,6 +663,7 @@ def main():
         if need <= 0:
             note(f"{folder}: already has {len(existing)}")
             continue
+        keys = keywords(folder, queries)
         taken = 0
         for source in sources:
             if taken >= need:
@@ -631,6 +681,9 @@ def main():
                             continue
                         if not one_shot and sound not in SPEECH_OK and AVOID.search(text):
                             skipped.append((folder, c, "title or tags suggest music, speech or sudden events"))
+                            continue
+                        if not names_the_sound(c, keys):
+                            skipped.append((folder, c, "its title does not name the sound"))
                             continue
                         kind = licence_kind(c["licence_text"])
                         if kind is None or (not personal and kind not in COMMERCIAL):
@@ -729,6 +782,16 @@ def main():
     note(f"{fetched} new; {len(manifest['sounds']) + len(one_shots['sounds'])} recordings ({personal_count} personal use) for "
          f"{len(plain)} of {len(QUERIES)} sounds, {len(variants)} of {len(catalog['variants'])} specific sounds "
          f"and {len(singles)} of {len(ONE_SHOTS)} one-off sounds in {out}")
+    listed = {e["file"] for e in manifest["sounds"]} | {f"{ONE_SHOT_FOLDER}/{e['file']}" for e in one_shots["sounds"]}
+    extra = sorted(
+        str(f.relative_to(out)) for f in out.rglob("*")
+        if f.is_file() and f.suffix.lower() in {".m4a", ".aac", ".mp3", ".wav", ".aif", ".aiff", ".caf", ".flac"}
+        and str(f.relative_to(out)) not in listed
+    )
+    if extra:
+        note(f"{len(extra)} audio file(s) in {out} are not in sounds.json (a stopped run, or added by hand); "
+             f"the app plays them too, without credits. Move them out if they are not yours: {', '.join(extra[:10])}"
+             + (" ..." if len(extra) > 10 else ""))
     note("Copy this Atmosphere folder into the music folder, then import the music folder in the app.")
 
 
