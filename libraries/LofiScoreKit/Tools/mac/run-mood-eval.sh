@@ -93,6 +93,22 @@ $B/lofi-train embed --kinds word --version 6 --curve 2> "$OUT/embed.log"
 grep -A30 "^summary" "$OUT/embed.log" || tail -30 "$OUT/embed.log"
 cp Models/LofiMood-embed-*-6.report.json "$OUT/" 2>/dev/null || true
 
+step "All-books comparison: out-of-fold over every labelled book"
+# The 320 test windows cannot separate recipes less than about 4 points
+# apart. This rotates the held-out books over all of them (10 folds, 3
+# shuffles) so each recipe is scored on every labelled window, and compares
+# recipes window by window with intervals from resampling books. It reuses
+# the embed step's feature cache. The "-old" recipe trains only on the books
+# of samples v1 to v3, to show what the newer books add.
+python3 -I -c 'import json,sys; print("\n".join(sorted({json.loads(l)["book"] for l in open(sys.argv[1])})))' \
+  "$W/sample.jsonl" > "$W/old-books.txt"
+if $B/lofi-train oof --kind word --folds 10 --repeats 3 --old-books "$W/old-books.txt" \
+     --out "$OUT/oof-word.jsonl" 2> "$OUT/oof.log"; then
+  python3 -I Tools/eval/oof_compare.py "$OUT/oof-word.jsonl" | tee "$OUT/oof-compare.txt"
+else
+  tail -5 "$OUT/oof.log"
+fi
+
 step "Fast engine and baselines on the 320 held-out windows"
 T="$W/train/test-windows.jsonl"
 $B/lofi-eval run --engine fast:Models/LofiMood-maxent-5.mlmodel --in "$T" --out "$OUT/readings/fast-maxent-5.jsonl"
