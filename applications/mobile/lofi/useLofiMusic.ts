@@ -1,0 +1,115 @@
+// LOFI-FORK: the lofi music's state and settings, for the player and Settings
+// (see FORK.md).
+import { useCallback, useEffect, useState } from "react"
+
+import { logger } from "@/logger"
+import {
+  type LofiImportSummary,
+  type LofiMusicStatus,
+  LofiScore,
+} from "@/modules/lofi-score"
+
+export type LofiMusic = ReturnType<typeof useLofiMusic>
+
+/**
+ * Reads the music's state from the native module, every `pollInterval`
+ * milliseconds while mounted (or once, with null), and changes its settings.
+ * `available` is false where the module does not exist (Android, the web).
+ */
+export function useLofiMusic(pollInterval: number | null) {
+  const [status, setStatus] = useState<LofiMusicStatus | null>(null)
+
+  const refresh = useCallback(async () => {
+    if (!LofiScore) return
+    try {
+      setStatus(await LofiScore.getStatus())
+    } catch (error) {
+      logger.error(`Lofi music status: ${String(error)}`)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+    if (pollInterval === null) return
+    const timer = setInterval(() => void refresh(), pollInterval)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [refresh, pollInterval])
+
+  const apply = useCallback(
+    async (
+      optimistic: (current: LofiMusicStatus) => LofiMusicStatus,
+      call: () => Promise<LofiMusicStatus> | undefined,
+    ) => {
+      setStatus((current) => (current ? optimistic(current) : current))
+      try {
+        const updated = await call()
+        if (updated) setStatus(updated)
+      } catch (error) {
+        logger.error(`Lofi music setting: ${String(error)}`)
+        void refresh()
+      }
+    },
+    [refresh],
+  )
+
+  const setEnabled = useCallback(
+    (enabled: boolean) =>
+      apply(
+        (current) => ({ ...current, enabled }),
+        () => LofiScore?.setEnabled(enabled),
+      ),
+    [apply],
+  )
+
+  const setMutedInCar = useCallback(
+    (mutedInCar: boolean) =>
+      apply(
+        (current) => ({ ...current, mutedInCar }),
+        () => LofiScore?.setMutedInCar(mutedInCar),
+      ),
+    [apply],
+  )
+
+  /** The level under the voice in dB, or null for the default. */
+  const setMusicLevel = useCallback(
+    (level: number | null) =>
+      apply(
+        (current) => ({
+          ...current,
+          musicLevelDB: level ?? current.defaultMusicLevelDB,
+        }),
+        () => LofiScore?.setMusicLevel(level),
+      ),
+    [apply],
+  )
+
+  const importMusicFolder =
+    useCallback(async (): Promise<LofiImportSummary | null> => {
+      if (!LofiScore) return null
+      const summary = await LofiScore.importMusicFolder()
+      await refresh()
+      return summary
+    }, [refresh])
+
+  const removeImportedMusic = useCallback(
+    () =>
+      apply(
+        (current) => current,
+        () => LofiScore?.removeImportedMusic(),
+      ),
+    [apply],
+  )
+
+  return {
+    available: LofiScore !== null,
+    status,
+    refresh,
+    setEnabled,
+    setMutedInCar,
+    setMusicLevel,
+    importMusicFolder,
+    removeImportedMusic,
+  }
+}

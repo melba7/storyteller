@@ -1,0 +1,191 @@
+import Foundation
+import LofiAudio
+
+/// Copies a music folder the listener picked (in Files or iCloud Drive) into the app's own
+/// storage, so playback never depends on a security-scoped bookmark or on iCloud keeping
+/// the files downloaded.
+///
+/// What is copied: every audio file (one subfolder per mood, as `MusicLibrary` reads them),
+/// `library.json` and `SOURCES.csv` at the top, mood tracks in `MoodTracks/`, and a Core ML
+/// mood classifier (`.mlmodel` or `.mlmodelc`) at the top. Nothing else.
+public enum MusicFolderImport {
+    public struct Summary: Sendable, Hashable, Codable {
+        public var folderName: String
+        public var tracks: Int
+        public var moodTracks: Int
+        public var hasClassifier: Bool
+        /// Files that were still only in iCloud and could not be read.
+        public var notDownloaded: Int
+    }
+
+    public enum ImportError: Error, Equatable, CustomStringConvertible {
+        case noMusic(String)
+        case unreadable(String)
+
+        public var description: String {
+            switch self {
+            case let .noMusic(name):
+                return "\(name) has no music: it needs one folder per mood (Calm, Cozy, …) with audio files in them"
+            case let .unreadable(reason):
+                return "The folder could not be read: \(reason)"
+            }
+        }
+    }
+
+    public static let moodTracksFolderName = "MoodTracks"
+
+    /// Copies `source` into `destination`, replacing what was there only once the copy has
+    /// worked and holds at least one track.
+    @discardableResult
+    public static func importFolder(_ source: URL, into destination: URL, fileManager: FileManager = .default) throws -> Summary {
+        #if canImport(Darwin)
+        let scoped = source.startAccessingSecurityScopedResource()
+        defer { if scoped { source.stopAccessingSecurityScopedResource() } }
+        #endif
+
+        let parent = destination.deletingLastPathComponent()
+        try fileManager.createDirectory(at: parent, withIntermediateDirectories: true)
+        let staging = parent.appendingPathComponent(destination.lastPathComponent + ".incoming", isDirectory: true)
+        try? fileManager.removeItem(at: staging)
+        try fileManager.createDirectory(at: staging, withIntermediateDirectories: true)
+        var keepStaging = false
+        defer { if !keepStaging { try? fileManager.removeItem(at: staging) } }
+
+        let plan = try plan(for: source, fileManager: fileManager)
+        for item in plan.items {
+            let target = staging.appendingPathComponent(item.relativePath, isDirectory: item.isDirectory)
+            try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try copy(item.url, to: target, fileManager: fileManager)
+        }
+
+        let library: MusicLibrary
+        do {
+            library = try MusicLibrary.load(from: staging, fileManager: fileManager)
+        } catch {
+            throw ImportError.noMusic(source.lastPathComponent)
+        }
+        guard !library.tracks.isEmpty else { throw ImportError.noMusic(source.lastPathComponent) }
+
+        try? fileManager.removeItem(at: destination)
+        try fileManager.moveItem(at: staging, to: destination)
+        keepStaging = true
+        excludeFromBackup(destination)
+
+        return Summary(
+            folderName: source.lastPathComponent,
+            tracks: library.tracks.count,
+            moodTracks: plan.items.filter { $0.relativePath.hasPrefix(moodTracksFolderName + "/") }.count,
+            hasClassifier: plan.items.contains { isClassifier($0.url) },
+            notDownloaded: plan.notDownloaded
+        )
+    }
+
+    /// The Core ML classifier in a music folder, if it has one.
+    public static func classifierModel(in folder: URL, fileManager: FileManager = .default) -> URL? {
+        let contents = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        // A compiled model loads faster; prefer it.
+        return contents.filter(isClassifier).sorted { lhs, rhs in
+            (lhs.pathExtension == "mlmodelc" ? 0 : 1, lhs.lastPathComponent) < (rhs.pathExtension == "mlmodelc" ? 0 : 1, rhs.lastPathComponent)
+        }.first
+    }
+
+    // MARK: - Internals
+
+    struct Item: Equatable {
+        var url: URL
+        var relativePath: String
+        var isDirectory: Bool
+    }
+
+    struct Plan {
+        var items: [Item] = []
+        var notDownloaded = 0
+    }
+
+    static func plan(for source: URL, fileManager: FileManager) throws -> Plan {
+        var plan = Plan()
+        let root = source.standardizedFileURL.resolvingSymlinksInPath()
+        let rootPath = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        guard let enumerator = fileManager.enumerator(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [],
+            errorHandler: { _, _ in true }
+        ) else {
+            throw ImportError.unreadable(source.lastPathComponent)
+        }
+        for case let url as URL in enumerator {
+            let resolved = url.standardizedFileURL.resolvingSymlinksInPath()
+            guard resolved.path.hasPrefix(rootPath) else { continue }
+            let relative = String(resolved.path.dropFirst(rootPath.count))
+            let components = relative.split(separator: "/").map(String.init)
+            guard let name = components.last else { continue }
+            let isDirectory = (try? resolved.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+
+            if name.hasPrefix(".") {
+                // An iCloud placeholder (".Song.mp3.icloud") means the file is not on the device.
+                if name.hasSuffix(".icloud") {
+                    let original = String(name.dropFirst().dropLast(".icloud".count))
+                    if MusicLibrary.audioExtensions.contains((original as NSString).pathExtension.lowercased()) {
+                        plan.notDownloaded += 1
+                    }
+                }
+                if isDirectory { enumerator.skipDescendants() }
+                continue
+            }
+            if isDirectory {
+                if isClassifier(resolved) {
+                    if components.count == 1 {
+                        plan.items.append(Item(url: resolved, relativePath: relative, isDirectory: true))
+                    }
+                    enumerator.skipDescendants()
+                }
+                continue
+            }
+            let ext = resolved.pathExtension.lowercased()
+            let topLevel = components.count == 1
+            if MusicLibrary.audioExtensions.contains(ext) && !topLevel
+                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || ext == "mlmodel")
+                || components.count == 2 && components[0] == moodTracksFolderName && ext == "json"
+            {
+                plan.items.append(Item(url: resolved, relativePath: relative, isDirectory: false))
+            }
+        }
+        plan.items.sort { $0.relativePath < $1.relativePath }
+        return plan
+    }
+
+    static func isClassifier(_ url: URL) -> Bool {
+        ["mlmodel", "mlmodelc"].contains(url.pathExtension.lowercased())
+    }
+
+    private static func copy(_ source: URL, to target: URL, fileManager: FileManager) throws {
+        #if canImport(Darwin)
+        // Coordinated reading makes iCloud Drive download a file that is not on the device yet.
+        var coordinationError: NSError?
+        var copyError: Error?
+        NSFileCoordinator().coordinate(readingItemAt: source, options: [.withoutChanges], error: &coordinationError) { url in
+            do { try fileManager.copyItem(at: url, to: target) } catch { copyError = error }
+        }
+        let failure: Error? = coordinationError ?? copyError
+        if let error = failure {
+            throw ImportError.unreadable("\(source.lastPathComponent): \(error.localizedDescription)")
+        }
+        #else
+        do {
+            try fileManager.copyItem(at: source, to: target)
+        } catch {
+            throw ImportError.unreadable("\(source.lastPathComponent): \(error)")
+        }
+        #endif
+    }
+
+    private static func excludeFromBackup(_ url: URL) {
+        #if canImport(Darwin)
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        var url = url
+        try? url.setResourceValues(values)
+        #endif
+    }
+}

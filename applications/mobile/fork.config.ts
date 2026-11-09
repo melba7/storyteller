@@ -4,8 +4,9 @@
  * app.config.ts builds upstream's config and then passes it through
  * `withForkIdentity` (the LOFI-FORK lines there), so the fork gets its own
  * name and bundle ID and installs next to the official Storyteller app instead
- * of replacing it. Change the values here, never in app.config.ts, so upstream
- * syncs keep merging cleanly.
+ * of replacing it. It also adds the pods for the fork's lofi music module.
+ * Change the values here, never in app.config.ts, so upstream syncs keep
+ * merging cleanly.
  *
  * app.config.ts imports this file with its `.ts` extension, because Expo loads
  * app.config.ts with Node's `require`, which only finds TypeScript files by
@@ -36,6 +37,53 @@ export const forkIdentity: ForkIdentity = {
   appId: "io.github.melba7.storytellerlofi",
 }
 
+/**
+ * The Swift package in libraries/LofiScoreKit, built from source by CocoaPods
+ * for the fork's lofi music module (modules/lofi-score). Each target has a
+ * podspec next to Package.swift. The path is relative to the generated `ios`
+ * folder.
+ */
+const lofiScorePods = [
+  "LofiScoreCore",
+  "LofiText",
+  "LofiMood",
+  "LofiDirector",
+  "LofiAudio",
+  "LofiPlaceholders",
+  "LofiScoreHost",
+].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" }))
+
+type PluginEntry = NonNullable<ExpoConfig["plugins"]>[number]
+
+interface BuildPropertiesOptions {
+  ios?: { extraPods?: unknown[] }
+}
+
+/**
+ * Adds the LofiScoreKit pods to expo-build-properties' `ios.extraPods`, next
+ * to upstream's own extra pods.
+ */
+export function withLofiScorePods(plugins: PluginEntry[]): PluginEntry[] {
+  return plugins.map((entry) => {
+    const [name, options] = (Array.isArray(entry) ? entry : [entry]) as [
+      unknown,
+      BuildPropertiesOptions | undefined,
+    ]
+    if (name !== "expo-build-properties") return entry
+    const ios = options?.ios ?? {}
+    return [
+      "expo-build-properties",
+      {
+        ...options,
+        ios: {
+          ...ios,
+          extraPods: [...(ios.extraPods ?? []), ...lofiScorePods],
+        },
+      },
+    ]
+  })
+}
+
 export function withForkIdentity(
   upstreamConfig: (context: ConfigContext) => ExpoConfig,
 ): (context: ConfigContext) => ExpoConfig {
@@ -53,6 +101,7 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
     slug: forkIdentity.slug,
     ios: { ...config.ios, bundleIdentifier: appId },
     android: { ...config.android, package: appId },
+    plugins: withLofiScorePods(config.plugins ?? []),
   }
 
   // Upstream's EAS account and project belong to upstream. Drop them unless

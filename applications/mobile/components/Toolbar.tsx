@@ -5,6 +5,7 @@ import { View } from "react-native"
 
 import { type Bookmark } from "@/database/bookmarks"
 import { cn } from "@/lib/utils"
+import { LofiMusicToolbarItem } from "@/lofi/LofiMusicToolbarItem" // LOFI-FORK
 import { useAppSelector } from "@/store/appState"
 import { useGetBookQuery } from "@/store/localApi"
 import {
@@ -58,6 +59,8 @@ export function Toolbar({ mode, activeBookmarks, vertical = false }: Props) {
             </View>
           ))}
         <SpeedItem />
+        {/* LOFI-FORK: lofi music for readaloud books, see FORK.md */}
+        {format === "readaloud" && <LofiMusicToolbarItem />}
         <NavigationItem mode={mode} />
         <BookmarkItem activeBookmarks={activeBookmarks} />
         {format === "readaloud" &&

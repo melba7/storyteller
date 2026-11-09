@@ -35,11 +35,19 @@ Files and folders that belong to the fork, which upstream never touches:
 - `FORK.md`: this file.
 - `.github/workflows/`: fork CI and the upstream sync.
 - `tools/fork/`: the fork checks and the sync scripts.
-- `applications/mobile/fork.config.ts`: the fork's app name and bundle ID.
-- Planned: `libraries/LofiScoreKit/` (the Swift music engine),
-  `applications/mobile/modules/lofi-score/` (its Expo module),
-  `applications/mobile/lofi/` (the React Native UI) and `tools/lofi-library/`
-  (music library scripts).
+- `applications/mobile/fork.config.ts`: the fork's app name and bundle ID, and
+  the pods for the music engine.
+- `libraries/LofiScoreKit/`: the Swift music engine. Next to its
+  `Package.swift`, one podspec per target lets CocoaPods build it from source
+  for the app.
+- `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
+  the JavaScript binding and its tests.
+- `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: read-only
+  hooks on upstream's audiobook player. It is a new file inside upstream's
+  Readium module, because the player's observers and `Track` are internal to it;
+  it only adds observers and reads state, and no upstream line changes.
+- `applications/mobile/lofi/`: the React Native UI.
+- Planned: `tools/lofi-library/` (music library scripts).
 
 Touch points are the only edits to upstream files. Each one carries `LOFI-FORK`
 markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
@@ -47,12 +55,15 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
 - `applications/mobile/app.config.ts` (3 markers): passes upstream's config
   through `withForkIdentity` from `fork.config.ts`, so the fork installs beside
   the official app.
+- `applications/mobile/components/Toolbar.tsx` (2 markers): the music button in
+  the player's toolbar for readaloud books, in the read-along and listening
+  screens. It opens a panel with on and off, the music's volume and the car
+  setting.
+- `applications/mobile/app/(root)/settings.tsx` (2 markers): the music's section
+  in Settings, which also imports a music folder.
 
-Wiring in the music adds four more, each a line or two: making the narrator's
-play, track and sleep-timer observers public in
-`modules/readium/ios/AudiobookPlayerActor.swift`, one import in
-`store/store.ts`, a toolbar button in `components/Toolbar.tsx` and a settings
-link in `app/(root)/settings.tsx` (all under `applications/mobile/`).
+The native side needs no touch point: the Expo module starts with the app and
+follows the narrator through `LofiNarratorBridge.swift`.
 
 To add a touch point, keep the edit to a line or two and put the real code in a
 fork-owned folder. Mark each changed line or block with a `LOFI-FORK` comment,

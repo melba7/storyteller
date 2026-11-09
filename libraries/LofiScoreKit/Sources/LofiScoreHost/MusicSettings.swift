@@ -1,0 +1,59 @@
+import Foundation
+import LofiAudio
+
+/// The music's settings, kept in `UserDefaults` under the `LofiScore.` prefix so they never
+/// mix with the app's own preferences.
+public final class MusicSettings: @unchecked Sendable {
+    public static let musicLevelRange: ClosedRange<Double> = -30 ... -4
+
+    private let defaults: UserDefaults
+    private let prefix = "LofiScore."
+
+    public init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    /// Music under the narration. On by default: installing the fork is opting in.
+    public var enabled: Bool {
+        get { defaults.object(forKey: prefix + "enabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: prefix + "enabled") }
+    }
+
+    /// Keep the music off when the narration plays through CarPlay.
+    public var mutedInCar: Bool {
+        get { defaults.bool(forKey: prefix + "mutedInCar") }
+        set { defaults.set(newValue, forKey: prefix + "mutedInCar") }
+    }
+
+    /// The music's level under the voice, in dB, if the listener moved the slider. Nil
+    /// means the player's default, which may change between versions.
+    public var musicLevelDB: Double? {
+        get { defaults.object(forKey: prefix + "musicLevelDB") as? Double }
+        set {
+            if let newValue {
+                let clamped = min(Self.musicLevelRange.upperBound, max(Self.musicLevelRange.lowerBound, newValue))
+                defaults.set(clamped, forKey: prefix + "musicLevelDB")
+            } else {
+                defaults.removeObject(forKey: prefix + "musicLevelDB")
+            }
+        }
+    }
+
+    /// The name of the folder the music was last imported from, for the settings screen.
+    public var importedFolderName: String? {
+        get { defaults.string(forKey: prefix + "importedFolderName") }
+        set { defaults.set(newValue, forKey: prefix + "importedFolderName") }
+    }
+
+    /// The player's ducking with the listener's level applied.
+    public func ducking(base: DuckingSettings = DuckingSettings()) -> DuckingSettings {
+        var ducking = base
+        if let musicLevelDB { ducking.bedLevelDB = musicLevelDB }
+        return ducking
+    }
+
+    /// Routes where the music stays off.
+    public var mutedRoutes: Set<OutputRoute> {
+        mutedInCar ? [.carPlay] : []
+    }
+}

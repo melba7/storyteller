@@ -33,6 +33,7 @@ let package = Package(
         .library(name: "LofiAudio", targets: ["LofiAudio"]),
         .library(name: "LofiPlaceholders", targets: ["LofiPlaceholders"]),
         .library(name: "LofiDemoKit", targets: ["LofiDemoKit"]),
+        .library(name: "LofiScoreHost", targets: ["LofiScoreHost"]),
         .executable(name: "lofi-eval", targets: ["LofiEvalCLI"]),
         .executable(name: "lofi-train", targets: ["LofiTrainCLI"]),
         .executable(name: "lofi-replay", targets: ["lofi-replay"]),
@@ -83,6 +84,16 @@ let package = Package(
             swiftSettings: swift5
         ),
 
+        // MARK: App integration
+
+        // What the Storyteller app's native module drives: follows the narrator's events,
+        // opens each book's text, imports music folders, keeps the settings.
+        .target(
+            name: "LofiScoreHost",
+            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders"],
+            swiftSettings: swift5
+        ),
+
         .executableTarget(name: "lofi-replay", dependencies: ["LofiDirector"], swiftSettings: swift5),
         .executableTarget(
             name: "lofi-placeholders",
@@ -118,6 +129,11 @@ let package = Package(
         .testTarget(
             name: "LofiDemoKitTests",
             dependencies: ["LofiDemoKit", "LofiAudio", "LofiDirector", "LofiScoreCore"],
+            swiftSettings: swift5
+        ),
+        .testTarget(
+            name: "LofiScoreHostTests",
+            dependencies: ["LofiScoreHost", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiScoreCore"],
             swiftSettings: swift5
         ),
     ]

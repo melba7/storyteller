@@ -86,7 +86,8 @@ jobs:
       - name: Formatting of the fork's own files
         run: |
           yarn oxfmt --check FORK.md .github/workflows tools/fork \
-            applications/mobile/fork.config.ts applications/mobile/app.config.ts
+            applications/mobile/fork.config.ts applications/mobile/app.config.ts \
+            applications/mobile/lofi applications/mobile/modules/lofi-score
 
   ios-build:
     name: iOS simulator build

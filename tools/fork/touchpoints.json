@@ -7,6 +7,7 @@
     "applications/mobile/fork.config.ts",
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
+    "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
     "libraries/LofiScoreKit/",
     "tools/fork/",
     "tools/lofi-library/"
@@ -16,6 +17,16 @@
       "file": "applications/mobile/app.config.ts",
       "markers": 3,
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
+    },
+    {
+      "file": "applications/mobile/app/(root)/settings.tsx",
+      "markers": 2,
+      "purpose": "Shows the lofi music's section (on and off, volume, the car, importing a music folder) under the reading settings."
+    },
+    {
+      "file": "applications/mobile/components/Toolbar.tsx",
+      "markers": 2,
+      "purpose": "Adds the lofi music button to the player's toolbar for readaloud books, in both the read-along and listening screens."
     }
   ],
   "allowedChanges": [],
