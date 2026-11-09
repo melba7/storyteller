@@ -1,6 +1,7 @@
 #if canImport(AVFoundation)
 import AVFoundation
 import Foundation
+import LofiAtmosphere
 import LofiAudio
 
 extension LofiMusicHost {
@@ -10,7 +11,10 @@ extension LofiMusicHost {
     /// - stand-in tracks synthesised into `Caches/LofiScore/Placeholders` until then,
     /// - mood tracks also read from `Application Support/LofiScore/MoodTracks`,
     /// - books where Storyteller unzips them, `Documents/books/extracted/<uuid>/readaloud`,
-    /// - AVAudioEngine for the sound, inside the narrator's own audio session.
+    /// - AVAudioEngine for the sound, inside the narrator's own audio session,
+    /// - the atmosphere: imported sounds in `Music/Atmosphere`, stand-ins synthesised into
+    ///   `Caches/LofiScore/Atmosphere`, atmosphere tracks also read from
+    ///   `Application Support/LofiScore/AtmosphereTracks`, and a second AVAudioEngine of its own.
     public static func forApp(settings: MusicSettings = MusicSettings()) -> LofiMusicHost {
         let fileManager = FileManager.default
         let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -24,7 +28,10 @@ extension LofiMusicHost {
             placeholderFolder: caches.appendingPathComponent("Placeholders", isDirectory: true),
             moodTrackFolders: [support.appendingPathComponent("MoodTracks", isDirectory: true)],
             booksFolder: documents.appendingPathComponent("books/extracted", isDirectory: true),
-            makeBackend: { AVAudioEngineBackend() }
+            makeBackend: { AVAudioEngineBackend() },
+            makeAmbienceBackend: { AVAmbienceBackend() },
+            atmospherePlaceholderFolder: caches.appendingPathComponent("Atmosphere", isDirectory: true),
+            atmosphereTrackFolders: [support.appendingPathComponent("AtmosphereTracks", isDirectory: true)]
         ))
     }
 }

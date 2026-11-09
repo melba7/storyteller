@@ -52,12 +52,32 @@ public final class LofiScoreModule: Module {
         "moodTracks": summary.moodTracks,
         "hasClassifier": summary.hasClassifier,
         "notDownloaded": summary.notDownloaded,
+        "atmosphereRecordings": summary.atmosphereRecordings,
+        "atmosphereTracks": summary.atmosphereTracks,
       ]
     }
 
     // The imported music's CREDITS.md, or null.
     AsyncFunction("getMusicCredits") { () async -> String? in
       await LofiScoreRuntime.shared.host.musicCredits()
+    }
+
+    AsyncFunction("setAtmosphereEnabled") { (enabled: Bool) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setAtmosphereEnabled(enabled)
+      return await host.status().jsonObject()
+    }
+
+    // The atmosphere's level under the voice, in dB. null goes back to the default.
+    AsyncFunction("setAtmosphereLevel") { (level: Double?) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setAtmosphereLevel(dB: level)
+      return await host.status().jsonObject()
+    }
+
+    // The imported sounds' Atmosphere/CREDITS.md, or null.
+    AsyncFunction("getAtmosphereCredits") { () async -> String? in
+      await LofiScoreRuntime.shared.host.atmosphereCredits()
     }
 
     AsyncFunction("removeImportedMusic") { () async -> [String: Any] in

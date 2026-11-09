@@ -70,6 +70,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
     }
 
     private var bookID: String?
+    /// The last track given, kept for its book: it may arrive just before the book opens.
+    private var givenTrack: (bookID: String, track: AtmosphereTrack?)?
     private var enabled = true
     private var narrating = false
     private var routeMuted = false
@@ -117,7 +119,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             guard bookID != id else { return }
             bookID = id
-            director.setTrack(nil)
+            director.setTrack(givenTrack?.bookID == id ? givenTrack?.track : nil)
+            missing = []
             playhead = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
             updateTransport(at: scheduler.now)
@@ -139,10 +142,11 @@ public final class AmbiencePlayer: @unchecked Sendable {
         }
     }
 
-    /// The book's atmosphere track, or nil when it has none. Ignored if another book has
-    /// been opened since.
+    /// The book's atmosphere track, or nil when it has none. Kept for when that book opens
+    /// if another book is open now.
     public func setTrack(_ track: AtmosphereTrack?, forBook id: String) {
         scheduler.perform { [self] in
+            givenTrack = (id, track)
             guard bookID == id else { return }
             director.setTrack(track)
             missing = []

@@ -9,6 +9,7 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { LofiScore } from "@/modules/lofi-score"
 import {
+  atmosphereSourceLabel,
   moodCounts,
   moodName,
   musicSourceLabel,
@@ -40,6 +41,12 @@ export function LofiMusicSettings() {
         if (summary.moodTracks > 0) {
           parts.push(`${summary.moodTracks} book mood tracks.`)
         }
+        if (summary.atmosphereRecordings) {
+          parts.push(`${summary.atmosphereRecordings} atmosphere sounds.`)
+        }
+        if (summary.atmosphereTracks) {
+          parts.push(`${summary.atmosphereTracks} book atmosphere tracks.`)
+        }
         if (summary.notDownloaded > 0) {
           parts.push(
             `${summary.notDownloaded} files were still in iCloud and were left out: open the folder in Files to download them, then import again.`,
@@ -67,14 +74,29 @@ export function LofiMusicSettings() {
     }
   }
 
+  async function showSoundCredits() {
+    try {
+      const text = await LofiScore?.getAtmosphereCredits()
+      setCredits(
+        text
+          ? plainCredits(text)
+          : "The Atmosphere folder came without a CREDITS.md file.",
+      )
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    }
+  }
+
   return (
     <View className="mt-8 w-full gap-4">
       <Text variant="h2">Lofi Music</Text>
       <Text variant="p" className="text-sm">
         Quiet lofi music under the narration of readaloud books, matched to the
         mood of the passage being read. It only ever follows what you have
-        already heard, so it never gives away what comes next. Turn it on or off
-        and change its volume from the music button in the player too.
+        already heard, so it never gives away what comes next. Atmosphere sounds
+        add the quiet sounds of the scene, like rain, a fire or the sea, and the
+        music steps aside while a crowd is heard. Turn them on or off and change
+        their volume from the music button in the player too.
       </Text>
       <LofiMusicControls music={music} />
       {status && (
@@ -119,6 +141,31 @@ export function LofiMusicSettings() {
               <Text>Remove imported music</Text>
             </Button>
           )}
+          {status.atmosphere?.available && (
+            <>
+              <Text maxFontSizeMultiplier={1.5} className="mt-2 text-lg">
+                Atmosphere sounds
+              </Text>
+              <Text variant="muted">
+                {atmosphereSourceLabel(status.atmosphere)}
+              </Text>
+              <Text variant="muted">
+                They come from an Atmosphere folder inside the music folder,
+                with one subfolder per sound (Rain, Fireplace, Crowd, …), and
+                play for books with an atmosphere track.
+              </Text>
+              {(status.atmosphere.source === "imported" ||
+                status.atmosphere.source === "mixed") && (
+                <Button
+                  accessibilityLabel="Show the sound credits"
+                  variant="ghost"
+                  onPress={() => void showSoundCredits()}
+                >
+                  <Text>Sound credits</Text>
+                </Button>
+              )}
+            </>
+          )}
           {message && <Text className="text-sm">{message}</Text>}
           {status.lastError && (
             <Text variant="muted">Last problem: {status.lastError}</Text>
@@ -143,7 +190,7 @@ export function LofiMusicSettings() {
             </Text>
           </ScrollView>
           <Button
-            accessibilityLabel="Close the music credits"
+            accessibilityLabel="Close the credits"
             variant="secondary"
             onPress={() => {
               setCredits(null)

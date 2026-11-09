@@ -5,6 +5,8 @@ import LofiAudio
 /// mix with the app's own preferences.
 public final class MusicSettings: @unchecked Sendable {
     public static let musicLevelRange: ClosedRange<Double> = -30 ... -4
+    /// Matches `AtmosphereConfig.levelRange`.
+    public static let atmosphereLevelRange: ClosedRange<Double> = -40 ... -16
 
     private let defaults: UserDefaults
     private let prefix = "LofiScore."
@@ -35,6 +37,27 @@ public final class MusicSettings: @unchecked Sendable {
                 defaults.set(clamped, forKey: prefix + "musicLevelDB")
             } else {
                 defaults.removeObject(forKey: prefix + "musicLevelDB")
+            }
+        }
+    }
+
+    /// Quiet sounds of the scene (rain, a fire, a crowd) under the narration. On by default,
+    /// like the music; it plays only for books with an atmosphere track.
+    public var atmosphereEnabled: Bool {
+        get { defaults.object(forKey: prefix + "atmosphereEnabled") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: prefix + "atmosphereEnabled") }
+    }
+
+    /// The atmosphere's level under the voice, in dB, if the listener moved the slider. Nil
+    /// means the player's default.
+    public var atmosphereLevelDB: Double? {
+        get { defaults.object(forKey: prefix + "atmosphereLevelDB") as? Double }
+        set {
+            if let newValue {
+                let range = Self.atmosphereLevelRange
+                defaults.set(min(range.upperBound, max(range.lowerBound, newValue)), forKey: prefix + "atmosphereLevelDB")
+            } else {
+                defaults.removeObject(forKey: prefix + "atmosphereLevelDB")
             }
         }
     }

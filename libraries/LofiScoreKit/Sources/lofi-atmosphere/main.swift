@@ -5,7 +5,8 @@ import LofiPlaceholders
 import LofiText
 
 // lofi-atmosphere: score a book's atmosphere track with Claude, print a track's scenes,
-// write the synthesised stand-in sounds, or check a sounds folder.
+// combine it with the mood track into a book score, write the synthesised stand-in
+// sounds, or check a sounds folder.
 
 let usage = """
     usage:
@@ -13,10 +14,14 @@ let usage = """
                       [--max-dollars D] [--words 250] [--probe-budget 0.5] [--resolution 3] [--concurrency 4]
       lofi-atmosphere track EPUB-DIR --book NAME --dry-run
       lofi-atmosphere show FILE [--places]
+      lofi-atmosphere score --out FILE [--mood TRACK.track.json] [--atmosphere TRACK.atmosphere.json]
       lofi-atmosphere synth FOLDER [--seconds 30] [--rate 32000] [--sound rain]
       lofi-atmosphere library FOLDER
 
-    The key comes from ANTHROPIC_API_KEY, or the file named by ANTHROPIC_API_KEY_FILE; it is never printed.
+    Claude is reached like lofi-eval: LOFI_CLAUDE_VIA=api uses the Anthropic API with the key from
+    ANTHROPIC_API_KEY, or the file named by ANTHROPIC_API_KEY_FILE (never printed); LOFI_CLAUDE_VIA=plan
+    runs each request through Claude Code (`claude -p`, or LOFI_CLAUDE_CODE) on its signed-in plan.
+    Unset, the API is used when a key is set and the plan otherwise.
     """
 
 func note(_ text: String) {
@@ -61,7 +66,7 @@ struct Arguments {
     func flag(_ name: String) -> Bool { flags.contains(name) }
 }
 
-func apiKey() -> String {
+func apiKey() -> String? {
     let env = ProcessInfo.processInfo.environment
     if let key = env["ANTHROPIC_API_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
         return key
@@ -71,7 +76,32 @@ func apiKey() -> String {
         .trimmingCharacters(in: .whitespacesAndNewlines), !key.isEmpty {
         return key
     }
-    fail("set ANTHROPIC_API_KEY, or ANTHROPIC_API_KEY_FILE to a file holding the key")
+    return nil
+}
+
+/// How requests reach Claude: the same LOFI_CLAUDE_VIA convention as lofi-eval.
+func claudeTransport() -> (apiKey: String, transport: any HTTPTransport, via: String) {
+    let env = ProcessInfo.processInfo.environment
+    let plan: () -> (String, any HTTPTransport, String) = {
+        #if os(macOS) || os(Linux)
+        let executable = env["LOFI_CLAUDE_CODE"].flatMap { $0.isEmpty ? nil : $0 } ?? "claude"
+        return ("claude-code", ClaudeCodeTransport(executable: executable), "plan")
+        #else
+        fail("the plan route needs macOS or Linux")
+        #endif
+    }
+    switch env["LOFI_CLAUDE_VIA"]?.lowercased() {
+    case "api":
+        guard let key = apiKey() else { fail("set ANTHROPIC_API_KEY, or ANTHROPIC_API_KEY_FILE to a file holding the key") }
+        return (key, URLSessionTransport(), "api")
+    case "plan", "claude-code", "subscription":
+        return plan()
+    case nil, "":
+        if let key = apiKey() { return (key, URLSessionTransport(), "api") }
+        return plan()
+    case let other?:
+        fail("LOFI_CLAUDE_VIA must be api or plan, not \(other)")
+    }
 }
 
 /// Stops a paid run before it spends more than `--max-dollars` at list prices.
@@ -160,11 +190,14 @@ func trackCommand(_ args: Arguments) async throws {
     let model = args.string("model") ?? "claude-opus-5-5"
     guard let prices = ScenePrices.forModel(model) else { fail("no price known for \(model); use one of \(ScenePrices.known.map(\.model))") }
     let usage = SceneUsage()
+    let route = claudeTransport()
     let engine = ClaudeSceneEngine(
-        apiKey: apiKey(),
+        apiKey: route.apiKey,
         configuration: .init(model: prices.model, effort: args.string("effort") ?? "low"),
-        usage: usage
+        usage: usage,
+        transport: route.transport
     )
+    note("\(book): \(engine.id) via the \(route.via == "plan" ? "Claude plan (Claude Code)" : "Anthropic API")")
     let outURL = URL(fileURLWithPath: outPath)
     var track = AtmosphereTrack(engineID: engine.id, bookID: book, wordsBetweenEntries: plan.wordsBetweenEntries)
     if FileManager.default.fileExists(atPath: outPath) {
@@ -197,7 +230,7 @@ func trackCommand(_ args: Arguments) async throws {
         note(String(format: "  stopped at --max-dollars %.2f; run again with a higher cap to finish", cap.dollars ?? 0))
     }
     report.failures.prefix(5).forEach { note("  failed \($0)") }
-    note(String(format: "  Claude: %d responses, %d input, %d cache-read, %d output tokens, %d retries, %d refusals: about $%.2f at %@",
+    note(String(format: "  Claude: %d responses, %d input, %d cache-read, %d output tokens, %d retries, %d refusals: about $%.2f at %@ list prices",
                 totals.responses, totals.inputTokens, totals.cacheReadTokens, totals.outputTokens, totals.retries,
                 totals.refusals, prices.dollars(totals), prices.model))
     note("wrote \(outPath)")
@@ -231,6 +264,25 @@ func showCommand(_ args: Arguments) throws {
         }
         if let world = memory.world { print("world: \(world)") }
     }
+}
+
+// MARK: - score
+
+/// Writes a book score, format 1: `{"format":1,"mood":…,"atmosphere":…}`, the file that can
+/// travel inside the read-aloud EPUB at META-INF/storyteller-lofi/score.json.
+func scoreCommand(_ args: Arguments) throws {
+    guard let outPath = args.string("out") else { fail("give --out FILE\n\(usage)") }
+    var object: [String: Any] = ["format": 1]
+    if let path = args.string("mood") {
+        object["mood"] = try JSONSerialization.jsonObject(with: MoodTrack.load(from: URL(fileURLWithPath: path)).encoded())
+    }
+    if let path = args.string("atmosphere") {
+        object["atmosphere"] = try JSONSerialization.jsonObject(with: AtmosphereTrack.load(from: URL(fileURLWithPath: path)).encoded())
+    }
+    guard object.count > 1 else { fail("give --mood, --atmosphere or both\n\(usage)") }
+    let data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
+    try data.write(to: URL(fileURLWithPath: outPath), options: .atomic)
+    note("wrote \(outPath) with \(object.keys.filter { $0 != "format" }.sorted().joined(separator: " and "))")
 }
 
 // MARK: - synth and library
@@ -268,6 +320,7 @@ do {
     switch args.positional.first {
     case "track": try await trackCommand(args)
     case "show": try showCommand(args)
+    case "score": try scoreCommand(args)
     case "synth": try synthCommand(args)
     case "library": try libraryCommand(args)
     default: fail(usage)

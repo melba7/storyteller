@@ -85,6 +85,37 @@ export function useLofiMusic(pollInterval: number | null) {
     [apply],
   )
 
+  const setAtmosphereEnabled = useCallback(
+    (enabled: boolean) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? { ...current, atmosphere: { ...current.atmosphere, enabled } }
+            : current,
+        () => LofiScore?.setAtmosphereEnabled(enabled),
+      ),
+    [apply],
+  )
+
+  /** The atmosphere's level under the voice in dB, or null for the default. */
+  const setAtmosphereLevel = useCallback(
+    (level: number | null) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? {
+                ...current,
+                atmosphere: {
+                  ...current.atmosphere,
+                  levelDB: level ?? current.atmosphere.defaultLevelDB,
+                },
+              }
+            : current,
+        () => LofiScore?.setAtmosphereLevel(level),
+      ),
+    [apply],
+  )
+
   const importMusicFolder =
     useCallback(async (): Promise<LofiImportSummary | null> => {
       if (!LofiScore) return null
@@ -109,6 +140,8 @@ export function useLofiMusic(pollInterval: number | null) {
     setEnabled,
     setMutedInCar,
     setMusicLevel,
+    setAtmosphereEnabled,
+    setAtmosphereLevel,
     importMusicFolder,
     removeImportedMusic,
   }

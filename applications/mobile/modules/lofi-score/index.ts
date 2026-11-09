@@ -15,6 +15,65 @@ export type LofiMood =
   | "adventurous"
   | (string & {})
 
+/** A sound of the atmosphere, as the native module names it. */
+export type LofiAmbientSound =
+  | "rain"
+  | "heavyRain"
+  | "rainIndoors"
+  | "thunder"
+  | "wind"
+  | "strongWind"
+  | "snow"
+  | "fireplace"
+  | "campfire"
+  | "seaShore"
+  | "openSea"
+  | "river"
+  | "dripping"
+  | "forest"
+  | "birdsong"
+  | "nightInsects"
+  | "nightForest"
+  | "swamp"
+  | "crowd"
+  | "city"
+  | "oldTown"
+  | "horses"
+  | "train"
+  | "ship"
+  | "machinery"
+  | "clock"
+  | (string & {})
+
+/** The atmosphere sounds' state: quiet sounds of the scene under the voice. */
+export type LofiAtmosphereStatus = {
+  enabled: boolean
+  /** False when this build cannot play them. */
+  available: boolean
+  /** The level of a sound at full, in dB under the voice. */
+  levelDB: number
+  defaultLevelDB: number
+  levelRange: number[]
+  /** Imported recordings, synthesised stand-ins, both, or nothing. */
+  source: "imported" | "standIns" | "mixed" | "none"
+  preparing: boolean
+  /** Sounds with a recording, of `totalSounds`. */
+  sounds: number
+  totalSounds: number
+  /** The open book has an atmosphere track. */
+  track: boolean
+  trackOrigin?: string
+  /** The place being narrated and its sounds. Only ever the present. */
+  place?: string
+  playing: LofiAmbientSound[]
+  /** The music has faded out for a crowd. */
+  musicYielding: boolean
+  chapterDip: boolean
+  missingSounds: LofiAmbientSound[]
+  engineRunning: boolean
+  lastError?: string
+}
+
 /** The music's state, as the native module reports it. */
 export type LofiMusicStatus = {
   enabled: boolean
@@ -52,6 +111,8 @@ export type LofiMusicStatus = {
     routeMuted: boolean
     recentMoods: LofiMood[]
   }
+  /** Missing from builds before the atmosphere sounds. */
+  atmosphere?: LofiAtmosphereStatus
   recentEvents: string[]
   lastError?: string
 }
@@ -64,6 +125,9 @@ export type LofiImportSummary = {
   hasClassifier: boolean
   /** Files that were still only in iCloud and were left out. */
   notDownloaded: number
+  /** Recordings from the folder's Atmosphere folder, and atmosphere tracks. */
+  atmosphereRecordings?: number
+  atmosphereTracks?: number
 }
 
 type LofiScoreNativeModule = {
@@ -77,6 +141,11 @@ type LofiScoreNativeModule = {
   removeImportedMusic(): Promise<LofiMusicStatus>
   /** The imported music's CREDITS.md, or null when it had none. */
   getMusicCredits(): Promise<string | null>
+  setAtmosphereEnabled(enabled: boolean): Promise<LofiMusicStatus>
+  /** null goes back to the default level. */
+  setAtmosphereLevel(level: number | null): Promise<LofiMusicStatus>
+  /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
+  getAtmosphereCredits(): Promise<string | null>
 }
 
 /**

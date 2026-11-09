@@ -170,6 +170,12 @@ final class PlayerTests: XCTestCase {
         h.player.closeBook()
         h.scheduler.advance(by: 2)
         XCTAssertTrue(h.audible.isEmpty)
+
+        // A track that arrives just before its book opens is kept for it.
+        h.player.openBook(id: "another book")
+        h.narrate(0, then: 4)
+        XCTAssertEqual(h.snapshot.scene?.placeID, "p1")
+        XCTAssertEqual(h.audible.count, 1)
     }
 
     func testTheLevelSliderMovesEverySound() throws {

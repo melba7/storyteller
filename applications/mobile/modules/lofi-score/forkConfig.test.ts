@@ -33,6 +33,7 @@ describe("withLofiScorePods", () => {
       "LofiDirector",
       "LofiAudio",
       "LofiPlaceholders",
+      "LofiAtmosphere",
       "LofiScoreHost",
     ])
     expect(options.ios.extraPods[1]).toEqual({
