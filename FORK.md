@@ -42,10 +42,11 @@ Files and folders that belong to the fork, which upstream never touches:
   for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
-- `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: read-only
-  hooks on upstream's audiobook player. It is a new file inside upstream's
-  Readium module, because the player's observers and `Track` are internal to it;
-  it only adds observers and reads state, and no upstream line changes.
+- `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on
+  upstream's audiobook player. It is a new file inside upstream's Readium module,
+  because the player's observers and `Track` are internal to it. It adds
+  observers and reads state, and holds the narration for a moment when the
+  atmosphere swells at a big scene change (see the touch point below).
 - `applications/mobile/lofi/`: the React Native UI.
 - Planned: `tools/lofi-library/` (music library scripts).
 
@@ -61,9 +62,18 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   setting.
 - `applications/mobile/app/(root)/settings.tsx` (2 markers): the music's section
   in Settings, which also imports a music folder.
+- `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift`
+  (8 markers): the narration hold. When the atmosphere swells at a big scene
+  change, the bridge stops the narrator at the end of the sentence for under a
+  second (0.8 s by default, switchable in Settings) and then carries on. These
+  one-line hooks keep that invisible: `getIsPlaying()` and the remote play and
+  toggle commands count a hold as playing, the play state observer ignores it,
+  pause and the sleep timer end it and report the pause, and play ends it early
+  without the automatic rewind. The real code, and an access extension at the
+  end of the file for the player's private state, live in the bridge.
 
-The native side needs no touch point: the Expo module starts with the app and
-follows the narrator through `LofiNarratorBridge.swift`.
+The Expo module needs no touch point: it starts with the app and follows the
+narrator through `LofiNarratorBridge.swift`.
 
 To add a touch point, keep the edit to a line or two and put the real code in a
 fork-owned folder. Mark each changed line or block with a `LOFI-FORK` comment,

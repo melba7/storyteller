@@ -27,6 +27,11 @@
       "file": "applications/mobile/components/Toolbar.tsx",
       "markers": 2,
       "purpose": "Adds the lofi music button to the player's toolbar for readaloud books, in both the read-along and listening screens."
+    },
+    {
+      "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",
+      "markers": 8,
+      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer."
     }
   ],
   "allowedChanges": [],
