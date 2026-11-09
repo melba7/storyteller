@@ -362,14 +362,15 @@ def cmd_final(args) -> None:
     note(f"wrote {args.out} ({params / 1e6:.1f}M parameters, about {params * 2 / 1e6:.0f} MB in 16-bit)")
 
 
-def load_final(folder: str):
+def load_final(folder: str, eager: bool = False):
     torch, nn = torch_modules()
     from transformers import AutoModel, AutoTokenizer
     with open(os.path.join(folder, "meta.json")) as f:
         meta = json.load(f)
     tok = AutoTokenizer.from_pretrained(os.path.join(folder, "encoder"))
     tok.truncation_side = "left"
-    encoder = AutoModel.from_pretrained(os.path.join(folder, "encoder"))
+    extra = {"attn_implementation": "eager"} if eager else {}
+    encoder = AutoModel.from_pretrained(os.path.join(folder, "encoder"), **extra)
 
     class MoodNet(nn.Module):
         def __init__(self):
@@ -417,6 +418,94 @@ def cmd_read(args) -> None:
     note(f"read {len(windows)} windows -> {args.out} (earlier weight {weight}, {per_window_ms:.1f} ms a window in batches)")
 
 
+def cmd_coreml(args) -> None:
+    """Core ML for the app: an ML program (16-bit) taking input_ids and
+    attention_mask of a fixed length and giving the mood probabilities, plus
+    a JSON file with the WordPiece vocabulary and settings the app's
+    tokenizer needs. On macOS it also checks the Core ML model against
+    PyTorch on windows from --check."""
+    import numpy as np
+    import coremltools as ct
+    torch, nn = torch_modules()
+    model, tok, meta = load_final(args.model, eager=True)
+    model = model.to("cpu").float().eval()
+    length = meta.get("max_len", 256)
+
+    class Probabilities(nn.Module):
+        def __init__(self, inner):
+            super().__init__()
+            self.inner = inner
+
+        def forward(self, input_ids, attention_mask):
+            # The additive 4-D mask is built here, so the encoder skips
+            # transformers' own mask code (which Core ML cannot convert).
+            extended = (1.0 - attention_mask[:, None, None, :].to(torch.float32)) * -10000.0
+            hidden = self.inner.encoder(input_ids=input_ids, attention_mask=extended).last_hidden_state
+            m = attention_mask.unsqueeze(-1).to(hidden.dtype)
+            pooled = (hidden * m).sum(1) / m.sum(1).clamp(min=1e-6)
+            return torch.softmax(self.inner.head(pooled), dim=-1)
+
+    wrapped = Probabilities(model).eval()
+    sample = tok(["It was a quiet evening by the fire."], padding="max_length", truncation=True,
+                 max_length=length, return_tensors="pt")
+    with torch.no_grad():
+        same = torch.allclose(wrapped(sample["input_ids"], sample["attention_mask"]),
+                              torch.softmax(model(sample["input_ids"], sample["attention_mask"]), dim=-1), atol=1e-4)
+    if not same:
+        raise SystemExit("the 4-D mask path does not match the model; not converting")
+    # torch.export copes with newer transformers' mask code, which TorchScript
+    # tracing turns into ops Core ML cannot convert; fall back to tracing.
+    try:
+        program = torch.export.export(wrapped, (sample["input_ids"], sample["attention_mask"]))
+        source = program.run_decompositions({})
+    except Exception as e:  # older torch
+        note(f"torch.export failed ({type(e).__name__}: {e}); tracing instead")
+        with torch.no_grad():
+            source = torch.jit.trace(wrapped, (sample["input_ids"], sample["attention_mask"]), strict=False)
+    ml = ct.convert(
+        source,
+        inputs=[ct.TensorType(name="input_ids", shape=(1, length), dtype=np.int32),
+                ct.TensorType(name="attention_mask", shape=(1, length), dtype=np.int32)],
+        outputs=[ct.TensorType(name="probabilities")],
+        convert_to="mlprogram", compute_precision=ct.precision.FLOAT16,
+        minimum_deployment_target=ct.target.iOS17,
+    )
+    ml.short_description = f"Mood of a passage ({', '.join(MOODS)}), fine-tuned from {meta['base']}"
+    ml.license = "Model weights: Apache-2.0 base (see CREDITS). Mood labels: LofiScoreKit."
+    name = args.name
+    os.makedirs(args.out, exist_ok=True)
+    package = os.path.join(args.out, f"{name}.mlpackage")
+    ml.save(package)
+    vocab = [t for t, _ in sorted(tok.get_vocab().items(), key=lambda kv: kv[1])]
+    config = {
+        "format": 1, "kind": "wordpiece-transformer", "model": f"{name}.mlmodelc", "moods": MOODS,
+        "maxTokens": length, "lowercase": bool(getattr(tok, "do_lower_case", True)),
+        "chunkWords": meta.get("chunk_words", CHUNK_WORDS), "earlierWeight": meta.get("earlier_weight", 0.2),
+        "base": meta["base"], "variant": meta.get("variant"),
+        "special": {"cls": tok.cls_token, "sep": tok.sep_token, "pad": tok.pad_token, "unk": tok.unk_token},
+        "vocab": vocab,
+    }
+    with open(os.path.join(args.out, f"{name}.json"), "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, separators=(",", ":"))
+    size = sum(os.path.getsize(os.path.join(d, x)) for d, _, xs in os.walk(package) for x in xs)
+    note(f"wrote {package} ({size / 1e6:.1f} MB) and {name}.json ({len(vocab)} word pieces)")
+
+    if args.check and sys.platform == "darwin":
+        windows = [json.loads(line) for line in open(args.check, encoding="utf-8") if line.strip()][:args.check_count]
+        agree, worst = 0, 0.0
+        for w in windows:
+            enc = tok([recent_chunk(w["text"])], padding="max_length", truncation=True, max_length=length, return_tensors="pt")
+            with torch.no_grad():
+                p_torch = wrapped(enc["input_ids"], enc["attention_mask"])[0].tolist()
+            out = ml.predict({"input_ids": enc["input_ids"].numpy().astype(np.int32),
+                              "attention_mask": enc["attention_mask"].numpy().astype(np.int32)})
+            p_ml = [float(x) for x in np.asarray(out["probabilities"]).reshape(-1)]
+            agree += argmax_mood(p_torch) == argmax_mood(p_ml)
+            worst = max(worst, max(abs(a - b) for a, b in zip(p_torch, p_ml)))
+        note(f"Core ML vs PyTorch on {len(windows)} windows: same mood {agree}/{len(windows)}, "
+             f"largest probability difference {worst:.4f}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -450,8 +539,14 @@ def main() -> None:
     p.add_argument("--out", required=True)
     p.add_argument("--engine", default=None)
     p.add_argument("--earlier-weight", type=float, default=None)
+    p = sub.add_parser("coreml")
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", required=True)
+    p.add_argument("--name", default="LofiMood-lm")
+    p.add_argument("--check", default=None, help="windows .jsonl to compare Core ML with PyTorch on (macOS)")
+    p.add_argument("--check-count", type=int, default=200)
     args = ap.parse_args()
-    {"oof": cmd_oof, "final": cmd_final, "read": cmd_read}[args.cmd](args)
+    {"oof": cmd_oof, "final": cmd_final, "read": cmd_read, "coreml": cmd_coreml}[args.cmd](args)
 
 
 if __name__ == "__main__":

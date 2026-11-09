@@ -8,6 +8,7 @@
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
 #   Tools/mac/finetune.sh [--recipes-dir DIR] [--base NAME] [--variants hard,soft]
 #                         [--folds 10] [--epochs 3] [--out DIR] [--smoke]
+#   Tools/mac/finetune.sh --convert RESULTS/models/lm-soft [--name LofiMood-lm-minilm-soft]
 #
 # Run Tools/mac/try-recipes.sh first: this reuses its export
 # (Tools/data/work/train), its out-of-fold rows (oof-word.jsonl) and its
@@ -34,6 +35,8 @@ FOLDS=10
 EPOCHS=3
 SMOKE=0
 OUT=""
+CONVERT=""
+NAME=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --recipes-dir) RECIPES_DIR="$2"; shift 2 ;;
@@ -43,10 +46,12 @@ while [ $# -gt 0 ]; do
     --epochs) EPOCHS="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
     --smoke) SMOKE=1; shift ;;
+    --convert) CONVERT="$2"; shift 2 ;;
+    --name) NAME="$2"; shift 2 ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
 done
-[ -n "$OUT" ] || OUT="$ROOT/lofi-mood-eval-results/$(date +%Y-%m-%d-%H%M)-finetune$([ $SMOKE = 1 ] && echo -smoke)"
+[ -n "$OUT" ] || OUT="$ROOT/lofi-mood-eval-results/$(date +%Y-%m-%d-%H%M)-finetune$([ $SMOKE = 1 ] && echo -smoke)$([ -n "$CONVERT" ] && echo -coreml)"
 case "$PKG" in "$ROOT"/*) ;; *) echo "Run this from a clone inside ~/Storyteller Lofi (found $PKG)."; exit 2 ;; esac
 case "$OUT" in "$ROOT"/*) ;; *) echo "--out must be inside ~/Storyteller Lofi"; exit 2 ;; esac
 if [ -z "$RECIPES_DIR" ]; then
@@ -91,6 +96,24 @@ fi
 "$PY" -I -c 'import sys, torch, transformers; print("python", sys.version.split()[0], "| torch", torch.__version__, "| transformers", transformers.__version__, "| device", "mps (Apple GPU)" if torch.backends.mps.is_available() else "cpu")' \
   || die "torch does not import"
 du -sh "$VENV" 2>/dev/null | sed 's/^/environment size: /'
+
+if [ -n "$CONVERT" ]; then
+  # --convert: Core ML for the app (an .mlpackage, compiled to .mlmodelc,
+  # plus a JSON file with the tokenizer's word pieces), checked against
+  # PyTorch on the 320 test windows. Adds coremltools to the environment.
+  step "Core ML conversion of $CONVERT"
+  [ -s "$CONVERT/meta.json" ] || die "no model in $CONVERT (expected meta.json)"
+  "$PY" -m pip install -q coremltools >> "$OUT/pip.log" 2>&1 || { tail -3 "$OUT/pip.log"; die "installing coremltools failed"; }
+  [ -n "$NAME" ] || NAME="LofiMood-lm-$(basename "$CONVERT" | sed 's/^lm-//')"
+  "$PY" -I Tools/eval/finetune_mood.py coreml --model "$CONVERT" --out "$OUT/coreml" --name "$NAME" \
+    --check "$W/train/test-windows.jsonl" 2> >(tee "$OUT/coreml.log" >&2) || die "conversion failed (see coreml.log)"
+  xcrun coremlcompiler compile "$OUT/coreml/$NAME.mlpackage" "$OUT/coreml" > "$OUT/compile.log" 2>&1 \
+    || { tail -5 "$OUT/compile.log"; die "coremlcompiler failed"; }
+  du -sh "$OUT/coreml/"* | sed 's/^/  /'
+  step "Done"
+  echo "Core ML model: $OUT/coreml ($NAME.mlmodelc and $NAME.json). Nothing was shipped."
+  exit 0
+fi
 
 step "Labelled windows (from try-recipes.sh's export)"
 [ -s "$W/train/train.json" ] && [ -s "$W/train/test.json" ] || die "no export in $W/train: run Tools/mac/try-recipes.sh first"
