@@ -110,6 +110,7 @@ On the Mac, two scripts wrap all of this (both stay inside
 
 ```sh
 Tools/mac/run-mood-eval.sh            # build, test, retrain Fast v4, score it; Claude only if the key file exists, $6 cap
+Tools/mac/try-recipes.sh              # compare training recipes on every book and on people's ratings; no Claude, ships nothing
 Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what tracks for these books would cost
 Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
 ```
@@ -206,6 +207,44 @@ It is not measured yet on purpose: the test labels, plausible sets included,
 were made from the passage alone, so a reading that uses the wider story
 can only look worse against them. Judging it needs labels made with the
 story in view, or Mo's listening test.
+
+### Round 9: training recipes, people's ratings and 100 more books (9 Nov 2026)
+
+Mo asked what else could make the local model better, and to train it on
+a hundred more books. `lofi-train` now has named recipes
+(`Sources/LofiTrainCLI/Recipes.swift`) that `oof` compares on every
+labelled book and `embed --recipe NAME` trains for shipping:
+
+- `word2-settings`: the shipped recipe (word-3's). With `--all` on every
+  labelled book it makes word-8.
+- `prior-0.15`, `prior-0.3`, `prior-0.5`: a gentle cure for the pull
+  towards tense and calm. After training, each mood's bias loses that
+  fraction of its log share of the labels ("logit adjustment"). At 1 this
+  would be about `balanced`, which over-corrected by 4.8 points.
+- `soft-0.3`: soft labels. Where a window has a plausible set (an `accept`
+  list), the other moods that would also suit it share 30% of its target.
+- `people-v0.25`, `people-v0.5`, `people-v1`, `people-va0.5`: lean the moods
+  towards how pleasant (and energetic) *people* rate the text.
+  `lofi-train people` learns those two ratings by ridge regression from
+  EmoBank's 7,309 non-fiction sentences. Its 2,753 fiction sentences stay
+  the test and never train anything. The lean adds `strength` × the mood's
+  standardised anchor × the standardised rating to each mood's logit, so a
+  pleasant-sounding passage favours cozy, hopeful and romantic. It is
+  folded into the weights (`LinearMoodModel.addingLinearScore`), so the
+  model file and the app are unchanged. A shipped model leaned this way is
+  derived from EmoBank (CC BY-SA 4.0), so the credits must name it, and a
+  published build should prefer an unleaned model unless that licence is
+  checked.
+
+`Tools/mac/try-recipes.sh` runs the whole comparison with no Claude calls:
+export, word-8, the people ratings, the all-books comparison (now also
+"fits" on every window that has a plausible set), every candidate trained on
+all books, and the people's-ratings check of each against the shipped
+model. It ships nothing. The ship rule below decides.
+
+Sample v5 adds 40 windows from each of the 100 "classic" novels in
+`books.csv`, labelled with a best mood and the moods that would also suit
+it (see Labels).
 
 ## Labels
 

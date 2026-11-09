@@ -14,6 +14,9 @@ before it. This is an outside check that does not rest on Claude's labels.
     .build/release/lofi-eval run --engine embed:Models/LofiMood-embed-word-7.json --in Tools/data/work/emobank-windows.jsonl --out R.jsonl
     # 3. scores
     python3 -I Tools/eval/emobank.py score DIR READINGS.jsonl [READINGS2.jsonl ...]
+    # every sentence with its genre and ratings, for `lofi-train people`,
+    # which learns from the non-fiction ones only
+    python3 -I Tools/eval/emobank.py people DIR > Tools/data/work/emobank-people.jsonl
 
 Scores, on the sentences every given engine read: Spearman correlation of
 each engine's valence and arousal with the people's; and on the sentences
@@ -52,6 +55,16 @@ def fiction(folder: str) -> dict[str, list[dict]]:
     for rows in docs.values():
         rows.sort(key=lambda x: x["start"])
     return docs
+
+
+def people(folder: str) -> None:
+    meta = {r["id"]: r for r in csv.DictReader(open(f"{folder}/meta.tsv", encoding="utf-8"), delimiter="\t")}
+    for r in csv.DictReader(open(f"{folder}/emobank.csv", encoding="utf-8")):
+        m = meta.get(r["id"])
+        if not m or not r["text"].strip():
+            continue
+        print(json.dumps({"id": r["id"], "doc": m.get("document") or r["id"], "category": m.get("category") or "",
+                          "v": float(r["V"]), "a": float(r["A"]), "text": r["text"].strip()}))
 
 
 def windows(folder: str, context_words: int) -> None:
@@ -184,9 +197,13 @@ def main() -> None:
     s.add_argument("folder")
     s.add_argument("readings", nargs="+")
     s.add_argument("--boot", type=int, default=1000)
+    p = sub.add_parser("people")
+    p.add_argument("folder")
     args = ap.parse_args()
     if args.cmd == "windows":
         windows(args.folder, args.context_words)
+    elif args.cmd == "people":
+        people(args.folder)
     else:
         score(args.folder, args.readings, args.boot)
 
