@@ -324,6 +324,26 @@ struct MoodTrackTests {
         #expect(wellPast.engineID.hasPrefix("lexicon"), "the scored part ends 16+ sentences back")
     }
 
+    @Test func savesAndLoadsAndPlaysOverTheLiveEngine() async throws {
+        let guardian = try SpoilerGuard(chapters: sampleBook())
+        let store = MoodTrackStore(MoodTrack(engineID: "echo/1", bookID: "sample", wordsBetweenEntries: 50))
+        _ = try await MoodTrackBuilder(spoilerGuard: guardian, plan: .init(wordsBetweenEntries: 50))
+            .build(into: store, engine: PositionEchoEngine())
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("lofi-track-\(UUID().uuidString)")
+            .appendingPathComponent("sample.track.json")
+        try store.snapshot.save(to: url)
+        let loaded = try MoodTrack.load(from: url)
+        #expect(loaded == store.snapshot)
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+
+        let engine = MoodEngineCatalog.playbackEngine(track: MoodTrackStore(loaded))
+        #expect(engine.id.hasPrefix("track[echo/1]>"))
+        let reading = try await engine.reading(for: try window(guardian, 2, 10))
+        #expect(echoedPosition(reading) != nil)
+        #expect(MoodEngineCatalog.playbackEngine(track: nil).id == MoodEngineCatalog.recommendedEngine().id)
+    }
+
     @Test func digestIgnoresWhitespaceOnly() {
         #expect(TextDigest.fnv1a64("a  b\nc") == TextDigest.fnv1a64("a b c"))
         #expect(TextDigest.fnv1a64("a b c") != TextDigest.fnv1a64("a b d"))

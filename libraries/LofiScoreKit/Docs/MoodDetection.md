@@ -34,7 +34,7 @@ after the position never changes the window. Engines receive nothing else.
 | `nltagger` | Apple's sentiment score plus the cue words | iOS/macOS NaturalLanguage |
 | `fm`, `fm-tagging` | Apple's on-device model asked for one line (`fm-tagging` does not follow the format; see results) (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
 | `fast:<model>` | Create ML text classifier trained by `lofi-train` on the newest 160 words of each window | the `.mlmodel`; BERT models need iOS 17+ and Apple's embedding assets |
-| `recommended[:<model>]` | what `MoodEngineCatalog` would pick on this device | |
+| `recommended[:<model>]` | what `MoodEngineCatalog` picks: the Fast classifier when given, else `nltagger` (the on-device model is opt-in only, via `onDeviceModelEngine`) | |
 | `claude[:<model>]` | Claude through the Anthropic Messages API, one window per request, answer fixed by a JSON schema (default `claude-opus-5-5`, effort low) | network and an API key; costs money, so it scores books ahead of time rather than during playback |
 | `track[…]>…` | a saved mood track played back, with a live engine wherever the track does not reach | a track file from `lofi-eval track` or the in-app builder |
 
@@ -193,6 +193,8 @@ supported iPhone, and agrees best with Mo's labels. So:
 | fast:bert v3 (same, `--max-iterations 100`) | 320 | identical to v2 | | | 16 ms |
 | fm, prompt v2 | 319 | 19.7% | 0.180 | 0.118 | 812 ms |
 | fm, prompt v2, names masked | 319 | 22.3% | 0.215 | 0.143 | 819 ms |
+| **Mac round 3** | | | | | |
+| fast:maxent v3 (23 books, 3 held out for validation) | 320 | 28.7% | 0.248 | 0.158 | 0.9 ms |
 | Claude relabelling 80 test windows blind (`claude-rerun-80.jsonl`) | 80 | 67.5% | | 0.620 | |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
@@ -247,6 +249,15 @@ What the second Mac run showed:
   windows give 27.5% exact, 1,000 give 29.6%, 1,500 give 30.2% and 1,998 give
   30.6% (mean of 8 random subsets each), so doubling the set again would add
   perhaps a point or two. A bag-of-words model tops out far below the ceiling.
+
+Round 3 retrained maxent with three training books held out for Create ML's
+validation: validation accuracy now reads 34.4% next to 28.7% on the test
+books, instead of round 2's misleading 90.9%. The 3-point drop from v2 is 9
+windows of 320 and v3 trained on three fewer books, so it is noise rather than
+a regression; the shipped model should be trained with `--all` anyway.
+`lofi-train` reports about a point less than `lofi-eval` for the same model
+(27.8% vs 28.7%) because training scores only the newest 160 words, while
+`ClassifierMoodEngine` blends in the 160 words before them at weight 0.35.
 
 By the rule above, **the Fast engine (maxent) is the default**: it is the best
 engine, deterministic, sub-millisecond and plot-blind. fm stays off. Mo's gold

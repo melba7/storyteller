@@ -87,6 +87,17 @@ public struct MoodTrack: Codable, Sendable, Hashable {
         return low
     }
 
+    /// Reads a track saved with `save(to:)`.
+    public static func load(from url: URL) throws -> MoodTrack {
+        try decode(Data(contentsOf: url))
+    }
+
+    /// Writes the track atomically, so a crash mid-save keeps the old file.
+    public func save(to url: URL) throws {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encoded().write(to: url, options: .atomic)
+    }
+
     public func encoded() throws -> Data {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
