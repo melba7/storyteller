@@ -32,7 +32,7 @@ after the position never changes the window. Engines receive nothing else.
 | --- | --- | --- |
 | `lexicon` | hand-written cue words, weighted toward the newest sentences | nothing; the baseline |
 | `nltagger` | Apple's sentiment score plus the cue words | iOS/macOS NaturalLanguage |
-| `fm`, `fm-tagging` | Apple's on-device model asked for one line (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
+| `fm`, `fm-tagging` | Apple's on-device model asked for one line (`fm-tagging` does not follow the format; see results) (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
 | `fast:<model>` | Create ML text classifier trained by `lofi-train` on the newest 160 words of each window | the `.mlmodel`; BERT models need iOS 17+ and Apple's embedding assets |
 | `recommended[:<model>]` | what `MoodEngineCatalog` would pick on this device | |
 
@@ -84,7 +84,7 @@ $B/lofi-eval run --engine fm --in $W/sample.masked.jsonl --out $W/readings/fm.ma
 
 # 2. Train the Fast engine on the 26 training books
 $B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
-  --split Tools/data/labels/split.json \
+  --split Tools/data/labels/split.json --balance \
   --labels Tools/data/labels/claude-v1.jsonl --labels Tools/data/labels/claude-v2.jsonl
   # add --labels Tools/data/labels/mo-check.jsonl last once it exists
 $B/lofi-train train --algorithm maxent
@@ -128,10 +128,38 @@ supported iPhone, and agrees best with Mo's labels. So:
 
 | Engine | Test windows | Exact | Macro-F1 | Kappa | p50 latency |
 | --- | --- | --- | --- | --- | --- |
-| lexicon (vs Claude labels) | 320 | 26.2% | 0.215 | 0.124 | 0.8 ms |
+| lexicon (vs Claude labels) | 320 | 26.2% | 0.215 | 0.124 | 0.5 ms |
+| nltagger | 320 | 25.0% | 0.180 | 0.132 | 4.0 ms |
+| fm, prompt v1 | 315 | 19.7% | 0.125 | 0.096 | 734 ms |
+| fm-tagging, prompt v1 | 0 | no usable answers | | | |
+| fast:maxent v1 (1,040 windows) | 320 | 25.3% | 0.176 | 0.118 | 0.9 ms |
+| fast:bert v1 (1,040 windows) | 320 | 23.1% | 0.114 | 0.073 | 16 ms |
 | TF-IDF + logistic regression, 1,040 train windows (Linux stand-in for `fast:maxent`) | 320 | 30.6% | 0.260 | 0.188 | n/a |
 | same, 1,998 train windows | 320 | 31.9% | 0.298 | 0.199 | n/a |
 | Claude relabelling 80 test windows blind (`claude-rerun-80.jsonl`) | 80 | 67.5% | | 0.620 | |
+
+Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
+scored against Claude's labels.
+
+What the first Mac run showed:
+
+- **fm, prompt v1** answered tense, somber or hopeful almost every time and
+  never calm. The prompt's format example was `bucket=tense; …`, and a small
+  model copies examples. Prompt v2 shows a placeholder instead, says that most
+  of a novel is calm, and adds the tie-breaks from the guidelines. 17 of 1,360
+  answers said `bucket=tension`; nouns like that now parse.
+- **fm-tagging** (the content-tagging adapter) ignores the answer format and
+  replies with topic tags ("emotion analysis"), and refused 48 of 320 windows.
+  It is not usable for this and should not be offered.
+- **fast:maxent** reached 100% training accuracy in 4 iterations, so it
+  memorised the 1,040 windows; it is no better than the lexicon. `--balance`
+  and the 1,998-window set help the Linux stand-in a little.
+- **fast:bert** only ever predicted calm, playful or tense and stopped at 40%
+  training accuracy: it had not finished learning.
+- Drift: on the first 15% of famous books fm was 14 points darker than on
+  obscure ones (relative to fast:bert), but it was about 81% dark everywhere,
+  so the test says little until fm stops answering dark by default. Masking
+  names changed 8.7% of its answers on famous books.
 
 The lexicon says "calm" for two thirds of windows; it is a floor, not a
 candidate. A bag-of-words classifier does a little better and gains from the
