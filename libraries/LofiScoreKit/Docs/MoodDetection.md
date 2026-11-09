@@ -141,6 +141,15 @@ name-masking test matters more for it than for the on-device engines.
   or a v1 label of hopeful) were re-read, and 5 changed
   (`v2-overrides-test.json`, applied by `Tools/data/relabel_v2.py`). The new
   moods are rare in these eight books, so their scores rest on few windows.
+- `claude-g2-train.jsonl`: the 1,998 training windows (the other 26 books of
+  sample v1, plus sample v2) carried over the same way. 608 were re-read and
+  61 changed: 33 romantic, 15 adventurous, 13 dreamy
+  (`v2-overrides-train.json`). That is too few for a bag-of-words model to
+  learn the new moods well: on a Linux stand-in (TF-IDF and logistic
+  regression) training on these labels left the other moods' accuracy
+  unchanged and still almost never predicted a new mood. So for now the
+  new moods come from Claude tracks; the Fast engine needs more labelled
+  examples of them first.
 - `Tools/data/eval/sample-v1.jsonl.gz` is the frozen sample: 40 causal windows
   from each of 34 public-domain novels (PG-19 texts turned into readaloud
   EPUBs by `Tools/data/make_readaloud.py`), 1,360 in all. Window ids are

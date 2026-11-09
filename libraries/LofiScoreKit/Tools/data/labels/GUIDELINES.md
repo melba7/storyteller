@@ -53,4 +53,6 @@ Tie-breaks:
   moves "love declared" from hopeful to romantic. The other definitions are
   unchanged. Labels made under v1 (`claude-v1.jsonl`, `claude-v2.jsonl`,
   `claude-rerun-80.jsonl`) never use the new moods; `claude-g2-*.jsonl` files
-  are labelled under v2.
+  are labelled under v2. They carry the v1 labels over and change only the
+  windows re-read under v2 (`v2-overrides-*.json`, applied by
+  `Tools/data/relabel_v2.py`).
