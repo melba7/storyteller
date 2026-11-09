@@ -14,6 +14,7 @@ import {
   DEFAULT_EPUB_SUFFIX_TEMPLATE,
   type Settings,
 } from "@/database/settingsTypes"
+import { type UUID } from "@/uuid"
 
 const SCHEMA_PATH = join(cwd(), "schema.sql")
 
@@ -69,7 +70,7 @@ const DEFAULT_SETTINGS: Settings = {
   maxUploadChunkSize: null,
   opdsEnabled: null,
   opdsPageSize: null,
-  opdsFormat: null,
+  opdsFormats: ["readaloud", "ebook", "audiobook"],
   opdsSortField: null,
   opdsSortDirection: null,
   scanCronExpression: null,
@@ -223,4 +224,18 @@ export function seedBooks(
   )
 
   return run(books)
+}
+
+export function seedUser(ctx: TestDbContext, userId: UUID) {
+  const permissionUuid = randomUUID()
+
+  ctx.sqlite
+    .prepare(`INSERT INTO user_permission (uuid, book_list) VALUES (?, 1)`)
+    .run(permissionUuid)
+
+  ctx.sqlite
+    .prepare(
+      `INSERT INTO "user" (id, user_permission_uuid, email) VALUES (?, ?, ?)`,
+    )
+    .run(userId, permissionUuid, `${userId}@example.com`)
 }

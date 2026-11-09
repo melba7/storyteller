@@ -159,9 +159,11 @@ and when the upstream sync starts it:
   formatting of the fork's own files.
 - **iOS simulator build** (macOS): `expo prebuild` with the fork's identity and
   an unsigned simulator build with `xcodebuild`, to catch native breakage. It
-  also runs `swift test` for `libraries/LofiScoreKit` once that exists. On pull
-  requests it only runs when the mobile app, the root package files or this
-  workflow change.
+  also runs `swift test` for `libraries/LofiScoreKit` once that exists. Before
+  `pod install` it fetches Sentry's prebuilt framework with retries
+  (`tools/fork/prefetch-sentry-xcframework.rb`), because `pod install` tries
+  that GitHub download only once. On pull requests it only runs when the mobile
+  app, the root package files or this workflow change.
 
 ## One-time GitHub settings
 
