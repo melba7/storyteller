@@ -181,22 +181,59 @@ and when the upstream sync starts it:
 
 ## Building on an iPhone
 
-You need a Mac with Xcode and its iOS platform, Node 26 (upstream's version;
-22.18 or newer also works), CocoaPods, Homebrew's `cmake` and `pkg-config`
-(upstream's iOS builds install them), and an Apple ID added under Xcode →
-Settings → Accounts. Connect the iPhone by cable once and turn on Developer Mode
-(Settings → Privacy & Security) when iOS asks.
+There are three ways to run the app. TestFlight is the one that needs no
+Developer Mode on the phone.
+
+### TestFlight
+
+`.github/workflows/testflight.yml` builds an App Store build of `main` after
+every change to the app, and on demand from the Actions tab, and uploads it to
+TestFlight. Install the TestFlight app on the iPhone once; each new build then
+arrives like an app update and keeps working for 90 days. Until the secrets
+below exist, the workflow only reports which ones are missing.
+
+One-time setup, with a paid Apple Developer Program membership:
+
+1. On developer.apple.com, under Certificates, Identifiers & Profiles →
+   Identifiers, register an App ID with the explicit bundle ID from
+   `applications/mobile/fork.config.ts` (`io.github.melba7.storytellerlofi`).
+2. In App Store Connect → Apps, add a new iOS app with that bundle ID. Any name
+   and SKU will do.
+3. In App Store Connect → Users and Access → Integrations → App Store Connect
+   API, create a team key with the Admin role, which Xcode needs to manage
+   signing in the cloud. Download the `.p8` file (it can only be downloaded
+   once) and note the key ID and the issuer ID.
+4. In this repository's Settings → Secrets and variables → Actions, add the
+   repository secrets `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8` (the whole
+   text of the `.p8` file) and `APPLE_TEAM_ID` (from Membership details on
+   developer.apple.com).
+5. Run the TestFlight workflow from the Actions tab. When App Store Connect has
+   processed the build, add yourself as an internal tester under TestFlight and
+   accept the invitation on the iPhone.
+
+The workflow signs with Apple-managed certificates through the API key, so no
+certificates or profiles are stored in this public repository. Each run uses its
+run number as the build number.
+
+### iOS Simulator
+
+On a Mac with Xcode and its iOS platform, Node 24 (upstream's version; 22.18 or
+newer also works), CocoaPods, and Homebrew's `cmake` and `pkg-config`
+(upstream's iOS builds install them):
 
 ```sh
 corepack enable
-yarn install
+(cd applications/mobile && ./scripts/pre-install.mjs)
+yarn workspaces focus @storyteller-platform/mobile
 cd applications/mobile
-APP_VARIANT=development yarn expo run:ios --device
+yarn expo run:ios --configuration Release
 ```
 
-That makes a development build, which loads its JavaScript from the Metro server
-on the Mac. Add `--configuration Release` for a standalone build that works away
-from the Mac. The first build asks for a signing team: pick the personal team of
-your Apple ID. With a free Apple ID the app stops opening after 7 days and has
-to be installed again; a paid Apple Developer Program membership extends that to
-a year and enables TestFlight.
+### Straight from Xcode
+
+Add an Apple ID under Xcode → Settings → Accounts, connect the iPhone by cable,
+turn on Developer Mode (Settings → Privacy & Security), and run the commands
+above with `--device`. `APP_VARIANT=development` without
+`--configuration Release` makes a development build that loads its JavaScript
+from the Metro server on the Mac. With a free Apple ID the app stops opening
+after 7 days and has to be installed again.

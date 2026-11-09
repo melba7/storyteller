@@ -47,11 +47,22 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const isDev = process.env["APP_VARIANT"] === "development"
   const appId = isDev ? `${forkIdentity.appId}.dev` : forkIdentity.appId
 
+  const ios: NonNullable<ExpoConfig["ios"]> = {
+    ...config.ios,
+    bundleIdentifier: appId,
+  }
+  // Set by .github/workflows/testflight.yml: every TestFlight upload needs its
+  // own build number, and the signing team for an App Store build.
+  const buildNumber = process.env["FORK_BUILD_NUMBER"]
+  if (buildNumber) ios.buildNumber = buildNumber
+  const appleTeamId = process.env["APPLE_TEAM_ID"]
+  if (appleTeamId) ios.appleTeamId = appleTeamId
+
   const result: ExpoConfig = {
     ...config,
     name: isDev ? `${forkIdentity.name} (dev)` : forkIdentity.name,
     slug: forkIdentity.slug,
-    ios: { ...config.ios, bundleIdentifier: appId },
+    ios,
     android: { ...config.android, package: appId },
   }
 
