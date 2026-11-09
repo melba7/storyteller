@@ -49,6 +49,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 26.12.1
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
       - name: Prepare git and Yarn
         run: |
           git config user.name "github-actions[bot]"

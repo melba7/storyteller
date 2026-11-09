@@ -34,6 +34,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
       - name: Touch points, upstream footprint and no music
         run: node tools/fork/check-fork.mjs --list
       - name: Decide whether the iOS build is needed
@@ -63,6 +66,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
       - name: Enable Yarn
         run: npm i -g corepack && corepack enable
       - uses: actions/cache@v4
@@ -96,6 +102,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
       - name: Select the newest stable Xcode
         run: |
           xcode=$(ls -d /Applications/Xcode_[0-9]*.app | grep -vi beta | sort -V | tail -n 1)
