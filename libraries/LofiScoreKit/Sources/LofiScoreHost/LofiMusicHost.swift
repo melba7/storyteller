@@ -406,9 +406,9 @@ public final class LofiMusicHost: @unchecked Sendable {
         lastError = nil
         HostLog.note("\(source) music: \(library.tracks.count) tracks")
         musicYield.setPlayer(player)
-        sinks.setMusic(player)
-        // Brings the new player up to date with the book and the narrator.
-        follower.attach(sinks)
+        // Brings the new player up to date with the book and the narrator, without
+        // reopening the book for the atmosphere already playing.
+        follower.catchUp(player, reading: true) { [sinks] in sinks.setMusic(player) }
         prepareContextualAssetsIfNeeded()
     }
 
@@ -617,8 +617,8 @@ public final class LofiMusicHost: @unchecked Sendable {
         atmosphereSource = source
         atmosphereSounds = library.sounds.count
         HostLog.note("atmosphere: \(library.sounds.count) of \(AmbientSound.allCases.count) sounds (\(source))")
-        sinks.setAtmosphere(player)
-        follower.attach(sinks)
+        // Brings the atmosphere up to date without reopening the book for the music.
+        follower.catchUp(player, reading: false) { [sinks] in sinks.setAtmosphere(player) }
     }
 
     private func recordAtmosphere(_ event: AmbienceEvent) {

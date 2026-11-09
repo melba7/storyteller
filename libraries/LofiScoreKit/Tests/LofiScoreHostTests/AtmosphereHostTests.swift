@@ -103,8 +103,29 @@ final class AtmosphereHostTests: XCTestCase {
 
     // MARK: - The whole host
 
-    private func makeHost(defaults: UserDefaults) -> (LofiMusicHost, () -> FakeAmbienceBackend?) {
+    /// The music player's scheduler and its fake backend, to read the backend on its own queue.
+    private final class MusicSide: @unchecked Sendable {
         let scheduler = DispatchScheduler(label: "test.player")
+        private let lock = NSLock()
+        private var made: FakeAudioBackend?
+
+        func make() -> FakeAudioBackend {
+            let fake = FakeAudioBackend(clock: scheduler)
+            lock.withLock { made = fake }
+            return fake
+        }
+
+        /// The backend's calls so far, read on the player's queue.
+        func calls() async -> [FakeAudioBackend.Call] {
+            guard let backend = lock.withLock({ made }) else { return [] }
+            return await withCheckedContinuation { continuation in
+                scheduler.perform { continuation.resume(returning: backend.calls) }
+            }
+        }
+    }
+
+    private func makeHost(defaults: UserDefaults, music: MusicSide = MusicSide()) -> (LofiMusicHost, () -> FakeAmbienceBackend?) {
+        let scheduler = music.scheduler
         let lock = NSLock()
         var ambience: FakeAmbienceBackend?
         let environment = LofiMusicHost.Environment(
@@ -112,7 +133,7 @@ final class AtmosphereHostTests: XCTestCase {
             musicFolder: folder.appendingPathComponent("app/Music", isDirectory: true),
             placeholderFolder: nil,
             booksFolder: folder.appendingPathComponent("books/extracted", isDirectory: true),
-            makeBackend: { FakeAudioBackend(clock: scheduler) },
+            makeBackend: { music.make() },
             makePlayerScheduler: { scheduler },
             followerScheduler: DispatchScheduler(label: "test.follower"),
             makeLiveEngine: { _ in LexiconMoodEngine() },
@@ -207,5 +228,28 @@ final class AtmosphereHostTests: XCTestCase {
         let status = try await waitFor(host) { $0.atmosphere.playing == ["crowd"] }
         XCTAssertEqual(status.book?.text, "ready")
         XCTAssertEqual(status.library.tracks, 0, "the music stays off")
+    }
+
+    func testTurningTheAtmosphereOnMidBookLeavesTheMusicAlone() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
+        MusicSettings(defaults: defaults).atmosphereEnabled = false
+        try prepareBook()
+        try write(Data([0]), to: "app/Music/Calm/a.mp3")
+        let music = MusicSide()
+        let (host, _) = makeHost(defaults: defaults, music: music)
+        host.start()
+        _ = try await waitFor(host) { $0.library.tracks == 1 }
+        narrate(host)
+        _ = try await waitFor(host) { $0.playback.musicMood != nil && $0.playback.engineRunning }
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let before = await music.calls()
+        XCTAssertTrue(before.contains { if case .load = $0 { return true } else { return false } }, "the music is playing")
+
+        await host.setAtmosphereEnabled(true)
+        _ = try await waitFor(host) { $0.atmosphere.playing == ["crowd"] }
+        // Long enough for a reopened book's fade-out (1 s) and its stopped decks.
+        try await Task.sleep(nanoseconds: 2_500_000_000)
+        let after = await music.calls()
+        XCTAssertEqual(Array(after.dropFirst(before.count)), [], "the music was not reopened, faded out or restarted")
     }
 }
