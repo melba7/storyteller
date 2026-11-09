@@ -53,6 +53,8 @@ public final class LofiMusicHost: @unchecked Sendable {
         /// app reports a hold that was dropped with `narrationHold(began: false)`). Nil: no
         /// pauses.
         public var holdNarration: (@Sendable (_ seconds: Double) -> Bool)?
+        /// Where the "Wrong mood" button's log goes (``MoodFeedbackLog``). Nil: no log.
+        public var feedbackFolder: URL?
 
         public init(
             settings: MusicSettings,
@@ -71,7 +73,8 @@ public final class LofiMusicHost: @unchecked Sendable {
             atmospherePlaceholderFolder: URL? = nil,
             atmosphereTrackFolders: [URL] = [],
             soundEdition: SoundEdition = .personal,
-            holdNarration: (@Sendable (_ seconds: Double) -> Bool)? = nil
+            holdNarration: (@Sendable (_ seconds: Double) -> Bool)? = nil,
+            feedbackFolder: URL? = nil
         ) {
             self.settings = settings
             self.musicFolder = musicFolder
@@ -90,6 +93,7 @@ public final class LofiMusicHost: @unchecked Sendable {
             self.atmosphereTrackFolders = atmosphereTrackFolders
             self.soundEdition = soundEdition
             self.holdNarration = holdNarration
+            self.feedbackFolder = feedbackFolder
         }
     }
 
@@ -103,6 +107,8 @@ public final class LofiMusicHost: @unchecked Sendable {
     }
 
     public let follower: NarrationFollower
+    /// The "Wrong mood" button's log, if the environment gives it a folder.
+    public let feedback: MoodFeedbackLog?
     private let environment: Environment
     private var settings: MusicSettings { environment.settings }
     private let queue = DispatchQueue(label: "LofiScore.host")
@@ -122,6 +128,8 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var bookText: BookTextState = .none
     private var lastError: String?
     private var recentEvents: [String] = []
+    /// Whether this book's opening mood went into the wrong-mood counts yet (on `queue`).
+    private var openingMoodCounted = false
 
     // The atmosphere, on `queue` too.
     private let sinks = NarrationFanOut()
@@ -144,6 +152,7 @@ public final class LofiMusicHost: @unchecked Sendable {
 
     public init(environment: Environment) {
         self.environment = environment
+        feedback = environment.feedbackFolder.map { MoodFeedbackLog(folder: $0) }
         follower = NarrationFollower(scheduler: environment.followerScheduler)
         musicYield = MusicYield(scheduler: DispatchScheduler(label: "LofiScore.musicYield"), fade: environment.atmosphereConfig.musicYieldFade)
         follower.attach(sinks)
@@ -197,6 +206,82 @@ public final class LofiMusicHost: @unchecked Sendable {
     public func narrationHold(began: Bool) {
         queue.async { [self] in
             atmosphere?.narrationHold(began: began)
+        }
+    }
+
+    // MARK: - Reading on screen
+
+    /// The listener turned a page of `bookID` with the narration stopped, and the page now
+    /// begins with `clip`'s sentence. The music follows the pages (see
+    /// ``NarrationFollower/readerReached(_:)``), if ``MusicSettings/followsReading`` is on.
+    public func readerReached(bookID: String, clip: NarratorClip) {
+        queue.async { [self] in
+            guard settings.followsReading, book?.id == bookID else { return }
+            follower.readerReached(clip)
+        }
+    }
+
+    /// The listener stopped reading on screen (the app went to the background).
+    public func readerStopped() {
+        follower.readerStopped()
+    }
+
+    /// Music while reading on screen, on or off.
+    public func setFollowsReading(_ enabled: Bool) async {
+        await onQueue { [self] in
+            settings.followsReading = enabled
+            if !enabled { follower.readerStopped() }
+        }
+    }
+
+    // MARK: - Wrong mood
+
+    /// The listener says the mood playing is wrong. With `mood`, the music moves there;
+    /// without, to the engine's next guess. Logged for the listening test. Nil when no book
+    /// is playing or nothing changed.
+    public func markWrongMood(_ mood: MoodBucket? = nil) async -> MoodOverride? {
+        let (player, bookID, engine) = await onQueue { [self] () -> (LofiScorePlayer?, String?, String?) in
+            var engine: String?
+            if case let .ready(_, engineID, _) = bookText { engine = engineID }
+            return (player, book?.id, engine)
+        }
+        guard let player, let bookID else { return nil }
+        let result = await withCheckedContinuation { (continuation: CheckedContinuation<MoodOverride?, Never>) in
+            player.overrideMood(to: mood) { continuation.resume(returning: $0) }
+        }
+        guard let result else { return nil }
+        HostLog.note("listener: not \(result.rejected.rawValue), \(result.picked ? "picked" : "guessed") \(result.chosen.rawValue)")
+        if let feedback {
+            let entry = MoodFeedbackLog.Entry(
+                bookID: bookID,
+                sentence: result.sentence,
+                rejected: result.rejected.rawValue,
+                chosen: result.chosen.rawValue,
+                how: result.picked ? "picked" : "guess",
+                correction: result.correction,
+                readingSource: result.readingSource?.rawValue,
+                engine: result.readingSource == .live ? engine : nil,
+                track: result.trackID
+            )
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                work.async {
+                    do {
+                        try feedback.record(entry)
+                    } catch {
+                        HostLog.error("wrong-mood log: \(error)")
+                    }
+                    continuation.resume()
+                }
+            }
+        }
+        return result
+    }
+
+    /// The wrong-mood log as text to share, or nil when nothing was marked yet.
+    public func moodFeedbackText() async -> String? {
+        guard let feedback else { return nil }
+        return await withCheckedContinuation { continuation in
+            work.async { continuation.resume(returning: feedback.exportText()) }
         }
     }
 
@@ -334,6 +419,18 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
         let (status, player, atmosphere) = await onQueue { [self] in (makeStatus(followerStatus), player, atmosphere) }
         var result = status
+        if let feedback {
+            let bookID = result.book?.id
+            let (book, total) = await withCheckedContinuation { continuation in
+                work.async { continuation.resume(returning: (bookID.map { feedback.counts(bookID: $0) }, feedback.counts(bookID: nil))) }
+            }
+            result.feedback = .init(
+                bookChanges: book?.changes ?? 0,
+                bookWrong: book?.wrong ?? 0,
+                totalChanges: total.changes,
+                totalWrong: total.wrong
+            )
+        }
         if let atmosphere {
             let ambience = await withCheckedContinuation { continuation in
                 atmosphere.snapshot { continuation.resume(returning: $0) }
@@ -351,6 +448,15 @@ public final class LofiMusicHost: @unchecked Sendable {
             player.snapshot { continuation.resume(returning: $0) }
         }
         result.playback.musicMood = snapshot.musicMood?.rawValue
+        if let id = snapshot.decks.first(where: { $0.deck == snapshot.activeDeck })?.trackID,
+           let track = player.library.track(id: id) {
+            result.playback.nowPlaying = .init(
+                title: track.displayTitle,
+                artist: track.displayArtist,
+                license: track.licenseName,
+                mood: (snapshot.musicMood ?? track.bucket).rawValue
+            )
+        }
         result.playback.engineRunning = snapshot.engineRunning
         result.playback.routeMuted = snapshot.routeMuted
         result.playback.recentMoods = snapshot.recentDecisions.suffix(5).map(\.bucket.rawValue)
@@ -451,6 +557,7 @@ public final class LofiMusicHost: @unchecked Sendable {
     }
 
     private func record(_ event: PlayerEvent) {
+        countMoodChange(event)
         let line: String
         switch event {
         case let .error(message):
@@ -467,6 +574,31 @@ public final class LofiMusicHost: @unchecked Sendable {
             if case let .error(message) = event { lastError = message }
             recentEvents.append(line)
             if recentEvents.count > 20 { recentEvents.removeFirst() }
+        }
+    }
+
+    /// Counts the moods the music chose on its own, for the wrong-mood log: every change,
+    /// and the opening mood of a book (which is not a change when it is the director's
+    /// starting mood, so only the first track tells).
+    private func countMoodChange(_ event: PlayerEvent) {
+        guard let feedback else { return }
+        queue.async { [self] in
+            switch event {
+            case .bookOpened, .bookClosed:
+                openingMoodCounted = false
+                return
+            case let .moodChanged(decision):
+                let counts = decision.reason != .listener
+                openingMoodCounted = true
+                guard counts else { return }
+            case .trackStarted:
+                guard !openingMoodCounted else { return }
+                openingMoodCounted = true
+            default:
+                return
+            }
+            guard let id = book?.id else { return }
+            work.async { feedback.noteChange(bookID: id) }
         }
     }
 
@@ -722,6 +854,7 @@ public final class LofiMusicHost: @unchecked Sendable {
         return LofiMusicStatus(
             enabled: settings.enabled,
             mutedInCar: settings.mutedInCar,
+            followsReading: settings.followsReading,
             musicLevelDB: ducking.bedLevelDB,
             defaultMusicLevelDB: environment.config.ducking.bedLevelDB,
             musicLevelRange: [MusicSettings.musicLevelRange.lowerBound, MusicSettings.musicLevelRange.upperBound],
@@ -735,6 +868,7 @@ public final class LofiMusicHost: @unchecked Sendable {
             book: text,
             playback: .init(
                 narrating: followerStatus.isNarrating,
+                reading: followerStatus.isReading,
                 sentence: followerStatus.position?.globalIndex,
                 estimatedRate: (followerStatus.estimatedRate * 100).rounded() / 100,
                 readings: followerStatus.readingsDelivered,
@@ -804,13 +938,34 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         public var moodTrack: Bool
     }
 
+    /// The track playing, for the music panel.
+    public struct NowPlaying: Codable, Sendable, Hashable {
+        public var title: String
+        public var artist: String?
+        /// The license's short name ("CC BY 4.0"), when the music folder's SOURCES.csv has it.
+        public var license: String?
+        public var mood: String
+    }
+
+    /// The "Wrong mood" button's counts: the music's own mood changes, and how many of them
+    /// the listener marked wrong, in the open book and in all books.
+    public struct Feedback: Codable, Sendable, Hashable {
+        public var bookChanges: Int
+        public var bookWrong: Int
+        public var totalChanges: Int
+        public var totalWrong: Int
+    }
+
     public struct Playback: Codable, Sendable, Hashable {
         public var narrating: Bool
+        /// Following the pages of a listener reading on screen, the narration stopped.
+        public var reading: Bool = false
         public var sentence: Int?
         public var estimatedRate: Double
         public var readings: Int
         /// The mood playing now. Only the present: nothing ahead of the narration.
         public var musicMood: String?
+        public var nowPlaying: NowPlaying? = nil
         public var engineRunning: Bool
         public var routeMuted: Bool
         public var recentMoods: [String]
@@ -818,6 +973,8 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
 
     public var enabled: Bool
     public var mutedInCar: Bool
+    /// Music while reading on screen with the narration stopped.
+    public var followsReading: Bool = true
     public var musicLevelDB: Double
     public var defaultMusicLevelDB: Double
     public var musicLevelRange: [Double]
@@ -861,6 +1018,7 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
     public var book: Book?
     public var playback: Playback
     public var atmosphere: Atmosphere
+    public var feedback: Feedback? = nil
     public var recentEvents: [String]
     public var lastError: String?
 

@@ -16,7 +16,8 @@ extension LofiMusicHost {
     ///   `Caches/LofiScore/Atmosphere`, atmosphere tracks also read from
     ///   `Application Support/LofiScore/AtmosphereTracks`, and a second AVAudioEngine of its own;
     ///   which recordings it may play comes from the Info.plist (`soundEditionInfoKey`),
-    /// - `holdNarration`, from the app's narrator, for the atmosphere's short pauses.
+    /// - `holdNarration`, from the app's narrator, for the atmosphere's short pauses,
+    /// - the "Wrong mood" log in `Application Support/LofiScore/Feedback`.
     public static func forApp(
         settings: MusicSettings = MusicSettings(),
         holdNarration: (@Sendable (_ seconds: Double) -> Bool)? = nil
@@ -38,7 +39,8 @@ extension LofiMusicHost {
             atmospherePlaceholderFolder: caches.appendingPathComponent("Atmosphere", isDirectory: true),
             atmosphereTrackFolders: [support.appendingPathComponent("AtmosphereTracks", isDirectory: true)],
             soundEdition: soundEdition(Bundle.main.object(forInfoDictionaryKey: soundEditionInfoKey)),
-            holdNarration: holdNarration
+            holdNarration: holdNarration,
+            feedbackFolder: support.appendingPathComponent("Feedback", isDirectory: true)
         ))
     }
 }

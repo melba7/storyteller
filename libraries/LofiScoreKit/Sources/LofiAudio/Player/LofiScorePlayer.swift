@@ -198,11 +198,11 @@ public final class LofiScorePlayer: @unchecked Sendable {
     /// With `mood`, the music moves there; without, to the director's next guess. The change
     /// is a quick crossfade, held for the usual dwell, and the rejected mood stays out until
     /// the text moves on (``MoodDirector/listenerOverride(to:)``). `completion` gets what
-    /// happened, on the player's context, or nil when no book is open or nothing changed.
+    /// happened, on the player's context, or nil when no music is playing or nothing changed.
     public func overrideMood(to mood: MoodBucket? = nil, completion: @escaping (MoodOverride?) -> Void) {
         scheduler.perform { [self] in
             let now = scheduler.now
-            guard bookID != nil else {
+            guard bookID != nil, transport.target > 0, director.phase != .awaitingFirstReading else {
                 completion(nil)
                 return
             }

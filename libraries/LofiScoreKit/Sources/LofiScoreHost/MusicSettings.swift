@@ -21,6 +21,13 @@ public final class MusicSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: prefix + "enabled") }
     }
 
+    /// Music (and the atmosphere) while the listener reads a readaloud book on screen with
+    /// the narration stopped, following the pages. On by default.
+    public var followsReading: Bool {
+        get { defaults.object(forKey: prefix + "followsReading") as? Bool ?? true }
+        set { defaults.set(newValue, forKey: prefix + "followsReading") }
+    }
+
     /// Keep the music off when the narration plays through CarPlay.
     public var mutedInCar: Bool {
         get { defaults.bool(forKey: prefix + "mutedInCar") }
