@@ -242,9 +242,30 @@ export, word-8, the people ratings, the all-books comparison (now also
 all books, and the people's-ratings check of each against the shipped
 model. It ships nothing. The ship rule below decides.
 
-Sample v5 adds 40 windows from each of the 100 "classic" novels in
-`books.csv`, labelled with a best mood and the moods that would also suit
-it (see Labels).
+Results on the 53 books (Mac, 9 Nov 2026, 3 repeats of 10 folds, against
+the word-2 settings): `soft-0.3-prior-0.3` scored best on Claude's labels
+but 8.8 points worse on people's ratings, so it was rejected, and every
+`prior-*` recipe also lost on people's ratings. `people-va0.5` was best on
+people's ratings (+8.5) but 1.0 point worse on exact. `people-v1` was
+clearly worse on "fits". **`people-v0.5` met the ship rule**: exact +0.1,
+macro-F1 +0.033 (significant), kappa +0.005, fits -1.4 (not significant),
+people's ratings +2.6 (not significant), and the valence correlation +0.06
+(significant). It ships as `LofiMood-embed-word-8-people-v0.5.json`, with
+EmoBank named in `LofiMusic/CREDITS.md`. word-8 (the plain recipe on 53
+books) was still worse than word-3 on people's ratings, so more books alone
+did not fix that.
+
+Round 10: sample v5 adds 40 windows from each of the 100 "classic" novels
+in `books.csv` (4,000 windows, 153 books in all), each labelled with a best
+mood and the moods that would also suit it (1.7 moods per window on
+average; see Labels). With best-and-also-fits labels on most training
+windows, soft labels have far more to work with, so three recipes combine
+the shipped lean with the other ideas: `people-v0.5-soft-0.3`,
+`people-v0.5-prior-0.15` and `people-v0.5-a0.25` (a quarter of the energy
+lean that cost `people-va0.5` its exact score). `try-recipes.sh` now finds
+the shipped model in `LofiMusic` and also compares every recipe with the
+shipped recipe (`oof-compare-vs-shipped.txt`), since a candidate has to
+beat what ships, not just word-2. Its candidates are named word-9-*.
 
 ## Labels
 
@@ -281,6 +302,14 @@ it (see Labels).
   only, added because the embedding model's learning curve was still
   climbing at 26 books. With them the export has 3,119 labelled training
   windows from 45 books (42 for training, 3 for validation).
+- `Tools/data/eval/sample-v5.jsonl.gz` and `claude-g2-v5.jsonl`: 40 causal
+  windows from each of the 100 "classic" novels in `books.csv` (4,000 in
+  all, none overlapping earlier samples), labelled under guidelines v2 by
+  Claude with a best mood (`bucket`) and every mood that would also suit it
+  (`accept`, best first), as in the test sets. Training data only. Best
+  moods: playful 959, tense 954, melancholy 438, calm 417, mysterious 363,
+  hopeful 186, somber 175, romantic 172, cozy 145, adventurous 129, dreamy
+  62.
 - `claude-g2-test-sets.jsonl`: the 320 test windows re-read blind by
   Claude (9 Nov 2026), each with a best mood (`bucket`) and every mood that
   would also suit it (`accept`, best first). Scored as "fits" by

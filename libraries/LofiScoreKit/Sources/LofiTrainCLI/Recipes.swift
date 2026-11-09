@@ -66,6 +66,11 @@ struct Recipe {
         variant("people-v0.5") { $0.leanValence = 0.5 },
         variant("people-v1") { $0.leanValence = 1 },
         variant("people-va0.5") { $0.leanValence = 0.5; $0.leanArousal = 0.5 },
+        // Round 10: people-v0.5 (shipped since round 9) combined with the
+        // other ideas, now that 100 more books have best-and-also-fits labels.
+        variant("people-v0.5-soft-0.3") { $0.leanValence = 0.5; $0.options.alternativeWeight = 0.3 },
+        variant("people-v0.5-prior-0.15") { $0.leanValence = 0.5; $0.options.priorShift = 0.15 },
+        variant("people-v0.5-a0.25") { $0.leanValence = 0.5; $0.leanArousal = 0.25 },
     ]
 
     static func named(_ name: String) -> Recipe? { catalog.first { $0.name == name } }

@@ -7,7 +7,12 @@
 # a candidate meets the ship rule in Docs/MoodDetection.md.
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
-#   Tools/mac/try-recipes.sh [--out DIR] [--repeats 3] [--recipes a,b,...]
+#   Tools/mac/try-recipes.sh [--out DIR] [--repeats 3] [--recipes a,b,...] [--version 9]
+#                            [--shipped LofiMusic/LofiMood-embed-....json]
+#
+# The shipped model is the one LofiMood-embed-*.json in LofiMusic; its recipe
+# (read from the name, e.g. word-8-people-v0.5 -> people-v0.5) is the second
+# baseline, since a new candidate has to beat what ships, not just word-2.
 #
 # Recipes are in Sources/LofiTrainCLI/Recipes.swift. The people recipes lean
 # the moods towards how pleasant and energetic people rate a text, learned
@@ -21,21 +26,31 @@ set -uo pipefail
 ROOT="$HOME/Storyteller Lofi"
 PKG="$(cd "$(dirname "$0")/../.." && pwd)"
 EMOBANK="$ROOT/external-data/emobank"
-SHIPPED="$ROOT/LofiMusic/LofiMood-embed-word-3.json"
+SHIPPED=""
 OUT="$ROOT/lofi-mood-eval-results/$(date +%Y-%m-%d-%H%M)-recipes"
 REPEATS=3
 RECIPES=""
+VERSION=9
 while [ $# -gt 0 ]; do
   case "$1" in
     --out) OUT="$2"; shift 2 ;;
     --repeats) REPEATS="$2"; shift 2 ;;
     --recipes) RECIPES="$2"; shift 2 ;;
     --shipped) SHIPPED="$2"; shift 2 ;;
+    --version) VERSION="$2"; shift 2 ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
 done
 case "$PKG" in "$ROOT"/*) ;; *) echo "Run this from a clone inside ~/Storyteller Lofi (found $PKG)."; exit 2 ;; esac
 case "$OUT" in "$ROOT"/*) ;; *) echo "--out must be inside ~/Storyteller Lofi"; exit 2 ;; esac
+if [ -z "$SHIPPED" ]; then
+  # The one model in LofiMusic (the app loads whichever is there).
+  for f in "$ROOT"/LofiMusic/LofiMood-embed-*.json; do [ -s "$f" ] && SHIPPED="$f"; done
+fi
+# Its recipe, from the name: LofiMood-embed-word-8-people-v0.5.json -> people-v0.5;
+# a plain LofiMood-embed-word-8.json was the word-2 settings.
+SHIPPED_RECIPE=$(basename "${SHIPPED:-none}" .json | sed -E 's/^LofiMood-embed-word-[0-9]+-?//')
+[ -n "$SHIPPED_RECIPE" ] && [ "$SHIPPED_RECIPE" != none ] || SHIPPED_RECIPE=word2-settings
 
 mkdir -p "$OUT/emobank"
 exec > >(tee "$OUT/run.log") 2>&1
@@ -85,10 +100,12 @@ if [ -s "$L/claude-g2-v5.jsonl" ] && grep -q '"accept"' "$L/claude-g2-v5.jsonl";
   SETS_PY+=(--sets "$L/claude-g2-v5.jsonl")
 fi
 
-step "word-8: the shipped recipe (word-2 settings) on every labelled book"
+echo "shipped model: ${SHIPPED:-none} (recipe $SHIPPED_RECIPE)"
+
+step "word-$VERSION: the word-2 settings on every labelled book"
 # Also computes the word features of any new windows (cached in $W/train).
-$B/lofi-train embed --kinds word --recipe word2-settings --all --version 8 2> "$OUT/embed-8.log" || { tail -5 "$OUT/embed-8.log"; die "embed failed"; }
-grep -A4 "^summary" "$OUT/embed-8.log"
+$B/lofi-train embed --kinds word --recipe word2-settings --all --version "$VERSION" 2> "$OUT/embed-$VERSION.log" || { tail -5 "$OUT/embed-$VERSION.log"; die "embed failed"; }
+grep -A4 "^summary" "$OUT/embed-$VERSION.log"
 
 step "People's ratings: how pleasant and energetic (EmoBank non-fiction)"
 PEOPLE=()
@@ -112,17 +129,21 @@ $B/lofi-train oof --kind word --folds 10 --repeats "$REPEATS" --old-books "$W/ol
   ${RECIPE_ARGS[@]+"${RECIPE_ARGS[@]}"} --out "$OUT/oof-word.jsonl" 2> "$OUT/oof.log" || { tail -5 "$OUT/oof.log"; die "oof failed"; }
 grep -E "^recipes:|^alternatives:" "$OUT/oof.log"
 python3 -I Tools/eval/oof_compare.py "$OUT/oof-word.jsonl" "${SETS_PY[@]}" | tee "$OUT/oof-compare.txt"
+if [ "$SHIPPED_RECIPE" != word2-settings ] && grep -q "\"recipe\": *\"$SHIPPED_RECIPE\"" "$OUT/oof-word.jsonl"; then
+  echo; echo "-- against the shipped recipe ($SHIPPED_RECIPE) --"
+  python3 -I Tools/eval/oof_compare.py "$OUT/oof-word.jsonl" --baseline "$SHIPPED_RECIPE" "${SETS_PY[@]}" | tee "$OUT/oof-compare-vs-shipped.txt"
+fi
 
 step "Candidates trained on every book"
-CANDIDATES=(Models/LofiMood-embed-word-8.json)
+CANDIDATES=("Models/LofiMood-embed-word-$VERSION.json")
 for r in $(python3 -I -c 'import json,sys; print(" ".join(sorted({json.loads(l)["recipe"] for l in open(sys.argv[1])})))' "$OUT/oof-word.jsonl"); do
   case "$r" in word2-settings|*-old|nested-exact) continue ;; esac
   case "$r" in people-*) [ ${#PEOPLE[@]} -gt 0 ] || continue ;; esac
-  if $B/lofi-train embed --kinds word --recipe "$r" --all --version "8-$r" "${SETS[@]}" ${PEOPLE[@]+"${PEOPLE[@]}"} 2> "$OUT/embed-8-$r.log"; then
-    CANDIDATES+=("Models/LofiMood-embed-word-8-$r.json")
+  if $B/lofi-train embed --kinds word --recipe "$r" --all --version "$VERSION-$r" "${SETS[@]}" ${PEOPLE[@]+"${PEOPLE[@]}"} 2> "$OUT/embed-$VERSION-$r.log"; then
+    CANDIDATES+=("Models/LofiMood-embed-word-$VERSION-$r.json")
     echo "trained $r"
   else
-    tail -2 "$OUT/embed-8-$r.log"
+    tail -2 "$OUT/embed-$VERSION-$r.log"
   fi
 done
 cp "${CANDIDATES[@]}" "$OUT/" 2>/dev/null || true
