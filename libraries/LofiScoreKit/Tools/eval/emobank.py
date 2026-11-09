@@ -10,6 +10,7 @@ before it. This is an outside check that does not rest on Claude's labels.
 
     # 1. windows (keep the data out of git: it lives in Tools/data/work)
     python3 -I Tools/eval/emobank.py windows DIR_WITH_emobank.csv_AND_meta.tsv > Tools/data/work/emobank-windows.jsonl
+    # (--clear-only keeps the 386 clearly rated sentences: a cheaper set for Claude)
     # 2. readings, with any engine
     .build/release/lofi-eval run --engine embed:Models/LofiMood-embed-word-7.json --in Tools/data/work/emobank-windows.jsonl --out R.jsonl
     # 3. scores
@@ -67,9 +68,11 @@ def people(folder: str) -> None:
                           "v": float(r["V"]), "a": float(r["A"]), "text": r["text"].strip()}))
 
 
-def windows(folder: str, context_words: int) -> None:
+def windows(folder: str, context_words: int, clear_only: bool = False) -> None:
     for doc, rows in sorted(fiction(folder).items()):
         for i, row in enumerate(rows):
+            if clear_only and 2.4 < row["V"] < 3.6:
+                continue
             lines = [row["text"]]
             words = len(row["text"].split())
             j = i - 1
@@ -193,6 +196,8 @@ def main() -> None:
     w = sub.add_parser("windows")
     w.add_argument("folder")
     w.add_argument("--context-words", type=int, default=120)
+    w.add_argument("--clear-only", action="store_true",
+                   help="only the sentences people clearly rated (valence at most 2.4 or at least 3.6)")
     s = sub.add_parser("score")
     s.add_argument("folder")
     s.add_argument("readings", nargs="+")
@@ -201,7 +206,7 @@ def main() -> None:
     p.add_argument("folder")
     args = ap.parse_args()
     if args.cmd == "windows":
-        windows(args.folder, args.context_words)
+        windows(args.folder, args.context_words, args.clear_only)
     elif args.cmd == "people":
         people(args.folder)
     else:

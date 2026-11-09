@@ -113,6 +113,7 @@ Tools/mac/run-mood-eval.sh            # build, test, retrain Fast v4, score it; 
 Tools/mac/try-recipes.sh              # compare training recipes on every book and on people's ratings; no Claude, ships nothing
 Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what tracks for these books would cost
 Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
+Tools/mac/make-tracks.sh --prompt 3 ~/Storyteller\ Lofi/Books/*.epub     # + combined with atmosphere, copied to LofiMusic/tracks
 ```
 
 Make tracks from the read-aloud EPUB exactly as Storyteller serves it. The
@@ -191,9 +192,15 @@ runs keep a cap counted at API list prices. Claude Code must be signed in
 once on the Mac (`claude`, then log in), or `CLAUDE_CODE_OAUTH_TOKEN` set from
 `claude setup-token`.
 
-`Tools/mac/claude-check.sh` scores Claude against the local model on the 320
-test passages with the plausible sets, prompt v2 against v3 on the same
-windows. Prompt v3 (`LOFI_CLAUDE_PROMPT=3`) asks first for `about`, one line
+`Tools/mac/claude-check.sh` scores Claude against the local model (every
+`LofiMood-*.json` in the music folder) on two tests, window by window: the
+320 test passages with the plausible sets, and EmoBank's 386 fiction
+sentences that people clearly rated pleasant or unpleasant
+(`emobank.py windows --clear-only`; the score is how often the mood lands on
+the side people rated). The first test's labels come from Claude, so they
+favour prompt v2; the second does not rest on Claude. Its runs are
+MODEL:PROMPT, by default `opus-5-5:2 opus-5-5:3 sonnet-5-5:2`, to choose the
+model and prompt `make-tracks.sh` uses (`--engine`, `--prompt`). Prompt v3 (`LOFI_CLAUDE_PROMPT=3`) asks first for `about`, one line
 on what is happening and what is at stake (the schema's keys are sent
 sorted, so it is written before the mood), and then for `also`, up to two
 other moods whose music would also suit. Those go into the reading's
