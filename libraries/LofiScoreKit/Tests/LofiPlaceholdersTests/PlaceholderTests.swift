@@ -45,7 +45,10 @@ final class LoudnessTests: XCTestCase {
     func testTruePeakCatchesPeaksBetweenSamples() {
         // A sine at a quarter of the sample rate, phase-shifted so no sample lands on a crest.
         let rate = 48_000.0
-        let samples = (0..<4800).map { Float(sin(2 * .pi * 12_000 * Double($0) / rate + .pi / 4)) }
+        let samples = (0..<4800).map { (i: Int) -> Float in
+            let phase: Double = 2 * Double.pi * 12_000 * Double(i) / rate + Double.pi / 4
+            return Float(sin(phase))
+        }
         let buffer = StereoBuffer(left: samples, right: samples, sampleRate: rate)
         XCTAssertEqual(Double(buffer.samplePeak), sqrt(0.5), accuracy: 1e-3)
         XCTAssertGreaterThan(Loudness.truePeak(buffer), Gain.decibels(fromLinear: Double(buffer.samplePeak)) + 1)

@@ -244,7 +244,9 @@ public final class LofiMusicHost: @unchecked Sendable {
         let (player, bookID, engine) = await onQueue { [self] () -> (LofiScorePlayer?, String?, String?) in
             var engine: String?
             if case let .ready(_, engineID, _) = bookText { engine = engineID }
-            return (player, book?.id, engine)
+            // `self.` because Swift 6.2 (Xcode 26) takes a bare `player` here for the
+            // variable this statement declares.
+            return (self.player, book?.id, engine)
         }
         guard let player, let bookID else { return nil }
         let result = await withCheckedContinuation { (continuation: CheckedContinuation<MoodOverride?, Never>) in
@@ -434,7 +436,12 @@ public final class LofiMusicHost: @unchecked Sendable {
         let followerStatus = await withCheckedContinuation { continuation in
             follower.status { continuation.resume(returning: $0) }
         }
-        let (status, player, atmosphere) = await onQueue { [self] in (makeStatus(followerStatus), player, atmosphere) }
+        // Named apart from the properties they copy: Swift 6.2 (Xcode 26) takes a bare
+        // `player` in the closure for the variable this statement declares.
+        let (status, currentPlayer, currentAtmosphere) = await onQueue {
+            [self] () -> (LofiMusicStatus, LofiScorePlayer?, AmbiencePlayer?) in
+            (makeStatus(followerStatus), self.player, self.atmosphere)
+        }
         var result = status
         if let feedback {
             let bookID = result.book?.id
@@ -448,7 +455,7 @@ public final class LofiMusicHost: @unchecked Sendable {
                 totalWrong: total.wrong
             )
         }
-        if let atmosphere {
+        if let atmosphere = currentAtmosphere {
             let ambience = await withCheckedContinuation { continuation in
                 atmosphere.snapshot { continuation.resume(returning: $0) }
             }
@@ -460,7 +467,7 @@ public final class LofiMusicHost: @unchecked Sendable {
             result.atmosphere.engineRunning = ambience.engineRunning
             result.atmosphere.lastError = ambience.lastError
         }
-        guard let player else { return result }
+        guard let player = currentPlayer else { return result }
         let snapshot = await withCheckedContinuation { continuation in
             player.snapshot { continuation.resume(returning: $0) }
         }
