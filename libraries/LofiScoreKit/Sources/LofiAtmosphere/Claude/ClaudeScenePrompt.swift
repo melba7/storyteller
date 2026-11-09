@@ -3,17 +3,27 @@ import LofiMood
 import LofiText
 
 /// What ``ClaudeSceneEngine`` sends: the rules and the sound list as the system prompt;
-/// the book's world, the current scene, the places visited so far and the passage as the
-/// user message; and a JSON schema for the answer.
+/// the book's world, the current scene, the places visited so far, the more specific
+/// sounds available and the passage as the user message; and a JSON schema for the answer.
 public enum ClaudeScenePrompt {
     /// Bump when the wording or schema changes; engine ids and saved tracks record it.
-    public static let version = 1
+    public static let version = 2
 
     /// Places listed with each passage, most recent first.
     public static let maxPlacesListed = 15
+    /// Variants listed: the shared ones in the system prompt, the book's own with each passage.
+    public static let maxVariantsListed = 80
 
-    public static var system: String {
+    /// The system prompt without shared variants.
+    public static var system: String { system(sharedVariants: []) }
+
+    /// The system prompt. `sharedVariants` (the starter set and other books' variants) are
+    /// the same for a whole run, so they sit here, where the prompt cache keeps them.
+    public static func system(sharedVariants: [SoundVariant]) -> String {
         let sounds = AmbientSound.allCases.map { "- \($0.rawValue): \($0.guidance)" }.joined(separator: "\n")
+        let shared = sharedVariants.isEmpty
+            ? "none"
+            : "\n" + sharedVariants.prefix(maxVariantsListed).map(describe).joined(separator: "\n")
         return """
             You design the background soundscape for an audiobook: quiet, steady sounds of the \
             place where the story is, played softly under the narrator's voice and some gentle \
@@ -52,6 +62,37 @@ public enum ClaudeScenePrompt {
             The sounds:
             \(sounds)
 
+            More specific sounds (variants):
+            - A sound may name a variant: a more specific kind of it, from the specific sounds \
+            available (listed below, and with the passage when the book has added its own). Use \
+            one when it fits the place clearly better than the plain sound; otherwise variant is "".
+            - When the place clearly calls for a steady sound that is a distinctly more specific \
+            kind of one of the sounds above and no available variant fits (church bells across a \
+            town square, a waterfall, a busy cafe, a blizzard), add it to newSounds: id (a short \
+            camelCase name such as churchBells), of (the sound above it is a kind of; that sound \
+            plays until a recording is found), about (what it is, up to ten words) and search \
+            (two to five words to search a sound library with). Then use it as that sound's variant.
+            - Only for a place the characters are in, not a passing mention; only a steady sound \
+            that can loop (no single bangs or footsteps, no words that can be followed, no music); \
+            at most one new sound per answer, and never one that is already available. Usually \
+            newSounds is empty.
+
+            Specific sounds available in every book (variant (the sound it is a kind of): what it is): \(shared)
+
+            Moments:
+            - moment is "swell" when the passage's last sentence is the very moment the \
+            characters walk into a much louder place or a big steady sound starts around them: \
+            entering a crowded hall, a market or a busy inn; stepping out into a storm, or a storm \
+            breaking overhead; coming out onto a beach, a cliff top or a ship's deck; a train, \
+            coach or ship setting off, an engine starting; coming upon a waterfall, a rushing \
+            river or a roaring bonfire.
+            - "hush" when the last sentence is the moment the sound around them suddenly drops \
+            away: a door shutting on a noisy room, the rain stopping, an engine cutting out, \
+            stepping into a silent church or a snowy field.
+            - Otherwise "none". The narration pauses for under a second at a moment, so keep \
+            them for clear, audible arrivals, a few per chapter at most, and never for a place \
+            that is only remembered or talked about.
+
             Also answer:
             - setting: indoors, outdoors, vehicle (a carriage, train, ship, spaceship) or unclear.
             - world: a few words on the book's setting so far (era, region, season, technology), \
@@ -62,8 +103,11 @@ public enum ClaudeScenePrompt {
             """
     }
 
-    /// The user message for one window.
-    public static func message(for window: CausalWindow, memory: PlaceMemory, maxWords: Int = 400) -> String {
+    /// The user message for one window. Variants already in the system prompt
+    /// (`sharedVariants`) are not repeated.
+    public static func message(
+        for window: CausalWindow, memory: PlaceMemory, maxWords: Int = 400, sharedVariants: [SoundVariant] = []
+    ) -> String {
         var lines: [String] = []
         lines.append("Book's world so far: \(memory.world ?? "nothing known yet")")
         if let current = memory.current, current.placeID != nil || !current.isSilent {
@@ -77,9 +121,14 @@ public enum ClaudeScenePrompt {
         } else {
             lines.append("Places visited before (most recent first):")
             for place in places {
-                let sounds = place.layers.isEmpty ? "no sounds" : place.layers.map { "\($0.sound.rawValue) \($0.level.rawValue)" }.joined(separator: ", ")
-                lines.append("- \(place.id) \"\(place.name)\" (\(place.setting.rawValue)): \(sounds)")
+                lines.append("- \(place.id) \"\(place.name)\" (\(place.setting.rawValue)): \(describe(place.layers))")
             }
+        }
+        let shared = Set(sharedVariants.prefix(maxVariantsListed).map(\.id))
+        let own = memory.variants.filter { !shared.contains($0.id) }.prefix(maxVariantsListed)
+        if !own.isEmpty {
+            lines.append("Specific sounds this book has added so far:")
+            lines.append(contentsOf: own.map(describe))
         }
         lines.append("")
         lines.append("Passage (the last sentence is being read aloud now):")
@@ -91,8 +140,20 @@ public enum ClaudeScenePrompt {
 
     static func describe(_ scene: StoryScene) -> String {
         let place = scene.placeID.map { id in scene.placeName.map { "\(id) \"\($0)\"" } ?? id } ?? "no particular place"
-        let sounds = scene.layers.isEmpty ? "no sounds" : scene.layers.map { "\($0.sound.rawValue) \($0.level.rawValue)" }.joined(separator: ", ")
-        return "\(place) (\(scene.setting.rawValue)): \(sounds)"
+        return "\(place) (\(scene.setting.rawValue)): \(describe(scene.layers))"
+    }
+
+    /// "- churchBells (oldTown): church bells ringing across a town".
+    static func describe(_ variant: SoundVariant) -> String {
+        "- \(variant.id) (\(variant.of.rawValue)): \(variant.about)"
+    }
+
+    /// "fireplace soft, oldTown faint (variant churchBells)".
+    static func describe(_ layers: [SceneLayer]) -> String {
+        guard !layers.isEmpty else { return "no sounds" }
+        return layers.map { layer in
+            "\(layer.sound.rawValue) \(layer.level.rawValue)" + (layer.variant.map { " (variant \($0))" } ?? "")
+        }.joined(separator: ", ")
     }
 
     /// The answer's JSON schema, for `output_config.format`. Structured outputs do not
@@ -111,16 +172,32 @@ public enum ClaudeScenePrompt {
                         "properties": [
                             "sound": ["type": "string", "enum": AmbientSound.allCases.map(\.rawValue)],
                             "level": ["type": "string", "enum": AmbientLevel.allCases.map(\.rawValue)],
+                            "variant": ["type": "string"],
                         ],
-                        "required": ["sound", "level"],
+                        "required": ["sound", "level", "variant"],
                         "additionalProperties": false,
                     ] as [String: Any],
                 ] as [String: Any],
+                "newSounds": [
+                    "type": "array",
+                    "items": [
+                        "type": "object",
+                        "properties": [
+                            "id": ["type": "string"],
+                            "of": ["type": "string", "enum": AmbientSound.allCases.map(\.rawValue)],
+                            "about": ["type": "string"],
+                            "search": ["type": "string"],
+                        ],
+                        "required": ["id", "of", "about", "search"],
+                        "additionalProperties": false,
+                    ] as [String: Any],
+                ] as [String: Any],
+                "moment": ["type": "string", "enum": ["none"] + StoryScene.Moment.allCases.map(\.rawValue)],
                 "world": ["type": "string"],
                 "cue": ["type": "string"],
                 "confidence": ["type": "number"],
             ] as [String: Any],
-            "required": ["place", "placeName", "setting", "sounds", "world", "cue", "confidence"],
+            "required": ["place", "placeName", "setting", "sounds", "newSounds", "moment", "world", "cue", "confidence"],
             "additionalProperties": false,
         ]
     }

@@ -15,12 +15,16 @@ before it. This is an outside check that does not rest on Claude's labels.
     # 3. scores
     python3 -I Tools/eval/emobank.py score DIR READINGS.jsonl [READINGS2.jsonl ...]
 
-Scores: Spearman correlation of each engine's valence and arousal with the
-people's, with 95% intervals from resampling whole stories; and, on the
-sentences people clearly rated (valence at most 2.4 or at least 3.6),
-whether the engine's mood falls on the same side (pleasant moods: cozy,
-playful, hopeful, romantic, dreamy, adventurous; unpleasant: melancholy,
-tense, somber). Standard library only.
+Scores, on the sentences every given engine read: Spearman correlation of
+each engine's valence and arousal with the people's; and on the sentences
+people clearly rated (valence at most 2.4 or at least 3.6), how many get a
+mood on the right side (pleasant: cozy, playful, hopeful, romantic, dreamy,
+adventurous; unpleasant: melancholy, tense, somber; calm and mysterious take
+no side and count as misses), how many get a side at all, and how often a
+side is right when one is taken. The last flatters an engine that rarely
+takes a side, so compare engines on the first. 95% intervals resample whole
+stories; with several files, each is also compared with the first, paired.
+Standard library only.
 """
 from __future__ import annotations
 
@@ -99,44 +103,75 @@ def spearman(x: list[float], y: list[float]) -> float:
 def score(folder: str, files: list[str], boot: int) -> None:
     gold = {"emobank:" + r["id"]: (doc, r) for doc, rows in fiction(folder).items() for r in rows}
     docs = sorted({d for d, _ in gold.values()})
-    rng = random.Random(7)
-    samples = [[rng.choice(docs) for _ in docs] for _ in range(boot)]
-    print(f"# EmoBank fiction: {len(gold)} sentences in {len(docs)} stories; intervals: 95%, {boot} story resamples")
+    readings: list[tuple[str, dict[str, dict]]] = []
     for path in files:
-        by_doc: dict[str, list[tuple[float, float, float, float, str]]] = {d: [] for d in docs}
-        engine = path
+        engine, rows = path, {}
         for line in open(path, encoding="utf-8"):
             r = json.loads(line)
-            if r.get("id") not in gold or r.get("bucket") is None:
-                continue
-            engine = r.get("engine", engine)
-            doc, g = gold[r["id"]]
-            by_doc[doc].append((g["V"], g["A"], r.get("valence") or 0.0, r.get("arousal") or 0.0, r["bucket"]))
+            if r.get("id") in gold and r.get("bucket") is not None:
+                engine = r.get("engine", engine)
+                rows[r["id"]] = r
+        readings.append((engine, rows))
+    # Score every engine on the sentences all of them read, so differences are paired.
+    common = set(gold)
+    for _, rows in readings:
+        common &= set(rows)
+    by_doc = {d: sorted(i for i in common if gold[i][0] == d) for d in docs}
+    rng = random.Random(7)
+    samples = [[rng.choice(docs) for _ in docs] for _ in range(boot)]
 
-        def stats(sample: list[str]) -> tuple[float, float, float]:
-            rows = [x for d in sample for x in by_doc[d]]
-            v = spearman([x[0] for x in rows], [x[2] for x in rows])
-            a = spearman([x[1] for x in rows], [x[3] for x in rows])
-            clear = [x for x in rows if (x[0] <= 2.4 or x[0] >= 3.6) and (x[4] in PLEASANT or x[4] in UNPLEASANT)]
-            side = sum(1 for x in clear if (x[0] >= 3.6) == (x[4] in PLEASANT)) / len(clear) if clear else float("nan")
-            return v, a, side
+    def side(bucket: str) -> int:
+        return 1 if bucket in PLEASANT else -1 if bucket in UNPLEASANT else 0
 
-        point = stats(docs)
-        bs = [stats(s) for s in samples]
+    def stats(rows: dict[str, dict], sample: list[str]) -> tuple[float, float, float, float, float]:
+        ids = [i for d in sample for i in by_doc[d]]
+        v = spearman([gold[i][1]["V"] for i in ids], [rows[i].get("valence") or 0.0 for i in ids])
+        a = spearman([gold[i][1]["A"] for i in ids], [rows[i].get("arousal") or 0.0 for i in ids])
+        clear = [i for i in ids if gold[i][1]["V"] <= 2.4 or gold[i][1]["V"] >= 3.6]
+        want = {i: 1 if gold[i][1]["V"] >= 3.6 else -1 for i in clear}
+        sided = [i for i in clear if side(rows[i]["bucket"]) != 0]
+        right = sum(1 for i in sided if side(rows[i]["bucket"]) == want[i])
+        n = max(1, len(clear))
+        return v, a, right / n, len(sided) / n, (right / len(sided) if sided else float("nan"))
 
-        def iv(k: int) -> str:
-            vals = sorted(b[k] for b in bs if b[k] == b[k])
-            if not vals:
-                return "n/a"
-            lo, hi = vals[int(0.025 * len(vals))], vals[int(0.975 * len(vals)) - 1]
-            return f"{lo:.1%} to {hi:.1%}" if k == 2 else f"{lo:.2f} to {hi:.2f}"
+    names = ["valence rho", "arousal rho", "clear sentences on the right side", "clear sentences given a side", "right when it takes a side"]
+    percent = [False, False, True, True, True]
 
-        n = sum(len(v) for v in by_doc.values())
-        clear_n = sum(1 for v in by_doc.values() for x in v if (x[0] <= 2.4 or x[0] >= 3.6))
-        print(f"  {engine}: {n} readings")
-        print(f"    valence vs people: Spearman {point[0]:.2f} ({iv(0)})")
-        print(f"    arousal vs people: Spearman {point[1]:.2f} ({iv(1)})")
-        print(f"    clearly pleasant or unpleasant sentences ({clear_n}), mood on the same side when it takes one: {point[2]:.1%} ({iv(2)})")
+    def fmt(k: int, x: float) -> str:
+        return f"{x:.1%}" if percent[k] else f"{x:.2f}"
+
+    def interval(values: list[float], k: int, signed: bool = False) -> str:
+        vals = sorted(x for x in values if x == x)
+        if not vals:
+            return "n/a"
+        lo, hi = vals[int(0.025 * len(vals))], vals[int(0.975 * len(vals)) - 1]
+        if signed:
+            return (f"{lo * 100:+.1f} to {hi * 100:+.1f} points" if percent[k] else f"{lo:+.2f} to {hi:+.2f}")
+        return f"{fmt(k, lo)} to {fmt(k, hi)}"
+
+    clear_n = sum(1 for i in common if gold[i][1]["V"] <= 2.4 or gold[i][1]["V"] >= 3.6)
+    print(f"# EmoBank fiction: {len(common)} sentences all engines read, in {len(docs)} stories ({clear_n} clearly pleasant or unpleasant to people)")
+    print(f"# intervals: 95%, {boot} story resamples. Pleasant moods: {', '.join(sorted(PLEASANT))}; unpleasant: {', '.join(sorted(UNPLEASANT))}; calm and mysterious take no side.")
+    boots = []
+    for engine, rows in readings:
+        point = stats(rows, docs)
+        bs = [stats(rows, smp) for smp in samples]
+        boots.append((engine, point, bs))
+        print(f"  {engine}")
+        for k, name in enumerate(names):
+            print(f"    {name}: {fmt(k, point[k])} ({interval([b[k] for b in bs], k)})")
+    if len(boots) > 1:
+        base, bpoint, bbs = boots[0]
+        print(f"\n## Paired differences from {base}")
+        for engine, point, bs in boots[1:]:
+            parts = []
+            for k in (0, 1, 2):
+                d = point[k] - bpoint[k]
+                diffs = [x[k] - y[k] for x, y in zip(bs, bbs)]
+                shown = f"{d * 100:+.1f} points" if percent[k] else f"{d:+.2f}"
+                parts.append(f"{names[k]} {shown} ({interval(diffs, k, signed=True)})")
+            print(f"  {engine}: " + ";  ".join(parts))
+        print("  (an interval that includes 0 means the difference could be luck)")
 
 
 def main() -> None:

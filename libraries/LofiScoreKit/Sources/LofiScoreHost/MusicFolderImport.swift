@@ -13,8 +13,8 @@ import LofiScoreCore
 /// mood tracks and book scores (`*.json` in `MoodTracks/`, and `*.track.json` or
 /// `*.score.json` anywhere, gathered into `MoodTracks/`), and the Fast mood models at the top (embedding models named
 /// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). For the
-/// atmosphere: `Atmosphere/<Sound>/` audio with `Atmosphere/sounds.json`, `SOURCES.csv` and
-/// `CREDITS.md`, and atmosphere tracks (`*.atmosphere.json` anywhere, gathered into
+/// atmosphere: `Atmosphere/<Sound>/` and `Atmosphere/<Sound>.<Variant>/` audio with
+/// `Atmosphere/sounds.json`, `variants.json`, `SOURCES.csv` and `CREDITS.md`, and atmosphere tracks (`*.atmosphere.json` anywhere, gathered into
 /// `AtmosphereTracks/`). Nothing else: an audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
     public struct Summary: Sendable, Hashable, Codable {
@@ -165,10 +165,11 @@ public enum MusicFolderImport {
             return components.count == 2 && MoodBucket(lenient: components[0]) != nil
                 || listed.contains(components.joined(separator: "/"))
         }
-        // An atmosphere recording: `Atmosphere/<Sound>/<file>`.
+        // An atmosphere recording: `Atmosphere/<Sound>/<file>`, or a variant's,
+        // `Atmosphere/<Sound>.<Variant>/<file>`.
         func isAtmosphere(_ components: [String]) -> Bool {
             guard components.count == 3, components[0].lowercased() == atmosphereFolderName.lowercased(),
-                  AmbientSound(lenient: components[1]) != nil,
+                  AmbientSound(lenient: components[1]) != nil || SoundVariant.parseFolder(components[1]) != nil,
                   let name = components.last
             else { return false }
             return AmbienceLibrary.audioExtensions.contains((name as NSString).pathExtension.lowercased())
@@ -222,7 +223,7 @@ public enum MusicFolderImport {
             }
             if isAtmosphere(components)
                 || components.count == 2 && components[0].lowercased() == atmosphereFolderName.lowercased()
-                && [AmbienceLibrary.manifestName, "sources.csv", creditsFileName.lowercased()].contains(name.lowercased())
+                && [AmbienceLibrary.manifestName, SoundVariantCatalog.fileName, "sources.csv", creditsFileName.lowercased()].contains(name.lowercased())
             {
                 // Under one spelling of the folder, where the host looks.
                 let rest = components.dropFirst().joined(separator: "/")

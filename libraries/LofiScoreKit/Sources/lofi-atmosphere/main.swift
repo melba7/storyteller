@@ -12,11 +12,15 @@ let usage = """
     usage:
       lofi-atmosphere track EPUB-DIR --book NAME --out FILE [--model claude-opus-5-5] [--effort low]
                       [--max-dollars D] [--words 250] [--probe-budget 0.5] [--resolution 3] [--concurrency 4]
-      lofi-atmosphere track EPUB-DIR --book NAME --dry-run
+                      [--variants Atmosphere/variants.json]
+      lofi-atmosphere track EPUB-DIR --book NAME --dry-run [--variants FILE]
       lofi-atmosphere show FILE [--places]
       lofi-atmosphere score --out FILE [--mood TRACK.track.json] [--atmosphere TRACK.atmosphere.json]
       lofi-atmosphere synth FOLDER [--seconds 30] [--rate 32000] [--sound rain]
-      lofi-atmosphere library FOLDER
+      lofi-atmosphere library FOLDER [--edition personal|publish]
+
+    --variants offers the more specific sounds in that catalog (the fetch script's starter set and
+    other books' requests) to Claude, besides the ones it asks for in this book.
 
     Claude is reached like lofi-eval: LOFI_CLAUDE_VIA=api uses the Anthropic API with the key from
     ANTHROPIC_API_KEY, or the file named by ANTHROPIC_API_KEY_FILE (never printed); LOFI_CLAUDE_VIA=plan
@@ -156,7 +160,19 @@ func trackCommand(_ args: Arguments) async throws {
         wordsBetweenEntries: args.int("words", default: 250),
         refinement: budget > 0 ? .init(resolutionSentences: args.int("resolution", default: 3), probeBudget: budget) : nil
     )
-    let builder = AtmosphereTrackBuilder(spoilerGuard: spoilerGuard, plan: plan)
+    var offered: [SoundVariant] = []
+    if let path = args.string("variants") {
+        if FileManager.default.fileExists(atPath: path) {
+            do {
+                offered = try SoundVariantCatalog.load(from: URL(fileURLWithPath: path)).offered(toBook: book)
+            } catch {
+                fail("could not read \(path): \(error)")
+            }
+        } else {
+            note("no variants catalog at \(path) yet; Claude gets only the variants it asks for")
+        }
+    }
+    let builder = AtmosphereTrackBuilder(spoilerGuard: spoilerGuard, plan: plan, offeredVariants: offered)
 
     if args.flag("dry-run") {
         let all = try builder.narratedPositions()
@@ -169,11 +185,12 @@ func trackCommand(_ args: Arguments) async throws {
         let requests = positions.count + probes
         let averageWords = Double(passageWords) / Double(max(1, positions.count))
         // Passage at ~1.35 tokens a word, plus ~450 for the place list and framing;
-        // the ~2,000-token system prompt is read from the cache after the first request.
+        // the system prompt (~2,400 tokens plus ~20 a shared variant) is read from the
+        // cache after the first request.
         let input = Int(Double(requests) * (averageWords * 1.35 + 450))
-        let cached = requests * 2_000
+        let cached = requests * (2_400 + 20 * min(offered.count, ClaudeScenePrompt.maxVariantsListed))
         let output = requests * 450
-        note("\(book): \(all.count) narrated sentences, \(positions.count) entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter), up to \(probes) probes")
+        note("\(book): \(all.count) narrated sentences, \(positions.count) entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter), up to \(probes) probes, \(offered.count) shared variants offered")
         for prices in ScenePrices.known {
             var totals = SceneUsage.Totals()
             totals.inputTokens = input
@@ -193,7 +210,7 @@ func trackCommand(_ args: Arguments) async throws {
     let route = claudeTransport()
     let engine = ClaudeSceneEngine(
         apiKey: route.apiKey,
-        configuration: .init(model: prices.model, effort: args.string("effort") ?? "low"),
+        configuration: .init(model: prices.model, effort: args.string("effort") ?? "low", sharedVariants: offered),
         usage: usage,
         transport: route.transport
     )
@@ -226,6 +243,9 @@ func trackCommand(_ args: Arguments) async throws {
     note(String(format: "%@ with %@: %d planned, %d already there, %d scored, %d probes, %d failed, %d places, %.0f s",
                 book, engine.id, report.planned, report.alreadyScored, report.scored, report.probes, report.failed,
                 report.places, Date().timeIntervalSince(started)))
+    let shared = Set(offered.map(\.id))
+    let asked = store.snapshot.variants.filter { !shared.contains($0.id) }
+    note("  more specific sounds: \(report.variants) used, \(asked.count) new" + (asked.isEmpty ? "" : ": " + asked.map { "\($0.id) (\($0.of.rawValue))" }.joined(separator: ", ")))
     if report.stoppedEarly {
         note(String(format: "  stopped at --max-dollars %.2f; run again with a higher cap to finish", cap.dollars ?? 0))
     }
@@ -242,6 +262,9 @@ func showCommand(_ args: Arguments) throws {
     guard let path = args.positional.dropFirst().first else { fail(usage) }
     let track = try AtmosphereTrack.load(from: URL(fileURLWithPath: path))
     print("\(track.bookID): \(track.entries.count) entries by \(track.engineID)")
+    for variant in track.variants {
+        print("variant \(variant.id), a kind of \(variant.of.rawValue), from #\(variant.firstIndex ?? 0): \(variant.about) [search: \(variant.search)]")
+    }
     var previous: StoryScene?
     var previousChapter: Int?
     for entry in track.entries {
@@ -305,11 +328,25 @@ func synthCommand(_ args: Arguments) throws {
 
 func libraryCommand(_ args: Arguments) throws {
     guard let path = args.positional.dropFirst().first else { fail(usage) }
-    let library = try AmbienceLibrary.load(from: URL(fileURLWithPath: path))
+    let editionName = args.string("edition") ?? SoundEdition.personal.rawValue
+    guard let edition = SoundEdition(rawValue: editionName) else { fail("--edition is personal or publish") }
+    let library = try AmbienceLibrary.load(from: URL(fileURLWithPath: path), edition: edition)
+    func describe(_ recordings: [AmbienceRecording]) -> String {
+        guard !recordings.isEmpty else { return "none" }
+        return recordings.map { r in
+            let level = r.loudness.map { String(format: " %.1f LUFS", $0) } ?? " (unmeasured)"
+            let use = r.isPersonalUseOnly ? " [personal use]" : r.isPublishStandBy ? " [publishing stand-by]" : ""
+            return r.file + level + use
+        }.joined(separator: ", ")
+    }
+    print("\(edition.rawValue) edition")
     for sound in AmbientSound.allCases {
-        let recordings = library.recordings(of: sound)
-        let detail = recordings.map { r in r.loudness.map { String(format: "%@ %.1f LUFS", r.file, $0) } ?? "\(r.file) (unmeasured)" }
-        print("\(sound.folderName): \(recordings.isEmpty ? "none" : detail.joined(separator: ", "))")
+        print("\(sound.folderName): \(describe(library.recordings(of: sound)))")
+    }
+    for key in library.variants.sorted() {
+        let parts = key.split(separator: ".", maxSplits: 1).map(String.init)
+        guard let sound = AmbientSound(rawValue: parts[0]) else { continue }
+        print("\(SoundVariant.folderName(of: sound, id: parts[1])): \(describe(library.recordings(of: sound, variant: parts[1])))")
     }
 }
 

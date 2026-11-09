@@ -16,18 +16,23 @@ public struct SceneAnswer: Sendable, Hashable {
     /// The scene, without a place id yet (the builder assigns ids).
     public var scene: StoryScene
     public var world: String?
+    /// More specific sounds asked for in this answer, not offered before (no first index
+    /// yet: the builder gives them this entry's).
+    public var newVariants: [SoundVariant]
 
-    public init(place: Place, scene: StoryScene, world: String?) {
+    public init(place: Place, scene: StoryScene, world: String?, newVariants: [SoundVariant] = []) {
         self.place = place
         self.scene = scene
         self.world = world
+        self.newVariants = newVariants
     }
 }
 
 /// Judges the scene of one causal window, given the places met so far.
 ///
 /// Engines see only `SpoilerGuard` windows and a ``PlaceMemory`` made from earlier
-/// entries, so no engine can see text that has not been narrated.
+/// entries (and variants first asked for before the window), so no engine can see text
+/// that has not been narrated.
 public protocol SceneEngine: Sendable {
     /// Engine and prompt version, e.g. "claude.opus-5-5/a1". Saved in the track.
     var id: String { get }

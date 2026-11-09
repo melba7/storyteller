@@ -84,11 +84,14 @@ export function describeAtmosphere(status: LofiMusicStatus): string {
 export function atmosphereSourceLabel(
   atmosphere: NonNullable<LofiMusicStatus["atmosphere"]>,
 ): string {
+  const more = atmosphere.variants
+    ? `, and ${atmosphere.variants} more specific ${atmosphere.variants === 1 ? "sound" : "sounds"}`
+    : ""
   switch (atmosphere.source) {
     case "imported":
-      return `${atmosphere.sounds} of ${atmosphere.totalSounds} sounds, imported`
+      return `${atmosphere.sounds} of ${atmosphere.totalSounds} sounds, imported${more}`
     case "mixed":
-      return `${atmosphere.sounds} sounds: imported recordings, with stand-ins for the rest`
+      return `${atmosphere.sounds} sounds: imported recordings, with stand-ins for the rest${more}`
     case "standIns":
       return "Stand-in sounds. Import recordings (an Atmosphere folder in the music folder) for the real thing."
     case "none":

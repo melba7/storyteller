@@ -25,6 +25,10 @@ public struct ClaudeSceneEngine: SceneEngine {
         public var endpoint: URL
         public var apiVersion: String
         public var timeout: TimeInterval
+        /// Variants offered in every request of a run (the starter set and other books'),
+        /// sent once in the cached system prompt. The builder offers the same ones through
+        /// the memory, which is what answers are checked against.
+        public var sharedVariants: [SoundVariant]
 
         public init(
             model: String = "claude-opus-5-5",
@@ -35,7 +39,8 @@ public struct ClaudeSceneEngine: SceneEngine {
             maxRetries: Int = 4,
             endpoint: URL = URL(string: "https://api.anthropic.com/v1/messages")!,
             apiVersion: String = "2026-10-21",
-            timeout: TimeInterval = 120
+            timeout: TimeInterval = 120,
+            sharedVariants: [SoundVariant] = []
         ) {
             self.model = model
             self.effort = effort
@@ -46,6 +51,7 @@ public struct ClaudeSceneEngine: SceneEngine {
             self.endpoint = endpoint
             self.apiVersion = apiVersion
             self.timeout = timeout
+            self.sharedVariants = sharedVariants
         }
 
         var usesServerFallback: Bool { serverFallback ?? !model.contains("haiku") }
@@ -135,13 +141,15 @@ public struct ClaudeSceneEngine: SceneEngine {
             "max_tokens": configuration.maxTokens,
             "system": [[
                 "type": "text",
-                "text": ClaudeScenePrompt.system,
+                "text": ClaudeScenePrompt.system(sharedVariants: configuration.sharedVariants),
                 // The same on every request of a run; cached once it is long enough.
                 "cache_control": ["type": "ephemeral"],
             ] as [String: Any]],
             "messages": [[
                 "role": "user",
-                "content": ClaudeScenePrompt.message(for: window, memory: memory, maxWords: configuration.maxWords),
+                "content": ClaudeScenePrompt.message(
+                    for: window, memory: memory, maxWords: configuration.maxWords, sharedVariants: configuration.sharedVariants
+                ),
             ]],
             "output_config": [
                 "effort": configuration.effort,
@@ -183,17 +191,40 @@ public struct ClaudeSceneEngine: SceneEngine {
         return try answer(fromJSON: text, memory: memory)
     }
 
+    /// New sounds kept from one answer; the prompt asks for one at most.
+    static let maxNewVariantsPerAnswer = 1
+
     /// Turns the JSON answer into a ``SceneAnswer``. Unknown sounds are dropped, an id the
     /// memory does not hold is treated as a new place, and "new" with the name of a known
-    /// place is that place.
+    /// place is that place. A variant must be one the memory offers or one this answer
+    /// adds; any other is dropped and the plain sound kept.
     public static func answer(fromJSON text: String, memory: PlaceMemory) throws -> SceneAnswer {
         guard let raw = try? JSONDecoder().decode(Answer.self, from: Data(text.utf8)) else {
             throw SceneEngineError.unparseable(text)
         }
+        var available = Dictionary(memory.variants.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var added: [SoundVariant] = []
+        for item in raw.newSounds ?? [] where added.count < maxNewVariantsPerAnswer {
+            guard let id = SoundVariant.normalizedID(item.id), available[id] == nil,
+                  let of = AmbientSound(rawValue: item.of) ?? AmbientSound(lenient: item.of)
+            else { continue }
+            let about = String(item.about.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120))
+            let search = String(item.search.trimmingCharacters(in: .whitespacesAndNewlines).prefix(80))
+            guard !about.isEmpty || !search.isEmpty else { continue }
+            let variant = SoundVariant(id: id, of: of, about: about.isEmpty ? search : about, search: search.isEmpty ? about : search)
+            available[id] = variant
+            added.append(variant)
+        }
+        var used = Set<String>()
         let layers = raw.sounds.compactMap { item -> SceneLayer? in
             guard let sound = AmbientSound(rawValue: item.sound) ?? AmbientSound(lenient: item.sound),
                   let level = AmbientLevel(rawValue: item.level.lowercased())
             else { return nil }
+            if let name = item.variant, let id = SoundVariant.normalizedID(name), let variant = available[id] {
+                used.insert(id)
+                // The variant decides which sound it stands in for.
+                return SceneLayer(variant.of, level, variant: id)
+            }
             return SceneLayer(sound, level)
         }
         let name = raw.placeName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -225,9 +256,15 @@ public struct ClaudeSceneEngine: SceneEngine {
             setting: StoryScene.Setting(rawValue: raw.setting.lowercased()) ?? .unclear,
             layers: layers,
             confidence: raw.confidence,
-            cue: cue.isEmpty ? nil : String(cue.prefix(120))
+            cue: cue.isEmpty ? nil : String(cue.prefix(120)),
+            // A moment needs somewhere to happen.
+            moment: place == .none ? nil : raw.moment.flatMap { StoryScene.Moment(rawValue: $0.lowercased()) }
         )
-        return SceneAnswer(place: place, scene: scene, world: world.isEmpty ? nil : String(world.prefix(160)))
+        return SceneAnswer(
+            place: place, scene: scene, world: world.isEmpty ? nil : String(world.prefix(160)),
+            // A new sound the scene does not use is not worth fetching.
+            newVariants: added.filter { used.contains($0.id) }
+        )
     }
 
     static func backoff(attempt: Int, retryAfter: String?) -> Double {
@@ -278,11 +315,20 @@ public struct ClaudeSceneEngine: SceneEngine {
         struct Sound: Decodable {
             let sound: String
             let level: String
+            let variant: String?
+        }
+        struct NewSound: Decodable {
+            let id: String
+            let of: String
+            let about: String
+            let search: String
         }
         let place: String
         let placeName: String
         let setting: String
         let sounds: [Sound]
+        let newSounds: [NewSound]?
+        let moment: String?
         let world: String
         let cue: String
         let confidence: Double

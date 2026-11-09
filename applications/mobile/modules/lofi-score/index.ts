@@ -60,6 +60,13 @@ export type LofiAtmosphereStatus = {
   /** Sounds with a recording, of `totalSounds`. */
   sounds: number
   totalSounds: number
+  /** More specific sounds (church bells, a waterfall) with recordings. */
+  variants?: number
+  /** "personal" in your own builds, which may play personal-use recordings; "publish" in an App Store build. */
+  edition?: "personal" | "publish"
+  /** Short narration pauses where the sound swells or hushes: the setting, and whether this app can pause its narrator. */
+  pausesEnabled?: boolean
+  pausesAvailable?: boolean
   /** The open book has an atmosphere track. */
   track: boolean
   trackOrigin?: string
@@ -144,6 +151,8 @@ type LofiScoreNativeModule = {
   setAtmosphereEnabled(enabled: boolean): Promise<LofiMusicStatus>
   /** null goes back to the default level. */
   setAtmosphereLevel(level: number | null): Promise<LofiMusicStatus>
+  /** Short narration pauses where the sound swells (a crowded hall, a storm breaking) or hushes. */
+  setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
   /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
   getAtmosphereCredits(): Promise<string | null>
 }

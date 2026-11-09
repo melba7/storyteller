@@ -62,14 +62,23 @@ public struct AtmosphereTrackBuilder: Sendable {
         public var failures: [String] = []
         public var stoppedEarly = false
         public var places = 0
+        /// More specific sounds the track uses, and how many of them it asked for itself.
+        public var variants = 0
+        public var newVariants = 0
     }
 
     public let spoilerGuard: SpoilerGuard
     public let plan: Plan
+    /// More specific sounds the scorer may use anywhere in the book: the starter set and
+    /// other books' variants (``SoundVariantCatalog/offered(toBook:)``), never this book's
+    /// own from an earlier run. The book's own variants come from its track, each only
+    /// after the entry that first asked for it.
+    public let offeredVariants: [SoundVariant]
 
-    public init(spoilerGuard: SpoilerGuard, plan: Plan = Plan()) {
+    public init(spoilerGuard: SpoilerGuard, plan: Plan = Plan(), offeredVariants: [SoundVariant] = []) {
         self.spoilerGuard = spoilerGuard
         self.plan = plan
+        self.offeredVariants = offeredVariants
     }
 
     /// Every narrated sentence, in order.
@@ -185,13 +194,18 @@ public struct AtmosphereTrackBuilder: Sendable {
                 }
             }
         }
-        report.places = Set(store.snapshot.entries.compactMap(\.scene.placeID)).count
+        let track = store.snapshot
+        report.places = Set(track.entries.compactMap(\.scene.placeID)).count
+        report.variants = track.variants.count
+        let offered = Set(offeredVariants.map(\.id))
+        report.newVariants = track.variants.filter { !offered.contains($0.id) }.count
         return report
     }
 
-    /// Two scenes the listener would hear as different: another place, or other sounds.
+    /// Two scenes the listener would hear as different: another place, or other sounds
+    /// (a variant counts as its own sound).
     static func differ(_ a: StoryScene, _ b: StoryScene) -> Bool {
-        a.placeID != b.placeID || a.sounds != b.sounds
+        a.placeID != b.placeID || Set(a.layers.map(\.key)) != Set(b.layers.map(\.key))
     }
 
     /// The sentence halfway between each pair of neighbouring entries whose scenes differ
@@ -205,7 +219,10 @@ public struct AtmosphereTrackBuilder: Sendable {
     ) -> [SentencePosition] {
         var found: [(value: Int, probe: SentencePosition)] = []
         for (a, b) in zip(entries, entries.dropFirst()) where differ(a.scene, b.scene) {
-            guard b.globalIndex - a.globalIndex > resolution else { continue }
+            // A swell or hush pauses the narration right after its sentence, so it is
+            // pinned to the sentence itself.
+            let needed = b.scene.moment == nil ? resolution : 1
+            guard b.globalIndex - a.globalIndex > needed else { continue }
             let target = a.globalIndex + (b.globalIndex - a.globalIndex) / 2
             guard let probe = position(atOrAfter: target, in: narrated),
                   probe.globalIndex > a.globalIndex, probe.globalIndex < b.globalIndex,
@@ -284,10 +301,18 @@ public struct AtmosphereTrackBuilder: Sendable {
         nextEntry: AtmosphereTrack.Entry?
     ) async throws -> AtmosphereTrack.Entry {
         let window = try spoilerGuard.window(at: position)
-        let memory = PlaceMemory(track: store.snapshot, before: position.globalIndex)
+        let memory = PlaceMemory(track: store.snapshot, before: position.globalIndex, offered: offeredVariants)
         let answer = try await engine.scene(for: window, memory: memory)
         var entry: AtmosphereTrack.Entry!
         store.update { track in
+            // Every variant the scene uses goes into the track, first used here at the
+            // latest, so the track is complete on its own and the fetch knows what to find.
+            let added = Dictionary(answer.newVariants.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            for id in answer.scene.layers.compactMap(\.variant) {
+                guard var variant = added[id] ?? memory.variant(id) else { continue }
+                variant.firstIndex = position.globalIndex
+                track.addVariant(variant)
+            }
             var scene = answer.scene
             switch answer.place {
             case let .known(id):

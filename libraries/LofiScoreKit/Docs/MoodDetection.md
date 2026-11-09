@@ -150,7 +150,26 @@ intervals from resampling stories, and on the sentences people clearly
 found pleasant or unpleasant, how often the engine's mood is on that side.
 It checks direction and intensity only: emotion ratings say nothing about
 calm against cozy or mysterious. Lexicon, as a floor: valence 0.19 (0.11 to
-0.25), arousal 0.16 (0.09 to 0.21), same side 71% of 386 clear sentences.
+0.25), arousal 0.16 (0.09 to 0.21); of the 386 clear sentences it puts 31%
+on the right side and takes no side on 57% (it says calm), so its 71% "right
+when it takes a side" flatters it: compare engines on the right-side share.
+
+It changed a decision. Scored on the same 2,752 sentences:
+
+| Engine | Valence rho | Clear sentences on the right side | Minus word-7 (paired) |
+| --- | --- | --- | --- |
+| embed:word v7 (word-6 settings, 53 books; shipped for an hour) | 0.12 | 40.9% (34.4 to 46.2) | |
+| embed:word v3 (word-2 settings, 34 books; shipped before) | 0.17 | **49.7%** (43.9 to 54.0) | +8.8 points (+5.4 to +12.5) |
+| embed:word v2 (word-2 settings, 26 books) | 0.17 | 44.6% (37.8 to 53.3) | +3.6 (+0.8 to +9.3) |
+| lexicon | 0.19 | 30.8% (24.4 to 34.5) | -10.1 (-16.7 to -3.7) |
+
+word-7 tied word-3's recipe on Claude's labels but gets pleasant against
+unpleasant wrong more often on people's ratings: its lighter regularisation
+(l2 0.03) and heavier earlier words seem to fit Claude's labelling habits
+rather than emotion in general. So `LofiMood-embed-word-3.json` is the
+shipped model again. With only seven stories the intervals are rough, but
+every measure points the same way. The ship rule below now includes this
+check.
 
 ### Claude on the Max plan instead of an API key (9 Nov 2026)
 
@@ -318,7 +337,9 @@ supported iPhone, and agrees best with Mo's labels. So:
    recipe, the all-books comparison (`lofi-train oof`) decides: it ships
    when its exact agreement is clearly better, or no more than half a point
    lower with macro-F1 and kappa no worse and one of them clearly better,
-   and when fits on the plausible sets is not clearly worse.
+   when fits on the plausible sets is not clearly worse, and when it is not
+   clearly worse than the shipped model on people's ratings
+   (`Tools/eval/emobank.py`, the share of clear sentences on the right side).
 2. The Fast engine is the default if it is within a few points of the best
    engine: it is deterministic, takes milliseconds, and knows no plots.
 3. An LLM engine (`fm`) becomes the default only if it is clearly better *and*
@@ -548,10 +569,10 @@ more often (hopeful 66 against 38 per pass, somber 104 against 67, with 200
 and 196 in the labels); the cross-validated 37.6% quoted above flatters
 by about a point, because choosing settings on the same windows adds
 optimism; and every recipe still over-predicts tense (about 1,000 against
-701) and calm (880 against 632). So the shipped model moves to word-6's
-settings trained on all 53 books (`LofiMood-embed-word-7.json`), and the
-next gains are expected from better labels and a better Claude reading,
-not from more books.
+701) and calm (880 against 632). So the shipped model moved to word-6's
+settings trained on all 53 books (`LofiMood-embed-word-7.json`), until the
+EmoBank check below sent it back; the next gains are expected from better
+labels and a better Claude reading, not from more books.
 
 By the rule above, **the Fast engine is the default**: it is the best
 engine, deterministic, quick and plot-blind. Since round 4 the embedding

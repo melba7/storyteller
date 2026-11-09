@@ -252,4 +252,12 @@ final class AtmosphereHostTests: XCTestCase {
         let after = await music.calls()
         XCTAssertEqual(Array(after.dropFirst(before.count)), [], "the music was not reopened, faded out or restarted")
     }
+
+    func testTheBuildSaysWhichSoundsItMayPlay() {
+        XCTAssertEqual(LofiMusicHost.soundEdition("publish"), .publish)
+        XCTAssertEqual(LofiMusicHost.soundEdition(" PUBLISH "), .publish)
+        XCTAssertEqual(LofiMusicHost.soundEdition("personal"), .personal)
+        XCTAssertEqual(LofiMusicHost.soundEdition(nil), .personal, "Mo's builds, which have no key, are personal")
+        XCTAssertEqual(LofiMusicHost.soundEdition(1), .personal)
+    }
 }

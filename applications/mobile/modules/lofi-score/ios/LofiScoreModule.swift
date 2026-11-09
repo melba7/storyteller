@@ -1,8 +1,9 @@
 // LOFI-FORK: the Storyteller Lofi fork's native module (see FORK.md).
 //
-// One music host per app. It follows the audiobook player through the read-only hooks in
+// One music host per app. It follows the audiobook player through the hooks in
 // modules/readium/ios/LofiNarratorBridge.swift and plays inside the narrator's own audio
-// session: it never changes the session, Now Playing or the remote commands.
+// session: it never changes the session, Now Playing or the remote commands. The one thing
+// it asks of the narrator is a short hold where the atmosphere swells or hushes.
 
 import ExpoModulesCore
 import LofiScoreHost
@@ -75,6 +76,13 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
+    // Short narration pauses where the atmosphere swells or hushes.
+    AsyncFunction("setAtmospherePauses") { (enabled: Bool) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setAtmospherePausesEnabled(enabled)
+      return await host.status().jsonObject()
+    }
+
     // The imported sounds' Atmosphere/CREDITS.md, or null.
     AsyncFunction("getAtmosphereCredits") { () async -> String? in
       await LofiScoreRuntime.shared.host.atmosphereCredits()
@@ -92,9 +100,18 @@ public final class LofiScoreModule: Module {
 final class LofiScoreRuntime: @unchecked Sendable {
   static let shared = LofiScoreRuntime()
 
-  let host = LofiMusicHost.forApp()
+  let host: LofiMusicHost
+  private let holds: LofiNarrationHoldRelay
   private let lock = NSLock()
   private var started = false
+
+  private init() {
+    let holds = LofiNarrationHoldRelay()
+    let host = LofiMusicHost.forApp(holdNarration: { holds.request(seconds: $0) })
+    holds.attach(host)
+    self.host = host
+    self.holds = holds
+  }
 
   func start() {
     let first: Bool = lock.withLock {
@@ -104,6 +121,7 @@ final class LofiScoreRuntime: @unchecked Sendable {
     guard first else { return }
     host.start()
     let host = self.host
+    let holds = self.holds
     Task {
       let player = AudiobookPlayerActor.shared
       await player.lofiObserve(
@@ -111,6 +129,7 @@ final class LofiScoreRuntime: @unchecked Sendable {
           host.narratorLoadedBook(id: track.bookUuid, trackFile: track.fileURL)
         },
         playing: { isPlaying, clip in
+          holds.narratorPlayingChanged(isPlaying)
           host.narratorPlayingChanged(isPlaying)
           if let clip {
             host.narratorClipStarted(NarratorClip(clip), audioTime: clip.playbackPosition)
@@ -124,6 +143,7 @@ final class LofiScoreRuntime: @unchecked Sendable {
       if let state = await player.lofiState() {
         host.narratorLoadedBook(id: state.track.bookUuid, trackFile: state.track.fileURL)
         if state.isPlaying {
+          holds.narratorPlayingChanged(true)
           host.narratorPlayingChanged(true)
         }
         if let clip = state.clip {
@@ -131,6 +151,52 @@ final class LofiScoreRuntime: @unchecked Sendable {
         }
       }
     }
+  }
+}
+
+/// Passes the atmosphere's requests for a short narration hold to the audiobook player, and
+/// the player's answers back. The host wants an answer at once, so the relay answers from
+/// what the narrator last reported, and the player has the final say: a hold it refuses
+/// comes back as `narrationHold(began: false)` with no `true` before it.
+final class LofiNarrationHoldRelay: @unchecked Sendable {
+  private let lock = NSLock()
+  private var narratorPlaying = false
+  private var pending = false
+  private var host: LofiMusicHost?
+
+  func attach(_ host: LofiMusicHost) {
+    lock.withLock { self.host = host }
+  }
+
+  func narratorPlayingChanged(_ isPlaying: Bool) {
+    lock.withLock { narratorPlaying = isPlaying }
+  }
+
+  func request(seconds: Double) -> Bool {
+    let accepted: Bool = lock.withLock {
+      guard narratorPlaying, !pending else { return false }
+      pending = true
+      return true
+    }
+    guard accepted else { return false }
+    Task {
+      let armed = await AudiobookPlayerActor.shared.lofiHoldAfterCurrentClip(seconds: seconds) { [self] event in
+        switch event {
+        case .began: report(began: true, over: false)
+        case .ended, .dropped: report(began: false, over: true)
+        }
+      }
+      if !armed { report(began: false, over: true) }
+    }
+    return true
+  }
+
+  private func report(began: Bool, over: Bool) {
+    let host: LofiMusicHost? = lock.withLock {
+      if over { pending = false }
+      return self.host
+    }
+    host?.narrationHold(began: began)
   }
 }
 
