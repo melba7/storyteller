@@ -1,0 +1,137 @@
+# CI for the Storyteller Lofi fork. See FORK.md ("CI").
+name: Fork CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  # The upstream sync starts this on its sync branches, because pull requests
+  # opened with the workflow token do not trigger pull_request runs.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fork-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 26.12.1
+
+jobs:
+  fork-checks:
+    name: Fork checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      native: ${{ steps.changes.outputs.native }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Touch points, upstream footprint and no music
+        run: node tools/fork/check-fork.mjs --list
+      - name: Decide whether the iOS build is needed
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          native=true
+          if [ "$EVENT" = "pull_request" ]; then
+            pattern='^(applications/mobile/|libraries/LofiScoreKit/|package\.json$|yarn\.lock$|\.yarnrc\.yml$|\.yarn/patches/|\.github/workflows/fork-ci\.yml$)'
+            if ! git diff --name-only "origin/$BASE_REF...HEAD" | grep -qE "$pattern"; then
+              native=false
+            fi
+          fi
+          echo "native=$native" >>"$GITHUB_OUTPUT"
+          echo "iOS build needed: $native"
+
+  mobile-js:
+    name: Mobile typecheck, tests and format
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      YARN_ENABLE_GLOBAL_CACHE: "true"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Enable Yarn
+        run: npm i -g corepack && corepack enable
+      - uses: actions/cache@v4
+        with:
+          path: ~/.yarn/berry/cache
+          key: yarn-${{ runner.os }}-${{ hashFiles('yarn.lock') }}
+          restore-keys: yarn-${{ runner.os }}-
+      # Native addons and install scripts are not needed to typecheck and test
+      # the mobile app's TypeScript.
+      - run: yarn install --immutable --mode=skip-build
+      - name: Typecheck the mobile app and the packages it uses
+        run: yarn tsc --build applications/mobile
+      - name: Upstream's mobile tests
+        run: yarn test:mobile
+      - name: Formatting of the fork's own files
+        run: |
+          yarn oxfmt --check FORK.md .github/workflows tools/fork \
+            applications/mobile/fork.config.ts applications/mobile/app.config.ts
+
+  ios-build:
+    name: iOS simulator build
+    needs: fork-checks
+    if: needs.fork-checks.outputs.native == 'true'
+    runs-on: macos-26
+    timeout-minutes: 120
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      EXPO_IMAGE_UTILS_NO_SHARP: "1"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Select the newest stable Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_[0-9]*.app | grep -vi beta | sort -V | tail -n 1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      - name: LofiScoreKit tests
+        if: hashFiles('libraries/LofiScoreKit/Package.swift') != ''
+        working-directory: libraries/LofiScoreKit
+        run: swift test
+      # Same steps as upstream's EAS iOS build (applications/mobile/.eas).
+      - name: Install the mobile app's dependencies
+        run: |
+          npm i -g corepack && corepack enable
+          brew install cmake pkg-config
+          (cd applications/mobile && ./scripts/pre-install.mjs)
+          yarn workspaces focus @storyteller-platform/mobile
+      - name: Expo prebuild (development variant, fork identity)
+        working-directory: applications/mobile
+        env:
+          APP_VARIANT: development
+        run: yarn expo prebuild --no-install -p ios
+      - name: Install pods
+        working-directory: applications/mobile/ios
+        run: pod install
+      - name: Build for the iOS simulator, unsigned
+        working-directory: applications/mobile/ios
+        run: |
+          set -o pipefail
+          workspace=$(ls -d *.xcworkspace | head -n 1)
+          scheme=$(basename "$workspace" .xcworkspace)
+          xcodebuild -workspace "$workspace" -scheme "$scheme" \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build |
+            if command -v xcbeautify >/dev/null; then
+              xcbeautify --renderer github-actions
+            else
+              tail -n 300
+            fi

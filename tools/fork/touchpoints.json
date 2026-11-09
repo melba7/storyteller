@@ -1,0 +1,23 @@
+{
+  "$comment": "Everything the fork changes relative to upstream. tools/fork/check-fork.mjs enforces this in CI and FORK.md explains it. Register a new hook here in the same commit that adds it.",
+  "marker": "LOFI-FORK",
+  "forkPaths": [
+    ".github/workflows/",
+    "FORK.md",
+    "applications/mobile/fork.config.ts",
+    "applications/mobile/lofi/",
+    "applications/mobile/modules/lofi-score/",
+    "libraries/LofiScoreKit/",
+    "tools/fork/",
+    "tools/lofi-library/"
+  ],
+  "touchpoints": [
+    {
+      "file": "applications/mobile/app.config.ts",
+      "markers": 3,
+      "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
+    }
+  ],
+  "allowedChanges": [],
+  "allowedAudio": []
+}
