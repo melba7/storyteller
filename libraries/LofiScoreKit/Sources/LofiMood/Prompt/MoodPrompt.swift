@@ -11,7 +11,7 @@ import LofiText
 /// parseable line.
 public enum MoodPrompt {
     /// Bump when the wording changes; engines include it in their ids.
-    public static let version = 1
+    public static let version = 2
 
     public static let instructions = """
         You choose background music for an audiobook. You will see the passage that has just \
@@ -31,11 +31,18 @@ public enum MoodPrompt {
         tense: danger, conflict, fear, a chase or a fight; urgent suspense
         somber: grave and heavy; death, grief, solemn ritual, dread
 
+        Most of a novel is calm: ordinary conversation, travel, description, explanation. \
+        Answer calm unless the final sentences clearly carry another mood. Choose tense only \
+        for danger or conflict happening now, somber only for death, grief or dread, and \
+        hopeful only for clear relief or happiness. Cozy needs warmth or affection on the \
+        page; playful needs humour or teasing.
+
         Also rate valence from -1 (very unpleasant) to 1 (very pleasant), arousal from 0 \
         (still) to 1 (frantic), and your confidence from 0 to 1.
 
-        Answer with one line in exactly this format and nothing else:
-        bucket=tense; valence=-0.6; arousal=0.8; confidence=0.7
+        Answer with one line in exactly this format and nothing else, putting one of the \
+        eight mood words after bucket= and numbers after the other three:
+        bucket=MOOD; valence=V; arousal=A; confidence=C
         """
 
     /// The prompt for one window, trimmed to its most recent `maxWords` words.

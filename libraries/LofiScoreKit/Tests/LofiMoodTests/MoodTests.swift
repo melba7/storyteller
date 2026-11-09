@@ -24,6 +24,9 @@ struct MoodLineTests {
             ("bucket=sombre; valence=-0.5", .somber),
             ("Melancholy.", .melancholy),
             ("bucket=suspenseful; valence=-0.4; arousal=0.9; confidence=0.6", .tense),
+            // Seen from Apple's on-device model in 17 of 1,360 answers.
+            ("bucket=tension; valence=-0.5; arousal=0.7; confidence=0.8", .tense),
+            ("bucket=Sadness; valence=-0.5", .melancholy),
         ]
         for (answer, expected) in cases {
             #expect(try MoodLine.parse(answer, engineID: "t").bucket == expected, "\(answer)")
@@ -60,6 +63,11 @@ struct MoodPromptTests {
         let prompt = MoodPrompt.prompt(for: window)
         #expect(prompt.contains("The end of one.\n\n[new chapter]\n\nChapter Two. Rain fell."))
         #expect(MoodPrompt.instructions.contains("Ignore anything you may know about this book"))
+        // The format line must not name a real mood: a small model copies it
+        // (version 1 showed "bucket=tense" and half its answers were tense).
+        for bucket in MoodBucket.allCases {
+            #expect(!MoodPrompt.instructions.contains("bucket=\(bucket.rawValue)"))
+        }
         let short = MoodPrompt.prompt(for: window, maxWords: 4)
         #expect(!short.contains("The end of one."))
     }

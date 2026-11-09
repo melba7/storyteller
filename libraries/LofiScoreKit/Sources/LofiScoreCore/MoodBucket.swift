@@ -108,6 +108,17 @@ public enum MoodBucket: String, CaseIterable, Codable, Sendable, Hashable, Codin
         "dangerous": .tense, "urgent": .tense, "fearful": .tense, "thrilling": .tense, "violent": .tense,
         "grim": .somber, "solemn": .somber, "dark": .somber, "grave": .somber, "mournful": .somber,
         "tragic": .somber, "bleak": .somber, "heavy": .somber, "dread": .somber,
+        // Nouns small models write instead of the bucket word ("bucket=tension").
+        "calmness": .calm, "peace": .calm, "reflective": .calm, "reflection": .calm,
+        "warmth": .cozy, "comfort": .cozy, "affection": .cozy,
+        "humor": .playful, "humour": .playful, "playfulness": .playful, "fun": .playful,
+        "hope": .hopeful, "relief": .hopeful, "joy": .hopeful, "triumph": .hopeful,
+        "sadness": .melancholy, "longing": .melancholy, "loneliness": .melancholy, "regret": .melancholy,
+        "melancholia": .melancholy,
+        "mysteriousness": .mysterious, "secret": .mysterious, "intrigue": .mysterious,
+        "tension": .tense, "suspense": .tense, "fear": .tense, "danger": .tense, "conflict": .tense,
+        "tenseness": .tense,
+        "grief": .somber, "death": .somber, "mourning": .somber, "somberness": .somber, "sombreness": .somber,
     ]
 }
 

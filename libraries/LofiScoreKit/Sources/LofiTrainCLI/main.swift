@@ -8,13 +8,17 @@ import CreateML
 // lofi-train: builds the Fast engine's Create ML text classifier.
 //
 //   lofi-train export --windows W.jsonl [--windows W2.jsonl ...] --labels L.jsonl [--labels L2.jsonl ...]
-//                     [--split split.json] [--out-dir DIR] [--chunk-words 160]
+//                     [--split split.json] [--out-dir DIR] [--chunk-words 160] [--balance]
 //       Joins window records (several window files are read in order; a window
 //       id seen twice is kept once) with labels (a later label file wins over an
 //       earlier one, so Mo's corrections override Claude's), keeps the newest
 //       words of each window exactly as the Fast engine will see them, and
 //       writes DIR/train.json and DIR/test.json in Create ML's JSON format,
-//       plus DIR/test-windows.jsonl for `lofi-eval run`. Runs anywhere.
+//       plus DIR/test-windows.jsonl for `lofi-eval run`. With --balance, rarer
+//       moods in the training set are repeated (in order, no randomness) until
+//       every mood has as many examples as the commonest; Create ML's MaxEnt has
+//       no class weights, and without this it rarely predicts the rare moods.
+//       The test set is never changed. Runs anywhere.
 //
 //   lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all]
 //       macOS only. Trains on DIR/train.json (and DIR/test.json too with --all,
@@ -23,7 +27,7 @@ import CreateML
 //       FILE.report.json beside it.
 
 let usage = """
-    usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N]
+    usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all]
     """
 
@@ -32,7 +36,7 @@ guard let command = arguments.first else {
     print(usage)
     exit(0)
 }
-let options = Options(arguments.dropFirst(), flags: ["all", "help"])
+let options = Options(arguments.dropFirst(), flags: ["all", "balance", "help"])
 
 do {
     switch command {
@@ -129,19 +133,36 @@ func exportCommand(_ options: Options) throws {
         }
     }
 
+    let distinctTrain = train.count
+    if options.flag("balance") { train = balanced(train) }
+
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
     try encoder.encode(train).write(to: outDir.appendingPathComponent("train.json"))
     try encoder.encode(test).write(to: outDir.appendingPathComponent("test.json"))
     try testWindows.write(to: outDir.appendingPathComponent("test-windows.jsonl"))
 
-    note("train: \(train.count) examples from \(Set(train.map(\.book)).count) books (\(describe(labellers["train"]!)))")
+    note("train: \(distinctTrain) examples from \(Set(train.map(\.book)).count) books (\(describe(labellers["train"]!)))")
+    if train.count != distinctTrain { note("  balanced to \(train.count) by repeating rarer moods") }
     note("  \(distribution(train))")
     note("test:  \(test.count) examples from \(Set(test.map(\.book)).count) books (\(describe(labellers["test"]!)))")
     note("  \(distribution(test))")
     if unlabelled > 0 { note("skipped \(unlabelled) windows with no label") }
     if duplicates > 0 { note("skipped \(duplicates) repeated window ids") }
     note("wrote \(outDir.path)/train.json, test.json, test-windows.jsonl (newest \(chunkWords) words per window)")
+}
+
+/// Repeats each mood's examples in order until every mood has as many as the
+/// commonest one. Deterministic, so the same labels always give the same model.
+func balanced(_ examples: [Example]) -> [Example] {
+    let groups = Dictionary(grouping: examples, by: \.label)
+    guard let target = groups.values.map(\.count).max() else { return examples }
+    var out = examples
+    for label in groups.keys.sorted() {
+        let group = groups[label]!
+        for k in 0..<(target - group.count) { out.append(group[k % group.count]) }
+    }
+    return out
 }
 
 func describe(_ counts: [String: Int]) -> String {
