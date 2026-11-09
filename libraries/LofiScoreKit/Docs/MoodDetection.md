@@ -267,6 +267,49 @@ the shipped model in `LofiMusic` and also compares every recipe with the
 shipped recipe (`oof-compare-vs-shipped.txt`), since a candidate has to
 beat what ships, not just word-2. Its candidates are named word-9-*.
 
+Results on the 153 books (Mac, 9 Nov 2026, 7,439 windows, 3 repeats of 10
+folds; "fits" on 4,320 windows from 108 books):
+
+- More books help now: the same recipe trained only on the 53 older books
+  is 3.6 points worse on exact (-4.7 to -2.5) and 5.8 worse on fits (-7.0
+  to -4.7). Round 7's 19 extra books had added under a point.
+- **`people-v0.5-prior-0.15` meets the ship rule** against the shipped
+  `people-v0.5`: exact +0.0 (-0.2 to +0.2), macro-F1 +0.015 (+0.010 to
+  +0.019), kappa +0.006 (+0.003 to +0.008), fits -0.0 (-0.4 to +0.3). Its
+  all-books model, word-9-people-v0.5-prior-0.15, puts 10.4 points more of
+  people's clearly pleasant or unpleasant sentences on the right side than
+  the shipped word-8-people-v0.5 (+5.8 to +14.5; 62.7% against 52.3%). It
+  names the rarer moods more often and tense less (per pass: tense 2,323
+  against 2,484, with 1,655 in the labels; hopeful 160 against 118;
+  somber 228 against 172; cozy 193 against 145; romantic 176 against 137;
+  adventurous 65 against 37), so it shipped as
+  `LofiMood-embed-word-9-people-v0.5-prior-0.15.json`.
+- `people-v0.5-a0.25` was best on people's ratings (+14.5) but clearly
+  worse on fits (-0.9, -1.5 to -0.2). Every soft-label recipe lost on both
+  tests (e.g. `soft-0.3` -12.2 on people's ratings): best-and-also-fits
+  labels are better used for scoring than as training targets.
+- For a published build, the best unleaned model (no EmoBank) is
+  word-9-prior-0.15: exact +0.1, kappa +0.007 (+0.000 to +0.014) against
+  `people-v0.5`, fits -0.3 (not significant), and +3.4 on people's ratings
+  (+0.0 to +7.6) against the shipped word-8-people-v0.5.
+
+### A fine-tuned small language model (9 Nov 2026)
+
+Mo agreed to PyTorch on the Mac, inside "~/Storyteller Lofi" only, to test
+the next step up from a softmax head on fixed word embeddings: a small
+pretrained transformer whose every layer is tuned on the labels.
+`Tools/mac/finetune.sh` makes a virtual environment in
+"~/Storyteller Lofi/python-mood" (caches in "~/Storyteller Lofi/.cache"),
+then runs `Tools/eval/finetune_mood.py`: out-of-fold predictions on every
+labelled book (10 folds of whole books) for a "hard" variant (best mood
+only) and a "soft" one (other fitting moods share 30%), each read with and
+without the earlier words at 0.2; a paired comparison with the shipped
+recipe's rows from try-recipes.sh; a model per variant trained on every
+book; and the people's-ratings check against the shipped model. The base
+is sentence-transformers/all-MiniLM-L6-v2 (22.7M parameters, Apache-2.0,
+about 45 MB in 16-bit). It ships only if it passes the same rule; then it
+needs a Core ML conversion and a WordPiece tokenizer in the app.
+
 ## Labels
 
 - `Tools/data/labels/GUIDELINES.md` is the one definition of the moods for
