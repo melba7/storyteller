@@ -136,6 +136,34 @@ or Haiku), and whether to use the Batch API (half price, answers within
 hours) for whole-book scoring. Claude knows famous novels, so the
 name-masking test matters more for it than for the on-device engines.
 
+### Claude on the Max plan instead of an API key (9 Nov 2026)
+
+Mo asked whether the Claude steps could run on their Max plan. They can, on
+the Mac: `ClaudeCodeTransport` sends each request through Claude Code's
+scripted mode (`claude -p`, never `--bare`, which ignores the subscription
+login) from an empty folder, with the request's system prompt in place of
+Claude Code's own, every tool off, the answer held to the request's JSON
+schema, no saved session, and `ANTHROPIC_API_KEY` removed from the child's
+environment. It turns Claude Code's JSON result back into a Messages API
+response, so `ClaudeMoodEngine`, its retries and its usage counts are
+unchanged; "Not logged in" maps to 401 (stop), usage limits to 429 (retry).
+`lofi-eval` picks the route with `LOFI_CLAUDE_VIA=plan|api` (default: the API
+when a key is set, otherwise the plan). `make-tracks.sh` and
+`claude-check.sh` default to `--via plan`. It costs no money but uses the
+plan's usage limits, which every Claude session on the account shares, so
+runs keep a cap counted at API list prices. Claude Code must be signed in
+once on the Mac (`claude`, then log in), or `CLAUDE_CODE_OAUTH_TOKEN` set from
+`claude setup-token`.
+
+`Tools/mac/claude-check.sh` scores Claude against the local model on the 320
+test passages with the plausible sets, prompt v2 against v3 on the same
+windows. Prompt v3 (`LOFI_CLAUDE_PROMPT=3`) asks first for `about`, one line
+on what is happening and what is at stake (the schema's keys are sent
+sorted, so it is written before the mood), and then for `also`, up to two
+other moods whose music would also suit. Those go into the reading's
+`scores` after the best mood, so playback can keep music that still fits
+instead of switching.
+
 ## Labels
 
 - `Tools/data/labels/GUIDELINES.md` is the one definition of the moods for
