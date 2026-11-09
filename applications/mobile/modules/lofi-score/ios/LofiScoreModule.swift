@@ -75,6 +75,13 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
+    // Short narration pauses where the atmosphere swells or hushes.
+    AsyncFunction("setAtmospherePauses") { (enabled: Bool) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setAtmospherePausesEnabled(enabled)
+      return await host.status().jsonObject()
+    }
+
     // The imported sounds' Atmosphere/CREDITS.md, or null.
     AsyncFunction("getAtmosphereCredits") { () async -> String? in
       await LofiScoreRuntime.shared.host.atmosphereCredits()

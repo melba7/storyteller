@@ -23,6 +23,17 @@ public struct AtmosphereConfig: Sendable, Hashable {
     public var minDwell: TimeInterval = 20
     /// A scene the scorer was less sure of than this never replaces the one playing.
     public var minConfidence: Double = 0.35
+    /// A swell or hush (``StoryScene/Moment``): the narrator pauses this long after the
+    /// sentence, while the new sound rises (by ``swellBoostDB``, over ``swellRise``) or the
+    /// old one is cut, then the sound settles under the voice over ``swellRelease``.
+    public var holdSeconds: TimeInterval = 0.8
+    public var swellBoostDB: Double = 8
+    public var swellRise: TimeInterval = 0.5
+    public var swellRelease: TimeInterval = 3
+    /// Pauses are rare: at least this long apart, and never this soon after the narrator
+    /// starts or the listener seeks.
+    public var minTimeBetweenHolds: TimeInterval = 120
+    public var noHoldAfterStart: TimeInterval = 10
     /// A scene this many sentences old with no newer one (a track scored only part way)
     /// fades to silence.
     public var maxLagSentences: Int = 80
@@ -100,7 +111,8 @@ public struct AtmosphereDirector: Sendable {
         case wait(until: TimeInterval)
     }
 
-    /// What to do now that `globalIndex` is being narrated. `seek` waives the dwell.
+    /// What to do now that `globalIndex` is being narrated. `seek` waives the dwell, and so
+    /// does a swell or hush that starts at this sentence.
     public mutating func step(at globalIndex: Int, now: TimeInterval, seek: Bool = false) -> Step {
         let next = target(at: globalIndex)
         if next.scene.soundsLike(applied.scene) {
@@ -109,10 +121,14 @@ public struct AtmosphereDirector: Sendable {
             applied.entryIndex = next.entryIndex
             return .dip(next.dipped)
         }
-        if !seek, now - appliedAt < config.minDwell {
+        // A swell or hush starting at this very sentence does not wait: it is the story's
+        // own change of sound, and its pause belongs right after this sentence.
+        let isMoment = next.scene.moment != nil && next.entryIndex == globalIndex
+        if !seek, !isMoment, now - appliedAt < config.minDwell {
             return .wait(until: appliedAt + config.minDwell)
         }
-        let placeChanged = next.scene.placeID != applied.scene.placeID || next.scene.sounds != applied.scene.sounds
+        let placeChanged = next.scene.placeID != applied.scene.placeID
+            || Set(next.scene.layers.map(\.key)) != Set(applied.scene.layers.map(\.key))
         let fade = seek ? config.quickFade : (placeChanged ? config.sceneFade : config.levelFade)
         applied = next
         appliedAt = now

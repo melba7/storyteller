@@ -186,5 +186,23 @@ describe("describeAtmosphere", () => {
     expect(
       atmosphereSourceLabel({ ...atmosphere, source: "imported", sounds: 12 }),
     ).toBe("12 of 26 sounds, imported")
+    expect(
+      atmosphereSourceLabel({
+        ...atmosphere,
+        source: "imported",
+        sounds: 26,
+        variants: 31,
+      }),
+    ).toBe("26 of 26 sounds, imported, and 31 more specific sounds")
+    expect(
+      atmosphereSourceLabel({
+        ...atmosphere,
+        source: "mixed",
+        sounds: 20,
+        variants: 1,
+      }),
+    ).toBe(
+      "20 sounds: imported recordings, with stand-ins for the rest, and 1 more specific sound",
+    )
   })
 })

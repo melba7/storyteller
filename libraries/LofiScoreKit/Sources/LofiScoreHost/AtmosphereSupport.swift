@@ -183,3 +183,15 @@ final class MusicYield: @unchecked Sendable {
         ramp.value(at: scheduler.now)
     }
 }
+
+extension LofiMusicHost {
+    /// The Info.plist key that says which sounds a build may play: "personal" (Mo's own
+    /// builds, the default) or "publish" (an App Store build). The app's `fork.config.ts`
+    /// sets it from `LOFI_SOUND_EDITION` at build time.
+    public static let soundEditionInfoKey = "LofiScoreSoundEdition"
+
+    /// The edition an Info.plist value names; anything but "publish" is a personal build.
+    public static func soundEdition(_ value: Any?) -> SoundEdition {
+        (value as? String)?.trimmingCharacters(in: .whitespaces).lowercased() == SoundEdition.publish.rawValue ? .publish : .personal
+    }
+}

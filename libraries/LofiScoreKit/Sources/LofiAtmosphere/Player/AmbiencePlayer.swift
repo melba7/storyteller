@@ -6,6 +6,8 @@ import LofiDirector
 public enum AmbienceEvent: Sendable, Hashable {
     case sceneChanged(StoryScene)
     case musicYield(Bool)
+    /// A swell or hush asked the narrator to pause after the sentence.
+    case narrationHold(StoryScene.Moment)
     case missingSound(AmbientSound)
     case error(String)
 }
@@ -14,6 +16,8 @@ public enum AmbienceEvent: Sendable, Hashable {
 public struct AmbienceSnapshot: Sendable, Hashable {
     public struct Voice: Sendable, Hashable {
         public var sound: AmbientSound
+        /// The variant playing, when the recording is one.
+        public var variant: String?
         public var recording: String
         public var gain: Double
         public var playing: Bool
@@ -29,6 +33,9 @@ public struct AmbienceSnapshot: Sendable, Hashable {
     public var dipped: Bool
     public var musicYielding: Bool
     public var routeMuted: Bool
+    /// Short narration pauses for swells and hushes are on, and the app can do them.
+    public var pausesEnabled: Bool
+    public var pausesAvailable: Bool
     public var voices: [Voice]
     public var missingSounds: [AmbientSound]
     public var lastError: String?
@@ -50,6 +57,11 @@ public final class AmbiencePlayer: @unchecked Sendable {
     /// Called with true when the music should step aside, false when it may come back.
     public var onMusicYieldChanged: ((Bool) -> Void)?
     public var onEvent: ((AmbienceEvent) -> Void)?
+    /// Asks the app to pause the narrator for this many seconds at the end of the
+    /// sentence being narrated, for a swell or a hush. It answers false when it cannot,
+    /// and the scene then changes without a pause. The app reports the pause itself
+    /// through ``narrationHold(began:)``. Nil: no pauses.
+    public var requestNarrationHold: ((TimeInterval) -> Bool)?
 
     public let library: AmbienceLibrary
     private let backend: AmbienceBackend
@@ -84,6 +96,19 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private var lastError: String?
     private var engineRetries = 0
 
+    // Swells and hushes.
+    private var pausesEnabled = true
+    private var sentenceDuration: TimeInterval?
+    /// When the narrator last started or the listener last sought; no pause soon after.
+    private var settledSince: TimeInterval = -.infinity
+    private var lastHoldAt: TimeInterval = -.infinity
+    /// A pause asked for and not begun yet, until it expires.
+    private var pendingMoment: (moment: StoryScene.Moment, expires: TimeInterval)?
+    private var holding = false
+    /// Extra gain on the sounds of the scene playing, while it swells.
+    private var swell = Ramp(value: 1)
+    private var holdTimer: LofiCancellable?
+
     private var ticker: LofiCancellable?
     private var dwellTimer: LofiCancellable?
     private var stopSlotsTimer: LofiCancellable?
@@ -108,7 +133,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     }
 
     deinit {
-        for timer in [ticker, dwellTimer, stopSlotsTimer, engineStopTimer, retryTimer] {
+        for timer in [ticker, dwellTimer, stopSlotsTimer, engineStopTimer, retryTimer, holdTimer] {
             timer?.cancel()
         }
     }
@@ -159,6 +184,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
 
     public func narratorDidPlay() {
         scheduler.perform { [self] in
+            if !narrating { settledSince = scheduler.now }
             narrating = true
             updateTransport(at: scheduler.now)
         }
@@ -167,6 +193,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     public func narratorDidPause() {
         scheduler.perform { [self] in
             narrating = false
+            endHold(release: config.fadeOut)
             updateTransport(at: scheduler.now)
         }
     }
@@ -175,6 +202,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             guard let index else { return }
             playhead = index
+            settledSince = scheduler.now
+            pendingMoment = nil
             evaluate(seek: true)
         }
     }
@@ -183,8 +212,24 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             guard let globalSentenceIndex else { return }
             let isJump = playhead.map { globalSentenceIndex < $0 } ?? true
+            if isJump { settledSince = scheduler.now }
             playhead = globalSentenceIndex
+            sentenceDuration = duration
             evaluate(seek: isJump)
+        }
+    }
+
+    /// The narrator's pause for a swell or a hush began (true) or ended (false).
+    public func narrationHold(began: Bool) {
+        scheduler.perform { [self] in
+            let now = scheduler.now
+            if began {
+                guard let pending = pendingMoment, now <= pending.expires else { return }
+                pendingMoment = nil
+                beginHold(pending.moment, at: now)
+            } else {
+                endHold(release: config.swellRelease)
+            }
         }
     }
 
@@ -193,8 +238,17 @@ public final class AmbiencePlayer: @unchecked Sendable {
     public func setEnabled(_ isEnabled: Bool) {
         scheduler.perform { [self] in
             enabled = isEnabled
+            if !isEnabled { endHold(release: config.fadeOut) }
             updateTransport(at: scheduler.now)
             updateYield()
+        }
+    }
+
+    /// Short narration pauses for swells and hushes.
+    public func setPausesEnabled(_ isEnabled: Bool) {
+        scheduler.perform { [self] in
+            pausesEnabled = isEnabled
+            if !isEnabled { pendingMoment = nil }
         }
     }
 
@@ -240,6 +294,9 @@ public final class AmbiencePlayer: @unchecked Sendable {
             dwellTimer?.cancel()
             dwellTimer = nil
             apply(target, fade: fade, at: now)
+            if !seek, let moment = target.scene.moment, target.entryIndex == playhead {
+                askForHold(moment, at: now)
+            }
         case let .dip(dipped):
             dip.go(to: dipped ? Gain.linear(fromDB: config.chapterDipDB) : 1, over: config.levelFade, at: now, shape: .linear)
             ensureTicker()
@@ -259,7 +316,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
 
         var desired: [(layer: SceneLayer, recording: AmbienceRecording)] = []
         for layer in scene.layers {
-            guard let recording = library.recording(of: layer.sound, key: recordingKey(layer.sound, scene: scene)) else {
+            guard let recording = library.recording(for: layer, key: recordingKey(layer, scene: scene)) else {
                 if missing.insert(layer.sound).inserted { onEvent?(.missingSound(layer.sound)) }
                 continue
             }
@@ -309,12 +366,12 @@ public final class AmbiencePlayer: @unchecked Sendable {
     }
 
     /// The key that picks a recording: weather is the same across the book, everything
-    /// else belongs to its place.
-    private func recordingKey(_ sound: AmbientSound, scene: StoryScene) -> String {
+    /// else belongs to its place. A variant behaves like the sound it is a kind of.
+    private func recordingKey(_ layer: SceneLayer, scene: StoryScene) -> String {
         let book = bookID ?? ""
-        switch sound.scope {
-        case .weather: return "\(book)|\(sound.rawValue)"
-        case .place: return "\(book)|\(scene.placeID ?? "-")|\(sound.rawValue)"
+        switch layer.sound.scope {
+        case .weather: return "\(book)|\(layer.key)"
+        case .place: return "\(book)|\(scene.placeID ?? "-")|\(layer.key)"
         }
     }
 
@@ -355,6 +412,66 @@ public final class AmbiencePlayer: @unchecked Sendable {
         yielding = should
         onEvent?(.musicYield(should))
         onMusicYieldChanged?(should)
+    }
+
+    // MARK: - Swells and hushes
+
+    /// Asks the app to pause the narrator after this sentence, when a pause is allowed and
+    /// would be heard: a swell needs sounds to rise, a hush sounds to cut.
+    private func askForHold(_ moment: StoryScene.Moment, at now: TimeInterval) {
+        guard pausesEnabled, shouldPlay, backend.isEngineRunning, !holding,
+              now - lastHoldAt >= config.minTimeBetweenHolds,
+              now - settledSince >= config.noHoldAfterStart,
+              let request = requestNarrationHold
+        else { return }
+        let heard: Bool
+        switch moment {
+        case .swell: heard = voices.contains { $0 != nil && $0?.retiring == false }
+        case .hush: heard = voices.contains { $0?.retiring == true }
+        }
+        guard heard, request(config.holdSeconds) else { return }
+        lastHoldAt = now
+        pendingMoment = (moment, now + (sentenceDuration ?? 10) + config.holdSeconds + 2)
+        onEvent?(.narrationHold(moment))
+    }
+
+    private func beginHold(_ moment: StoryScene.Moment, at now: TimeInterval) {
+        holding = true
+        switch moment {
+        case .swell:
+            // The new sounds finish fading in and rise while the narrator is quiet.
+            for slot in voices.indices {
+                guard var voice = voices[slot], !voice.retiring else { continue }
+                voice.ramp.go(to: gain(for: voice.sound, level: voice.level, recording: voice.recording), over: config.swellRise, at: now, shape: .equalPower)
+                voices[slot] = voice
+            }
+            swell.go(to: Gain.linear(fromDB: config.swellBoostDB), over: config.swellRise, at: now, shape: .equalPower)
+        case .hush:
+            // What the old scene still had is gone in the pause.
+            for slot in voices.indices {
+                guard var voice = voices[slot], voice.retiring else { continue }
+                voice.ramp.go(to: 0, over: min(0.3, config.holdSeconds / 2), at: now, shape: .equalPower)
+                voices[slot] = voice
+            }
+        }
+        holdTimer?.cancel()
+        // If the app never says the pause ended, settle anyway.
+        holdTimer = scheduler.schedule(after: config.holdSeconds + 3) { [weak self] in
+            guard let self else { return }
+            self.holdTimer = nil
+            self.endHold(release: self.config.swellRelease)
+        }
+        ensureTicker()
+    }
+
+    private func endHold(release: TimeInterval) {
+        pendingMoment = nil
+        holdTimer?.cancel()
+        holdTimer = nil
+        guard holding else { return }
+        holding = false
+        swell.go(to: 1, over: release, at: scheduler.now, shape: .equalPower)
+        ensureTicker()
     }
 
     // MARK: - Engine and transport
@@ -462,7 +579,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     }
 
     private func isMoving(at now: TimeInterval) -> Bool {
-        transport.isRunning(at: now) || dip.isRunning(at: now)
+        transport.isRunning(at: now) || dip.isRunning(at: now) || swell.isRunning(at: now)
             || voices.contains { $0.map { $0.ramp.isRunning(at: now) } ?? false }
             || voices.contains { $0?.retiring == true }
     }
@@ -470,10 +587,11 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private func pushGains() {
         let now = scheduler.now
         let master = transport.value(at: now) * dip.value(at: now)
+        let swelling = swell.value(at: now)
         for slot in voices.indices {
             guard let voice = voices[slot] else { continue }
             let value = voice.ramp.value(at: now)
-            backend.setGain(Float(min(1, max(0, value * master))), slot: slot)
+            backend.setGain(Float(min(1, max(0, value * master * (voice.retiring ? 1 : swelling)))), slot: slot)
             if voice.retiring, !voice.ramp.isRunning(at: now), value <= 0.0001 {
                 if voice.playing { backend.stop(slot: slot) }
                 voices[slot] = nil
@@ -498,10 +616,12 @@ public final class AmbiencePlayer: @unchecked Sendable {
             dipped: director.applied.dipped,
             musicYielding: yielding,
             routeMuted: routeMuted,
+            pausesEnabled: pausesEnabled,
+            pausesAvailable: requestNarrationHold != nil,
             voices: voices.compactMap { voice in
                 voice.map {
                     AmbienceSnapshot.Voice(
-                        sound: $0.sound, recording: $0.recording.file,
+                        sound: $0.sound, variant: $0.recording.variant, recording: $0.recording.file,
                         gain: $0.ramp.value(at: now) * master, playing: $0.playing, fadingOut: $0.retiring
                     )
                 }

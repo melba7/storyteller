@@ -58,15 +58,56 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
     public var chapterStarts: [Int]
     /// Sorted by position.
     public private(set) var entries: [Entry]
+    /// The more specific sounds the entries use (``SoundVariant``), each with the entry
+    /// that first asked for it, so the fetch script knows what to look for online.
+    public private(set) var variants: [SoundVariant]
 
-    public init(engineID: String, bookID: String, wordsBetweenEntries: Int, chapterStarts: [Int] = [], entries: [Entry] = []) {
+    public init(
+        engineID: String, bookID: String, wordsBetweenEntries: Int, chapterStarts: [Int] = [],
+        entries: [Entry] = [], variants: [SoundVariant] = []
+    ) {
         format = Self.currentFormat
         self.engineID = engineID
         self.bookID = bookID
         self.wordsBetweenEntries = wordsBetweenEntries
         self.chapterStarts = chapterStarts.sorted()
         self.entries = []
+        self.variants = []
         entries.forEach { insert($0) }
+        variants.forEach { addVariant($0) }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case format, engineID, bookID, wordsBetweenEntries, chapterStarts, entries, variants
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        format = try c.decode(Int.self, forKey: .format)
+        engineID = try c.decode(String.self, forKey: .engineID)
+        bookID = try c.decode(String.self, forKey: .bookID)
+        wordsBetweenEntries = try c.decode(Int.self, forKey: .wordsBetweenEntries)
+        chapterStarts = try c.decode([Int].self, forKey: .chapterStarts)
+        entries = try c.decode([Entry].self, forKey: .entries)
+        // Tracks made before variants existed have none.
+        variants = try c.decodeIfPresent([SoundVariant].self, forKey: .variants) ?? []
+    }
+
+    /// Adds a variant, or moves a known one's first use earlier.
+    public mutating func addVariant(_ variant: SoundVariant) {
+        if let index = variants.firstIndex(where: { $0.id == variant.id }) {
+            if let new = variant.firstIndex, new < (variants[index].firstIndex ?? Int.max) {
+                variants[index].firstIndex = new
+            }
+            return
+        }
+        variants.append(variant)
+        variants.sort { ($0.firstIndex ?? -1, $0.id) < ($1.firstIndex ?? -1, $1.id) }
+    }
+
+    /// The variants first asked for strictly before the sentence.
+    public func variants(before globalIndex: Int) -> [SoundVariant] {
+        variants.filter { ($0.firstIndex ?? 0) < globalIndex }
     }
 
     /// Adds or replaces the entry for its sentence.
@@ -149,7 +190,7 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         // Re-sort in case the file was edited by hand.
         return AtmosphereTrack(
             engineID: track.engineID, bookID: track.bookID, wordsBetweenEntries: track.wordsBetweenEntries,
-            chapterStarts: track.chapterStarts, entries: track.entries
+            chapterStarts: track.chapterStarts, entries: track.entries, variants: track.variants
         )
     }
 }
