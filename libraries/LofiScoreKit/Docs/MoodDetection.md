@@ -6,7 +6,7 @@ past that sentence.
 
 ```
 EPUB 3 media overlays ──► SpoilerGuard ──► CausalWindow ──► MoodEngine ──► MoodReading ──► director (audio side)
- (LofiText)               (no lookahead)    (text ≤ now)     (LofiMood)     (8 buckets + valence/arousal)
+ (LofiText)               (no lookahead)    (text ≤ now)     (LofiMood)     (11 buckets + valence/arousal)
 ```
 
 ## Targets
@@ -34,6 +34,7 @@ after the position never changes the window. Engines receive nothing else.
 | `nltagger` | Apple's sentiment score plus the cue words | iOS/macOS NaturalLanguage |
 | `fm`, `fm-tagging` | Apple's on-device model asked for one line (`fm-tagging` does not follow the format; see results) (`bucket=…; valence=…; arousal=…; confidence=…`), `String` output under `permissiveContentTransformations`, falls back on refusal | iOS/macOS 26 with Apple Intelligence on |
 | `fast:<model>` | Create ML text classifier trained by `lofi-train` on the newest 160 words of each window | the `.mlmodel`; BERT models need iOS 17+ and Apple's embedding assets |
+| `embed:<model.json>` | the Fast engine with Apple's on-device embeddings (`sentence`, `word`, `contextual`, or several side by side such as `word+contextual`) instead of a bag of words: the mean vector of the newest 160 words plus the mean of their last part, fed to a small softmax model (`LinearMoodModel`, plain JSON) trained by `lofi-train embed`, with the 160 words before them blended in at a weight chosen with the model | iOS/macOS NaturalLanguage; `contextual` needs iOS 17+ and Apple's embedding assets |
 | `recommended[:<model>]` | what `MoodEngineCatalog` picks: the Fast classifier when given, else `nltagger` (the on-device model is opt-in only, via `onDeviceModelEngine`) | |
 | `claude[:<model>]` | Claude through the Anthropic Messages API, one window per request, answer fixed by a JSON schema (default `claude-opus-5-5`, effort low) | network and an API key; costs money, so it scores books ahead of time rather than during playback |
 | `track[…]>…` | a saved mood track played back, with a live engine wherever the track does not reach | a track file from `lofi-eval track` or the in-app builder |
@@ -113,6 +114,12 @@ Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what trac
 Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
 ```
 
+Make tracks from the read-aloud EPUB exactly as Storyteller serves it. The
+app finds a book's track by the digests of its first sentences, not by file
+name, so the sentence text must match what `SpoilerGuard` reads on the phone.
+To install them, copy the tracks folder into the music folder and import it
+in the app; the import collects every `*.track.json`.
+
 By hand:
 
 ```sh
@@ -150,6 +157,13 @@ name-masking test matters more for it than for the on-device engines.
   unchanged and still almost never predicted a new mood. So for now the
   new moods come from Claude tracks; the Fast engine needs more labelled
   examples of them first.
+- `Tools/data/eval/sample-v3.jsonl.gz` and `claude-g2-v3.jsonl`: 361 more
+  windows from the 26 training books, picked where cue words for romantic,
+  dreamy or adventurous appear in the newest words (at least 15 sentences
+  from any v1 or v2 window), labelled under guidelines v2 by Claude. They add
+  31 romantic, 24 adventurous and 19 dreamy examples. The other 287 got one
+  of the older moods, which also shows a model that a cue word alone does not
+  make a new mood.
 - `Tools/data/eval/sample-v1.jsonl.gz` is the frozen sample: 40 causal windows
   from each of 34 public-domain novels (PG-19 texts turned into readaloud
   EPUBs by `Tools/data/make_readaloud.py`), 1,360 in all. Window ids are
@@ -200,6 +214,10 @@ $B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
   # add --labels Tools/data/labels/mo-check.jsonl last once it exists
 $B/lofi-train train --algorithm maxent --version 3
 $B/lofi-train train --algorithm bert --version 3      # optional; see the results below
+# Apple's embeddings with a trained softmax head; settings are chosen by
+# 5-fold cross-validation over the 26 training books, then it trains on all
+# 26; --curve adds a learning curve, --all also trains on the test books
+$B/lofi-train embed --kinds word,contextual,word+contextual --version 2 --curve
 for m in maxent bert; do
   $B/lofi-eval run --engine fast:Models/LofiMood-$m-3.mlmodel --in $W/train/test-windows.jsonl --out $W/readings/fast-$m.jsonl
 done
@@ -256,12 +274,20 @@ supported iPhone, and agrees best with Mo's labels. So:
 | **Mac round 3** | | | | | |
 | fast:maxent v3 (23 books, 3 held out for validation) | 320 | 28.7% | 0.248 | 0.158 | 0.9 ms |
 | Claude relabelling 80 test windows blind (`claude-rerun-80.jsonl`) | 80 | 67.5% | | 0.620 | |
+| **Mac round 4, against the eleven-mood labels (`claude-g2-test`)** | | | | | |
+| lexicon | 320 | 25.9% | 0.160 | 0.126 | 0.6 ms |
+| fast:maxent v3 | 320 | 28.1% | 0.179 | 0.154 | 1.0 ms |
+| fast:maxent v4 (23 books, 2,104 windows including sample v3) | 320 | 27.5% | 0.230 | 0.146 | 1.0 ms |
+| embed:sentence v1 | 320 | 24.7% | 0.145 | 0.132 | 117 ms |
+| embed:word v1 (26 books) | 320 | 35.6% | 0.289 | 0.237 | 10 ms |
+| embed:contextual v1 (26 books) | 320 | **36.2%** | **0.318** | **0.251** | 52 ms |
 
 Mac rows are from Mo's Mac (macOS 26.6.2, Xcode SDK 27.2) on 9 Nov 2026,
 scored against Claude's labels. Round 1 used the first 1,360 windows and
 prompt v1; round 2 used both label sets, `--balance` and prompt v2. The raw
 readings, models and logs are on the Mac in
-`~/Storyteller Lofi/lofi-mood-eval-results/round2/`.
+`~/Storyteller Lofi/lofi-mood-eval-results/round2/` (round 4:
+`2026-11-09-1043/`).
 
 What the first Mac run showed:
 
@@ -319,8 +345,25 @@ a regression; the shipped model should be trained with `--all` anyway.
 (27.8% vs 28.7%) because training scores only the newest 160 words, while
 `ClassifierMoodEngine` blends in the 160 words before them at weight 0.35.
 
-By the rule above, **the Fast engine (maxent) is the default**: it is the best
-engine, deterministic, sub-millisecond and plot-blind. fm stays off. Mo's gold
+Round 4 tried Apple's on-device embeddings in place of the bag of words
+(`embed:`), with settings picked on the three validation books and the model
+then trained on all 26 training books. Word and contextual embeddings both
+beat every maxent model by 8 to 9 points of exact agreement and about 0.1
+kappa on the 320 held-out windows; sentence embeddings did not help. The two
+good models agree with each other on only 44% of windows, so they read the
+text differently, which is why `word+contextual` (both side by side) is the
+next thing to measure. Three validation books proved too few to pick
+settings (neighbouring settings swung by 5 points), so `lofi-train embed`
+now cross-validates over all 26 training books, and it scores the test books
+exactly as the engine reads them. The new moods still have only 1 or 2 test
+windows each, so their scores mean little yet.
+
+By the rule above, **the Fast engine is the default**: it is the best
+engine, deterministic, quick and plot-blind. Since round 4 the embedding
+model is the better Fast model; `MoodEngineCatalog.fastEngine` takes either
+kind (a `.json` embedding model or a Create ML `.mlmodel`), and
+`fastEngine(modelURLs:)` falls back from one to the next, so a phone missing
+the contextual embedding's assets still gets a Fast engine. fm stays off. Mo's gold
 labels may still move the numbers, and the gap to the ceiling is why a
 precomputed Claude mood track is now a decision for Mo.
 

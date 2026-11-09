@@ -15,10 +15,12 @@ import CreateML
 //       earlier one, so Mo's corrections override Claude's), keeps the newest
 //       words of each window exactly as the Fast engine will see them, and
 //       writes DIR/train.json and DIR/test.json in Create ML's JSON format,
-//       plus DIR/test-windows.jsonl for `lofi-eval run`. With --balance, rarer
-//       moods in the training set are repeated (in order, no randomness) until
-//       every mood has as many examples as the commonest; Create ML's MaxEnt has
-//       no class weights, and without this it rarely predicts the rare moods.
+//       plus DIR/test-windows.jsonl for `lofi-eval run` and DIR/earlier.json
+//       (the words before each chunk, which the engines blend in) for
+//       `embed`. With --balance, rarer moods in the training set are repeated
+//       (in order, no randomness) until every mood has as many examples as the
+//       commonest; Create ML's MaxEnt has no class weights, and without this it
+//       rarely predicts the rare moods.
 //       The test set is never changed. With --validation-books N, N training
 //       books (spread evenly through the sorted list) go to DIR/valid.json
 //       instead, unbalanced and never repeated, so Create ML validates on rows
@@ -34,10 +36,16 @@ import CreateML
 //       accuracy and macro-F1 on DIR/test.json, and writes the model plus a
 //       FILE.report.json beside it. --max-iterations sets Create ML's
 //       ModelParameters.maxIterations (its default is used otherwise).
+//
+//   lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5]
+//                    [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
+//       macOS only. A Fast engine on Apple's on-device embeddings instead of a
+//       bag of words; see Embed.swift.
 
 let usage = """
     usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
+           lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -45,12 +53,13 @@ guard let command = arguments.first else {
     print(usage)
     exit(0)
 }
-let options = Options(arguments.dropFirst(), flags: ["all", "balance", "help"])
+let options = Options(arguments.dropFirst(), flags: ["all", "balance", "curve", "help"])
 
 do {
     switch command {
     case "export": try exportCommand(options)
     case "train": try trainCommand(options)
+    case "embed": try embedCommand(options)
     case "help", "--help", "-h": print(usage)
     default: fail("unknown command \(command)\n\(usage)")
     }
@@ -118,6 +127,7 @@ func exportCommand(_ options: Options) throws {
     var unlabelled = 0
     var duplicates = 0
     var seen: Set<String> = []
+    var earlierChunks: [String: String] = [:]
     let windowLines = try windowPaths.flatMap { try Data(contentsOf: URL(fileURLWithPath: $0)).split(separator: 0x0A) }
     for line in windowLines where !line.isEmpty {
         let window = try JSONDecoder().decode(WindowText.self, from: Data(line))
@@ -133,6 +143,8 @@ func exportCommand(_ options: Options) throws {
             id: window.id, book: window.book,
             text: ClassifierInput.recentChunk(of: window.text, words: chunkWords), label: bucket.rawValue
         )
+        let earlier = ClassifierInput.earlierChunk(of: window.text, words: chunkWords)
+        if ClassifierInput.wordCount(earlier) >= ClassifierInput.minimumEarlierWords { earlierChunks[window.id] = earlier }
         let side = testBooks.contains(window.book) ? "test" : "train"
         labellers[side]![label.labeller ?? "unknown", default: 0] += 1
         if side == "test" {
@@ -159,6 +171,8 @@ func exportCommand(_ options: Options) throws {
     try encoder.encode(train).write(to: outDir.appendingPathComponent("train.json"))
     try encoder.encode(test).write(to: outDir.appendingPathComponent("test.json"))
     try testWindows.write(to: outDir.appendingPathComponent("test-windows.jsonl"))
+    // The words before each chunk, which the engines blend in; `embed` reads them.
+    try encoder.encode(earlierChunks).write(to: outDir.appendingPathComponent("earlier.json"))
     let validURL = outDir.appendingPathComponent("valid.json")
     if valid.isEmpty {
         // A stale valid.json from an earlier export would be picked up by `train`.
@@ -182,7 +196,7 @@ func exportCommand(_ options: Options) throws {
     note("  \(distribution(test))")
     if unlabelled > 0 { note("skipped \(unlabelled) windows with no label") }
     if duplicates > 0 { note("skipped \(duplicates) repeated window ids") }
-    note("wrote \(outDir.path)/train.json, \(valid.isEmpty ? "" : "valid.json, ")test.json, test-windows.jsonl (newest \(chunkWords) words per window)")
+    note("wrote \(outDir.path)/train.json, \(valid.isEmpty ? "" : "valid.json, ")test.json, test-windows.jsonl, earlier.json (newest \(chunkWords) words per window, and the \(chunkWords) before them)")
 }
 
 /// `count` items spread evenly through `items` (which should be sorted), so

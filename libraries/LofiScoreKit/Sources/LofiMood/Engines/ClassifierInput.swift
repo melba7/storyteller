@@ -10,6 +10,14 @@ public enum ClassifierInput {
     /// How many of the newest words the classifier reads.
     public static let defaultChunkWords = 160
 
+    /// The earlier chunk is only read when it has at least this many words.
+    public static let minimumEarlierWords = 40
+
+    /// Words in `text`, split on whitespace like the chunks.
+    public static func wordCount(_ text: String) -> Int {
+        tokens(text).count
+    }
+
     /// The newest `words` words of `text`, joined by single spaces.
     public static func recentChunk(of text: String, words: Int = defaultChunkWords) -> String {
         tokens(text).suffix(max(words, 1)).joined(separator: " ")
