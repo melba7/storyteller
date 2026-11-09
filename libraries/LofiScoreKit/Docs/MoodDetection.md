@@ -51,6 +51,8 @@ after the position never changes the window. Engines receive nothing else.
   windows from the 26 training books only (new positions, near-duplicates of
   v1 windows dropped), each labelled by Claude the same way. With v1 that makes
   1,998 training windows; the 320 test windows are unchanged.
+- `claude-rerun-80.jsonl`: 80 of the test windows (10 per book) labelled a
+  second time by Claude, blind to the first pass, to measure label noise.
 - `split.json`: 8 books (320 windows) held out of training. Mo labels these
   blind; they are the test set every engine is scored on.
 - Mo's labels come from the labelling page (an artifact with its own small
@@ -127,6 +129,14 @@ supported iPhone, and agrees best with Mo's labels. So:
 | Engine | Test windows | Exact | Macro-F1 | Kappa | p50 latency |
 | --- | --- | --- | --- | --- | --- |
 | lexicon (vs Claude labels) | 320 | 26.2% | 0.215 | 0.124 | 0.8 ms |
+| TF-IDF + logistic regression, 1,040 train windows (Linux stand-in for `fast:maxent`) | 320 | 30.6% | 0.260 | 0.188 | n/a |
+| same, 1,998 train windows | 320 | 31.9% | 0.298 | 0.199 | n/a |
+| Claude relabelling 80 test windows blind (`claude-rerun-80.jsonl`) | 80 | 67.5% | | 0.620 | |
 
 The lexicon says "calm" for two thirds of windows; it is a floor, not a
-candidate. The other engines need the Mac.
+candidate. A bag-of-words classifier does a little better and gains from the
+extra labels, but stays far below the last row, which is the ceiling: the same
+labeller agrees with itself about two times in three (most slips are
+calm/mysterious, cozy/hopeful and calm/tense), so no engine should be expected
+to beat about 65% against these labels, and Mo's gold labels will set the real
+ceiling. The BERT-embedding Fast engine and the on-device model need the Mac.
