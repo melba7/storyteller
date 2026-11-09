@@ -112,6 +112,16 @@ export interface Book {
   uuid: Generated<import("@/uuid").UUID>
 }
 
+export interface BookAccess {
+  bookUuid: import("@/uuid").UUID
+  userId: import("@/uuid").UUID
+}
+
+export interface BookAccessView {
+  bookUuid: import("@/uuid").UUID
+  userId: import("@/uuid").UUID
+}
+
 export interface BookToCollection {
   bookUuid: import("@/uuid").UUID
   collectionUuid: import("@/uuid").UUID
@@ -399,6 +409,22 @@ export interface Progression {
   uuid: Generated<import("@/uuid").UUID>
 }
 
+export interface ProgressionHistory {
+  bookUuid: import("@/uuid").UUID
+  charRef: string | null
+  createdAt: Generated<string>
+  deviceId: string
+  deviceName: string
+  mediaRef: string | null
+  modified: Date
+  progression: number
+  sourceFormat: string | null
+  title: string | null
+  updatedAt: Generated<string>
+  userId: import("@/uuid").UUID
+  uuid: Generated<import("@/uuid").UUID>
+}
+
 export interface ProgressionReference {
   createdAt: Generated<string>
   kind: NonNullable<
@@ -642,6 +668,8 @@ export interface DB {
   alignmentReport: AlignmentReport
   audiobook: Audiobook
   book: Book
+  bookAccess: BookAccess
+  bookAccessView: BookAccessView
   bookToCollection: BookToCollection
   bookToCreator: BookToCreator
   bookToSeries: BookToSeries
@@ -665,6 +693,7 @@ export interface DB {
   migration: Migration
   position: Position
   progression: Progression
+  progressionHistory: ProgressionHistory
   progressionReference: ProgressionReference
   readaloud: Readaloud
   series: Series
