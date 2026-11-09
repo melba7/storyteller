@@ -38,9 +38,9 @@ import LofiText
 
 let usage = """
     usage: lofi-eval windows <epub-dir> [--book ID] [--sample N --seed S | --every-sentence] [--chapters A-B] [--max-words 400] [--out FILE]
-           lofi-eval run --engine NAME [--in FILE] [--out FILE] [--limit N] [--concurrency N]
+           lofi-eval run --engine NAME [--in FILE] [--out FILE] [--limit N] [--concurrency N] [--max-dollars D]
            lofi-eval simulate <epub-dir> --engine NAME [--track FILE] [--cadence auto|plan|sentence] [--book ID] [--chapters A-B] [--out FILE]
-           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--refine-budget 0.6] [--resolution 3] [--chapters A-B] [--concurrency 4] [--dry-run]
+           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--refine-budget 0.6] [--resolution 3] [--chapters A-B] [--concurrency 4] [--max-dollars D] [--dry-run]
            lofi-eval engines
     engines: \(EngineFactory.names.joined(separator: ", "))
     """
@@ -144,9 +144,15 @@ func runCommand(_ args: Arguments) async throws {
     var counts: [String: Int] = [:]
     let started = now()
     let width = max(1, args.int("concurrency", default: 1))
+    let cap = SpendCap(args)
     var done = 0
     for batchStart in stride(from: 0, to: records.count, by: width) {
         let batch = Array(records[batchStart..<min(records.count, batchStart + width)])
+        guard cap.allows(batch.count) else {
+            note(String(format: "  stopped at --max-dollars %.2f after %d of %d windows (about $%.2f spent)",
+                        cap.dollars ?? 0, done, records.count, cap.spent))
+            break
+        }
         let windows = try batch.map(rebuild)
         // Run the batch at once, then write it in input order.
         let results = await withTaskGroup(of: (Int, Result<MoodReading, any Error>, Double).self) { group in
@@ -183,7 +189,7 @@ func runCommand(_ args: Arguments) async throws {
     let p95 = latencies.isEmpty ? 0 : latencies[min(latencies.count - 1, Int(Double(latencies.count) * 0.95))]
     note(String(
         format: "%@: %d readings, %d failures, p50 %.1f ms, p95 %.1f ms, %.1f s total",
-        engine.id, records.count - failures, failures, p50, p95, now() - started
+        engine.id, done - failures, failures, p50, p95, now() - started
     ))
     note("  buckets: " + counts.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: ", "))
     reportClaudeUsage()

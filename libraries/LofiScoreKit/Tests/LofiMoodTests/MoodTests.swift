@@ -79,6 +79,20 @@ struct MoodPromptTests {
         let short = MoodPrompt.prompt(for: window, maxWords: 4)
         #expect(!short.contains("The end of one."))
     }
+
+    @Test func everyMoodIsDefinedInBothPromptsAndTheGuidelines() throws {
+        let guidelines = try String(
+            contentsOf: URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+                .appendingPathComponent("Tools/data/labels/GUIDELINES.md"),
+            encoding: .utf8
+        )
+        for bucket in MoodBucket.allCases {
+            #expect(MoodPrompt.instructions.contains("\n\(bucket.rawValue): "), "on-device prompt lacks \(bucket)")
+            #expect(ClaudeMoodPrompt.system.contains("- \(bucket.rawValue): "), "Claude prompt lacks \(bucket)")
+            #expect(guidelines.contains("| \(bucket.rawValue) |"), "guidelines lack \(bucket)")
+        }
+    }
 }
 
 @Suite("Lexicon engine")

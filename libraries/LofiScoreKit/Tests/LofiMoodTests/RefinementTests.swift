@@ -123,6 +123,20 @@ struct RefinementTests {
         }
     }
 
+    @Test func aSpendingCapStopsNewReadings() async throws {
+        let (_, builder, store) = try Self.setup(refinement: .init())
+        let engine = StepEngine([(0, .calm), (49, .tense)])
+        let report = try await builder.build(into: store, engine: engine, concurrency: 2, continueIf: { engine.calls.count < 4 })
+        #expect(report.stoppedEarly)
+        #expect(report.probes == 0, "refinement does not start after a stop")
+        #expect((4...5).contains(store.count), "in-flight readings finish, nothing new starts")
+
+        // Without the cap the same store is finished off.
+        let rest = try await builder.build(into: store, engine: StepEngine([(0, .calm), (49, .tense)]))
+        #expect(!rest.stoppedEarly && rest.alreadyScored == store.count - rest.scored - rest.probes)
+        #expect(rest.alreadyScored + rest.scored == rest.planned)
+    }
+
     @Test func noRefinementMeansOnlyThePlannedEntries() async throws {
         let (_, builder, store) = try Self.setup(refinement: nil)
         let report = try await builder.build(into: store, engine: StepEngine([(0, .calm), (49, .tense)]))

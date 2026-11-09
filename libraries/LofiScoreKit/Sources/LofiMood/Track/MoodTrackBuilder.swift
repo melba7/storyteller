@@ -79,6 +79,8 @@ public struct MoodTrackBuilder: Sendable {
         public var unrefinedChanges = 0
         public var failed = 0
         public var failures: [String] = []
+        /// `continueIf` said stop before everything was scored.
+        public var stoppedEarly = false
     }
 
     public let spoilerGuard: SpoilerGuard
@@ -131,11 +133,14 @@ public struct MoodTrackBuilder: Sendable {
     /// skipped; run again to retry them.
     ///
     /// `onEntry` gets each new entry and the number added so far in this run.
+    /// `continueIf` is asked before each new reading starts (a spending cap,
+    /// say); once it says no, readings in flight finish and nothing new starts.
     public func build(
         into store: MoodTrackStore,
         engine: any MoodEngine,
         chapters: ClosedRange<Int>? = nil,
         concurrency: Int = 4,
+        continueIf: (@Sendable () -> Bool)? = nil,
         onEntry: (@Sendable (MoodTrack.Entry, Int) -> Void)? = nil
     ) async throws -> Report {
         let positions = try scoringPositions(chapters: chapters)
@@ -145,18 +150,19 @@ public struct MoodTrackBuilder: Sendable {
         report.alreadyScored = positions.count - todo.count
 
         var added = 0
-        let first = try await score(todo, into: store, engine: engine, concurrency: concurrency) { entry in
+        let first = try await score(todo, into: store, engine: engine, concurrency: concurrency, continueIf: continueIf) { entry in
             added += 1
             onEntry?(entry, added)
         }
+        report.stoppedEarly = first.stopped
         report.scored = first.scored
         report.failed += first.failed.count
         report.failures += first.failed.prefix(20).map { "\($0.position): \($0.error)" }
 
-        if let refinement = plan.refinement {
+        if let refinement = plan.refinement, !report.stoppedEarly {
             try await refine(
                 into: store, engine: engine, planned: positions, refinement: refinement,
-                chapters: chapters, concurrency: concurrency, report: &report
+                chapters: chapters, concurrency: concurrency, continueIf: continueIf, report: &report
             ) { entry in
                 added += 1
                 onEntry?(entry, added)
@@ -174,6 +180,7 @@ public struct MoodTrackBuilder: Sendable {
         refinement: Refinement,
         chapters: ClosedRange<Int>?,
         concurrency: Int,
+        continueIf: (@Sendable () -> Bool)?,
         report: inout Report,
         onEntry: (MoodTrack.Entry) -> Void
     ) async throws {
@@ -197,8 +204,12 @@ public struct MoodTrackBuilder: Sendable {
             guard budget > 0, !candidates.isEmpty else { break }
             let round = Array(candidates.prefix(min(budget, roundSize)))
             budget -= round.count
-            let result = try await score(round, into: store, engine: engine, concurrency: concurrency, onEntry: onEntry)
+            let result = try await score(round, into: store, engine: engine, concurrency: concurrency, continueIf: continueIf, onEntry: onEntry)
             report.probes += result.scored
+            if result.stopped {
+                report.stoppedEarly = true
+                break
+            }
             report.failed += result.failed.count
             for failure in result.failed {
                 failedProbes.insert(failure.position.globalIndex)
@@ -255,16 +266,22 @@ public struct MoodTrackBuilder: Sendable {
         into store: MoodTrackStore,
         engine: any MoodEngine,
         concurrency: Int,
+        continueIf: (@Sendable () -> Bool)? = nil,
         onEntry: (MoodTrack.Entry) -> Void
-    ) async throws -> (scored: Int, failed: [Failure]) {
+    ) async throws -> (scored: Int, failed: [Failure], stopped: Bool) {
         var scored = 0
         var failed: [Failure] = []
+        var stopped = false
         let width = max(1, concurrency)
         let spoilerGuard = self.spoilerGuard
         try await withThrowingTaskGroup(of: (SentencePosition, Result<MoodTrack.Entry, any Error>).self) { group in
             var next = 0
             func launch() {
-                guard next < positions.count else { return }
+                guard next < positions.count, !stopped else { return }
+                if let continueIf, !continueIf() {
+                    stopped = true
+                    return
+                }
                 let position = positions[next]
                 next += 1
                 group.addTask {
@@ -291,7 +308,7 @@ public struct MoodTrackBuilder: Sendable {
                 launch()
             }
         }
-        return (scored, failed)
+        return (scored, failed, stopped)
     }
 }
 
