@@ -67,3 +67,28 @@ export function moodCounts(library: LofiMusicStatus["library"]): string {
   }
   return parts.join(" · ")
 }
+
+/**
+ * The music's CREDITS.md as plain text for the credits screen: headings, bold
+ * and links lose their Markdown marks, and a link keeps its address.
+ */
+export function plainCredits(markdown: string): string {
+  return markdown
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) =>
+      line
+        .replace(/^#{1,6}\s+/, "")
+        .replace(/^(\s*)[-*]\s+/, "$1• ")
+        .replace(
+          /\[([^\]]+)\]\(([^)\s]+)\)/g,
+          (_, text: string, url: string) =>
+            text === url ? url : `${text} (${url})`,
+        )
+        .replace(/(\*\*|__)(.+?)\1/g, "$2")
+        .replace(/`([^`]+)`/g, "$1"),
+    )
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+}

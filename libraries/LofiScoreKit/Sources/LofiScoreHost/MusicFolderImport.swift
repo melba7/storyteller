@@ -7,9 +7,10 @@ import LofiScoreCore
 /// the files downloaded.
 ///
 /// What is copied: the audio `MusicLibrary` plays (files directly inside a mood folder, such
-/// as `Calm/`, and files `library.json` lists), `library.json` and `SOURCES.csv` at the top,
-/// mood tracks (`*.json` in `MoodTracks/`, and `*.track.json` anywhere, gathered into
-/// `MoodTracks/`), and the Fast mood models at the top (embedding models named
+/// as `Calm/`, and files `library.json` lists), `library.json`, `SOURCES.csv` and `CREDITS.md`
+/// at the top,
+/// mood tracks and book scores (`*.json` in `MoodTracks/`, and `*.track.json` or
+/// `*.score.json` anywhere, gathered into `MoodTracks/`), and the Fast mood models at the top (embedding models named
 /// `LofiMood-embed-*.json`, Core ML classifiers `.mlmodel` or `.mlmodelc`). Nothing else: an
 /// audiobook unpacked somewhere in the folder is left behind.
 public enum MusicFolderImport {
@@ -37,6 +38,14 @@ public enum MusicFolderImport {
     }
 
     public static let moodTracksFolderName = "MoodTracks"
+    /// The attribution the music's licences ask for (CC BY and BY-SA tracks), shown in Settings.
+    public static let creditsFileName = "CREDITS.md"
+
+    /// The credits file in a music folder, if it has one (any capitalisation).
+    public static func creditsFile(in folder: URL, fileManager: FileManager = .default) -> URL? {
+        let contents = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+        return contents.first { $0.lastPathComponent.lowercased() == creditsFileName.lowercased() }
+    }
 
     /// Copies `source` into `destination`, replacing what was there only once the copy has
     /// worked and holds at least one track.
@@ -179,8 +188,8 @@ public enum MusicFolderImport {
                 }
                 continue
             }
-            if name.lowercased().hasSuffix(".track.json") {
-                // Claude mood tracks from the Mac (`make-tracks.sh`), wherever they sit:
+            if name.lowercased().hasSuffix(".track.json") || name.lowercased().hasSuffix(".score.json") {
+                // Claude mood tracks and book scores from the Mac (`make-tracks.sh`), wherever they sit:
                 // they all go to MoodTracks/, where the app looks for them.
                 plan.items.append(Item(url: resolved, relativePath: moodTracksFolderName + "/" + name, isDirectory: false))
                 continue
@@ -188,7 +197,7 @@ public enum MusicFolderImport {
             let ext = resolved.pathExtension.lowercased()
             let topLevel = components.count == 1
             if isMusic(components)
-                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || ext == "mlmodel" || isEmbeddingModel(resolved))
+                || topLevel && (name == LibraryManifest.fileName || name.lowercased() == "sources.csv" || name.lowercased() == creditsFileName.lowercased() || ext == "mlmodel" || isEmbeddingModel(resolved))
                 || components.count == 2 && components[0] == moodTracksFolderName && ext == "json"
             {
                 plan.items.append(Item(url: resolved, relativePath: relative, isDirectory: false))
