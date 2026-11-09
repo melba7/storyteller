@@ -38,6 +38,8 @@ let package = Package(
         .executable(name: "lofi-replay", targets: ["lofi-replay"]),
         .executable(name: "lofi-placeholders", targets: ["lofi-placeholders"]),
         .executable(name: "lofi-demo", targets: ["lofi-demo"]),
+        .executable(name: "lofi-render", targets: ["lofi-render"]),
+        .executable(name: "lofi-import", targets: ["lofi-import"]),
     ],
     targets: [
         // Shared value types: MoodBucket, MoodReading, MoodObservation.
@@ -88,6 +90,18 @@ let package = Package(
             swiftSettings: swift5
         ),
         .executableTarget(name: "lofi-demo", dependencies: ["LofiDemoKit"], swiftSettings: swift5),
+        // The demo story read by the Mac's voice with the music underneath, rendered to a file (macOS).
+        .executableTarget(
+            name: "lofi-render",
+            dependencies: ["LofiDemoKit", "LofiAudio", "LofiDirector", "LofiPlaceholders", "LofiScoreCore"],
+            swiftSettings: swift5
+        ),
+        // Measures a music folder and writes its library.json (loudness, true peak, length, provenance).
+        .executableTarget(
+            name: "lofi-import",
+            dependencies: ["LofiDemoKit", "LofiAudio", "LofiPlaceholders", "LofiScoreCore"],
+            swiftSettings: swift5
+        ),
 
         // MARK: Tests
 

@@ -63,7 +63,9 @@ public struct MusicLibrary: Sendable {
 
     // MARK: - Loading
 
-    /// Loads `library.json` from `folder` if there is one, otherwise scans its mood subfolders.
+    /// Loads `library.json` from `folder` if there is one, then adds any track in the mood
+    /// subfolders that it does not list, so music dropped into a folder after the last import
+    /// still plays (at the assumed loudness until the import runs again).
     public static func load(from folder: URL, fileManager: FileManager = .default) throws -> MusicLibrary {
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue else {
@@ -75,8 +77,11 @@ public struct MusicLibrary: Sendable {
             for track in manifest.tracks where !isSafeRelativePath(track.file) {
                 throw LoadError.unsafePath(track.file)
             }
-            guard !manifest.tracks.isEmpty else { throw LoadError.noTracks(folder.path) }
-            return MusicLibrary(root: folder, tracks: manifest.tracks, defaultLoudness: manifest.targetLoudness ?? -16)
+            let listed = Set(manifest.tracks.map(\.file))
+            let unlisted = scannedTracks(in: folder, fileManager: fileManager).filter { !listed.contains($0.file) }
+            let tracks = manifest.tracks + unlisted
+            guard !tracks.isEmpty else { throw LoadError.noTracks(folder.path) }
+            return MusicLibrary(root: folder, tracks: tracks, defaultLoudness: manifest.targetLoudness ?? -16)
         }
         return try scan(folder: folder, fileManager: fileManager)
     }
@@ -85,16 +90,24 @@ public struct MusicLibrary: Sendable {
     /// ("Calm", "calm", "Sombre"...). A tempo in the file name ("rainy-day 72bpm.m4a") is
     /// picked up for bar-aligned crossfades.
     public static func scan(folder: URL, fileManager: FileManager = .default) throws -> MusicLibrary {
-        let children = try fileManager.contentsOfDirectory(
+        let tracks = scannedTracks(in: folder, fileManager: fileManager)
+        guard !tracks.isEmpty else { throw LoadError.noTracks(folder.path) }
+        return MusicLibrary(root: folder, tracks: tracks)
+    }
+
+    /// Every audio file in `folder`'s mood subfolders, sorted by folder and file name.
+    static func scannedTracks(in folder: URL, fileManager: FileManager = .default) -> [LibraryTrack] {
+        guard let children = try? fileManager.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: [.isDirectoryKey],
             options: [.skipsHiddenFiles]
-        )
+        ) else { return [] }
         var tracks: [LibraryTrack] = []
         for child in children.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
             let isDirectory = (try? child.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
-            guard isDirectory, let bucket = MoodBucket(lenient: child.lastPathComponent) else { continue }
-            let files = try fileManager.contentsOfDirectory(at: child, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+            guard isDirectory, let bucket = MoodBucket(lenient: child.lastPathComponent),
+                  let files = try? fileManager.contentsOfDirectory(at: child, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+            else { continue }
             for file in files.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
             where audioExtensions.contains(file.pathExtension.lowercased()) {
                 let relative = child.lastPathComponent + "/" + file.lastPathComponent
@@ -107,8 +120,7 @@ public struct MusicLibrary: Sendable {
                 ))
             }
         }
-        guard !tracks.isEmpty else { throw LoadError.noTracks(folder.path) }
-        return MusicLibrary(root: folder, tracks: tracks)
+        return tracks
     }
 
     /// A tempo written into a file name, such as "72bpm" or "72 BPM".

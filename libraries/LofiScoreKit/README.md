@@ -7,7 +7,8 @@ the mood of what has already been narrated, never what comes next.
   See [Docs/MoodDetection.md](Docs/MoodDetection.md).
 - **Music side** (director, audio engine, placeholder library, demo):
   `LofiDirector`, `LofiAudio`, `LofiPlaceholders`, `LofiDemoKit`, `lofi-replay`,
-  `lofi-placeholders`, `lofi-demo`. See [Docs/MusicEngine.md](Docs/MusicEngine.md).
+  `lofi-placeholders`, `lofi-import`, `lofi-render`, `lofi-demo`.
+  See [Docs/MusicEngine.md](Docs/MusicEngine.md).
 - **Shared:** `LofiScoreCore` holds the value types both sides use
   (`MoodBucket`, `MoodReading`, `MoodObservation`).
 
@@ -15,6 +16,8 @@ the mood of what has already been narrated, never what comes next.
 swift test                                  # everything that runs off Apple platforms too
 swift run lofi-replay --synthetic           # director on synthetic 10-hour books
 swift run -c release lofi-placeholders      # synthesise the placeholder music
+swift run -c release lofi-import ~/Storyteller\ Lofi/LofiMusic   # measure real music, write library.json
+swift run -c release lofi-render --music ~/Storyteller\ Lofi/LofiMusic   # the story with music, to an .m4a
 swift run -c release lofi-demo              # the demo, on a Mac
 open Demo/LofiScoreDemo.xcodeproj           # the demo, on iPhone
 ```

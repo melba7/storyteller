@@ -54,11 +54,55 @@ public final class AVAudioEngineBackend: LofiAudioBackend, @unchecked Sendable {
     private var engineObserver: NSObjectProtocol?
     private var sessionObservers: [NSObjectProtocol] = []
 
+    /// Set for offline rendering: the engine renders on request instead of to the output.
+    private let offline: (format: AVAudioFormat, maximumFrameCount: AVAudioFrameCount)?
+    private var offlineSetupError: Error?
+
     public init(eq: PresenceEQ = PresenceEQ(), notificationCenter: NotificationCenter = .default) {
         eqSettings = eq
         notifications = notificationCenter
+        offline = nil
         buildGraph()
         observeSession()
+    }
+
+    /// A backend that renders offline, as fast as it can, for tools that write the music to
+    /// a file (`lofi-render`). Nothing is played and the audio session is not observed.
+    /// Call ``renderOffline(_:into:)`` to pull audio; the player drives it as usual.
+    public init(offlineFormat format: AVAudioFormat, maximumFrameCount: AVAudioFrameCount = 4096, eq: PresenceEQ = PresenceEQ()) throws {
+        eqSettings = eq
+        // A private centre: an offline engine has no hardware or session to hear about.
+        notifications = NotificationCenter()
+        offline = (format, maximumFrameCount)
+        buildGraph()
+        if let offlineSetupError {
+            throw offlineSetupError
+        }
+    }
+
+    /// The format ``renderOffline(_:into:)`` produces.
+    public var offlineFormat: AVAudioFormat? {
+        offline == nil ? nil : engine.manualRenderingFormat
+    }
+
+    /// Renders the next `frames` frames into `buffer` (offline backends only). Returns
+    /// false and leaves the buffer silent while the engine is stopped.
+    @discardableResult
+    public func renderOffline(_ frames: AVAudioFrameCount, into buffer: AVAudioPCMBuffer) throws -> Bool {
+        guard offline != nil, engine.isRunning else {
+            buffer.frameLength = min(frames, buffer.frameCapacity)
+            if let channels = buffer.floatChannelData {
+                for channel in 0..<Int(buffer.format.channelCount) {
+                    channels[channel].update(repeating: 0, count: Int(buffer.frameLength))
+                }
+            }
+            return false
+        }
+        let status = try engine.renderOffline(frames, to: buffer)
+        guard status == .success else {
+            throw LofiAudioError.loadFailed(trackID: "offline render", reason: "render status \(status.rawValue)")
+        }
+        return true
     }
 
     deinit {
@@ -192,6 +236,13 @@ public final class AVAudioEngineBackend: LofiAudioBackend, @unchecked Sendable {
     // MARK: - Graph
 
     private func buildGraph() {
+        if let offline {
+            do {
+                try engine.enableManualRenderingMode(.offline, format: offline.format, maximumFrameCount: offline.maximumFrameCount)
+            } catch {
+                offlineSetupError = error
+            }
+        }
         players = [AVAudioPlayerNode(), AVAudioPlayerNode()]
         musicMixer = AVAudioMixerNode()
         eq = AVAudioUnitEQ(numberOfBands: 2)
@@ -220,7 +271,7 @@ public final class AVAudioEngineBackend: LofiAudioBackend, @unchecked Sendable {
 
     /// Music mixer → EQ → main mixer, at the output's sample rate.
     private func connectMusicChain() {
-        let outputRate = engine.outputNode.outputFormat(forBus: 0).sampleRate
+        let outputRate = offline != nil ? engine.manualRenderingFormat.sampleRate : engine.outputNode.outputFormat(forBus: 0).sampleRate
         let format = AVAudioFormat(standardFormatWithSampleRate: outputRate > 0 ? outputRate : 44_100, channels: 2)
         engine.disconnectNodeOutput(musicMixer)
         engine.disconnectNodeOutput(eq)

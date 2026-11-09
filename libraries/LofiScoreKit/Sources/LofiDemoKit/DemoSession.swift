@@ -54,9 +54,25 @@ public final class DemoSession: ObservableObject {
     private var logCount = 0
     private var scopedFolder: URL?
     private let started = Date()
+    private var autoplayPending: Bool
 
+    /// Launch arguments for unattended runs (the Simulator, screenshots):
+    /// `-LofiDemoAutoplay YES` starts reading as soon as the music is ready,
+    /// `-LofiDemoSilent YES` sets the music volume to zero and keeps the voice off,
+    /// `-LofiDemoMusicFolder /path` uses that folder instead of the placeholders.
     public init() {
-        preparePlaceholders()
+        let defaults = UserDefaults.standard
+        autoplayPending = defaults.bool(forKey: "LofiDemoAutoplay")
+        if defaults.bool(forKey: "LofiDemoSilent") {
+            musicVolume = 0
+            speakAloud = false
+        }
+        if let path = defaults.string(forKey: "LofiDemoMusicFolder"),
+           let library = try? MusicLibrary.load(from: URL(fileURLWithPath: path, isDirectory: true)) {
+            use(library, source: URL(fileURLWithPath: path).lastPathComponent)
+        } else {
+            preparePlaceholders()
+        }
         pollTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.poll()
         }
@@ -117,6 +133,10 @@ public final class DemoSession: ObservableObject {
         libraryState = .ready(source: source, trackCount: library.tracks.count, emptyMoods: library.emptyBuckets)
         addLog("Library: \(source), \(library.tracks.count) tracks")
         rebuild()
+        if autoplayPending {
+            autoplayPending = false
+            narrator?.play()
+        }
     }
 
     // MARK: - Player

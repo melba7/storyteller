@@ -204,8 +204,9 @@ final class LibraryTests: XCTestCase {
         XCTAssertEqual(Set(library.emptyBuckets), Set(MoodBucket.allCases).subtracting([.calm, .somber]))
     }
 
-    func testManifestIsPreferredAndLenient() throws {
+    func testManifestComesFirstAndUnlistedFilesAreAdded() throws {
         try touch("Calm/rain 80bpm.wav")
+        try touch("Calm/c1.m4a")
         let json = """
         {
           "version": 1,
@@ -219,7 +220,10 @@ final class LibraryTests: XCTestCase {
         """
         try Data(json.utf8).write(to: folder.appendingPathComponent("library.json"))
         let library = try MusicLibrary.load(from: folder)
-        XCTAssertEqual(library.tracks.map(\.id), ["m1", "c1"])
+        // "Calm/c1.m4a" is listed, so only the unlisted file is added, after the manifest's tracks.
+        XCTAssertEqual(library.tracks.map(\.id), ["m1", "c1", "calm/rain 80bpm"])
+        XCTAssertEqual(library.loudness(of: library.tracks[2]), -16)
+        XCTAssertEqual(library.tracks[2].bpm, 80)
         XCTAssertEqual(library.tracks[0].bucket, .melancholy)
         XCTAssertEqual(library.tracks[0].seed?.value, "1234")
         XCTAssertEqual(library.loudness(of: library.tracks[0]), -15.5)

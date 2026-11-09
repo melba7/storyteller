@@ -23,6 +23,8 @@ MoodObservation ──► MoodDirector ──► MoodDecision ──► LofiScor
 | `lofi-replay` | runs replay scripts and synthetic 10-hour books through the director | everywhere |
 | `lofi-placeholders` | writes the placeholder library (WAV + `library.json`) | everywhere |
 | `lofi-demo` | the demo as a macOS app | macOS |
+| `lofi-render` | the demo story read by the Mac's voice with the music underneath, rendered offline to an `.m4a` | macOS |
+| `lofi-import` | measures a music folder and writes its `library.json` | macOS (WAV only elsewhere) |
 
 Music targets build in the Swift 5 language mode because AVFoundation's
 callbacks are not annotated for strict concurrency yet. The player keeps all of
@@ -125,9 +127,10 @@ LofiMusic/
   library.json   (optional; written by an import tool)
 ```
 
-Folder names match loosely ("calm", "Sombre"). Without `library.json`, every
-`m4a/aac/mp3/wav/aif/aiff/caf/flac` file is a track, and a tempo in the file name
-is picked up. `library.json` adds measured loudness and the rest:
+Folder names match loosely ("calm", "Sombre"). Every
+`m4a/aac/mp3/wav/aif/aiff/caf/flac` file in a mood folder is a track, and a tempo
+in the file name is picked up. `library.json` adds measured loudness and the rest;
+files it does not list still play, at an assumed −16 LUFS, until the next import:
 
 ```json
 {
@@ -146,6 +149,13 @@ is picked up. `library.json` adds measured loudness and the rest:
 Paths must stay inside the folder (no `/` prefix, no `..`). Music never goes in
 git: the fork is public. `.gitignore` here ignores audio files and the
 `/Library/` and `/PlaceholderLibrary/` folders.
+
+**Importing.** `swift run -c release lofi-import ~/Storyteller\ Lofi/LofiMusic`
+decodes every track, measures its integrated loudness (BS.1770), true peak and
+length, takes the source and license from a `SOURCES.csv` beside the music when
+there is one (matched by file name), and writes `library.json` (keeping the old one
+as `library.json.bak`). Tempo, key and anything else already in `library.json` are
+kept. Run it again after adding music. `--dry-run` only prints.
 
 **Placeholder music.** `swift run -c release lofi-placeholders` synthesises 16
 original tracks (two per mood, 30 to 42 s, distinct tempos and keys) normalised
@@ -177,14 +187,34 @@ The same narrator and mood source run headless in `Tests/LofiDemoKitTests`,
 which plays the whole story on a manual clock and checks that no change is
 made before its mood has been narrated.
 
+For unattended runs (the Simulator, screenshots) the app takes launch arguments:
+`-LofiDemoAutoplay YES` starts reading once the music is ready, `-LofiDemoSilent YES`
+sets the music volume to zero with the voice off, and `-LofiDemoMusicFolder /path`
+uses that folder instead of the placeholders.
+
+### Listening without installing anything
+
+`swift run -c release lofi-render --music ~/Storyteller\ Lofi/LofiMusic --out story.m4a`
+renders the demo story to a file you can play anywhere, such as on a phone without
+Developer Mode. The Mac's voice (`say`) reads each sentence; the story runs
+through the real `LofiScorePlayer` on a manual clock (`OfflineStoryRun`) with an
+`AVAudioEngineBackend` in offline manual-rendering mode, so the crossfades, bar
+alignment, bed level, gap lift, EQ and rotation are the engine's own. The voice is
+levelled to −18 LUFS, the bed the player set sits under it, and the whole file is
+brought to −16 LUFS with peaks under −1 dBFS. A `.txt` beside it lists the chapters,
+the text side's readings and every music change with its time, to read along.
+Options: `--voice NAME` (any `say -v '?'` voice), `--rate WPM`, `--real-timings`
+(the app's 90 s dwell instead of the demo's 20 s), `--noise`, `--seed`. Nothing
+is played out loud.
+
 ## Running the tests
 
-`swift test` runs everything that is not Apple-only (113 tests on Linux):
+`swift test` runs everything that is not Apple-only (122 tests on Linux):
 director rules, replays, 10-hour synthetic books, the causality property test,
 the player against a fake backend (crossfade power, bar alignment, reversal,
 queued changes, pause and engine stop, ducking, rotation, route loss, restarts,
-fallbacks), the library loader, loudness against the BS.1770 reference, and the
-end-to-end demo. The AVAudioEngine backend and the SwiftUI demo compile only on
+fallbacks), the library loader and importer, loudness against the BS.1770
+reference, the end-to-end demo, and the offline run and mix behind `lofi-render`. The AVAudioEngine backend and the SwiftUI demo compile only on
 Apple platforms; build them on a Mac with `swift build` or in Xcode.
 
 ## For the Expo integration (thread 5)
