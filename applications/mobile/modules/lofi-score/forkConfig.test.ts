@@ -1,5 +1,5 @@
 // LOFI-FORK: the fork's app config adds the LofiScoreKit pods (see FORK.md).
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
   applyForkIdentity,
@@ -74,6 +74,29 @@ describe("soundEdition", () => {
     expect(config.ios?.infoPlist).toEqual({
       UIBackgroundModes: ["audio"],
       LofiScoreSoundEdition: soundEdition(),
+    })
+  })
+
+  describe("in a TestFlight build", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it("keeps the build number and signing team next to it", () => {
+      vi.stubEnv("FORK_BUILD_NUMBER", "42")
+      vi.stubEnv("APPLE_TEAM_ID", "TEAM123456")
+      vi.stubEnv("LOFI_SOUND_EDITION", "publish")
+      const config = applyForkIdentity({
+        name: "Storyteller",
+        slug: "storyteller",
+        ios: { infoPlist: { UIBackgroundModes: ["audio"] } },
+      })
+      expect(config.ios?.buildNumber).toBe("42")
+      expect(config.ios?.appleTeamId).toBe("TEAM123456")
+      expect(config.ios?.infoPlist).toEqual({
+        UIBackgroundModes: ["audio"],
+        LofiScoreSoundEdition: "publish",
+      })
     })
   })
 })
