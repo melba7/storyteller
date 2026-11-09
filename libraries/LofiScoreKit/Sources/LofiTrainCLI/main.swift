@@ -7,9 +7,10 @@ import CreateML
 
 // lofi-train: builds the Fast engine's Create ML text classifier.
 //
-//   lofi-train export --windows W.jsonl --labels L.jsonl [--labels L2.jsonl ...]
+//   lofi-train export --windows W.jsonl [--windows W2.jsonl ...] --labels L.jsonl [--labels L2.jsonl ...]
 //                     [--split split.json] [--out-dir DIR] [--chunk-words 160]
-//       Joins window records with labels (a later label file wins over an
+//       Joins window records (several window files are read in order; a window
+//       id seen twice is kept once) with labels (a later label file wins over an
 //       earlier one, so Mo's corrections override Claude's), keeps the newest
 //       words of each window exactly as the Fast engine will see them, and
 //       writes DIR/train.json and DIR/test.json in Create ML's JSON format,
@@ -22,7 +23,7 @@ import CreateML
 //       FILE.report.json beside it.
 
 let usage = """
-    usage: lofi-train export --windows FILE --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N]
+    usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all]
     """
 
@@ -72,7 +73,8 @@ struct Example: Codable {
 }
 
 func exportCommand(_ options: Options) throws {
-    guard let windowsPath = options.string("windows") else { fail("give --windows\n\(usage)") }
+    let windowPaths = options.strings("windows")
+    guard !windowPaths.isEmpty else { fail("give at least one --windows file\n\(usage)") }
     let labelPaths = options.strings("labels")
     guard !labelPaths.isEmpty else { fail("give at least one --labels file\n\(usage)") }
     let outDir = URL(fileURLWithPath: options.string("out-dir") ?? "Tools/data/work/train", isDirectory: true)
@@ -99,9 +101,15 @@ func exportCommand(_ options: Options) throws {
     var testWindows = Data()
     var labellers: [String: [String: Int]] = ["train": [:], "test": [:]]
     var unlabelled = 0
-    let windowLines = try Data(contentsOf: URL(fileURLWithPath: windowsPath)).split(separator: 0x0A)
+    var duplicates = 0
+    var seen: Set<String> = []
+    let windowLines = try windowPaths.flatMap { try Data(contentsOf: URL(fileURLWithPath: $0)).split(separator: 0x0A) }
     for line in windowLines where !line.isEmpty {
         let window = try JSONDecoder().decode(WindowText.self, from: Data(line))
+        guard seen.insert(window.id).inserted else {
+            duplicates += 1
+            continue
+        }
         guard let label = labels[window.id], let bucket = MoodBucket(lenient: label.bucket) else {
             unlabelled += 1
             continue
@@ -132,6 +140,7 @@ func exportCommand(_ options: Options) throws {
     note("test:  \(test.count) examples from \(Set(test.map(\.book)).count) books (\(describe(labellers["test"]!)))")
     note("  \(distribution(test))")
     if unlabelled > 0 { note("skipped \(unlabelled) windows with no label") }
+    if duplicates > 0 { note("skipped \(duplicates) repeated window ids") }
     note("wrote \(outDir.path)/train.json, test.json, test-windows.jsonl (newest \(chunkWords) words per window)")
 }
 

@@ -47,6 +47,10 @@ after the position never changes the window. Engines receive nothing else.
   file instead of rebuilding the books.
 - `claude-v1.jsonl`: Claude's label for every sampled window, judged on the
   text alone.
+- `Tools/data/eval/sample-v2.jsonl.gz` and `claude-v2.jsonl`: 958 more
+  windows from the 26 training books only (new positions, near-duplicates of
+  v1 windows dropped), each labelled by Claude the same way. With v1 that makes
+  1,998 training windows; the 320 test windows are unchanged.
 - `split.json`: 8 books (320 windows) held out of training. Mo labels these
   blind; they are the test set every engine is scored on.
 - Mo's labels come from the labelling page (an artifact with its own small
@@ -65,6 +69,7 @@ swift build -c release && swift test
 B=.build/release
 W=Tools/data/work && mkdir -p $W/readings
 gunzip -c Tools/data/eval/sample-v1.jsonl.gz > $W/sample.jsonl
+gunzip -c Tools/data/eval/sample-v2.jsonl.gz > $W/sample2.jsonl   # extra training windows
 python3 Tools/eval/mask_names.py $W/sample.jsonl > $W/sample.masked.jsonl
 
 $B/lofi-eval engines                      # what can run here
@@ -76,8 +81,10 @@ done
 $B/lofi-eval run --engine fm --in $W/sample.masked.jsonl --out $W/readings/fm.masked.jsonl
 
 # 2. Train the Fast engine on the 26 training books
-$B/lofi-train export --windows $W/sample.jsonl --split Tools/data/labels/split.json \
-  --labels Tools/data/labels/claude-v1.jsonl   # add --labels Tools/data/labels/mo-check.jsonl once it exists
+$B/lofi-train export --windows $W/sample.jsonl --windows $W/sample2.jsonl \
+  --split Tools/data/labels/split.json \
+  --labels Tools/data/labels/claude-v1.jsonl --labels Tools/data/labels/claude-v2.jsonl
+  # add --labels Tools/data/labels/mo-check.jsonl last once it exists
 $B/lofi-train train --algorithm maxent
 $B/lofi-train train --algorithm bert
 for m in maxent bert; do
@@ -93,8 +100,10 @@ python3 Tools/eval/score.py --windows $W/sample.jsonl --masked-pair $W/readings/
 ```
 
 For changes per hour under the plan's director rules, build playback windows
-for a few books with `Tools/eval/export_windows.sh` (needs the EPUBs from
-`fetch_books.py` and `make_readaloud.py`, and `pip3 install pysbd`) and run
+with `Tools/eval/export_windows.sh` (needs the EPUBs from `fetch_books.py` and
+`make_readaloud.py`, and `pip3 install pysbd`; it never overwrites the frozen
+samples, and its `sample.rebuilt.jsonl` should match `sample-v1` byte for
+byte, which it does on Linux) and run
 `score.py --director` on readings of `playback.jsonl`, or play a book through
 `MoodTracker` with `lofi-eval simulate <epub-dir> --engine NAME`.
 
