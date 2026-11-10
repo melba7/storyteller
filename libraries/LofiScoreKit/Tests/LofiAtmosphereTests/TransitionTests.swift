@@ -96,7 +96,7 @@ final class TransitionTests: XCTestCase {
             """, memory: memory).scene.transition, "answers in the older shape still read")
 
         let system = ClaudeScenePrompt.system
-        XCTAssertEqual(ClaudeScenePrompt.version, 5)
+        XCTAssertEqual(ClaudeScenePrompt.version, 6)
         for transition in SceneTransition.allCases {
             XCTAssertTrue(system.contains("- \(transition.rawValue): "), "\(transition.rawValue) is not in the prompt")
         }

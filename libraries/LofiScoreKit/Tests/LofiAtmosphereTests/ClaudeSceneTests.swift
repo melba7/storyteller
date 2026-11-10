@@ -19,6 +19,30 @@ final class ClaudeSceneTests: XCTestCase {
         return PlaceMemory(entries: [entry])
     }
 
+    func testANewPlaceNamedLikeAKnownOneIsThatPlace() throws {
+        let guardian = try SpoilerGuard(chapters: [["One.", "Two.", "Three."]])
+        func entry(_ index: Int, _ id: String, _ name: String) throws -> AtmosphereTrack.Entry {
+            let position = try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: index))
+            return AtmosphereTrack.Entry(
+                position: position, sentence: "x",
+                scene: StoryScene(placeID: id, placeName: name, setting: .indoors, layers: [SceneLayer(.roomTone)]), world: nil
+            )
+        }
+        let memory = PlaceMemory(entries: [
+            try entry(0, "p1", "Toad Hall"), try entry(1, "p2", "the courtyard of Castle Dracula"), try entry(2, "p3", "the Weasleys' kitchen"),
+        ])
+        func place(_ name: String) throws -> SceneAnswer.Place {
+            try ClaudeSceneEngine.answer(fromJSON: """
+                {"place":"new","placeName":"\(name)","setting":"indoors","sounds":[{"sound":"roomTone","level":"soft"}],"world":"","cue":"","confidence":0.7}
+                """, memory: memory).place
+        }
+        XCTAssertEqual(try place("the castle courtyard"), .known("p2"), "two words inside a listed name")
+        XCTAssertEqual(try place("the kitchen at the Weasleys'"), .known("p3"), "the same words in another order")
+        XCTAssertEqual(try place("the hall"), .new("the hall"), "one word is not enough to be sure")
+        XCTAssertEqual(try place("the great hall of Toad Hall"), .known("p1"), "a listed name inside a longer one")
+        XCTAssertEqual(try place("the Weasleys' garden"), .new("the Weasleys' garden"), "a different place at the same house")
+    }
+
     func testAnswersMapToKnownAndNewPlaces() throws {
         let memory = try memory()
         let known = try ClaudeSceneEngine.answer(fromJSON: """
@@ -69,7 +93,7 @@ final class ClaudeSceneTests: XCTestCase {
 
         let haiku = ClaudeSceneEngine(apiKey: "k", configuration: .init(model: "claude-haiku-5-5"))
         XCTAssertNil(haiku.body(for: window, memory: PlaceMemory())["fallbacks"])
-        XCTAssertEqual(engine.id, "claude.sonnet-5-5/a5")
+        XCTAssertEqual(engine.id, "claude.sonnet-5-5/a6")
     }
 
     func testParsesAMessagesResponseAndCountsUsage() async throws {

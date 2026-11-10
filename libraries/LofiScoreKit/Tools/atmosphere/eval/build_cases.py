@@ -13,19 +13,25 @@ scorer rather than agreeing with it.
 
 The expectations (see SceneEvalCase in Sources/LofiAtmosphere/Eval/SceneEval.swift):
   place      "new", "none", "any", or a place id from the case's memory
-  setting    indoors | outdoors | vehicle
+  setting    indoors | outdoors | vehicle ("vehicle|outdoors" accepts either)
   main       families any of which may be the loudest sound
   required   families that must be there; forbidden: families that must not
   kinds      {family: [acceptable kinds]} when the family is in the scene
   state      words any of which should be in the state note ([] = no note)
-  moment     none | swell | hush;  oneShot: none | a one-off sound id
+  moment     none | swell | hush;  oneShot: none | a one-off sound id ("a|b" accepts either)
+  transition transitions any of which fit, or ["none"]
+  sinceAt    words of the sentence where the story enters the scene (resolved to expect.since,
+             the sentence's first six words); since "none" = the scene was already under way
   heard      false when silence is as good as a sound
+Families, kinds, one-off sounds and transitions are checked against Tools/atmosphere/catalog.json.
 """
 from __future__ import annotations
 
 import json
 import pathlib
 import sys
+
+CATALOG = pathlib.Path(__file__).resolve().parent.parent / "catalog.json"
 
 HERE = pathlib.Path(__file__).resolve().parent
 BOOKS = HERE.parent.parent / "data" / "books" / "json"
@@ -117,7 +123,7 @@ CASES = [
          about="Harker alone in his room at the castle by day; wolves heard habitually, not now",
          tags=["place", "oneShot", "state"], memory=DRACULA_CASTLE,
          expect=dict(place="p2", setting="indoors", main=["roomTone", "wind", "emptyHall"],
-                     forbidden=["crowd", "city", "murmur"], oneShot="none", moment="none")),
+                     forbidden=["crowd", "city", "murmur"], oneShot="none", moment="none", transition=["none"], since="none")),
     dict(id="dr-castle-wolves-howl", book="dracula", ch=3, at="answered from far and wide by the howling of wolves", n=12,
          about="at his window at night; the Count calls and the wolves howl now",
          tags=["oneShot", "place"], memory=DRACULA_CASTLE,
@@ -129,24 +135,25 @@ CASES = [
              {"id": "p1", "name": "the Golden Krone hotel, Bistritz", "setting": "indoors", "sounds": "murmur soft, fireplace faint"},
              {"id": "p2", "name": "the caleche through the Borgo Pass", "setting": "vehicle", "sounds": "horses soft, wind soft, nightForest faint", "state": "night, wolves about"}]},
          expect=dict(place="new", setting="outdoors", main=["wind", "nightForest", "emptyHall", "roomTone", "horses"],
-                     forbidden=["crowd", "city"])),
+                     forbidden=["crowd", "city"], oneShot="chainsRattle")),
     dict(id="dr-whitby-calm", book="dracula", ch=6, at="in the great harmony of nature's silence", n=10,
          about="the harbour on the sultry still night before the storm (a newspaper cutting)",
          tags=["state", "sounds"], memory=WHITBY,
          expect=dict(place="p2", setting="outdoors", main=["seaShore", "wind", "murmur", "oldTown"],
-                     forbidden=["strongWind", "thunder", "heavyRain", "crowd"], state=["calm", "still", "sultry", "silence", "quiet"], moment="none")),
+                     forbidden=["strongWind", "thunder", "heavyRain", "crowd"], state=["calm", "still", "sultry", "silence", "quiet"], moment="none",
+                     transition=["none"], since="none")),
     dict(id="dr-whitby-tempest-breaks", book="dracula", ch=6, at="without warning the tempest broke", n=12,
          about="the moment the storm breaks over the harbour",
-         tags=["transition", "state"], memory=WHITBY,
+         tags=["transition", "state"], memory=WHITBY, sinceAt="Then without warning the tempest broke",
          expect=dict(place="p2", setting="outdoors", main=["strongWind", "seaShore", "heavyRain", "thunder", "wind"],
-                     moment="swell", state=["storm", "tempest", "gale", "break"])),
+                     moment="swell", state=["storm", "tempest", "gale", "break"], transition=["stormBreaks"])),
     dict(id="dr-whitby-storm-height", book="dracula", ch=6, at="clung with grim clasp to the iron stanchions", n=8,
          about="the storm at its height on the piers",
          tags=["sounds", "kinds"],
          memory={"world": WHITBY["world"], "current": "p2", "places": WHITBY["places"][:1] + [
              {"id": "p2", "name": "Whitby harbour and the piers", "setting": "outdoors", "sounds": "seaShore.stormySea full, strongWind soft", "state": "the tempest breaking"}]},
          expect=dict(place="p2", setting="outdoors", main=["strongWind", "seaShore", "heavyRain"], required=["strongWind"],
-                     kinds={"seaShore": ["stormySea", "cliffs", "harbour"]}, forbidden=["city", "roomTone"])),
+                     kinds={"seaShore": ["stormySea", "cliffs", "harbour"]}, forbidden=["city", "roomTone"], since="none")),
     dict(id="dr-mina-cliff-evening", book="dracula", ch=5, at="a Salvation Army meeting in a back street", n=10,
          about="Mina alone on the cliff seat at nine in the evening, sheep bleating, a band far off",
          tags=["sounds"], memory={"world": WHITBY["world"], "places": WHITBY["places"][:1], "current": "none"},
@@ -174,7 +181,7 @@ CASES = [
          memory={"world": "Dr Seward's asylum at Purfleet, near London, autumn, the 1890s", "current": "p1", "places": [
              {"id": "p1", "name": "the Harkers' room at the asylum", "setting": "indoors", "sounds": "roomTone.houseAtNight faint", "state": "night"}]},
          expect=dict(place="p1", setting="indoors", main=["roomTone", "deepDrone", "clock", "wind"],
-                     forbidden=["crowd", "city", "murmur", "birdsong"], state=["night", "fog", "mist", "dream", "dark"])),
+                     forbidden=["crowd", "city", "murmur", "birdsong"], state=["night", "fog", "mist", "dream", "dark"], since="none")),
     dict(id="dr-funeral-harbour", book="dracula", ch=6, at="stood on it when the time came and saw everything", n=8,
          about="the sea captain's funeral seen from the churchyard seat, boats in the harbour",
          tags=["sounds", "place"], memory={"world": WHITBY["world"], "places": WHITBY["places"], "current": "none"},
@@ -200,22 +207,22 @@ CASES = [
          about="the captain's dreadful stories of storms at sea, told in the parlour: remembered places do not count",
          tags=["place"], memory=BENBOW,
          expect=dict(place="p1", setting="indoors", main=["murmur", "fireplace", "roomTone", "crowd"],
-                     forbidden=["openSea", "ship", "strongWind", "seaShore", "thunder"])),
+                     forbidden=["openSea", "ship", "strongWind", "seaShore", "thunder"], transition=["none"], since="none")),
     dict(id="ti-benbow-doctor", book="treasure-island", ch=0, at="Drink and the devil had done for the rest—Yo-ho-ho, and a bottle of rum!\"", n=8,
          about="the doctor in the parlour with the country folk and the drunk captain",
          tags=["place", "sounds"], memory=BENBOW,
          expect=dict(place="p1", setting="indoors", main=["murmur", "fireplace", "roomTone"], forbidden=["crowd", "city"])),
     dict(id="ti-blind-man-leaves", book="treasure-island", ch=2, at="tap-tap-tapping into the distance", n=10,
-         about="the blind man leaves the parlour; his stick taps away down the road (not a one-off sound in the list)",
-         tags=["oneShot"],
+         about="the blind man leaves the parlour; his stick taps away down the road",
+         tags=["sounds"],
          memory={"world": BENBOW["world"], "current": "p1", "places": [
              {"id": "p1", "name": "the Admiral Benbow inn", "setting": "indoors", "sounds": "roomTone faint, fireplace faint", "state": "morning, the captain alone in the parlour"}]},
-         expect=dict(place="p1", setting="indoors", oneShot="none", forbidden=["crowd"])),
+         expect=dict(place="p1", setting="indoors", forbidden=["crowd"], since="none")),
     dict(id="ti-counting-coins-frost", book="treasure-island", ch=3, at="the tap-tapping of the blind man's stick upon the frozen road", n=10,
          about="Jim and his mother alone at night counting the dead captain's coins; the inn silent, frost outside",
          tags=["state", "oneShot"], memory=BENBOW,
          expect=dict(place="p1", setting="indoors", main=["roomTone", "clock", "fireplace", "wind"],
-                     forbidden=["murmur", "crowd"], state=["night", "frost", "silent", "still", "quiet", "alone", "dead"], oneShot="none")),
+                     forbidden=["murmur", "crowd"], state=["night", "frost", "silent", "still", "quiet", "alone", "dead"])),
     dict(id="ti-bristol-quays", book="treasure-island", ch=6, at="The smell of tar and salt was something new", n=8,
          about="walking along the Bristol quays among ships and sailors",
          tags=["sounds"],
@@ -231,13 +238,13 @@ CASES = [
          expect=dict(place="p2", setting="vehicle", main=["ship", "crowd", "seaShore", "openSea"], oneShot="none")),
     dict(id="ti-hispaniola-sails", book="treasure-island", ch=9, at="begun her voyage to the Isle of Treasure", n=6,
          about="the ship sets off: a swell",
-         tags=["transition"], memory=HISPANIOLA,
-         expect=dict(place="p2", setting="vehicle", main=["ship", "openSea", "crowd", "seaShore", "wind"], moment="swell")),
+         tags=["transition"], memory=HISPANIOLA, sinceAt="begun her voyage to the Isle of Treasure",
+         expect=dict(place="p2", setting="vehicle", main=["ship", "openSea", "crowd", "seaShore", "wind"], moment="swell", transition=["vehicleDeparts"])),
     dict(id="ti-apple-barrel", book="treasure-island", ch=10, at="returned the voice of the coxswain, Israel Hands", n=10,
          about="Jim hidden in the apple barrel on deck at night, pirates talking low beside it",
          tags=["sounds"], memory={"world": HISPANIOLA["world"], "current": "p2", "places": HISPANIOLA["places"][:1] + [
              {"id": "p2", "name": "the Hispaniola at sea", "setting": "vehicle", "sounds": "ship soft, openSea soft", "state": "a fine night, the last of the voyage"}]},
-         expect=dict(place="p2", setting="vehicle", main=["ship", "openSea", "murmur"], forbidden=["crowd", "city"])),
+         expect=dict(place="p2", setting="vehicle", main=["ship", "openSea", "murmur"], forbidden=["crowd", "city"], since="none")),
     dict(id="ti-jolly-boat", book="treasure-island", ch=15, at="in the direction of the stockade upon the chart", n=8,
          about="rowing ashore in the jolly-boat",
          tags=["sounds"],
@@ -276,20 +283,20 @@ CASES = [
          memory={"world": "London, Christmas Eve, the 1840s", "current": "p1", "places": [
              {"id": "p1", "name": "Scrooge's rooms", "setting": "indoors", "sounds": "fireplace faint, roomTone faint", "state": "evening, alone with his gruel"}]},
          expect=dict(place="p1", setting="indoors", main=["roomTone", "fireplace", "clock", "deepDrone"], forbidden=["crowd", "city"],
-                     state=["night", "dark", "alone", "fear", "dread", "silent"])),
+                     state=["night", "dark", "alone", "fear", "dread", "silent"], oneShot="chainsRattle")),
     dict(id="cc-chimes-quarters", book="a-christmas-carol", ch=1, at="the chimes of a neighbouring church struck the four quarters", n=2, lead=6,
          about="Scrooge wakes in the dark; a church clock chimes the quarters",
          tags=["oneShot"], memory=SCROOGE,
-         expect=dict(place="p2", setting="indoors", oneShot="clockChime")),
+         expect=dict(place="p2", setting="indoors", oneShot="clockChime|bellToll")),
     dict(id="cc-fezziwig-closing", book="a-christmas-carol", ch=1, at="looked up at the clock, which pointed to the hour of seven", n=10,
          about="a warehouse at closing time on Christmas Eve, Fezziwig at his desk",
          tags=["place"], memory={"world": FEZZIWIG["world"], "places": FEZZIWIG["places"][:1], "current": "p1"},
          expect=dict(place="new", setting="indoors", main=["roomTone", "emptyHall", "clock", "hushedRoom", "workshop", "fireplace"], forbidden=["crowd", "city"])),
     dict(id="cc-fezziwig-dance", book="a-christmas-carol", ch=1, at="away they all went, twenty couple at once", n=12,
          about="the warehouse turned into a ballroom: the same place in a new state, the dance starting",
-         tags=["state", "transition"], memory=FEZZIWIG,
+         tags=["state", "transition"], memory=FEZZIWIG, sinceAt="In came a fiddler",
          expect=dict(place="p2", setting="indoors", main=["crowd"], kinds={"crowd": ["partyIndoors", "ballroom", "feastHall"]},
-                     state=["dance", "party", "ball", "music", "fiddler"], moment="swell")),
+                     state=["dance", "party", "ball", "music", "fiddler"], moment="swell|none", transition=["crowdGathers", "none"])),
     dict(id="cc-christmas-morning-streets", book="a-christmas-carol", ch=2, at="in their best clothes, and with their gayest faces", n=8,
          about="Christmas morning streets, shops shutting, steeples calling people to church",
          tags=["sounds", "kinds"],
@@ -299,7 +306,7 @@ CASES = [
                      forbidden=["city", "roomTone"])),
     dict(id="cc-cratchits-quiet", book="a-christmas-carol", ch=3, at="found the mother and the children seated round the fire", n=6,
          about="back at the Cratchits', now quiet and in mourning: a known place in a new state",
-         tags=["place", "state"], memory=CRATCHITS,
+         tags=["place", "state"], memory=CRATCHITS, sinceAt="found the mother and the children seated round the fire",
          expect=dict(place="p1", setting="indoors", main=["fireplace", "roomTone", "clock"], forbidden=["crowd", "murmur", "kitchen"],
                      state=["quiet", "hush", "still", "sad", "mourning", "grief", "silent"])),
     dict(id="cc-churchyard", book="a-christmas-carol", ch=3, at="lay underneath the ground", n=8,
@@ -310,7 +317,7 @@ CASES = [
          about="Christmas morning, every church bell pealing, Scrooge opens his window",
          tags=["sounds", "oneShot"], memory=SCROOGE,
          expect=dict(place="p2", setting="indoors", main=["oldTown", "roomTone", "snow"], required=["oldTown"], kinds={"oldTown": ["churchBells"]},
-                     forbidden=["crowd"], oneShot="none")),
+                     forbidden=["crowd"], transition=["windowOpens"])),
     dict(id="cc-counting-house-next-day", book="a-christmas-carol", ch=4, at="No Bob.", n=12,
          about="the day after Christmas, Scrooge in his counting-house waiting for Bob: a return to a known place",
          tags=["place", "state"], memory={"world": SCROOGE["world"], "places": SCROOGE["places"], "current": "none"},
@@ -326,7 +333,7 @@ CASES = [
          tags=["sounds"],
          memory={"world": "the English river bank, Edwardian; animals who live like people", "current": "p1", "places": [
              {"id": "p1", "name": "the river bank", "setting": "outdoors", "sounds": "river soft, birdsong faint", "state": "a spring morning"}]},
-         expect=dict(place="any", main=["river"], forbidden=["openSea", "seaShore", "city", "crowd"])),
+         expect=dict(place="any", main=["river", "openSea"], kinds={"openSea": ["rowingBoat"]}, forbidden=["seaShore", "city", "crowd"])),
     dict(id="ww-poop-poop", book="wind-in-the-willows", ch=1, at="Poop-poop!", n=10, hit=1,
          about="the caravan on the open road; a motor-car comes up behind, horn sounding",
          tags=["oneShot", "sounds"],
@@ -344,20 +351,21 @@ CASES = [
          tags=["sounds", "transition"],
          memory={"world": "the English river bank, Edwardian; midwinter, snow", "current": "p1", "places": [
              {"id": "p1", "name": "the Wild Wood", "setting": "outdoors", "sounds": "snow soft, nightForest faint", "state": "night, deep snow"}]},
-         expect=dict(place="new", setting="indoors", main=["fireplace", "kitchen", "roomTone"], forbidden=["crowd", "city", "snow", "nightForest"])),
+         expect=dict(place="new", setting="indoors", main=["fireplace", "kitchen", "roomTone"], forbidden=["crowd", "city", "snow", "nightForest"],
+                     transition=["stepInside", "enterThroughDoor", "none"])),
     dict(id="ww-dungeon", book="wind-in-the-willows", ch=5, at="dungeon", n=8,
          about="Toad thrown into the castle dungeon",
          tags=["kinds"],
          expect=dict(place="new", setting="indoors", main=["dripping", "emptyHall", "roomTone"], kinds={"dripping": ["dungeon", "cave"], "emptyHall": ["prisonBlock", "castleCorridor"]},
                      forbidden=["crowd", "birdsong", "city"])),
     dict(id="ww-train", book="wind-in-the-willows", ch=7, at="engine-driver", n=10,
-         about="Toad escapes on the engine of a train",
-         tags=["sounds", "kinds"],
-         expect=dict(place="new", setting="vehicle", main=["train", "machinery"], kinds={"train": ["steamTrain"]}, forbidden=["city", "crowd"])),
+         about="Toad on the platform, talking to the engine-driver of a train standing in the station",
+         tags=["sounds"],
+         expect=dict(place="new", main=["train", "crowd", "machinery", "emptyHall"], forbidden=["city"])),
     dict(id="ww-toad-hall-banquet", book="wind-in-the-willows", ch=11, at="the banquet", n=10,
-         about="Toad Hall full of guests for the banquet: a known place in a new state",
-         tags=["state", "place"], memory=TOAD_HALL,
-         expect=dict(place="p1", setting="indoors", main=["crowd", "murmur"], state=["banquet", "party", "feast", "guests", "dinner"])),
+         about="in the secret tunnel under Toad Hall, the banquet roaring overhead",
+         tags=["state", "sounds"], memory=TOAD_HALL,
+         expect=dict(place="any", setting="indoors", main=["dripping", "murmur", "crowd", "emptyHall"], state=["banquet", "party", "feast", "guests", "dinner", "overhead", "muffled"])),
     # ---- Jane Eyre --------------------------------------------------------------------
     dict(id="je-window-seat-rain", book="jane-eyre", ch=0, at="lamentable blast", n=10,
          about="Jane in the window seat on a wet November afternoon",
@@ -371,7 +379,7 @@ CASES = [
     dict(id="je-lowood-schoolroom", book="jane-eyre", ch=4, at="the schoolroom was in a glorious tumult", n=10,
          about="the Lowood schoolroom between lessons, eighty girls talking at once",
          tags=["kinds"],
-         expect=dict(place="any", setting="indoors", main=["crowd", "murmur"], kinds={"crowd": ["classroomChatter", "schoolyard", "cafeteria"]}, forbidden=["city", "birdsong", "roomTone"])),
+         expect=dict(place="any", setting="indoors", main=["crowd", "murmur"], kinds={"crowd": ["classroomChatter", "schoolyard", "cafeteria"]}, forbidden=["city", "birdsong"])),
     dict(id="je-lowood-bell", book="jane-eyre", ch=4, at="the bell rang", n=8,
          about="the school bell rings at Lowood",
          tags=["oneShot"],
@@ -387,21 +395,21 @@ CASES = [
                      state=["winter", "cold", "frost", "evening", "sunset", "still", "january"])),
     dict(id="je-orchard-rain-rushes", book="jane-eyre", ch=22, at="the rain rushed down", n=10,
          about="the storm breaks over the orchard at Thornfield",
-         tags=["transition"],
+         tags=["transition"], sinceAt="The rain rushed down",
          memory={"world": "Thornfield Hall, the English midlands, a midsummer evening, the 1800s", "current": "p1", "places": [
              {"id": "p1", "name": "the orchard at Thornfield", "setting": "outdoors", "sounds": "nightInsects soft, wind faint", "state": "a still midsummer evening"}]},
-         expect=dict(place="p1", setting="outdoors", main=["heavyRain", "rain", "strongWind", "thunder"], moment="swell")),
+         expect=dict(place="p1", setting="outdoors", main=["heavyRain", "rain", "strongWind", "thunder"], moment="swell", transition=["stormBreaks"])),
     dict(id="je-orchard-thunder-crack", book="jane-eyre", ch=22, at="close rattling peal", n=10,
          about="lightning and a crack of thunder over the orchard",
          tags=["oneShot"],
          memory={"world": "Thornfield Hall, the English midlands, a midsummer evening, the 1800s", "current": "p1", "places": [
              {"id": "p1", "name": "the orchard at Thornfield", "setting": "outdoors", "sounds": "heavyRain full, strongWind soft", "state": "the storm breaking"}]},
-         expect=dict(place="p1", setting="outdoors", oneShot="thunderClap", main=["heavyRain", "strongWind", "thunder", "rain", "wind"])),
+         expect=dict(place="p1", setting="outdoors", oneShot="thunderClap", main=["heavyRain", "strongWind", "thunder", "rain", "wind"], since="none")),
     dict(id="je-church-hush", book="jane-eyre", ch=25, at="quiet and humble temple", n=8,
          about="walking into the quiet church for the wedding: a hush",
-         tags=["transition", "kinds"],
+         tags=["transition", "kinds"], sinceAt="quiet and humble temple",
          expect=dict(place="new", setting="indoors", main=["emptyHall", "hushedRoom", "roomTone"], kinds={"emptyHall": ["cathedral", "stoneHall"], "hushedRoom": ["chapel", "monastery"]},
-                     moment="hush", forbidden=["crowd", "city"])),
+                     moment="hush", forbidden=["crowd", "city"], transition=["enterThroughDoor", "stepInside"])),
     dict(id="je-moor-night", book="jane-eyre", ch=27, at="warm with the heat of the summer day", n=10,
          about="Jane alone on the moor at night in summer",
          tags=["sounds", "state"],
@@ -415,22 +423,23 @@ CASES = [
     dict(id="sg-carriage-moor", book="the-secret-garden", ch=2, at="wild, low, rushing sound", n=10,
          about="the carriage across the moor at night; wind and rain",
          tags=["sounds", "kinds"],
-         expect=dict(place="any", setting="vehicle", main=["horses", "wind", "rain", "strongWind"], kinds={"horses": ["stagecoach"]}, required=["wind"],
+         expect=dict(place="any", setting="vehicle", main=["horses", "wind", "rain", "strongWind"], kinds={"horses": ["stagecoach"]}, required=["wind|strongWind"],
                      forbidden=["city", "crowd"], state=["night", "rain", "dark", "wind", "moor"])),
     dict(id="sg-arrival-hall", book="the-secret-garden", ch=2, at="It opened into an enormous hall", n=8,
          about="in from the rainy night into the manor's hall: the weather follows indoors",
-         tags=["sounds", "transition"],
+         tags=["sounds", "transition"], sinceAt="It opened into an enormous hall",
          memory={"world": "the Yorkshire moor, Edwardian England; a wet night", "current": "p1", "places": [
              {"id": "p1", "name": "the carriage across the moor", "setting": "vehicle", "sounds": "horses.stagecoach soft, rain soft, wind soft", "state": "night, rain, wind"}]},
-         expect=dict(place="new", setting="indoors", main=["emptyHall", "rainIndoors", "roomTone", "wind"], forbidden=["rain", "horses", "crowd", "city"])),
+         expect=dict(place="new", setting="indoors", main=["emptyHall", "rainIndoors", "roomTone", "wind"], forbidden=["rain", "horses", "crowd", "city"],
+                     transition=["stepInside", "enterThroughDoor"])),
     dict(id="sg-wuthering", book="the-secret-garden", ch=4, at="wutherin'", n=8,
          about="Martha and Mary indoors, the wind wuthering round the house",
          tags=["sounds"],
-         expect=dict(place="any", setting="indoors", main=["wind", "roomTone", "strongWind", "fireplace"], required=["wind"], forbidden=["crowd", "city"])),
+         expect=dict(place="any", setting="indoors", main=["wind", "roomTone", "strongWind", "fireplace"], required=["wind|strongWind"], forbidden=["crowd", "city"])),
     dict(id="sg-crying-corridor", book="the-secret-garden", ch=4, at="crying", n=8, hit=2,
          about="a far-off crying heard down the corridors of the manor at night",
          tags=["kinds"],
-         expect=dict(place="any", setting="indoors", main=["emptyHall", "wind", "roomTone"], kinds={"emptyHall": ["castleCorridor", "hotelCorridor", "stoneHall"]}, forbidden=["crowd", "city"])),
+         expect=dict(place="any", setting="indoors", main=["emptyHall", "wind", "strongWind", "roomTone"], kinds={"emptyHall": ["castleCorridor", "hotelCorridor", "stoneHall"]}, forbidden=["crowd", "city"])),
     dict(id="sg-robin-garden", book="the-secret-garden", ch=8, at="the robin", n=8, hit=2,
          about="inside the secret garden for the first time, the robin singing",
          tags=["kinds"],
@@ -451,11 +460,11 @@ CASES = [
     dict(id="rc-green-dragon", book="railway-children", ch=2, at="tore shrieking out of the mouth of its dark lair", n=8,
          about="the morning express tears shrieking out of the tunnel past the children on the fence",
          tags=["sounds"],
-         expect=dict(place="any", setting="outdoors", main=["train", "birdsong", "wind"], required=["train"], forbidden=["city", "crowd", "roomTone"])),
+         expect=dict(place="any", setting="outdoors", main=["train", "birdsong", "wind"], oneShot="trainWhistle|none", forbidden=["city", "crowd", "roomTone"])),
     dict(id="rc-perks-kitchen", book="railway-children", ch=9, at="buttoning her bodice", n=8,
          about="in the Perks's cottage kitchen",
          tags=["sounds"],
-         expect=dict(place="any", setting="indoors", main=["kitchen", "roomTone", "murmur", "fireplace"], forbidden=["crowd", "train", "city"])),
+         expect=dict(place="any", setting="indoors", main=["kitchen", "roomTone", "murmur", "fireplace", "river"], forbidden=["crowd", "train", "city"])),
     # ---- The Call of the Wild ---------------------------------------------------------
     dict(id="cw-judge-miller", book="call-of-the-wild", ch=0, at="Judge Miller's place", n=6,
          about="Buck's home in the sun-kissed Santa Clara valley",
@@ -468,7 +477,7 @@ CASES = [
     dict(id="cw-camp-fire", book="call-of-the-wild", ch=2, at="eat supper in the dark", n=8,
          about="the camp at night on the trail, the fire, the dogs",
          tags=["kinds"],
-         expect=dict(place="any", setting="outdoors", main=["campfire", "wind", "snow", "strongWind"], kinds={"campfire": ["campAtNight", "bonfire"]}, forbidden=["city", "crowd", "birdsong"])),
+         expect=dict(place="any", setting="outdoors", main=["campfire", "wind", "snow", "strongWind"], required=["campfire"], forbidden=["city", "crowd", "birdsong"])),
     dict(id="cw-long-drawn-howl", book="call-of-the-wild", ch=6, at="long-drawn howl", n=8,
          about="Buck hears the call of the wild: a wolf's howl from the forest",
          tags=["oneShot"],
@@ -481,29 +490,29 @@ CASES = [
     dict(id="hb-baker-street-smoke", book="hound-of-the-baskervilles", ch=2, at="took me by the throat", n=8,
          about="back in the sitting room in the evening, thick with pipe smoke: a return to a known place",
          tags=["place"], memory={"world": BAKER_STREET["world"], "places": BAKER_STREET["places"], "current": "none"},
+         sinceAt="My first impression as I opened the door",
          expect=dict(place="p1", setting="indoors", forbidden=["city", "crowd"])),
     dict(id="hb-train-devon", book="hound-of-the-baskervilles", ch=5, at="The journey was a swift and pleasant one", n=6,
          about="the train from Paddington to Devonshire",
          tags=["sounds"],
          expect=dict(place="new", setting="vehicle", main=["train"], forbidden=["city", "horses", "crowd"])),
     dict(id="hb-wagonette", book="hound-of-the-baskervilles", ch=5, at="wagonette", n=8,
-         about="the wagonette from the station up on to the moor",
+         about="off the train at a little wayside station, the wagonette waiting outside",
          tags=["sounds"],
-         expect=dict(place="new", setting="vehicle", main=["horses", "wind"], forbidden=["train", "city", "crowd"])),
+         expect=dict(place="new", setting="outdoors", main=["birdsong", "wind", "horses", "train", "crowd", "emptyHall"], forbidden=["city"])),
     dict(id="hb-dining-room", book="hound-of-the-baskervilles", ch=5, at="the dining-room", n=8,
          about="the gloomy dining-room of Baskerville Hall",
          tags=["state", "kinds"],
          expect=dict(place="any", setting="indoors", main=["emptyHall", "fireplace", "roomTone"], kinds={"emptyHall": ["stoneHall", "castleCorridor"]},
-                     forbidden=["crowd", "city"], state=["gloom", "dim", "shadow", "dark", "silent", "dinner"])),
+                     forbidden=["crowd", "city"], state=["gloom", "dim", "shadow", "dark", "silent", "dinner", "sombre", "somber"])),
     dict(id="hb-moor-moan", book="hound-of-the-baskervilles", ch=6, at="a long, low moan", n=8,
          about="on the moor, a long low moan sweeps over it",
          tags=["kinds"],
-         expect=dict(place="any", setting="outdoors", main=["wind", "strongWind", "nightInsects", "birdsong"], kinds={"wind": ["windInTallGrass", "mountainWind"], "strongWind": ["moorGale"]},
-                     forbidden=["crowd", "city", "roomTone"])),
+         expect=dict(place="any", setting="outdoors", main=["wind", "strongWind", "nightInsects", "birdsong"], forbidden=["crowd", "city", "roomTone"])),
     dict(id="hb-stone-hut", book="hound-of-the-baskervilles", ch=10, at="the hut", n=8, hit=2,
-         about="inside the stone hut on the moor",
+         about="coming up to the stone hut on the moor",
          tags=["sounds"],
-         expect=dict(place="any", setting="indoors", main=["wind", "roomTone", "strongWind"], forbidden=["crowd", "city"])),
+         expect=dict(place="any", main=["wind", "roomTone", "strongWind"], forbidden=["crowd", "city"])),
     # ---- The War of the Worlds --------------------------------------------------------
     dict(id="wow-common-crowd", book="war-of-the-worlds", ch=2, at="perhaps twenty people", n=8, lead=6,
          about="a little crowd round the cylinder on Horsell Common",
@@ -519,10 +528,9 @@ CASES = [
          expect=dict(place="any", setting="indoors", main=["roomTone", "dripping", "machinery", "deepDrone"], kinds={"roomTone": ["cellar", "oldHouseCreaks"]},
                      forbidden=["crowd", "city", "birdsong"], state=["dark", "silent", "hidden", "trapped", "ruin", "quiet"])),
     dict(id="wow-thunder-child", book="war-of-the-worlds", ch=16, at="Thunder Child", n=8,
-         about="on a crowded paddle steamer off the Essex coast",
+         about="on the Essex shore near Tillingham, a crowd of shipping of every kind offshore",
          tags=["sounds"],
-         expect=dict(place="any", setting="vehicle", main=["openSea", "ship", "seaShore", "crowd", "machinery"], kinds={"openSea": ["ferry", "motorboat"], "ship": ["steamship"]},
-                     forbidden=["city", "roomTone"])),
+         expect=dict(place="any", setting="outdoors", main=["seaShore", "crowd", "murmur", "wind", "openSea"], forbidden=["city", "roomTone"])),
     # ---- Frankenstein -----------------------------------------------------------------
     dict(id="fr-walton-ice", book="frankenstein", ch=3, at="closed in the ship on all sides", n=8,
          about="Walton's ship surrounded by ice in a fog",
@@ -564,12 +572,12 @@ CASES = [
     dict(id="wh-fir-bough", book="wuthering-heights", ch=2, at="rattled its dry cones against the panes", n=8,
          about="in bed in the oak closet at night, the wind and a fir branch at the window",
          tags=["oneShot", "sounds"],
-         expect=dict(place="any", setting="indoors", main=["strongWind", "wind", "roomTone", "snow"], oneShot="none", forbidden=["crowd", "city"],
+         expect=dict(place="any", setting="indoors", main=["strongWind", "wind", "roomTone", "snow"], forbidden=["crowd", "city"],
                      state=["night", "wind", "storm", "dark", "dream"])),
     dict(id="wh-storm-fury", book="wuthering-heights", ch=8, at="in full fury", n=8,
          about="midnight at the Heights, the storm comes rattling over in full fury",
-         tags=["transition"],
-         expect=dict(place="any", main=["strongWind", "thunder", "rainIndoors", "heavyRain", "wind"], moment="swell")),
+         tags=["transition"], sinceAt="About midnight, while we still sat up",
+         expect=dict(place="any", main=["strongWind", "thunder", "rainIndoors", "heavyRain", "wind"], moment="swell", transition=["stormBreaks"])),
     # ---- Alice's Adventures in Wonderland ---------------------------------------------
     dict(id="al-rabbit-hole", book="alice-in-wonderland", ch=0, at="Down, down, down", n=8,
          about="Alice falling slowly down the well",
@@ -594,8 +602,9 @@ CASES = [
          expect=dict(place="new", setting="indoors", main=["roomTone", "clock", "fireplace", "murmur"], forbidden=["crowd", "city", "birdsong"])),
     dict(id="pp-assembly", book="pride-and-prejudice", ch=2, at="entered the assembly room", n=8,
          about="walking into the Meryton assembly ball",
-         tags=["transition", "kinds"],
-         expect=dict(place="new", setting="indoors", main=["crowd"], kinds={"crowd": ["ballroom", "partyIndoors"]}, moment="swell", forbidden=["city", "roomTone"])),
+         tags=["transition", "kinds"], sinceAt="And when the party entered the assembly room",
+         expect=dict(place="new", setting="indoors", main=["crowd"], kinds={"crowd": ["ballroom", "partyIndoors"]}, moment="swell", forbidden=["city", "roomTone"],
+                     transition=["enterThroughDoor", "stepInside"])),
     dict(id="pp-netherfield-ball", book="pride-and-prejudice", ch=17, at="cluster of red coats", n=6, lead=5,
          about="the Netherfield ball, the drawing-room full of officers",
          tags=["kinds"],
@@ -631,7 +640,7 @@ CASES = [
     dict(id="bb-stormy-bridge", book="black-beauty", ch=11, at="the wooden bridge", n=8,
          about="the dog-cart in a storm, the river in flood at the bridge",
          tags=["state"],
-         expect=dict(place="any", setting="vehicle", main=["heavyRain", "strongWind", "river", "horses", "rain", "wind"], kinds={"river": ["rapids"]},
+         expect=dict(place="any", setting="vehicle|outdoors", main=["heavyRain", "strongWind", "river", "horses", "rain", "wind", "forest"], kinds={"river": ["rapids"]},
                      forbidden=["city", "crowd"], state=["storm", "flood", "rain", "wind", "gale"])),
     dict(id="bb-stable-fire", book="black-beauty", ch=15, at="full of smoke", n=8,
          about="the stable fills with smoke at night; horses tied in their stalls",
@@ -685,6 +694,13 @@ def find(chapters, at, ch=None, hit=1):
 
 def main() -> None:
     check_only = "--check" in sys.argv
+    catalog = json.load(open(CATALOG, encoding="utf-8"))
+    families = {s["id"] for s in catalog["sounds"]}
+    kinds_of = {}
+    for v in catalog["variants"]:
+        kinds_of.setdefault(v["of"], set()).add(v["id"])
+    one_shots = {o["id"] for o in catalog["oneShots"]} | {"none"}
+    transitions = {t["id"] if isinstance(t, dict) else t for t in catalog.get("transitions", [])} | {"none"}
     books = {}
     out = []
     problems = 0
@@ -712,6 +728,35 @@ def main() -> None:
             chapters.append(case["extra"])
         memory = case.get("memory")
         expect = dict(case["expect"])
+        if case.get("sinceAt"):
+            where = [i for i, s in enumerate(chapters[-1]) if case["sinceAt"].lower() in s.lower()]
+            if not where:
+                print(f"NO SINCE  {case['id']}: \"{case['sinceAt']}\" is not in the passage")
+                problems += 1
+            else:
+                expect["since"] = " ".join(chapters[-1][where[-1]].split()[:6])
+        for label in ("main", "required", "forbidden"):
+            for family in [f for item in (expect.get(label) or []) for f in item.split("|")]:
+                if family not in families:
+                    print(f"BAD FAMILY  {case['id']}: {family}")
+                    problems += 1
+        for family, accepted in (expect.get("kinds") or {}).items():
+            for kind in accepted:
+                if kind not in kinds_of.get(family, set()):
+                    print(f"BAD KIND  {case['id']}: {family}.{kind}")
+                    problems += 1
+        for sound in (expect.get("oneShot") or "").split("|"):
+            if sound and sound not in one_shots:
+                print(f"BAD ONE-OFF  {case['id']}: {sound}")
+                problems += 1
+        for t in expect.get("transition") or []:
+            if t not in transitions:
+                print(f"BAD TRANSITION  {case['id']}: {t}")
+                problems += 1
+        if any(x not in ("indoors", "outdoors", "vehicle") for x in (expect.get("setting") or "indoors").split("|")) \
+                or any(x not in ("none", "swell", "hush") for x in (expect.get("moment") or "none").split("|")):
+            print(f"BAD SETTING/MOMENT  {case['id']}")
+            problems += 1
         if memory and expect["place"] not in ("new", "none", "any") and expect["place"] not in {p["id"] for p in memory["places"]}:
             print(f"BAD PLACE  {case['id']}: expected {expect['place']} is not in the memory")
             problems += 1

@@ -47,11 +47,11 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
     public struct Expect: Codable, Sendable, Hashable {
         /// "new", "none", "any", or the id of a place in the memory.
         public var place: String
-        /// indoors, outdoors or vehicle; nil leaves it unchecked.
+        /// indoors, outdoors or vehicle ("vehicle|outdoors" for either); nil leaves it unchecked.
         public var setting: String?
         /// Families any of which may be the loudest layer.
         public var main: [String]?
-        /// Families that must be in the scene at any level.
+        /// Families that must be in the scene at any level ("wind|strongWind": either).
         public var required: [String]?
         /// Families that must not be in the scene.
         public var forbidden: [String]?
@@ -61,10 +61,16 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
         /// Words any of which should be in the state note; an empty list means the
         /// note should be empty.
         public var state: [String]?
-        /// "none", "swell" or "hush"; nil leaves it unchecked.
+        /// "none", "swell" or "hush" ("swell|none" for either); nil leaves it unchecked.
         public var moment: String?
-        /// "none" or a one-off sound; nil leaves it unchecked.
+        /// "none" or a one-off sound ("clockChime|bellToll" for either); nil leaves it unchecked.
         public var oneShot: String?
+        /// Transitions any of which fit, or ["none"]; nil leaves it unchecked.
+        public var transition: [String]?
+        /// "none" when the scene was already under way before the passage, otherwise the
+        /// first words of the sentence where the story enters the scene; nil leaves it
+        /// unchecked.
+        public var since: String?
         /// Whether the scene should be heard at all (confidence at least
         /// ``SceneEvaluator/minimumConfidence`` and at least one sound). Nil means yes
         /// unless `place` is "none".
@@ -73,7 +79,8 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
         public init(
             place: String, setting: String? = nil, main: [String]? = nil, required: [String]? = nil,
             forbidden: [String]? = nil, kinds: [String: [String]]? = nil, state: [String]? = nil,
-            moment: String? = nil, oneShot: String? = nil, heard: Bool? = nil
+            moment: String? = nil, oneShot: String? = nil, transition: [String]? = nil, since: String? = nil,
+            heard: Bool? = nil
         ) {
             self.place = place
             self.setting = setting
@@ -84,6 +91,8 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
             self.state = state
             self.moment = moment
             self.oneShot = oneShot
+            self.transition = transition
+            self.since = since
             self.heard = heard
         }
     }
@@ -215,8 +224,10 @@ public struct SceneEvalAnswer: Codable, Sendable, Hashable {
     /// "fireplace soft", loudest first.
     public var sounds: [String]
     public var moment: String?
+    public var transition: String?
     public var oneShot: String?
     public var quote: String?
+    public var since: String?
     public var confidence: Double
     public var world: String?
 
@@ -231,8 +242,10 @@ public struct SceneEvalAnswer: Codable, Sendable, Hashable {
         state = answer.scene.state
         sounds = answer.scene.layers.map { "\($0.key) \($0.level.rawValue)" }
         moment = answer.scene.moment?.rawValue
+        transition = answer.scene.transition?.rawValue
         oneShot = answer.oneShot?.sound.rawValue
         quote = answer.oneShot?.quote
+        since = answer.since
         confidence = answer.scene.confidence
         world = answer.world
     }
@@ -248,10 +261,11 @@ public struct SceneEvalAnswer: Codable, Sendable, Hashable {
         let scene = StoryScene(
             placeID: nil, placeName: placeName, setting: StoryScene.Setting(rawValue: setting) ?? .unclear,
             layers: SceneEvalCase.layers(sounds.joined(separator: ", ")), confidence: confidence,
-            moment: moment.flatMap { StoryScene.Moment(rawValue: $0) }, state: state
+            moment: moment.flatMap { StoryScene.Moment(rawValue: $0) }, state: state,
+            transition: transition.flatMap { SceneTransition(rawValue: $0) }
         )
         let mention = oneShot.flatMap { OneShotSound(rawValue: $0) }.map { OneShotMention(sound: $0, quote: quote ?? "") }
-        return SceneAnswer(place: place, scene: scene, world: world, oneShot: mention)
+        return SceneAnswer(place: place, scene: scene, world: world, oneShot: mention, since: since)
     }
 }
 
@@ -290,7 +304,9 @@ public enum SceneEvaluator {
     public static let minimumConfidence = 0.35
 
     /// The checks in the order the report lists them.
-    public static let checkNames = ["place", "setting", "main", "required", "forbidden", "kinds", "state", "moment", "oneShot", "heard"]
+    public static let checkNames = [
+        "place", "setting", "main", "required", "forbidden", "kinds", "state", "moment", "transition", "oneShot", "since", "heard",
+    ]
 
     /// Which expectations the answer meets. Only the checks the case asks for are in
     /// the result.
@@ -308,13 +324,13 @@ public enum SceneEvaluator {
         default: checks["place"] = answer.place == .known(expect.place)
         }
         if let setting = expect.setting {
-            checks["setting"] = scene.setting.rawValue == setting.lowercased()
+            checks["setting"] = alternatives(setting).contains(scene.setting.rawValue)
         }
         if let main = expect.main {
             checks["main"] = scene.layers.first.map { main.contains($0.sound.rawValue) } ?? false
         }
         if let required = expect.required {
-            checks["required"] = required.allSatisfy { families.contains($0) }
+            checks["required"] = required.allSatisfy { item in alternatives(item, keepCase: true).contains { families.contains($0) } }
         }
         if let forbidden = expect.forbidden {
             checks["forbidden"] = !forbidden.contains { families.contains($0) }
@@ -336,16 +352,32 @@ public enum SceneEvaluator {
             checks["state"] = words.isEmpty ? note.isEmpty : words.contains { note.contains($0.lowercased()) }
         }
         if let moment = expect.moment {
-            checks["moment"] = moment.lowercased() == "none" ? scene.moment == nil : scene.moment?.rawValue == moment.lowercased()
+            checks["moment"] = alternatives(moment).contains(scene.moment?.rawValue ?? "none")
         }
         if let oneShot = expect.oneShot {
-            if oneShot.lowercased() == "none" {
-                checks["oneShot"] = answer.oneShot == nil
-            } else if let mention = answer.oneShot, mention.sound.rawValue == oneShot {
+            let accepted = alternatives(oneShot, keepCase: true)
+            if let mention = answer.oneShot {
                 // The builder keeps a cue only when its words are found in the passage.
-                checks["oneShot"] = window.map { mention.locate(in: $0) != nil } ?? true
+                let placed = window.map { mention.locate(in: $0) != nil } ?? true
+                checks["oneShot"] = accepted.contains(mention.sound.rawValue) && placed
             } else {
-                checks["oneShot"] = false
+                checks["oneShot"] = accepted.contains("none")
+            }
+        }
+        if let transitions = expect.transition {
+            let got = scene.transition?.rawValue ?? "none"
+            checks["transition"] = transitions.map { $0.lowercased() }.contains(got.lowercased())
+        }
+        if let since = expect.since {
+            if since.lowercased() == "none" {
+                checks["since"] = answer.since == nil
+            } else if let window {
+                // The same matching the builder uses to pin the change.
+                let wanted = SceneChangeFinder.line(startingWith: since, in: window)
+                let got = answer.since.flatMap { SceneChangeFinder.line(startingWith: $0, in: window) }
+                checks["since"] = wanted != nil && got == wanted
+            } else {
+                checks["since"] = answer.since != nil
             }
         }
         let heard = expect.heard ?? (expect.place.lowercased() != "none")
@@ -353,6 +385,11 @@ public enum SceneEvaluator {
             checks["heard"] = scene.confidence >= minimumConfidence && !scene.isSilent
         }
         return checks
+    }
+
+    /// "swell|none" as its choices.
+    static func alternatives(_ text: String, keepCase: Bool = false) -> [String] {
+        text.split(separator: "|").map { keepCase ? String($0).trimmingCharacters(in: .whitespaces) : $0.lowercased().trimmingCharacters(in: .whitespaces) }
     }
 
     /// Scores one case.
@@ -476,7 +513,10 @@ public enum SceneEvaluator {
             if let answer = result.answer {
                 let place = answer.place == "new" ? "new \"\(answer.placeName ?? "")\"" : answer.place
                 let state = answer.state.map { " (\($0))" } ?? ""
-                let extras = [answer.moment.map { "moment \($0)" }, answer.oneShot.map { "one-off \($0) \"\(answer.quote ?? "")\"" }].compactMap { $0 }
+                let extras = [
+                    answer.moment.map { "moment \($0)" }, answer.transition.map { "transition \($0)" },
+                    answer.oneShot.map { "one-off \($0) \"\(answer.quote ?? "")\"" }, answer.since.map { "since \"\($0)\"" },
+                ].compactMap { $0 }
                 lines.append("    got: \(place) [\(answer.setting)]\(state): " + (answer.sounds.isEmpty ? "no sounds" : answer.sounds.joined(separator: ", "))
                     + String(format: " conf %.2f", answer.confidence) + (extras.isEmpty ? "" : "; " + extras.joined(separator: "; ")))
             }
@@ -490,7 +530,9 @@ public enum SceneEvaluator {
                 if missed.contains("kinds"), let k = expect.kinds { want.append("kinds " + k.map { "\($0.key).\($0.value.joined(separator: "|"))" }.joined(separator: " ")) }
                 if missed.contains("state"), let s = expect.state { want.append("state ~ \(s.joined(separator: "|"))") }
                 if missed.contains("moment"), let m = expect.moment { want.append("moment \(m)") }
+                if missed.contains("transition"), let t = expect.transition { want.append("transition \(t.joined(separator: "|"))") }
                 if missed.contains("oneShot"), let o = expect.oneShot { want.append("one-off \(o)") }
+                if missed.contains("since"), let s = expect.since { want.append("since \"\(s)\"") }
                 if missed.contains("heard") { want.append("heard (confidence >= \(minimumConfidence), a sound)") }
                 lines.append("    want: " + want.joined(separator: "; "))
             }

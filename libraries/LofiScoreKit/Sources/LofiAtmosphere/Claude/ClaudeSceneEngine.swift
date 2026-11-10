@@ -244,7 +244,7 @@ public struct ClaudeSceneEngine: SceneEngine {
         case "none", "":
             place = layers.isEmpty ? .none : (name.isEmpty ? .none : .new(name))
         case "new":
-            if let known = memory.place(named: name) {
+            if let known = knownPlace(named: name, in: memory) {
                 place = .known(known.id)
             } else {
                 place = name.isEmpty ? .none : .new(name)
@@ -252,7 +252,7 @@ public struct ClaudeSceneEngine: SceneEngine {
         default:
             if memory.places[id] != nil {
                 place = .known(id)
-            } else if let known = memory.place(named: name) {
+            } else if let known = knownPlace(named: name, in: memory) {
                 place = .known(known.id)
             } else {
                 place = name.isEmpty ? .none : .new(name)
@@ -279,12 +279,31 @@ public struct ClaudeSceneEngine: SceneEngine {
             // Without the words it cannot be placed on a sentence.
             if !quote.isEmpty { oneShot = OneShotMention(sound: sound, quote: String(quote.prefix(120))) }
         }
+        let since = (raw.since ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         return SceneAnswer(
             place: place, scene: scene, world: world.isEmpty ? nil : String(world.prefix(160)),
             // A new sound the scene does not use is not worth fetching.
             newVariants: added.filter { used.contains($0.id) },
-            oneShot: oneShot
+            oneShot: oneShot,
+            // A scene that is nowhere has no start.
+            since: since.isEmpty || place == .none ? nil : String(since.prefix(120))
         )
+    }
+
+    /// The listed place a "new" place's name is another name for: the same words, or a
+    /// name of two or more words that are all inside the other's ("the castle courtyard"
+    /// and "the courtyard of Castle Dracula"; but not "the hall" for "Toad Hall"). The
+    /// most recently visited wins.
+    static func knownPlace(named name: String, in memory: PlaceMemory) -> PlaceMemory.Place? {
+        if let exact = memory.place(named: name) { return exact }
+        let words = Set(PlaceMemory.nameKey(name).split(separator: " "))
+        guard words.count >= 2 else { return nil }
+        return memory.places.values
+            .filter { place in
+                let theirs = Set(PlaceMemory.nameKey(place.name).split(separator: " "))
+                return theirs.count >= 2 && (words.isSubset(of: theirs) || theirs.isSubset(of: words))
+            }
+            .max { $0.lastSeen < $1.lastSeen }
     }
 
     static func backoff(attempt: Int, retryAfter: String?) -> Double {
@@ -357,6 +376,8 @@ public struct ClaudeSceneEngine: SceneEngine {
         /// Optional, so answers in the older shape (and the eval set) still read.
         let transition: String?
         let oneShot: OneShot?
+        /// Optional: where the scene starts inside the passage (prompt version 6 on).
+        let since: String?
         let world: String
         let cue: String
         let confidence: Double
