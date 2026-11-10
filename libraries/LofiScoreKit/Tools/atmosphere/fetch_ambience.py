@@ -60,6 +60,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -229,18 +230,44 @@ def note(text):
     print(text, file=sys.stderr, flush=True)
 
 
+# Statuses that mean "slow down" or "busy, try again": waited out instead of giving up.
+RETRY_STATUSES = {429, 502, 503, 504}
+RETRIES = 6
+
+
+def retry_after(error):
+    """The server's Retry-After in seconds, if it sent a number (capped at 5 minutes)."""
+    value = (error.headers or {}).get("Retry-After", "")
+    return min(300.0, float(value)) if value.strip().isdigit() else None
+
+
+def open_url(url, timeout):
+    """urlopen that waits out rate limits: Wikimedia answers 429 when asked too often."""
+    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    for attempt in range(RETRIES):
+        try:
+            return urllib.request.urlopen(request, timeout=timeout)
+        except urllib.error.HTTPError as error:
+            if error.code not in RETRY_STATUSES or attempt == RETRIES - 1:
+                raise
+            wait = retry_after(error) or min(120.0, 5.0 * 2 ** attempt)
+            note(f"  {urllib.parse.urlparse(url).netloc} answered {error.code}; waiting {wait:.0f} s")
+            time.sleep(wait)
+
+
 def fetch_json(url, params=None):
     if params:
         url = url + "?" + urllib.parse.urlencode(params)
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=60) as response:
+    with open_url(url, timeout=60) as response:
         return json.load(response)
 
 
 def download(url, path):
-    request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    with urllib.request.urlopen(request, timeout=300) as response, open(path, "wb") as out:
+    """Downloads through a .part file, so a stopped download is never taken for a whole one."""
+    part = path.with_name(path.name + ".part")
+    with open_url(url, timeout=300) as response, open(part, "wb") as out:
         shutil.copyfileobj(response, out)
+    part.replace(path)
 
 
 def licence_kind(text):
@@ -332,6 +359,9 @@ class Freesound:
         return licence_kind(candidate["licence_text"])
 
 
+COMMONS_PAUSE = 3.0
+
+
 class Commons:
     name = "commons"
 
@@ -349,7 +379,8 @@ class Commons:
                 "iiprop": "url|extmetadata|size",
             },
         )
-        time.sleep(1)
+        # Wikimedia rate-limits clients that search quickly; open_url waits out any 429.
+        time.sleep(COMMONS_PAUSE)
         pages = (data.get("query") or {}).get("pages") or {}
         for page in pages.values():
             info = (page.get("imageinfo") or [{}])[0]
