@@ -5,6 +5,7 @@ import { AppState } from "react-native"
 
 import { logger } from "@/logger"
 import { LofiScore } from "@/modules/lofi-score"
+import { ReaderSession } from "@/modules/lofi-score/readerSession"
 import { getClip } from "@/modules/readium"
 import { bookLocatorChanged } from "@/store/actions"
 import { startAppListening } from "@/store/listeners/listenerMiddleware"
@@ -15,17 +16,41 @@ import {
   getIsPlaying,
 } from "@/store/selectors/bookshelfSelectors"
 
+const session = new ReaderSession(() => {
+  void LofiScore?.readerStopped()
+})
+
 /**
- * The page moved while the narration is stopped: tell the music which sentence
- * now tops the page, found the same way the app keeps the audio in step with
- * the page. The music judges the mood from there, never from the rest of the
- * page.
+ * The reader is showing this book (it opened, or the app came back to it).
+ * The music waits for the first page turn: the page the book opens at does
+ * not start it.
+ */
+export function readerShown(bookUuid: string) {
+  session.shown(bookUuid, Date.now())
+}
+
+/**
+ * The reader went away (the book closed, or the app left it): the music that
+ * follows the pages stops, instead of playing on until it times out. The
+ * narration's music is not affected.
+ */
+export function readerHidden() {
+  session.hidden(Date.now())
+}
+
+/**
+ * The page turned while the narration is stopped: tell the music which
+ * sentence now tops the page, found the same way the app keeps the audio in
+ * step with the page. The music judges the mood from there, never from the
+ * rest of the page.
  */
 startAppListening({
   actionCreator: bookLocatorChanged,
   effect: async (action, listenerApi) => {
     if (!LofiScore) return
-    const { bookUuid, locator } = action.payload
+    const { bookUuid, locator, timestamp } = action.payload
+    // The reader reporting the page it opened at is not a page turn.
+    if (!session.isPageTurn(bookUuid, timestamp)) return
     const state = listenerApi.getState()
     if (getIsPlaying(state)) return
     if (getCurrentlyPlayingBookUuid(state) !== bookUuid) return

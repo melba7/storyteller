@@ -8,9 +8,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
-import { LofiScore } from "@/modules/lofi-score"
+import { useAppSelector } from "@/store/appState"
+import { getCurrentlyPlayingBookUuid } from "@/store/selectors/bookshelfSelectors"
 
 import { LofiMusicControls } from "./LofiMusicControls"
+import { readerHidden, readerShown } from "./readerFollow"
 import { useLofiMusic } from "./useLofiMusic"
 
 type Props = {
@@ -27,15 +29,18 @@ export function LofiMusicToolbarItem({ mode }: Props) {
   const music = useLofiMusic(open ? 1500 : 15000)
   const insets = useSafeAreaInsets()
 
-  // Closing the book stops the music that follows the pages you read, instead
-  // of letting it play on until it times out. The narration's music is not
-  // affected.
+  const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
+
+  // The reader's toolbar comes and goes with the reader. The music that
+  // follows the pages waits for the first page turn after the book opens, and
+  // stops when the book closes.
   useEffect(() => {
-    if (mode !== "text") return
+    if (mode !== "text" || !bookUuid) return
+    readerShown(bookUuid)
     return () => {
-      void LofiScore?.readerStopped()
+      readerHidden()
     }
-  }, [mode])
+  }, [mode, bookUuid])
 
   if (!music.available) return null
   const enabled = music.status?.enabled ?? true
