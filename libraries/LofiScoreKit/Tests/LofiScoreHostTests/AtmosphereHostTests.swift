@@ -230,7 +230,7 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertFalse(MusicSettings(defaults: defaults).atmosphereEnabled)
     }
 
-    func testOneOffSoundsAreOffUntilTurnedOn() async throws {
+    func testOneOffSoundsAreOnUntilTurnedOff() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook()
         try write(Data([0]), to: "app/Music/Atmosphere/OneShots/DoorKnock/knock.wav")
@@ -239,13 +239,13 @@ final class AtmosphereHostTests: XCTestCase {
         var status = try await waitFor(host) { $0.atmosphere.sounds == 1 }
         XCTAssertEqual(status.atmosphere.oneShots, 1, "the imported knock; this build has no stand-ins")
         XCTAssertEqual(status.atmosphere.totalOneShots, OneShotSound.allCases.count)
-        XCTAssertFalse(status.atmosphere.oneShotsEnabled, "off by default")
+        XCTAssertTrue(status.atmosphere.oneShotsEnabled, "on by default")
 
-        await host.setAtmosphereOneShotsEnabled(true)
+        await host.setAtmosphereOneShotsEnabled(false)
         status = await host.status()
-        XCTAssertTrue(status.atmosphere.oneShotsEnabled)
-        XCTAssertTrue(MusicSettings(defaults: defaults).atmosphereOneShotsEnabled, "the setting persists")
-        XCTAssertEqual((status.jsonObject()["atmosphere"] as? [String: Any])?["oneShotsEnabled"] as? Bool, true)
+        XCTAssertFalse(status.atmosphere.oneShotsEnabled)
+        XCTAssertFalse(MusicSettings(defaults: defaults).atmosphereOneShotsEnabled, "the setting persists")
+        XCTAssertEqual((status.jsonObject()["atmosphere"] as? [String: Any])?["oneShotsEnabled"] as? Bool, false)
     }
 
     func testTheAtmosphereWorksWithTheMusicOff() async throws {

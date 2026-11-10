@@ -13,7 +13,7 @@ import Foundation
 /// be there.
 public enum SoundCatalog {
     /// Bump when entries change in a way the fetch script should notice.
-    public static let version = 2
+    public static let version = 3
 
     /// A more specific kind of a built-in sound.
     public struct Variant: Sendable, Hashable {
@@ -314,6 +314,8 @@ public enum SoundCatalog {
         .init("villageEvening", .oldTown, "a village at dusk: smoke, a dog, voices far off", ["village evening ambience", "village dusk ambience"]),
         // Travel
         .init("gallop", .horses, "riding at a gallop", ["horse galloping", "horse gallop ride"]),
+        .init("trot", .horses, "riding at a trot", ["horse trotting", "horse trot ride"]),
+        .init("horseAtAWalk", .horses, "a horse at a walk, reins and harness", ["horse walking hooves", "horse walk saddle creak"]),
         .init("stagecoach", .horses, "inside a stagecoach or carriage on the road", ["stagecoach interior", "horse carriage ride interior"]),
         .init("wagonTrain", .horses, "a wagon or ox cart on a rough track", ["wagon wheels dirt road", "ox cart wheels"]),
         .init("camelCaravan", .horses, "a camel caravan: bells, sand, wind", ["camel caravan", "camels walking desert bells"]),
@@ -361,6 +363,77 @@ public enum SoundCatalog {
         .init("dreamscape", .deepDrone, "a dream or vision, soft and unreal", ["dream ambience", "ethereal ambience soft"]),
         .init("eerieStillness", .deepDrone, "an eerie stillness, a low dread", ["eerie ambience", "horror ambience low"]),
         .init("magicalHush", .deepDrone, "a magical presence, a shimmering stillness", ["magical ambience", "mystical ambience"]),
+        // What the characters are doing
+        .init("walkingGravel", .footsteps, "walking on gravel or a stony path", ["footsteps gravel walking", "walking gravel path"]),
+        .init("walkingWoodFloor", .footsteps, "walking on a wooden floor or boards", ["footsteps wooden floor", "walking wood floor creak"]),
+        .init("walkingStoneCorridor", .footsteps, "walking a stone corridor or flagged floor, echoing", ["footsteps stone corridor echo", "footsteps stone floor"]),
+        .init("walkingSnow", .footsteps, "walking through snow, crunching", ["footsteps snow crunch", "walking in snow"]),
+        .init("walkingLeaves", .footsteps, "walking through leaves or undergrowth", ["footsteps leaves forest", "walking dry leaves"]),
+        .init("walkingWetStreet", .footsteps, "walking a wet street, splashing a little", ["footsteps wet pavement", "walking wet street puddles"]),
+        .init("walkingSand", .footsteps, "walking on sand", ["footsteps sand beach", "walking sand"]),
+        .init("walkingStairs", .footsteps, "climbing or descending stairs", ["footsteps stairs", "walking up stairs wooden"]),
+        .init("walkingGrass", .footsteps, "walking through grass or a meadow", ["footsteps grass", "walking tall grass"]),
+        .init("walkingMud", .footsteps, "trudging through mud", ["footsteps mud squelch", "walking mud boots"]),
+        .init("heelsOnTile", .footsteps, "hard heels on tile or marble", ["high heels tile floor", "footsteps marble heels"]),
+        .init("sneaking", .footsteps, "creeping, slow careful steps", ["sneaking footsteps slow", "creeping footsteps quiet"]),
+        .init("bootsOnDeck", .footsteps, "boots on a ship's deck", ["footsteps ship deck wood", "boots wooden deck"]),
+        .init("limping", .footsteps, "an uneven walk, a limp, a stick", ["footsteps limp cane", "walking stick footsteps"]),
+        .init("runningStreet", .running, "running down a street or pavement", ["running footsteps street", "running pavement footsteps"]),
+        .init("runningForest", .running, "running through woods, branches and leaves", ["running footsteps forest", "running through woods"]),
+        .init("runningCorridor", .running, "running down a corridor, echoing", ["running footsteps corridor", "running hallway echo"]),
+        .init("runningGravel", .running, "running on gravel or a stony path", ["running footsteps gravel", "running gravel path"]),
+        .init("runningStairs", .running, "running up or down stairs", ["running stairs footsteps", "running down stairs"]),
+        .init("runningGrass", .running, "running across grass or a field", ["running footsteps grass", "running field grass"]),
+        .init("runningSnow", .running, "running through snow", ["running footsteps snow", "running in snow crunch"]),
+        .init("runningShallows", .running, "running or splashing through shallow water", ["running water splashing footsteps", "running through shallow water"]),
+        .init("chase", .running, "a chase: several sets of running feet", ["chase footsteps running group", "people running chase"]),
+        .init("heavyBreathing", .breathing, "heavy breathing after effort", ["heavy breathing exhausted", "breathing hard"]),
+        .init("panickedBreathing", .breathing, "fast, frightened breathing", ["panicked breathing", "scared breathing fast"]),
+        .init("sleepingBreathing", .breathing, "the slow breath of someone asleep", ["sleeping breathing slow", "breathing asleep"]),
+        .init("breathingInMask", .breathing, "breath inside a mask, helmet or respirator", ["breathing mask respirator", "breathing helmet"]),
+        .init("labouredBreathing", .breathing, "laboured, sick or wounded breathing", ["laboured breathing", "wheezing breathing"]),
+        .init("breathingUnderwater", .breathing, "a diver's breath and bubbles", ["scuba breathing bubbles", "underwater breathing regulator"]),
+        .init("racingHeartbeat", .heartbeat, "a heart racing", ["heartbeat fast", "racing heartbeat"]),
+        .init("slowHeartbeat", .heartbeat, "a slow, heavy heartbeat", ["heartbeat slow", "slow heartbeat loop"]),
+        .init("swimmingStrokes", .swimming, "swimming, stroke after stroke", ["swimming strokes", "swimming freestyle water"]),
+        .init("treadingWater", .swimming, "treading water, keeping afloat", ["treading water", "splashing water staying afloat"]),
+        .init("wading", .swimming, "wading through water", ["wading water walking", "walking through water"]),
+        .init("floating", .swimming, "floating still, water lapping at the ears", ["floating water lapping", "water lapping close"]),
+        .init("rockFace", .climbing, "climbing a rock face: hands on stone, a scrape", ["rock climbing", "climbing rock scrape"]),
+        .init("ropeClimb", .climbing, "climbing a rope", ["rope climbing creak", "climbing rope"]),
+        .init("ladderRungs", .climbing, "climbing a ladder", ["climbing ladder rungs", "ladder climbing wood"]),
+        .init("treeClimb", .climbing, "climbing a tree: bark, leaves, branches", ["climbing tree branches", "tree climbing leaves"]),
+        .init("scree", .climbing, "scrambling over loose scree", ["scree scramble rocks", "loose rocks scramble"]),
+        .init("iceClimb", .climbing, "climbing ice: picks and crampons", ["ice climbing axe", "ice axe crampons"]),
+        .init("swordFight", .fighting, "a sword fight: blades, feet, breath", ["sword fight", "sword fighting clash"]),
+        .init("fistFight", .fighting, "a fist fight or a scuffle", ["fist fight punches", "fight scuffle punches"]),
+        .init("battle", .fighting, "a battle around them: steel, shouts, hooves", ["medieval battle ambience", "battle ambience swords"]),
+        .init("siege", .fighting, "a siege: engines, stone, shouts from the walls", ["siege battle ambience", "castle siege ambience"]),
+        .init("brawl", .fighting, "a tavern brawl: furniture, fists", ["bar fight brawl", "tavern brawl"]),
+        .init("armouredMelee", .fighting, "armoured men at close quarters", ["armor fight clank", "knights fighting armour"]),
+        .init("quillOnPaper", .writing, "a quill scratching on paper", ["quill writing paper", "quill pen scratching"]),
+        .init("penOnPaper", .writing, "a pen on paper", ["pen writing paper", "writing with pen"]),
+        .init("pencilOnPaper", .writing, "a pencil on paper", ["pencil writing paper", "pencil sketching"]),
+        .init("typing", .writing, "typing on a keyboard", ["keyboard typing", "typing computer keyboard"]),
+        .init("pageTurning", .writing, "reading: pages turning now and then", ["page turning book", "book pages turning"]),
+        .init("chalkOnBoard", .writing, "chalk on a blackboard", ["chalk blackboard writing", "chalk on chalkboard"]),
+        .init("cutleryAndPlates", .meal, "a meal: cutlery on plates, a glass set down", ["cutlery plates dinner", "dinner plates cutlery"]),
+        .init("teaThings", .meal, "tea: cups on saucers, a spoon, a pot", ["tea cups saucers", "tea pouring cup spoon"]),
+        .init("tavernMeal", .meal, "a meal at an inn: wooden bowls, tankards", ["tankards wooden table", "medieval tavern dishes"]),
+        .init("campMeal", .meal, "a meal by a fire: tin plates, a pot", ["camp cooking tin plates", "tin plates spoons"]),
+        .init("washingUp", .meal, "dishes being washed", ["washing dishes sink", "dishes washing up"]),
+        .init("digging", .work, "digging: a spade in earth", ["digging shovel dirt", "shovel digging soil"]),
+        .init("choppingWood", .work, "chopping wood with an axe", ["chopping wood axe", "wood chopping"]),
+        .init("sweeping", .work, "sweeping a floor or a yard", ["sweeping broom floor", "broom sweeping"]),
+        .init("scrubbing", .work, "scrubbing a floor", ["scrubbing floor brush", "scrubbing brush bucket"]),
+        .init("hammering", .work, "hammering: nails, a workbench", ["hammering nails", "hammer nails wood"]),
+        .init("sawing", .work, "sawing wood by hand", ["hand saw wood", "sawing wood"]),
+        .init("harvesting", .work, "harvesting: a scythe, a sickle, sheaves", ["scythe cutting grass", "harvest sickle wheat"]),
+        .init("rowing", .work, "rowing: oars dipping and creaking", ["rowing oars dipping", "oars rowlocks rowing"]),
+        .init("washingClothes", .work, "washing clothes by hand, at a tub or a river", ["washing clothes hand water", "laundry washing tub"]),
+        .init("shovellingSnow", .work, "shovelling snow", ["shoveling snow", "snow shovel scrape"]),
+        .init("ploughing", .work, "ploughing: a horse, harness, the share in the soil", ["horse plough field", "ploughing horse"]),
+        .init("knitting", .work, "knitting or sewing by hand, needles clicking", ["knitting needles", "knitting needles clicking"]),
     ]
 
     /// The starter variants, as the scorer and the catalogue file use them.
@@ -576,6 +649,7 @@ public enum SoundCatalog {
                 "queries": sound.searchQueries,
                 "voices": sound.isVoices,
                 "weather": sound.scope == .weather,
+                "scope": sound.scope.rawValue,
                 "replacesMusic": sound.musicPolicy == .replacesMusic,
                 "levelOffsetDB": sound.levelOffsetDB,
             ])
@@ -602,6 +676,9 @@ public enum SoundCatalog {
         let places: [[String: Any]] = placeGuide.map { guide in
             ["place": guide.place, "states": guide.states.map { ["when": $0.when, "sounds": $0.sounds] }]
         }
+        let transitions: [[String: Any]] = SceneTransition.allCases.map { transition in
+            ["id": transition.rawValue, "about": transition.guidance, "seconds": transition.timeline.seconds]
+        }
         let object: [String: Any] = [
             "version": version,
             "promptVersion": ClaudeScenePrompt.version,
@@ -609,6 +686,7 @@ public enum SoundCatalog {
             "variants": variants,
             "oneShots": oneShots,
             "places": places,
+            "transitions": transitions,
         ]
         return try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
     }

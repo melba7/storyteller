@@ -189,6 +189,453 @@
         "car horn single",
         "car horn honk"
       ]
+    },
+    {
+      "about" : "a door opening (the latch, the swing)",
+      "folder" : "DoorOpen",
+      "id" : "doorOpen",
+      "longestSeconds" : 3,
+      "queries" : [
+        "door open",
+        "door opening latch"
+      ]
+    },
+    {
+      "about" : "a door closing, not slammed",
+      "folder" : "DoorClose",
+      "id" : "doorClose",
+      "longestSeconds" : 3,
+      "queries" : [
+        "door close",
+        "door closing"
+      ]
+    },
+    {
+      "about" : "a car door shutting",
+      "folder" : "CarDoor",
+      "id" : "carDoor",
+      "longestSeconds" : 2,
+      "queries" : [
+        "car door close",
+        "car door shut"
+      ]
+    },
+    {
+      "about" : "an engine starting",
+      "folder" : "EngineStart",
+      "id" : "engineStart",
+      "longestSeconds" : 5,
+      "queries" : [
+        "car engine start",
+        "engine starting"
+      ]
+    },
+    {
+      "about" : "an engine switched off",
+      "folder" : "EngineStop",
+      "id" : "engineStop",
+      "longestSeconds" : 4,
+      "queries" : [
+        "engine switch off",
+        "car engine stop"
+      ]
+    },
+    {
+      "about" : "a car driving away",
+      "folder" : "CarDrivesOff",
+      "id" : "carDrivesOff",
+      "longestSeconds" : 12,
+      "queries" : [
+        "car drives away",
+        "car driving off",
+        "car pulling away"
+      ]
+    },
+    {
+      "about" : "a train pulling out of a station",
+      "folder" : "TrainPullsAway",
+      "id" : "trainPullsAway",
+      "longestSeconds" : 20,
+      "queries" : [
+        "train departing station",
+        "train pulling away",
+        "steam train leaving station"
+      ]
+    },
+    {
+      "about" : "a horse or carriage going off at a trot",
+      "folder" : "HoovesAway",
+      "id" : "hoovesAway",
+      "longestSeconds" : 12,
+      "queries" : [
+        "horse trotting away",
+        "horse carriage leaving",
+        "horse hooves passing"
+      ]
+    },
+    {
+      "about" : "a splash: something or someone into water",
+      "folder" : "Splash",
+      "id" : "splash",
+      "longestSeconds" : 3,
+      "queries" : [
+        "water splash",
+        "big splash",
+        "jump into water splash"
+      ]
+    },
+    {
+      "about" : "a window or shutter opened or closed",
+      "folder" : "WindowSlide",
+      "id" : "windowSlide",
+      "longestSeconds" : 3,
+      "queries" : [
+        "window open slide",
+        "window closing",
+        "sash window"
+      ]
+    },
+    {
+      "about" : "an iron gate creaking",
+      "folder" : "GateCreak",
+      "id" : "gateCreak",
+      "longestSeconds" : 4,
+      "queries" : [
+        "iron gate creak",
+        "gate creaking open"
+      ]
+    },
+    {
+      "about" : "a key turning in a lock, a bolt drawn",
+      "folder" : "KeyInLock",
+      "id" : "keyInLock",
+      "longestSeconds" : 3,
+      "queries" : [
+        "key in lock turn",
+        "door unlock key",
+        "bolt draw"
+      ]
+    },
+    {
+      "about" : "a sword drawn from its scabbard",
+      "folder" : "SwordDraw",
+      "id" : "swordDraw",
+      "longestSeconds" : 2,
+      "queries" : [
+        "sword unsheathe",
+        "sword draw scabbard"
+      ]
+    },
+    {
+      "about" : "two blades meeting, once",
+      "folder" : "SwordClash",
+      "id" : "swordClash",
+      "longestSeconds" : 2,
+      "queries" : [
+        "sword clash single",
+        "swords clash hit"
+      ]
+    },
+    {
+      "about" : "a match struck, a lamp or candle lit",
+      "folder" : "MatchStrike",
+      "id" : "matchStrike",
+      "longestSeconds" : 3,
+      "queries" : [
+        "match strike",
+        "match light strike"
+      ]
+    },
+    {
+      "about" : "glasses touched in a toast, a glass set down",
+      "folder" : "GlassClink",
+      "id" : "glassClink",
+      "longestSeconds" : 2,
+      "queries" : [
+        "glass clink toast",
+        "wine glasses clink"
+      ]
+    },
+    {
+      "about" : "a chair pushed back, scraping the floor",
+      "folder" : "ChairScrape",
+      "id" : "chairScrape",
+      "longestSeconds" : 2,
+      "queries" : [
+        "chair scrape floor",
+        "chair pushed back"
+      ]
+    },
+    {
+      "about" : "paper unfolded, a letter opened, pages shuffled",
+      "folder" : "PaperRustle",
+      "id" : "paperRustle",
+      "longestSeconds" : 3,
+      "queries" : [
+        "paper rustle",
+        "letter unfold paper",
+        "paper shuffle"
+      ]
+    },
+    {
+      "about" : "keys jingling",
+      "folder" : "KeysJingle",
+      "id" : "keysJingle",
+      "longestSeconds" : 3,
+      "queries" : [
+        "keys jingle",
+        "keyring jingle"
+      ]
+    },
+    {
+      "about" : "applause",
+      "folder" : "Applause",
+      "id" : "applause",
+      "longestSeconds" : 8,
+      "queries" : [
+        "applause",
+        "audience applause clapping"
+      ]
+    },
+    {
+      "about" : "a crowd cheering, once",
+      "folder" : "Cheer",
+      "id" : "cheer",
+      "longestSeconds" : 6,
+      "queries" : [
+        "crowd cheer",
+        "crowd cheering short"
+      ]
+    },
+    {
+      "about" : "a burst of laughter from several people",
+      "folder" : "Laughter",
+      "id" : "laughter",
+      "longestSeconds" : 5,
+      "queries" : [
+        "group laughter",
+        "people laughing"
+      ]
+    },
+    {
+      "about" : "a heavy thump, a fall, a body or a sack hitting the floor",
+      "folder" : "Thump",
+      "id" : "thump",
+      "longestSeconds" : 2,
+      "queries" : [
+        "heavy thump",
+        "body fall thud",
+        "thud floor"
+      ]
+    },
+    {
+      "about" : "a whip cracked",
+      "folder" : "WhipCrack",
+      "id" : "whipCrack",
+      "longestSeconds" : 2,
+      "queries" : [
+        "whip crack"
+      ]
+    },
+    {
+      "about" : "an arrow loosed, flying past",
+      "folder" : "ArrowWhoosh",
+      "id" : "arrowWhoosh",
+      "longestSeconds" : 2,
+      "queries" : [
+        "arrow whoosh",
+        "arrow release fly"
+      ]
+    },
+    {
+      "about" : "a kettle coming to the boil and whistling",
+      "folder" : "KettleWhistle",
+      "id" : "kettleWhistle",
+      "longestSeconds" : 8,
+      "queries" : [
+        "kettle whistle",
+        "kettle boiling whistle"
+      ]
+    },
+    {
+      "about" : "a book shut",
+      "folder" : "BookClose",
+      "id" : "bookClose",
+      "longestSeconds" : 2,
+      "queries" : [
+        "book close",
+        "book closing thud"
+      ]
+    },
+    {
+      "about" : "a bed or floorboard creaking under weight",
+      "folder" : "BedCreak",
+      "id" : "bedCreak",
+      "longestSeconds" : 3,
+      "queries" : [
+        "bed creak",
+        "floorboard creak"
+      ]
+    },
+    {
+      "about" : "footsteps coming nearer and stopping",
+      "folder" : "FootstepsApproach",
+      "id" : "footstepsApproach",
+      "longestSeconds" : 6,
+      "queries" : [
+        "footsteps approaching stop",
+        "footsteps approach"
+      ]
+    },
+    {
+      "about" : "footsteps going away",
+      "folder" : "FootstepsLeave",
+      "id" : "footstepsLeave",
+      "longestSeconds" : 7,
+      "queries" : [
+        "footsteps walking away",
+        "footsteps leaving"
+      ]
+    },
+    {
+      "about" : "a single gust of wind, a draught through a door",
+      "folder" : "WindGust",
+      "id" : "windGust",
+      "longestSeconds" : 6,
+      "queries" : [
+        "wind gust single",
+        "wind gust"
+      ]
+    },
+    {
+      "about" : "coins counted out or dropped",
+      "folder" : "CoinsClink",
+      "id" : "coinsClink",
+      "longestSeconds" : 3,
+      "queries" : [
+        "coins drop",
+        "coins clink"
+      ]
+    },
+    {
+      "about" : "a bottle uncorked",
+      "folder" : "BottleUncork",
+      "id" : "bottleUncork",
+      "longestSeconds" : 2,
+      "queries" : [
+        "bottle uncork",
+        "cork pop wine"
+      ]
+    },
+    {
+      "about" : "a drink poured",
+      "folder" : "PouringDrink",
+      "id" : "pouringDrink",
+      "longestSeconds" : 4,
+      "queries" : [
+        "pouring drink glass",
+        "pour liquid glass"
+      ]
+    },
+    {
+      "about" : "a siren going past",
+      "folder" : "SirenPasses",
+      "id" : "sirenPasses",
+      "longestSeconds" : 10,
+      "queries" : [
+        "siren passing",
+        "police siren pass by"
+      ]
+    },
+    {
+      "about" : "a lift arriving, its bell",
+      "folder" : "ElevatorDing",
+      "id" : "elevatorDing",
+      "longestSeconds" : 3,
+      "queries" : [
+        "elevator ding",
+        "lift bell arrive"
+      ]
+    },
+    {
+      "about" : "a gull crying",
+      "folder" : "SeagullCry",
+      "id" : "seagullCry",
+      "longestSeconds" : 4,
+      "queries" : [
+        "seagull cry",
+        "gull call single"
+      ]
+    },
+    {
+      "about" : "a crow or raven cawing",
+      "folder" : "CrowCaw",
+      "id" : "crowCaw",
+      "longestSeconds" : 3,
+      "queries" : [
+        "crow caw",
+        "raven caw"
+      ]
+    },
+    {
+      "about" : "a bird taking off, a flutter of wings",
+      "folder" : "WingsFlutter",
+      "id" : "wingsFlutter",
+      "longestSeconds" : 3,
+      "queries" : [
+        "bird wings flutter take off",
+        "pigeon wings flap"
+      ]
+    },
+    {
+      "about" : "a slap",
+      "folder" : "Slap",
+      "id" : "slap",
+      "longestSeconds" : 1,
+      "queries" : [
+        "slap face",
+        "slap"
+      ]
+    },
+    {
+      "about" : "a bell over a shop door, a hand bell rung",
+      "folder" : "ShopBell",
+      "id" : "shopBell",
+      "longestSeconds" : 3,
+      "queries" : [
+        "shop door bell",
+        "hand bell ring"
+      ]
+    },
+    {
+      "about" : "a gavel struck",
+      "folder" : "Gavel",
+      "id" : "gavel",
+      "longestSeconds" : 2,
+      "queries" : [
+        "gavel strike",
+        "judge gavel"
+      ]
+    },
+    {
+      "about" : "a baby starting to cry",
+      "folder" : "BabyCry",
+      "id" : "babyCry",
+      "longestSeconds" : 6,
+      "queries" : [
+        "baby cry",
+        "baby crying start"
+      ]
+    },
+    {
+      "about" : "chains rattling",
+      "folder" : "ChainsRattle",
+      "id" : "chainsRattle",
+      "longestSeconds" : 4,
+      "queries" : [
+        "chains rattle",
+        "chain rattling"
+      ]
     }
   ],
   "places" : [
@@ -820,7 +1267,7 @@
       ]
     }
   ],
-  "promptVersion" : 4,
+  "promptVersion" : 5,
   "sounds" : [
     {
       "about" : "steady rain, heard outdoors or under a light shelter",
@@ -834,6 +1281,7 @@
         "steady rain"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -849,6 +1297,7 @@
         "torrential rain"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -864,6 +1313,7 @@
         "rain inside house"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -878,6 +1328,7 @@
         "thunder rumble rain ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -893,6 +1344,7 @@
         "wind field"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -908,6 +1360,7 @@
         "gale wind"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -923,6 +1376,7 @@
         "snow forest winter"
       ],
       "replacesMusic" : false,
+      "scope" : "weather",
       "voices" : false,
       "weather" : true
     },
@@ -938,6 +1392,7 @@
         "wood stove crackle"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -952,6 +1407,7 @@
         "campfire night"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -967,6 +1423,7 @@
         "waves rocks"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -982,6 +1439,7 @@
         "boat hull water"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -997,6 +1455,7 @@
         "creek water flowing"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1011,6 +1470,7 @@
         "water drips cave ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1025,6 +1485,7 @@
         "woodland ambience birds wind"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1040,6 +1501,7 @@
         "garden birds"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1054,6 +1516,7 @@
         "night insects ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1068,6 +1531,7 @@
         "forest at night owl"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1082,6 +1546,7 @@
         "marsh frogs ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1097,6 +1562,7 @@
         "school hallway ambience"
       ],
       "replacesMusic" : true,
+      "scope" : "place",
       "voices" : true,
       "weather" : false
     },
@@ -1111,6 +1577,7 @@
         "city traffic distant ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1126,6 +1593,7 @@
         "village square ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1140,6 +1608,7 @@
         "horse drawn carriage"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1154,6 +1623,7 @@
         "steam train journey"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1168,6 +1638,7 @@
         "sailing ship ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1182,6 +1653,7 @@
         "engine room ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1196,6 +1668,7 @@
         "grandfather clock ticking"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1211,6 +1684,7 @@
         "house interior room tone"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1226,6 +1700,7 @@
         "exam hall ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1241,6 +1716,7 @@
         "muffled voices next room"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : true,
       "weather" : false
     },
@@ -1256,6 +1732,7 @@
         "hospital corridor ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1271,6 +1748,7 @@
         "electrical hum ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1286,6 +1764,7 @@
         "frying pan sizzle kitchen"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1301,6 +1780,7 @@
         "carpentry workshop"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1316,6 +1796,7 @@
         "barn ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1331,6 +1812,7 @@
         "bus interior ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1345,6 +1827,7 @@
         "aircraft cabin interior flight"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1360,6 +1843,7 @@
         "space station ambience"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
     },
@@ -1375,8 +1859,286 @@
         "eerie ambience low hum"
       ],
       "replacesMusic" : false,
+      "scope" : "place",
       "voices" : false,
       "weather" : false
+    },
+    {
+      "about" : "the characters walking, while the passage has them on the move: on gravel, a wooden floor, stone, snow, leaves, sand, stairs. Soft or faint, beside the place's own sounds, and dropped the moment they stop or sit",
+      "folder" : "Footsteps",
+      "group" : "doing",
+      "id" : "footsteps",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "footsteps walking loop",
+        "walking footsteps gravel",
+        "footsteps wooden floor walking"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "the characters running or fleeing: fast footsteps, a chase. Only while they run",
+      "folder" : "Running",
+      "group" : "doing",
+      "id" : "running",
+      "levelOffsetDB" : -3,
+      "queries" : [
+        "running footsteps loop",
+        "footsteps running outdoor",
+        "running footsteps corridor"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "breathing heard close: heavy after effort, panicked in fear, the slow breath of someone asleep beside them, breath inside a mask or helmet. Faint, and only while the passage dwells on it",
+      "folder" : "Breathing",
+      "group" : "doing",
+      "id" : "breathing",
+      "levelOffsetDB" : -6,
+      "queries" : [
+        "heavy breathing",
+        "breathing close loop",
+        "breathing slow"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a heartbeat heard close, in dread, effort or stillness. Faint and rare; only while the passage dwells on it",
+      "folder" : "Heartbeat",
+      "group" : "doing",
+      "id" : "heartbeat",
+      "levelOffsetDB" : -6,
+      "queries" : [
+        "heartbeat loop",
+        "heart beat slow",
+        "heartbeat fast"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "the characters in the water by their own effort: swimming, wading, treading water. Only while they are in it",
+      "folder" : "Swimming",
+      "group" : "doing",
+      "id" : "swimming",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "swimming strokes water",
+        "swimming loop",
+        "wading water walking"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "the characters climbing: a rock face, a rope, a ladder, a tree, loose scree. Only while they climb",
+      "folder" : "Climbing",
+      "group" : "doing",
+      "id" : "climbing",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "rock climbing sounds",
+        "climbing rope ladder",
+        "scrambling rocks loose"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a fight the characters are in or right beside: swords, fists, a battle around them. Only while it goes on",
+      "folder" : "Fighting",
+      "group" : "doing",
+      "id" : "fighting",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "sword fight ambience",
+        "medieval battle ambience",
+        "fist fight sounds"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "the characters writing or reading close by: a quill or pen on paper, a pencil, typing, pages turning. Faint",
+      "folder" : "Writing",
+      "group" : "doing",
+      "id" : "writing",
+      "levelOffsetDB" : -8,
+      "queries" : [
+        "writing quill on paper",
+        "pen writing paper",
+        "pencil writing paper"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a meal being eaten where the characters sit: cutlery on plates, cups, a table. Beside the place's own sounds",
+      "folder" : "Meal",
+      "group" : "doing",
+      "id" : "meal",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "cutlery plates dinner ambience",
+        "dinner table dishes cutlery",
+        "tea cups saucers"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "manual work the characters are doing or standing beside: digging, chopping wood, sweeping, scrubbing, hammering, sawing, harvesting. Only while it goes on",
+      "folder" : "Work",
+      "group" : "doing",
+      "id" : "work",
+      "levelOffsetDB" : -3,
+      "queries" : [
+        "digging shovel dirt loop",
+        "chopping wood axe",
+        "hammering nails"
+      ],
+      "replacesMusic" : false,
+      "scope" : "activity",
+      "voices" : false,
+      "weather" : false
+    }
+  ],
+  "transitions" : [
+    {
+      "about" : "they leave a room full of sound (a party, a hall, a tavern, a busy shop) through a door: the door opens, the noise follows them out, the door shuts on it and it fades behind them",
+      "id" : "leaveThroughDoor",
+      "seconds" : 13
+    },
+    {
+      "about" : "they go in through a door to a room full of sound: the door opens and it floods in",
+      "id" : "enterThroughDoor",
+      "seconds" : 6.5
+    },
+    {
+      "about" : "they step out of a quiet building into the open",
+      "id" : "stepOutside",
+      "seconds" : 6.5
+    },
+    {
+      "about" : "they come in from the open into a quiet building; the outdoors drops away behind the door",
+      "id" : "stepInside",
+      "seconds" : 8.5
+    },
+    {
+      "about" : "in the same place, a door, shutter or hatch closes on a noise nearby, which goes muffled",
+      "id" : "doorClosesOnNoise",
+      "seconds" : 4.5
+    },
+    {
+      "about" : "a window opens and the outside comes in",
+      "id" : "windowOpens",
+      "seconds" : 1.8
+    },
+    {
+      "about" : "a window closes and the outside goes muffled",
+      "id" : "windowCloses",
+      "seconds" : 4.5
+    },
+    {
+      "about" : "they walk away from the old sound with no door between: across a field, down a beach, along a corridor, out of a square",
+      "id" : "walkAway",
+      "seconds" : 14
+    },
+    {
+      "about" : "they walk towards the new sound, which grows nearer",
+      "id" : "approach",
+      "seconds" : 12
+    },
+    {
+      "about" : "they get into or onto a vehicle (a car, a carriage, a train, a boat, a plane) and it sets off",
+      "id" : "boardVehicle",
+      "seconds" : 8
+    },
+    {
+      "about" : "they get out of a vehicle that has stopped",
+      "id" : "leaveVehicle",
+      "seconds" : 3.5
+    },
+    {
+      "about" : "they stay as a train, coach, car or ship pulls away from them",
+      "id" : "vehicleDeparts",
+      "seconds" : 12
+    },
+    {
+      "about" : "a vehicle pulls up beside them",
+      "id" : "vehicleArrives",
+      "seconds" : 5
+    },
+    {
+      "about" : "they go under water",
+      "id" : "diveUnder",
+      "seconds" : 3.3
+    },
+    {
+      "about" : "they come up out of the water",
+      "id" : "surface",
+      "seconds" : 0.8
+    },
+    {
+      "about" : "they fall asleep, faint or lose consciousness; the world sinks away",
+      "id" : "fallAsleep",
+      "seconds" : 16
+    },
+    {
+      "about" : "they wake or come round; the world comes back",
+      "id" : "wakeUp",
+      "seconds" : 6
+    },
+    {
+      "about" : "the crowd around them breaks up and drifts away",
+      "id" : "crowdDisperses",
+      "seconds" : 16
+    },
+    {
+      "about" : "a crowd gathers around them",
+      "id" : "crowdGathers",
+      "seconds" : 10
+    },
+    {
+      "about" : "a storm breaks overhead",
+      "id" : "stormBreaks",
+      "seconds" : 3
+    },
+    {
+      "about" : "the rain stops and the world is suddenly quiet",
+      "id" : "rainStops",
+      "seconds" : 8
+    },
+    {
+      "about" : "everything stops at once: a shock, a spell, an engine cut, a blow",
+      "id" : "suddenSilence",
+      "seconds" : 6.5
+    },
+    {
+      "about" : "a hard cut: a chapter break or a jump in time to somewhere else",
+      "id" : "quickCut",
+      "seconds" : 1.5
     }
   ],
   "variants" : [
@@ -4043,6 +4805,28 @@
       "search" : "horse galloping"
     },
     {
+      "about" : "riding at a trot",
+      "folder" : "Horses.Trot",
+      "id" : "trot",
+      "of" : "horses",
+      "queries" : [
+        "horse trotting",
+        "horse trot ride"
+      ],
+      "search" : "horse trotting"
+    },
+    {
+      "about" : "a horse at a walk, reins and harness",
+      "folder" : "Horses.HorseAtAWalk",
+      "id" : "horseAtAWalk",
+      "of" : "horses",
+      "queries" : [
+        "horse walking hooves",
+        "horse walk saddle creak"
+      ],
+      "search" : "horse walking hooves"
+    },
+    {
       "about" : "inside a stagecoach or carriage on the road",
       "folder" : "Horses.Stagecoach",
       "id" : "stagecoach",
@@ -4547,7 +5331,777 @@
         "mystical ambience"
       ],
       "search" : "magical ambience"
+    },
+    {
+      "about" : "walking on gravel or a stony path",
+      "folder" : "Footsteps.WalkingGravel",
+      "id" : "walkingGravel",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps gravel walking",
+        "walking gravel path"
+      ],
+      "search" : "footsteps gravel walking"
+    },
+    {
+      "about" : "walking on a wooden floor or boards",
+      "folder" : "Footsteps.WalkingWoodFloor",
+      "id" : "walkingWoodFloor",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps wooden floor",
+        "walking wood floor creak"
+      ],
+      "search" : "footsteps wooden floor"
+    },
+    {
+      "about" : "walking a stone corridor or flagged floor, echoing",
+      "folder" : "Footsteps.WalkingStoneCorridor",
+      "id" : "walkingStoneCorridor",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps stone corridor echo",
+        "footsteps stone floor"
+      ],
+      "search" : "footsteps stone corridor echo"
+    },
+    {
+      "about" : "walking through snow, crunching",
+      "folder" : "Footsteps.WalkingSnow",
+      "id" : "walkingSnow",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps snow crunch",
+        "walking in snow"
+      ],
+      "search" : "footsteps snow crunch"
+    },
+    {
+      "about" : "walking through leaves or undergrowth",
+      "folder" : "Footsteps.WalkingLeaves",
+      "id" : "walkingLeaves",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps leaves forest",
+        "walking dry leaves"
+      ],
+      "search" : "footsteps leaves forest"
+    },
+    {
+      "about" : "walking a wet street, splashing a little",
+      "folder" : "Footsteps.WalkingWetStreet",
+      "id" : "walkingWetStreet",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps wet pavement",
+        "walking wet street puddles"
+      ],
+      "search" : "footsteps wet pavement"
+    },
+    {
+      "about" : "walking on sand",
+      "folder" : "Footsteps.WalkingSand",
+      "id" : "walkingSand",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps sand beach",
+        "walking sand"
+      ],
+      "search" : "footsteps sand beach"
+    },
+    {
+      "about" : "climbing or descending stairs",
+      "folder" : "Footsteps.WalkingStairs",
+      "id" : "walkingStairs",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps stairs",
+        "walking up stairs wooden"
+      ],
+      "search" : "footsteps stairs"
+    },
+    {
+      "about" : "walking through grass or a meadow",
+      "folder" : "Footsteps.WalkingGrass",
+      "id" : "walkingGrass",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps grass",
+        "walking tall grass"
+      ],
+      "search" : "footsteps grass"
+    },
+    {
+      "about" : "trudging through mud",
+      "folder" : "Footsteps.WalkingMud",
+      "id" : "walkingMud",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps mud squelch",
+        "walking mud boots"
+      ],
+      "search" : "footsteps mud squelch"
+    },
+    {
+      "about" : "hard heels on tile or marble",
+      "folder" : "Footsteps.HeelsOnTile",
+      "id" : "heelsOnTile",
+      "of" : "footsteps",
+      "queries" : [
+        "high heels tile floor",
+        "footsteps marble heels"
+      ],
+      "search" : "high heels tile floor"
+    },
+    {
+      "about" : "creeping, slow careful steps",
+      "folder" : "Footsteps.Sneaking",
+      "id" : "sneaking",
+      "of" : "footsteps",
+      "queries" : [
+        "sneaking footsteps slow",
+        "creeping footsteps quiet"
+      ],
+      "search" : "sneaking footsteps slow"
+    },
+    {
+      "about" : "boots on a ship's deck",
+      "folder" : "Footsteps.BootsOnDeck",
+      "id" : "bootsOnDeck",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps ship deck wood",
+        "boots wooden deck"
+      ],
+      "search" : "footsteps ship deck wood"
+    },
+    {
+      "about" : "an uneven walk, a limp, a stick",
+      "folder" : "Footsteps.Limping",
+      "id" : "limping",
+      "of" : "footsteps",
+      "queries" : [
+        "footsteps limp cane",
+        "walking stick footsteps"
+      ],
+      "search" : "footsteps limp cane"
+    },
+    {
+      "about" : "running down a street or pavement",
+      "folder" : "Running.RunningStreet",
+      "id" : "runningStreet",
+      "of" : "running",
+      "queries" : [
+        "running footsteps street",
+        "running pavement footsteps"
+      ],
+      "search" : "running footsteps street"
+    },
+    {
+      "about" : "running through woods, branches and leaves",
+      "folder" : "Running.RunningForest",
+      "id" : "runningForest",
+      "of" : "running",
+      "queries" : [
+        "running footsteps forest",
+        "running through woods"
+      ],
+      "search" : "running footsteps forest"
+    },
+    {
+      "about" : "running down a corridor, echoing",
+      "folder" : "Running.RunningCorridor",
+      "id" : "runningCorridor",
+      "of" : "running",
+      "queries" : [
+        "running footsteps corridor",
+        "running hallway echo"
+      ],
+      "search" : "running footsteps corridor"
+    },
+    {
+      "about" : "running on gravel or a stony path",
+      "folder" : "Running.RunningGravel",
+      "id" : "runningGravel",
+      "of" : "running",
+      "queries" : [
+        "running footsteps gravel",
+        "running gravel path"
+      ],
+      "search" : "running footsteps gravel"
+    },
+    {
+      "about" : "running up or down stairs",
+      "folder" : "Running.RunningStairs",
+      "id" : "runningStairs",
+      "of" : "running",
+      "queries" : [
+        "running stairs footsteps",
+        "running down stairs"
+      ],
+      "search" : "running stairs footsteps"
+    },
+    {
+      "about" : "running across grass or a field",
+      "folder" : "Running.RunningGrass",
+      "id" : "runningGrass",
+      "of" : "running",
+      "queries" : [
+        "running footsteps grass",
+        "running field grass"
+      ],
+      "search" : "running footsteps grass"
+    },
+    {
+      "about" : "running through snow",
+      "folder" : "Running.RunningSnow",
+      "id" : "runningSnow",
+      "of" : "running",
+      "queries" : [
+        "running footsteps snow",
+        "running in snow crunch"
+      ],
+      "search" : "running footsteps snow"
+    },
+    {
+      "about" : "running or splashing through shallow water",
+      "folder" : "Running.RunningShallows",
+      "id" : "runningShallows",
+      "of" : "running",
+      "queries" : [
+        "running water splashing footsteps",
+        "running through shallow water"
+      ],
+      "search" : "running water splashing footsteps"
+    },
+    {
+      "about" : "a chase: several sets of running feet",
+      "folder" : "Running.Chase",
+      "id" : "chase",
+      "of" : "running",
+      "queries" : [
+        "chase footsteps running group",
+        "people running chase"
+      ],
+      "search" : "chase footsteps running group"
+    },
+    {
+      "about" : "heavy breathing after effort",
+      "folder" : "Breathing.HeavyBreathing",
+      "id" : "heavyBreathing",
+      "of" : "breathing",
+      "queries" : [
+        "heavy breathing exhausted",
+        "breathing hard"
+      ],
+      "search" : "heavy breathing exhausted"
+    },
+    {
+      "about" : "fast, frightened breathing",
+      "folder" : "Breathing.PanickedBreathing",
+      "id" : "panickedBreathing",
+      "of" : "breathing",
+      "queries" : [
+        "panicked breathing",
+        "scared breathing fast"
+      ],
+      "search" : "panicked breathing"
+    },
+    {
+      "about" : "the slow breath of someone asleep",
+      "folder" : "Breathing.SleepingBreathing",
+      "id" : "sleepingBreathing",
+      "of" : "breathing",
+      "queries" : [
+        "sleeping breathing slow",
+        "breathing asleep"
+      ],
+      "search" : "sleeping breathing slow"
+    },
+    {
+      "about" : "breath inside a mask, helmet or respirator",
+      "folder" : "Breathing.BreathingInMask",
+      "id" : "breathingInMask",
+      "of" : "breathing",
+      "queries" : [
+        "breathing mask respirator",
+        "breathing helmet"
+      ],
+      "search" : "breathing mask respirator"
+    },
+    {
+      "about" : "laboured, sick or wounded breathing",
+      "folder" : "Breathing.LabouredBreathing",
+      "id" : "labouredBreathing",
+      "of" : "breathing",
+      "queries" : [
+        "laboured breathing",
+        "wheezing breathing"
+      ],
+      "search" : "laboured breathing"
+    },
+    {
+      "about" : "a diver's breath and bubbles",
+      "folder" : "Breathing.BreathingUnderwater",
+      "id" : "breathingUnderwater",
+      "of" : "breathing",
+      "queries" : [
+        "scuba breathing bubbles",
+        "underwater breathing regulator"
+      ],
+      "search" : "scuba breathing bubbles"
+    },
+    {
+      "about" : "a heart racing",
+      "folder" : "Heartbeat.RacingHeartbeat",
+      "id" : "racingHeartbeat",
+      "of" : "heartbeat",
+      "queries" : [
+        "heartbeat fast",
+        "racing heartbeat"
+      ],
+      "search" : "heartbeat fast"
+    },
+    {
+      "about" : "a slow, heavy heartbeat",
+      "folder" : "Heartbeat.SlowHeartbeat",
+      "id" : "slowHeartbeat",
+      "of" : "heartbeat",
+      "queries" : [
+        "heartbeat slow",
+        "slow heartbeat loop"
+      ],
+      "search" : "heartbeat slow"
+    },
+    {
+      "about" : "swimming, stroke after stroke",
+      "folder" : "Swimming.SwimmingStrokes",
+      "id" : "swimmingStrokes",
+      "of" : "swimming",
+      "queries" : [
+        "swimming strokes",
+        "swimming freestyle water"
+      ],
+      "search" : "swimming strokes"
+    },
+    {
+      "about" : "treading water, keeping afloat",
+      "folder" : "Swimming.TreadingWater",
+      "id" : "treadingWater",
+      "of" : "swimming",
+      "queries" : [
+        "treading water",
+        "splashing water staying afloat"
+      ],
+      "search" : "treading water"
+    },
+    {
+      "about" : "wading through water",
+      "folder" : "Swimming.Wading",
+      "id" : "wading",
+      "of" : "swimming",
+      "queries" : [
+        "wading water walking",
+        "walking through water"
+      ],
+      "search" : "wading water walking"
+    },
+    {
+      "about" : "floating still, water lapping at the ears",
+      "folder" : "Swimming.Floating",
+      "id" : "floating",
+      "of" : "swimming",
+      "queries" : [
+        "floating water lapping",
+        "water lapping close"
+      ],
+      "search" : "floating water lapping"
+    },
+    {
+      "about" : "climbing a rock face: hands on stone, a scrape",
+      "folder" : "Climbing.RockFace",
+      "id" : "rockFace",
+      "of" : "climbing",
+      "queries" : [
+        "rock climbing",
+        "climbing rock scrape"
+      ],
+      "search" : "rock climbing"
+    },
+    {
+      "about" : "climbing a rope",
+      "folder" : "Climbing.RopeClimb",
+      "id" : "ropeClimb",
+      "of" : "climbing",
+      "queries" : [
+        "rope climbing creak",
+        "climbing rope"
+      ],
+      "search" : "rope climbing creak"
+    },
+    {
+      "about" : "climbing a ladder",
+      "folder" : "Climbing.LadderRungs",
+      "id" : "ladderRungs",
+      "of" : "climbing",
+      "queries" : [
+        "climbing ladder rungs",
+        "ladder climbing wood"
+      ],
+      "search" : "climbing ladder rungs"
+    },
+    {
+      "about" : "climbing a tree: bark, leaves, branches",
+      "folder" : "Climbing.TreeClimb",
+      "id" : "treeClimb",
+      "of" : "climbing",
+      "queries" : [
+        "climbing tree branches",
+        "tree climbing leaves"
+      ],
+      "search" : "climbing tree branches"
+    },
+    {
+      "about" : "scrambling over loose scree",
+      "folder" : "Climbing.Scree",
+      "id" : "scree",
+      "of" : "climbing",
+      "queries" : [
+        "scree scramble rocks",
+        "loose rocks scramble"
+      ],
+      "search" : "scree scramble rocks"
+    },
+    {
+      "about" : "climbing ice: picks and crampons",
+      "folder" : "Climbing.IceClimb",
+      "id" : "iceClimb",
+      "of" : "climbing",
+      "queries" : [
+        "ice climbing axe",
+        "ice axe crampons"
+      ],
+      "search" : "ice climbing axe"
+    },
+    {
+      "about" : "a sword fight: blades, feet, breath",
+      "folder" : "Fighting.SwordFight",
+      "id" : "swordFight",
+      "of" : "fighting",
+      "queries" : [
+        "sword fight",
+        "sword fighting clash"
+      ],
+      "search" : "sword fight"
+    },
+    {
+      "about" : "a fist fight or a scuffle",
+      "folder" : "Fighting.FistFight",
+      "id" : "fistFight",
+      "of" : "fighting",
+      "queries" : [
+        "fist fight punches",
+        "fight scuffle punches"
+      ],
+      "search" : "fist fight punches"
+    },
+    {
+      "about" : "a battle around them: steel, shouts, hooves",
+      "folder" : "Fighting.Battle",
+      "id" : "battle",
+      "of" : "fighting",
+      "queries" : [
+        "medieval battle ambience",
+        "battle ambience swords"
+      ],
+      "search" : "medieval battle ambience"
+    },
+    {
+      "about" : "a siege: engines, stone, shouts from the walls",
+      "folder" : "Fighting.Siege",
+      "id" : "siege",
+      "of" : "fighting",
+      "queries" : [
+        "siege battle ambience",
+        "castle siege ambience"
+      ],
+      "search" : "siege battle ambience"
+    },
+    {
+      "about" : "a tavern brawl: furniture, fists",
+      "folder" : "Fighting.Brawl",
+      "id" : "brawl",
+      "of" : "fighting",
+      "queries" : [
+        "bar fight brawl",
+        "tavern brawl"
+      ],
+      "search" : "bar fight brawl"
+    },
+    {
+      "about" : "armoured men at close quarters",
+      "folder" : "Fighting.ArmouredMelee",
+      "id" : "armouredMelee",
+      "of" : "fighting",
+      "queries" : [
+        "armor fight clank",
+        "knights fighting armour"
+      ],
+      "search" : "armor fight clank"
+    },
+    {
+      "about" : "a quill scratching on paper",
+      "folder" : "Writing.QuillOnPaper",
+      "id" : "quillOnPaper",
+      "of" : "writing",
+      "queries" : [
+        "quill writing paper",
+        "quill pen scratching"
+      ],
+      "search" : "quill writing paper"
+    },
+    {
+      "about" : "a pen on paper",
+      "folder" : "Writing.PenOnPaper",
+      "id" : "penOnPaper",
+      "of" : "writing",
+      "queries" : [
+        "pen writing paper",
+        "writing with pen"
+      ],
+      "search" : "pen writing paper"
+    },
+    {
+      "about" : "a pencil on paper",
+      "folder" : "Writing.PencilOnPaper",
+      "id" : "pencilOnPaper",
+      "of" : "writing",
+      "queries" : [
+        "pencil writing paper",
+        "pencil sketching"
+      ],
+      "search" : "pencil writing paper"
+    },
+    {
+      "about" : "typing on a keyboard",
+      "folder" : "Writing.Typing",
+      "id" : "typing",
+      "of" : "writing",
+      "queries" : [
+        "keyboard typing",
+        "typing computer keyboard"
+      ],
+      "search" : "keyboard typing"
+    },
+    {
+      "about" : "reading: pages turning now and then",
+      "folder" : "Writing.PageTurning",
+      "id" : "pageTurning",
+      "of" : "writing",
+      "queries" : [
+        "page turning book",
+        "book pages turning"
+      ],
+      "search" : "page turning book"
+    },
+    {
+      "about" : "chalk on a blackboard",
+      "folder" : "Writing.ChalkOnBoard",
+      "id" : "chalkOnBoard",
+      "of" : "writing",
+      "queries" : [
+        "chalk blackboard writing",
+        "chalk on chalkboard"
+      ],
+      "search" : "chalk blackboard writing"
+    },
+    {
+      "about" : "a meal: cutlery on plates, a glass set down",
+      "folder" : "Meal.CutleryAndPlates",
+      "id" : "cutleryAndPlates",
+      "of" : "meal",
+      "queries" : [
+        "cutlery plates dinner",
+        "dinner plates cutlery"
+      ],
+      "search" : "cutlery plates dinner"
+    },
+    {
+      "about" : "tea: cups on saucers, a spoon, a pot",
+      "folder" : "Meal.TeaThings",
+      "id" : "teaThings",
+      "of" : "meal",
+      "queries" : [
+        "tea cups saucers",
+        "tea pouring cup spoon"
+      ],
+      "search" : "tea cups saucers"
+    },
+    {
+      "about" : "a meal at an inn: wooden bowls, tankards",
+      "folder" : "Meal.TavernMeal",
+      "id" : "tavernMeal",
+      "of" : "meal",
+      "queries" : [
+        "tankards wooden table",
+        "medieval tavern dishes"
+      ],
+      "search" : "tankards wooden table"
+    },
+    {
+      "about" : "a meal by a fire: tin plates, a pot",
+      "folder" : "Meal.CampMeal",
+      "id" : "campMeal",
+      "of" : "meal",
+      "queries" : [
+        "camp cooking tin plates",
+        "tin plates spoons"
+      ],
+      "search" : "camp cooking tin plates"
+    },
+    {
+      "about" : "dishes being washed",
+      "folder" : "Meal.WashingUp",
+      "id" : "washingUp",
+      "of" : "meal",
+      "queries" : [
+        "washing dishes sink",
+        "dishes washing up"
+      ],
+      "search" : "washing dishes sink"
+    },
+    {
+      "about" : "digging: a spade in earth",
+      "folder" : "Work.Digging",
+      "id" : "digging",
+      "of" : "work",
+      "queries" : [
+        "digging shovel dirt",
+        "shovel digging soil"
+      ],
+      "search" : "digging shovel dirt"
+    },
+    {
+      "about" : "chopping wood with an axe",
+      "folder" : "Work.ChoppingWood",
+      "id" : "choppingWood",
+      "of" : "work",
+      "queries" : [
+        "chopping wood axe",
+        "wood chopping"
+      ],
+      "search" : "chopping wood axe"
+    },
+    {
+      "about" : "sweeping a floor or a yard",
+      "folder" : "Work.Sweeping",
+      "id" : "sweeping",
+      "of" : "work",
+      "queries" : [
+        "sweeping broom floor",
+        "broom sweeping"
+      ],
+      "search" : "sweeping broom floor"
+    },
+    {
+      "about" : "scrubbing a floor",
+      "folder" : "Work.Scrubbing",
+      "id" : "scrubbing",
+      "of" : "work",
+      "queries" : [
+        "scrubbing floor brush",
+        "scrubbing brush bucket"
+      ],
+      "search" : "scrubbing floor brush"
+    },
+    {
+      "about" : "hammering: nails, a workbench",
+      "folder" : "Work.Hammering",
+      "id" : "hammering",
+      "of" : "work",
+      "queries" : [
+        "hammering nails",
+        "hammer nails wood"
+      ],
+      "search" : "hammering nails"
+    },
+    {
+      "about" : "sawing wood by hand",
+      "folder" : "Work.Sawing",
+      "id" : "sawing",
+      "of" : "work",
+      "queries" : [
+        "hand saw wood",
+        "sawing wood"
+      ],
+      "search" : "hand saw wood"
+    },
+    {
+      "about" : "harvesting: a scythe, a sickle, sheaves",
+      "folder" : "Work.Harvesting",
+      "id" : "harvesting",
+      "of" : "work",
+      "queries" : [
+        "scythe cutting grass",
+        "harvest sickle wheat"
+      ],
+      "search" : "scythe cutting grass"
+    },
+    {
+      "about" : "rowing: oars dipping and creaking",
+      "folder" : "Work.Rowing",
+      "id" : "rowing",
+      "of" : "work",
+      "queries" : [
+        "rowing oars dipping",
+        "oars rowlocks rowing"
+      ],
+      "search" : "rowing oars dipping"
+    },
+    {
+      "about" : "washing clothes by hand, at a tub or a river",
+      "folder" : "Work.WashingClothes",
+      "id" : "washingClothes",
+      "of" : "work",
+      "queries" : [
+        "washing clothes hand water",
+        "laundry washing tub"
+      ],
+      "search" : "washing clothes hand water"
+    },
+    {
+      "about" : "shovelling snow",
+      "folder" : "Work.ShovellingSnow",
+      "id" : "shovellingSnow",
+      "of" : "work",
+      "queries" : [
+        "shoveling snow",
+        "snow shovel scrape"
+      ],
+      "search" : "shoveling snow"
+    },
+    {
+      "about" : "ploughing: a horse, harness, the share in the soil",
+      "folder" : "Work.Ploughing",
+      "id" : "ploughing",
+      "of" : "work",
+      "queries" : [
+        "horse plough field",
+        "ploughing horse"
+      ],
+      "search" : "horse plough field"
+    },
+    {
+      "about" : "knitting or sewing by hand, needles clicking",
+      "folder" : "Work.Knitting",
+      "id" : "knitting",
+      "of" : "work",
+      "queries" : [
+        "knitting needles",
+        "knitting needles clicking"
+      ],
+      "search" : "knitting needles"
     }
   ],
-  "version" : 2
+  "version" : 3
 }

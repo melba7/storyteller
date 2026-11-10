@@ -55,6 +55,16 @@ export type LofiAmbientSound =
   | "aircraft"
   | "spaceship"
   | "deepDrone"
+  | "footsteps"
+  | "running"
+  | "breathing"
+  | "heartbeat"
+  | "swimming"
+  | "climbing"
+  | "fighting"
+  | "writing"
+  | "meal"
+  | "work"
   | (string & {})
 
 /** The atmosphere sounds' state: quiet sounds of the scene under the voice. */
@@ -82,7 +92,7 @@ export type LofiAtmosphereStatus = {
   /** Short narration pauses where the sound swells or hushes: the setting, and whether this app can pause its narrator. */
   pausesEnabled?: boolean
   pausesAvailable?: boolean
-  /** One-off sounds (a knock, a clap of thunder): the setting (off by default), and how many of `totalOneShots` have a recording or stand-in. */
+  /** One-off sounds (a knock, a clap of thunder, the door of a change of scene): the setting (on by default), and how many of `totalOneShots` have a recording or stand-in. */
   oneShotsEnabled?: boolean
   oneShots?: number
   totalOneShots?: number
@@ -258,7 +268,7 @@ type LofiScoreNativeModule = {
   setAtmosphereIntensity(intensity: number | null): Promise<LofiMusicStatus>
   /** Short narration pauses where the sound swells (a crowded hall, a storm breaking) or hushes. */
   setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
-  /** One-off sounds on the sentences that say they happen. Off by default. */
+  /** One-off sounds on the sentences that say they happen, and the door, engine or splash of a change of scene. On by default. */
   setAtmosphereOneShots(enabled: boolean): Promise<LofiMusicStatus>
   /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
   getAtmosphereCredits(): Promise<string | null>

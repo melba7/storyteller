@@ -8,7 +8,7 @@ import LofiText
 /// and a JSON schema for the answer.
 public enum ClaudeScenePrompt {
     /// Bump when the wording or schema changes; engine ids and saved tracks record it.
-    public static let version = 4
+    public static let version = 5
 
     /// Places listed with each passage, most recent first.
     public static let maxPlacesListed = 15
@@ -27,6 +27,7 @@ public enum ClaudeScenePrompt {
         let extra = sharedVariants.filter { !builtIn.contains($0.id) }.prefix(maxVariantsListed)
         let shared = extra.isEmpty ? "none" : "\n" + extra.map(describe).joined(separator: "\n")
         let oneShots = OneShotSound.allCases.map { "- \($0.rawValue): \($0.guidance)" }.joined(separator: "\n")
+        let transitions = SceneTransition.allCases.map { "- \($0.rawValue): \($0.guidance)" }.joined(separator: "\n")
         return """
             You design the background soundscape for an audiobook: steady sounds of the place \
             where the story is, played under the narrator's voice the whole time, with some \
@@ -79,6 +80,13 @@ public enum ClaudeScenePrompt {
             - crowd is for many people right around the characters whose words cannot be made \
             out. The music pauses while it plays, so use it only where a crowd is clearly there; \
             a few voices are murmur.
+            - The sounds under "\(AmbientSound.Group.doing.title)" are what the characters are \
+            doing, on top of the place's own sounds: footsteps while they walk, running in a \
+            chase, breathing or a heartbeat when the passage dwells on it, swimming, climbing, a \
+            fight, writing, a meal, work. Add one (at most one, soft or faint) only while the \
+            passage has them doing it right now, and drop it the moment they stop, sit, arrive \
+            or the passage moves on. They belong to the characters, not the place: a place is \
+            never remembered with them.
 
             \(soundList)
 
@@ -127,6 +135,24 @@ public enum ClaudeScenePrompt {
 
             The one-off sounds:
             \(oneShots)
+
+            Transitions:
+            - transition says how the sound moves from the current scene to the new one when \
+            the passage's last sentence is the very moment the characters move: out of a party \
+            through a door (the door opens, the noise follows them, the door shuts on it and it \
+            fades behind them), into a crowded room, out of a house into the open, into a car, \
+            a carriage, a train or a boat, out of one, left standing as a train pulls away, \
+            under water, asleep. The player plays it out over the next seconds, with the door, \
+            the engine or the splash as one-off sounds.
+            - Pick the one that fits the text; "none" when the scene does not change, when the \
+            change is a plain cut (a new chapter somewhere else: quickCut is for a jump the \
+            text itself makes), or when the characters were already there. Choosing one is \
+            not a one-off sound: a knock before the door opens is still a oneShot.
+            - A transition and a moment can go together: enterThroughDoor with swell when the \
+            hall's noise floods in; stepInside with hush when a door shuts on a storm.
+
+            The transitions:
+            \(transitions)
 
             Also answer:
             - setting: indoors, outdoors, vehicle (a carriage, train, ship, spaceship) or unclear.
@@ -260,6 +286,7 @@ public enum ClaudeScenePrompt {
                     ] as [String: Any],
                 ] as [String: Any],
                 "moment": ["type": "string", "enum": ["none"] + StoryScene.Moment.allCases.map(\.rawValue)],
+                "transition": ["type": "string", "enum": ["none"] + SceneTransition.allCases.map(\.rawValue)],
                 "oneShot": [
                     "type": "object",
                     "properties": [
@@ -273,7 +300,7 @@ public enum ClaudeScenePrompt {
                 "cue": ["type": "string"],
                 "confidence": ["type": "number"],
             ] as [String: Any],
-            "required": ["place", "placeName", "setting", "state", "sounds", "newSounds", "moment", "oneShot", "world", "cue", "confidence"],
+            "required": ["place", "placeName", "setting", "state", "sounds", "newSounds", "moment", "transition", "oneShot", "world", "cue", "confidence"],
             "additionalProperties": false,
         ]
     }

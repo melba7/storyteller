@@ -18,7 +18,7 @@ final class CatalogTests: XCTestCase {
             XCTAssertNil(sound.firstIndex, "a catalogue kind is available from the first sentence")
             XCTAssertEqual(variant.folderName, "\(variant.of.folderName).\(variant.id.prefix(1).uppercased())\(variant.id.dropFirst())")
         }
-        XCTAssertGreaterThanOrEqual(SoundCatalog.variants.count, 250)
+        XCTAssertGreaterThanOrEqual(SoundCatalog.variants.count, 350)
         for sound in AmbientSound.allCases {
             XCTAssertFalse(SoundCatalog.variants(of: sound).isEmpty, "\(sound.rawValue) has no more specific kinds")
             XCTAssertNil(SoundCatalog.variant(sound.rawValue), "\(sound.rawValue) is a family, not a kind")
@@ -75,6 +75,7 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual((exported["variants"] as? [[String: Any]])?.count, SoundCatalog.variants.count)
         XCTAssertEqual((exported["oneShots"] as? [[String: Any]])?.count, OneShotSound.allCases.count)
         XCTAssertEqual((exported["places"] as? [[String: Any]])?.count, SoundCatalog.placeGuide.count)
+        XCTAssertEqual((exported["transitions"] as? [[String: Any]])?.count, SceneTransition.allCases.count)
         XCTAssertTrue(sounds.contains { $0["id"] as? String == "crowd" && $0["voices"] as? Bool == true && $0["replacesMusic"] as? Bool == true })
 
         // Tools/atmosphere/catalog.json is what the fetch script reads on the Mac; it is
@@ -88,7 +89,7 @@ final class CatalogTests: XCTestCase {
 
     func testThePromptCarriesEveryFamilyItsKindsAndThePlaceGuide() {
         let system = ClaudeScenePrompt.system
-        XCTAssertEqual(ClaudeScenePrompt.version, 4)
+        XCTAssertEqual(ClaudeScenePrompt.version, 5)
         for sound in AmbientSound.allCases {
             XCTAssertTrue(system.contains("\n- \(sound.rawValue): "), "\(sound.rawValue) is not in the prompt")
         }
@@ -169,7 +170,7 @@ final class CatalogTests: XCTestCase {
         XCTAssertEqual(AmbientSound.murmur.group, .people)
         XCTAssertEqual(AmbientSound.spaceship.group, .travel)
         XCTAssertEqual(AmbientSound.deepDrone.group, .elsewhere)
-        XCTAssertEqual(AmbientSound.allCases.count, 38)
+        XCTAssertEqual(AmbientSound.allCases.count, 48)
         XCTAssertTrue(AmbientSound.allCases.firstIndex(of: .roomTone)! > AmbientSound.allCases.firstIndex(of: .clock)!,
                       "new families go after the old ones, so older tracks and recordings keep their order")
         XCTAssertEqual(OneShotSound.schoolBell.search.longestSeconds > 0, true)

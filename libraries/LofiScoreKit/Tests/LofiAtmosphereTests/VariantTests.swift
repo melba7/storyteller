@@ -253,7 +253,7 @@ final class VariantTests: XCTestCase {
         XCTAssertNotNil(properties["newSounds"])
         XCTAssertEqual((properties["moment"] as? [String: Any])?["enum"] as? [String], ["none", "swell", "hush"])
         XCTAssertNotNil(properties["state"])
-        XCTAssertEqual(engine.id, "claude.haiku-5-5/a4")
+        XCTAssertEqual(engine.id, "claude.haiku-5-5/a5")
     }
 
     // MARK: - Builder
