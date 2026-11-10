@@ -77,14 +77,6 @@ CHANGES = {
 }
 
 
-def performer_of(tags):
-    """Musopen names the pianist in the item's file list; the download step kept it as a tag."""
-    m = re.search(r"performer:([^;]+)", str(tags))
-    if not m:
-        return ""
-    return m.group(1).strip().replace("OIga", "Olga")   # typo on archive.org (capital i for l)
-
-
 def main():
     picks_path, cand_path, out_dir = sys.argv[1:4]
     os.makedirs(out_dir, exist_ok=True)
@@ -97,7 +89,8 @@ def main():
         mood = p.mood.capitalize()
         musopen = c.source == "archive.org" and "musopen" in str(c.album).lower()
         classical = piano_pieces.is_classical(c)
-        title = piano_pieces.display_title(c.title) if classical else clean_title(c.title)
+        performer = piano_pieces.performer_of(c.tags) if classical else ""
+        title = piano_pieces.display_title(c.title, performer) if classical else clean_title(c.title)
         artist = clean_artist(c.artist)
         base = safe(f"{title} - {artist}")
         file = f"{mood}/{base}.mp3"
@@ -111,7 +104,6 @@ def main():
         credit = artist
         if classical:
             # The licence belongs to the recording, so the credit names who played it.
-            performer = performer_of(c.tags)
             credit = f"{artist}, played by {performer}" if performer and performer != artist else artist
             if musopen:
                 credit += " (Musopen recording)"

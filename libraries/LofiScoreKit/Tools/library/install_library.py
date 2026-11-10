@@ -25,13 +25,21 @@ gain slowly (ffmpeg dynaudnorm, 7.5 s window, at most +10 dB), so notes keep the
 shape and only whole passages move. Measured on 12 recordings: the spread between 10 s
 stretches fell from 10-16 dB to 4-10 dB, and the gain never moved faster than 4 dB a second.
 
+Silence at the ends is what lies 45 dB under the recording's peak. A recording with an
+audible room (a home recording, an old tape) never gets that quiet, so its hiss would pass
+for music and a late start would stay. For those the room is taken to be the quietest
+200 ms of the file, and the music starts at the first 100 ms that stay 10 dB above it.
+On the 23 processed piano picks this moved three starts by 1.0 to 1.2 s and cut two tails.
+
 Both steps can take a while. --moods limits the copy step to some folders so a run fits
 in a short time slot; run it once per group with --no-measure, then once with
 --measure-only. A run that is cut off can simply be repeated.
 """
+import array
 import csv
 import hashlib
 import json
+import math
 import os
 import re
 import shutil
@@ -47,6 +55,9 @@ EVEN_WINDOW_FRAMES = 15       # x 0.5 s: the gain follows the loudest moment wit
 SILENCE_BELOW_PEAK_DB = 45.0  # what counts as silence at the ends
 KEEP_LEAD_S = 0.05            # silence left before the first note
 KEEP_TAIL_S = 1.5             # of the fading last note, kept and faded out
+ROOM_WITHIN_PEAK_DB = 60.0    # a room this loud never counts as silence by the test above
+ABOVE_ROOM_DB = 10.0          # ... so there a note is what rises this far above the room
+ROOM_LEAD_S = 0.2             # and this much more is kept before it, for a soft attack
 
 
 def sha256(path):
@@ -83,6 +94,42 @@ def measure(path):
     }
 
 
+def frame_levels(path, rate=4000, frame_s=0.05):
+    """The level in dB of every 50 ms of a file. Plain Python, so it runs anywhere ffmpeg does."""
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-i", path, "-ac", "1", "-ar", str(rate), "-f", "s16le", "-"]
+    raw = subprocess.run(cmd, capture_output=True, timeout=300).stdout
+    samples = array.array("h")
+    samples.frombytes(raw[: len(raw) // 2 * 2])
+    if sys.byteorder == "big":
+        samples.byteswap()
+    n = int(rate * frame_s)
+    levels = []
+    for i in range(0, len(samples) - n + 1, n):
+        chunk = samples[i:i + n]
+        power = sum(x * x for x in chunk) / n
+        levels.append(10 * math.log10(max(power, 1.0) / 32768.0 ** 2))
+    return levels, frame_s
+
+
+def room_span(path, peak):
+    """(start, end) of the music in a recording whose room noise is too loud to count as silence.
+
+    Returns None when the recording is quiet enough for the ordinary test. The room is taken
+    to be the quietest 200 ms of the file; a note is 100 ms that stay ABOVE_ROOM_DB over it.
+    """
+    levels, step = frame_levels(path)
+    if len(levels) < 40:
+        return None
+    room = min(sum(levels[i:i + 4]) / 4 for i in range(len(levels) - 3))
+    if room < peak - ROOM_WITHIN_PEAK_DB:
+        return None
+    loud = [v > room + ABOVE_ROOM_DB for v in levels]
+    notes = [i for i in range(len(loud) - 1) if loud[i] and loud[i + 1]]
+    if not notes:
+        return None
+    return max(0.0, notes[0] * step - ROOM_LEAD_S), (notes[-1] + 2) * step
+
+
 def sounding_span(path):
     """(peak dB, start, end, duration): where the music starts and where its last note has faded."""
     duration = duration_of(path)
@@ -95,6 +142,15 @@ def sounding_span(path):
         start = ends[0]                               # the file opens with silence
     if starts and (len(ends) < len(starts) or ends[-1] >= duration - 0.1) and starts[-1] > start:
         end = starts[-1]                              # and closes with it
+    if start <= 0.0 or end >= duration:
+        # No silence found at one end. Either the music fills the file, or the room is
+        # audible (a home recording, an old tape) and its hiss passes for sound.
+        room = room_span(path, peak)
+        if room:
+            if start <= 0.0 and room[0] > 0.3:
+                start = room[0]
+            if end >= duration and room[1] < duration - 0.3 and room[1] > start:
+                end = room[1]
     return peak, max(0.0, start), min(duration, end), duration
 
 

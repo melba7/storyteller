@@ -51,7 +51,9 @@ def main():
             chain = label
         last = len(tracks) - 1
         filters.append(f"{chain}afade=t=in:d=1,areverse,afade=t=in:d=2,areverse[out]" if last >= 0 else "")
+        # Without -map_metadata the sampler would carry the first track's title and artist.
         cmd += ["-filter_complex", ";".join(f for f in filters if f), "-map", "[out]",
+                "-map_metadata", "-1", "-metadata", f"title={mood} sampler",
                 "-c:a", "aac", "-b:a", "192k", os.path.join(out, f"{mood}.m4a")]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=170)
         if result.returncode != 0:

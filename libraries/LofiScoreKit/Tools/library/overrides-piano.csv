@@ -1,4 +1,13 @@
 # Piano picks for Somber, Melancholy and Mysterious, 10 November 2026.
+# Second round the same day, after Satie, Bach's Well-Tempered Clavier (Kimiko Ishizaka)
+# and more modern piano came in. Swapped out: Goldberg Variation 21 (c0946) and Étude
+# Op. 25 No. 7 (c0830) from Somber; Waltz in A minor B. 150 (c0920) from Melancholy;
+# Nocturne Op. 27 No. 1 (c0891, stormy middle) and "Horror" (c0817, tense rather than
+# mysterious) from Mysterious.
+# The F minor fugue BWV 857 (c0986) scored well for Mysterious and was dropped all the
+# same: a fugue opens with one soft voice, 12 to 17 dB under its own middle for the first
+# ten seconds, and the player starts every track at its beginning. The Moonlight Sonata
+# (c0961) keeps the eighth place.
 # The scores put the right pieces at the top; these pins settle which mood a piece that
 # suits two of them goes to, and which modern tracks were seen to be one piano on a
 # close-up spectrogram (zoom_sheet.py). id,mood,weight: -9 on * drops, 5 or more pins.
@@ -8,28 +17,28 @@ c0908,somber,5
 c0911,somber,5
 c0832,somber,5
 c0876,somber,5
-c0830,somber,5
 c0950,somber,5
-c0946,somber,5
 c0829,somber,5
+c0979,somber,5
+c0964,somber,5
 # Melancholy
 c0890,melancholy,5
 c0898,melancholy,5
 c0896,melancholy,5
 c0885,melancholy,5
-c0920,melancholy,5
 c0912,melancholy,5
+c0995,melancholy,5
 c0811,melancholy,5
 c0745,melancholy,5
 # Mysterious
 c0907,mysterious,5
 c0903,mysterious,5
 c0900,mysterious,5
-c0891,mysterious,5
 c0847,mysterious,5
 c0943,mysterious,5
+c0962,mysterious,5
+c0963,mysterious,5
 c0961,mysterious,5
-c0817,mysterious,5
 # Not one piano on the close-up: a pad or strings run under it.
 c0788,*,-9
 c0806,*,-9

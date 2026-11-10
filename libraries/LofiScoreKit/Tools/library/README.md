@@ -69,7 +69,7 @@ that Mysterious missed too. Those three moods are now one piano and nothing else
 
 | Step | Script | What it does |
 |---|---|---|
-| 1 | `build_candidates.py fsm-piano fma-piano ia-musopen analysis pack` | Adds a piano pool tagged `phase:piano`: modern piano from the same two sites, and Musopen's public-domain recordings of Chopin, Bach, Schubert and Beethoven on archive.org. |
+| 1 | `build_candidates.py fsm-piano fma-piano ia-musopen analysis pack` | Adds a piano pool tagged `phase:piano`: modern piano from the same two sites, and Musopen's public-domain recordings of Chopin, Bach, Schubert and Beethoven on archive.org. Later passes added Wikimedia Commons and other archive.org items. |
 | 2 | `analyze.py`, then `instruments.py` and `sustain.py` | The usual measures, then two checks for "is it really one piano". `instruments.py` keeps how long each kind of instrument sounds. `sustain.py` looks for notes that swell or hold level, which a piano cannot do. |
 | 3 | `pick_piano.py` with `overrides-piano.csv` | Scores, filters and picks 8 per mood. |
 | 4 | `zoom_sheet.py`, `sheet.py` | Close-up spectrograms. A piano note is a sharp edge whose partials fade; a pad is a level line with no edge. |
@@ -100,6 +100,36 @@ for them, and both recorded in `CREDITS.md` and `SOURCES.csv`:
 
 A changed track stays under its own license. The samplers for these moods play the
 first 20 s of each track, since that is what the app plays first.
+
+### Second pass, the same day
+
+Mysterious was the weakest set: mostly Chopin, and one nocturne turned stormy after two
+minutes. A second and third download pass (see the header of `build_candidates.py`)
+brought Satie, Bach's Well-Tempered Clavier played by Kimiko Ishizaka (CC0) and more
+modern piano, 35 candidates in all. Five tracks changed: Satie's Gnossiennes 1 and 4
+went into Mysterious, the E-flat minor prelude BWV 853 and "Desolation" into Somber,
+and Gymnopédie No. 1 into Melancholy. `overrides-piano.csv` names what left and why.
+
+What that pass taught:
+
+- **"Solo piano" in a description is not proof.** Four Satie recordings from one
+  archive.org item are synthesizer versions. YAMNet heard piano in 0 to 1% of their
+  frames and ambient music in up to half, and the close-up showed level bands with no
+  attack. A recording from a trusted source now has to show piano in at least a quarter
+  of its frames (`piano_f15`), and still gets its close-up.
+- **Fugues open too quietly.** A fugue starts with one soft voice, and its first ten
+  seconds sit 12 to 17 dB under the piece's own middle, even after evening out. The
+  player starts every track at its beginning, so under a voice a fugue is a slow start.
+  Preludes, the Gnossiennes and the Moonlight Sonata open at their full level.
+- **Room noise hides a late start.** The trim treats 45 dB under the peak as silence.
+  A home recording with an audible room never gets that quiet, so the Gnossiennes kept
+  1.2 s of hiss before the first note. For such recordings the installer now takes the
+  quietest 200 ms as the room and starts where the sound first stays 10 dB above it.
+- **Wikimedia Commons needs a contact.** `upload.wikimedia.org` answered 429 after two
+  files, also at one file every ten minutes. Its robot policy asks for a contact link
+  or address in the User-Agent. That is Mo's to give, so the 43 other recordings chosen
+  in `piano2_commons.json` (Gnossiennes 2, 3, 5 and 6, Debussy, Ravel, Brahms) are
+  still unfetched.
 
 ## Re-running
 
@@ -134,6 +164,11 @@ python3 install_library.py FINAL/install.csv LofiCandidates LofiMusic-build --mo
 python3 install_library.py FINAL/install.csv LofiCandidates LofiMusic --measure-only
 python3 make_samplers.py LofiMusic "Renders/Mood samplers" 20 1.0 Somber,Melancholy,Mysterious start
 ```
+
+To swap a few tracks, put only their rows of `install.csv` into a small list and build
+that into a side folder. Move the replaced files to `Retired/`, move the new ones in,
+then run `--measure-only` with the full `install.csv` so `library.json` and
+`SOURCES.csv` match the folders again.
 
 `LofiMusic` also holds things other tools put there: the text side's model files
 (`LofiMood-embed-*.json`), the atmosphere sounds, each book's mood track, and a section

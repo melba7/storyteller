@@ -169,9 +169,16 @@ OTHER = [
     (r"intermezzo.*op\.? ?117.*\bno\.? ?2\b|intermezzo in b.?flat minor", {M: 0.9}),
     (r"intermezzo.*op\.? ?117.*\bno\.? ?3\b", {S: 0.7, Y: 0.6}),
     (r"intermezzo.*op\.? ?119.*\bno\.? ?1\b", {Y: 0.7, M: 0.6}),
+    # Well-Tempered Clavier I. The slow minor-key fugues are austere rather than sad.
+    (r"fugue.{0,40}bwv ?849", {S: 0.8, Y: 0.6}),
+    (r"fugue.{0,40}bwv ?853", {S: 0.8, Y: 0.5}),
+    (r"fugue.{0,40}bwv ?867", {S: 0.8, Y: 0.4}),
+    (r"fugue.{0,40}bwv ?857", {Y: 0.7, S: 0.4, "tense": 0.3}),     # winding chromatic subject
+    (r"fugue.{0,40}bwv ?861", {"adventurous": 0.3, M: 0.3}),
     (r"bwv ?853|prelude.{0,30}e.?flat minor", {S: 1.0, M: 0.5}),
     (r"bwv ?867|prelude.{0,30}b.?flat minor", {S: 0.9, M: 0.6}),
-    (r"bwv ?849|bwv ?869", {M: 0.7, S: 0.4}),
+    (r"bwv ?849", {M: 0.8, S: 0.4}),
+    (r"bwv ?869", {M: 0.6, "calm": 0.4}),                          # walking bass, even and unhurried
     (r"bwv ?857", {M: 0.7, S: 0.5}),
     (r"bwv ?861", {M: 0.6, "calm": 0.3}),
     (r"marche fun[eè]bre|funeral march", {S: 1.3}),
@@ -242,16 +249,29 @@ def is_classical(row):
 
 
 def classical(text, composer):
-    """(form, moods) from the tables above; moods may hold the extra key "storm"."""
+    """(form, moods) from the tables above; moods may hold the extra key "storm".
+
+    text is "title | album | artist", lower case. The title is tried on its own first: an
+    album called "Gnossiennes and Gymnopedies" says nothing about which one a track is.
+    """
     if composer == "chopin":
         return chopin(text)
     g = goldberg(text)
     if g is not None:
         return "variation", g
-    for pattern, moods in OTHER:
-        if re.search(pattern, text):
-            return "", dict(moods)
+    for part in (text.split(" | ")[0], text):
+        for pattern, moods in OTHER:
+            if re.search(pattern, part):
+                return "", dict(moods)
     return "", {}
+
+
+def performer_of(tags):
+    """The player of a classical recording, kept by the download step as a tag."""
+    m = re.search(r"performer:([^;]+)", str(tags))
+    if not m:
+        return ""
+    return m.group(1).strip().replace("OIga", "Olga")   # typo on archive.org (capital i for l)
 
 
 PRELUDE_KEYS = {2: "A minor", 4: "E minor", 6: "B minor", 8: "F-sharp minor", 13: "F-sharp major",
@@ -271,9 +291,14 @@ def _uncamel(s):
     return t
 
 
-def display_title(title):
+def display_title(title, performer=""):
     """A readable title for file names and credits; the recordings' own titles vary a lot."""
     t = str(title).strip()
+    if performer:                                   # "Gnossienne No. 1 (Gregory Tait, live)"
+        t = re.sub(r"\s*\(" + re.escape(performer) + r"[^)]*\)", "", t).strip()
+    m = re.match(r"Well-Tempered Clavier (I+): (Prelude|Fugue) No\. (\d+) in (.+?),? BWV ?(\d+)$", t)
+    if m:
+        return f"Well-Tempered Clavier {m.group(1)} - {m.group(2)} No. {m.group(3)} in {m.group(4)}, BWV {m.group(5)}"
     if re.match(r"MoonlightSonataMv1", t):
         return "Moonlight Sonata, Op. 27 No. 2 - I. Adagio sostenuto"
     m = re.match(r"JohannSebastianBach-\d+-GoldbergVariationsBwv\.988-(.+)$", t)

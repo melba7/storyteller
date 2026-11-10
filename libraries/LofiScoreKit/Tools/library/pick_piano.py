@@ -138,8 +138,8 @@ def main():
     d = cand.merge(feat, on="id", how="left", suffixes=("", "_f")).reset_index(drop=True)
     d["text"] = (d.title.fillna("") + " | " + d.album.fillna("") + " | " + d.artist.fillna("")).str.lower()
     d["composer"] = [pieces.composer_of(t) for t in d.text]
-    d["title_clean"] = [pieces.display_title(t) if c else base.nice_title(t, a)
-                        for t, a, c in zip(d.title, d.artist, d.composer)]
+    d["title_clean"] = [pieces.display_title(t, pieces.performer_of(g)) if c else base.nice_title(t, a)
+                        for t, a, c, g in zip(d.title, d.artist, d.composer, d.tags)]
     d["fav"] = d.favorites.map(base.num)
     d["tempo_n"] = pd.to_numeric(d.tempo, errors="coerce")
 
