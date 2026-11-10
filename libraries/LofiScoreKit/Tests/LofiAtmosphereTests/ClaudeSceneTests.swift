@@ -43,6 +43,24 @@ final class ClaudeSceneTests: XCTestCase {
         XCTAssertEqual(try place("the Weasleys' garden"), .new("the Weasleys' garden"), "a different place at the same house")
     }
 
+    func testSinceIsDroppedWhenNothingChanges() throws {
+        let guardian = try SpoilerGuard(chapters: [["One.", "Two."]])
+        let position = try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: 0))
+        let memory = PlaceMemory(entries: [AtmosphereTrack.Entry(
+            position: position, sentence: "x",
+            scene: StoryScene(placeID: "p1", placeName: "the parlour", setting: .indoors, layers: [SceneLayer(.fireplace)]), world: nil
+        )])
+        func since(_ place: String, named name: String = "the parlour", sounds: String) throws -> String? {
+            try ClaudeSceneEngine.answer(fromJSON: """
+                {"place":"\(place)","placeName":"\(name)","setting":"indoors","sounds":[\(sounds)],"world":"","cue":"","confidence":0.7,"since":"Two."}
+                """, memory: memory).since
+        }
+        XCTAssertNil(try since("p1", sounds: #"{"sound":"fireplace","level":"loud"}"#), "the same place with the same sounds has nothing to pin")
+        XCTAssertEqual(try since("p1", sounds: #"{"sound":"fireplace","level":"soft"},{"sound":"rainIndoors","level":"soft"}"#), "Two.",
+                       "a new sound at the current place is a change")
+        XCTAssertEqual(try since("new", named: "the stable yard", sounds: #"{"sound":"fireplace","level":"loud"}"#), "Two.", "a new place is a change")
+    }
+
     func testAnswersMapToKnownAndNewPlaces() throws {
         let memory = try memory()
         let known = try ClaudeSceneEngine.answer(fromJSON: """

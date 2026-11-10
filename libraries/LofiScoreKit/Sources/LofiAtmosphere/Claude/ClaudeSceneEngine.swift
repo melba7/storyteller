@@ -279,7 +279,12 @@ public struct ClaudeSceneEngine: SceneEngine {
             // Without the words it cannot be placed on a sentence.
             if !quote.isEmpty { oneShot = OneShotMention(sound: sound, quote: String(quote.prefix(120))) }
         }
-        let since = (raw.since ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        var since = (raw.since ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        // Nothing to pin when the passage stays in the current scene with the same sounds.
+        if let current = memory.current, let currentID = current.placeID, place == .known(currentID),
+           Set(layers.map(\.key)) == Set(current.layers.map(\.key)) {
+            since = ""
+        }
         return SceneAnswer(
             place: place, scene: scene, world: world.isEmpty ? nil : String(world.prefix(160)),
             // A new sound the scene does not use is not worth fetching.

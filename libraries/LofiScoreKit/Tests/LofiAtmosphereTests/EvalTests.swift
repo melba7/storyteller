@@ -73,8 +73,8 @@ final class EvalTests: XCTestCase {
             since: "The captain told"
         )
         let missed = SceneEvaluator.checks(for: inn, answer: wrong, window: window).filter { !$0.value }.keys
-        XCTAssertEqual(Set(missed), ["place", "setting", "main", "forbidden", "state", "oneShot", "transition", "since", "heard"],
-                       "a remembered place taken for the scene fails every check")
+        XCTAssertEqual(Set(missed), ["place", "setting", "main", "forbidden", "state", "oneShot", "transition", "heard"],
+                       "a remembered place taken for the scene fails every check but since, which a change of sound allows")
     }
 
     func testOneShotAndSinceMustBeFoundInThePassage() throws {
@@ -98,6 +98,24 @@ final class EvalTests: XCTestCase {
         let bad = SceneEvaluator.checks(for: storm, answer: misplaced, window: window)
         XCTAssertEqual(bad["oneShot"], false, "a quote not in the passage cannot be placed")
         XCTAssertEqual(bad["since"], false, "since names the wrong sentence")
+
+        var either = storm
+        either.expect.since = "A flash lit|The rain rushed"
+        XCTAssertEqual(SceneEvaluator.checks(for: either, answer: misplaced, window: window)["since"], true, "either sentence is accepted")
+        either.expect.place = "none|p1"
+        XCTAssertEqual(SceneEvaluator.checks(for: either, answer: misplaced, window: window)["place"], true, "either place is accepted")
+        either.expect.place = "none|new"
+        XCTAssertEqual(SceneEvaluator.checks(for: either, answer: misplaced, window: window)["place"], false)
+
+        // "none": a since is still accepted when the answer changed the sounds at the current place.
+        let inn = try cases()[0]
+        let innWindow = try inn.window()
+        let stays = StoryScene(placeID: nil, setting: .indoors, layers: [SceneLayer(.murmur, .soft), SceneLayer(.fireplace, .faint)], confidence: 0.9)
+        let pinned = SceneAnswer(place: .known("p1"), scene: stays, world: nil, oneShot: nil, since: "Nobody spoke")
+        XCTAssertEqual(SceneEvaluator.checks(for: inn, answer: pinned, window: innWindow)["since"], false, "nothing changed, so nothing to pin")
+        let louder = StoryScene(placeID: nil, setting: .indoors, layers: [SceneLayer(.murmur, .soft), SceneLayer(.fireplace, .faint), SceneLayer(.roomTone, .faint)], confidence: 0.9)
+        let changed = SceneAnswer(place: .known("p1"), scene: louder, world: nil, oneShot: nil, since: "Nobody spoke")
+        XCTAssertEqual(SceneEvaluator.checks(for: inn, answer: changed, window: innWindow)["since"], true, "a new sound is a change the builder pins")
 
         let plain = SceneAnswer(
             place: .known("p1"),

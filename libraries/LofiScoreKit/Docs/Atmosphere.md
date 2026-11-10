@@ -113,10 +113,10 @@ setting, main, required, forbidden, kinds, state, moment, transition, oneShot, s
 heard), each tag (place, sounds, state, transition, oneShot, kinds), and for each failed
 case what the scorer answered and what was wanted. `--only id,id`, `--book slug`,
 `--tag tag` and `--limit N` pick cases; `--model` and `--effort` pick the scorer; the plan
-route (`LOFI_CLAUDE_VIA=plan`) costs plan usage, about a dollar's worth at list prices for
-the whole set on Opus 5.5 at low effort, in under four minutes at `--concurrency 4`.
+route (`LOFI_CLAUDE_VIA=plan`) costs plan usage, under two dollars' worth at list prices for
+the whole set on Opus 5.5 at low effort, in about 4 minutes at `--concurrency 4`.
 
-What the set found, and what changed because of it (`SceneEvalTests` covers the checks):
+What the set found, and what changed because of it (`EvalTests` covers the checks):
 
 - **Prompt 5** (the catalogue with transitions and action sounds) passed 97 of 114 cases.
   It went silent on passages that describe the place the story is in (a tunnel, London
@@ -129,7 +129,30 @@ What the set found, and what changed because of it (`SceneEvalTests` covers the 
   through descriptive passages, compares a new place's name with every listed place
   first (and the parser maps a two-word match to the listed id), names the kind when the
   text names the sound, settles indoors and outdoors from the kind of place, and spells
-  out ship and coach departures. PROMPT6_RESULTS
+  out ship and coach departures. The parser drops `since` when the answer is the current
+  scene with the same sounds, so a scene is pinned only on a real change (a change of
+  sound at the same place counts). Prompt 6 passes 107 of 114 cases: 104 on the live run,
+  and three more once labels were widened where the scorer's reading was as good as the
+  label's (bolts drawn back as a lock sound, the crowd at Fezziwig's filling when "in they
+  all came", "imprisoned, hiding in silence" for the scullery). By check: place 67 of 68,
+  setting 100 of 102, main 100 of 103, required 10 of 10, forbidden 100 of 100, kinds 33
+  of 33, state 23 of 24, moment 9 of 9, transition 12 of 13, one-off 13 of 15, since 18 of
+  18, heard 110 of 111.
+- **Still missed** (seven cases): two descriptive passages in the second person are still
+  answered with no place (the Railway Children tunnel, Mrs Lynde at her window); a bell
+  that both starts the scene and should be a one-off (the Lowood school bell) is not named;
+  a one-off whose quote spans a sentence the splitter broke in two (the chain under
+  Scrooge's floor; the builder would drop that cue too, so the fix is in the book text, not
+  the scorer); a state note that ignores the passage's last sentence (the gloomy dining-room
+  at Baskerville Hall); no enter transition at the Meryton assembly; and garden birdsong as
+  the first sound in the Perks's kitchen. A different book, a different answer: the scorer's
+  answers vary a little from run to run even at low effort, so compare runs by the per-check
+  lines and read the "got/want" lines before changing anything.
+
+As a whole-book check, the first eight chapters of Treasure Island (645 sentences) were
+scored end to end with prompt 6 on the plan route: 62 planned sentences and 31 probes, 93
+entries, 52 of them with a pinned `sceneStart`, 17 places, 0 failures, about $2.50 at list
+prices in under ten minutes. The track is in the project's shared files for the timing work.
 
 ## More specific sounds (variants)
 

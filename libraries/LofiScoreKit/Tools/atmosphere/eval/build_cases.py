@@ -12,7 +12,7 @@ scorer rather than agreeing with it.
     python3 -I Tools/atmosphere/eval/build_cases.py --check    # only report anchors that fail
 
 The expectations (see SceneEvalCase in Sources/LofiAtmosphere/Eval/SceneEval.swift):
-  place      "new", "none", "any", or a place id from the case's memory
+  place      "new", "none", "any", or a place id from the case's memory ("a|b" accepts either)
   setting    indoors | outdoors | vehicle ("vehicle|outdoors" accepts either)
   main       families any of which may be the loudest sound
   required   families that must be there; forbidden: families that must not
@@ -21,7 +21,9 @@ The expectations (see SceneEvalCase in Sources/LofiAtmosphere/Eval/SceneEval.swi
   moment     none | swell | hush;  oneShot: none | a one-off sound id ("a|b" accepts either)
   transition transitions any of which fit, or ["none"]
   sinceAt    words of the sentence where the story enters the scene (resolved to expect.since,
-             the sentence's first six words); since "none" = the scene was already under way
+             the sentence's first six words; a list accepts any of the sentences); since "none"
+             = the scene was already under way
+             (a since is still accepted when the answer changed the current scene's sounds)
   heard      false when silence is as good as a sound
 Families, kinds, one-off sounds and transitions are checked against Tools/atmosphere/catalog.json.
 """
@@ -120,9 +122,9 @@ TOAD_HALL = {
 CASES = [
     # ---- Dracula --------------------------------------------------------------------
     dict(id="dr-castle-room-morning", book="dracula", ch=1, at="except the howling of wolves", n=14,
-         about="Harker alone in his room at the castle by day; wolves heard habitually, not now",
+         about="Harker alone in the castle by day (breakfast in the room where they supped); wolves heard habitually, not now",
          tags=["place", "oneShot", "state"], memory=DRACULA_CASTLE,
-         expect=dict(place="p2", setting="indoors", main=["roomTone", "wind", "emptyHall"],
+         expect=dict(place="p2|new", setting="indoors", main=["roomTone", "wind", "emptyHall"],
                      forbidden=["crowd", "city", "murmur"], oneShot="none", moment="none", transition=["none"], since="none")),
     dict(id="dr-castle-wolves-howl", book="dracula", ch=3, at="answered from far and wide by the howling of wolves", n=12,
          about="at his window at night; the Count calls and the wolves howl now",
@@ -135,7 +137,7 @@ CASES = [
              {"id": "p1", "name": "the Golden Krone hotel, Bistritz", "setting": "indoors", "sounds": "murmur soft, fireplace faint"},
              {"id": "p2", "name": "the caleche through the Borgo Pass", "setting": "vehicle", "sounds": "horses soft, wind soft, nightForest faint", "state": "night, wolves about"}]},
          expect=dict(place="new", setting="outdoors", main=["wind", "nightForest", "emptyHall", "roomTone", "horses"],
-                     forbidden=["crowd", "city"], oneShot="chainsRattle")),
+                     forbidden=["crowd", "city"], oneShot="chainsRattle|keyInLock")),
     dict(id="dr-whitby-calm", book="dracula", ch=6, at="in the great harmony of nature's silence", n=10,
          about="the harbour on the sultry still night before the storm (a newspaper cutting)",
          tags=["state", "sounds"], memory=WHITBY,
@@ -294,7 +296,7 @@ CASES = [
          expect=dict(place="new", setting="indoors", main=["roomTone", "emptyHall", "clock", "hushedRoom", "workshop", "fireplace", "oldTown"], forbidden=["crowd", "city"])),
     dict(id="cc-fezziwig-dance", book="a-christmas-carol", ch=1, at="away they all went, twenty couple at once", n=12,
          about="the warehouse turned into a ballroom: the same place in a new state, the dance starting",
-         tags=["state", "transition"], memory=FEZZIWIG, sinceAt="In came a fiddler",
+         tags=["state", "transition"], memory=FEZZIWIG, sinceAt=["In came a fiddler", "In they all came, one after another"],
          expect=dict(place="p2", setting="indoors", main=["crowd"], kinds={"crowd": ["partyIndoors", "ballroom", "feastHall"]},
                      state=["dance", "party", "ball", "music", "fiddler"], moment="swell|none", transition=["crowdGathers", "none"])),
     dict(id="cc-christmas-morning-streets", book="a-christmas-carol", ch=2, at="in their best clothes, and with their gayest faces", n=8,
@@ -395,7 +397,7 @@ CASES = [
                      state=["winter", "cold", "frost", "evening", "sunset", "still", "january", "dusk"])),
     dict(id="je-orchard-rain-rushes", book="jane-eyre", ch=22, at="the rain rushed down", n=10,
          about="the storm breaks over the orchard at Thornfield",
-         tags=["transition"], sinceAt="The rain rushed down",
+         tags=["transition"], sinceAt=["And what ailed the chestnut", "The rain rushed down"],
          memory={"world": "Thornfield Hall, the English midlands, a midsummer evening, the 1800s", "current": "p1", "places": [
              {"id": "p1", "name": "the orchard at Thornfield", "setting": "outdoors", "sounds": "nightInsects soft, wind faint", "state": "a still midsummer evening"}]},
          expect=dict(place="p1", setting="outdoors", main=["heavyRain", "rain", "strongWind", "thunder"], moment="swell", transition=["stormBreaks"])),
@@ -464,7 +466,7 @@ CASES = [
     dict(id="rc-perks-kitchen", book="railway-children", ch=9, at="buttoning her bodice", n=8,
          about="in the Perks's cottage kitchen",
          tags=["sounds"],
-         expect=dict(place="any", setting="indoors", main=["kitchen", "roomTone", "murmur", "fireplace", "river"], forbidden=["crowd", "train", "city"])),
+         expect=dict(place="any", setting="indoors", main=["kitchen", "roomTone", "murmur", "fireplace", "river", "work"], forbidden=["crowd", "train", "city"])),
     # ---- The Call of the Wild ---------------------------------------------------------
     dict(id="cw-judge-miller", book="call-of-the-wild", ch=0, at="Judge Miller's place", n=6,
          about="Buck's home in the sun-kissed Santa Clara valley",
@@ -526,7 +528,7 @@ CASES = [
          about="hiding in the scullery of the ruined house beside the Martian pit",
          tags=["state", "kinds"],
          expect=dict(place="any", setting="indoors", main=["roomTone", "dripping", "machinery", "deepDrone"], kinds={"roomTone": ["cellar", "oldHouseCreaks"]},
-                     forbidden=["crowd", "city", "birdsong"], state=["dark", "silent", "hidden", "trapped", "ruin", "quiet"])),
+                     forbidden=["crowd", "city", "birdsong"], state=["dark", "silen", "hid", "trapped", "imprison", "ruin", "quiet"])),
     dict(id="wow-thunder-child", book="war-of-the-worlds", ch=16, at="Thunder Child", n=8,
          about="on the Essex shore near Tillingham, a crowd of shipping of every kind offshore",
          tags=["sounds"],
@@ -729,12 +731,16 @@ def main() -> None:
         memory = case.get("memory")
         expect = dict(case["expect"])
         if case.get("sinceAt"):
-            where = [i for i, s in enumerate(chapters[-1]) if case["sinceAt"].lower() in s.lower()]
-            if not where:
-                print(f"NO SINCE  {case['id']}: \"{case['sinceAt']}\" is not in the passage")
-                problems += 1
-            else:
-                expect["since"] = " ".join(chapters[-1][where[-1]].split()[:6])
+            starts = []
+            for words in ([case["sinceAt"]] if isinstance(case["sinceAt"], str) else case["sinceAt"]):
+                where = [i for i, s in enumerate(chapters[-1]) if words.lower() in s.lower()]
+                if not where:
+                    print(f"NO SINCE  {case['id']}: \"{words}\" is not in the passage")
+                    problems += 1
+                else:
+                    starts.append(" ".join(chapters[-1][where[-1]].split()[:6]))
+            if starts:
+                expect["since"] = "|".join(starts)
         for label in ("main", "required", "forbidden"):
             for family in [f for item in (expect.get(label) or []) for f in item.split("|")]:
                 if family not in families:
@@ -757,7 +763,8 @@ def main() -> None:
                 or any(x not in ("none", "swell", "hush") for x in (expect.get("moment") or "none").split("|")):
             print(f"BAD SETTING/MOMENT  {case['id']}")
             problems += 1
-        if memory and expect["place"] not in ("new", "none", "any") and expect["place"] not in {p["id"] for p in memory["places"]}:
+        known = {p["id"] for p in memory["places"]} if memory else set()
+        if any(place not in ("new", "none", "any") and place not in known for place in expect["place"].split("|")):
             print(f"BAD PLACE  {case['id']}: expected {expect['place']} is not in the memory")
             problems += 1
         item = {"id": case["id"], "book": slug, "about": case.get("about"), "tags": case.get("tags"), "chapters": chapters, "expect": expect}

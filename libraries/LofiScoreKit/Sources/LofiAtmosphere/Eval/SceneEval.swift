@@ -45,7 +45,7 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
     }
 
     public struct Expect: Codable, Sendable, Hashable {
-        /// "new", "none", "any", or the id of a place in the memory.
+        /// "new", "none", "any", or the id of a place in the memory ("a|b" accepts either).
         public var place: String
         /// indoors, outdoors or vehicle ("vehicle|outdoors" for either); nil leaves it unchecked.
         public var setting: String?
@@ -67,8 +67,10 @@ public struct SceneEvalCase: Codable, Sendable, Hashable {
         public var oneShot: String?
         /// Transitions any of which fit, or ["none"]; nil leaves it unchecked.
         public var transition: [String]?
-        /// "none" when the scene was already under way before the passage, otherwise the
-        /// first words of the sentence where the story enters the scene; nil leaves it
+        /// "none" when the scene was already under way before the passage (a `since` is
+        /// still accepted if the answer changed the current scene's sounds, since the
+        /// builder would then pin that change), otherwise the first words of the sentence
+        /// where the story enters the scene ("a|b" accepts either sentence); nil leaves it
         /// unchecked.
         public var since: String?
         /// Whether the scene should be heard at all (confidence at least
@@ -316,12 +318,15 @@ public enum SceneEvaluator {
         var checks: [String: Bool] = [:]
         let families = Set(scene.layers.map(\.sound.rawValue))
 
-        switch expect.place.lowercased() {
-        case "any": break
-        case "none": checks["place"] = answer.place == .none
-        case "new":
-            if case .new = answer.place { checks["place"] = true } else { checks["place"] = false }
-        default: checks["place"] = answer.place == .known(expect.place)
+        let wantedPlaces = alternatives(expect.place, keepCase: true)
+        if !wantedPlaces.contains(where: { $0.lowercased() == "any" }) {
+            checks["place"] = wantedPlaces.contains { wanted in
+                switch wanted.lowercased() {
+                case "none": return answer.place == .none
+                case "new": if case .new = answer.place { return true } else { return false }
+                default: return answer.place == .known(wanted)
+                }
+            }
         }
         if let setting = expect.setting {
             checks["setting"] = alternatives(setting).contains(scene.setting.rawValue)
@@ -370,12 +375,15 @@ public enum SceneEvaluator {
         }
         if let since = expect.since {
             if since.lowercased() == "none" {
-                checks["since"] = answer.since == nil
+                // A change of sound at the current place is a change the builder pins.
+                let current = (try? item.placeMemory())?.current
+                let changed = current.map { Set(scene.layers.map(\.key)) != Set($0.layers.map(\.key)) } ?? true
+                checks["since"] = answer.since == nil || changed
             } else if let window {
                 // The same matching the builder uses to pin the change.
-                let wanted = SceneChangeFinder.line(startingWith: since, in: window)
+                let wanted = alternatives(since, keepCase: true).compactMap { SceneChangeFinder.line(startingWith: $0, in: window) }
                 let got = answer.since.flatMap { SceneChangeFinder.line(startingWith: $0, in: window) }
-                checks["since"] = wanted != nil && got == wanted
+                checks["since"] = got.map(wanted.contains) ?? false
             } else {
                 checks["since"] = answer.since != nil
             }
