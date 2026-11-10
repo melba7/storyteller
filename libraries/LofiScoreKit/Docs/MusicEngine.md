@@ -203,10 +203,10 @@ by measuring and scoring, not by ear. Vocals, wide dynamics, holiday themes and 
 busiest tracks were filtered out, and steady, warm tracks ranked higher.
 
 Somber, Melancholy and Mysterious are solo piano, because lofi hip-hop did not carry
-those moods: Chopin, Bach and Beethoven in Musopen's public-domain recordings, and
-three modern pieces. Their silent lead-ins are trimmed, since the player starts a track
-at its first sample, and their loud and quiet passages are brought closer together so
-they sit under a voice.
+those moods: Chopin, Bach, Satie and Beethoven in freely licensed recordings (Musopen,
+Kimiko Ishizaka's Well-Tempered Clavier, Wikimedia Commons), and three modern pieces.
+Their silent lead-ins are trimmed, since the player starts a track at its first sample,
+and their loud and quiet passages are brought closer together so they sit under a voice.
 
 Every track is CC0, public domain, CC BY or CC BY-SA. `SOURCES.csv` and `CREDITS.md`
 in the folder give each track's page, its license, the credit that license asks for and
