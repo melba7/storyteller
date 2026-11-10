@@ -72,7 +72,14 @@ The same rules as the mood track:
   the sentence: a probe sees only the text up to its own sentence and the places before
   it, so a sound still starts only where the text up to that sentence gives it. A change
   is pinned when the entries are within 3 sentences, or when an answer made from the text
-  up to its own sentence says the scene begins right there.
+  up to its own sentence says the scene begins right there. A change that plays a door or
+  an engine, or pauses the narration, is narrowed to its own sentence and comes first.
+- A probe with less text to go on may name a place differently from the entry after it.
+  When that entry says its scene had begun by the probe's sentence, the probe's new place
+  takes its id (`idForNewPlace`), so one place is not left a sentence later under another
+  name. And a swell, hush or transition is made once: when the sentence an entry says its
+  scene began on has been scored and makes the same move, the later entry's copy is taken
+  off (`dropRepeatedMoves`), or the door would play twice.
 - On the phone, the sound at sentence *n* comes from the newest entry at or before *n*,
   never a later one. Entries Claude was unsure of (confidence under 0.35) are skipped.
 - The status screen shows only the scene playing now.

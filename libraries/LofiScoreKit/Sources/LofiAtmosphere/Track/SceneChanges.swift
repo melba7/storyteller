@@ -102,11 +102,15 @@ public struct SceneChangeFinder: Sendable, Hashable {
         public let hinted: Bool
         /// Pinned because the later entry's own answer says its scene begins on its sentence.
         public let pinnedByAnswer: Bool
+        /// The change plays something on its own sentence (a swell, a hush, a door or an
+        /// engine), so it is narrowed to that sentence and counts for more.
+        public let onItsSentence: Bool
 
         public var gap: Int { at - from }
         public var isPinned: Bool { probe == nil }
-        /// What narrowing it is worth: how much the listener hears times how far off it may be.
-        public var value: Double { difference * Double(gap) }
+        /// What narrowing it is worth: how much the listener hears times how far off it
+        /// may be, and half as much again when a late start would play a door late.
+        public var value: Double { difference * Double(gap) * (onItsSentence ? 1.5 : 1) }
     }
 
     /// Two scenes the listener would hear as different: another place or other sounds (a
@@ -151,7 +155,8 @@ public struct SceneChangeFinder: Sendable, Hashable {
             }
             out.append(Change(
                 from: previous.globalIndex, at: entry.globalIndex, before: before, after: after,
-                difference: after.difference(from: before), probe: probe, hinted: hinted, pinnedByAnswer: byAnswer
+                difference: after.difference(from: before), probe: probe, hinted: hinted, pinnedByAnswer: byAnswer,
+                onItsSentence: onItsSentence
             ))
         }
         return out
@@ -180,5 +185,43 @@ public struct SceneChangeFinder: Sendable, Hashable {
             }
         }
         return inside ?? runOn
+    }
+}
+
+extension AtmosphereTrack {
+    /// Takes a swell, hush or transition off an entry when an earlier entry already made
+    /// it: the entry's own answer says its scene began on an earlier sentence, and an
+    /// entry at or after that sentence, sure enough to be played, carries the same move.
+    /// Returns how many moves were taken off.
+    ///
+    /// A first-pass entry a few sentences after a door names the door and the sentence it
+    /// was on. Once that sentence is scored, its entry plays the door, and the later
+    /// entry would play it a second time whenever its sounds differ a little. A move on
+    /// an entry whose scene began earlier is kept when no earlier entry made it (it is
+    /// then the first to say so), and a hush or swell inside a scene that is already
+    /// going is kept too.
+    @discardableResult
+    public mutating func dropRepeatedMoves(minConfidence: Double = AtmosphereConfig().minConfidence) -> Int {
+        var dropped = 0
+        for (index, entry) in entries.enumerated() {
+            guard entry.scene.moment != nil || entry.scene.transition != nil,
+                  let start = entry.sceneStart, start < entry.globalIndex
+            else { continue }
+            var scene = entry.scene
+            for earlier in entries[..<index].reversed() {
+                guard earlier.globalIndex >= start else { break }
+                guard earlier.scene.confidence >= minConfidence else { continue }
+                if scene.transition != nil, earlier.scene.transition == scene.transition {
+                    scene.transition = nil
+                    dropped += 1
+                }
+                if scene.moment != nil, earlier.scene.moment == scene.moment {
+                    scene.moment = nil
+                    dropped += 1
+                }
+            }
+            if scene != entry.scene { insert(Entry(copying: entry, scene: scene)) }
+        }
+        return dropped
     }
 }

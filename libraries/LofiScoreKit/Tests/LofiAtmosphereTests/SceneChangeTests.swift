@@ -10,13 +10,24 @@ final class HintingSceneEngine: SceneEngine, @unchecked Sendable {
     let id = "hinting/1"
     let inner = MarkerSceneEngine()
     let hints: Bool
+    /// Every answer whose scene is not the one before the passage names a transition, as
+    /// Claude does a few sentences after a door as well as on it.
+    let moves: Bool
+    /// From when this is set, a new place met on the passage's very last sentence gets a
+    /// name of its own, as a probe with less text to go on gives it.
+    var vagueAtFirstSight = false
 
-    init(hints: Bool = true) {
+    init(hints: Bool = true, moves: Bool = false) {
         self.hints = hints
+        self.moves = moves
     }
 
     func scene(for window: CausalWindow, memory: PlaceMemory) async throws -> SceneAnswer {
         var answer = try await inner.scene(for: window, memory: memory)
+        if vagueAtFirstSight, case .new = answer.place, window.lines.last?.text.contains("[") == true {
+            answer.place = .new("somewhere past sentence \(window.position.globalIndex)")
+            answer.scene.placeName = nil
+        }
         guard hints else { return answer }
         let before = memory.current ?? .silent
         let sameSounds = Set(before.layers.map(\.key)) == Set(answer.scene.layers.map(\.key))
@@ -30,6 +41,7 @@ final class HintingSceneEngine: SceneEngine, @unchecked Sendable {
               let line = window.lines.last(where: { $0.text.contains("[") })
         else { return answer }
         answer.since = line.text.split(separator: " ").prefix(4).joined(separator: " ")
+        if moves { answer.scene.transition = .stepInside }
         return answer
     }
 }
@@ -181,6 +193,13 @@ final class SceneChangeTests: XCTestCase {
         ]
         let probes = AtmosphereTrackBuilder.refinableChanges(in: entries, narrated: narrated, finder: SceneChangeFinder(), excluding: [])
         XCTAssertEqual(probes.map(\.globalIndex), [24, 54, 8])
+        // A change that plays a door counts for half as much again: 12 apart with a door
+        // (18) comes before 16 apart without (16).
+        var throughADoor = Self.tavern
+        throughADoor.transition = .enterThroughDoor
+        let withADoor = entries.dropLast() + [Self.entry(60, throughADoor)]
+        let doorFirst = AtmosphereTrackBuilder.refinableChanges(in: Array(withADoor), narrated: narrated, finder: SceneChangeFinder(), excluding: [])
+        XCTAssertEqual(doorFirst.map(\.globalIndex), [54, 24, 8])
         let skipping = AtmosphereTrackBuilder.refinableChanges(in: entries, narrated: narrated, finder: SceneChangeFinder(), excluding: [24])
         XCTAssertEqual(skipping.map(\.globalIndex), [54, 8])
     }
@@ -249,6 +268,104 @@ final class SceneChangeTests: XCTestCase {
             XCTAssertLessThanOrEqual(first.globalIndex - turn, 3, "change at \(turn) pinned at \(first.globalIndex)")
         }
         XCTAssertLessThan(hinted.report.probes, plain.report.probes)
+    }
+
+    // MARK: - One place, one door
+
+    func testAMoveAlreadyMadeIsNotRepeated() {
+        var outside = Self.street
+        outside.transition = .stepOutside
+        var further = StoryScene(placeID: "p2", layers: [SceneLayer(.oldTown), SceneLayer(.wind, .faint)])
+        further.transition = .stepOutside
+        func track(_ entries: [AtmosphereTrack.Entry]) -> AtmosphereTrack {
+            AtmosphereTrack(engineID: "t", bookID: "b", wordsBetweenEntries: 250, entries: entries)
+        }
+
+        // The entry on sentence 15 says its scene began on 11; 11 has been scored since
+        // and steps outside there. The door is played once, on 11.
+        var twice = track([Self.entry(0, Self.tavern), Self.entry(11, outside, start: 11), Self.entry(15, further, start: 11)])
+        XCTAssertEqual(twice.dropRepeatedMoves(), 1)
+        XCTAssertEqual(twice.entries.map(\.scene.transition), [nil, .stepOutside, nil])
+        XCTAssertEqual(twice.entries[2].sceneStart, 11)
+        XCTAssertEqual(twice.entries[2].scene.layers, further.layers)
+        XCTAssertEqual(twice.dropRepeatedMoves(), 0)
+
+        // Nothing scored on or after sentence 11 yet: 15 is the first to step outside.
+        var first = track([Self.entry(0, Self.tavern), Self.entry(15, further, start: 11)])
+        XCTAssertEqual(first.dropRepeatedMoves(), 0)
+        XCTAssertEqual(first.entries[1].scene.transition, .stepOutside)
+
+        // The entry on 11 is too unsure to be played, or made another move: 15 keeps its own.
+        var unsure = track([Self.entry(0, Self.tavern), Self.entry(11, outside, confidence: 0.2, start: 11), Self.entry(15, further, start: 11)])
+        XCTAssertEqual(unsure.dropRepeatedMoves(), 0)
+        var throughADoor = Self.street
+        throughADoor.transition = .leaveThroughDoor
+        var other = track([Self.entry(0, Self.tavern), Self.entry(11, throughADoor, start: 11), Self.entry(15, further, start: 11)])
+        XCTAssertEqual(other.dropRepeatedMoves(), 0)
+
+        // A hush inside a scene that has been going since sentence 11 is its own moment;
+        // the same swell twice is not.
+        var hushed = Self.street
+        hushed.moment = .hush
+        var inside = track([Self.entry(0, Self.tavern), Self.entry(11, Self.street, start: 11), Self.entry(15, hushed, start: 11)])
+        XCTAssertEqual(inside.dropRepeatedMoves(), 0)
+        XCTAssertEqual(inside.entries[2].scene.moment, .hush)
+        var swelling = Self.street
+        swelling.moment = .swell
+        var louder = further
+        louder.transition = nil
+        louder.moment = .swell
+        var swells = track([Self.entry(0, Self.tavern), Self.entry(11, swelling, start: 11), Self.entry(15, louder, start: 11)])
+        XCTAssertEqual(swells.dropRepeatedMoves(), 1)
+        XCTAssertEqual(swells.entries.map(\.scene.moment), [nil, .swell, nil])
+    }
+
+    func testAProbeWhereTheNextEntrySaysItsSceneBeganTakesItsPlace() {
+        var track = AtmosphereTrack(engineID: "t", bookID: "b", wordsBetweenEntries: 10)
+        track.insert(Self.entry(5, StoryScene(placeID: "p1", placeName: "the kitchen", layers: [])))
+        let path = Self.entry(15, StoryScene(placeID: "p2", placeName: "the coast path", layers: [SceneLayer(.seaShore)]), start: 10)
+        track.insert(path)
+        // The names do not match, but the path's own answer says its scene began on sentence 10.
+        XCTAssertEqual(AtmosphereTrackBuilder.idForNewPlace(named: "the road from the inn", before: 10, nextEntry: path, in: track), "p2")
+        XCTAssertEqual(AtmosphereTrackBuilder.idForNewPlace(named: "the road from the inn", before: 12, nextEntry: path, in: track), "p2")
+        // Before that sentence it is somewhere else.
+        XCTAssertEqual(AtmosphereTrackBuilder.idForNewPlace(named: "the road from the inn", before: 8, nextEntry: path, in: track), "p3")
+        // And a place the story was already in before the probe is not a new place there.
+        track.insert(Self.entry(3, StoryScene(placeID: "p2", placeName: "the coast path", layers: [SceneLayer(.seaShore)])))
+        XCTAssertEqual(AtmosphereTrackBuilder.idForNewPlace(named: "the road from the inn", before: 10, nextEntry: path, in: track), "p3")
+    }
+
+    func testAProbeOnTheHintedSentenceIsTheSamePlaceAndMakesTheMoveOnce() async throws {
+        let guardian = try BuilderTests.book()
+        let store = AtmosphereTrackStore(AtmosphereTrack(engineID: "hinting/1", bookID: "test", wordsBetweenEntries: 60))
+        let engine = HintingSceneEngine(moves: true)
+        // First pass alone, then the probes, which name a place they have only just met differently.
+        let first = try await AtmosphereTrackBuilder(spoilerGuard: guardian, plan: .init(wordsBetweenEntries: 60, refinement: nil))
+            .build(into: store, engine: engine)
+        XCTAssertEqual(first.probes, 0)
+        engine.vagueAtFirstSight = true
+        let report = try await AtmosphereTrackBuilder(spoilerGuard: guardian, plan: .init(wordsBetweenEntries: 60))
+            .build(into: store, engine: engine, concurrency: 3)
+        XCTAssertGreaterThan(report.probes, 0)
+        XCTAssertGreaterThan(report.repeatedMovesDropped, 0)
+
+        let track = store.snapshot
+        // Street, tavern and hall, each under one id, however a probe named them.
+        XCTAssertEqual(Set(track.entries.compactMap(\.scene.placeID)).count, 3)
+        for (marker, chapter) in [(25, 0), (40, 0), (30, 1)] {
+            let turn = try XCTUnwrap(try guardian.position(chapterOrdinal: chapter, sentenceIndex: marker)).globalIndex
+            let at = try XCTUnwrap(track.entries.first { $0.globalIndex == turn }, "no entry on \(turn)")
+            let next = try XCTUnwrap(track.entries.first { $0.globalIndex > turn })
+            XCTAssertEqual(at.scene.placeID, next.scene.placeID)
+            // The move is made on the sentence it happens on, and only there.
+            XCTAssertEqual(at.scene.transition, .stepInside)
+            XCTAssertNil(next.scene.transition, "the move at \(turn) is made again at \(next.globalIndex)")
+        }
+        // No entry repeats the move of the entry before it within one scene.
+        for (a, b) in zip(track.entries, track.entries.dropFirst()) where b.scene.transition != nil {
+            XCTAssertTrue(SceneChangeFinder.differ(a.scene, b.scene) && (b.sceneStart ?? b.globalIndex) > a.globalIndex,
+                          "\(b.globalIndex) repeats a move")
+        }
     }
 
     func testOldTracksWithoutHintsStillLoad() throws {
