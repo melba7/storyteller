@@ -242,7 +242,9 @@ again to carry on. The atmosphere steps it runs:
    each licence on the recording's own record, cuts a seamless 60 s loop from the steadiest
    part (encoded with Apple's AAC encoder so the phone loops it without a tick), measures
    loudness, and writes `sounds.json`, `variants.json`, `SOURCES.csv`, `CREDITS.md` and
-   `skipped.csv`, saving as it goes so a stopped run resumes. Only one run writes a folder
+   `skipped.csv`, saving as it goes so a stopped run resumes. It waits out rate limits
+   (Wikimedia answers HTTP 429 to quick searches) rather than skipping sounds, and downloads
+   through `.part` files. Only one run writes a folder
    at a time (a second one waits), and at the end it lists audio files that `sounds.json`
    doesn't know: the app plays those too, without credits. `--dry-run` lists what it
    would fetch.
