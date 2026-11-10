@@ -3,6 +3,10 @@
 These scripts chose the tracks in `~/Storyteller Lofi/LofiMusic` on Mo's Mac. Only the
 scripts and the choices live in git. The music never does, because the fork is public.
 
+**Shelved on 10 November 2026.** Mo made ambience sounds the app's focus and set the
+music aside for later. Nothing here is running. The [last section](#state-when-the-music-was-shelved)
+says what state the library is in and where everything that is not in git lives.
+
 Nobody listened to the candidates. Each track was measured, scored against every mood
 from several weak sources of evidence, filtered hard for anything that would fight a
 narrator, and then checked by eye on spectrograms. Treat the result as a strong first
@@ -174,3 +178,55 @@ then run `--measure-only` with the full `install.csv` so `library.json` and
 (`LofiMood-embed-*.json`), the atmosphere sounds, each book's mood track, and a section
 at the end of `CREDITS.md`. So change mood folders in place rather than swapping the
 whole folder, and keep that section when `CREDITS.md` is rewritten.
+
+Two small diagnostics, both read-only: `noise_check.py` says how far a recording's
+quietest stretches sit under its music, overall and above 4 kHz where hiss shows, and
+`even_test.py` tries gain-riding settings on a file and reports the spread before and
+after. The first decided that the Gnossiennes' room noise is no worse than what the
+library already held; the second chose the evening-out settings.
+
+## State when the music was shelved
+
+**The library is complete and consistent.** `~/Storyteller Lofi/LofiMusic` holds 90
+tracks, 8 per mood and 10 for calm, and `library.json`, `SOURCES.csv` and `CREDITS.md`
+match the folders (checked on 10 November after the last change). The copy in iCloud
+Drive, which the phone imports from, matched it the same day.
+
+**What Mo has and has not heard.** Mo listened to samplers of the lofi library and
+objected to three moods: Somber, Melancholy and Mysterious. Those became solo piano.
+Samplers of both piano passes were sent, and the music was shelved before Mo said what
+they think of them. So the piano sets are unreviewed, and the other eight moods passed
+without comment rather than with praise.
+
+**Loose ends, none of them blocking:**
+
+- 43 recordings picked on Wikimedia Commons are not downloaded (Gnossiennes 2, 3, 5
+  and 6, Debussy, Ravel, Brahms; `piano2_commons.json`). The site wants a contact link
+  or address in the User-Agent. Mo was asked and the question was dropped with the
+  shelving, so ask again before sending one.
+- 16 tracks are CC BY-SA. For Mo's own phone that only means the credits. If the app is
+  ever published, check how far share-alike reaches or swap them; every mood has CC0 or
+  CC BY alternates in the pool (`review.txt`).
+- Goldberg Variation 25 in Somber starts 0.85 s late. Its room is uneven, so the
+  room-noise test in `install_library.py` leaves it alone. A sturdier estimate of the
+  room, a low percentile in place of the quietest 200 ms, would catch it.
+- Well-known pieces (Moonlight Sonata, Prelude in E minor) may pull a listener's
+  attention. Alternates are in the piano `review.txt`.
+
+**What is not in git, and where it is:**
+
+| Where | What |
+|---|---|
+| Mac, `~/Storyteller Lofi/LofiMusic/` | The installed library. |
+| Mac, `~/Storyteller Lofi/LofiCandidates/` | The pool: 996 originals, `candidates.csv`, the download state. Re-downloading it takes hours at one request a second. |
+| Mac, `~/Storyteller Lofi/LofiMusic-tools/` | The scripts as they ran there, the install lists (`piano/round2/`), and a copy of the three analysis archives (`analysis/`). |
+| Mac, `~/Storyteller Lofi/Retired/` | Earlier sets: the first 32 CC0 tracks, the lofi versions of the three piano moods, the five piano tracks the second pass replaced. |
+| Mac, `~/Storyteller Lofi/Renders/Mood samplers/` | One sampler per mood and `What plays when.txt`. |
+| Project files, `lofi-music-library/analysis/` | `music-library-analysis-996.tar.gz`: every measurement (YAMNet, librosa, instrument and sustain checks), the pick outputs with scores and reasons, and the install list. `music-library-sheets-lofi.tar.gz` and `music-library-sheets-piano.tar.gz`: the spectrogram sheets. The README beside them says how to re-pick without measuring anything again. |
+| Project files, `lofi-music-library/selection*/`, `samplers*/` | The lists and samplers that were sent to Mo. |
+
+**To pick the music up again:** unpack the analysis archives, change `overrides.csv` or
+`overrides-piano.csv`, re-run the picker and `finalize.py`, then follow "Re-running"
+above for the Mac side. New candidates need `build_candidates.py` on the Mac, an
+analysis pack copied over, and `analyze.py` (with `instruments.py` and `sustain.py`
+for piano) before they can be scored.
