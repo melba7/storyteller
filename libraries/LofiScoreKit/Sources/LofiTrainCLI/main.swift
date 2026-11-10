@@ -44,15 +44,21 @@ import CreateML
 //       bag of words; see Embed.swift.
 //
 //   lofi-train oof [--data DIR] [--kind word] [--folds 10] [--repeats 3] [--old-books FILE] [--out FILE]
+//                  [--recipes a,b] [--alternatives FILE ...] [--people FILE]
 //       macOS only. Out-of-fold predictions over every labelled book for a few
 //       fixed recipes, compared window by window by Tools/eval/oof_compare.py;
 //       see OOF.swift.
+//
+//   lofi-train people --in people.jsonl [--kind word] [--out FILE]
+//       macOS only. Learns how pleasant and how energetic people rate a text
+//       (EmoBank's non-fiction sentences), for the "people" recipes; see People.swift.
 
 let usage = """
     usage: lofi-train export --windows FILE [--windows FILE ...] --labels FILE [--labels FILE ...] [--split FILE] [--out-dir DIR] [--chunk-words N] [--balance] [--validation-books N]
            lofi-train train --algorithm maxent|elmo|bert [--data DIR] [--out FILE.mlmodel] [--version V] [--all] [--max-iterations N]
            lofi-train embed [--data DIR] [--kinds word,contextual,word+contextual] [--folds 5] [--choose exact|kappa|macro-f1] [--version V] [--out-dir DIR] [--iterations N] [--all] [--curve]
-           lofi-train oof [--data DIR] [--kind word] [--folds 10] [--repeats 3] [--old-books FILE] [--out FILE]
+           lofi-train oof [--data DIR] [--kind word] [--folds 10] [--repeats 3] [--old-books FILE] [--out FILE] [--recipes a,b] [--alternatives FILE ...] [--people FILE]
+           lofi-train people --in people.jsonl [--kind word] [--out FILE]
     """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -72,6 +78,12 @@ do {
         try oofCommand(options)
         #else
         fail("oof needs the Mac")
+        #endif
+    case "people":
+        #if canImport(NaturalLanguage)
+        try peopleCommand(options)
+        #else
+        fail("people needs the Mac")
         #endif
     case "help", "--help", "-h": print(usage)
     default: fail("unknown command \(command)\n\(usage)")
@@ -418,6 +430,25 @@ struct Options {
         guard let n = Int(raw) else { fail("--\(name) expects a whole number, got \(raw)") }
         return n
     }
+    func double(_ name: String) -> Double? {
+        guard let raw = string(name) else { return nil }
+        guard let v = Double(raw) else { fail("--\(name) expects a number, got \(raw)") }
+        return v
+    }
+}
+
+/// Other moods that would also suit each window, by window id, from label
+/// files with an `accept` list (best first, as in claude-g2-test-sets.jsonl).
+/// Later files win.
+func alternativeMoods(_ paths: [String]) throws -> [String: [String]] {
+    struct Row: Decodable { var id: String; var bucket: String; var accept: [String]? }
+    var out: [String: [String]] = [:]
+    for path in paths {
+        for row in try readLines(Row.self, path: path) {
+            out[row.id] = (row.accept ?? []).filter { $0 != row.bucket }
+        }
+    }
+    return out
 }
 
 func readLines<T: Decodable>(_ type: T.Type, path: String) throws -> [T] {

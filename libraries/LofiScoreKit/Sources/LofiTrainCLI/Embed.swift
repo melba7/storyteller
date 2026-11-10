@@ -27,6 +27,12 @@ import NaturalLanguage
 //     --curve adds a learning curve (test agreement when training on a
 //     quarter, half or three quarters of the books) to show whether more
 //     labelled windows would help.
+//     --recipe NAME skips the search and trains a fixed recipe from
+//     Recipes.swift (the one `lofi-train oof` picked), with its settings,
+//     earlier-words weight, prior shift, soft labels (from --alternatives
+//     FILE ..., label files with `accept` lists) and lean towards people's
+//     ratings (from --people FILE, written by `lofi-train people`). Its
+//     cross-validation line then scores the settings and prior shift only.
 
 struct EmbedReport: Codable {
     var kind: String
@@ -62,11 +68,25 @@ func embedCommand(_ options: Options) throws {
     guard let criterion = LinearMoodModelSelection.Criterion(rawValue: choose) else {
         fail("--choose must be exact, kappa or macro-f1")
     }
+    var recipe: Recipe? = nil
+    if let name = options.string("recipe") {
+        guard let r = Recipe.named(name) else {
+            fail("unknown recipe \(name); known: \(Recipe.catalog.map(\.name).joined(separator: ", "))")
+        }
+        if r.oldOnly { fail("\(name) is for comparisons only") }
+        recipe = r
+    }
+    let alternatives = try alternativeMoods(options.strings("alternatives"))
+    var people: PeopleScores? = nil
+    if let path = options.string("people") { people = try PeopleScores.load(from: URL(fileURLWithPath: path)) }
+    if recipe?.usesPeople == true, people == nil { fail("recipe \(recipe!.name) needs --people FILE (lofi-train people)") }
+    if recipe?.usesAlternatives == true, alternatives.isEmpty { fail("recipe \(recipe!.name) needs --alternatives FILE") }
     #if canImport(NaturalLanguage)
     try embedExperiment(dataDir: dataDir, kinds: kinds, version: version, outDir: outDir, iterations: iterations,
-                        folds: folds, criterion: criterion, includeTest: options.flag("all"), curve: options.flag("curve"))
+                        folds: folds, criterion: criterion, includeTest: options.flag("all"), curve: options.flag("curve"),
+                        recipe: recipe, alternatives: alternatives, people: people)
     #else
-    _ = (dataDir, version, outDir, iterations, criterion)
+    _ = (dataDir, version, outDir, iterations, criterion, recipe, alternatives, people)
     fail("embed needs Apple's NaturalLanguage embeddings; run it on the Mac")
     #endif
 }
@@ -85,7 +105,8 @@ struct FeatureCache: Codable {
 }
 
 func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL, iterations: Int,
-                     folds: Int, criterion: LinearMoodModelSelection.Criterion, includeTest: Bool, curve: Bool) throws {
+                     folds: Int, criterion: LinearMoodModelSelection.Criterion, includeTest: Bool, curve: Bool,
+                     recipe fixed: Recipe? = nil, alternatives: [String: [String]] = [:], people: PeopleScores? = nil) throws {
     let train = try distinctExamples(dataDir.appendingPathComponent("train.json"))
     let validURL = dataDir.appendingPathComponent("valid.json")
     let valid = FileManager.default.fileExists(atPath: validURL.path) ? try distinctExamples(validURL) : []
@@ -160,15 +181,17 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
             }
             return out
         }
-        func selectionExamples(_ list: [Example]) -> [LinearMoodModelSelection.Example] {
+        func selectionExamples(_ list: [Example]) -> [(id: String, example: LinearMoodModelSelection.Example)] {
             list.compactMap { e in
                 guard let recent = vector(e.id) else { return nil }
                 let earlier = earlierText[e.id] == nil ? nil : vector(e.id + "|earlier")
-                return LinearMoodModelSelection.Example(group: e.book, label: e.label, recent: recent, earlier: earlier)
+                return (e.id, LinearMoodModelSelection.Example(group: e.book, label: e.label, recent: recent, earlier: earlier))
             }
         }
-        let poolX = selectionExamples(pool)
-        let testX = selectionExamples(test)
+        let poolPairs = selectionExamples(pool)
+        let testPairs = selectionExamples(test)
+        let poolX = poolPairs.map(\.example)
+        let testX = testPairs.map(\.example)
         if poolX.count < pool.count || testX.count < test.count {
             note("\(spec): no features for \(pool.count - poolX.count) training and \(test.count - testX.count) test windows; they are left out")
         }
@@ -177,26 +200,37 @@ func embedExperiment(dataDir: URL, kinds: [String], version: String, outDir: URL
             continue
         }
 
-        // Settings by cross-validation over whole training books.
-        let settings = [true, false].flatMap { balanced in
+        // Settings by cross-validation over whole training books (or the fixed recipe's).
+        var fixedOptions = fixed?.options
+        fixedOptions?.iterations = iterations
+        let grid: [LinearMoodModel.TrainingOptions] = [true, false].flatMap { balanced in
             [0.01, 0.03, 0.1, 0.3, 1.0, 3.0].map { LinearMoodModel.TrainingOptions(l2: $0, iterations: iterations, balanced: balanced) }
         }
-        note("\(spec): \(settings.count) settings × \(folds) folds over \(poolBooks) books, \(dimension) features")
+        let settings: [LinearMoodModel.TrainingOptions] = fixedOptions.map { [$0] } ?? grid
+        let earlierWeights: [Double] = fixed.map { [$0.earlierWeight] } ?? [0, 0.2, 0.35, 0.5]
+        note("\(spec): \(settings.count) settings × \(folds) folds over \(poolBooks) books, \(dimension) features\(fixed.map { " (recipe \($0.name))" } ?? "")")
         let candidates = LinearMoodModelSelection.crossValidate(
-            poolX, features: featureID, settings: settings, earlierWeights: [0, 0.2, 0.35, 0.5], folds: folds, criterion: criterion
+            poolX, features: featureID, settings: settings, earlierWeights: earlierWeights, folds: folds, criterion: criterion
         ) { note("  \(spec) " + $0) }
         let chosen = LinearMoodModelSelection.best(candidates, by: criterion)!
-        let options = LinearMoodModel.TrainingOptions(l2: chosen.l2, iterations: iterations, balanced: chosen.balanced)
+        var recipe = fixed ?? Recipe(name: "chosen", options: .init(l2: chosen.l2, iterations: iterations, balanced: chosen.balanced),
+                                     earlierWeight: chosen.previousChunkWeight)
+        recipe.options.iterations = iterations
+        let options = recipe.options
+        if recipe.usesPeople, let people, people.features != featureID {
+            fail("the --people file was learned on \(people.features) features, not \(featureID)")
+        }
 
         // The model to keep: chosen settings, trained on every training book (and the test books with --all).
-        let finalX = includeTest ? poolX + testX : poolX
-        var model = LinearMoodModel.train(features: featureID, x: finalX.map(\.recent), labels: finalX.map(\.label), options: options)
-        model.previousChunkWeight = chosen.previousChunkWeight
+        let finalPairs = includeTest ? poolPairs + testPairs : poolPairs
+        let finalX = finalPairs.map(\.example)
+        let model = recipe.train(features: featureID, examples: finalX,
+                                 alternatives: finalPairs.map { alternatives[$0.id] ?? [] }, people: people)
         let testScores = AgreementScores(
             gold: testX.map(\.label),
             predicted: testX.map { LinearMoodModelSelection.predict(model, $0, earlierWeight: chosen.previousChunkWeight) }
         )
-        let settingsText = "best \(criterion.rawValue): balanced=\(chosen.balanced), l2=\(chosen.l2), earlier words weight \(chosen.previousChunkWeight)"
+        let settingsText = fixed.map { "recipe \($0.name)" } ?? "best \(criterion.rawValue): balanced=\(chosen.balanced), l2=\(chosen.l2), earlier words weight \(chosen.previousChunkWeight)"
         summary.append("\(spec) (\(featureID), \(dimension) features; \(settingsText))")
         summary.append("  cross-validated on \(poolBooks) training books: \(chosen.scores.summary)")
         summary.append("  test\(includeTest ? " (trained on these books too, so not a fair score)" : ""): \(testScores.summary)")

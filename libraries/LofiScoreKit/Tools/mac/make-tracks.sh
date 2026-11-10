@@ -4,7 +4,10 @@
 # worth it.
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
-#   Tools/mac/make-tracks.sh [--via plan|api] [--cap DOLLARS] [--engine claude|claude:sonnet-5-5|claude:haiku-5-5] [--dry-run] BOOK.epub|EPUB-DIR ...
+#   Tools/mac/make-tracks.sh [--via plan|api] [--cap DOLLARS] [--engine claude|claude:sonnet-5-5|claude:haiku-5-5]
+#                            [--prompt 2|3] [--no-copy] [--dry-run] BOOK.epub|EPUB-DIR ...
+#
+# --prompt picks the prompt version (default 2; claude-check.sh compares them).
 #
 # --via plan (the default) runs every request through Claude Code (`claude -p`)
 # on the Claude subscription it is signed in with: no API key and no money,
@@ -22,9 +25,11 @@
 #
 # Use the read-aloud EPUBs as Storyteller serves them (the synced book the
 # phone downloads): the app matches a track to its book by the digests of its
-# first sentences, so the text must be the same. To get tracks onto the
-# phone, put the tracks folder inside the music folder before importing it
-# in the app; the import picks up every *.track.json in it.
+# first sentences, so the text must be the same. When a book's atmosphere
+# track ("<book>.atmosphere.json", from make-atmosphere.sh) is there too, the
+# two are combined into "<book>.score.json". Unless --no-copy, the tracks are
+# then copied into "~/Storyteller Lofi/LofiMusic/tracks", which the app's
+# import picks up (Settings > Import a music folder).
 set -uo pipefail
 
 ROOT="$HOME/Storyteller Lofi"
@@ -35,6 +40,8 @@ CAP=""
 ENGINE=claude
 VIA=plan
 DRY=0
+COPY=1
+PROMPT=""
 BOOKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -42,6 +49,8 @@ while [ $# -gt 0 ]; do
     --engine) ENGINE="$2"; shift 2 ;;
     --via) VIA="$2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
+    --prompt) PROMPT="$2"; shift 2 ;;
+    --no-copy) COPY=0; shift ;;
     -*) echo "unknown option $1"; exit 2 ;;
     *) BOOKS+=("$1"); shift ;;
   esac
@@ -56,10 +65,18 @@ case "$PKG" in "$ROOT"/*) ;; *) echo "Run this from a clone inside ~/Storyteller
 
 cd "$PKG"
 B=.build/release
-[ -x "$B/lofi-eval" ] || swift build -c release --product lofi-eval > /dev/null || { echo "build failed"; exit 1; }
 mkdir -p "$TRACKS/books" "$TRACKS/logs"
+swift build -c release --product lofi-eval > "$TRACKS/logs/build.log" 2>&1 || { grep error "$TRACKS/logs/build.log"; echo "build failed"; exit 1; }
 export LOFI_CLAUDE_VIA="$VIA"
 [ "$VIA" = api ] && export ANTHROPIC_API_KEY_FILE="$KEY_FILE"
+[ -n "$PROMPT" ] && export LOFI_CLAUDE_PROMPT="$PROMPT"
+# lofi-atmosphere combines a book's mood and atmosphere tracks. This clone may
+# not have it; the atmosphere tools' clone does.
+ATMOS=""
+for candidate in "$B/lofi-atmosphere" "$ROOT/atmosphere-tools/libraries/LofiScoreKit/.build/release/lofi-atmosphere"; do
+  [ -x "$candidate" ] && { ATMOS="$candidate"; break; }
+done
+DONE=()
 SPENT=0
 NOCAP=0
 [ -n "$CAP" ] || { CAP=100000; NOCAP=1; }
@@ -93,12 +110,34 @@ for book in "${BOOKS[@]}"; do
       echo "Every request failed for $name; stopping (see $log)."
       break
     fi
+    [ -s "$TRACKS/$name.track.json" ] && DONE+=("$name")
   else
     echo "== $name skipped: the \$$CAP cap is reached"
   fi
 done
-[ "$DRY" = 1 ] || {
-  if [ "$VIA" = plan ]; then echo "Used about \$$SPENT of plan usage, counted at API list prices. Tracks: $TRACKS"
-  else echo "Spent about \$$SPENT at list prices. Tracks: $TRACKS"; fi
+[ "$DRY" = 1 ] && exit 0
+if [ "$VIA" = plan ]; then echo "Used about \$$SPENT of plan usage, counted at API list prices. Tracks: $TRACKS"
+else echo "Spent about \$$SPENT at list prices. Tracks: $TRACKS"; fi
+
+MUSIC="$ROOT/LofiMusic"
+for name in "${DONE[@]+"${DONE[@]}"}"; do
+  if [ -s "$TRACKS/$name.atmosphere.json" ]; then
+    if [ -n "$ATMOS" ]; then
+      "$ATMOS" score --mood "$TRACKS/$name.track.json" --atmosphere "$TRACKS/$name.atmosphere.json" \
+        --out "$TRACKS/$name.score.json" 2>&1 | sed "s/^/$name: /"
+    else
+      echo "$name: has an atmosphere track too, but lofi-atmosphere isn't built here to combine them (make-atmosphere.sh does it on its next run)."
+    fi
+  fi
+  if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
+    mkdir -p "$MUSIC/tracks"
+    for file in "$TRACKS/$name.track.json" "$TRACKS/$name.score.json"; do
+      [ -s "$file" ] && cp "$file" "$MUSIC/tracks/"
+    done
+  fi
+done
+if [ "$COPY" = 1 ] && [ -d "$MUSIC" ] && [ ${#DONE[@]} -gt 0 ]; then
+  echo "Copied ${#DONE[@]} track(s) into $MUSIC/tracks. Import that folder in the app (Settings > Import a music folder)."
+else
   echo "To use them on the phone, copy that folder into the music folder and import it in the app."
-}
+fi

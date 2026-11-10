@@ -17,6 +17,11 @@ import LofiScoreCore
 //     --old-books lists (one per line) the books available before the newest
 //     batch; the "-old" recipes train only on those, still scored on every
 //     held-out window, to measure what the newer books add.
+//     --recipes picks recipes by name (Recipes.swift; "nested-exact" too). By
+//     default: the baseline, the prior-shift corrections, the soft-label
+//     recipes when --alternatives files are given, the people recipes when
+//     --people is given, and the "-old" one with --old-books. Nested runs
+//     only when named: it trains 50 models per fold.
 
 struct OOFRow: Codable {
     var id: String
@@ -61,15 +66,43 @@ func oofCommand(_ options: Options) throws {
     note("oof: \(examples.count) windows from \(books.count) books (\(test.count) of them from the \(Set(test.map(\.book)).count) test books), \(folds) folds × \(repeats) repeats, features \(cache.features)")
     if let oldBooks { note("old books: \(books.filter { oldBooks.contains($0) }.count) of \(books.count)") }
 
-    struct Recipe { var name: String; var options: LinearMoodModel.TrainingOptions; var weight: Double; var oldOnly: Bool }
-    var recipes = [
-        Recipe(name: "word2-settings", options: .init(l2: 0.1, iterations: 300, balanced: false), weight: 0.2, oldOnly: false),
-        Recipe(name: "word6-settings", options: .init(l2: 0.03, iterations: 300, balanced: false), weight: 0.35, oldOnly: false),
-        Recipe(name: "balanced-l2-0.1", options: .init(l2: 0.1, iterations: 300, balanced: true), weight: 0.2, oldOnly: false),
-    ]
-    if oldBooks != nil {
-        recipes.append(Recipe(name: "word2-settings-old", options: .init(l2: 0.1, iterations: 300, balanced: false), weight: 0.2, oldOnly: true))
+    let alternativesByID = try alternativeMoods(options.strings("alternatives"))
+    var people: PeopleScores? = nil
+    if let path = options.string("people") {
+        let loaded = try PeopleScores.load(from: URL(fileURLWithPath: path))
+        guard loaded.features == cache.features else {
+            fail("\(path) was learned on \(loaded.features) features, not \(cache.features)")
+        }
+        people = loaded
     }
+    var recipes: [Recipe]
+    var nested = false
+    if let names = options.string("recipes") {
+        recipes = []
+        for name in names.split(separator: ",").map(String.init) {
+            if name == "nested-exact" { nested = true; continue }
+            guard let r = Recipe.named(name) else {
+                fail("unknown recipe \(name); known: \((Recipe.catalog.map(\.name) + ["nested-exact"]).joined(separator: ", "))")
+            }
+            recipes.append(r)
+        }
+    } else {
+        recipes = Recipe.catalog.filter { r in
+            if r.name == Recipe.baseline.name || r.name.hasPrefix("prior-") { return true }
+            if r.oldOnly { return oldBooks != nil }
+            if r.usesAlternatives { return !alternativesByID.isEmpty && !r.name.contains("prior") }
+            if r.usesPeople { return people != nil }
+            return false
+        }
+        if !alternativesByID.isEmpty { recipes += Recipe.catalog.filter { $0.name == "soft-0.3-prior-0.3" } }
+    }
+    if recipes.contains(where: \.oldOnly), oldBooks == nil { fail("the -old recipes need --old-books") }
+    if recipes.contains(where: \.usesPeople), people == nil { fail("the people recipes need --people FILE (lofi-train people)") }
+    let alternatives = meta.map { alternativesByID[$0.id] ?? [] }
+    if !alternativesByID.isEmpty {
+        note("alternatives: \(alternatives.filter { !$0.isEmpty }.count) of \(examples.count) windows have other moods that would also suit them")
+    }
+    note("recipes: \((recipes.map(\.name) + (nested ? ["nested-exact"] : [])).joined(separator: ", "))")
     let grid = [true, false].flatMap { b in [0.01, 0.03, 0.1, 0.3, 1.0].map { LinearMoodModel.TrainingOptions(l2: $0, iterations: 300, balanced: b) } }
     let weights = [0.0, 0.2, 0.35, 0.5]
 
@@ -84,12 +117,16 @@ func oofCommand(_ options: Options) throws {
             let heldIdx = examples.indices.filter { foldOf[examples[$0].group]! == f }
             for recipe in recipes {
                 let idx = recipe.oldOnly ? trainIdx.filter { oldBooks!.contains(examples[$0].group) } : trainIdx
-                let model = LinearMoodModel.train(features: cache.features, x: idx.map { examples[$0].recent },
-                                                  labels: idx.map { examples[$0].label }, options: recipe.options)
+                let model = recipe.train(features: cache.features, examples: idx.map { examples[$0] },
+                                         alternatives: idx.map { alternatives[$0] }, people: people)
                 for i in heldIdx {
                     rows.append(OOFRow(id: meta[i].id, book: meta[i].book, gold: examples[i].label, repeatIndex: rep, recipe: recipe.name,
-                                       predicted: LinearMoodModelSelection.predict(model, examples[i], earlierWeight: recipe.weight)))
+                                       predicted: LinearMoodModelSelection.predict(model, examples[i], earlierWeight: recipe.earlierWeight)))
                 }
+            }
+            guard nested else {
+                note(String(format: "  repeat %d fold %d: %d held-out windows, %.0f s", rep + 1, f + 1, heldIdx.count, Date().timeIntervalSince(started)))
+                continue
             }
             // Nested: choose settings on the outer-training books only.
             let inner = trainIdx.map { examples[$0] }
@@ -110,7 +147,7 @@ func oofCommand(_ options: Options) throws {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
     try rows.map { String(data: try encoder.encode($0), encoding: .utf8)! }.joined(separator: "\n").write(to: out, atomically: true, encoding: .utf8)
-    for name in recipes.map(\.name) + ["nested-exact"] {
+    for name in recipes.map(\.name) + (nested ? ["nested-exact"] : []) {
         let r = rows.filter { $0.recipe == name }
         let s = AgreementScores(gold: r.map(\.gold), predicted: r.map(\.predicted))
         note("  \(name): \(s.summary) (pooled over \(repeats) repeats)")

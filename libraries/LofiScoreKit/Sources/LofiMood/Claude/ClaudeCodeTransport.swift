@@ -32,18 +32,26 @@ public struct ClaudeCodeTransport: HTTPTransport {
     public var extraArguments: [String]
     /// A run is stopped after this many seconds, or the request's timeout if longer.
     public var minimumTimeout: TimeInterval
+    /// How a request's JSON schema reaches Claude. `false` (the default) puts
+    /// it in the system prompt and reads the JSON object from the answer's
+    /// text. `true` passes `--json-schema`, which makes Claude Code take two
+    /// model turns per request (a StructuredOutput tool call, then a closing
+    /// message), so the prompt is sent and cached twice: about twice the usage.
+    public var schemaAsTool: Bool
 
     public init(
         executable: String = "claude",
         workingDirectory: URL? = nil,
         extraArguments: [String] = [],
-        minimumTimeout: TimeInterval = 120
+        minimumTimeout: TimeInterval = 120,
+        schemaAsTool: Bool = false
     ) {
         self.executable = executable
         self.workingDirectory = workingDirectory
             ?? FileManager.default.temporaryDirectory.appendingPathComponent("lofi-claude-code", isDirectory: true)
         self.extraArguments = extraArguments
         self.minimumTimeout = minimumTimeout
+        self.schemaAsTool = schemaAsTool
     }
 
     /// One `claude -p` run: its arguments and the prompt it reads on stdin.
@@ -51,20 +59,23 @@ public struct ClaudeCodeTransport: HTTPTransport {
         var arguments: [String]
         var prompt: String
         var model: String
+        /// The answer must be a JSON object found in the reply's text.
+        var expectsJSON = false
     }
 
     public func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         guard let body = request.httpBody,
               let json = try JSONSerialization.jsonObject(with: body) as? [String: Any]
         else { throw ClaudeCodeError.badRequest("the request has no JSON body") }
-        let call = try Self.call(for: json, extraArguments: extraArguments)
+        let call = try Self.call(for: json, extraArguments: extraArguments, schemaAsTool: schemaAsTool)
         try FileManager.default.createDirectory(at: workingDirectory, withIntermediateDirectories: true)
         let path = try Self.resolve(executable)
         let run = try await Self.run(
             path: path, arguments: call.arguments, input: Data(call.prompt.utf8),
             directory: workingDirectory, timeout: max(minimumTimeout, request.timeoutInterval)
         )
-        let (data, status) = Self.response(fromCLI: run.output, exitStatus: run.status, errorOutput: run.errorOutput, requestedModel: call.model)
+        let (data, status) = Self.response(fromCLI: run.output, exitStatus: run.status, errorOutput: run.errorOutput,
+                                           requestedModel: call.model, expectsJSON: call.expectsJSON)
         let url = request.url ?? URL(string: "https://api.anthropic.com/v1/messages")!
         guard let http = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["content-type": "application/json"]) else {
             throw ClaudeCodeError.badRequest("could not make a response")
@@ -77,9 +88,9 @@ public struct ClaudeCodeTransport: HTTPTransport {
     /// Turns a Messages API body into `claude -p` arguments. Only what
     /// `ClaudeMoodEngine` sends is supported: one system prompt, one user
     /// message of text, an optional JSON schema and effort.
-    static func call(for body: [String: Any], extraArguments: [String] = []) throws -> Call {
+    static func call(for body: [String: Any], extraArguments: [String] = [], schemaAsTool: Bool = false) throws -> Call {
         guard let model = body["model"] as? String, !model.isEmpty else { throw ClaudeCodeError.badRequest("no model") }
-        let system: String
+        var system: String
         if let text = body["system"] as? String {
             system = text
         } else if let blocks = body["system"] as? [[String: Any]] {
@@ -99,23 +110,79 @@ public struct ClaudeCodeTransport: HTTPTransport {
             throw ClaudeCodeError.badRequest("the user message has no text")
         }
 
+        // No tools, MCP servers or skills: some runs on Mo's Mac sent about
+        // 97k tokens per request instead of about 3k, most likely the
+        // account's claude.ai connectors loading into the context.
         var arguments = [
             "-p",
             "--output-format", "json",
             "--no-session-persistence",
             "--tools", "",
+            "--strict-mcp-config",
+            "--disable-slash-commands",
             "--model", model,
         ]
-        if !system.isEmpty { arguments += ["--system-prompt", system] }
         let output = body["output_config"] as? [String: Any]
+        var expectsJSON = false
         if let format = output?["format"] as? [String: Any], let schema = format["schema"] {
             let data = try JSONSerialization.data(withJSONObject: schema, options: [.sortedKeys])
-            arguments += ["--json-schema", String(decoding: data, as: UTF8.self)]
+            let text = String(decoding: data, as: UTF8.self)
+            if schemaAsTool {
+                arguments += ["--json-schema", text]
+            } else {
+                system += (system.isEmpty ? "" : "\n\n") + Self.schemaInstruction + text
+                expectsJSON = true
+            }
         }
+        if !system.isEmpty { arguments += ["--system-prompt", system] }
         if let effort = output?["effort"] as? String, !effort.isEmpty {
             arguments += ["--effort", effort]
         }
-        return Call(arguments: arguments + extraArguments, prompt: prompt, model: model)
+        return Call(arguments: arguments + extraArguments, prompt: prompt, model: model, expectsJSON: expectsJSON)
+    }
+
+    /// Precedes the schema at the end of the system prompt when it is not
+    /// passed as a tool. Keys in the schema's order keep prompt v3's `about`
+    /// before the mood, as structured output did.
+    static let schemaInstruction = """
+        Reply with one JSON object and nothing else: no other text and no code fence. \
+        It must match this JSON Schema, with its keys in the order the schema lists them:
+
+        """
+
+    /// The first complete JSON object in `text` (skipping any words, code
+    /// fence or stray brace around it), or nil when there is none.
+    static func jsonObjectText(in text: String) -> String? {
+        let chars = Array(text.unicodeScalars)
+        for start in chars.indices where chars[start] == "{" {
+            var depth = 0
+            var inString = false
+            var escaped = false
+            scan: for i in start..<chars.count {
+                let c = chars[i]
+                if inString {
+                    if escaped { escaped = false } else if c == "\\" { escaped = true } else if c == "\"" { inString = false }
+                    continue
+                }
+                switch c {
+                case "\"": inString = true
+                case "{": depth += 1
+                case "}":
+                    depth -= 1
+                    if depth == 0 {
+                        var view = String.UnicodeScalarView()
+                        view.append(contentsOf: chars[start...i])
+                        let candidate = String(view)
+                        if (try? JSONSerialization.jsonObject(with: Data(candidate.utf8))) is [String: Any] {
+                            return candidate
+                        }
+                        break scan
+                    }
+                default: break
+                }
+            }
+        }
+        return nil
     }
 
     // MARK: - Response
@@ -140,7 +207,8 @@ public struct ClaudeCodeTransport: HTTPTransport {
     /// body and HTTP status. Errors map to the statuses the engine already
     /// handles: not signed in is 401 (stop), usage or rate limits 429 and
     /// overload 529 (retry), anything else 500 (retry).
-    static func response(fromCLI output: Data, exitStatus: Int32, errorOutput: Data = Data(), requestedModel: String) -> (Data, Int) {
+    static func response(fromCLI output: Data, exitStatus: Int32, errorOutput: Data = Data(), requestedModel: String,
+                         expectsJSON: Bool = false) -> (Data, Int) {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         // The result is the JSON object Claude Code printed: the whole output
@@ -170,6 +238,13 @@ public struct ClaudeCodeTransport: HTTPTransport {
         if let structured = raw["structured_output"], !(structured is NSNull),
            let data = try? JSONSerialization.data(withJSONObject: structured, options: [.sortedKeys]) {
             text = String(decoding: data, as: UTF8.self)
+        } else if expectsJSON {
+            // A reply that holds no JSON object is retried, like an API error.
+            guard let object = jsonObjectText(in: result.result ?? "") else {
+                let detail = String((result.result ?? "").prefix(200))
+                return (errorBody(type: "api_error", message: "the answer was not a JSON object: \(detail)"), 500)
+            }
+            text = object
         } else {
             text = result.result ?? ""
         }
@@ -276,6 +351,7 @@ public struct ClaudeCodeTransport: HTTPTransport {
             child.process.currentDirectoryURL = directory
             var environment = ProcessInfo.processInfo.environment
             environment.removeValue(forKey: "ANTHROPIC_API_KEY")
+            environment["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"
             child.process.environment = environment
             child.process.standardInput = child.stdin
             child.process.standardOutput = child.stdout

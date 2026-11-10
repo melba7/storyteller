@@ -68,12 +68,24 @@ public struct LinearMoodModel: Codable, Sendable, Equatable {
         public var learningRate: Double
         /// Weight each mood's examples so every mood counts equally in the loss.
         public var balanced: Bool
+        /// After training, subtract this much of each mood's log share of the
+        /// labels from its bias ("logit adjustment"): 0 or nil changes
+        /// nothing, 1 removes the pull towards common moods entirely. A gentle
+        /// version of `balanced`, which over-corrects (round 8: 4.8 points
+        /// lower agreement).
+        public var priorShift: Double?
+        /// With `alternatives`, the share of each example's target spread over
+        /// the other moods that would also suit it (best mood keeps the rest).
+        public var alternativeWeight: Double?
 
-        public init(l2: Double = 1e-3, iterations: Int = 300, learningRate: Double = 0.05, balanced: Bool = true) {
+        public init(l2: Double = 1e-3, iterations: Int = 300, learningRate: Double = 0.05, balanced: Bool = true,
+                    priorShift: Double? = nil, alternativeWeight: Double? = nil) {
             self.l2 = l2
             self.iterations = iterations
             self.learningRate = learningRate
             self.balanced = balanced
+            self.priorShift = priorShift
+            self.alternativeWeight = alternativeWeight
         }
     }
 
@@ -141,14 +153,32 @@ public struct LinearMoodModel: Codable, Sendable, Equatable {
 
     /// Fits the model by full-batch Adam on softmax cross-entropy plus an L2
     /// penalty. Deterministic: the weights start at zero and there is no sampling.
-    public static func train(features: String, x: [[Double]], labels: [String], options: TrainingOptions = TrainingOptions()) -> LinearMoodModel {
+    ///
+    /// `alternatives` (one list per example, possibly empty) names other moods
+    /// that would also suit each example; with `options.alternativeWeight`
+    /// they share that much of its target ("soft labels").
+    public static func train(features: String, x: [[Double]], labels: [String], alternatives: [[String]]? = nil,
+                             options: TrainingOptions = TrainingOptions()) -> LinearMoodModel {
         precondition(!x.isEmpty && x.count == labels.count, "need one label per example")
+        precondition(alternatives == nil || alternatives!.count == labels.count, "need one list of alternatives per example")
         let n = x.count
         let d = x[0].count
-        let classes = Array(Set(labels)).sorted()
+        let softShare = min(max(options.alternativeWeight ?? 0, 0), 1)
+        let others: [[String]] = softShare > 0 && alternatives != nil
+            ? zip(labels, alternatives!).map { label, alts in alts.filter { $0 != label } }
+            : []
+        let classes = Array(Set(labels).union(others.joined())).sorted()
         let k = classes.count
         let index = Dictionary(uniqueKeysWithValues: classes.enumerated().map { ($1, $0) })
         let y = labels.map { index[$0]! }
+        // Soft targets only where an example has alternatives: (index, share) pairs.
+        var soft: [[(Int, Double)]] = []
+        if !others.isEmpty {
+            soft = others.enumerated().map { i, alts in
+                guard !alts.isEmpty else { return [] }
+                return [(y[i], 1 - softShare)] + alts.map { (index[$0]!, softShare / Double(alts.count)) }
+            }
+        }
 
         // Standardise. z is n×d and zt its transpose, both row-major.
         var mean = [Double](repeating: 0, count: d)
@@ -195,8 +225,14 @@ public struct LinearMoodModel: Codable, Sendable, Equatable {
                 for c in 0..<k { r[row + c] += b[c]; top = max(top, r[row + c]) }
                 var total = 0.0
                 for c in 0..<k { let e = exp(r[row + c] - top); r[row + c] = e; total += e }
+                for c in 0..<k { r[row + c] /= total }
+                if !soft.isEmpty, !soft[i].isEmpty {
+                    for (c, t) in soft[i] { r[row + c] -= t }
+                } else {
+                    r[row + y[i]] -= 1
+                }
                 for c in 0..<k {
-                    let g = w[i] * (r[row + c] / total - (c == y[i] ? 1 : 0))
+                    let g = w[i] * r[row + c]
                     r[row + c] = g
                     gb[c] += g
                 }
@@ -217,8 +253,32 @@ public struct LinearMoodModel: Codable, Sendable, Equatable {
             }
         }
 
+        if let shift = options.priorShift, shift != 0 {
+            var counts = [Double](repeating: 0, count: k)
+            for c in y { counts[c] += 1 }
+            // A mood seen only as an alternative counts as half an example.
+            for c in 0..<k { b[c] -= shift * log(max(counts[c], 0.5) / Double(n)) }
+        }
         let rows = (0..<k).map { c in (0..<d).map { j in W[j * k + c] } }
         return LinearMoodModel(features: features, classes: classes, mean: mean, scale: scale, weights: rows, bias: b, training: options)
+    }
+
+    /// This model with `perClass[mood] × (a·x + c)` added to each mood's
+    /// logit, folded into the weights and biases, so the result is an
+    /// ordinary model file that any engine reads. `a` and `c` act on the raw
+    /// (unstandardised) features. Used to lean the moods towards a score
+    /// learned elsewhere, such as how pleasant people rate a text.
+    public func addingLinearScore(weights a: [Double], bias c: Double, perClass: [String: Double]) -> LinearMoodModel {
+        precondition(a.count == dimension, "expected \(dimension) weights, got \(a.count)")
+        var out = self
+        // a·x = Σ a_j (z_j scale_j + mean_j), with z the standardised input.
+        let offset = zip(a, mean).reduce(c) { $0 + $1.0 * $1.1 }
+        for (k, name) in classes.enumerated() {
+            guard let f = perClass[name], f != 0 else { continue }
+            for j in 0..<dimension { out.weights[k][j] += f * a[j] * scale[j] }
+            out.bias[k] += f * offset
+        }
+        return out
     }
 
     /// c (m×n) = a (m×p) · b (p×n), all row-major. Accelerate on Apple platforms.
