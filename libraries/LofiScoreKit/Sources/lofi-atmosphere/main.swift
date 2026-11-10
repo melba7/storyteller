@@ -18,6 +18,13 @@ let usage = """
       lofi-atmosphere synth FOLDER [--seconds 30] [--rate 32000] [--sound rain]
       lofi-atmosphere library FOLDER [--edition personal|publish]
       lofi-atmosphere catalog [--out Tools/atmosphere/catalog.json] [--prompt]
+      lofi-atmosphere eval CASES.jsonl [--model claude-opus-5-5] [--effort low] [--concurrency 4] [--out RESULTS.jsonl]
+                      [--only id,id] [--book SLUG] [--tag TAG] [--limit N] [--verbose]
+      lofi-atmosphere eval CASES.jsonl --replay RESULTS.jsonl [--verbose]
+
+    eval scores the passages in CASES.jsonl (Tools/atmosphere/eval/cases.jsonl: real book passages with
+    the place, sounds, state, moment and one-off sound each should get) and reports how many checks
+    pass; --replay re-checks a saved run without asking Claude again.
 
     The built-in catalogue (every sound family, its more specific kinds and the place guide) is
     always offered to Claude. --variants adds the Mac's catalog of other books' requests. catalog
@@ -42,7 +49,7 @@ struct Arguments {
     var positional: [String] = []
     var options: [String: String] = [:]
     var flags: Set<String> = []
-    static let flagNames: Set<String> = ["dry-run", "places", "prompt"]
+    static let flagNames: Set<String> = ["dry-run", "places", "prompt", "verbose"]
 
     init(_ raw: [String]) {
         var i = 0
@@ -396,6 +403,59 @@ func catalogCommand(_ args: Arguments) throws {
     }
 }
 
+// MARK: - eval
+
+func evalCommand(_ args: Arguments) async throws {
+    guard let path = args.positional.dropFirst().first else { fail("give the cases file\n\(usage)") }
+    var cases = try SceneEvalCase.load(from: URL(fileURLWithPath: path))
+    if let only = args.string("only") {
+        let ids = Set(only.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+        cases = cases.filter { ids.contains($0.id) }
+    }
+    if let book = args.string("book") { cases = cases.filter { $0.book == book } }
+    if let tag = args.string("tag") { cases = cases.filter { $0.tags?.contains(tag) ?? false } }
+    let limit = args.int("limit", default: 0)
+    if limit > 0 { cases = Array(cases.prefix(limit)) }
+    guard !cases.isEmpty else { fail("no cases to run in \(path)") }
+    let verbose = args.flag("verbose")
+
+    if let replayPath = args.string("replay") {
+        let saved = try SceneEvalResult.load(from: URL(fileURLWithPath: replayPath))
+        let results = SceneEvaluator.replay(cases, results: saved)
+        print(SceneEvaluator.report(cases, results: results, engineID: "replay of \(replayPath)", verbose: verbose))
+        return
+    }
+
+    let model = args.string("model") ?? "claude-opus-5-5"
+    guard let prices = ScenePrices.forModel(model) else { fail("no price known for \(model); use one of \(ScenePrices.known.map(\.model))") }
+    let usage = SceneUsage()
+    let route = claudeTransport()
+    let engine = ClaudeSceneEngine(
+        apiKey: route.apiKey,
+        configuration: .init(model: prices.model, effort: args.string("effort") ?? "low"),
+        usage: usage,
+        transport: route.transport
+    )
+    note("\(cases.count) cases with \(engine.id) via the \(route.via == "plan" ? "Claude plan (Claude Code)" : "Anthropic API")")
+    let started = Date()
+    let total = cases.count
+    let results = await SceneEvaluator.run(cases, engine: engine, concurrency: args.int("concurrency", default: 4)) { _, done in
+        if done % 10 == 0 || done == total { note("  \(done) of \(total) scored") }
+    }
+    if let out = args.string("out") {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        let lines = try results.map { String(decoding: try encoder.encode($0), as: UTF8.self) }
+        try (lines.joined(separator: "\n") + "\n").write(to: URL(fileURLWithPath: out), atomically: true, encoding: .utf8)
+        note("wrote \(out)")
+    }
+    print(SceneEvaluator.report(cases, results: results, engineID: engine.id, verbose: verbose))
+    let totals = usage.totals
+    note(String(format: "Claude: %d responses, %d input, %d cache-read, %d output tokens, %d retries, %d refusals: about $%.2f at %@ list prices, %.0f s",
+                totals.responses, totals.inputTokens, totals.cacheReadTokens, totals.outputTokens, totals.retries,
+                totals.refusals, prices.dollars(totals), prices.model, Date().timeIntervalSince(started)))
+}
+
 // MARK: - main
 
 let args = Arguments(Array(CommandLine.arguments.dropFirst()))
@@ -407,6 +467,7 @@ do {
     case "synth": try synthCommand(args)
     case "library": try libraryCommand(args)
     case "catalog": try catalogCommand(args)
+    case "eval": try await evalCommand(args)
     default: fail(usage)
     }
 } catch {

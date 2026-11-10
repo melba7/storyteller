@@ -89,7 +89,7 @@ final class CatalogTests: XCTestCase {
 
     func testThePromptCarriesEveryFamilyItsKindsAndThePlaceGuide() {
         let system = ClaudeScenePrompt.system
-        XCTAssertEqual(ClaudeScenePrompt.version, 5)
+        XCTAssertEqual(ClaudeScenePrompt.version, 6)
         for sound in AmbientSound.allCases {
             XCTAssertTrue(system.contains("\n- \(sound.rawValue): "), "\(sound.rawValue) is not in the prompt")
         }
