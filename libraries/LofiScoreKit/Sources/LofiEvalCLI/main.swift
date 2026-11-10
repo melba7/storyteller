@@ -16,7 +16,7 @@ import LofiText
 //       --concurrency runs several readings at once (for network engines); the
 //       output keeps the input order.
 //
-//   lofi-eval simulate <epub-dir> --engine NAME [--track track.json] [--cadence auto|plan|sentence] [--book id] [--chapters a-b] [--out f]
+//   lofi-eval simulate <epub-dir> --engine NAME [--track track.json] [--settle off|N[:A]] [--cadence auto|plan|sentence] [--book id] [--chapters a-b] [--out f]
 //       Plays the book through MoodTracker on a simulated clock, exactly as the
 //       app would, and reports readings, mood changes per hour and latency.
 //       With --track, plays a saved mood track back and uses NAME wherever the
@@ -25,13 +25,24 @@ import LofiText
 //       4 sentences / 20 s for Apple's on-device model.
 //
 //   lofi-eval track    <epub-dir> --engine NAME --out track.json [--book id] [--words 250] [--refine-budget 0.6] [--resolution 3]
-//       Scores the book once into a mood track, then pins each mood change to
-//       within --resolution sentences, spending at most --refine-budget times
-//       the planned entries on extra readings (0 turns refinement off).
-//                      [--chapters a-b] [--concurrency 4] [--dry-run]
-//       Scores a whole book once into a mood track (see MoodTrackBuilder).
-//       Resumes from an existing --out file. --dry-run only counts the entries
-//       and estimates the Claude cost.
+//                      [--settle off|N[:A]] [--chapters a-b] [--concurrency 4] [--dry-run]
+//       Scores a whole book once into a mood track (see MoodTrackBuilder), then
+//       pins each mood change to within --resolution sentences, spending at
+//       most --refine-budget times the planned entries on extra readings (0
+//       turns refinement off). Resumes from an existing --out file. --dry-run
+//       only counts the entries and estimates the Claude cost.
+//
+//   lofi-eval settle   <track.json> [--settle N[:A]] [--resolution 3] [--out f]
+//       How a saved track settles into scenes (see MoodSettling), without the
+//       book: how often its readings turn, how many turns the music follows
+//       and how closely those are pinned. --out writes one line per entry:
+//       sentence, its own mood, the mood played.
+//
+//   --settle, for all three: playback settles a track's readings into
+//       scene-length moods. N is what a change of music costs, in sentences of
+//       narration on a mood that does not fit (default 9, about a minute); A
+//       what a sentence costs on a mood the reading only lists as also fitting
+//       (default 0.25); off plays (and, for track, refines) every turn.
 //
 //   lofi-eval engines
 //       Which engines can run on this machine.
@@ -39,8 +50,9 @@ import LofiText
 let usage = """
     usage: lofi-eval windows <epub-dir> [--book ID] [--sample N --seed S | --every-sentence] [--chapters A-B] [--max-words 400] [--out FILE]
            lofi-eval run --engine NAME [--in FILE] [--out FILE] [--limit N] [--concurrency N] [--max-dollars D]
-           lofi-eval simulate <epub-dir> --engine NAME [--track FILE] [--cadence auto|plan|sentence] [--book ID] [--chapters A-B] [--out FILE]
-           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--refine-budget 0.6] [--resolution 3] [--chapters A-B] [--concurrency 4] [--max-dollars D] [--dry-run]
+           lofi-eval simulate <epub-dir> --engine NAME [--track FILE] [--settle off|N[:A]] [--cadence auto|plan|sentence] [--book ID] [--chapters A-B] [--out FILE]
+           lofi-eval track <epub-dir> --engine NAME --out FILE [--book ID] [--words 250] [--refine-budget 0.6] [--resolution 3] [--settle off|N[:A]] [--chapters A-B] [--concurrency 4] [--max-dollars D] [--dry-run]
+           lofi-eval settle <track.json> [--settle N[:A]] [--resolution 3] [--out FILE]
            lofi-eval engines
     engines: \(EngineFactory.names.joined(separator: ", "))
     """
@@ -58,6 +70,7 @@ do {
     case "run": try await runCommand(args)
     case "simulate": try await simulateCommand(args)
     case "track": try await trackCommand(args)
+    case "settle": try settleCommand(args)
     case "engines": EngineFactory.availabilityReport().forEach { print($0) }
     case "help", "--help", "-h": print(usage)
     default: fail("unknown command \(command)\n\(usage)")
@@ -229,7 +242,9 @@ func simulateCommand(_ args: Arguments) async throws {
     if let trackPath = args.string("track") {
         let track = try MoodTrack.decode(Data(contentsOf: URL(fileURLWithPath: trackPath)))
         note("playing \(track.entries.count) track entries from \(track.engineID), \(name) elsewhere")
-        engine = TrackedMoodEngine(store: MoodTrackStore(track), fallback: timed)
+        let settling = settlingOption(args)
+        if let settling { note("  " + settledSummary(track.entries, settling)) }
+        engine = TrackedMoodEngine(store: MoodTrackStore(track), fallback: timed, settling: settling)
     }
     let cadence: ReadingCadence.Configuration
     switch args.string("cadence") ?? "auto" {
