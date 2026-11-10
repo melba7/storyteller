@@ -98,8 +98,8 @@ for them, and both recorded in `CREDITS.md` and `SOURCES.csv`:
   +10 dB), so notes keep their shape and whole passages move. The loudness range of the
   evened picks fell from 10-21 LU to 6-13 LU.
 
-Share-alike tracks are never changed. The samplers for these moods play the first 20 s
-of each track, since that is what the app plays first.
+A changed track stays under its own license. The samplers for these moods play the
+first 20 s of each track, since that is what the app plays first.
 
 ## Re-running
 

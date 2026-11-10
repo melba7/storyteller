@@ -68,9 +68,6 @@ LEX = [
     (r"tension|danger|chase|\bstorm|fury|panic|\bfear|\bbattle|\bwar\b|horror|decisive", {"tense": 1.0}),
     (r"\bepic|heroes|journey|adventure|reaching the sky|traveling|follow the river", {"adventurous": 1.0}),
 ]
-COMPOSERS = ["chopin", "satie", "debussy", "schumann", "beethoven", "grieg", "schubert", "liszt",
-             "mendelssohn", "tchaikovsky", "scriabin", "rachmaninoff", "rachmaninov", "ravel", "bach",
-             "mozart", "brahms", "field", "faur[eé]", "albeniz", "granados", "wagner"]
 
 # YAMNet mood classes -> moods (z-scored within the eligible pool).
 YAM = {
@@ -129,13 +126,6 @@ def edges(path, sr=22050):
     return round(live[0] * 0.05, 2), round((k - 1 - live[-1]) * 0.05, 2)
 
 
-def composer_of(text):
-    for c in COMPOSERS:
-        if re.search(r"\b" + c, text) or re.search(c + r"\b", text.replace(" ", "")):
-            return re.sub(r"[^a-z]", "", c)
-    return ""
-
-
 def main():
     cand_path, feat_path, yam_dir, inst_path, sustain_path, out_dir = sys.argv[1:7]
     override_path = sys.argv[7] if len(sys.argv) > 7 else None
@@ -147,7 +137,7 @@ def main():
     feat = feat.drop_duplicates("id", keep="last")
     d = cand.merge(feat, on="id", how="left", suffixes=("", "_f")).reset_index(drop=True)
     d["text"] = (d.title.fillna("") + " | " + d.album.fillna("") + " | " + d.artist.fillna("")).str.lower()
-    d["composer"] = [composer_of(t) for t in d.text]
+    d["composer"] = [pieces.composer_of(t) for t in d.text]
     d["title_clean"] = [pieces.display_title(t) if c else base.nice_title(t, a)
                         for t, a, c in zip(d.title, d.artist, d.composer)]
     d["fav"] = d.favorites.map(base.num)
@@ -183,7 +173,7 @@ def main():
     sus = pd.read_csv(sustain_path).drop_duplicates("path", keep="last").set_index("path")
     for c in ("swell_e", "steady_e"):
         d[c] = [sus[c].get(p, np.nan) for p in d.path.fillna("")]
-    d["known_solo"] = (d.composer != "") & (d.source == "archive.org")
+    d["known_solo"] = (d.composer != "") & d.source.isin(pieces.SOLO_SOURCES)
 
     # --- filters -----------------------------------------------------------------------
     reasons, soft = {}, {}
@@ -213,12 +203,13 @@ def main():
             flag(i, f"length {r.duration:.0f}s")
         # Piano swings far more than lofi. Up to EVEN_ABOVE the track is used as it is;
         # above it install_library.py evens it out (slow gain riding), which copes with
-        # about 22 LU. Tracks under a share-alike licence are not evened.
+        # about 22 LU.
         if r.lra > (22 if r.known_solo else 16):
             flag(i, f"wide dynamics (loudness range {r.lra:.0f} LU)")
         if r.lufs < -34:
             flag(i, f"recorded very quietly ({r.lufs:.0f} LUFS)")
-        if not r.known_solo and r.piano_f15 < 0.05:
+        # On the Musopen recordings YAMNet hears a piano at least 29% of the time.
+        if r.piano_f15 < (0.25 if r.known_solo else 0.05):
             flag(i, f"piano not recognised ({r.piano_f15:.0%} of the time)")
         others = []
         for g, (stat, limit) in SOLO_LIMITS.items():
@@ -303,7 +294,7 @@ def main():
     # How well a track sits under a voice: even loudness, few notes, soft tone, no dance step.
     # Evening out takes most of the sting out of a wide loudness range, so count only part of it.
     d["lra_eff"] = np.where(d.lra > EVEN_ABOVE, EVEN_ABOVE + 0.3 * (d.lra - EVEN_ABOVE), d.lra)
-    d["even"] = np.where((d.lra > EVEN_ABOVE) & ~d.license.fillna("").str.contains("SA"), "yes", "")
+    d["even"] = np.where(d.lra > EVEN_ABOVE, "yes", "")
     d["subtle"] = (-0.35 * zz("lra_eff") - 0.25 * zz("onset_rate") - 0.2 * zz("dyn") - 0.2 * zz("centroid")
                    - 0.5 * d.storm - np.where(d.form.isin(pieces.DANCES), 0.25, 0.0)).round(2)
     br = pd.to_numeric(d.bitrate_kbps, errors="coerce").fillna(256)
@@ -360,14 +351,16 @@ def main():
     pk = pd.DataFrame(picks)
     # What install_library.py should do to each pick: "even" (even out and trim), "trim"
     # (only cut silence off the ends; music starts from the top of a track, so a silent
-    # lead-in is a late start) or nothing. Share-alike tracks are left exactly as released.
+    # lead-in is a late start) or nothing. A changed track stays under its own licence,
+    # which for share-alike is what that licence asks, and the credits say what changed.
+    # The library holds MP3s, so a pick in another format is at least trimmed (re-encoded).
     if len(pk):
         lead_trail = [edges(p) for p in pk.path]
         pk["lead_s"] = [a for a, _ in lead_trail]
         pk["trail_s"] = [b for _, b in lead_trail]
-        sa = pk.license.fillna("").str.contains("SA")
-        pk["process"] = np.where(sa, "", np.where(pk.even == "yes", "even",
-                                 np.where((pk.lead_s > 0.3) | (pk.trail_s > 2.0), "trim", "")))
+        not_mp3 = ~pk.local_path.fillna("").str.lower().str.endswith(".mp3")
+        pk["process"] = np.where(pk.even == "yes", "even",
+                                 np.where((pk.lead_s > 0.3) | (pk.trail_s > 2.0) | not_mp3, "trim", ""))
     cols = ["mood", "n", "id", "pass", "source", "artist", "album", "title_clean", "license", "fit", "rank",
             "subtle", "quality", "tempo_n", "key", "mode", "lufs", "lra", "duration", "bitrate_kbps", "best",
             "piano_f15", "piano_f30", "drums_f15", "strings_f15", "synth_f15", "ambient_f30", "swell_e", "steady_e",

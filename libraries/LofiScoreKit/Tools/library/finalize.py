@@ -95,7 +95,8 @@ def main():
     for p in picks.itertuples():
         c = cand.loc[p.id]
         mood = p.mood.capitalize()
-        classical = c.source == "archive.org"
+        musopen = c.source == "archive.org" and "musopen" in str(c.album).lower()
+        classical = piano_pieces.is_classical(c)
         title = piano_pieces.display_title(c.title) if classical else clean_title(c.title)
         artist = clean_artist(c.artist)
         base = safe(f"{title} - {artist}")
@@ -108,10 +109,12 @@ def main():
         lic_url = re.sub(r"/deed\.[^/]*$", "", str(c.license_url).strip()).rstrip("/") + "/"
         lname = license_name(c.license_url, c.license)
         credit = artist
-        if classical and "musopen" in str(c.album).lower():
+        if classical:
+            # The licence belongs to the recording, so the credit names who played it.
             performer = performer_of(c.tags)
-            credit = (f"{artist}, played by {performer} (Musopen recording)" if performer
-                      else f"{artist} (Musopen recording)")
+            credit = f"{artist}, played by {performer}" if performer and performer != artist else artist
+            if musopen:
+                credit += " (Musopen recording)"
         process = str(getattr(p, "process", "") or "")
         process = process if process in CHANGES else ""
         attribution = f'"{title}" by {credit}, {c.page_url}, licensed under {lname} ({lic_url})'

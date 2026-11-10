@@ -110,7 +110,11 @@ GOLDBERG = {
 
 # Other composers, matched on the lower-cased "title | album | artist"; the first match wins.
 OTHER = [
-    (r"gnossienne", {Y: 1.4}),
+    (r"gnossienne.{0,12}\b2\b", {Y: 1.1, M: 0.4}),
+    (r"gnossienne.{0,12}\b4\b", {Y: 1.2, M: 0.5}),
+    (r"gnossienne.{0,12}\b5\b", {Y: 0.6, "dreamy": 0.5, "calm": 0.4}),   # the gentle, flowing one
+    (r"gnossienne.{0,12}\b6\b", {Y: 0.9}),
+    (r"gnossienne", {Y: 1.4}),                                             # Nos. 1 and 3 above all
     (r"gymnop[eé]die.*\b(no\.?|n[°º]|#)? ?1\b|premi[eè]re gymnop", {M: 1.0, "calm": 0.5}),
     (r"gymnop[eé]die.*\b(no\.?|n[°º]|#)? ?2\b", {Y: 0.6, "dreamy": 0.6, M: 0.4}),
     (r"gymnop[eé]die.*\b(no\.?|n[°º]|#)? ?3\b", {M: 0.9, S: 0.5}),
@@ -125,7 +129,24 @@ OTHER = [
     (r"d\.? ?664.{0,40}andante", {"calm": 0.6, M: 0.5}),
     (r"menuett|minuet|scherzo|rondo|allegr|presto|vivace", {"playful": 0.6}),
     (r"schubert.*(andante|adagio|lento)|(andante|adagio|lento).*schubert", {M: 0.4, "calm": 0.3}),
+    (r"le gibet", {Y: 1.2, S: 0.7}),
+    (r"oiseaux tristes", {Y: 0.9, M: 0.6}),
+    (r"pavane pour une infante|pavane for a dead princess", {M: 0.9, "calm": 0.4}),
+    (r"v mlh[aá]ch|in the mists?", {Y: 1.0, M: 0.6}),
+    (r"barn owl|s[yý][cč]ek", {Y: 1.0, S: 0.5}),
+    (r"unutterable anguish|[uú]zkost", {S: 0.9, M: 0.5}),
+    (r"overgrown path|zarostl[eé]m chodn[ií][cč]ku", {M: 0.7, Y: 0.5}),
+    (r"old castle|vecchio castello", {Y: 0.9, M: 0.8}),
+    (r"catacomb", {Y: 1.0, S: 0.8}),
+    (r"[eé]tude.{0,30}op\.? ?2.{0,6}no\.? ?1\b.{0,40}scriabin|scriabin.{0,60}op\.? ?2.{0,6}no\.? ?1\b", {M: 1.0}),
+    (r"scriabin.{0,60}op\.? ?74|op\.? ?74.{0,60}scriabin", {Y: 1.1, "tense": 0.3}),
+    (r"scriabin.{0,60}op\.? ?11.{0,8}no\.? ?(2|4|10|13|15|16|22)\b", {M: 0.7, Y: 0.5}),
+    (r"scriabin.{0,60}pr[eé]lude", {M: 0.4, Y: 0.4}),
     (r"des pas sur la neige|footsteps in the snow", {S: 1.0, Y: 0.7}),
+    (r"danseuses de delphes", {Y: 0.8, "calm": 0.5}),
+    (r"terrasse des audiences|et la lune descend|cloches [aà] travers", {Y: 0.9, "dreamy": 0.5}),
+    (r"hommage [aà] rameau", {S: 0.5, "calm": 0.5, Y: 0.4}),
+    (r"snow is dancing", {Y: 0.7, "playful": 0.3}),
     (r"la cath[eé]drale engloutie|sunken cathedral", {Y: 1.0}),
     (r"voiles\b|canope|feuilles mortes|brouillards", {Y: 1.0, "dreamy": 0.4}),
     (r"clair de lune", {"dreamy": 1.3}),
@@ -141,6 +162,9 @@ OTHER = [
     (r"solitary traveller|einsamer wanderer|heimweh|homesick", {M: 0.9}),
     (r"gondellied|venetian boat|gondola song", {M: 0.8, Y: 0.5}),
     (r"\boctober\b|autumn song|chanson triste|sad song", {M: 1.0}),
+    (r"\bjune\b.{0,30}barcarol|barcarol.{0,30}\bjune\b", {M: 0.8, "romantic": 0.3}),
+    (r"intermezzo.*op\.? ?117.*\bno\.? ?1\b", {"calm": 0.7, M: 0.4}),
+    (r"intermezzo.*op\.? ?118.*\bno\.? ?2\b", {"romantic": 1.0, M: 0.3}),
     (r"intermezzo.*op\.? ?118.*\bno\.? ?6\b|intermezzo in e.?flat minor", {S: 0.9, Y: 0.8}),
     (r"intermezzo.*op\.? ?117.*\bno\.? ?2\b|intermezzo in b.?flat minor", {M: 0.9}),
     (r"intermezzo.*op\.? ?117.*\bno\.? ?3\b", {S: 0.7, Y: 0.6}),
@@ -148,6 +172,8 @@ OTHER = [
     (r"bwv ?853|prelude.{0,30}e.?flat minor", {S: 1.0, M: 0.5}),
     (r"bwv ?867|prelude.{0,30}b.?flat minor", {S: 0.9, M: 0.6}),
     (r"bwv ?849|bwv ?869", {M: 0.7, S: 0.4}),
+    (r"bwv ?857", {M: 0.7, S: 0.5}),
+    (r"bwv ?861", {M: 0.6, "calm": 0.3}),
     (r"marche fun[eè]bre|funeral march", {S: 1.3}),
     (r"\belegie\b|\belegy\b|[eé]l[eé]gie|lament", {S: 0.9, M: 0.6}),
 ]
@@ -185,6 +211,34 @@ def goldberg(text):
     if re.search(r"aria", text.replace("variation", "")):
         return dict(GOLDBERG["aria"])
     return {}
+
+
+COMPOSERS = ["chopin", "satie", "debussy", "schumann", "beethoven", "grieg", "schubert", "liszt",
+             "mendelssohn", "tchaikovsky", "scriabin", "rachmaninoff", "rachmaninov", "ravel", "bach",
+             "mozart", "brahms", "field", "faur[eé]", "albeniz", "granados", "wagner", "jan[aá][cč]ek",
+             "m[ou]+ssorgsky"]
+# Pieces whose name alone says who wrote them (a performer's own upload may not name him).
+PIECE_COMPOSERS = [(r"gymnop[eé]die|gnossienne", "satie")]
+# Sources whose classical recordings are one piano: Musopen on archive.org, performers'
+# own uploads on Wikimedia Commons and archive.org, Kevin MacLeod's classical piano.
+SOLO_SOURCES = {"archive.org", "commons", "incompetech"}
+
+
+def composer_of(text):
+    """The composer named in a candidate's lower-case "title | album | artist", or ""."""
+    for c in COMPOSERS:
+        if re.search(r"\b" + c, text) or re.search(c + r"\b", text.replace(" ", "")):
+            return re.sub(r"[^a-z]", "", c)
+    for pattern, composer in PIECE_COMPOSERS:
+        if re.search(pattern, text):
+            return composer
+    return ""
+
+
+def is_classical(row):
+    """A known solo recording of a classical piece: a composer is named and the source is trusted."""
+    text = " | ".join(str(row.get(k) or "") for k in ("title", "album", "artist")).lower()
+    return row.get("source") in SOLO_SOURCES and bool(composer_of(text))
 
 
 def classical(text, composer):
