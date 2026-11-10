@@ -65,8 +65,8 @@ case "$PKG" in "$ROOT"/*) ;; *) echo "Run this from a clone inside ~/Storyteller
 
 cd "$PKG"
 B=.build/release
-[ -x "$B/lofi-eval" ] || swift build -c release --product lofi-eval > /dev/null || { echo "build failed"; exit 1; }
 mkdir -p "$TRACKS/books" "$TRACKS/logs"
+swift build -c release --product lofi-eval > "$TRACKS/logs/build.log" 2>&1 || { grep error "$TRACKS/logs/build.log"; echo "build failed"; exit 1; }
 export LOFI_CLAUDE_VIA="$VIA"
 [ "$VIA" = api ] && export ANTHROPIC_API_KEY_FILE="$KEY_FILE"
 [ -n "$PROMPT" ] && export LOFI_CLAUDE_PROMPT="$PROMPT"

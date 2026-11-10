@@ -20,7 +20,8 @@ import LofiText
 ///                              ANTHROPIC_API_KEY or the file named by ANTHROPIC_API_KEY_FILE;
 ///                              LOFI_CLAUDE_VIA=plan runs each request through Claude Code
 ///                              (`claude -p`) on its signed-in subscription, no key needed
-///                              (LOFI_CLAUDE_CODE names the executable if not on PATH).
+///                              (LOFI_CLAUDE_CODE names the executable if not on PATH;
+///                              LOFI_CLAUDE_CODE_ARGS adds arguments to each run).
 ///                              Unset: the API when a key is set, otherwise the plan.
 enum EngineFactory {
     static let names = ["lexicon", "nltagger", "fm", "fm-tagging", "fast:<model>", "fm+fast:<model>", "embed:<model.json>", "lm:<config.json>", "recommended[:<model>]", "claude[:<model>]"]
@@ -159,8 +160,13 @@ enum EngineFactory {
         case .plan(let executable):
             #if os(macOS) || os(Linux)
             // The key is never sent: the transport ignores headers.
+            // LOFI_CLAUDE_CODE_ARGS adds arguments to every run, e.g.
+            // "--strict-mcp-config --disable-slash-commands" to keep the
+            // account's connectors and skills out of each request.
+            let extra = (ProcessInfo.processInfo.environment["LOFI_CLAUDE_CODE_ARGS"] ?? "")
+                .split(whereSeparator: \.isWhitespace).map(String.init)
             return ClaudeMoodEngine(apiKey: "subscription", configuration: configuration, usage: claudeUsage,
-                                    transport: ClaudeCodeTransport(executable: executable))
+                                    transport: ClaudeCodeTransport(executable: executable, extraArguments: extra))
             #else
             _ = executable
             throw unavailable("claude", "Claude Code runs only on a Mac")
