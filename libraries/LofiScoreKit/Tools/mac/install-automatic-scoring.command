@@ -1,14 +1,15 @@
 #!/bin/bash
 # Double-click in Finder. Sets the Mac up to score books by itself, so adding
-# music and atmosphere to a book is as easy as syncing it in Storyteller:
+# atmosphere sounds to a book is as easy as syncing it in Storyteller:
 #
 #   - a copy of the fork's tools in "~/Storyteller Lofi/scoring-tools", built once;
 #   - your Storyteller server's address and login (optional: without it, books
 #     are scored when you drop their read-aloud EPUBs into "~/Storyteller Lofi/Books");
 #   - a launchd job that runs Tools/mac/lofi-sync.sh when a book lands in Books/
 #     and every half hour: it fetches newly synced books, scores them through your
-#     Claude plan (capped per book), copies the results into LofiMusic and its
-#     iCloud copy (the phone's linked music folder picks them up), and puts each
+#     Claude plan (capped per book), copies the results into LofiMusic (the
+#     folder the phone follows; the name is from when it held the music) and its
+#     iCloud copy (the phone's linked sounds folder picks them up), and puts each
 #     score inside its book on the server.
 #
 # Run it again to change the login or update the tools. stop-automatic-scoring.command
@@ -121,5 +122,5 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST" || finish "Could not start the job (
 echo
 echo "Automatic scoring is on. It runs now, when a book lands in $ROOT/Books, and every half hour."
 echo "Progress: $ROOT/logs/lofi-sync.log. On the phone, pick the LofiMusic folder in iCloud Drive once"
-echo "(Settings > Lofi Music > Import a music folder); from then on new scores and sounds arrive by themselves."
+echo "(Settings > Atmosphere Sounds > Import a sounds folder); from then on new scores and sounds arrive by themselves."
 finish "Done."

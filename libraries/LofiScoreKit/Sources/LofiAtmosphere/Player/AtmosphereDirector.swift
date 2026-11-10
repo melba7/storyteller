@@ -1,5 +1,5 @@
 import Foundation
-import LofiAudio
+import LofiAudioCore
 
 /// Timings and levels for the atmosphere.
 public struct AtmosphereConfig: Sendable, Hashable {

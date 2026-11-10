@@ -6,14 +6,15 @@
 # Tools/mac/lofi-sync.sh in this window, which also fetches newly synced books
 # from your Storyteller server (once install-automatic-scoring.command has set
 # it up), mirrors the results to the iCloud copy of LofiMusic and puts each
-# score inside its book on the server. What it does for each book:
-#   1. The mood track (which music plays when): Tools/mac/make-tracks.sh with Claude
-#      Opus and prompt 3, the pair the Claude check picked.
-#   2. The atmosphere (which quiet sounds play under each scene, where the narration
-#      pauses briefly for a swell, the one-off sounds): Tools/mac/make-atmosphere.sh.
-#      It combines the two into "<book>.score.json".
-# Then it fetches recordings for any new sounds the books asked for and copies the
-# tracks and sounds into "~/Storyteller Lofi/LofiMusic", ready for the phone.
+# score inside its book on the server. For each book it makes the atmosphere
+# (which quiet sounds play under each scene, where the narration pauses briefly
+# for a swell, the one-off sounds): Tools/mac/make-atmosphere.sh, which writes
+# "<book>.score.json". Then it fetches recordings for any new sounds the books
+# asked for and copies the tracks and sounds into "~/Storyteller Lofi/LofiMusic"
+# (the folder the phone follows), ready for the phone.
+#
+# The shelved music's mood track (which music plays when; Tools/mac/make-tracks.sh)
+# is not made unless LOFI_MOOD_TRACKS=1 is set, to spare the plan.
 #
 # Books already scored are skipped, and a stopped run carries on where it stopped.
 # Each step is capped per book (in lofi-sync.sh, at API list prices) so a run that

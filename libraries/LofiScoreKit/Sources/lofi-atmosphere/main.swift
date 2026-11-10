@@ -1,7 +1,6 @@
 import Foundation
 import LofiAtmosphere
 import LofiMood
-import LofiPlaceholders
 import LofiText
 
 // lofi-atmosphere: score a book's atmosphere track with Claude, print a track's scenes,

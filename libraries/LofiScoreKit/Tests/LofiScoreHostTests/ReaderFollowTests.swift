@@ -1,12 +1,10 @@
 import Foundation
-import LofiAudio
-import LofiMood
-import LofiScoreCore
+import LofiAudioCore
 import LofiText
 import XCTest
 @testable import LofiScoreHost
 
-/// Music while the listener reads on screen with the narrator stopped.
+/// The sounds while the listener reads on screen with the narrator stopped.
 final class ReaderFollowTests: XCTestCase {
     private var scheduler: ManualScheduler!
     private var follower: NarrationFollower!
@@ -21,12 +19,11 @@ final class ReaderFollowTests: XCTestCase {
 
     private func opened() throws {
         follower.bookOpened(id: "book")
-        follower.attachText(try Books.text(clock: scheduler), toBook: "book")
+        follower.attachText(try Books.text(), toBook: "book")
     }
 
-    private func page(_ chapter: Int, _ index: Int, then seconds: TimeInterval = 60) async {
+    private func page(_ chapter: Int, _ index: Int, then seconds: TimeInterval = 60) {
         follower.readerReached(Books.clip(chapter, index))
-        await follower.waitUntilIdle()
         scheduler.advance(by: seconds)
     }
 
@@ -36,110 +33,94 @@ final class ReaderFollowTests: XCTestCase {
         return result!
     }
 
-    private var readingIndices: [Int] {
-        sink.readings.compactMap { if case let .reading(index, _) = $0 { return index } else { return nil } }
-    }
-
-    func testTheFirstPageStartsTheMusicFromItsTopSentence() async throws {
+    func testTheFirstPageStartsTheSoundsFromItsTopSentence() throws {
         try opened()
         sink.clear()
-        await page(0, 5)
+        page(0, 5)
         XCTAssertEqual(sink.calls.first, .play)
         XCTAssertTrue(sink.calls.contains(.seek(5)))
         XCTAssertEqual(sink.sentences, [5])
-        XCTAssertEqual(readingIndices, [5])
         XCTAssertTrue(status().isReading)
         XCTAssertFalse(status().isNarrating)
     }
 
-    func testTurningOnReadsEverySentenceUpToTheNewTopOfThePage() async throws {
+    func testTurningThePageMovesToItsTop() throws {
         try opened()
-        await page(0, 0)
+        page(0, 0)
         sink.clear()
-        await page(0, 12)
+        page(0, 12)
         XCTAssertEqual(sink.sentences, [12], "the playhead is the top of the page")
         XCTAssertTrue(sink.seeks.isEmpty, "turning a page is reading on, not a jump")
-        // Every reading is for a sentence at or above the top of the page: never below it.
-        XCTAssertFalse(readingIndices.isEmpty)
-        XCTAssertTrue(readingIndices.allSatisfy { $0 > 0 && $0 <= 12 })
-        XCTAssertEqual(readingIndices, readingIndices.sorted())
+        XCTAssertEqual(sink.durations, [0], "no voice: the sounds may rise a little")
     }
 
-    func testPagingBackKeepsTheMoodAndNothingIsReadAgain() async throws {
+    func testPagingBackKeepsTheScene() throws {
         try opened()
-        await page(0, 0)
-        await page(0, 12)
+        page(0, 0)
+        page(0, 12)
         sink.clear()
-        await page(0, 4)
+        page(0, 4)
         XCTAssertEqual(sink.sentences, [4])
         XCTAssertTrue(sink.seeks.isEmpty)
-        XCTAssertTrue(sink.readings.isEmpty)
-        // Forward again: nothing new until the pages pass sentence 12.
-        await page(0, 12)
-        XCTAssertTrue(sink.readings.isEmpty)
-        await page(0, 20)
-        XCTAssertTrue(readingIndices.allSatisfy { $0 > 12 && $0 <= 20 })
+        XCTAssertEqual(status().position?.globalIndex, 4)
     }
 
-    func testABigJumpIsASeek() async throws {
+    func testABigJumpIsASeek() throws {
         var configuration = NarrationFollower.Configuration()
         configuration.readerMaxPageStep = 20
         follower = NarrationFollower(scheduler: scheduler, configuration: configuration)
         follower.attach(sink)
         try opened()
-        await page(0, 0)
+        page(0, 0)
         sink.clear()
-        await page(1, 10)
+        page(1, 10)
         XCTAssertEqual(sink.seeks, [40])
-        XCTAssertEqual(readingIndices, [40])
     }
 
-    func testTheMusicStopsAfterAWhileWithoutAPageTurn() async throws {
+    func testTheSoundsStopAfterAWhileWithoutAPageTurn() throws {
         try opened()
-        await page(0, 0, then: 0)
+        page(0, 0, then: 0)
         sink.clear()
         scheduler.advance(by: 299)
         XCTAssertFalse(sink.calls.contains(.pause))
         scheduler.advance(by: 2)
         XCTAssertEqual(sink.calls, [.pause])
         XCTAssertFalse(status().isReading)
-        // The next page starts it again.
-        await page(0, 8)
+        // The next page starts them again.
+        page(0, 8)
         XCTAssertEqual(sink.calls.filter { $0 == .play }.count, 1)
     }
 
-    func testStoppingAndChangingBookPauseTheMusic() async throws {
+    func testStoppingAndChangingBookPauseTheSounds() throws {
         try opened()
-        await page(0, 0)
+        page(0, 0)
         sink.clear()
         follower.readerStopped()
         XCTAssertEqual(sink.calls, [.pause])
         follower.readerStopped()
         XCTAssertEqual(sink.calls, [.pause], "only once")
 
-        await page(0, 3)
+        page(0, 3)
         sink.clear()
         follower.bookOpened(id: "other")
-        XCTAssertEqual(sink.calls.first, .pause, "the old book's music does not carry on into the next")
+        XCTAssertEqual(sink.calls.first, .pause, "the old book's sounds do not carry on into the next")
     }
 
-    func testTheNarratorLeadsWhileItPlays() async throws {
+    func testTheNarratorLeadsWhileItPlays() throws {
         try opened()
         follower.playingChanged(true)
         follower.clipStarted(Books.clip(0, 2))
-        await follower.waitUntilIdle()
         sink.clear()
-        await page(0, 20)
+        page(0, 20)
         XCTAssertTrue(sink.calls.isEmpty, "pages are ignored while the narrator reads")
     }
 
-    func testPressingPlayHandsOverWithoutAPause() async throws {
+    func testPressingPlayHandsOverWithoutAPause() throws {
         try opened()
-        await page(0, 0)
+        page(0, 0)
         sink.clear()
         follower.playingChanged(true)
         follower.clipStarted(Books.clip(0, 1))
-        await follower.waitUntilIdle()
         XCTAssertFalse(sink.calls.contains(.pause))
         XCTAssertTrue(status().isNarrating)
         XCTAssertFalse(status().isReading)
@@ -147,12 +128,11 @@ final class ReaderFollowTests: XCTestCase {
         XCTAssertFalse(sink.calls.contains(.pause), "the reader's idle timer is gone")
     }
 
-    func testANewPlayerCatchesUpWhileReading() async throws {
+    func testANewPlayerCatchesUpWhileReading() throws {
         try opened()
-        await page(0, 6)
+        page(0, 6)
         let fresh = RecordingSink()
         follower.attach(fresh)
-        await follower.waitUntilIdle()
         XCTAssertEqual(fresh.calls.first, .play)
         XCTAssertTrue(fresh.calls.contains(.open("book")))
     }

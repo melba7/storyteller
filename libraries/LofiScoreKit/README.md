@@ -1,25 +1,25 @@
 # LofiScoreKit
 
-Spoiler-safe, tone-matched lofi under Storyteller's narration. The music follows
-the mood of what has already been narrated, never what comes next.
+Spoiler-safe atmosphere sounds under Storyteller's narration: the sounds of the
+scene being narrated, scored ahead of time from what has already been read,
+never from what comes next.
 
 - **Text side** (mood detection): `LofiText`, `LofiMood`, `lofi-eval`, `lofi-train`.
   See [Docs/MoodDetection.md](Docs/MoodDetection.md).
-- **Music side** (director, audio engine, placeholder library, demo):
-  `LofiDirector`, `LofiAudio`, `LofiPlaceholders`, `LofiDemoKit`, `lofi-replay`,
-  `lofi-placeholders`, `lofi-import`, `lofi-render`, `lofi-demo`.
-  See [Docs/MusicEngine.md](Docs/MusicEngine.md).
+- **Sound side** (the scene scorer, the layered player, the app host):
+  `LofiAudioCore`, `LofiAtmosphere`, `lofi-atmosphere`, `LofiScoreHost`.
+  See [Docs/Atmosphere.md](Docs/Atmosphere.md).
 - **Shared:** `LofiScoreCore` holds the value types both sides use
   (`MoodBucket`, `MoodReading`, `MoodObservation`).
 
+The lofi music that played alongside (its director, two-deck player,
+placeholder library, demo and library scripts) is shelved whole, not deleted:
+[shelved/lofi-music/README.md](../../shelved/lofi-music/README.md) at the
+repository root lists what it was and how to bring it back.
+
 ```sh
 swift test                                  # everything that runs off Apple platforms too
-swift run lofi-replay --synthetic           # director on synthetic 10-hour books
-swift run -c release lofi-placeholders      # synthesise the placeholder music
-swift run -c release lofi-import ~/Storyteller\ Lofi/LofiMusic   # measure real music, write library.json
-swift run -c release lofi-render --music ~/Storyteller\ Lofi/LofiMusic   # the story with music, to an .m4a
-swift run -c release lofi-demo              # the demo, on a Mac
-open Demo/LofiScoreDemo.xcodeproj           # the demo, on iPhone
+swift run -c release lofi-atmosphere        # score a book's atmosphere, show a track, synthesise stand-ins
 ```
 
-Music never goes into git: this fork is public.
+Audio never goes into git: this fork is public.

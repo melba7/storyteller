@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiAudio
+import LofiAudioCore
 import LofiText
 
 /// More specific sounds (variants), personal-use recordings, and the short narration

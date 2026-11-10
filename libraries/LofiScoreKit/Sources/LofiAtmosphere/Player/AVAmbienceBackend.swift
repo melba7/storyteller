@@ -1,7 +1,7 @@
 #if canImport(AVFoundation)
 import AVFoundation
 import Foundation
-import LofiAudio
+import LofiAudioCore
 
 /// The real atmosphere backend: its own `AVAudioEngine` with a few slots, each a player
 /// node looping one recording gaplessly through an EQ that keeps it out of the voice's way.
@@ -85,7 +85,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
         }
         let status = try engine.renderOffline(frames, to: buffer)
         guard status == .success else {
-            throw LofiAudioError.loadFailed(trackID: "offline render", reason: "render status \(status.rawValue)")
+            throw AmbienceError.loadFailed(file: "offline render", reason: "render status \(status.rawValue)")
         }
         return true
     }
@@ -152,8 +152,8 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     }
 
     public func play(slot: Int, from offset: TimeInterval) throws {
-        guard engine.isRunning else { throw LofiAudioError.engineNotRunning }
-        guard let file = files[slot] else { throw LofiAudioError.loadFailed(trackID: "slot \(slot)", reason: "nothing loaded") }
+        guard engine.isRunning else { throw AmbienceError.engineNotRunning }
+        guard let file = files[slot] else { throw AmbienceError.loadFailed(file: "slot \(slot)", reason: "nothing loaded") }
         let player = players[slot]
         let token = bump(slot)
         player.stop()
@@ -181,7 +181,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     }
 
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
-        guard engine.isRunning else { throw LofiAudioError.engineNotRunning }
+        guard engine.isRunning else { throw AmbienceError.engineNotRunning }
         let file = try AVAudioFile(forReading: url)
         let format = file.processingFormat
         oncePlayer.stop()

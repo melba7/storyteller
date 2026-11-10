@@ -4,7 +4,7 @@
  * app.config.ts builds upstream's config and then passes it through
  * `withForkIdentity` (the LOFI-FORK lines there), so the fork gets its own
  * name and bundle ID and installs next to the official Storyteller app instead
- * of replacing it. It also adds the pods for the fork's lofi music module.
+ * of replacing it. It also adds the pods for the fork's atmosphere module.
  * Change the values here, never in app.config.ts, so upstream syncs keep
  * merging cleanly.
  *
@@ -39,17 +39,15 @@ export const forkIdentity: ForkIdentity = {
 
 /**
  * The Swift package in libraries/LofiScoreKit, built from source by CocoaPods
- * for the fork's lofi music module (modules/lofi-score). Each target has a
+ * for the fork's atmosphere module (modules/lofi-score). Each target has a
  * podspec next to Package.swift. The path is relative to the generated `ios`
- * folder.
+ * folder. (The shelved music's pods live in shelved/lofi-music.)
  */
 const lofiScorePods = [
   "LofiScoreCore",
   "LofiText",
   "LofiMood",
-  "LofiDirector",
-  "LofiAudio",
-  "LofiPlaceholders",
+  "LofiAudioCore",
   "LofiAtmosphere",
   "LofiScoreHost",
 ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" }))
