@@ -26,14 +26,20 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
         /// What the scorer had worked out about the book's world so far ("Victorian
         /// London, autumn"), carried forward to later entries.
         public let world: String?
+        /// Global index of the sentence where, by this entry's own answer, its scene
+        /// began: its own sentence or an earlier one of its passage. Nil when the answer
+        /// did not say. Only the builder reads it, to choose which sentence to score next
+        /// (``SceneChangeFinder``); playback never does.
+        public let sceneStart: Int?
 
-        public init(position: SentencePosition, sentence: String, scene: StoryScene, world: String? = nil) {
+        public init(position: SentencePosition, sentence: String, scene: StoryScene, world: String? = nil, sceneStart: Int? = nil) {
             chapterOrdinal = position.chapterOrdinal
             sentenceIndex = position.sentenceIndex
             globalIndex = position.globalIndex
             sentenceDigest = TextDigest.fnv1a64(sentence)
             self.scene = scene
             self.world = world
+            self.sceneStart = sceneStart.map { min($0, position.globalIndex) }
         }
 
         init(copying entry: Entry, scene: StoryScene) {
@@ -43,6 +49,7 @@ public struct AtmosphereTrack: Codable, Sendable, Hashable {
             sentenceDigest = entry.sentenceDigest
             self.scene = scene
             world = entry.world
+            sceneStart = entry.sceneStart
         }
     }
 
