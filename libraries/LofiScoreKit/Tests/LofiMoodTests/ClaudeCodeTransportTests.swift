@@ -6,13 +6,15 @@ import Testing
 
 @testable import LofiMood
 
-/// Writes a stand-in `claude` that saves its arguments and stdin, then prints
-/// `output` and exits with `status`, so the transport runs end to end without
-/// Claude Code.
-func fakeClaude(output: String, status: Int32 = 0) throws -> (executable: String, folder: URL) {
-    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fake-claude-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    try output.write(to: folder.appendingPathComponent("output.json"), atomically: true, encoding: .utf8)
+/// One stand-in `claude` script, written once: it saves its arguments and
+/// stdin next to how it was called, then prints that folder's output.json and
+/// exits with its status. Each test calls it through a symlink in its own
+/// folder. Writing a fresh script per test and running it at once can fail
+/// on Linux with "Text file busy" when a parallel test forks while the file is
+/// still open for writing, which turned into a retry and a pause now and then.
+let sharedFakeClaude: String = {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fake-claude-shared-\(UUID().uuidString)", isDirectory: true)
+    try! FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     let script = """
         #!/bin/sh
         dir="$(dirname "$0")"
@@ -21,15 +23,27 @@ func fakeClaude(output: String, status: Int32 = 0) throws -> (executable: String
         printf '%s' "${ANTHROPIC_API_KEY:-unset}" > "$dir/key.txt"
         pwd > "$dir/pwd.txt"
         cat "$dir/output.json"
-        exit \(status)
+        exit "$(cat "$dir/status.txt")"
         """
     let executable = folder.appendingPathComponent("claude")
-    try script.write(to: executable, atomically: true, encoding: .utf8)
-    try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+    try! script.write(to: executable, atomically: true, encoding: .utf8)
+    try! FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+    return executable.path
+}()
+
+/// A stand-in `claude` that prints `output` and exits with `status`, so the
+/// transport runs end to end without Claude Code.
+func fakeClaude(output: String, status: Int32 = 0) throws -> (executable: String, folder: URL) {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("fake-claude-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    try output.write(to: folder.appendingPathComponent("output.json"), atomically: true, encoding: .utf8)
+    try "\(status)".write(to: folder.appendingPathComponent("status.txt"), atomically: true, encoding: .utf8)
+    let executable = folder.appendingPathComponent("claude")
+    try FileManager.default.createSymbolicLink(atPath: executable.path, withDestinationPath: sharedFakeClaude)
     return (executable.path, folder)
 }
 
-@Suite("Claude Code transport")
+@Suite("Claude Code transport", .serialized)
 struct ClaudeCodeTransportTests {
     let guardian: SpoilerGuard
 

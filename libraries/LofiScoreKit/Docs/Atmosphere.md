@@ -215,9 +215,14 @@ From the clone in `~/Storyteller Lofi`, in `libraries/LofiScoreKit`:
 
 The easy way: put read-aloud EPUBs in `~/Storyteller Lofi/Books` and double-click
 `~/Storyteller Lofi/Score atmosphere.command` (a copy of `Tools/mac/score-atmosphere.command`).
-It updates the tools clone in `~/Storyteller Lofi/atmosphere-tools`, scores every book
-through the Claude plan, fetches any new sounds and copies everything into
-`~/Storyteller Lofi/LofiMusic`. The steps it runs:
+It updates the tools clone in `~/Storyteller Lofi/atmosphere-tools`, then scores every book
+through the Claude plan: first its mood track (`Tools/mac/make-tracks.sh --engine claude
+--prompt 3`, Opus with prompt 3 as the Claude check chose; see MoodDetection.md), then its
+atmosphere, which is combined with the mood track into `<book>.score.json`. It fetches any
+new sounds and copies everything into `~/Storyteller Lofi/LofiMusic`. Each step is capped
+per book at API list prices (20 dollars for the mood, 25 for the atmosphere; edit the
+command to change them), so a run that goes wrong can't use up the plan; double-click
+again to carry on. The atmosphere steps it runs:
 
 1. **Recordings.** `python3 -I Tools/atmosphere/fetch_ambience.py [--edition personal|publish]`.
    - `personal` (the default) searches Freesound with the API key in

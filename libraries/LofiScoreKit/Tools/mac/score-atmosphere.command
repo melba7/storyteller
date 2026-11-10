@@ -1,18 +1,25 @@
 #!/bin/bash
 # Double-click in Finder (a copy lives at "~/Storyteller Lofi/Score atmosphere.command").
 #
-# Scores the atmosphere (which quiet sounds play under each scene, and where the
-# narration pauses briefly for a swell) of every read-aloud EPUB in
-# "~/Storyteller Lofi/Books", through your Claude plan: no API key and no extra
-# cost, only the plan's usage limits. Then it fetches recordings for any new
-# sounds the books asked for and copies the tracks and sounds into
-# "~/Storyteller Lofi/LofiMusic", ready to import on the phone.
+# Scores every read-aloud EPUB in "~/Storyteller Lofi/Books" through your Claude plan:
+# no API key and no extra cost, only the plan's usage limits.
+#   1. The mood track (which music plays when): Tools/mac/make-tracks.sh with Claude
+#      Opus and prompt 3, the pair the Claude check picked.
+#   2. The atmosphere (which quiet sounds play under each scene, where the narration
+#      pauses briefly for a swell, the one-off sounds): Tools/mac/make-atmosphere.sh.
+#      It combines the two into "<book>.score.json".
+# Then it fetches recordings for any new sounds the books asked for and copies the
+# tracks and sounds into "~/Storyteller Lofi/LofiMusic", ready to import on the phone.
 #
-# Books already scored are skipped, and a stopped run carries on where it
-# stopped. A long novel takes most of an hour; two books are scored at a time.
+# Books already scored are skipped, and a stopped run carries on where it stopped.
+# Each step is capped per book (below, at API list prices) so a run that goes wrong
+# can't use up the plan; double-click again to carry on past a cap. A long novel
+# takes about an hour; two books are scored at a time.
 ROOT="$HOME/Storyteller Lofi"
 CLONE="$ROOT/atmosphere-tools"
 BOOKS_DIR="$ROOT/Books"
+MOOD_CAP_PER_BOOK=20
+ATMOSPHERE_CAP_PER_BOOK=25
 PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin"
 
 finish() {
@@ -32,5 +39,12 @@ echo "Updating the tools..."
 git -C "$CLONE" pull --ff-only --quiet || echo "(could not update; using the tools as they are)"
 cd "$CLONE/libraries/LofiScoreKit" || finish "The tools folder looks broken." 1
 echo "Scoring ${#books[@]} book(s): ${books[*]##*/}"
-Tools/mac/make-atmosphere.sh --via plan --parallel 2 "${books[@]}"
+echo
+echo "1 of 2: mood tracks"
+Tools/mac/make-tracks.sh --via plan --engine claude --prompt 3 \
+  --cap $((MOOD_CAP_PER_BOOK * ${#books[@]})) "${books[@]}"
+echo
+echo "2 of 2: atmosphere"
+Tools/mac/make-atmosphere.sh --via plan --parallel 2 \
+  --cap $((ATMOSPHERE_CAP_PER_BOOK * ${#books[@]})) "${books[@]}"
 finish "Done."
