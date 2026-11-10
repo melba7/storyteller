@@ -110,8 +110,10 @@ On the Mac, two scripts wrap all of this (both stay inside
 
 ```sh
 Tools/mac/run-mood-eval.sh            # build, test, retrain Fast v4, score it; Claude only if the key file exists, $6 cap
+Tools/mac/try-recipes.sh              # compare training recipes on every book and on people's ratings; no Claude, ships nothing
 Tools/mac/make-tracks.sh --dry-run ~/Downloads/*.epub                # what tracks for these books would cost
 Tools/mac/make-tracks.sh --cap 10 --engine claude:sonnet-5-5 BOOK.epub  # tracks into ~/Storyteller Lofi/tracks/
+Tools/mac/make-tracks.sh --prompt 3 ~/Storyteller\ Lofi/Books/*.epub     # + combined with atmosphere, copied to LofiMusic/tracks
 ```
 
 Make tracks from the read-aloud EPUB exactly as Storyteller serves it. The
@@ -182,6 +184,12 @@ schema, no saved session, and `ANTHROPIC_API_KEY` removed from the child's
 environment. It turns Claude Code's JSON result back into a Messages API
 response, so `ClaudeMoodEngine`, its retries and its usage counts are
 unchanged; "Not logged in" maps to 401 (stop), usage limits to 429 (retry).
+The schema goes at the end of the system prompt and the transport reads
+the first JSON object in the reply (a reply without one is retried): with
+`--json-schema` Claude Code takes two model turns per request, a
+StructuredOutput tool call and a closing message, which sent and cached each
+prompt twice (the Redwood track cost $0.0194 per request, about 1.75 times
+the API estimate). `LOFI_CLAUDE_CODE_SCHEMA=tool` brings the tool back.
 `lofi-eval` picks the route with `LOFI_CLAUDE_VIA=plan|api` (default: the API
 when a key is set, otherwise the plan). `make-tracks.sh` and
 `claude-check.sh` default to `--via plan`. It costs no money but uses the
@@ -190,14 +198,38 @@ runs keep a cap counted at API list prices. Claude Code must be signed in
 once on the Mac (`claude`, then log in), or `CLAUDE_CODE_OAUTH_TOKEN` set from
 `claude setup-token`.
 
-`Tools/mac/claude-check.sh` scores Claude against the local model on the 320
-test passages with the plausible sets, prompt v2 against v3 on the same
-windows. Prompt v3 (`LOFI_CLAUDE_PROMPT=3`) asks first for `about`, one line
+`Tools/mac/claude-check.sh` scores Claude against the local model (every
+`LofiMood-*.json` in the music folder) on two tests, window by window: the
+320 test passages with the plausible sets, and EmoBank's 386 fiction
+sentences that people clearly rated pleasant or unpleasant
+(`emobank.py windows --clear-only`; the score is how often the mood lands on
+the side people rated). The first test's labels come from Claude, so they
+favour prompt v2; the second does not rest on Claude. Its runs are
+MODEL:PROMPT, by default `opus-5-5:2 opus-5-5:3 sonnet-5-5:2`, to choose the
+model and prompt `make-tracks.sh` uses (`--engine`, `--prompt`). Prompt v3 (`LOFI_CLAUDE_PROMPT=3`) asks first for `about`, one line
 on what is happening and what is at stake (the schema's keys are sent
 sorted, so it is written before the mood), and then for `also`, up to two
 other moods whose music would also suit. Those go into the reading's
 `scores` after the best mood, so playback can keep music that still fits
 instead of switching.
+
+First run on the Mac (2026-11-10, Mo's plan; the per-run caps cut the Opus
+runs to 6 of the 8 test books and Sonnet's EmoBank run to one story, so
+pairs were rescored on the windows both read). On Claude's plausible sets,
+which flatter Claude: Opus p2 76% exact / 92% fits, Opus p3 73% / 89%, Sonnet
+p2 68% / 88%, the local word-9 model 41% / 62%. On EmoBank's clearly rated
+sentences, Opus p3 against the local model: valence rho +0.15 (-0.02 to
++0.27), arousal rho +0.17 (+0.06 to +0.29), right when it takes a side 80%
+against 73%, but it answers calm or mysterious (no side) for about a
+quarter of them, so its share on the right side is lower (58% against 66%,
+-7.8 points, -17.3 to +2.3). Opus p2 was a little behind p3 on every
+EmoBank figure. Tracks use Opus with prompt v3. One run's requests carried
+about 18k input tokens each instead of about 3.5k. It was not the account's
+connectors or skills: on Claude Code 2.1.321 `--strict-mcp-config` and
+`--disable-slash-commands` change a minimal call by under 1%. If it comes
+back, `LOFI_CLAUDE_CODE_ARGS` adds flags to every plan run. A track for a
+121k-word book is about 475 entries and up to 285 probes, estimated at
+$5.30 to $8.49 at Opus list prices.
 
 Next for Claude's reading is a "story so far" note: a short summary of the
 chapters already read (who is who, what is at stake, the book's usual tone)
@@ -206,6 +238,130 @@ It is not measured yet on purpose: the test labels, plausible sets included,
 were made from the passage alone, so a reading that uses the wider story
 can only look worse against them. Judging it needs labels made with the
 story in view, or Mo's listening test.
+
+### Round 9: training recipes, people's ratings and 100 more books (9 Nov 2026)
+
+Mo asked what else could make the local model better, and to train it on
+a hundred more books. `lofi-train` now has named recipes
+(`Sources/LofiTrainCLI/Recipes.swift`) that `oof` compares on every
+labelled book and `embed --recipe NAME` trains for shipping:
+
+- `word2-settings`: the shipped recipe (word-3's). With `--all` on every
+  labelled book it makes word-8.
+- `prior-0.15`, `prior-0.3`, `prior-0.5`: a gentle cure for the pull
+  towards tense and calm. After training, each mood's bias loses that
+  fraction of its log share of the labels ("logit adjustment"). At 1 this
+  would be about `balanced`, which over-corrected by 4.8 points.
+- `soft-0.3`: soft labels. Where a window has a plausible set (an `accept`
+  list), the other moods that would also suit it share 30% of its target.
+- `people-v0.25`, `people-v0.5`, `people-v1`, `people-va0.5`: lean the moods
+  towards how pleasant (and energetic) *people* rate the text.
+  `lofi-train people` learns those two ratings by ridge regression from
+  EmoBank's 7,309 non-fiction sentences. Its 2,753 fiction sentences stay
+  the test and never train anything. The lean adds `strength` × the mood's
+  standardised anchor × the standardised rating to each mood's logit, so a
+  pleasant-sounding passage favours cozy, hopeful and romantic. It is
+  folded into the weights (`LinearMoodModel.addingLinearScore`), so the
+  model file and the app are unchanged. A shipped model leaned this way is
+  derived from EmoBank (CC BY-SA 4.0), so the credits must name it, and a
+  published build should prefer an unleaned model unless that licence is
+  checked.
+
+`Tools/mac/try-recipes.sh` runs the whole comparison with no Claude calls:
+export, word-8, the people ratings, the all-books comparison (now also
+"fits" on every window that has a plausible set), every candidate trained on
+all books, and the people's-ratings check of each against the shipped
+model. It ships nothing. The ship rule below decides.
+
+Results on the 53 books (Mac, 9 Nov 2026, 3 repeats of 10 folds, against
+the word-2 settings): `soft-0.3-prior-0.3` scored best on Claude's labels
+but 8.8 points worse on people's ratings, so it was rejected, and every
+`prior-*` recipe also lost on people's ratings. `people-va0.5` was best on
+people's ratings (+8.5) but 1.0 point worse on exact. `people-v1` was
+clearly worse on "fits". **`people-v0.5` met the ship rule**: exact +0.1,
+macro-F1 +0.033 (significant), kappa +0.005, fits -1.4 (not significant),
+people's ratings +2.6 (not significant), and the valence correlation +0.06
+(significant). It ships as `LofiMood-embed-word-8-people-v0.5.json`, with
+EmoBank named in `LofiMusic/CREDITS.md`. word-8 (the plain recipe on 53
+books) was still worse than word-3 on people's ratings, so more books alone
+did not fix that.
+
+Round 10: sample v5 adds 40 windows from each of the 100 "classic" novels
+in `books.csv` (4,000 windows, 153 books in all), each labelled with a best
+mood and the moods that would also suit it (1.7 moods per window on
+average; see Labels). With best-and-also-fits labels on most training
+windows, soft labels have far more to work with, so three recipes combine
+the shipped lean with the other ideas: `people-v0.5-soft-0.3`,
+`people-v0.5-prior-0.15` and `people-v0.5-a0.25` (a quarter of the energy
+lean that cost `people-va0.5` its exact score). `try-recipes.sh` now finds
+the shipped model in `LofiMusic` and also compares every recipe with the
+shipped recipe (`oof-compare-vs-shipped.txt`), since a candidate has to
+beat what ships, not just word-2. Its candidates are named word-9-*.
+
+Results on the 153 books (Mac, 9 Nov 2026, 7,439 windows, 3 repeats of 10
+folds; "fits" on 4,320 windows from 108 books):
+
+- More books help now: the same recipe trained only on the 53 older books
+  is 3.6 points worse on exact (-4.7 to -2.5) and 5.8 worse on fits (-7.0
+  to -4.7). Round 7's 19 extra books had added under a point.
+- **`people-v0.5-prior-0.15` meets the ship rule** against the shipped
+  `people-v0.5`: exact +0.0 (-0.2 to +0.2), macro-F1 +0.015 (+0.010 to
+  +0.019), kappa +0.006 (+0.003 to +0.008), fits -0.0 (-0.4 to +0.3). Its
+  all-books model, word-9-people-v0.5-prior-0.15, puts 10.4 points more of
+  people's clearly pleasant or unpleasant sentences on the right side than
+  the shipped word-8-people-v0.5 (+5.8 to +14.5; 62.7% against 52.3%). It
+  names the rarer moods more often and tense less (per pass: tense 2,323
+  against 2,484, with 1,655 in the labels; hopeful 160 against 118;
+  somber 228 against 172; cozy 193 against 145; romantic 176 against 137;
+  adventurous 65 against 37), so it shipped as
+  `LofiMood-embed-word-9-people-v0.5-prior-0.15.json`.
+- `people-v0.5-a0.25` was best on people's ratings (+14.5) but clearly
+  worse on fits (-0.9, -1.5 to -0.2). Every soft-label recipe lost on both
+  tests (e.g. `soft-0.3` -12.2 on people's ratings): best-and-also-fits
+  labels are better used for scoring than as training targets.
+- For a published build, the best unleaned model (no EmoBank) is
+  word-9-prior-0.15: exact +0.1, kappa +0.007 (+0.000 to +0.014) against
+  `people-v0.5`, fits -0.3 (not significant), and +3.4 on people's ratings
+  (+0.0 to +7.6) against the shipped word-8-people-v0.5.
+
+### A fine-tuned small language model (9 Nov 2026)
+
+Mo agreed to PyTorch on the Mac, inside "~/Storyteller Lofi" only, to test
+the next step up from a softmax head on fixed word embeddings: a small
+pretrained transformer whose every layer is tuned on the labels.
+`Tools/mac/finetune.sh` makes a virtual environment in
+"~/Storyteller Lofi/python-mood" (caches in "~/Storyteller Lofi/.cache"),
+then runs `Tools/eval/finetune_mood.py`: out-of-fold predictions on every
+labelled book (10 folds of whole books) for a "hard" variant (best mood
+only) and a "soft" one (other fitting moods share 30%), each read with and
+without the earlier words at 0.2; a paired comparison with the shipped
+recipe's rows from try-recipes.sh; a model per variant trained on every
+book; and the people's-ratings check against the shipped model. The base
+is sentence-transformers/all-MiniLM-L6-v2 (22.7M parameters, Apache-2.0,
+about 45 MB in 16-bit). It ships only if it passes the same rule.
+
+First run (Mac, 9 Nov 2026, 10 folds, 22.7M parameters, about 3.6 minutes
+a fold on the M3 Pro's GPU): against the shipped recipe
+`people-v0.5-prior-0.15`, `lm-soft-e0.2` scored exact 45.9% against 40.1%
+(+5.8, +4.6 to +7.1), fits 64.7% against 57.3% (+7.3, +5.8 to +9.0),
+kappa +0.075 and macro-F1 +0.047, all significant: the best engine yet on
+Claude's labels. But on people's ratings it put 9.6 points fewer clear
+sentences on the right side (-19.0 to -3.4) and named hopeful almost never
+(12 a pass against 386 in the labels), so it failed the ship rule, like
+word-7 before it. Round 2 adds what made the word models pass:
+`finetune_mood.py` now has leans (people's-ratings lean and prior shift,
+folded into the head) and "-mt" variants that teach the encoder people's
+ratings while it learns the moods.
+
+The app side is ready for it: `finetune.sh --convert RESULTS/models/lm-soft`
+writes `LofiMood-lm-soft.mlmodelc` (an ML program, 16-bit, fixed 256
+tokens) and `LofiMood-lm-soft.json` (word pieces and settings), checks Core
+ML against PyTorch, then runs the app's own path (`lofi-eval
+--engine lm:…json`: `WordPieceTokenizer`, which matches Hugging Face's
+`BertTokenizerFast` and is tested on Linux, and `TransformerMoodEngine`)
+against PyTorch on the 320 test windows. `MoodEngineCatalog.fastEngine`
+puts a `LofiMood-lm-*.json` first wherever it is listed, with the embedding
+model as its fallback; the two files must sit in the same folder.
 
 ## Labels
 
@@ -242,6 +398,14 @@ story in view, or Mo's listening test.
   only, added because the embedding model's learning curve was still
   climbing at 26 books. With them the export has 3,119 labelled training
   windows from 45 books (42 for training, 3 for validation).
+- `Tools/data/eval/sample-v5.jsonl.gz` and `claude-g2-v5.jsonl`: 40 causal
+  windows from each of the 100 "classic" novels in `books.csv` (4,000 in
+  all, none overlapping earlier samples), labelled under guidelines v2 by
+  Claude with a best mood (`bucket`) and every mood that would also suit it
+  (`accept`, best first), as in the test sets. Training data only. Best
+  moods: playful 959, tense 954, melancholy 438, calm 417, mysterious 363,
+  hopeful 186, somber 175, romantic 172, cozy 145, adventurous 129, dreamy
+  62.
 - `claude-g2-test-sets.jsonl`: the 320 test windows re-read blind by
   Claude (9 Nov 2026), each with a best mood (`bucket`) and every mood that
   would also suit it (`accept`, best first). Scored as "fits" by

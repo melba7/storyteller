@@ -210,19 +210,29 @@ public enum MoodEngineCatalog {
     /// embedding is missing (the contextual one needs iOS 17 and its assets;
     /// see `ClassifierMoodEngine.prepareAssets()`), so list a Create ML model
     /// after it.
+    ///
+    /// A fine-tuned transformer (`LofiMood-lm-*.json`, see
+    /// `TransformerMoodEngine`) goes first wherever it is listed: it is the
+    /// more accurate kind, and the others remain its fallbacks.
     public static func fastEngine(modelURLs: [URL]) -> any MoodEngine {
         #if canImport(NaturalLanguage)
         var engine: any MoodEngine = NLTaggerMoodEngine()
         #else
         var engine: any MoodEngine = LexiconMoodEngine()
         #endif
-        for url in modelURLs.reversed() {
+        let ordered = modelURLs.filter(TransformerMoodConfig.isConfig) + modelURLs.filter { !TransformerMoodConfig.isConfig($0) }
+        for url in ordered.reversed() {
             if let model = fastModelEngine(url) { engine = FallbackMoodEngine(primary: model, fallback: engine) }
         }
         return engine
     }
 
     static func fastModelEngine(_ url: URL) -> (any MoodEngine)? {
+        #if canImport(CoreML)
+        if TransformerMoodConfig.isConfig(url) {
+            return try? TransformerMoodEngine(configURL: url)
+        }
+        #endif
         #if canImport(NaturalLanguage)
         if url.pathExtension.lowercased() == "json" {
             return try? EmbeddingMoodEngine(modelURL: url, version: url.deletingPathExtension().lastPathComponent)

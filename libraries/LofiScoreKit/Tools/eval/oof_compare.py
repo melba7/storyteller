@@ -6,7 +6,11 @@ rotated through cross-validation folds, repeated with different shuffles), so
 differences are paired. Intervals come from resampling whole books, because
 windows from one book are not independent.
 
-    python3 -I Tools/eval/oof_compare.py oof-word.jsonl [--baseline word2-settings] [--boot 1000]
+    python3 -I Tools/eval/oof_compare.py oof-word.jsonl [--baseline word2-settings] [--boot 1000] [--sets SETS.jsonl]
+
+With --sets (label files with an `accept` list, such as
+claude-g2-test-sets.jsonl), it also reports "fits" (the prediction is one of
+the moods that would suit the window) on the windows those files cover.
 
 Standard library only.
 """
@@ -42,17 +46,29 @@ def main() -> None:
     ap.add_argument("--baseline", default="word2-settings")
     ap.add_argument("--boot", type=int, default=1000)
     ap.add_argument("--seed", type=int, default=7)
+    ap.add_argument("--sets", action="append", default=[])
     args = ap.parse_args()
+    accept: dict[str, set[str]] = {}
+    for path in args.sets:
+        for line in open(path):
+            if line.strip():
+                r = json.loads(line)
+                accept[r["id"]] = set(r.get("accept") or []) | {r["bucket"]}
+    fits_by: dict[str, dict[str, list[bool]]] = collections.defaultdict(lambda: collections.defaultdict(list))
 
     by_recipe_book: dict[str, dict[str, list[tuple[str, str]]]] = collections.defaultdict(lambda: collections.defaultdict(list))
     repeats = set()
+    repeats_of: dict[str, set] = collections.defaultdict(set)
     for line in open(args.oof):
         r = json.loads(line)
         by_recipe_book[r["recipe"]][r["book"]].append((r["gold"], r["predicted"]))
         repeats.add(r["repeatIndex"])
+        repeats_of[r["recipe"]].add(r["repeatIndex"])
+        if r["id"] in accept:
+            fits_by[r["recipe"]][r["book"]].append(r["predicted"] in accept[r["id"]])
     recipes = sorted(by_recipe_book, key=lambda k: (k != args.baseline, k))
     books = sorted({b for d in by_recipe_book.values() for b in d})
-    windows = sum(len(v) for v in by_recipe_book[args.baseline].values()) // len(repeats)
+    windows = sum(len(v) for v in by_recipe_book[args.baseline].values()) // len(repeats_of[args.baseline])
     print(f"# {len(books)} books, {windows} windows, {len(repeats)} repeats; intervals: 95%, {args.boot} book resamples")
 
     def stat(recipe: str, sample: list[str]) -> tuple[float, float, float]:
@@ -98,14 +114,38 @@ def main() -> None:
         print(f"  {r}:\n      " + "\n      ".join(parts))
     print("  (an interval that excludes 0 is a real difference at the 95% level)")
 
+    if fits_by:
+        set_books = sorted({b for d in fits_by.values() for b in d})
+        n_sets = sum(len(v) for v in fits_by[args.baseline].values()) // len(repeats_of[args.baseline])
+        print(f"\n## Fits on the plausible sets ({n_sets} windows from {len(set_books)} books, held out in every fold)")
+        set_samples = [[rng.choice(set_books) for _ in set_books] for _ in range(args.boot)]
+
+        def fits(recipe: str, sample: list[str]) -> float:
+            v = [x for b in sample for x in fits_by[recipe][b]]
+            return sum(v) / len(v) if v else 0.0
+
+        base_boot = [fits(args.baseline, s) for s in set_samples]
+        for r in recipes:
+            point = fits(r, set_books)
+            vals = [fits(r, s) for s in set_samples]
+            lo, hi = interval(vals)
+            line = f"  {r:22} fits {point * 100:5.1f}% ({lo * 100:.1f} to {hi * 100:.1f})"
+            if r != args.baseline:
+                d = [a - b for a, b in zip(vals, base_boot)]
+                dlo, dhi = interval(d)
+                line += f"   vs {args.baseline}: {(point - fits(args.baseline, set_books)) * 100:+.1f} pts ({dlo * 100:+.1f} to {dhi * 100:+.1f})"
+            print(line)
+
     print("\n## Predicted vs labelled mood counts (one repeat's worth)")
     gold = collections.Counter(g for b in books for g, _ in by_recipe_book[args.baseline][b])
     width = max(len(r) for r in recipes) + 1
     print("  mood        labels " + " ".join(f"{r:>{width}}" for r in recipes))
     counts = {r: collections.Counter(p for b in books for _, p in by_recipe_book[r][b]) for r in recipes}
-    k = len(repeats)
+    k = len(repeats_of[args.baseline])
+    # Each recipe divided by its own number of repeats (a fine-tuned model
+    # may have run once where the word recipes ran three times).
     for mood in sorted(gold, key=lambda m: -gold[m]):
-        print(f"  {mood:11} {gold[mood] // k:6} " + " ".join(f"{counts[r][mood] / k:{width}.0f}" for r in recipes))
+        print(f"  {mood:11} {gold[mood] // k:6} " + " ".join(f"{counts[r][mood] / len(repeats_of[r]):{width}.0f}" for r in recipes))
 
 
 if __name__ == "__main__":

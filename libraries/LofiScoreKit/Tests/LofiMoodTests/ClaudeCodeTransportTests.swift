@@ -51,6 +51,8 @@ struct ClaudeCodeTransportTests {
         #expect(args.first == "-p")
         #expect(args.contains("--no-session-persistence"))
         #expect(!args.contains("--bare"), "bare mode never uses the subscription login")
+        #expect(args.contains("--strict-mcp-config"), "no connectors' tools in the context")
+        #expect(args.contains("--disable-slash-commands"))
         func value(_ flag: String) -> String? {
             args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
         }
@@ -58,10 +60,50 @@ struct ClaudeCodeTransportTests {
         #expect(value("--model") == "claude-sonnet-5-5")
         #expect(value("--output-format") == "json")
         #expect(value("--effort") == "low")
-        #expect(value("--system-prompt") == ClaudeMoodPrompt.system)
-        let schema = try #require(value("--json-schema"))
+        // The schema goes at the end of the system prompt, not to --json-schema,
+        // which would cost a second model turn per request.
+        #expect(value("--json-schema") == nil)
+        #expect(call.expectsJSON)
+        let system = try #require(value("--system-prompt"))
+        #expect(system.hasPrefix(ClaudeMoodPrompt.system + "\n\n" + ClaudeCodeTransport.schemaInstruction))
+        let schema = String(system.dropFirst(ClaudeMoodPrompt.system.count + 2 + ClaudeCodeTransport.schemaInstruction.count))
         let decoded = try #require(try JSONSerialization.jsonObject(with: Data(schema.utf8)) as? [String: Any])
         #expect((decoded["required"] as? [String])?.contains("mood") == true)
+
+        let asTool = try ClaudeCodeTransport.call(for: engine.body(for: w), schemaAsTool: true)
+        #expect(asTool.arguments.contains("--json-schema"))
+        #expect(!asTool.expectsJSON)
+        let toolSystem = asTool.arguments.firstIndex(of: "--system-prompt").map { asTool.arguments[$0 + 1] }
+        #expect(toolSystem == ClaudeMoodPrompt.system)
+    }
+
+    @Test func readsAJSONAnswerFromTheReplyText() async throws {
+        let fake = try fakeClaude(output: #"""
+            {"type":"result","subtype":"success","is_error":false,"num_turns":1,
+             "result":"Here it is:\n```json\n{\"about\": \"a door {slams}\", \"mood\": \"tense\", \"valence\": -0.5, \"arousal\": 0.7, \"confidence\": 0.8}\n```",
+             "usage":{"input_tokens":900,"output_tokens":40}}
+            """#)
+        defer { try? FileManager.default.removeItem(at: fake.folder) }
+        let engine = ClaudeMoodEngine(apiKey: "subscription", transport: ClaudeCodeTransport(executable: fake.executable))
+        let reading = try await engine.reading(for: try window(guardian, 0, 2))
+        #expect(reading.bucket == .tense)
+        #expect(reading.confidence == 0.8)
+        let args = try String(contentsOf: fake.folder.appendingPathComponent("args.txt"), encoding: .utf8)
+        #expect(!args.contains("--json-schema"))
+    }
+
+    @Test func aReplyWithoutJSONIsRetried() {
+        let output = Data(#"{"type":"result","is_error":false,"result":"Tense, I think.","usage":{}}"#.utf8)
+        let (_, status) = ClaudeCodeTransport.response(fromCLI: output, exitStatus: 0, requestedModel: "claude-opus-5-5", expectsJSON: true)
+        #expect(status == 500)
+        let (_, plain) = ClaudeCodeTransport.response(fromCLI: output, exitStatus: 0, requestedModel: "claude-opus-5-5")
+        #expect(plain == 200)
+    }
+
+    @Test func findsTheFirstWholeJSONObject() {
+        #expect(ClaudeCodeTransport.jsonObjectText(in: #"x {"a": "}{", "b": {"c": 1}} y {"d": 2}"#) == #"{"a": "}{", "b": {"c": 1}}"#)
+        #expect(ClaudeCodeTransport.jsonObjectText(in: #"{broken {"ok": "\"q\""}"#) == #"{"ok": "\"q\""}"#)
+        #expect(ClaudeCodeTransport.jsonObjectText(in: "no object here") == nil)
     }
 
     @Test func readsAStructuredAnswerEndToEnd() async throws {
