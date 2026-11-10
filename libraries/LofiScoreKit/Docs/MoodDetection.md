@@ -190,6 +190,12 @@ the first JSON object in the reply (a reply without one is retried): with
 StructuredOutput tool call and a closing message, which sent and cached each
 prompt twice (the Redwood track cost $0.0194 per request, about 1.75 times
 the API estimate). `LOFI_CLAUDE_CODE_SCHEMA=tool` brings the tool back.
+Every run also passes `--strict-mcp-config` and `--disable-slash-commands`
+and sets `ENABLE_CLAUDEAI_MCP_SERVERS=false`, so the account's connectors
+and skills stay out. Measured on 40 test passages with Opus and prompt v3:
+$0.0129 per request with the tool and connectors, $0.0114 with one turn,
+$0.0061 with one turn and no connectors, all with one turn and no parse
+failures, and 85 to 90% the same moods as the first run.
 `lofi-eval` picks the route with `LOFI_CLAUDE_VIA=plan|api` (default: the API
 when a key is set, otherwise the plan). `make-tracks.sh` and
 `claude-check.sh` default to `--via plan`. It costs no money but uses the
@@ -224,10 +230,11 @@ against 73%, but it answers calm or mysterious (no side) for about a
 quarter of them, so its share on the right side is lower (58% against 66%,
 -7.8 points, -17.3 to +2.3). Opus p2 was a little behind p3 on every
 EmoBank figure. Tracks use Opus with prompt v3. One run's requests carried
-about 18k input tokens each instead of about 3.5k. It was not the account's
-connectors or skills: on Claude Code 2.1.321 `--strict-mcp-config` and
-`--disable-slash-commands` change a minimal call by under 1%. If it comes
-back, `LOFI_CLAUDE_CODE_ARGS` adds flags to every plan run. A track for a
+about 18k input tokens each instead of about 3.5k: the account's claude.ai
+connectors (27 on Mo's account) load into `claude -p` asynchronously, so a
+tiny probe misses them but some requests carry them (once about 97k tokens
+each). See the transport notes below. `LOFI_CLAUDE_CODE_ARGS` adds flags to
+every plan run. A track for a
 121k-word book is about 475 entries and up to 285 probes, estimated at
 $5.30 to $8.49 at Opus list prices.
 
