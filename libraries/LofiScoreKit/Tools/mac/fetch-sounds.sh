@@ -43,8 +43,8 @@ say "fetching sounds from the catalogue in $PKG ($EDITIONS)"
 status=0
 for edition in $EDITIONS; do
   say "== $edition edition"
-  python3 -I "$PKG/Tools/atmosphere/fetch_ambience.py" --edition "$edition" "${ARGS[@]+"${ARGS[@]}"}" 2>&1 \
-    | grep -vE ": already has [0-9]+$" | tee -a "$LOGS/fetch-sounds.log"
+  python3 -I -u "$PKG/Tools/atmosphere/fetch_ambience.py" --edition "$edition" "${ARGS[@]+"${ARGS[@]}"}" 2>&1 \
+    | grep --line-buffered -vE ": already has [0-9]+$" | tee -a "$LOGS/fetch-sounds.log"
   [ "${PIPESTATUS[0]}" = 0 ] || { status=1; say "$edition edition: the fetch stopped early (see above); what it fetched is kept"; }
 done
 

@@ -66,7 +66,8 @@ public struct PlaceMemory: Sendable, Hashable {
         var place = places[id] ?? Place(id: id, name: scene.placeName ?? id, setting: scene.setting, layers: [], visits: 0, lastSeen: entry.globalIndex)
         if let name = scene.placeName, !name.isEmpty { place.name = name }
         if scene.setting != .unclear { place.setting = scene.setting }
-        place.layers = scene.layers
+        // What the characters were doing there (walking, eating) is not the place's.
+        place.layers = scene.layers.filter { $0.sound.scope != .activity }
         place.state = scene.state
         // A visit is a stretch of entries in the same place.
         if place.visits == 0 || previousPlaceID != id { place.visits += 1 }

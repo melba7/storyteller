@@ -301,13 +301,14 @@ export function LofiMusicSettings() {
                   <Text maxFontSizeMultiplier={1.5}>One-off sounds</Text>
                   <Text variant="muted">
                     A single sound on the sentence that says it happens, like a
-                    knock at the door or a clap of thunder. Rare and quiet, and
-                    off unless you turn it on.
+                    knock at the door or a clap of thunder, and the door or the
+                    engine when the story moves on. Rare and quiet; turn it off
+                    if sudden sounds are not for you.
                   </Text>
                 </View>
                 <Switch
                   accessibilityLabel="One-off sounds"
-                  checked={status.atmosphere.oneShotsEnabled ?? false}
+                  checked={status.atmosphere.oneShotsEnabled ?? true}
                   disabled={!status.atmosphere.enabled}
                   onCheckedChange={(enabled) =>
                     void music.setAtmosphereOneShots(enabled)

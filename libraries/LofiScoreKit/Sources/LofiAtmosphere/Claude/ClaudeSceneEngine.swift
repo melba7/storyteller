@@ -268,9 +268,10 @@ public struct ClaudeSceneEngine: SceneEngine {
             layers: layers,
             confidence: raw.confidence,
             cue: cue.isEmpty ? nil : String(cue.prefix(120)),
-            // A moment needs somewhere to happen.
+            // A moment or a transition needs somewhere to happen.
             moment: place == .none ? nil : raw.moment.flatMap { StoryScene.Moment(rawValue: $0.lowercased()) },
-            state: state.isEmpty || state.lowercased() == "none" ? nil : String(state.prefix(80))
+            state: state.isEmpty || state.lowercased() == "none" ? nil : String(state.prefix(80)),
+            transition: place == .none ? nil : raw.transition.flatMap { SceneTransition(rawValue: $0) ?? SceneTransition(lenient: $0) }
         )
         var oneShot: OneShotMention?
         if let item = raw.oneShot, let sound = OneShotSound(rawValue: item.sound) ?? OneShotSound(lenient: item.sound) {
@@ -353,6 +354,8 @@ public struct ClaudeSceneEngine: SceneEngine {
         }
         let newSounds: [NewSound]?
         let moment: String?
+        /// Optional, so answers in the older shape (and the eval set) still read.
+        let transition: String?
         let oneShot: OneShot?
         let world: String
         let cue: String
