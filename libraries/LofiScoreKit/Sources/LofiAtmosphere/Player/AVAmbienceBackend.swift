@@ -24,6 +24,8 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     private var oncePlayer = AVAudioPlayerNode()
     private var onceFilter = AVAudioUnitEQ(numberOfBands: 3)
     private var onceFormat: AVAudioFormat?
+    /// Bumped by every one-off sound, so an earlier fade-out never stops a later sound.
+    private var onceGeneration = 0
     private var files: [AVAudioFile?]
     private var connectedFormats: [AVAudioFormat?]
     /// Bumped whenever a slot is stopped or replaced, so its loop stops rescheduling.
@@ -189,9 +191,34 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
             onceFormat = format
         }
         Self.configure(onceFilter, for: filter)
+        withLock { onceGeneration += 1 }
         oncePlayer.volume = min(1, max(0, gain))
         oncePlayer.scheduleFile(file, at: nil, completionHandler: nil)
         oncePlayer.play()
+    }
+
+    public func stopOnce(fade: TimeInterval) {
+        guard oncePlayer.isPlaying else { return }
+        let token: Int = withLock {
+            onceGeneration += 1
+            return onceGeneration
+        }
+        let steps = max(1, Int((fade * 20).rounded(.up)))
+        let start = oncePlayer.volume
+        let interval = max(0.005, fade / Double(steps))
+        func step(_ index: Int) {
+            guard withLock({ onceGeneration == token }) else { return }
+            if index >= steps {
+                oncePlayer.stop()
+                return
+            }
+            oncePlayer.volume = start * Float(steps - index) / Float(steps)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + interval) { [weak self] in
+                guard self != nil else { return }
+                step(index + 1)
+            }
+        }
+        step(1)
     }
 
     // MARK: - Looping

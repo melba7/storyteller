@@ -184,6 +184,58 @@ export function musicSourceLabel(library: LofiMusicStatus["library"]): string {
   }
 }
 
+/**
+ * "Kept up to date with “LofiMusic”. Last checked 5 minutes ago: new: 1 book
+ * score", for the settings screen. `now` is for tests.
+ */
+export function linkedFolderLabel(
+  folder: NonNullable<LofiMusicStatus["library"]["linkedFolder"]>,
+  now: number = Date.now(),
+): string {
+  const parts = [`Kept up to date with “${folder.name}”.`]
+  if (folder.syncing) {
+    parts.push("Checking it now…")
+  } else if (folder.lastSync !== undefined) {
+    parts.push(`Last checked ${timeAgo(folder.lastSync * 1000, now)}.`)
+  }
+  if (!folder.syncing && folder.lastResult) {
+    parts.push(
+      folder.lastResult.charAt(0).toUpperCase() +
+        folder.lastResult.slice(1) +
+        ".",
+    )
+  }
+  return parts.join(" ")
+}
+
+/**
+ * The open book's id when its text is ready and it lacks a mood track, or an
+ * atmosphere track where the atmosphere can play; null otherwise. The app then
+ * asks the server for the book's score.
+ */
+export function bookNeedingScore(
+  status: LofiMusicStatus | null | undefined,
+): string | null {
+  const book = status?.book
+  if (!book || book.text !== "ready") return null
+  const atmosphere = status.atmosphere
+  const atmosphereMissing = atmosphere?.available === true && !atmosphere.track
+  return !book.moodTrack || atmosphereMissing ? book.id : null
+}
+
+/** "just now", "5 minutes ago", "3 hours ago", "2 days ago". */
+export function timeAgo(then: number, now: number = Date.now()): string {
+  const seconds = Math.max(0, Math.round((now - then) / 1000))
+  if (seconds < 60) return "just now"
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60)
+    return minutes === 1 ? "a minute ago" : `${minutes} minutes ago`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return hours === 1 ? "an hour ago" : `${hours} hours ago`
+  const days = Math.round(hours / 24)
+  return days === 1 ? "yesterday" : `${days} days ago`
+}
+
 /** "Calm 4 · Cozy 4 · …", with the moods that have no tracks at the end. */
 export function moodCounts(library: LofiMusicStatus["library"]): string {
   const withTracks = library.moods.filter((mood) => mood.tracks > 0)

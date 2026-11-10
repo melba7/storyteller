@@ -41,6 +41,8 @@ public struct AtmosphereConfig: Sendable, Hashable {
     public var minTimeBetweenOneShots: TimeInterval = 30
     public var noOneShotAfterStart: TimeInterval = 3
     public var maxOneShotDelay: TimeInterval = 8
+    /// A one-off sound still playing when the listener jumps is faded out this fast.
+    public var oneShotCut: TimeInterval = 0.3
     /// A scene this many sentences old with no newer one (a track scored only part way)
     /// fades to silence.
     public var maxLagSentences: Int = 80

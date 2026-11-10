@@ -101,6 +101,13 @@ export type LofiMusicStatus = {
     importedFolderName?: string
     tracks: number
     moods: { mood: LofiMood; tracks: number }[]
+    /**
+     * The music folder the app keeps up to date with: whatever is added to it
+     * (scores from the Mac, new sounds or tracks) is copied when the app opens,
+     * comes back to the foreground, or opens a book without a score. Missing
+     * when no folder is linked, and from older builds.
+     */
+    linkedFolder?: LofiLinkedFolder
   }
   /** The book the narrator has loaded, if any. */
   book?: {
@@ -164,6 +171,32 @@ export type LofiMoodOverride = {
   sentence?: number
 }
 
+export type LofiLinkedFolder = {
+  name: string
+  /** Seconds since 1970, when the folder was last looked at. */
+  lastSync?: number
+  /** What the last look found, or why it failed. */
+  lastResult?: string
+  syncing: boolean
+}
+
+/** What a look at the linked folder copied. */
+export type LofiSyncSummary = {
+  folderName: string
+  added: number
+  updated: number
+  notDownloaded: number
+  music: number
+  models: number
+  moodTracks: number
+  atmosphereTracks: number
+  atmosphereRecordings: number
+  /** The whole folder was imported afresh. */
+  fresh: boolean
+  /** One line: "New: 2 book scores, 1 sound". */
+  description: string
+}
+
 export type LofiImportSummary = {
   folderName: string
   tracks: number
@@ -183,8 +216,23 @@ type LofiScoreNativeModule = {
   setMutedInCar(muted: boolean): Promise<LofiMusicStatus>
   /** null goes back to the default level. */
   setMusicLevel(level: number | null): Promise<LofiMusicStatus>
-  /** Shows the Files folder picker; null when the listener cancels. */
+  /**
+   * Shows the Files folder picker, copies the music and keeps a link to the
+   * folder; null when the listener cancels.
+   */
   importMusicFolder(): Promise<LofiImportSummary | null>
+  /** Copies what is new in the linked folder now; null when none is linked. */
+  syncMusicFolder(): Promise<LofiSyncSummary | null>
+  /** Forgets the linked folder; the music already copied stays. */
+  unlinkMusicFolder(): Promise<LofiMusicStatus>
+  /**
+   * Keeps a score fetched from the server (the text of
+   * `GET /api/v2/books/<id>/lofi-score`) with its book, and reads the book
+   * again with it when it is the one open. Rejects when the text is not a
+   * score or the book is not on the device.
+   */
+  installBookScore(bookUuid: string, score: string): Promise<LofiMusicStatus>
+  /** Deletes the imported music and forgets the linked folder. */
   removeImportedMusic(): Promise<LofiMusicStatus>
   /** The imported music's CREDITS.md, or null when it had none. */
   getMusicCredits(): Promise<string | null>

@@ -4,9 +4,11 @@ import { describe, expect, it } from "vitest"
 import type { LofiMusicStatus } from "./index"
 import {
   atmosphereSourceLabel,
+  bookNeedingScore,
   canMarkWrongMood,
   describeAtmosphere,
   describeMusic,
+  linkedFolderLabel,
   moodCounts,
   moodFeedbackLine,
   moodFeedbackTotals,
@@ -16,6 +18,7 @@ import {
   plainCredits,
   soundList,
   soundName,
+  timeAgo,
   wrongMoodResult,
 } from "./status"
 
@@ -290,5 +293,90 @@ describe("describeAtmosphere", () => {
     ).toBe(
       "20 sounds: imported recordings, with stand-ins for the rest, and 1 more specific sound",
     )
+  })
+  it("describes the linked music folder", () => {
+    const now = Date.parse("2026-11-10T12:00:00Z")
+    const minutesAgo = (minutes: number) => (now - minutes * 60_000) / 1000
+    expect(
+      linkedFolderLabel(
+        { name: "LofiMusic", lastSync: minutesAgo(5), syncing: false },
+        now,
+      ),
+    ).toBe("Kept up to date with “LofiMusic”. Last checked 5 minutes ago.")
+    expect(
+      linkedFolderLabel(
+        {
+          name: "LofiMusic",
+          lastSync: minutesAgo(5),
+          lastResult: "new: 1 book score",
+          syncing: false,
+        },
+        now,
+      ),
+    ).toBe(
+      "Kept up to date with “LofiMusic”. Last checked 5 minutes ago. New: 1 book score.",
+    )
+    expect(
+      linkedFolderLabel(
+        { name: "LofiMusic", lastSync: minutesAgo(5), syncing: true },
+        now,
+      ),
+    ).toBe("Kept up to date with “LofiMusic”. Checking it now…")
+    expect(linkedFolderLabel({ name: "Music", syncing: false }, now)).toBe(
+      "Kept up to date with “Music”.",
+    )
+  })
+
+  it("says how long ago", () => {
+    const now = Date.parse("2026-11-10T12:00:00Z")
+    const ago = (seconds: number) => timeAgo(now - seconds * 1000, now)
+    expect(ago(0)).toBe("just now")
+    expect(ago(59)).toBe("just now")
+    expect(ago(60)).toBe("a minute ago")
+    expect(ago(5 * 60)).toBe("5 minutes ago")
+    expect(ago(60 * 60)).toBe("an hour ago")
+    expect(ago(3 * 60 * 60)).toBe("3 hours ago")
+    expect(ago(24 * 60 * 60)).toBe("yesterday")
+    expect(ago(3 * 24 * 60 * 60)).toBe("3 days ago")
+    expect(timeAgo(now + 5000, now)).toBe("just now")
+  })
+
+  it("asks the server for a score only when the open book lacks one", () => {
+    const book = { id: "b1", text: "ready" as const, moodTrack: false }
+    expect(bookNeedingScore(null)).toBeNull()
+    const { book: _none, ...noBook } = status()
+    expect(bookNeedingScore(noBook)).toBeNull()
+    expect(bookNeedingScore(status())).toBe("b")
+    expect(bookNeedingScore(status({ book }))).toBe("b1")
+    expect(
+      bookNeedingScore(status({ book: { ...book, text: "loading" } })),
+    ).toBeNull()
+    expect(
+      bookNeedingScore(status({ book: { ...book, moodTrack: true } })),
+    ).toBeNull()
+    expect(
+      bookNeedingScore(
+        status({
+          book: { ...book, moodTrack: true },
+          atmosphere: { ...atmosphere, available: true, track: false },
+        }),
+      ),
+    ).toBe("b1")
+    expect(
+      bookNeedingScore(
+        status({
+          book: { ...book, moodTrack: true },
+          atmosphere: { ...atmosphere, available: false, track: false },
+        }),
+      ),
+    ).toBeNull()
+    expect(
+      bookNeedingScore(
+        status({
+          book: { ...book, moodTrack: true },
+          atmosphere: { ...atmosphere, available: true, track: true },
+        }),
+      ),
+    ).toBeNull()
   })
 })

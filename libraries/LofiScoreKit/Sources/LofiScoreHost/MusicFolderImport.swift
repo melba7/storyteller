@@ -88,6 +88,13 @@ public enum MusicFolderImport {
         }
         guard !library.tracks.isEmpty else { throw ImportError.noMusic(source.lastPathComponent) }
 
+        // What was copied, so a later sync of the same folder copies only what is new.
+        var manifest = Manifest()
+        for item in plan.items {
+            manifest[item.relativePath] = stamp(of: item.url, fileManager: fileManager)
+        }
+        try? saveManifest(manifest, in: staging)
+
         try? fileManager.removeItem(at: destination)
         try fileManager.moveItem(at: staging, to: destination)
         keepStaging = true
@@ -166,6 +173,8 @@ public enum MusicFolderImport {
     struct Plan {
         var items: [Item] = []
         var notDownloaded = 0
+        /// The files still only in iCloud, by the names they will have once downloaded.
+        var placeholders: [URL] = []
     }
 
     static func plan(for source: URL, fileManager: FileManager) throws -> Plan {
@@ -222,8 +231,9 @@ public enum MusicFolderImport {
                 if name.hasSuffix(".icloud") {
                     let original = String(name.dropFirst().dropLast(".icloud".count))
                     let parts = Array(components.dropLast()) + [original]
-                    if isMusic(parts) || isAtmosphere(parts) {
+                    if isMusic(parts) || isAtmosphere(parts) || original.lowercased().hasSuffix(".json") {
                         plan.notDownloaded += 1
+                        plan.placeholders.append(resolved.deletingLastPathComponent().appendingPathComponent(original))
                     }
                 }
                 if isDirectory { enumerator.skipDescendants() }
@@ -284,7 +294,7 @@ public enum MusicFolderImport {
         ["mlmodel", "mlmodelc"].contains(url.pathExtension.lowercased())
     }
 
-    private static func copy(_ source: URL, to target: URL, fileManager: FileManager) throws {
+    static func copy(_ source: URL, to target: URL, fileManager: FileManager) throws {
         #if canImport(Darwin)
         // Coordinated reading makes iCloud Drive download a file that is not on the device yet.
         var coordinationError: NSError?

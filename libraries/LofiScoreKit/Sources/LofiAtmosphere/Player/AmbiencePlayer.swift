@@ -164,7 +164,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             director.setTrack(givenTrack?.bookID == id ? givenTrack?.track : nil)
             missing = []
             playhead = nil
-            cancelCue()
+            cutOneShot(over: config.fadeOut)
             lastOneShotIndex = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
             updateTransport(at: scheduler.now)
@@ -178,7 +178,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             bookID = nil
             director.setTrack(nil)
             playhead = nil
-            cancelCue()
+            cutOneShot(over: config.fadeOut)
             dwellTimer?.cancel()
             dwellTimer = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
@@ -215,7 +215,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         scheduler.perform { [self] in
             narrating = false
             endHold(release: config.fadeOut)
-            cancelCue()
+            cutOneShot(over: config.fadeOut)
             updateTransport(at: scheduler.now)
         }
     }
@@ -226,7 +226,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             playhead = index
             settledSince = scheduler.now
             pendingMoment = nil
-            cancelCue()
+            cutOneShot(over: config.oneShotCut)
             evaluate(seek: true)
         }
     }
@@ -275,7 +275,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             enabled = isEnabled
             if !isEnabled {
                 endHold(release: config.fadeOut)
-                cancelCue()
+                cutOneShot(over: config.fadeOut)
             }
             updateTransport(at: scheduler.now)
             updateYield()
@@ -294,7 +294,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     public func setOneShotsEnabled(_ isEnabled: Bool) {
         scheduler.perform { [self] in
             oneShotsEnabled = isEnabled
-            if !isEnabled { cancelCue() }
+            if !isEnabled { cutOneShot(over: config.fadeOut) }
         }
     }
 
@@ -572,6 +572,13 @@ public final class AmbiencePlayer: @unchecked Sendable {
         pendingCue = nil
     }
 
+    /// Drops a waiting one-off sound and fades out one that is playing: the narrator
+    /// stopped, the listener jumped, or the sounds went off.
+    private func cutOneShot(over fade: TimeInterval) {
+        cancelCue()
+        backend.stopOnce(fade: fade)
+    }
+
     // MARK: - Engine and transport
 
     private var shouldPlay: Bool {
@@ -761,7 +768,10 @@ extension AmbiencePlayer: AmbienceBackendDelegate {
         scheduler.perform { [self] in
             routeMuted = config.mutedRoutes.contains(route)
             // Headphones pulled: out at once; the narrator pauses and its next play brings us back.
-            if previousOutputLost { narrating = false }
+            if previousOutputLost {
+                narrating = false
+                cutOneShot(over: 0.1)
+            }
             updateTransport(at: scheduler.now, fadeOut: previousOutputLost ? 0.1 : nil)
             updateYield()
         }

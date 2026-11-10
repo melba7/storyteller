@@ -1,5 +1,5 @@
 // LOFI-FORK: the lofi music's section in Settings (see FORK.md).
-import { FolderInput } from "lucide-react-native"
+import { FolderInput, FolderSync } from "lucide-react-native"
 import { useState } from "react"
 import { Modal, ScrollView, Share, View } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
@@ -11,6 +11,7 @@ import { Text } from "@/components/ui/text"
 import { LofiScore } from "@/modules/lofi-score"
 import {
   atmosphereSourceLabel,
+  linkedFolderLabel,
   moodCounts,
   moodFeedbackTotals,
   moodName,
@@ -24,6 +25,7 @@ import { useLofiMusic } from "./useLofiMusic"
 export function LofiMusicSettings() {
   const music = useLofiMusic(2000)
   const [importing, setImporting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [credits, setCredits] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
@@ -60,6 +62,26 @@ export function LofiMusicSettings() {
       setMessage(error instanceof Error ? error.message : String(error))
     } finally {
       setImporting(false)
+    }
+  }
+
+  async function syncFolder() {
+    setSyncing(true)
+    setMessage(null)
+    try {
+      const summary = await music.syncMusicFolder()
+      if (summary) {
+        setMessage(
+          summary.description +
+            (summary.notDownloaded > 0
+              ? ". Files still in iCloud are downloading; check again in a while."
+              : "."),
+        )
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error))
+    } finally {
+      setSyncing(false)
     }
   }
 
@@ -161,19 +183,53 @@ export function LofiMusicSettings() {
             <Text variant="muted">{moodCounts(status.library)}</Text>
           )}
           <Button
-            accessibilityLabel="Import a music folder"
+            accessibilityLabel={
+              status.library.linkedFolder
+                ? "Pick a different music folder"
+                : "Import a music folder"
+            }
             variant="secondary"
-            disabled={importing}
+            disabled={importing || syncing}
             onPress={() => void importFolder()}
           >
             <Icon as={FolderInput} />
-            <Text>{importing ? "Importing…" : "Import a music folder"}</Text>
+            <Text>
+              {importing
+                ? "Importing…"
+                : status.library.linkedFolder
+                  ? "Pick a different music folder"
+                  : "Import a music folder"}
+            </Text>
           </Button>
-          <Text variant="muted">
-            Pick a folder with one subfolder per mood (
-            {status.library.moods.map((mood) => moodName(mood.mood)).join(", ")}
-            ), for example from iCloud Drive. The music is copied into the app.
-          </Text>
+          {status.library.linkedFolder ? (
+            <>
+              <Text variant="muted">
+                {linkedFolderLabel(status.library.linkedFolder)} New book
+                scores, sounds and tracks put into the folder are copied by
+                themselves when the app opens, comes back, or opens a book that
+                has no score yet.
+              </Text>
+              <Button
+                accessibilityLabel="Check the music folder for new files now"
+                variant="secondary"
+                disabled={importing || syncing}
+                onPress={() => void syncFolder()}
+              >
+                <Icon as={FolderSync} />
+                <Text>{syncing ? "Checking…" : "Check for new files now"}</Text>
+              </Button>
+            </>
+          ) : (
+            <Text variant="muted">
+              Pick a folder with one subfolder per mood (
+              {status.library.moods
+                .map((mood) => moodName(mood.mood))
+                .join(", ")}
+              ), for example from iCloud Drive. The music is copied into the
+              app, and the folder is kept linked so new scores, sounds and
+              tracks arrive by themselves.
+            </Text>
+          )}
           {status.library.source === "imported" && (
             <Button
               accessibilityLabel="Show the music credits"
@@ -183,11 +239,21 @@ export function LofiMusicSettings() {
               <Text>Music credits</Text>
             </Button>
           )}
+          {status.library.linkedFolder && (
+            <Button
+              accessibilityLabel="Stop keeping the music folder up to date"
+              variant="ghost"
+              disabled={importing || syncing}
+              onPress={() => void music.unlinkMusicFolder()}
+            >
+              <Text>Stop keeping it up to date</Text>
+            </Button>
+          )}
           {status.library.source === "imported" && (
             <Button
               accessibilityLabel="Remove the imported music"
               variant="ghost"
-              disabled={importing}
+              disabled={importing || syncing}
               onPress={() => void music.removeImportedMusic()}
             >
               <Text>Remove imported music</Text>

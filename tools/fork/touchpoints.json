@@ -8,6 +8,7 @@
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
     "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
+    "applications/web/src/app/api/v2/books/[bookId]/lofi-score/",
     "libraries/LofiScoreKit/",
     "tools/fork/",
     "tools/lofi-library/"

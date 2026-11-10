@@ -89,6 +89,74 @@ final class LofiMusicHostTests: XCTestCase {
         XCTAssertNil(MoodTrackFinder.find(bookID: "abc", in: [folder.appendingPathComponent("missing")], spoilerGuard: guardian))
     }
 
+    func testLooksThroughAnyNumberOfTracksAndRemembersTheMatch() throws {
+        let guardian = try Books.text().spoilerGuard
+        let tracks = folder.appendingPathComponent("MoodTracks", isDirectory: true)
+        // The match is the oldest file, behind hundreds of other books' tracks.
+        try track(for: guardian, bookID: "The Match").save(to: tracks.appendingPathComponent("aaa-match.json"))
+        for index in 0..<240 {
+            try track(for: guardian, bookID: "other \(index)", tamper: true).save(to: tracks.appendingPathComponent("other-\(index).score.json"))
+        }
+        let old = Date().addingTimeInterval(-3600)
+        try fileManager.setAttributes([.modificationDate: old], ofItemAtPath: tracks.appendingPathComponent("aaa-match.json").path)
+
+        XCTAssertEqual(MoodTrackFinder.find(bookID: "abc", in: [tracks], spoilerGuard: guardian)?.bookID, "The Match")
+        let memory = try XCTUnwrap(TrackMatchMemory.load(from: tracks))
+        XCTAssertEqual(memory["mood:abc"]?.file, "0/aaa-match.json")
+
+        // A book with no track: remembered too, until the folder changes.
+        let otherBook = try SpoilerGuard(chapters: [["Nothing here matches.", "Nor this."]])
+        XCTAssertNil(MoodTrackFinder.find(bookID: "xyz", in: [tracks], spoilerGuard: otherBook))
+        let none = try XCTUnwrap(TrackMatchMemory.load(from: tracks)?["xyz"] ?? TrackMatchMemory.load(from: tracks)?["mood:xyz"])
+        XCTAssertNil(none.file)
+        XCTAssertEqual(none.signature, memory["mood:abc"]?.signature)
+        XCTAssertFalse(files(under: tracks).contains("MoodTracks/.matches.json"), "the memory is a dot file the import never copies")
+    }
+
+    func testTheMatchMemorySkipsDecodingUntilTheFolderChanges() throws {
+        let tracks = folder.appendingPathComponent("MoodTracks", isDirectory: true)
+        try touch("MoodTracks/a.json", contents: Data("a".utf8))
+        try touch("MoodTracks/b.json", contents: Data("b".utf8))
+        // b is newer, so it is looked at first.
+        try fileManager.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)], ofItemAtPath: tracks.appendingPathComponent("a.json").path)
+        var decoded: [String] = []
+        func lookUp(_ book: String, match: String?) -> String? {
+            TrackMatchMemory.lookUp(
+                key: "t:" + book, bookID: book, folders: [tracks],
+                isCandidate: { $0.pathExtension == "json" },
+                bookName: { $0.deletingPathExtension().lastPathComponent },
+                decode: { url -> String? in
+                    decoded.append(url.lastPathComponent)
+                    return url.lastPathComponent
+                },
+                matches: { $0 == match }
+            )?.track
+        }
+        XCTAssertEqual(lookUp("x", match: "a.json"), "a.json")
+        XCTAssertEqual(decoded, ["b.json", "a.json"], "newest first")
+        decoded = []
+        XCTAssertEqual(lookUp("x", match: "a.json"), "a.json")
+        XCTAssertEqual(decoded, ["a.json"], "the remembered file is checked, nothing else")
+
+        decoded = []
+        XCTAssertNil(lookUp("y", match: nil))
+        XCTAssertEqual(decoded.count, 2)
+        decoded = []
+        XCTAssertNil(lookUp("y", match: nil))
+        XCTAssertEqual(decoded, [], "nothing matched last time and the folder is the same")
+
+        // A new file: the book is looked for again, and only the new file is new.
+        try touch("MoodTracks/c.json", contents: Data("c".utf8))
+        decoded = []
+        XCTAssertEqual(lookUp("y", match: "c.json"), "c.json")
+        XCTAssertTrue(decoded.contains("c.json"))
+        // The remembered file no longer matching (the book was re-synced) is not trusted.
+        decoded = []
+        XCTAssertNil(lookUp("x", match: nil))
+        XCTAssertEqual(decoded.first, "a.json")
+        XCTAssertEqual(decoded.count, 3)
+    }
+
     private func score(_ mood: MoodTrack?, format: Int = 1) throws -> Data {
         var object: [String: Any] = ["format": format, "atmosphere": ["format": 1, "cues": []]]
         if let mood {
@@ -174,6 +242,7 @@ final class LofiMusicHostTests: XCTestCase {
             atmosphereRecordings: 3, atmosphereTracks: 1
         ))
         XCTAssertEqual(files(under: destination), [
+            ".imported.json",
             "Atmosphere/OldTown.ChurchBells/bells-fs1.m4a",
             "Atmosphere/OneShots/DoorKnock/knock-fs2.m4a",
             "Atmosphere/OneShots/sounds.json",
@@ -219,7 +288,7 @@ final class LofiMusicHostTests: XCTestCase {
 
         let summary = try MusicFolderImport.importFolder(folder.appendingPathComponent("Listed"), into: destination)
         XCTAssertEqual(summary.tracks, 1)
-        XCTAssertEqual(files(under: destination), ["Mastered/Calm/a.m4a", "library.json"])
+        XCTAssertEqual(files(under: destination), [".imported.json", "Mastered/Calm/a.m4a", "library.json"])
     }
 
     func testAFolderWithoutMusicChangesNothing() throws {
@@ -230,6 +299,57 @@ final class LofiMusicHostTests: XCTestCase {
             XCTAssertEqual(error as? MusicFolderImport.ImportError, .noMusic("Empty"))
         }
         XCTAssertEqual(files(under: destination), ["Calm/kept.mp3"])
+    }
+
+    func testSyncCopiesOnlyWhatIsNewAndNeverDeletes() throws {
+        let source = folder.appendingPathComponent("Linked", isDirectory: true)
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+        try touch("Linked/Calm/a.mp3")
+        try touch("Linked/Cozy/b.mp3")
+        try touch("Linked/tracks/Book One.score.json")
+        try touch("Linked/Atmosphere/Rain/rain.m4a")
+        try touch("Linked/notes.txt")
+
+        // Nothing imported yet: a plain import, remembered file by file.
+        var summary = try MusicFolderImport.sync(source, into: destination)
+        XCTAssertTrue(summary.fresh)
+        XCTAssertEqual(summary.added, 4)
+        XCTAssertEqual(summary.music, 2)
+        XCTAssertEqual(summary.moodTracks, 1)
+        XCTAssertEqual(summary.atmosphereRecordings, 1)
+        XCTAssertEqual(summary.description, "Imported 1 book score, 2 tracks, 1 sound")
+        XCTAssertEqual(files(under: destination), [
+            ".imported.json", "Atmosphere/Rain/rain.m4a", "Calm/a.mp3", "Cozy/b.mp3", "MoodTracks/Book One.score.json",
+        ])
+
+        // The same folder again: nothing to do.
+        summary = try MusicFolderImport.sync(source, into: destination)
+        XCTAssertFalse(summary.changed)
+        XCTAssertEqual(summary.description, "Nothing new")
+
+        // A new score and a changed track: only those are copied, and a track the phone
+        // keeps but the folder no longer has stays.
+        try touch("Linked/tracks/Book Two.score.json", contents: Data("two".utf8))
+        try touch("Linked/Calm/a.mp3", contents: Data("longer".utf8))
+        try fileManager.removeItem(at: source.appendingPathComponent("Cozy/b.mp3"))
+        summary = try MusicFolderImport.sync(source, into: destination)
+        XCTAssertEqual(summary.added, 1)
+        XCTAssertEqual(summary.updated, 1)
+        XCTAssertEqual(summary.moodTracks, 1)
+        XCTAssertEqual(summary.music, 1)
+        XCTAssertEqual(summary.description, "New: 1 book score, 1 track")
+        XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("Calm/a.mp3")), Data("longer".utf8))
+        XCTAssertEqual(files(under: destination), [
+            ".imported.json", "Atmosphere/Rain/rain.m4a", "Calm/a.mp3", "Cozy/b.mp3",
+            "MoodTracks/Book One.score.json", "MoodTracks/Book Two.score.json",
+        ])
+        XCTAssertFalse(files(under: destination).contains { $0.hasSuffix(".part") })
+
+        // A file still in iCloud is counted and asked for, not copied.
+        try touch("Linked/Tense/.storm.wav.icloud")
+        summary = try MusicFolderImport.sync(source, into: destination)
+        XCTAssertEqual(summary.notDownloaded, 1)
+        XCTAssertEqual(summary.description, "Nothing new yet; 1 files are still downloading from iCloud")
     }
 
     // MARK: - The whole host
@@ -266,6 +386,100 @@ final class LofiMusicHostTests: XCTestCase {
             }
             try await Task.sleep(nanoseconds: 20_000_000)
         }
+    }
+
+    func testALinkedFolderBringsAScoreToTheOpenBook() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-host-\(UUID().uuidString)"))
+        try touch("Linked/Calm/a.mp3")
+        try touch("Linked/Tense/b.mp3")
+        try fileManager.createDirectory(at: folder.appendingPathComponent("books/extracted/book-1"), withIntermediateDirectories: true)
+        try fileManager.copyItem(at: Self.readerBook, to: folder.appendingPathComponent("books/extracted/book-1/readaloud"))
+
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        let summary = try await host.linkMusicFolder(folder.appendingPathComponent("Linked"))
+        XCTAssertEqual(summary.tracks, 2)
+        var status = try await waitFor(host) { $0.library.tracks == 2 }
+        XCTAssertEqual(status.library.linkedFolder?.name, "Linked")
+        XCTAssertNotNil(status.library.linkedFolder?.lastSync)
+
+        host.narratorLoadedBook(id: "book-1", trackFile: nil)
+        host.narratorPlayingChanged(true)
+        status = try await waitFor(host) { $0.book?.text == "ready" }
+        XCTAssertEqual(status.book?.moodTrack, false)
+
+        // The Mac scores the book into the linked folder; the next look picks it up and the
+        // open book gets its score without closing.
+        let guardian = try SpoilerGuard(epubDirectory: folder.appendingPathComponent("books/extracted/book-1/readaloud"))
+        try touch("Linked/tracks/Reader.score.json", contents: score(track(for: guardian, bookID: "Reader")))
+        let synced = try await host.syncMusicFolder(reason: .manual)
+        XCTAssertEqual(synced?.moodTracks, 1)
+        status = try await waitFor(host) { $0.book?.moodTrack == true }
+        XCTAssertEqual(status.book?.text, "ready")
+        XCTAssertEqual(status.library.linkedFolder?.lastResult, "New: 1 book score")
+        XCTAssertEqual(status.library.tracks, 2, "the music was not reloaded for a score")
+
+        // Unlinking keeps the music.
+        await host.unlinkMusicFolder()
+        status = await host.status()
+        XCTAssertNil(status.library.linkedFolder)
+        XCTAssertEqual(status.library.tracks, 2)
+        let unlinked = try await host.syncMusicFolder(reason: .manual)
+        XCTAssertNil(unlinked)
+
+        // A linked folder that went away is reported, not fatal.
+        _ = try await host.linkMusicFolder(folder.appendingPathComponent("Linked"))
+        try fileManager.removeItem(at: folder.appendingPathComponent("Linked"))
+        do {
+            _ = try await host.syncMusicFolder(reason: .manual)
+            XCTFail("a missing folder should throw")
+        } catch {}
+        status = await host.status()
+        XCTAssertTrue(status.library.linkedFolder?.lastResult?.hasPrefix("Could not read the folder") == true)
+    }
+
+    func testAScoreFromTheServerIsKeptInTheBook() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-host-\(UUID().uuidString)"))
+        try touch("Picked/Calm/a.mp3")
+        let bookFolder = folder.appendingPathComponent("books/extracted/book-1/readaloud")
+        try fileManager.createDirectory(at: folder.appendingPathComponent("books/extracted/book-1"), withIntermediateDirectories: true)
+        try fileManager.copyItem(at: Self.readerBook, to: bookFolder)
+
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        _ = try await host.importMusic(from: folder.appendingPathComponent("Picked"))
+        host.narratorLoadedBook(id: "book-1", trackFile: nil)
+        host.narratorPlayingChanged(true)
+        var status = try await waitFor(host) { $0.book?.text == "ready" }
+        XCTAssertEqual(status.book?.moodTrack, false)
+
+        // Not a score: refused, nothing written.
+        do {
+            try await host.installScore(Data("{\"format\":1}".utf8), forBook: "book-1")
+            XCTFail("an empty score should be refused")
+        } catch {}
+        XCTAssertFalse(fileManager.fileExists(atPath: bookFolder.appendingPathComponent(BookScore.pathInBook).path))
+
+        // A book that is not on the device.
+        let guardian = try SpoilerGuard(epubDirectory: bookFolder)
+        let data = try score(track(for: guardian, bookID: "book-1"))
+        do {
+            try await host.installScore(data, forBook: "book-9")
+            XCTFail("a book without text should be refused")
+        } catch {}
+
+        // The open book: the score lands inside it and the book follows it without closing.
+        try await host.installScore(data, forBook: "book-1")
+        XCTAssertTrue(fileManager.fileExists(atPath: bookFolder.appendingPathComponent(BookScore.pathInBook).path))
+        status = try await waitFor(host) { $0.book?.moodTrack == true }
+        XCTAssertEqual(status.book?.text, "ready")
+
+        // Opened again later, the book brings its own score.
+        host.narratorLoadedBook(id: "book-2", trackFile: nil)
+        status = try await waitFor(host) { $0.book?.id == "book-2" && $0.book?.text != "loading" }
+        host.narratorLoadedBook(id: "book-1", trackFile: nil)
+        status = try await waitFor(host) { $0.book?.text == "ready" && $0.book?.moodTrack == true }
+        XCTAssertEqual(status.book?.moodTrack, true)
     }
 
     func testFollowsABookFromItsUnzippedEPUB() async throws {

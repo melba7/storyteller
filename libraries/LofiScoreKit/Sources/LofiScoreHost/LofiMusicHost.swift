@@ -55,6 +55,10 @@ public final class LofiMusicHost: @unchecked Sendable {
         public var holdNarration: (@Sendable (_ seconds: Double) -> Bool)?
         /// Where the "Wrong mood" button's log goes (``MoodFeedbackLog``). Nil: no log.
         public var feedbackFolder: URL?
+        /// How a linked music folder is remembered across launches and found again: a
+        /// security-scoped bookmark on Apple platforms, the path elsewhere (tests).
+        public var makeBookmark: (URL) throws -> Data = FolderBookmark.make
+        public var resolveBookmark: (Data) throws -> URL = FolderBookmark.resolve
 
         public init(
             settings: MusicSettings,
@@ -97,6 +101,11 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
     }
 
+    /// Why the linked music folder is being looked at.
+    public enum SyncReason: String, Sendable {
+        case launch, foreground, bookOpened, manual
+    }
+
     public enum MusicSource: String, Codable, Sendable {
         /// Music imported from a folder.
         case imported
@@ -130,6 +139,11 @@ public final class LofiMusicHost: @unchecked Sendable {
     private var recentEvents: [String] = []
     /// Whether this book's opening mood went into the wrong-mood counts yet (on `queue`).
     private var openingMoodCounted = false
+    // The linked music folder (on `queue`).
+    private var syncing = false
+    private var lastSyncStarted: Date?
+    /// Automatic looks at the linked folder are at least this far apart.
+    static let syncInterval: TimeInterval = 60
 
     // The atmosphere, on `queue` too.
     private let sinks = NarrationFanOut()
@@ -167,6 +181,7 @@ public final class LofiMusicHost: @unchecked Sendable {
             HostLog.note("started, music \(settings.enabled ? "on" : "off"), atmosphere \(atmosphereOn ? "on" : "off")")
             if settings.enabled { prepareLibrary() }
             if atmosphereOn { prepareAtmosphere() }
+            syncMusicFolderIfDue(reason: .launch)
         }
     }
 
@@ -398,6 +413,170 @@ public final class LofiMusicHost: @unchecked Sendable {
         return summary
     }
 
+    /// Imports the folder like ``importMusic(from:)`` and keeps a link to it, so new scores,
+    /// sounds and tracks put into it later are copied without importing again (see
+    /// ``syncMusicFolder(reason:)``).
+    public func linkMusicFolder(_ folder: URL) async throws -> MusicFolderImport.Summary {
+        let summary = try await importMusic(from: folder)
+        let bookmark: Data?
+        do {
+            bookmark = try environment.makeBookmark(folder)
+        } catch {
+            HostLog.error("could not keep a link to \(folder.lastPathComponent): \(error)")
+            bookmark = nil
+        }
+        await onQueue { [self] in
+            settings.linkedFolderBookmark = bookmark
+            settings.linkedFolderName = bookmark == nil ? nil : folder.lastPathComponent
+            settings.lastSyncDate = Date()
+            settings.lastSyncResult = nil
+            lastSyncStarted = Date()
+        }
+        return summary
+    }
+
+    /// Forgets the linked folder. The music already imported stays.
+    public func unlinkMusicFolder() async {
+        await onQueue { [self] in
+            settings.linkedFolderBookmark = nil
+            settings.linkedFolderName = nil
+            settings.lastSyncDate = nil
+            settings.lastSyncResult = nil
+        }
+    }
+
+    /// Copies whatever is new in the linked music folder (``MusicFolderImport/sync(_:into:fileManager:)``)
+    /// and reloads what it touched: the music or the mood models, the atmosphere's sounds,
+    /// or the open book's text when a score for it may have arrived. Nil when no folder is
+    /// linked. Errors (the folder gone, iCloud not reachable) are kept for the settings
+    /// screen and thrown.
+    @discardableResult
+    public func syncMusicFolder(reason: SyncReason) async throws -> MusicFolderImport.SyncSummary? {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async { [self] in
+                startSync(reason: reason) { continuation.resume(with: $0) }
+            }
+        }
+    }
+
+    /// ``syncMusicFolder(reason:)`` in the background, unless one ran a minute ago or is
+    /// running. For launch, the app coming to the foreground, and a book opening without
+    /// a score.
+    public func syncMusicFolderIfDue(reason: SyncReason) {
+        queue.async { [self] in
+            guard settings.linkedFolderBookmark != nil, !syncing else { return }
+            if let last = lastSyncStarted, Date().timeIntervalSince(last) < Self.syncInterval { return }
+            startSync(reason: reason) { _ in }
+        }
+    }
+
+    /// On `queue`.
+    private func startSync(reason: SyncReason, completion: @escaping (Result<MusicFolderImport.SyncSummary?, Error>) -> Void) {
+        guard let bookmark = settings.linkedFolderBookmark else {
+            completion(.success(nil))
+            return
+        }
+        guard !syncing else {
+            completion(.failure(SyncError.busy))
+            return
+        }
+        syncing = true
+        lastSyncStarted = Date()
+        let environment = environment
+        let destination = environment.musicFolder
+        work.async { [weak self] in
+            let result = Result { () -> (MusicFolderImport.SyncSummary, Data?) in
+                let folder = try environment.resolveBookmark(bookmark)
+                let summary = try MusicFolderImport.sync(folder, into: destination)
+                // A bookmark goes stale when the folder moves; a fresh one keeps the link.
+                let refreshed = try? environment.makeBookmark(folder)
+                return (summary, refreshed)
+            }
+            guard let host = self else { return }
+            host.queue.async {
+                host.finishSync(reason: reason, result: result, completion: completion)
+            }
+        }
+    }
+
+    /// On `queue`.
+    private func finishSync(
+        reason: SyncReason,
+        result: Result<(MusicFolderImport.SyncSummary, Data?), Error>,
+        completion: (Result<MusicFolderImport.SyncSummary?, Error>) -> Void
+    ) {
+        syncing = false
+        settings.lastSyncDate = Date()
+        switch result {
+        case let .success((summary, refreshed)):
+            if let refreshed, refreshed != settings.linkedFolderBookmark { settings.linkedFolderBookmark = refreshed }
+            settings.lastSyncResult = summary.description
+            HostLog.note("music folder (\(reason.rawValue)): \(summary.description)")
+            if summary.changed || summary.fresh {
+                settings.importedFolderName = summary.folderName
+                if summary.fresh || summary.music > 0 || summary.models > 0 { reloadLibrary() }
+                if summary.fresh || summary.atmosphereRecordings > 0 { reloadAtmosphere() }
+                if summary.moodTracks > 0 || summary.atmosphereTracks > 0 { reopenBookIfUnscored() }
+            }
+            completion(.success(summary))
+        case let .failure(error):
+            settings.lastSyncResult = "Could not read the folder: \(error.localizedDescription)"
+            HostLog.error("music folder (\(reason.rawValue)): \(error)")
+            completion(.failure(error))
+        }
+    }
+
+    /// A score may have arrived for the open book: look at its text again when it has no
+    /// mood track or no atmosphere track yet. A book that already has both is left alone.
+    private func reopenBookIfUnscored() {
+        guard let book, followingOn else { return }
+        let hasMoodTrack: Bool
+        if case let .ready(id, _, moodTrack) = bookText, id == book.id { hasMoodTrack = moodTrack } else { hasMoodTrack = false }
+        let hasAtmosphere = atmosphereTrack?.bookID == book.id && atmosphereTrack?.track != nil
+        guard !(hasMoodTrack && (hasAtmosphere || environment.makeAmbienceBackend == nil)) else { return }
+        if case .loading = bookText { return }
+        HostLog.note("book \(book.id): looking for its score again")
+        loadBookText(replacing: true)
+    }
+
+    public enum SyncError: Error, CustomStringConvertible {
+        case busy
+        public var description: String { "the music folder is being read already" }
+    }
+
+    /// Keeps a score the app fetched from the server with its book: inside the unzipped
+    /// read-aloud EPUB at `BookScore.pathInBook`, where the book's text is read from, so a
+    /// re-imported music folder does not lose it and a deleted book takes it along. When
+    /// that book is open and missing a track, its text is read again with the score.
+    /// Throws when the data is not a score or the book's text is not on the device.
+    public func installScore(_ data: Data, forBook id: String) async throws {
+        let parts = try BookScore.contents(of: data)
+        let (trackFile, environment) = await onQueue { [self] () -> (URL?, Environment) in
+            (self.book?.id == id ? self.book?.trackFile : nil, self.environment)
+        }
+        let file: URL = try await withCheckedThrowingContinuation { continuation in
+            work.async {
+                guard let folder = BookTextLocator.epubDirectory(bookID: id, booksFolder: environment.booksFolder, trackFile: trackFile) else {
+                    continuation.resume(throwing: BookTextError.notFound)
+                    return
+                }
+                let file = folder.appendingPathComponent(BookScore.pathInBook)
+                do {
+                    try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try data.write(to: file, options: .atomic)
+                    continuation.resume(returning: file)
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+        await onQueue { [self] in
+            HostLog.note("book \(id): score saved in the book (mood: \(parts.mood), atmosphere: \(parts.atmosphere)) at \(file.lastPathComponent)")
+            guard book?.id == id else { return }
+            reopenBookIfUnscored()
+        }
+    }
+
     /// The imported music's credits (`CREDITS.md`), if the folder had them.
     public func musicCredits() async -> String? {
         let folder = environment.musicFolder
@@ -420,11 +599,15 @@ public final class LofiMusicHost: @unchecked Sendable {
         }
     }
 
-    /// Deletes the imported music and goes back to the stand-ins.
+    /// Deletes the imported music, forgets the linked folder and goes back to the stand-ins.
     public func removeImportedMusic() async {
         await onQueue { [self] in
             try? FileManager.default.removeItem(at: environment.musicFolder)
             settings.importedFolderName = nil
+            settings.linkedFolderBookmark = nil
+            settings.linkedFolderName = nil
+            settings.lastSyncDate = nil
+            settings.lastSyncResult = nil
             reloadLibrary()
             reloadAtmosphere()
         }
@@ -628,7 +811,9 @@ public final class LofiMusicHost: @unchecked Sendable {
 
     // MARK: - Book text
 
-    private func loadBookText() {
+    /// Opens the book's text and looks for its score. With `replacing`, the text already
+    /// attached is swapped for the new one (a score arrived) and the book stays open.
+    private func loadBookText(replacing: Bool = false) {
         guard let book else { return }
         let id = book.id
         bookText = .loading(id)
@@ -656,7 +841,15 @@ public final class LofiMusicHost: @unchecked Sendable {
                     // The atmosphere's track first, so it is there when the book opens.
                     self.atmosphereTrack = (id, found?.track, found?.origin)
                     self.atmosphere?.setTrack(found?.track, forBook: id)
-                    self.follower.attachText(text, toBook: id)
+                    if replacing {
+                        self.follower.replaceText(text, toBook: id)
+                    } else {
+                        self.follower.attachText(text, toBook: id)
+                    }
+                    // A book without a score: its score may have arrived in the linked folder.
+                    if !hasTrack || (found == nil && environment.makeAmbienceBackend != nil) {
+                        self.syncMusicFolderIfDue(reason: .bookOpened)
+                    }
                 case let .failure(error):
                     HostLog.note("book \(id): no music, \(error)")
                     self.bookText = .unavailable(id, reason: "\(error)")
@@ -913,7 +1106,13 @@ public final class LofiMusicHost: @unchecked Sendable {
                 preparing: preparingLibrary,
                 importedFolderName: settings.importedFolderName,
                 tracks: library?.tracks.count ?? 0,
-                moods: moods
+                moods: moods,
+                linkedFolder: settings.linkedFolderBookmark == nil ? nil : .init(
+                    name: settings.linkedFolderName ?? settings.importedFolderName ?? "music folder",
+                    lastSync: settings.lastSyncDate?.timeIntervalSince1970,
+                    lastResult: settings.lastSyncResult,
+                    syncing: syncing
+                )
             ),
             book: text,
             playback: .init(
@@ -973,6 +1172,16 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         public var tracks: Int
     }
 
+    /// The music folder the app keeps up to date with.
+    public struct LinkedFolder: Codable, Sendable, Hashable {
+        public var name: String
+        /// Seconds since 1970, when the folder was last looked at.
+        public var lastSync: Double?
+        /// What the last look found, or why it failed.
+        public var lastResult: String?
+        public var syncing: Bool
+    }
+
     public struct Library: Codable, Sendable, Hashable {
         /// "imported", "placeholders" or "none".
         public var source: String
@@ -980,6 +1189,8 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         public var importedFolderName: String?
         public var tracks: Int
         public var moods: [MoodCount]
+        /// Nil when no folder is linked (older builds, or the link was removed).
+        public var linkedFolder: LinkedFolder? = nil
     }
 
     public struct Book: Codable, Sendable, Hashable {
