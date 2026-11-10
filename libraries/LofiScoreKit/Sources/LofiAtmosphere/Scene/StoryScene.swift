@@ -80,6 +80,11 @@ public struct StoryScene: Codable, Sendable, Hashable {
     /// sounds. Shown to the scorer with the place's memory, so a change of state at a
     /// known place changes the sounds the same way each time. Never played.
     public var state: String?
+    /// How the sound moves from the last scene to this one, when the entry's own sentence
+    /// is the move (a door opened on a party and shut behind them, a train boarded). Only
+    /// the entry that starts a new scene uses it; without one the player infers a plain
+    /// transition from the two scenes (``SceneTransition/inferred(from:to:)``).
+    public var transition: SceneTransition?
 
     public static let maxLayers = 5
 
@@ -91,7 +96,8 @@ public struct StoryScene: Codable, Sendable, Hashable {
         confidence: Double = 1,
         cue: String? = nil,
         moment: Moment? = nil,
-        state: String? = nil
+        state: String? = nil,
+        transition: SceneTransition? = nil
     ) {
         self.placeID = placeID
         self.placeName = placeName
@@ -101,6 +107,7 @@ public struct StoryScene: Codable, Sendable, Hashable {
         self.cue = cue
         self.moment = moment
         self.state = state
+        self.transition = transition
     }
 
     /// No place and no sound.
@@ -146,7 +153,7 @@ public struct StoryScene: Codable, Sendable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case placeID, placeName, setting, layers, confidence, cue, moment, state
+        case placeID, placeName, setting, layers, confidence, cue, moment, state, transition
     }
 
     public init(from decoder: any Decoder) throws {
@@ -160,7 +167,9 @@ public struct StoryScene: Codable, Sendable, Hashable {
             cue: try c.decodeIfPresent(String.self, forKey: .cue),
             // An unknown moment from a newer scorer is ignored, not an error.
             moment: (try? c.decodeIfPresent(Moment.self, forKey: .moment)) ?? nil,
-            state: try c.decodeIfPresent(String.self, forKey: .state)
+            state: try c.decodeIfPresent(String.self, forKey: .state),
+            // A transition this build does not know plays as a plain change.
+            transition: (try? c.decodeIfPresent(SceneTransition.self, forKey: .transition)) ?? nil
         )
     }
 }
@@ -169,6 +178,7 @@ extension StoryScene: CustomStringConvertible {
     public var description: String {
         let place = placeName.map { "\(placeID ?? "?") \($0)" } ?? (placeID ?? "nowhere")
         let sounds = layers.isEmpty ? "silence" : layers.map { "\($0.key) \($0.level.rawValue)" }.joined(separator: ", ")
-        return "\(place) [\(setting.rawValue)]" + (state.map { " (\($0))" } ?? "") + ": \(sounds)" + (moment.map { " <\($0.rawValue)>" } ?? "")
+        return "\(place) [\(setting.rawValue)]" + (state.map { " (\($0))" } ?? "") + ": \(sounds)"
+            + (moment.map { " <\($0.rawValue)>" } ?? "") + (transition.map { " >\($0.rawValue)" } ?? "")
     }
 }

@@ -44,10 +44,11 @@ public final class AtmosphereSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: prefix + "atmospherePausesEnabled") }
     }
 
-    /// One-off sounds (a knock at the door, a clap of thunder) on the sentence that says they
-    /// happen. Off by default: sudden sounds are not for everyone.
+    /// One-off sounds (a knock at the door, a clap of thunder, the door of a scene
+    /// transition) on the sentence that says they happen. On by default; the listener can
+    /// turn them off if sudden sounds are not for them.
     public var atmosphereOneShotsEnabled: Bool {
-        get { defaults.object(forKey: prefix + "atmosphereOneShotsEnabled") as? Bool ?? false }
+        get { defaults.object(forKey: prefix + "atmosphereOneShotsEnabled") as? Bool ?? true }
         set { defaults.set(newValue, forKey: prefix + "atmosphereOneShotsEnabled") }
     }
 

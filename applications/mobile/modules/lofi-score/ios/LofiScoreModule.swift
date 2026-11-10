@@ -112,7 +112,8 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
-    // One-off sounds (a knock, a clap of thunder) on their sentences. Off by default.
+    // One-off sounds (a knock, a clap of thunder, the door or engine of a change of scene)
+    // on their sentences. On by default.
     AsyncFunction("setAtmosphereOneShots") { (enabled: Bool) async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.setAtmosphereOneShotsEnabled(enabled)

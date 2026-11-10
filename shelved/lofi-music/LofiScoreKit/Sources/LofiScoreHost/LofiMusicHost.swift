@@ -1059,6 +1059,8 @@ public final class LofiMusicHost: @unchecked Sendable {
             line = "atmosphere: \(moment.rawValue), the narrator pauses briefly"
         case let .oneShot(sound):
             line = "atmosphere: one-off \(sound.rawValue)"
+        case let .transition(transition):
+            line = "atmosphere: \(transition.rawValue)"
         case let .missingSound(sound):
             line = "no \(sound.rawValue) sound"
         case let .error(message):

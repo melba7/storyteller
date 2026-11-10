@@ -69,7 +69,7 @@ final class ClaudeSceneTests: XCTestCase {
 
         let haiku = ClaudeSceneEngine(apiKey: "k", configuration: .init(model: "claude-haiku-5-5"))
         XCTAssertNil(haiku.body(for: window, memory: PlaceMemory())["fallbacks"])
-        XCTAssertEqual(engine.id, "claude.sonnet-5-5/a4")
+        XCTAssertEqual(engine.id, "claude.sonnet-5-5/a5")
     }
 
     func testParsesAMessagesResponseAndCountsUsage() async throws {

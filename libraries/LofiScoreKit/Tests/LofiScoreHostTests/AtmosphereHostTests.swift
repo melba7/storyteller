@@ -249,18 +249,18 @@ final class AtmosphereHostTests: XCTestCase {
         var status = try await waitFor(host) { $0.atmosphere.sounds == 1 }
         XCTAssertEqual(status.atmosphere.oneShots, 1, "the imported knock; this build has no stand-ins")
         XCTAssertEqual(status.atmosphere.totalOneShots, OneShotSound.allCases.count)
-        XCTAssertFalse(status.atmosphere.oneShotsEnabled, "off by default")
+        XCTAssertTrue(status.atmosphere.oneShotsEnabled, "on by default")
         XCTAssertTrue(status.atmosphere.pausesAvailable)
         XCTAssertTrue(status.atmosphere.pausesEnabled, "on by default")
 
-        await host.setAtmosphereOneShotsEnabled(true)
+        await host.setAtmosphereOneShotsEnabled(false)
         await host.setAtmospherePausesEnabled(false)
         status = await host.status()
-        XCTAssertTrue(status.atmosphere.oneShotsEnabled)
+        XCTAssertFalse(status.atmosphere.oneShotsEnabled)
         XCTAssertFalse(status.atmosphere.pausesEnabled)
-        XCTAssertTrue(AtmosphereSettings(defaults: defaults).atmosphereOneShotsEnabled, "the setting persists")
+        XCTAssertFalse(AtmosphereSettings(defaults: defaults).atmosphereOneShotsEnabled, "the setting persists")
         XCTAssertFalse(AtmosphereSettings(defaults: defaults).atmospherePausesEnabled)
-        XCTAssertEqual((status.jsonObject()["atmosphere"] as? [String: Any])?["oneShotsEnabled"] as? Bool, true)
+        XCTAssertEqual((status.jsonObject()["atmosphere"] as? [String: Any])?["oneShotsEnabled"] as? Bool, false)
     }
 
     func testABuildThatCannotPlayLeavesTheBookAlone() async throws {

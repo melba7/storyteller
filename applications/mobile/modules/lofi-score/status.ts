@@ -27,6 +27,12 @@ export function soundName(sound: string): string {
     aircraft: "an aircraft",
     spaceship: "a spaceship",
     deepDrone: "a deep drone",
+    running: "running feet",
+    heartbeat: "a heartbeat",
+    fighting: "a fight",
+    writing: "a pen on paper",
+    meal: "a meal",
+    work: "someone at work",
   }
   return named[sound] ?? sound.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
 }

@@ -60,6 +60,15 @@ public struct AtmosphereConfig: Sendable, Hashable {
     public var maxOneShotDelay: TimeInterval = 8
     /// A one-off sound still playing when the listener jumps is faded out this fast.
     public var oneShotCut: TimeInterval = 0.3
+    /// Scene transitions (``SceneTransition``): when the track does not say how the story
+    /// moved from one place to the next, infer a plain one (a door between indoors and
+    /// out, a vehicle boarded) from the two scenes.
+    public var inferTransitions = true
+    /// A sound fully muffled (behind a shut door, under water) is also this much quieter.
+    public var muffleCutDB: Double = 9
+    /// A transition's one-off sounds (the door, the engine) skip the usual spacing between
+    /// one-off sounds, but never play this soon after the narrator starts or the listener seeks.
+    public var noTransitionSoundAfterStart: TimeInterval = 1.5
     /// A scene this many sentences old with no newer one (a track scored only part way)
     /// fades to silence.
     public var maxLagSentences: Int = 80
@@ -156,9 +165,9 @@ public struct AtmosphereDirector: Sendable {
             applied.entryIndex = next.entryIndex
             return .dip(next.dipped)
         }
-        // A swell or hush starting at this very sentence does not wait: it is the story's
-        // own change of sound, and its pause belongs right after this sentence.
-        let isMoment = next.scene.moment != nil && next.entryIndex == globalIndex
+        // A swell, hush or transition starting at this very sentence does not wait: it is
+        // the story's own change of sound, and belongs right after this sentence.
+        let isMoment = (next.scene.moment != nil || next.scene.transition != nil) && next.entryIndex == globalIndex
         if !seek, !isMoment, now - appliedAt < config.minDwell {
             return .wait(until: appliedAt + config.minDwell)
         }

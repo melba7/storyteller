@@ -9,6 +9,8 @@ public enum AmbienceEvent: Sendable, Hashable {
     case narrationHold(StoryScene.Moment)
     /// A one-off sound played on its sentence.
     case oneShot(OneShotSound)
+    /// A change of scene began with this transition (a door, a vehicle, a walk away).
+    case transition(SceneTransition)
     case missingSound(AmbientSound)
     case error(String)
 }
@@ -23,6 +25,8 @@ public struct AmbienceSnapshot: Sendable, Hashable {
         public var gain: Double
         public var playing: Bool
         public var fadingOut: Bool
+        /// 0 clear, 1 behind a shut door or under water.
+        public var muffle: Double
     }
 
     public var enabled: Bool
@@ -44,6 +48,8 @@ public struct AmbienceSnapshot: Sendable, Hashable {
     /// lifted in a gap in the narration right now.
     public var intensity: Double
     public var gapLifting: Bool
+    /// The last change of scene's transition, if it had one.
+    public var transition: SceneTransition?
     public var voices: [Voice]
     public var missingSounds: [AmbientSound]
     public var missingOneShots: [OneShotSound]
@@ -91,6 +97,9 @@ public final class AmbiencePlayer: @unchecked Sendable {
         var retiring: Bool
         /// Its place in the scene, 0 for the main sound.
         var rank = 0
+        /// 0 clear, 1 behind a shut door or under water: the backend rolls the top off
+        /// and the gain comes down by ``AtmosphereConfig/muffleCutDB``.
+        var muffle = Ramp(value: 0)
     }
 
     private var bookID: String?
@@ -136,6 +145,12 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private var pendingCue: (cue: AtmosphereTrack.Cue, timer: LofiCancellable)?
     private var missingOneShots: Set<OneShotSound> = []
 
+    // Scene transitions.
+    private var transitionTimers: [LofiCancellable] = []
+    private var lastTransition: SceneTransition?
+    /// The muffle last pushed to each slot, so the backend only hears of changes.
+    private var pushedMuffles: [Float]
+
     private var ticker: LofiCancellable?
     private var dwellTimer: LofiCancellable?
     private var stopSlotsTimer: LofiCancellable?
@@ -158,6 +173,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         director = AtmosphereDirector(config: config)
         rng = SplitMix64(seed: seed ?? UInt64.random(in: 1...UInt64.max))
         voices = Array(repeating: nil, count: backend.slotCount)
+        pushedMuffles = Array(repeating: 0, count: backend.slotCount)
         backend.delegate = self
     }
 
@@ -165,6 +181,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         for timer in [ticker, dwellTimer, stopSlotsTimer, engineStopTimer, retryTimer, holdTimer, gapTimer, pendingCue?.timer] {
             timer?.cancel()
         }
+        for timer in transitionTimers { timer.cancel() }
     }
 
     // MARK: - Narrator events
@@ -177,6 +194,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
             missing = []
             playhead = nil
             cutOneShot(over: config.fadeOut)
+            cancelTransition()
+            lastTransition = nil
             lastOneShotIndex = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
             updateTransport(at: scheduler.now)
@@ -191,6 +210,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
             director.setTrack(nil)
             playhead = nil
             cutOneShot(over: config.fadeOut)
+            cancelTransition()
+            lastTransition = nil
             dwellTimer?.cancel()
             dwellTimer = nil
             retireAll(over: config.fadeOut, at: scheduler.now)
@@ -229,6 +250,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             endGapLift(over: config.fadeOut)
             endHold(release: config.fadeOut)
             cutOneShot(over: config.fadeOut)
+            cancelTransition()
             updateTransport(at: scheduler.now)
         }
     }
@@ -241,6 +263,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             pendingMoment = nil
             endGapLift(over: config.gapLiftFall)
             cutOneShot(over: config.oneShotCut)
+            cancelTransition()
             evaluate(seek: true)
         }
     }
@@ -292,6 +315,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             if !isEnabled {
                 endHold(release: config.fadeOut)
                 cutOneShot(over: config.fadeOut)
+                cancelTransition()
             }
             updateTransport(at: scheduler.now)
             updateYield()
@@ -367,13 +391,19 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private func evaluate(seek: Bool) {
         guard let playhead, director.track != nil, bookID != nil else { return }
         let now = scheduler.now
+        let before = director.applied.scene
         switch director.step(at: playhead, now: now, seek: seek) {
         case .hold:
             break
         case let .change(target, fade):
             dwellTimer?.cancel()
             dwellTimer = nil
-            apply(target, fade: fade, at: now)
+            // How the story moved: what the track says, or a plain door or vehicle
+            // inferred from the two scenes. A jump by the listener is just a change.
+            let transition: SceneTransition? = seek ? nil
+                : target.scene.transition ?? (config.inferTransitions ? SceneTransition.inferred(from: before, to: target.scene) : nil)
+            apply(target, fade: fade, at: now, from: before, transition: transition)
+            if let transition { runTransition(transition, from: before, to: target.scene, at: now) }
             if !seek, let moment = target.scene.moment, target.entryIndex == playhead {
                 askForHold(moment, at: now)
             }
@@ -392,9 +422,15 @@ public final class AmbiencePlayer: @unchecked Sendable {
 
     /// Applies a scene: the sounds it has (as many as the intensity allows, loudest first)
     /// start or change level, the rest fade out. `quietly` keeps the scene-changed event
-    /// for real changes of scene.
-    private func apply(_ target: AtmosphereTarget, fade: TimeInterval, at now: TimeInterval, quietly: Bool = false) {
+    /// for real changes of scene. With a `transition`, the old sounds leave, the new
+    /// arrive and the kept ones change the way its timeline says, instead of crossfading.
+    private func apply(
+        _ target: AtmosphereTarget, fade: TimeInterval, at now: TimeInterval, quietly: Bool = false,
+        from previous: StoryScene? = nil, transition: SceneTransition? = nil
+    ) {
         let scene = target.scene
+        let timeline = transition?.timeline
+        let placeChanged = previous.map { $0.placeID != scene.placeID } ?? false
         dip.go(to: target.dipped ? Gain.linear(fromDB: config.chapterDipDB) : 1, over: fade, at: now, shape: .linear)
 
         var desired: [(layer: SceneLayer, recording: AmbienceRecording, rank: Int)] = []
@@ -412,7 +448,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         for slot in voices.indices {
             guard var voice = voices[slot], !wanted.contains(voice.recording.id), !voice.retiring else { continue }
             voice.retiring = true
-            voice.ramp.go(to: 0, over: fade, at: now, shape: .equalPower)
+            Self.leave(&voice, as: timeline?.leaving ?? .crossfade, fade: fade, at: now)
             voices[slot] = voice
         }
         // Keep, adjust or start what it has.
@@ -427,6 +463,18 @@ public final class AmbiencePlayer: @unchecked Sendable {
                 if !sameLevel {
                     voice.ramp.go(to: target, over: fade, at: now, shape: .linear)
                 }
+                switch timeline?.kept ?? .asIs {
+                case .asIs:
+                    // A muffle (a door shut on the noise) lasts while the story stays in
+                    // the place; a new place starts clear.
+                    if placeChanged, voice.muffle.target > 0 {
+                        voice.muffle.go(to: 0, over: fade, at: now, shape: .linear)
+                    }
+                case let .muffle(at, over):
+                    voice.muffle.go(to: 1, over: over, at: now + at, shape: .linear)
+                case let .unmuffle(at, over):
+                    voice.muffle.go(to: 0, over: over, at: now + at, shape: .linear)
+                }
                 voices[slot] = voice
                 continue
             }
@@ -438,17 +486,103 @@ public final class AmbiencePlayer: @unchecked Sendable {
                     ramp: Ramp(value: 0), playing: false, retiring: false, rank: rank
                 )
                 voice.ramp.jump(to: 0, at: now)
-                voice.ramp.go(to: target, over: fade, at: now, shape: .equalPower)
+                Self.arrive(&voice, as: timeline?.arriving ?? .crossfade, target: target, fade: fade, at: now)
                 backend.setGain(0, slot: slot)
+                // The slot's filter is pushed afresh for the new voice.
+                pushedMuffles[slot] = -1
                 voices[slot] = voice
                 if shouldPlay, backend.isEngineRunning { startSlot(slot) }
             } catch {
                 report("could not load \(recording.file): \(error)")
             }
         }
-        if !quietly { onEvent?(.sceneChanged(scene)) }
+        if !quietly {
+            lastTransition = transition
+            onEvent?(.sceneChanged(scene))
+        }
         updateYield()
         ensureTicker()
+    }
+
+    // MARK: - Scene transitions
+
+    /// Takes a retiring voice out the way the transition says.
+    private static func leave(_ voice: inout Voice, as leaving: SceneTransition.Timeline.Leaving, fade: TimeInterval, at now: TimeInterval) {
+        switch leaving {
+        case .crossfade:
+            voice.ramp.go(to: 0, over: fade, at: now, shape: .equalPower)
+        case let .fade(seconds), let .cut(seconds):
+            voice.ramp.go(to: 0, over: seconds, at: now, shape: .equalPower)
+        case let .walkAway(seconds, muffle):
+            voice.ramp.go(to: 0, over: seconds, at: now, shape: .equalPower)
+            voice.muffle.go(to: muffle, over: seconds, at: now, shape: .linear)
+        case let .throughDoor(closeAt, tail):
+            // As it was until the door shuts; then muffled at once and fading behind them.
+            voice.muffle.go(to: 1, over: 0.3, at: now + closeAt, shape: .linear)
+            voice.ramp.go(to: 0, over: tail, at: now + closeAt, shape: .equalPower)
+        case let .muffleThenFade(muffleOver, tail):
+            voice.muffle.go(to: 1, over: muffleOver, at: now, shape: .linear)
+            voice.ramp.go(to: 0, over: tail, at: now + muffleOver, shape: .equalPower)
+        }
+    }
+
+    /// Brings a new voice in the way the transition says.
+    private static func arrive(_ voice: inout Voice, as arriving: SceneTransition.Timeline.Arriving, target: Double, fade: TimeInterval, at now: TimeInterval) {
+        switch arriving {
+        case .crossfade:
+            voice.ramp.go(to: target, over: fade, at: now, shape: .equalPower)
+        case let .after(delay, over):
+            voice.ramp.go(to: target, over: over, at: now + delay, shape: .equalPower)
+        case let .throughDoor(openAt, over):
+            // Heard through the door first, muffled; the door opens and it comes clear.
+            voice.muffle.jump(to: 1, at: now)
+            voice.ramp.go(to: target, over: openAt + over, at: now, shape: .equalPower)
+            voice.muffle.go(to: 0, over: over, at: now + openAt, shape: .linear)
+        case let .creepIn(seconds):
+            voice.ramp.go(to: target, over: seconds, at: now, shape: .linear)
+        case let .burst(over):
+            voice.ramp.go(to: target, over: over, at: now, shape: .equalPower)
+        }
+    }
+
+    /// Reports the transition and plays its one-off sounds (the door, the engine) at their
+    /// moments, when one-off sounds are on. They are cancelled if the narrator stops or
+    /// the listener jumps before they come.
+    private func runTransition(_ transition: SceneTransition, from old: StoryScene, to new: StoryScene, at now: TimeInterval) {
+        cancelTransition()
+        onEvent?(.transition(transition))
+        guard oneShotsEnabled, shouldPlay, now - settledSince >= config.noTransitionSoundAfterStart else { return }
+        for timed in transition.sounds(from: old, to: new) {
+            if timed.at <= 0.05 {
+                playTransitionSound(timed.sound)
+            } else {
+                transitionTimers.append(scheduler.schedule(after: timed.at) { [weak self] in
+                    self?.playTransitionSound(timed.sound)
+                })
+            }
+        }
+    }
+
+    private func playTransitionSound(_ sound: OneShotSound) {
+        guard oneShotsEnabled, shouldPlay, backend.isEngineRunning else { return }
+        let now = scheduler.now
+        guard let recording = oneShots.recording(of: sound, key: "\(bookID ?? "")|move|\(playhead ?? 0)") else {
+            missingOneShots.insert(sound)
+            return
+        }
+        let targetLUFS = config.voiceLoudnessLUFS + config.bedLevelDB + config.oneShotBoostDB + sound.levelOffsetDB
+        let gain = min(1, Gain.linear(fromDB: targetLUFS - oneShots.loudness(of: recording))) * transport.value(at: now)
+        do {
+            try backend.playOnce(oneShots.url(for: recording), gain: Float(gain), filter: .standard)
+            onEvent?(.oneShot(sound))
+        } catch {
+            report("could not play \(recording.file): \(error)")
+        }
+    }
+
+    private func cancelTransition() {
+        for timer in transitionTimers { timer.cancel() }
+        transitionTimers = []
     }
 
     /// Linear gain, at most 1, that takes the scene's sounds down together so that their
@@ -475,6 +609,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
         switch layer.sound.scope {
         case .weather: return "\(book)|\(layer.key)"
         case .place: return "\(book)|\(scene.placeID ?? "-")|\(layer.key)"
+        // The characters' own footsteps are the same footsteps everywhere.
+        case .activity: return "\(book)|doing|\(layer.key)"
         }
     }
 
@@ -776,7 +912,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
 
     private func isMoving(at now: TimeInterval) -> Bool {
         transport.isRunning(at: now) || dip.isRunning(at: now) || swell.isRunning(at: now) || gapLift.isRunning(at: now)
-            || voices.contains { $0.map { $0.ramp.isRunning(at: now) } ?? false }
+            || voices.contains { $0.map { $0.ramp.isRunning(at: now) || $0.muffle.isRunning(at: now) } ?? false }
             || voices.contains { $0?.retiring == true }
     }
 
@@ -787,7 +923,13 @@ public final class AmbiencePlayer: @unchecked Sendable {
         for slot in voices.indices {
             guard let voice = voices[slot] else { continue }
             let value = voice.ramp.value(at: now)
-            backend.setGain(Float(min(1, max(0, value * master * (voice.retiring ? 1 : swelling)))), slot: slot)
+            let muffle = Float(min(1, max(0, voice.muffle.value(at: now))))
+            let cut = muffle > 0 ? Gain.linear(fromDB: -config.muffleCutDB * Double(muffle)) : 1
+            backend.setGain(Float(min(1, max(0, value * cut * master * (voice.retiring ? 1 : swelling)))), slot: slot)
+            if muffle != pushedMuffles[slot] {
+                pushedMuffles[slot] = muffle
+                backend.setMuffle(muffle, slot: slot)
+            }
             if voice.retiring, !voice.ramp.isRunning(at: now), value <= 0.0001 {
                 if voice.playing { backend.stop(slot: slot) }
                 voices[slot] = nil
@@ -818,11 +960,13 @@ public final class AmbiencePlayer: @unchecked Sendable {
             oneShotSounds: oneShots.sounds.count,
             intensity: config.intensity,
             gapLifting: gapLifting,
+            transition: lastTransition,
             voices: voices.compactMap { voice in
                 voice.map {
                     AmbienceSnapshot.Voice(
                         sound: $0.sound, variant: $0.recording.variant, recording: $0.recording.file,
-                        gain: $0.ramp.value(at: now) * master, playing: $0.playing, fadingOut: $0.retiring
+                        gain: $0.ramp.value(at: now) * master, playing: $0.playing, fadingOut: $0.retiring,
+                        muffle: $0.muffle.value(at: now)
                     )
                 }
             },

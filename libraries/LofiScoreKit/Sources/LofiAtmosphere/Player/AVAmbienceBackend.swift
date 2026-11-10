@@ -16,6 +16,9 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     public let slotCount: Int
     /// Enough for a scene's ``StoryScene/maxLayers`` sounds and the old scene's fading out.
     public static let defaultSlotCount = 12
+    /// Each slot's EQ: the presence dip, the high shelf, the speech-safe low-pass and the
+    /// muffle (``setMuffle(_:slot:)``).
+    static let bands = 4
 
     private let notifications: NotificationCenter
     private var engine = AVAudioEngine()
@@ -24,7 +27,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     private var mixer = AVAudioMixerNode()
     /// The one-off sounds' voice, on the mixer's bus after the slots.
     private var oncePlayer = AVAudioPlayerNode()
-    private var onceFilter = AVAudioUnitEQ(numberOfBands: 3)
+    private var onceFilter = AVAudioUnitEQ(numberOfBands: AVAmbienceBackend.bands)
     private var onceFormat: AVAudioFormat?
     /// Bumped by every one-off sound, so an earlier fade-out never stops a later sound.
     private var onceGeneration = 0
@@ -176,6 +179,26 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
         players[slot].stop()
     }
 
+    public func setMuffle(_ amount: Float, slot: Int) {
+        guard filters.indices.contains(slot) else { return }
+        Self.muffle(filters[slot], by: amount)
+    }
+
+    /// The muffle band: a low-pass that comes down from 8 kHz (nothing much) to 500 Hz
+    /// (a door shut on the sound) as `amount` goes from 0 to 1, bypassed at 0.
+    static func muffle(_ eq: AVAudioUnitEQ, by amount: Float) {
+        guard eq.bands.count > 3 else { return }
+        let band = eq.bands[3]
+        band.filterType = .lowPass
+        let clamped = min(1, max(0, amount))
+        if clamped < 0.01 {
+            band.bypass = true
+            return
+        }
+        band.frequency = Float(8000 * pow(500.0 / 8000.0, Double(clamped)))
+        band.bypass = false
+    }
+
     public func setGain(_ gain: Float, slot: Int) {
         players[slot].volume = min(1, max(0, gain))
     }
@@ -251,7 +274,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
             }
         }
         players = (0..<slotCount).map { _ in AVAudioPlayerNode() }
-        filters = (0..<slotCount).map { _ in AVAudioUnitEQ(numberOfBands: 3) }
+        filters = (0..<slotCount).map { _ in AVAudioUnitEQ(numberOfBands: Self.bands) }
         mixer = AVAudioMixerNode()
         engine.attach(mixer)
         let standard = AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 2)
@@ -265,7 +288,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
             connectedFormats[slot] = standard
         }
         oncePlayer = AVAudioPlayerNode()
-        onceFilter = AVAudioUnitEQ(numberOfBands: 3)
+        onceFilter = AVAudioUnitEQ(numberOfBands: Self.bands)
         engine.attach(oncePlayer)
         engine.attach(onceFilter)
         oncePlayer.volume = 0
@@ -305,6 +328,10 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
         shelf.bypass = false
         let lowPass = eq.bands[2]
         lowPass.filterType = .lowPass
+        if eq.bands.count > 3 {
+            eq.bands[3].filterType = .lowPass
+            eq.bands[3].bypass = true
+        }
         switch filter {
         case .standard:
             // The music's presence dip, a little deeper: ambience is mostly broadband noise.

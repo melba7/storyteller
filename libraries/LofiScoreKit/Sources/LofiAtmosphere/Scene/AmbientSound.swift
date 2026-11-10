@@ -64,8 +64,20 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
     case spaceship
     // Elsewhere
     case deepDrone
+    // What the characters are doing (added with the scene transitions). These follow the
+    // characters, not the place: footsteps are the same footsteps in every corridor.
+    case footsteps
+    case running
+    case breathing
+    case heartbeat
+    case swimming
+    case climbing
+    case fighting
+    case writing
+    case meal
+    case work
 
-    /// Sounds that belong to the weather rather than to a place.
+    /// Sounds that belong to the weather, the place, or the characters themselves.
     public enum Scope: String, Codable, Sendable {
         /// Rain is the same rain whichever street you are in, so the same recording
         /// keeps playing as the story moves between places.
@@ -73,6 +85,9 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         /// A fireplace belongs to its room: each place gets its own recording, and the
         /// same one every time the story comes back.
         case place
+        /// Footsteps belong to the characters: the same recording follows them from
+        /// place to place, and a place does not remember them (see ``PlaceMemory``).
+        case activity
     }
 
     /// What the music does while this sound plays.
@@ -95,6 +110,8 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case places
         case travel
         case elsewhere
+        /// What the characters are doing: the sounds of their own actions.
+        case doing
 
         public var title: String {
             switch self {
@@ -107,6 +124,7 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
             case .places: "Towns and places"
             case .travel: "Travel"
             case .elsewhere: "Elsewhere"
+            case .doing: "What the characters are doing"
             }
         }
     }
@@ -114,6 +132,7 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
     public var scope: Scope {
         switch self {
         case .rain, .heavyRain, .rainIndoors, .thunder, .wind, .strongWind, .snow: .weather
+        case .footsteps, .running, .breathing, .heartbeat, .swimming, .climbing, .fighting, .writing, .meal, .work: .activity
         default: .place
         }
     }
@@ -145,6 +164,7 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case .city, .oldTown: .places
         case .horses, .train, .ship, .machinery, .motorVehicle, .aircraft, .spaceship: .travel
         case .deepDrone: .elsewhere
+        case .footsteps, .running, .breathing, .heartbeat, .swimming, .climbing, .fighting, .writing, .meal, .work: .doing
         }
     }
 
@@ -193,6 +213,16 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case .aircraft: "inside an aircraft: an airliner's cabin, a small plane, a helicopter, an airship"
         case .spaceship: "inside a spacecraft or space station: a deep hum, ventilation, faint instruments"
         case .deepDrone: "a deep steady presence with no natural source: the void outside a hull, a dream, a magical stillness, a dread. Use sparingly, and only where the place has no sound of its own"
+        case .footsteps: "the characters walking, while the passage has them on the move: on gravel, a wooden floor, stone, snow, leaves, sand, stairs. Soft or faint, beside the place's own sounds, and dropped the moment they stop or sit"
+        case .running: "the characters running or fleeing: fast footsteps, a chase. Only while they run"
+        case .breathing: "breathing heard close: heavy after effort, panicked in fear, the slow breath of someone asleep beside them, breath inside a mask or helmet. Faint, and only while the passage dwells on it"
+        case .heartbeat: "a heartbeat heard close, in dread, effort or stillness. Faint and rare; only while the passage dwells on it"
+        case .swimming: "the characters in the water by their own effort: swimming, wading, treading water. Only while they are in it"
+        case .climbing: "the characters climbing: a rock face, a rope, a ladder, a tree, loose scree. Only while they climb"
+        case .fighting: "a fight the characters are in or right beside: swords, fists, a battle around them. Only while it goes on"
+        case .writing: "the characters writing or reading close by: a quill or pen on paper, a pencil, typing, pages turning. Faint"
+        case .meal: "a meal being eaten where the characters sit: cutlery on plates, cups, a table. Beside the place's own sounds"
+        case .work: "manual work the characters are doing or standing beside: digging, chopping wood, sweeping, scrubbing, hammering, sawing, harvesting. Only while it goes on"
         }
     }
 
@@ -209,6 +239,11 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case .dripping, .nightForest, .thunder, .emptyHall, .spaceship: -2
         case .machinery, .train, .kitchen, .motorVehicle, .aircraft: -1
         case .heavyRain, .strongWind: 1
+        case .writing: -8
+        case .breathing, .heartbeat: -6
+        case .footsteps, .climbing, .meal: -4
+        case .running, .work: -3
+        case .swimming, .fighting: -2
         default: 0
         }
     }
@@ -255,6 +290,16 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case .aircraft: ["airplane cabin ambience", "aircraft cabin interior flight"]
         case .spaceship: ["spaceship interior hum", "sci-fi spaceship ambience hum", "space station ambience"]
         case .deepDrone: ["deep space ambience", "dark ambience low rumble", "eerie ambience low hum"]
+        case .footsteps: ["footsteps walking loop", "walking footsteps gravel", "footsteps wooden floor walking"]
+        case .running: ["running footsteps loop", "footsteps running outdoor", "running footsteps corridor"]
+        case .breathing: ["heavy breathing", "breathing close loop", "breathing slow"]
+        case .heartbeat: ["heartbeat loop", "heart beat slow", "heartbeat fast"]
+        case .swimming: ["swimming strokes water", "swimming loop", "wading water walking"]
+        case .climbing: ["rock climbing sounds", "climbing rope ladder", "scrambling rocks loose"]
+        case .fighting: ["sword fight ambience", "medieval battle ambience", "fist fight sounds"]
+        case .writing: ["writing quill on paper", "pen writing paper", "pencil writing paper"]
+        case .meal: ["cutlery plates dinner ambience", "dinner table dishes cutlery", "tea cups saucers"]
+        case .work: ["digging shovel dirt loop", "chopping wood axe", "hammering nails"]
         }
     }
 

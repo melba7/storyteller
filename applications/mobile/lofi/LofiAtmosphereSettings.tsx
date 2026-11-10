@@ -149,8 +149,9 @@ export function LofiAtmosphereSettings() {
             <Text maxFontSizeMultiplier={1.5}>One-off sounds</Text>
             <Text variant="muted">
               A single sound on the sentence that says it happens, like a knock
-              at the door or a clap of thunder. Rare and quiet, and off unless
-              you turn it on.
+              at the door or a clap of thunder, and the door or the engine when
+              the story moves on. Rare and quiet; turn it off if sudden sounds
+              are not for you.
             </Text>
           </View>
           <Switch
