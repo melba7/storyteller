@@ -1,19 +1,25 @@
 // swift-tools-version: 6.0
 //
-// LofiScoreKit: spoiler-safe, tone-matched background music for readaloud books.
+// LofiScoreKit: spoiler-safe atmosphere sounds under the narration of readaloud books.
 //
 // The "text side" reads the narrated sentences out of an EPUB 3 media-overlay
 // book, builds causal windows that never look past the sentence being narrated,
-// and turns a window into a mood reading (LofiText, LofiMood).
-// The "music side" smooths those readings into calm music decisions and plays
-// them on a two-deck engine under the narration (LofiDirector, LofiAudio).
-// The two halves share only the value types in `LofiScoreCore`.
+// and turns a window into a mood reading (LofiText, LofiMood). The atmosphere
+// side scores each book's scenes ahead of time with Claude and plays the scene's
+// sounds under the voice (LofiAtmosphere). LofiScoreHost ties them to the app.
+//
+// The lofi music that used to play alongside (its director, two-deck player,
+// placeholder library and demo) is shelved, not deleted: see
+// shelved/lofi-music/README.md at the repository root for what it was and how
+// to bring it back. The small audio utilities the music and the atmosphere
+// share (the clock, the scheduler, gain maths, the loudness meter, WAV files)
+// stayed behind in LofiAudioCore.
 
 import PackageDescription
 
-// The music targets build in the Swift 5 language mode for now, because
+// The sound targets build in the Swift 5 language mode for now, because
 // AVFoundation's callbacks are not yet annotated for strict concurrency. The
-// player confines all of its state to one serial queue instead (LofiScheduler).
+// players confine all of their state to one serial queue instead (LofiScheduler).
 let swift5: [SwiftSetting] = [.swiftLanguageMode(.v5)]
 
 let package = Package(
@@ -29,19 +35,11 @@ let package = Package(
         .library(name: "LofiScoreCore", targets: ["LofiScoreCore"]),
         .library(name: "LofiText", targets: ["LofiText"]),
         .library(name: "LofiMood", targets: ["LofiMood"]),
-        .library(name: "LofiDirector", targets: ["LofiDirector"]),
-        .library(name: "LofiAudio", targets: ["LofiAudio"]),
-        .library(name: "LofiPlaceholders", targets: ["LofiPlaceholders"]),
-        .library(name: "LofiDemoKit", targets: ["LofiDemoKit"]),
-        .library(name: "LofiScoreHost", targets: ["LofiScoreHost"]),
+        .library(name: "LofiAudioCore", targets: ["LofiAudioCore"]),
         .library(name: "LofiAtmosphere", targets: ["LofiAtmosphere"]),
+        .library(name: "LofiScoreHost", targets: ["LofiScoreHost"]),
         .executable(name: "lofi-eval", targets: ["LofiEvalCLI"]),
         .executable(name: "lofi-train", targets: ["LofiTrainCLI"]),
-        .executable(name: "lofi-replay", targets: ["lofi-replay"]),
-        .executable(name: "lofi-placeholders", targets: ["lofi-placeholders"]),
-        .executable(name: "lofi-demo", targets: ["lofi-demo"]),
-        .executable(name: "lofi-render", targets: ["lofi-render"]),
-        .executable(name: "lofi-import", targets: ["lofi-import"]),
         .executable(name: "lofi-atmosphere", targets: ["lofi-atmosphere"]),
     ],
     targets: [
@@ -54,7 +52,9 @@ let package = Package(
         // Pure Swift + Foundation so it builds and tests on Linux too.
         .target(name: "LofiText", dependencies: ["LofiScoreCore"]),
 
-        // Mood engines. Apple-only engines are compiled behind `canImport`.
+        // Mood engines, the Claude transport and the per-book mood tracks. The
+        // atmosphere's scorer shares the transport; the mood tracks themselves
+        // wait for the music's return. Apple-only engines are compiled behind `canImport`.
         .target(name: "LofiMood", dependencies: ["LofiScoreCore", "LofiText"]),
 
         // Eval harness: windows from real books, engine runs, timings.
@@ -63,76 +63,39 @@ let package = Package(
         // Create ML trainer for the Fast engine (macOS only; a stub elsewhere).
         .executableTarget(name: "LofiTrainCLI", dependencies: ["LofiScoreCore", "LofiMood"]),
 
-        // MARK: Music side
+        // MARK: Sound
 
-        // Pure decision logic: turns noisy mood readings into calm music changes. No audio, no UI.
-        .target(name: "LofiDirector", dependencies: ["LofiScoreCore"], swiftSettings: swift5),
+        // What any sound player under the narration needs: a clock, a serial scheduler
+        // that is also the player's lock, gain and ramp maths, the output route, a stereo
+        // buffer with a loudness meter and a WAV writer, and a seedable random generator.
+        .target(name: "LofiAudioCore", swiftSettings: swift5),
 
-        // The two-deck music player: mixer automation, ducking, track rotation, library.json,
-        // and the AVAudioEngine backend (Apple platforms only).
-        .target(name: "LofiAudio", dependencies: ["LofiScoreCore", "LofiDirector"], swiftSettings: swift5),
-
-        // Synthesised placeholder tracks, one set per mood, so the demo works before real music exists.
-        .target(
-            name: "LofiPlaceholders",
-            dependencies: ["LofiScoreCore", "LofiDirector", "LofiAudio"],
-            swiftSettings: swift5
-        ),
-
-        // The demo: story, scripted mood source and narrator everywhere; SwiftUI app on Apple platforms.
-        .target(
-            name: "LofiDemoKit",
-            dependencies: ["LofiScoreCore", "LofiDirector", "LofiAudio", "LofiPlaceholders"],
-            swiftSettings: swift5
-        ),
-
-        // MARK: Atmosphere
-
-        // Ambient sounds under the music: the scene at each sentence (scored ahead of time
+        // Ambient sounds under the voice: the scene at each sentence (scored ahead of time
         // by Claude into a per-book atmosphere track, with a memory of the places met so
         // far), a director that holds a scene until the story moves on, and a layered
         // player that loops recordings seamlessly under the voice. Synthesised stand-ins
         // until real recordings are imported.
         .target(
             name: "LofiAtmosphere",
-            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders"],
+            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiAudioCore"],
             swiftSettings: swift5
         ),
         // Scores a book's atmosphere track with Claude, prints a track's scenes, writes
         // the synthesised stand-in sounds.
         .executableTarget(
             name: "lofi-atmosphere",
-            dependencies: ["LofiAtmosphere", "LofiText", "LofiMood", "LofiPlaceholders"],
+            dependencies: ["LofiAtmosphere", "LofiText", "LofiMood"],
             swiftSettings: swift5
         ),
 
         // MARK: App integration
 
         // What the Storyteller app's native module drives: follows the narrator's events,
-        // opens each book's text, imports music folders, keeps the settings.
+        // opens each book's text, imports the sounds folder, keeps the settings. LofiMood
+        // only for the sentence digests that match a track to its book.
         .target(
             name: "LofiScoreHost",
-            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiDirector", "LofiAudio", "LofiPlaceholders", "LofiAtmosphere"],
-            swiftSettings: swift5
-        ),
-
-        .executableTarget(name: "lofi-replay", dependencies: ["LofiDirector"], swiftSettings: swift5),
-        .executableTarget(
-            name: "lofi-placeholders",
-            dependencies: ["LofiPlaceholders", "LofiScoreCore"],
-            swiftSettings: swift5
-        ),
-        .executableTarget(name: "lofi-demo", dependencies: ["LofiDemoKit"], swiftSettings: swift5),
-        // The demo story read by the Mac's voice with the music underneath, rendered to a file (macOS).
-        .executableTarget(
-            name: "lofi-render",
-            dependencies: ["LofiDemoKit", "LofiAudio", "LofiDirector", "LofiPlaceholders", "LofiScoreCore"],
-            swiftSettings: swift5
-        ),
-        // Measures a music folder and writes its library.json (loudness, true peak, length, provenance).
-        .executableTarget(
-            name: "lofi-import",
-            dependencies: ["LofiDemoKit", "LofiAudio", "LofiPlaceholders", "LofiScoreCore"],
+            dependencies: ["LofiScoreCore", "LofiText", "LofiMood", "LofiAudioCore", "LofiAtmosphere"],
             swiftSettings: swift5
         ),
 
@@ -140,27 +103,15 @@ let package = Package(
 
         .testTarget(name: "LofiTextTests", dependencies: ["LofiText", "LofiScoreCore"], exclude: ["Fixtures"]),
         .testTarget(name: "LofiMoodTests", dependencies: ["LofiMood", "LofiText", "LofiScoreCore"]),
-        .testTarget(
-            name: "LofiDirectorTests",
-            dependencies: ["LofiDirector"],
-            resources: [.copy("Replays")],
-            swiftSettings: swift5
-        ),
-        .testTarget(name: "LofiAudioTests", dependencies: ["LofiAudio"], swiftSettings: swift5),
-        .testTarget(name: "LofiPlaceholdersTests", dependencies: ["LofiPlaceholders"], swiftSettings: swift5),
-        .testTarget(
-            name: "LofiDemoKitTests",
-            dependencies: ["LofiDemoKit", "LofiAudio", "LofiDirector", "LofiScoreCore"],
-            swiftSettings: swift5
-        ),
+        .testTarget(name: "LofiAudioCoreTests", dependencies: ["LofiAudioCore"], swiftSettings: swift5),
         .testTarget(
             name: "LofiAtmosphereTests",
-            dependencies: ["LofiAtmosphere", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiPlaceholders"],
+            dependencies: ["LofiAtmosphere", "LofiAudioCore", "LofiMood", "LofiText"],
             swiftSettings: swift5
         ),
         .testTarget(
             name: "LofiScoreHostTests",
-            dependencies: ["LofiScoreHost", "LofiAudio", "LofiDirector", "LofiMood", "LofiText", "LofiScoreCore", "LofiAtmosphere"],
+            dependencies: ["LofiScoreHost", "LofiAudioCore", "LofiText", "LofiScoreCore", "LofiAtmosphere"],
             swiftSettings: swift5
         ),
     ]

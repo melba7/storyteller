@@ -6,9 +6,9 @@ sounds of each scene under the narration: rain while it rains, a fire in the
 inn, the sea on the shore, a murmuring crowd, the quiet of an ordinary room.
 Claude reads the book once, off the phone, and writes down where the story is at
 every point and what that place sounds like, judged only from what has already
-been read and never from what comes next, so nothing is given away. The phone
-plays that track under the narrator, well under the voice. The lofi music the
-fork began with is shelved in `shelved/lofi-music/`, ready to come back. The fork
+been narrated and never from what comes next, so nothing is given away. The
+phone plays that track well under the narrator's voice. The lofi music the fork
+began with is shelved in `shelved/lofi-music/`, ready to come back. The fork
 keeps taking upstream's mobile releases through small, reviewed merges.
 
 Upstream code stays as upstream wrote it. The fork's own code lives in new
@@ -46,9 +46,9 @@ Files and folders that belong to the fork, which upstream never touches:
 - `libraries/LofiScoreKit/`: the Swift atmosphere engine: the scene scorer and
   its prompt, the track builder, the catalogue of sounds, the player, the app
   host, the `lofi-atmosphere` tool and the eval set that measures the scorer
-  (`Docs/Atmosphere.md`). The mood detection the shelved music used is still
-  there (`Docs/MoodDetection.md`). Next to its `Package.swift`, one podspec per
-  target lets CocoaPods build it from source for the app.
+  (`Docs/Atmosphere.md`), with the mood detection the shelved music used
+  (`Docs/MoodDetection.md`). Next to its `Package.swift`, one podspec per target
+  lets CocoaPods build it from source for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
 - `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on

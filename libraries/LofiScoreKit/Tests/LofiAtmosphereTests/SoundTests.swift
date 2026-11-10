@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiPlaceholders
+import LofiAudioCore
 
 final class SoundTests: XCTestCase {
     private func temporaryFolder() throws -> URL {

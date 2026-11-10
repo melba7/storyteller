@@ -1,19 +1,22 @@
 #!/bin/bash
-# The unattended path from a book synced in Storyteller to music and atmosphere
-# on the phone. install-automatic-scoring.command runs it from launchd when a
+# The unattended path from a book synced in Storyteller to atmosphere sounds on
+# the phone. install-automatic-scoring.command runs it from launchd when a
 # book lands in "~/Storyteller Lofi/Books" and every half hour; "Score
 # atmosphere.command" runs it when double-clicked. It does, in order:
 #
 #   1. Fetches newly synced read-aloud books from your Storyteller server into
 #      Books/ (fetch-books.sh), when "~/Storyteller Lofi/server.json" is set up.
 #   2. Scores every book in Books/ that has no score yet, through your Claude
-#      plan: the mood track (make-tracks.sh, Claude Opus, prompt 3) and the
-#      atmosphere (make-atmosphere.sh), which combines the two into
+#      plan: the atmosphere (make-atmosphere.sh), which writes
 #      "<book>.score.json", fetches recordings for new sounds, and copies the
-#      tracks and sounds into "~/Storyteller Lofi/LofiMusic".
+#      tracks and sounds into "~/Storyteller Lofi/LofiMusic" (the folder the
+#      phone follows; the name is from when it held the music). The music's
+#      mood track (make-tracks.sh, Claude Opus, prompt 3) is made first only
+#      with --with-mood-tracks or LOFI_MOOD_TRACKS=1, for when the music comes
+#      back (see shelved/lofi-music/README.md at the repository root).
 #   3. Mirrors LofiMusic into its iCloud Drive copy (iCloud Drive/Storyteller
 #      Lofi/LofiMusic) when there is one, adding and updating, never deleting.
-#      The phone's linked music folder picks the new files up by itself.
+#      The phone's linked sounds folder picks the new files up by itself.
 #   4. Puts each score inside the book on the server (PUT
 #      /api/v2/books/<id>/lofi-score), when the server is the fork's, so the
 #      phone also gets the score with the book itself.
@@ -22,11 +25,12 @@
 # capped per book at API list prices, so a run that goes wrong can't use up
 # the plan. A long novel takes about an hour.
 #
-#   lofi-sync.sh [--tools DIR] [--no-pull] [--interactive]
+#   lofi-sync.sh [--tools DIR] [--no-pull] [--interactive] [--with-mood-tracks]
 #
 # --tools is the fork checkout to use (default: the one this script is in).
 # --no-pull skips updating it. --interactive prints progress for a Terminal
-# window instead of the log.
+# window instead of the log. --with-mood-tracks also makes each book's mood
+# track for the shelved music (the score then carries both).
 set -uo pipefail
 
 ROOT="$HOME/Storyteller Lofi"
@@ -41,11 +45,13 @@ ATMOSPHERE_CAP_PER_BOOK=25
 TOOLS="$(cd "$(dirname "$0")/../../../.." && pwd)"
 PULL=1
 INTERACTIVE=0
+MOOD_TRACKS="${LOFI_MOOD_TRACKS:-0}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --tools) TOOLS="$2"; shift 2 ;;
     --no-pull) PULL=0; shift ;;
     --interactive) INTERACTIVE=1; shift ;;
+    --with-mood-tracks) MOOD_TRACKS=1; shift ;;
     *) echo "unknown option $1"; exit 2 ;;
   esac
 done
@@ -101,13 +107,15 @@ else
   cd "$PKG" || exit 1
   for book in "${TODO[@]}"; do
     name="$(basename "$book" .epub)"
-    say "scoring $name: the mood track"
-    if [ "$INTERACTIVE" = 1 ]; then
-      "$MAC/make-tracks.sh" --via plan --engine claude --prompt 3 --cap "$MOOD_CAP_PER_BOOK" "$book"
-    else
-      "$MAC/make-tracks.sh" --via plan --engine claude --prompt 3 --cap "$MOOD_CAP_PER_BOOK" "$book" >> "$LOGS/scoring.log" 2>&1
+    if [ "$MOOD_TRACKS" = 1 ]; then
+      say "scoring $name: the mood track"
+      if [ "$INTERACTIVE" = 1 ]; then
+        "$MAC/make-tracks.sh" --via plan --engine claude --prompt 3 --cap "$MOOD_CAP_PER_BOOK" "$book"
+      else
+        "$MAC/make-tracks.sh" --via plan --engine claude --prompt 3 --cap "$MOOD_CAP_PER_BOOK" "$book" >> "$LOGS/scoring.log" 2>&1
+      fi
+      [ -s "$TRACKS/$name.track.json" ] || { say "$name: no mood track was made (see $LOGS/scoring.log); the atmosphere waits"; continue; }
     fi
-    [ -s "$TRACKS/$name.track.json" ] || { say "$name: no mood track was made (see $LOGS/scoring.log); the atmosphere waits"; continue; }
     say "scoring $name: the atmosphere"
     if [ "$INTERACTIVE" = 1 ]; then
       "$MAC/make-atmosphere.sh" --via plan --cap "$ATMOSPHERE_CAP_PER_BOOK" "$book"
@@ -122,7 +130,7 @@ else
   done
 fi
 
-# 3. The iCloud copy, which the phone's linked music folder follows.
+# 3. The iCloud copy, which the phone's linked sounds folder follows.
 if [ -d "$ICLOUD" ] && [ -d "$MUSIC" ]; then
   if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/" 2>> "$LOGS/sync.log"; then
     say "iCloud copy up to date"

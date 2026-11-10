@@ -1,21 +1,16 @@
 import Foundation
-import LofiAudio
-import LofiMood
-import LofiScoreCore
+import LofiAudioCore
 import LofiText
 
-/// What the follower drives. ``LofiScorePlayer`` is the real one; tests record the calls.
-public protocol NarrationMusicSink: AnyObject {
+/// What the follower drives: the atmosphere player, or a recorder in tests.
+public protocol NarrationSink: AnyObject {
     func openBook(id: String)
     func closeBook()
     func narratorDidPlay()
     func narratorDidPause()
     func narratorDidSeek(toGlobalSentenceIndex index: Int?)
     func sentenceDidStart(globalSentenceIndex: Int?, duration: TimeInterval?)
-    func receive(_ observation: MoodObservation)
 }
-
-extension LofiScorePlayer: NarrationMusicSink {}
 
 /// One media-overlay clip as the app's audiobook player reports it: the sentence's element in
 /// its content document, and where its audio sits in which file.
@@ -39,48 +34,30 @@ public struct NarratorClip: Sendable, Hashable {
     }
 }
 
-/// The text side of one open book: the guard that maps clips to sentences (and never reads
-/// past the one being narrated) and the tracker that turns them into mood readings.
+/// The text side of one open book: the guard that maps the narrator's clips to sentences and
+/// never reads past the one being narrated. The atmosphere track's entries are matched to the
+/// book through it, and nothing ahead of the narration is ever looked at.
 public struct BookText: Sendable {
     public let spoilerGuard: SpoilerGuard
-    public let tracker: MoodTracker
-    /// The engine's id, for the status screen.
-    public let engineID: String
 
-    /// - Parameter cadence: how often to take a reading; nil leaves it to the tracker,
-    ///   which picks one to suit the engine.
-    public init(
-        spoilerGuard: SpoilerGuard,
-        engine: any MoodEngine,
-        cadence: ReadingCadence.Configuration? = nil,
-        clock: @escaping @Sendable () -> Double = MoodTracker.uptimeSeconds
-    ) {
+    public init(spoilerGuard: SpoilerGuard) {
         self.spoilerGuard = spoilerGuard
-        if let cadence {
-            tracker = MoodTracker(spoilerGuard: spoilerGuard, engine: engine, cadence: cadence, clock: clock)
-        } else {
-            tracker = MoodTracker(spoilerGuard: spoilerGuard, engine: engine, clock: clock)
-        }
-        engineID = engine.id
     }
 }
 
-/// Turns the app's narrator events into the music player's calls.
+/// Turns the app's narrator events into the atmosphere player's calls.
 ///
 /// The audiobook player reports three things: a clip started (each sentence of a readaloud
 /// book is a clip), playback started or stopped, and a book's track was loaded. From those
-/// the follower works out what the music needs:
+/// the follower works out what the sounds need:
 ///
-/// - which sentence is playing, through the book's ``SpoilerGuard``, so mood readings never
-///   look past it;
-/// - seeks: any jump backwards, or forwards by more than the reading cadence's step;
+/// - which sentence is playing, through the book's ``SpoilerGuard``, so the scene never
+///   runs ahead of the voice;
+/// - seeks: any jump backwards, or forwards by more than a sentence or two;
 /// - how long each sentence lasts at the current speed, estimated from the clip times
-///   (the speed itself is not reported), so the music can lift in long silences;
+///   (the speed itself is not reported), so the sounds can lift in long silences;
 /// - real pauses, ignoring the brief stalls the player reports while it seeks or loads
 ///   the next file.
-///
-/// Mood readings run in order on one task, after the sentence they belong to has started,
-/// and readings for a book that has since closed are dropped.
 ///
 /// Thread safety: every method may be called from any thread. State lives on the
 /// scheduler's context (one serial queue in the app).
@@ -88,14 +65,11 @@ public final class NarrationFollower: @unchecked Sendable {
     public struct Configuration: Sendable, Hashable {
         /// A stop shorter than this is a stall (seeking, loading the next file), not a pause.
         public var pauseDebounce: TimeInterval = 0.6
-        /// After a pause this long, the next reading starts a new stretch.
-        public var resetAfterPause: TimeInterval = 300
-        /// A forward jump of more than this many sentences is a seek. Matches the reading
-        /// cadence, so the director and the tracker agree on what a seek is.
-        public var maxContinuousStep: Int = ReadingCadence.Configuration.default.maxContinuousStep
+        /// A forward jump of more than this many sentences is a seek. One missed clip
+        /// boundary (a gap clip, a sentence the overlay skips) is still steady narration.
+        public var maxContinuousStep: Int = 2
         /// A jump back of up to this many sentences (the app's automatic rewind after a
-        /// pause, a skip-back button) replays what was just heard: the music keeps its mood
-        /// and no reading is taken until the narration passes the furthest sentence again.
+        /// pause, a skip-back button) replays what was just heard: the scene stays as it is.
         public var rewindTolerance: Int = 8
         /// Plausible playback speeds; estimates outside are clamped.
         public var rateRange: ClosedRange<Double> = 0.5...3.5
@@ -106,7 +80,7 @@ public final class NarrationFollower: @unchecked Sendable {
         /// Reading on screen with the narrator stopped: a page turn of up to this many
         /// sentences either way is reading on (or paging back); a bigger one is a jump.
         public var readerMaxPageStep: Int = 150
-        /// Reading on screen: after this long with no page turn, the music fades out.
+        /// Reading on screen: after this long with no page turn, the sounds fade out.
         public var readerIdleTimeout: TimeInterval = 300
 
         public init() {}
@@ -115,32 +89,23 @@ public final class NarrationFollower: @unchecked Sendable {
     /// What the follower knows, for the settings screen and tests.
     public struct Status: Sendable, Hashable {
         public var bookID: String?
-        /// The book's text is open and readings are flowing.
+        /// The book's text is open and the sentences are being followed.
         public var hasText: Bool
-        public var engineID: String?
         public var isNarrating: Bool
         /// The listener is reading the text on screen with the narrator stopped, and the
-        /// music follows the pages (``readerReached(_:)``).
+        /// sounds follow the pages (``readerReached(_:)``).
         public var isReading: Bool = false
         public var position: SentencePosition?
         public var estimatedRate: Double
         /// Clips that did not match a narrated sentence (front matter, audio-only parts).
         public var unmatchedClips: Int
-        public var readingsDelivered: Int
-    }
-
-    private enum Job {
-        case reading(MoodTracker, SentencePosition, isSeek: Bool, generation: Int)
-        case reset(MoodTracker)
     }
 
     public let configuration: Configuration
     private let scheduler: LofiScheduler
-    private let jobs: AsyncStream<Job>.Continuation
-    private var consumer: Task<Void, Never>?
 
     // State on the scheduler's context.
-    private var sink: NarrationMusicSink?
+    private var sink: NarrationSink?
     private var bookID: String?
     private var text: BookText?
     /// The latest clip that arrived before the book's text was ready.
@@ -150,7 +115,6 @@ public final class NarrationFollower: @unchecked Sendable {
     private var reading = false
     private var readerIdleTimer: LofiCancellable?
     private var pauseTimer: LofiCancellable?
-    private var pausedAt: TimeInterval?
     private var position: SentencePosition?
     /// The furthest sentence narrated since the last seek.
     private var furthest: SentencePosition?
@@ -159,82 +123,43 @@ public final class NarrationFollower: @unchecked Sendable {
     private var rate: Double = 1
     private var unmatchedClips = 0
 
-    // Shared with the reading task.
-    private let lock = NSLock()
-    private var generation = 0
-    private var outstanding = 0
-    private var delivered = 0
-    private var idleWaiters: [CheckedContinuation<Void, Never>] = []
-
     public init(scheduler: LofiScheduler, configuration: Configuration = Configuration()) {
         self.scheduler = scheduler
         self.configuration = configuration
-        let (stream, continuation) = AsyncStream<Job>.makeStream()
-        jobs = continuation
-        consumer = Task { [weak self] in
-            for await job in stream {
-                guard let self else { return }
-                await self.run(job)
-            }
-        }
     }
 
     deinit {
-        jobs.finish()
-        consumer?.cancel()
         pauseTimer?.cancel()
         readerIdleTimer?.cancel()
     }
 
-    // MARK: - The music player
+    // MARK: - The player
 
-    /// Sets (or replaces) the player. A new player is brought up to date: the open book,
-    /// whether the narrator is playing, and a fresh reading for the current sentence.
-    public func attach(_ newSink: NarrationMusicSink?) {
+    /// Sets (or replaces) the player. The old one fades out; a new one is brought up to
+    /// date: the open book, whether the narrator is playing, and where it is.
+    public func attach(_ newSink: NarrationSink?) {
         scheduler.perform { [self] in
             if let old = sink, old !== newSink {
-                // Let the old player fade out.
                 old.narratorDidPause()
                 old.closeBook()
             }
             sink = newSink
             guard let newSink else { return }
-            replay(to: newSink, reading: true)
-        }
-    }
-
-    /// Brings one more player up to date without touching the attached sink: for a player
-    /// added behind a sink that fans out to several (the music and the atmosphere), so the
-    /// players already there are not told to reopen the book. `install` runs first, on the
-    /// follower's queue, where it should add the player to the fan-out; the narrator's
-    /// events after it then reach the player only after its catch-up. With `reading`, the
-    /// attached sink also gets a fresh mood reading for the current sentence (for a new
-    /// music player; the atmosphere needs none, and the music already playing would take
-    /// it as a seek).
-    public func catchUp(_ newSink: NarrationMusicSink, reading: Bool, install: @escaping @Sendable () -> Void) {
-        scheduler.perform { [self] in
-            install()
-            replay(to: newSink, reading: reading)
-        }
-    }
-
-    /// The open book, whether the narrator is playing, and where it is. On the scheduler.
-    private func replay(to newSink: NarrationMusicSink, reading: Bool) {
-        if narrating || self.reading { newSink.narratorDidPlay() }
-        guard let bookID, let text else { return }
-        newSink.openBook(id: bookID)
-        if let position {
-            newSink.narratorDidSeek(toGlobalSentenceIndex: position.globalIndex)
-            newSink.sentenceDidStart(globalSentenceIndex: position.globalIndex, duration: nil)
-            if reading { enqueueReading(text.tracker, position, isSeek: true) }
+            if narrating || reading { newSink.narratorDidPlay() }
+            guard let bookID, text != nil else { return }
+            newSink.openBook(id: bookID)
+            if let position {
+                newSink.narratorDidSeek(toGlobalSentenceIndex: position.globalIndex)
+                newSink.sentenceDidStart(globalSentenceIndex: position.globalIndex, duration: nil)
+            }
         }
     }
 
     // MARK: - Narrator events
 
     /// The narrator loaded a book (or the next file of the same book). Only a new `id`
-    /// changes anything. The music stays off until ``attachText(_:toBook:)`` gives the
-    /// book's text: music with nothing to follow would only be a guess.
+    /// changes anything. The sounds stay off until ``attachText(_:toBook:)`` gives the
+    /// book's text: a scene with nothing to follow would only be a guess.
     public func bookOpened(id: String) {
         scheduler.perform { [self] in
             guard id != bookID else { return }
@@ -247,7 +172,6 @@ public final class NarrationFollower: @unchecked Sendable {
             furthest = nil
             anchor = nil
             unmatchedClips = 0
-            lock.withLock { generation += 1 }
         }
     }
 
@@ -263,7 +187,6 @@ public final class NarrationFollower: @unchecked Sendable {
             position = nil
             furthest = nil
             anchor = nil
-            lock.withLock { generation += 1 }
         }
     }
 
@@ -280,27 +203,26 @@ public final class NarrationFollower: @unchecked Sendable {
         }
     }
 
-    /// A better text for the open book, with the score that has since arrived. The book
-    /// stays open and the music plays on: from the next reading, taken at the sentence
-    /// being narrated, the new engine decides. Readings of the old one still in flight
-    /// are dropped.
+    /// The open book's text, read again (its score arrived, or the book was re-synced). The
+    /// book stays open and the sounds play on; the sentences are matched through the new
+    /// text from here.
     public func replaceText(_ bookText: BookText, toBook id: String) {
         scheduler.perform { [self] in
             guard id == bookID else { return }
             guard text != nil else {
-                text = bookText
-                sink?.openBook(id: id)
-                if let waiting = waitingClip {
-                    waitingClip = nil
-                    handle(waiting.clip, audioTime: waiting.audioTime)
-                }
+                attachNow(bookText, toBook: id)
                 return
             }
             text = bookText
-            lock.withLock { generation += 1 }
-            if narrating || reading, let position {
-                enqueueReading(bookText.tracker, position, isSeek: true)
-            }
+        }
+    }
+
+    private func attachNow(_ bookText: BookText, toBook id: String) {
+        text = bookText
+        sink?.openBook(id: id)
+        if let waiting = waitingClip {
+            waitingClip = nil
+            handle(waiting.clip, audioTime: waiting.audioTime)
         }
     }
 
@@ -312,22 +234,18 @@ public final class NarrationFollower: @unchecked Sendable {
                 pauseTimer = nil
                 if narrating {
                     // A pause too short to count, as far as the follower is concerned. The
-                    // players may have stopped on their own in the meantime (headphones
+                    // player may have stopped on its own in the meantime (headphones
                     // pulled: the narrator pauses itself and may be resumed at once), so
-                    // the resume is passed on; they treat a repeated play as nothing new.
+                    // the resume is passed on; it treats a repeated play as nothing new.
                     if wasPausing { sink?.narratorDidPlay() }
                     return
                 }
-                // The narrator takes over from the pages: the music carries on.
+                // The narrator takes over from the pages: the sounds carry on.
                 readerIdleTimer?.cancel()
                 readerIdleTimer = nil
                 reading = false
                 narrating = true
                 anchor = nil
-                if let pausedAt, scheduler.now - pausedAt >= configuration.resetAfterPause, let text {
-                    enqueue(.reset(text.tracker))
-                }
-                pausedAt = nil
                 // Forwarded even before the text is ready: the player only plays with a
                 // book open, and it has to know the narrator's state when one opens.
                 sink?.narratorDidPlay()
@@ -357,17 +275,15 @@ public final class NarrationFollower: @unchecked Sendable {
 
     /// The listener is reading the book's text on screen with the narrator stopped, and the
     /// page now begins with `clip`'s sentence (the app's own page-to-audio sync finds it).
-    /// The music plays as if the narrator were reading:
+    /// The sounds play as if the narrator were reading:
     ///
-    /// - judged from the top of the page, never from the rest of it, so nothing on the page
-    ///   the listener has not reached yet can show in the music;
-    /// - turning on a page reads every sentence between the last one reached and the new top
-    ///   of the page, in order, as narration would have;
-    /// - paging back keeps the mood, as a short rewind does; a jump of more than
+    /// - placed at the top of the page, never further into it, so nothing on the page the
+    ///   listener has not reached yet can show in the sounds;
+    /// - paging back keeps the scene, as a short rewind does; a jump of more than
     ///   ``Configuration/readerMaxPageStep`` sentences (the table of contents, a bookmark)
     ///   is a seek;
     /// - after ``Configuration/readerIdleTimeout`` without a page turn, or with
-    ///   ``readerStopped()``, the music fades out as on a pause.
+    ///   ``readerStopped()``, the sounds fade out as on a pause.
     ///
     /// Ignored while the narrator plays: it leads then.
     public func readerReached(_ clip: NarratorClip) {
@@ -385,20 +301,16 @@ public final class NarrationFollower: @unchecked Sendable {
             }
             if !reading {
                 reading = true
-                if let pausedAt, scheduler.now - pausedAt >= configuration.resetAfterPause {
-                    enqueue(.reset(text.tracker))
-                }
-                pausedAt = nil
                 anchor = nil
                 sink?.narratorDidPlay()
             }
             armReaderIdle()
-            follow(page: found, text: text)
+            follow(page: found)
         }
     }
 
     /// The listener stopped reading on screen (left the book, or the app went to the
-    /// background). The music fades out as on a pause.
+    /// background). The sounds fade out as on a pause.
     public func readerStopped() {
         scheduler.perform { [self] in
             stopReading()
@@ -410,7 +322,6 @@ public final class NarrationFollower: @unchecked Sendable {
         readerIdleTimer = nil
         guard reading else { return }
         reading = false
-        pausedAt = scheduler.now
         if !narrating { sink?.narratorDidPause() }
     }
 
@@ -421,34 +332,23 @@ public final class NarrationFollower: @unchecked Sendable {
         }
     }
 
-    private func follow(page found: SentencePosition, text: BookText) {
+    private func follow(page found: SentencePosition) {
         let previous = position
         let step = previous.map { found.globalIndex - $0.globalIndex }
         guard let previous, let step, abs(step) <= configuration.readerMaxPageStep else {
-            // The first page, or a jump: decide afresh from here.
+            // The first page, or a jump: the scene is decided afresh from here.
             sink?.narratorDidSeek(toGlobalSentenceIndex: found.globalIndex)
             sink?.sentenceDidStart(globalSentenceIndex: found.globalIndex, duration: 0)
             position = found
             furthest = found
-            enqueueReading(text.tracker, found, isSeek: true)
             return
         }
         guard step != 0 else { return }
-        // No voice: a duration of 0 lets the music rise a little, as in a pause.
+        // No voice: a duration of 0 lets the sounds rise a little, as in a pause.
         sink?.sentenceDidStart(globalSentenceIndex: found.globalIndex, duration: 0)
         position = found
         let reached = max(previous, furthest ?? previous)
-        guard found > reached else { return }
-        furthest = found
-        var cursor = reached
-        var walked = 0
-        while walked < configuration.readerMaxPageStep,
-              let next = try? text.spoilerGuard.position(after: cursor),
-              next <= found {
-            enqueueReading(text.tracker, next, isSeek: false)
-            cursor = next
-            walked += 1
-        }
+        if found > reached { furthest = found }
     }
 
     // MARK: - Status
@@ -458,26 +358,12 @@ public final class NarrationFollower: @unchecked Sendable {
             completion(Status(
                 bookID: bookID,
                 hasText: text != nil,
-                engineID: text?.engineID,
                 isNarrating: narrating,
                 isReading: reading,
                 position: position,
                 estimatedRate: rate,
-                unmatchedClips: unmatchedClips,
-                readingsDelivered: lock.withLock { delivered }
+                unmatchedClips: unmatchedClips
             ))
-        }
-    }
-
-    /// Waits until every reading queued so far has been delivered or dropped. For tests.
-    public func waitUntilIdle() async {
-        await withCheckedContinuation { continuation in
-            let idle: Bool = lock.withLock {
-                if outstanding == 0 { return true }
-                idleWaiters.append(continuation)
-                return false
-            }
-            if idle { continuation.resume() }
         }
     }
 
@@ -487,7 +373,6 @@ public final class NarrationFollower: @unchecked Sendable {
         pauseTimer = nil
         guard narrating else { return }
         narrating = false
-        pausedAt = scheduler.now
         anchor = nil
         sink?.narratorDidPause()
     }
@@ -507,7 +392,7 @@ public final class NarrationFollower: @unchecked Sendable {
             found = nil
         }
         guard let found else {
-            // Front matter or audio the book's text does not cover: no reading, no seek.
+            // Front matter or audio the book's text does not cover: no seek.
             unmatchedClips += 1
             anchor = nil
             return
@@ -532,12 +417,6 @@ public final class NarrationFollower: @unchecked Sendable {
         if isSeek || reached.map({ found > $0 }) ?? true {
             furthest = found
         }
-        // No new reading for a gap clip that maps to the sentence already playing, a resume
-        // inside it, or sentences being heard again after a short rewind.
-        let isNew = isSeek || reached.map { found.globalIndex > $0.globalIndex } ?? true
-        if found != previous, !isRewind, isNew {
-            enqueueReading(text.tracker, found, isSeek: isSeek)
-        }
     }
 
     private func updateRate(clip: NarratorClip, audioTime: Double?, isSeek: Bool, at now: TimeInterval) {
@@ -549,42 +428,5 @@ public final class NarrationFollower: @unchecked Sendable {
         guard wall >= configuration.minimumRateSample, audio > 0 else { return }
         let sample = min(configuration.rateRange.upperBound, max(configuration.rateRange.lowerBound, audio / wall))
         rate += (sample - rate) * configuration.rateSmoothing
-    }
-
-    private func enqueueReading(_ tracker: MoodTracker, _ position: SentencePosition, isSeek: Bool) {
-        let current = lock.withLock { generation }
-        enqueue(.reading(tracker, position, isSeek: isSeek, generation: current))
-    }
-
-    private func enqueue(_ job: Job) {
-        lock.withLock { outstanding += 1 }
-        jobs.yield(job)
-    }
-
-    private func run(_ job: Job) async {
-        switch job {
-        case let .reset(tracker):
-            await tracker.reset()
-        case let .reading(tracker, position, isSeek, jobGeneration):
-            if let observation = await tracker.sentenceStarted(position, isSeek: isSeek) {
-                deliver(observation, generation: jobGeneration)
-            }
-        }
-        let waiters: [CheckedContinuation<Void, Never>] = lock.withLock {
-            outstanding -= 1
-            guard outstanding == 0 else { return [] }
-            defer { idleWaiters.removeAll() }
-            return idleWaiters
-        }
-        waiters.forEach { $0.resume() }
-    }
-
-    private func deliver(_ observation: MoodObservation, generation jobGeneration: Int) {
-        scheduler.perform { [self] in
-            // The book may have changed while the engine ran.
-            guard lock.withLock({ generation }) == jobGeneration, text != nil else { return }
-            lock.withLock { delivered += 1 }
-            sink?.receive(observation)
-        }
     }
 }

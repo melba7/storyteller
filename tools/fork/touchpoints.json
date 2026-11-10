@@ -10,6 +10,7 @@
     "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
     "applications/web/src/app/api/v2/books/[bookId]/lofi-score/",
     "libraries/LofiScoreKit/",
+    "shelved/",
     "tools/fork/",
     "tools/lofi-library/"
   ],
@@ -27,12 +28,12 @@
     {
       "file": "applications/mobile/app/(root)/settings.tsx",
       "markers": 2,
-      "purpose": "Shows the atmosphere's section (on and off, volume, how much is going on, pauses, one-off sounds, the car, importing a sounds folder) under the reading settings."
+      "purpose": "Shows the atmosphere sounds' section (on and off, volume, how much is going on, the car, importing a sounds folder) under the reading settings."
     },
     {
       "file": "applications/mobile/components/Toolbar.tsx",
       "markers": 2,
-      "purpose": "Adds the atmosphere button to the player's toolbar for readaloud books, in both the read-along and listening screens."
+      "purpose": "Adds the atmosphere sounds button to the player's toolbar for readaloud books, in both the read-along and listening screens."
     },
     {
       "file": "applications/mobile/store/store.ts",

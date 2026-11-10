@@ -1,8 +1,7 @@
 #!/bin/bash
 # Puts each finished score inside its book on the Storyteller server, when the
 # server is the fork's (it answers PUT /api/v2/books/<id>/lofi-score). The
-# phone then gets the score with the book, as the music and atmosphere's own
-# "sync". A server without the route answers 404 and is left alone.
+# phone then gets the score with the book, as the atmosphere's own "sync". A server without the route answers 404 and is left alone.
 #
 # Uses "~/Storyteller Lofi/server.json" and the keychain like fetch-books.sh,
 # and "Books/.synced.json" to know which file is which book. Scores already
@@ -83,7 +82,7 @@ PY
       sent=$((sent + 1))
       echo "score sent to the server for $(basename "$score" .score.json)" ;;
     404|405)
-      echo "the server has no lofi-score route (not the fork's server); scores stay in the music folder only"
+      echo "the server has no lofi-score route (not the fork's server); scores stay in the sounds folder only"
       break ;;
     *)
       echo "could not send the score for $(basename "$score" .score.json): HTTP $code" ;;

@@ -1,5 +1,5 @@
 import Foundation
-import LofiAudio
+import LofiAudioCore
 
 /// How a slot's sound is shaped to stay out of the narrator's way.
 public enum AmbienceFilter: String, Sendable, Hashable, Codable {
@@ -11,6 +11,19 @@ public enum AmbienceFilter: String, Sendable, Hashable, Codable {
 
     public init(for sound: AmbientSound) {
         self = sound.isVoices ? .speechSafe : .standard
+    }
+}
+
+/// What a backend throws.
+public enum AmbienceError: Error, Equatable, CustomStringConvertible {
+    case engineNotRunning
+    case loadFailed(file: String, reason: String)
+
+    public var description: String {
+        switch self {
+        case .engineNotRunning: return "The audio engine is not running"
+        case let .loadFailed(file, reason): return "Could not load \(file): \(reason)"
+        }
     }
 }
 
@@ -59,7 +72,7 @@ public protocol AmbienceBackend: AnyObject {
 extension AmbienceBackend {
     /// Backends without a one-off voice play none.
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
-        throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "this backend plays no one-off sounds")
+        throw AmbienceError.loadFailed(file: url.lastPathComponent, reason: "this backend plays no one-off sounds")
     }
 
     public func stopOnce(fade: TimeInterval) {}
@@ -114,7 +127,7 @@ public final class FakeAmbienceBackend: AmbienceBackend {
 
     public func load(_ url: URL, slot: Int, filter: AmbienceFilter) throws -> TimeInterval {
         if failLoads.contains(url.lastPathComponent) {
-            throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "test")
+            throw AmbienceError.loadFailed(file: url.lastPathComponent, reason: "test")
         }
         slots[slot] = Slot(url: url, filter: filter, playing: false, gain: slots[slot].gain, muffle: 0)
         log.append("load \(slot) \(url.lastPathComponent)")
@@ -122,7 +135,7 @@ public final class FakeAmbienceBackend: AmbienceBackend {
     }
 
     public func play(slot: Int, from offset: TimeInterval) throws {
-        guard isEngineRunning else { throw LofiAudioError.engineNotRunning }
+        guard isEngineRunning else { throw AmbienceError.engineNotRunning }
         slots[slot].playing = true
         log.append("play \(slot)")
     }
@@ -150,9 +163,9 @@ public final class FakeAmbienceBackend: AmbienceBackend {
     }
 
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
-        guard isEngineRunning else { throw LofiAudioError.engineNotRunning }
+        guard isEngineRunning else { throw AmbienceError.engineNotRunning }
         if failLoads.contains(url.lastPathComponent) {
-            throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "test")
+            throw AmbienceError.loadFailed(file: url.lastPathComponent, reason: "test")
         }
         oneShots.append((url.lastPathComponent, gain))
         log.append("once \(url.lastPathComponent)")

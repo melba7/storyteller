@@ -1,6 +1,5 @@
 import Foundation
-import LofiDirector
-import LofiPlaceholders
+import LofiAudioCore
 
 /// Synthesised stand-ins for every ambient sound, so the atmosphere works before real
 /// recordings are imported (and in tests). They are rough sketches made from filtered

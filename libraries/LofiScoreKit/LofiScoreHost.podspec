@@ -4,7 +4,7 @@
 Pod::Spec.new do |s|
   s.name           = 'LofiScoreHost'
   s.version        = '0.1.0'
-  s.summary        = 'Follows the narrator in the app and runs the music for it.'
+  s.summary        = 'Follows the narrator in the app and runs the atmosphere sounds for it.'
   s.author         = 'Storyteller Lofi fork'
   s.homepage       = 'https://github.com/melba7/storyteller'
   s.license        = { type: 'MIT' }
@@ -16,9 +16,7 @@ Pod::Spec.new do |s|
   s.dependency 'LofiScoreCore'
   s.dependency 'LofiText'
   s.dependency 'LofiMood'
-  s.dependency 'LofiDirector'
-  s.dependency 'LofiAudio'
-  s.dependency 'LofiPlaceholders'
+  s.dependency 'LofiAudioCore'
   s.dependency 'LofiAtmosphere'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }

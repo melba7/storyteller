@@ -4,6 +4,11 @@ This half of the package answers one question while a readaloud book plays:
 *what music fits the story at the sentence being narrated now?* It never reads
 past that sentence.
 
+The music that used the answer is shelved (`shelved/lofi-music/README.md` at
+the repository root); the detection, its eval tools and the per-book mood tracks
+stay here for its return, and the atmosphere's scorer shares the Claude
+transport. Nothing in this document is wired into the app for now.
+
 ```
 EPUB 3 media overlays ──► SpoilerGuard ──► CausalWindow ──► MoodEngine ──► MoodReading ──► director (audio side)
  (LofiText)               (no lookahead)    (text ≤ now)     (LofiMood)     (11 buckets + valence/arousal)

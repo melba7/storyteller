@@ -1,6 +1,6 @@
 // LOFI-FORK: the Storyteller Lofi fork's native module (see FORK.md).
 //
-// One music host per app. It follows the audiobook player through the hooks in
+// One atmosphere host per app. It follows the audiobook player through the hooks in
 // modules/readium/ios/LofiNarratorBridge.swift and plays inside the narrator's own audio
 // session: it never changes the session, Now Playing or the remote commands. The one thing
 // it asks of the narrator is a short hold where the atmosphere swells or hushes.
@@ -23,65 +23,48 @@ public final class LofiScoreModule: Module {
       await LofiScoreRuntime.shared.host.status().jsonObject()
     }
 
-    AsyncFunction("setEnabled") { (enabled: Bool) async -> [String: Any] in
-      let host = LofiScoreRuntime.shared.host
-      await host.setEnabled(enabled)
-      return await host.status().jsonObject()
-    }
-
     AsyncFunction("setMutedInCar") { (muted: Bool) async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.setMutedInCar(muted)
       return await host.status().jsonObject()
     }
 
-    // The music's level under the voice, in dB. null goes back to the default.
-    AsyncFunction("setMusicLevel") { (level: Double?) async -> [String: Any] in
-      let host = LofiScoreRuntime.shared.host
-      await host.setMusicLevel(dB: level)
-      return await host.status().jsonObject()
-    }
-
-    // Shows the Files folder picker, copies the music into the app and keeps a link to the
+    // Shows the Files folder picker, copies the sounds into the app and keeps a link to the
     // folder, so whatever is added to it later (scores from the Mac, new sounds or tracks)
     // is copied without importing again. Resolves to null when the listener cancels.
-    AsyncFunction("importMusicFolder") { () async throws -> [String: Any]? in
+    AsyncFunction("importSoundsFolder") { () async throws -> [String: Any]? in
       guard let folder = await LofiFolderPicker.pick() else { return nil }
-      let summary = try await LofiScoreRuntime.shared.host.linkMusicFolder(folder)
+      let summary = try await LofiScoreRuntime.shared.host.linkSoundsFolder(folder)
       return [
         "folderName": summary.folderName,
-        "tracks": summary.tracks,
-        "moodTracks": summary.moodTracks,
-        "hasClassifier": summary.hasClassifier,
-        "notDownloaded": summary.notDownloaded,
-        "atmosphereRecordings": summary.atmosphereRecordings,
+        "recordings": summary.recordings,
+        "scores": summary.scores,
         "atmosphereTracks": summary.atmosphereTracks,
+        "notDownloaded": summary.notDownloaded,
       ]
     }
 
-    // Looks at the linked music folder now and copies what is new. Resolves to null when
+    // Looks at the linked sounds folder now and copies what is new. Resolves to null when
     // no folder is linked; rejects when the folder cannot be read.
-    AsyncFunction("syncMusicFolder") { () async throws -> [String: Any]? in
-      guard let summary = try await LofiScoreRuntime.shared.host.syncMusicFolder(reason: .manual) else { return nil }
+    AsyncFunction("syncSoundsFolder") { () async throws -> [String: Any]? in
+      guard let summary = try await LofiScoreRuntime.shared.host.syncSoundsFolder(reason: .manual) else { return nil }
       return [
         "folderName": summary.folderName,
         "added": summary.added,
         "updated": summary.updated,
         "notDownloaded": summary.notDownloaded,
-        "music": summary.music,
-        "models": summary.models,
-        "moodTracks": summary.moodTracks,
+        "scores": summary.scores,
         "atmosphereTracks": summary.atmosphereTracks,
-        "atmosphereRecordings": summary.atmosphereRecordings,
+        "recordings": summary.recordings,
         "fresh": summary.fresh,
         "description": summary.description,
       ]
     }
 
-    // Forgets the linked folder; the music already copied stays.
-    AsyncFunction("unlinkMusicFolder") { () async -> [String: Any] in
+    // Forgets the linked folder; the sounds already copied stay.
+    AsyncFunction("unlinkSoundsFolder") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
-      await host.unlinkMusicFolder()
+      await host.unlinkSoundsFolder()
       return await host.status().jsonObject()
     }
 
@@ -97,12 +80,7 @@ public final class LofiScoreModule: Module {
     // Back from the background: anything new in the linked folder (a score the Mac
     // finished) is copied, at most once a minute.
     OnAppEntersForeground {
-      LofiScoreRuntime.shared.host.syncMusicFolderIfDue(reason: .foreground)
-    }
-
-    // The imported music's CREDITS.md, or null.
-    AsyncFunction("getMusicCredits") { () async -> String? in
-      await LofiScoreRuntime.shared.host.musicCredits()
+      LofiScoreRuntime.shared.host.syncSoundsFolderIfDue(reason: .foreground)
     }
 
     AsyncFunction("setAtmosphereEnabled") { (enabled: Bool) async -> [String: Any] in
@@ -134,7 +112,8 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
-    // One-off sounds (a knock, a clap of thunder) on their sentences. Off by default.
+    // One-off sounds (a knock, a clap of thunder, the door or engine of a change of scene)
+    // on their sentences. On by default.
     AsyncFunction("setAtmosphereOneShots") { (enabled: Bool) async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.setAtmosphereOneShotsEnabled(enabled)
@@ -146,25 +125,13 @@ public final class LofiScoreModule: Module {
       await LofiScoreRuntime.shared.host.atmosphereCredits()
     }
 
-    AsyncFunction("removeImportedMusic") { () async -> [String: Any] in
+    AsyncFunction("removeImportedSounds") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
-      await host.removeImportedMusic()
+      await host.removeImportedSounds()
       return await host.status().jsonObject()
     }
 
-    // The music panel's "Wrong mood" button: the music moves to the named mood, or to the
-    // engine's next guess with null, and the tap is logged. Resolves to null when nothing
-    // was playing or nothing changed.
-    AsyncFunction("markWrongMood") { (mood: String?) async -> [String: Any]? in
-      await LofiScoreRuntime.shared.host.markWrongMood(named: mood)?.jsonObject()
-    }
-
-    // The wrong-mood log as text to share, or null when nothing was marked yet.
-    AsyncFunction("getMoodFeedback") { () async -> String? in
-      await LofiScoreRuntime.shared.host.moodFeedbackText()
-    }
-
-    // Music while reading on screen with the narration stopped.
+    // The sounds while reading on screen with the narration stopped.
     AsyncFunction("setFollowsReading") { (enabled: Bool) async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.setFollowsReading(enabled)
@@ -178,25 +145,25 @@ public final class LofiScoreModule: Module {
       LofiScoreRuntime.shared.host.readerReached(bookID: bookUuid, clip: NarratorClip(clip))
     }
 
-    // The reader left the book or the app: the music that follows the pages stops.
+    // The reader left the book or the app: the sounds that follow the pages stop.
     AsyncFunction("readerStopped") {
       LofiScoreRuntime.shared.host.readerStopped()
     }
   }
 }
 
-/// The app's one music host, wired to the audiobook player once.
+/// The app's one atmosphere host, wired to the audiobook player once.
 final class LofiScoreRuntime: @unchecked Sendable {
   static let shared = LofiScoreRuntime()
 
-  let host: LofiMusicHost
+  let host: LofiAtmosphereHost
   private let holds: LofiNarrationHoldRelay
   private let lock = NSLock()
   private var started = false
 
   private init() {
     let holds = LofiNarrationHoldRelay()
-    let host = LofiMusicHost.forApp(holdNarration: { holds.request(seconds: $0) })
+    let host = LofiAtmosphereHost.forApp(holdNarration: { holds.request(seconds: $0) })
     holds.attach(host)
     self.host = host
     self.holds = holds
@@ -251,9 +218,9 @@ final class LofiNarrationHoldRelay: @unchecked Sendable {
   private let lock = NSLock()
   private var narratorPlaying = false
   private var pending = false
-  private var host: LofiMusicHost?
+  private var host: LofiAtmosphereHost?
 
-  func attach(_ host: LofiMusicHost) {
+  func attach(_ host: LofiAtmosphereHost) {
     lock.withLock { self.host = host }
   }
 
@@ -281,7 +248,7 @@ final class LofiNarrationHoldRelay: @unchecked Sendable {
   }
 
   private func report(began: Bool, over: Bool) {
-    let host: LofiMusicHost? = lock.withLock {
+    let host: LofiAtmosphereHost? = lock.withLock {
       if over { pending = false }
       return self.host
     }
@@ -301,7 +268,7 @@ extension NarratorClip {
   }
 }
 
-/// The Files app's folder picker, for importing a music folder (from iCloud Drive, say).
+/// The Files app's folder picker, for importing a sounds folder (from iCloud Drive, say).
 @MainActor
 final class LofiFolderPicker: NSObject, UIDocumentPickerDelegate {
   private static var current: LofiFolderPicker?

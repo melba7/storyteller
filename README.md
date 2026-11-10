@@ -1,11 +1,13 @@
 # Storyteller
 
 <!-- LOFI-FORK: this fork's banner; FORK.md has the rest -->
+
 > **Storyteller Lofi** is a personal fork of Storyteller that plays the sounds
 > of each scene under the narration (rain, a fire, the sea, a murmuring crowd),
-> scored ahead of time from what has already been read and never from what
-> comes next. [FORK.md](FORK.md) explains what the fork adds, its ground rules
-> and how it keeps up with upstream. Everything below is upstream's README.
+> scored ahead of time from what has already been read and never from what comes
+> next. [FORK.md](FORK.md) explains what the fork adds, its ground rules and how
+> it keeps up with upstream. Everything below is upstream's README.
+
 <!-- LOFI-FORK: end of the banner -->
 
 <!-- prettier-ignore -->

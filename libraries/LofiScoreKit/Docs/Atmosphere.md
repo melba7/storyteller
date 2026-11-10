@@ -29,10 +29,11 @@ shelved (`shelved/lofi-music/` at the repository root).
   recording each visit, and the book's rain is the same rain everywhere.
 - **Weather carries over.** Rain, thunder, wind and snow stay with the story when it moves
   indoors (as rain on the windows) until the text says it stopped.
-- **A crowd is the one sound made of many voices.** When a scene has a crowd at `soft` or
-  louder (a busy hallway, a tavern full of people, a market), it is the scene's main sound
-  and any music that may play alongside (the shelved music, if it comes back) steps aside
-  for it: voices under a voice are too much.
+- **A crowd replaces the music, when there is music.** When a scene has a crowd at `soft`
+  or louder (a busy hallway, a tavern full of people, a market), the player asks the music
+  to fade out over 4 s and come back when the scene moves on. Music and a crowd together
+  are too much under a voice. With the music shelved nothing answers that request; it
+  stays so the music can come back (`shelved/lofi-music/README.md`).
 - **Changes are calm.** A new scene crossfades over 6 s, a level change over 4 s, and two
   changes are at least 20 s apart unless the listener seeks. When a new chapter starts and
   has not said where it is yet, the last scene drops 8 dB until it does.
@@ -300,7 +301,7 @@ sound. So:
   gets no lift, rising over 0.6 s and dropping back in 0.25 s when the next sentence starts.
   Pausing, seeking and a narration hold end it too. Reading on screen has no sentence
   timing, so no lift.
-- Each sound gets the music's presence dip around 2.5 kHz, where speech is clearest.
+- Each sound gets a presence dip around 2.5 kHz, where speech is clearest.
 
 The 48 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,
@@ -321,7 +322,7 @@ running, breathing, heartbeat, swimming, climbing, fighting, writing, meal, work
 | Director (which scene now) and player (fades, slots, crowd yield) | `Sources/LofiAtmosphere/Player` |
 | Audio: its own `AVAudioEngine`, 12 looping slots | `Player/AVAmbienceBackend.swift` |
 | Synthesised stand-ins for every sound | `Sound/AmbienceSynth.swift` |
-| App host: settings, finding the track, the narration hold | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiAtmosphereHost.swift` |
+| App host: settings, finding the track, the sounds folder, the narration hold | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiAtmosphereHost.swift` |
 | CLI: `lofi-atmosphere track / show / score / synth / library / catalog / eval` | `Sources/lofi-atmosphere` |
 | The catalogue as the fetch script reads it | `Tools/atmosphere/catalog.json` |
 
