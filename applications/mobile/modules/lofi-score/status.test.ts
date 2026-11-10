@@ -1,180 +1,131 @@
-// LOFI-FORK: tests for the lofi music's wording (see FORK.md).
+// LOFI-FORK: tests for the atmosphere's wording (see FORK.md).
 import { describe, expect, it } from "vitest"
 
-import type { LofiMusicStatus } from "./index"
+import type { LofiAtmosphereStatus, LofiStatus } from "./index"
 import {
   atmosphereSourceLabel,
   bookNeedingScore,
-  canMarkWrongMood,
   describeAtmosphere,
-  describeMusic,
   intensityLabel,
+  levelLabel,
   linkedFolderLabel,
-  moodCounts,
-  moodFeedbackLine,
-  moodFeedbackTotals,
-  musicLevelLabel,
-  musicSourceLabel,
-  nowPlayingLine,
   plainCredits,
   soundList,
   soundName,
   timeAgo,
-  wrongMoodResult,
 } from "./status"
 
-function status(overrides: Partial<LofiMusicStatus> = {}): LofiMusicStatus {
+const atmosphere: LofiAtmosphereStatus = {
+  enabled: true,
+  available: true,
+  levelDB: -24,
+  defaultLevelDB: -24,
+  levelRange: [-40, -14],
+  intensity: 0.75,
+  defaultIntensity: 0.75,
+  source: "imported",
+  preparing: false,
+  sounds: 38,
+  totalSounds: 38,
+  variants: 0,
+  edition: "personal",
+  pausesEnabled: true,
+  pausesAvailable: true,
+  oneShotsEnabled: false,
+  oneShots: 3,
+  totalOneShots: 12,
+  track: true,
+  trackOrigin: "the book's score",
+  place: "the tavern",
+  playing: ["rainIndoors", "fireplace"],
+  chapterDip: false,
+  routeMuted: false,
+  missingSounds: [],
+  engineRunning: true,
+}
+
+function status(overrides: Partial<LofiStatus> = {}): LofiStatus {
   return {
-    enabled: true,
     mutedInCar: false,
-    musicLevelDB: -12,
-    defaultMusicLevelDB: -12,
-    musicLevelRange: [-30, -4],
-    library: {
-      source: "imported",
-      preparing: false,
-      importedFolderName: "LofiMusic",
-      tracks: 32,
-      moods: [
-        { mood: "calm", tracks: 4 },
-        { mood: "tense", tracks: 0 },
-      ],
-    },
-    book: { id: "b", text: "ready", moodTrack: false },
+    followsReading: true,
+    folder: { imported: true, importedFolderName: "LofiMusic" },
+    book: { id: "b", text: "ready" },
     playback: {
       narrating: true,
+      reading: false,
+      sentence: 12,
       estimatedRate: 1,
-      readings: 3,
-      musicMood: "calm",
-      engineRunning: true,
-      routeMuted: false,
-      recentMoods: ["calm"],
     },
+    atmosphere,
     recentEvents: [],
     ...overrides,
   }
 }
 
-describe("describeMusic", () => {
-  it("says what is playing", () => {
-    expect(describeMusic(status())).toBe("Playing calm music")
+function withSounds(changes: Partial<LofiAtmosphereStatus>): LofiStatus {
+  return status({ atmosphere: { ...atmosphere, ...changes } })
+}
+
+describe("describeAtmosphere", () => {
+  it("names the sounds playing", () => {
+    expect(describeAtmosphere(status())).toBe("Rain on the windows and a fire")
+    expect(describeAtmosphere(withSounds({ playing: ["crowd"] }))).toBe("Crowd")
+    expect(describeAtmosphere(withSounds({ playing: [] }))).toBe("Quiet here")
   })
 
   it("explains why nothing is playing", () => {
-    expect(describeMusic(status({ enabled: false }))).toBe("Music is off")
-    const base = status()
+    expect(describeAtmosphere(withSounds({ available: false }))).toBe(
+      "Not in this version of the app",
+    )
+    expect(describeAtmosphere(withSounds({ enabled: false }))).toBe(
+      "Atmosphere sounds are off",
+    )
+    expect(describeAtmosphere(withSounds({ preparing: true }))).toBe(
+      "Getting the sounds ready…",
+    )
+    expect(describeAtmosphere(withSounds({ source: "none" }))).toBe(
+      "No sounds yet",
+    )
+    const { book: _none, ...noBook } = status()
+    expect(describeAtmosphere(noBook)).toBe(
+      "Plays with readaloud books that have an atmosphere track",
+    )
     expect(
-      describeMusic({
-        ...base,
-        library: { ...base.library, source: "none", tracks: 0 },
-      }),
-    ).toBe("No music yet. Import a music folder in Settings.")
+      describeAtmosphere(status({ book: { id: "b", text: "unavailable" } })),
+    ).toBe("This book has no text for the sounds to follow")
     expect(
-      describeMusic({
-        ...base,
-        book: { id: "b", text: "unavailable", moodTrack: false },
-      }),
-    ).toBe("This book has no text for the music to follow")
-    expect(
-      describeMusic({
-        ...base,
-        playback: { ...base.playback, narrating: false },
-      }),
-    ).toBe("Plays with the narration")
-    expect(
-      describeMusic({
-        ...base,
-        playback: { ...base.playback, routeMuted: true },
-      }),
-    ).toBe("Off in the car")
+      describeAtmosphere(status({ book: { id: "b", text: "loading" } })),
+    ).toBe("Reading the book…")
+    expect(describeAtmosphere(withSounds({ track: false }))).toBe(
+      "This book has no atmosphere track yet",
+    )
+    expect(describeAtmosphere(withSounds({ routeMuted: true }))).toBe(
+      "Off in the car",
+    )
   })
-})
 
-describe("reading on screen", () => {
-  it("says the music follows the pages", () => {
-    const base = status({ followsReading: true })
+  it("says the sounds follow the pages", () => {
+    const base = status()
     const stopped = { ...base.playback, narrating: false }
-    expect(describeMusic({ ...base, playback: stopped })).toBe(
+    expect(describeAtmosphere({ ...base, playback: stopped })).toBe(
       "Plays with the narration, or as you turn the pages",
     )
     expect(
-      describeMusic({ ...base, playback: { ...stopped, reading: true } }),
-    ).toBe("Playing calm music as you read")
-    expect(
-      describeMusic({
+      describeAtmosphere({
         ...base,
-        followsReading: false,
-        playback: stopped,
+        playback: { ...stopped, reading: true },
       }),
+    ).toBe("Rain on the windows and a fire")
+    expect(
+      describeAtmosphere({ ...base, followsReading: false, playback: stopped }),
     ).toBe("Plays with the narration")
-  })
-})
-
-describe("wrong mood", () => {
-  it("is offered only while the music can be heard", () => {
-    const base = status()
-    expect(canMarkWrongMood(base)).toBe(true)
-    expect(canMarkWrongMood({ ...base, enabled: false })).toBe(false)
-    expect(
-      canMarkWrongMood({
-        ...base,
-        playback: { ...base.playback, narrating: false },
-      }),
-    ).toBe(false)
-    expect(
-      canMarkWrongMood({
-        ...base,
-        playback: { ...base.playback, narrating: false, reading: true },
-      }),
-    ).toBe(true)
-    const { musicMood: _, ...silent } = base.playback
-    expect(canMarkWrongMood({ ...base, playback: silent })).toBe(false)
-  })
-
-  it("reports what changed and the counts", () => {
-    expect(
-      wrongMoodResult({
-        rejected: "tense",
-        chosen: "mysterious",
-        picked: false,
-        correction: false,
-      }),
-    ).toBe("Switched to mysterious music. Still wrong? Pick the mood.")
-    const none = {
-      bookChanges: 0,
-      bookWrong: 0,
-      totalChanges: 0,
-      totalWrong: 0,
-    }
-    expect(moodFeedbackLine(none)).toBeNull()
-    expect(moodFeedbackTotals(none)).toBeNull()
-    expect(moodFeedbackLine({ ...none, bookChanges: 1, bookWrong: 1 })).toBe(
-      "You marked 1 of 1 mood change wrong in this book",
-    )
-    expect(
-      moodFeedbackTotals({ ...none, totalChanges: 31, totalWrong: 2 }),
-    ).toBe("2 of 31 mood changes marked wrong (6%)")
-  })
-})
-
-describe("now playing", () => {
-  it("names the track, its artist and licence", () => {
-    expect(
-      nowPlayingLine({
-        title: "Sky Lake",
-        artist: "Purrple Cat",
-        license: "CC BY-SA 3.0",
-        mood: "calm",
-      }),
-    ).toBe("“Sky Lake” by Purrple Cat · CC BY-SA 3.0")
-    expect(nowPlayingLine({ title: "calm-1", mood: "calm" })).toBe("“calm-1”")
   })
 })
 
 describe("labels", () => {
   it("shows the level relative to the voice", () => {
-    expect(musicLevelLabel(-12)).toBe("12 dB under the voice")
-    expect(musicLevelLabel(0)).toBe("As loud as the voice")
+    expect(levelLabel(-24)).toBe("24 dB under the voice")
+    expect(levelLabel(0)).toBe("As loud as the voice")
   })
 
   it("says how much of the scene the intensity dial lets through", () => {
@@ -183,117 +134,23 @@ describe("labels", () => {
     expect(intensityLabel(0.5)).toBe("Some of the scene")
     expect(intensityLabel(0.75)).toBe("Most of the scene")
     expect(intensityLabel(1)).toBe("The whole scene")
-    expect(soundName("murmur")).toBe("murmuring voices")
-    expect(soundName("emptyHall")).toBe("an empty hall")
-  })
-
-  it("names the music's source and moods", () => {
-    expect(musicSourceLabel(status().library)).toBe(
-      "32 tracks from “LofiMusic”",
-    )
-    expect(moodCounts(status().library)).toBe("Calm 4 · no Tense yet")
-  })
-})
-
-describe("plainCredits", () => {
-  it("drops Markdown marks but keeps names, licences and links", () => {
-    const markdown = [
-      "# Music credits",
-      "",
-      "",
-      "",
-      "## Calm",
-      "- **Rain on Glass** by [HoliznaCC0](https://example.com/holizna), CC0",
-      "* Night Bus by Someone, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)",
-      "Source: [https://example.com](https://example.com) and `SOURCES.csv`",
-    ].join("\r\n")
-    expect(plainCredits(markdown)).toBe(
-      [
-        "Music credits",
-        "",
-        "Calm",
-        "• Rain on Glass by HoliznaCC0 (https://example.com/holizna), CC0",
-        "• Night Bus by Someone, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
-        "Source: https://example.com and SOURCES.csv",
-      ].join("\n"),
-    )
-  })
-})
-
-describe("describeAtmosphere", () => {
-  const atmosphere: NonNullable<LofiMusicStatus["atmosphere"]> = {
-    enabled: true,
-    available: true,
-    levelDB: -28,
-    defaultLevelDB: -28,
-    levelRange: [-40, -16],
-    source: "standIns",
-    preparing: false,
-    sounds: 26,
-    totalSounds: 26,
-    track: true,
-    trackOrigin: "the book's score",
-    place: "the tavern",
-    playing: ["rainIndoors", "fireplace"],
-    musicYielding: false,
-    chapterDip: false,
-    missingSounds: [],
-    engineRunning: true,
-  }
-
-  it("names the sounds playing", () => {
-    expect(describeAtmosphere(status({ atmosphere }))).toBe(
-      "Rain on the windows and a fire",
-    )
-    expect(
-      describeAtmosphere(
-        status({
-          atmosphere: {
-            ...atmosphere,
-            playing: ["crowd"],
-            musicYielding: true,
-          },
-        }),
-      ),
-    ).toBe("Crowd, with the music paused")
-  })
-
-  it("explains why nothing is playing", () => {
-    expect(describeAtmosphere(status())).toBe("Not in this version of the app")
-    expect(
-      describeAtmosphere(
-        status({ atmosphere: { ...atmosphere, enabled: false } }),
-      ),
-    ).toBe("Atmosphere is off")
-    expect(
-      describeAtmosphere(
-        status({ atmosphere: { ...atmosphere, track: false } }),
-      ),
-    ).toBe("This book has no atmosphere track yet")
-    expect(
-      describeAtmosphere(
-        status({ atmosphere: { ...atmosphere, playing: [] } }),
-      ),
-    ).toBe("Quiet here")
   })
 
   it("names sounds and their source", () => {
     expect(soundName("heavyRain")).toBe("heavy rain")
     expect(soundName("seaShore")).toBe("waves")
+    expect(soundName("murmur")).toBe("murmuring voices")
+    expect(soundName("emptyHall")).toBe("an empty hall")
     expect(soundList(["wind", "rain", "clock"])).toBe(
       "Wind, rain and a ticking clock",
     )
+    expect(soundList([])).toBe("")
     expect(
-      atmosphereSourceLabel({ ...atmosphere, source: "imported", sounds: 12 }),
+      atmosphereSourceLabel({ ...atmosphere, sounds: 12, totalSounds: 26 }),
     ).toBe("12 of 26 sounds, imported")
-    expect(
-      atmosphereSourceLabel({
-        ...atmosphere,
-        source: "imported",
-        sounds: 26,
-        variants: 31,
-      }),
-    ).toBe("26 of 26 sounds, imported, and 31 more specific sounds")
+    expect(atmosphereSourceLabel({ ...atmosphere, variants: 31 })).toBe(
+      "38 of 38 sounds, imported, and 31 more specific sounds",
+    )
     expect(
       atmosphereSourceLabel({
         ...atmosphere,
@@ -304,8 +161,15 @@ describe("describeAtmosphere", () => {
     ).toBe(
       "20 sounds: imported recordings, with stand-ins for the rest, and 1 more specific sound",
     )
+    expect(atmosphereSourceLabel({ ...atmosphere, source: "standIns" })).toBe(
+      "Stand-in sounds. Import a sounds folder (with an Atmosphere folder in it) for the real thing.",
+    )
+    expect(atmosphereSourceLabel({ ...atmosphere, source: "none" })).toBe(
+      "No sounds yet",
+    )
   })
-  it("describes the linked music folder", () => {
+
+  it("describes the linked sounds folder", () => {
     const now = Date.parse("2026-11-10T12:00:00Z")
     const minutesAgo = (minutes: number) => (now - minutes * 60_000) / 1000
     expect(
@@ -333,8 +197,8 @@ describe("describeAtmosphere", () => {
         now,
       ),
     ).toBe("Kept up to date with “LofiMusic”. Checking it now…")
-    expect(linkedFolderLabel({ name: "Music", syncing: false }, now)).toBe(
-      "Kept up to date with “Music”.",
+    expect(linkedFolderLabel({ name: "Sounds", syncing: false }, now)).toBe(
+      "Kept up to date with “Sounds”.",
     )
   })
 
@@ -351,43 +215,48 @@ describe("describeAtmosphere", () => {
     expect(ago(3 * 24 * 60 * 60)).toBe("3 days ago")
     expect(timeAgo(now + 5000, now)).toBe("just now")
   })
+})
 
+describe("bookNeedingScore", () => {
   it("asks the server for a score only when the open book lacks one", () => {
-    const book = { id: "b1", text: "ready" as const, moodTrack: false }
     expect(bookNeedingScore(null)).toBeNull()
     const { book: _none, ...noBook } = status()
     expect(bookNeedingScore(noBook)).toBeNull()
-    expect(bookNeedingScore(status())).toBe("b")
-    expect(bookNeedingScore(status({ book }))).toBe("b1")
+    expect(bookNeedingScore(status())).toBeNull()
+    expect(bookNeedingScore(withSounds({ track: false }))).toBe("b")
     expect(
-      bookNeedingScore(status({ book: { ...book, text: "loading" } })),
+      bookNeedingScore({
+        ...withSounds({ track: false }),
+        book: { id: "b", text: "loading" },
+      }),
     ).toBeNull()
     expect(
-      bookNeedingScore(status({ book: { ...book, moodTrack: true } })),
+      bookNeedingScore(withSounds({ track: false, available: false })),
     ).toBeNull()
-    expect(
-      bookNeedingScore(
-        status({
-          book: { ...book, moodTrack: true },
-          atmosphere: { ...atmosphere, available: true, track: false },
-        }),
-      ),
-    ).toBe("b1")
-    expect(
-      bookNeedingScore(
-        status({
-          book: { ...book, moodTrack: true },
-          atmosphere: { ...atmosphere, available: false, track: false },
-        }),
-      ),
-    ).toBeNull()
-    expect(
-      bookNeedingScore(
-        status({
-          book: { ...book, moodTrack: true },
-          atmosphere: { ...atmosphere, available: true, track: true },
-        }),
-      ),
-    ).toBeNull()
+  })
+})
+
+describe("plainCredits", () => {
+  it("drops Markdown marks but keeps names, licences and links", () => {
+    const markdown = [
+      "# Sound credits",
+      "",
+      "",
+      "",
+      "## Rain",
+      "- **Rain on Glass** by [someone](https://example.com/someone), CC0",
+      "* Night Rain by Someone, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)",
+      "Source: [https://example.com](https://example.com) and `SOURCES.csv`",
+    ].join("\r\n")
+    expect(plainCredits(markdown)).toBe(
+      [
+        "Sound credits",
+        "",
+        "Rain",
+        "• Rain on Glass by someone (https://example.com/someone), CC0",
+        "• Night Rain by Someone, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)",
+        "Source: https://example.com and SOURCES.csv",
+      ].join("\n"),
+    )
   })
 })

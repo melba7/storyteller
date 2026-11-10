@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiAudio
+import LofiAudioCore
 
 final class PlayerTests: XCTestCase {
     /// Two fires and two rains to choose between, one of everything else; no sea.

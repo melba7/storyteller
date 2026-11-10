@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiAudio
+import LofiAudioCore
 import LofiText
 
 /// Scene transitions (a door opened on a party and shut behind them, a car boarded) and

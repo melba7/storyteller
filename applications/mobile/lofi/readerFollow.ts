@@ -1,6 +1,6 @@
-// LOFI-FORK: lets the lofi music follow the pages while you read a readaloud
-// book on screen with the narration stopped (see FORK.md). store/store.ts
-// imports this file once, for its listeners.
+// LOFI-FORK: lets the atmosphere sounds follow the pages while you read a
+// readaloud book on screen with the narration stopped (see FORK.md).
+// store/store.ts imports this file once, for its listeners.
 import { AppState } from "react-native"
 
 import { logger } from "@/logger"
@@ -22,27 +22,26 @@ const session = new ReaderSession(() => {
 
 /**
  * The reader is showing this book (it opened, or the app came back to it).
- * The music waits for the first page turn: the page the book opens at does
- * not start it.
+ * The sounds wait for the first page turn: the page the book opens at does
+ * not start them.
  */
 export function readerShown(bookUuid: string) {
   session.shown(bookUuid, Date.now())
 }
 
 /**
- * The reader went away (the book closed, or the app left it): the music that
- * follows the pages stops, instead of playing on until it times out. The
- * narration's music is not affected.
+ * The reader went away (the book closed, or the app left it): the sounds that
+ * follow the pages stop, instead of playing on until they time out. The
+ * narration's sounds are not affected.
  */
 export function readerHidden() {
   session.hidden(Date.now())
 }
 
 /**
- * The page turned while the narration is stopped: tell the music which
+ * The page turned while the narration is stopped: tell the sounds which
  * sentence now tops the page, found the same way the app keeps the audio in
- * step with the page. The music judges the mood from there, never from the
- * rest of the page.
+ * step with the page. The scene is placed there, never further into the page.
  */
 startAppListening({
   actionCreator: bookLocatorChanged,
@@ -83,13 +82,13 @@ startAppListening({
       if (!clip) return
       await LofiScore.readerReached(bookUuid, clip.relativeUrl, clip.start)
     } catch (error) {
-      logger.error(`Lofi music, following the page: ${String(error)}`)
+      logger.error(`Lofi atmosphere, following the page: ${String(error)}`)
     }
   },
 })
 
-// Leaving the app stops the music that follows the pages (the narration's
-// music carries on in the background as before).
+// Leaving the app stops the sounds that follow the pages (the narration's
+// sounds carry on in the background as before).
 AppState.addEventListener("change", (state) => {
   if (state === "background") void LofiScore?.readerStopped()
 })

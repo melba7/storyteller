@@ -2,8 +2,8 @@
 
 Steady sounds of the scene under the narration, the whole time: rain while it rains, a fire
 in the inn, the sea on the shore, a murmuring crowd in a school hallway, the quiet of an
-ordinary room. It's an option next to the music ("Atmosphere sounds" in the player's music
-panel and in Settings), on by default, with its own volume and a dial for how much is going
+ordinary room. It is what the app plays ("Atmosphere sounds" in the player's panel and in
+Settings), on by default, with its own volume and a dial for how much is going
 on. The words stay clear through all of it.
 
 ## What it does
@@ -28,10 +28,11 @@ on. The words stay clear through all of it.
   recording each visit, and the book's rain is the same rain everywhere.
 - **Weather carries over.** Rain, thunder, wind and snow stay with the story when it moves
   indoors (as rain on the windows) until the text says it stopped.
-- **A crowd replaces the music.** When a scene has a crowd at `soft` or louder (a busy
-  hallway, a tavern full of people, a market), the music fades out over 4 s and comes back
-  when the scene moves on. Music and a crowd together are too much under a voice. Nothing
-  else makes the music step aside.
+- **A crowd replaces the music, when there is music.** When a scene has a crowd at `soft`
+  or louder (a busy hallway, a tavern full of people, a market), the player asks the music
+  to fade out over 4 s and come back when the scene moves on. Music and a crowd together
+  are too much under a voice. With the music shelved nothing answers that request; it
+  stays so the music can come back (`shelved/lofi-music/README.md`).
 - **Changes are calm.** A new scene crossfades over 6 s, a level change over 4 s, and two
   changes are at least 20 s apart unless the listener seeks. When a new chapter starts and
   has not said where it is yet, the last scene drops 8 dB until it does.
@@ -157,7 +158,7 @@ old sounds over 0.3 s. A moment also waives the 20 s gap between changes.
 It stays rare and never surprises: at most one pause every 2 minutes, none in the first
 10 s after play or a seek, never while seeking, only when the moment's sound is actually
 heard, and only when the setting is on and the app's narrator accepts (it refuses while
-paused or already holding). `LofiMusicHost.Environment.holdNarration` is the app's side;
+paused or already holding). `LofiAtmosphereHost.Environment.holdNarration` is the app's side;
 the app calls `narrationHold(began:)` when the hold starts and ends.
 
 ## One-off sounds
@@ -224,7 +225,7 @@ sound. So:
   be made out (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz), and a crowd
   pushes the music out.
 - Everything sits well under the voice: a sound at `full` is 24 dB under the narrator (the
-  music bed is 16 dB under), and the slider goes from 40 to 14 dB under, never closer. Each
+  shelved music's bed was 16 dB under), and the slider goes from 40 to 14 dB under, never closer. Each
   sound also has its own offset (a ticking clock -8 dB, room tone -6, an electric hum -5, a
   hushed room, a murmur or a deep drone -4, a crowd -3, heavy rain +1 dB), and `loud` is
   only 4 dB over `full`.
@@ -240,7 +241,7 @@ sound. So:
   gets no lift, rising over 0.6 s and dropping back in 0.25 s when the next sentence starts.
   Pausing, seeking and a narration hold end it too. Reading on screen has no sentence
   timing, so no lift.
-- Each sound gets the music's presence dip around 2.5 kHz, where speech is clearest.
+- Each sound gets a presence dip around 2.5 kHz, where speech is clearest.
 
 The 38 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,
@@ -258,12 +259,12 @@ vehicle, aircraft, spaceship, deep drone.
 | Director (which scene now) and player (fades, slots, crowd yield) | `Sources/LofiAtmosphere/Player` |
 | Audio: its own `AVAudioEngine`, 12 looping slots | `Player/AVAmbienceBackend.swift` |
 | Synthesised stand-ins for every sound | `Sound/AmbienceSynth.swift` |
-| App host: setting, finding the track, music fade | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiMusicHost.swift` |
+| App host: settings, finding the track, the sounds folder | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiAtmosphereHost.swift` |
 | CLI: `lofi-atmosphere track / show / score / synth / library / catalog` | `Sources/lofi-atmosphere` |
 | The catalogue as the fetch script reads it | `Tools/atmosphere/catalog.json` |
 
 The atmosphere's engine never touches the audio session, Now Playing, the remote commands
-or the microphone (`AtmosphereBoundaryTests` scans for it), like the music.
+or the microphone (`AtmosphereBoundaryTests` scans for it).
 
 ## Files
 
@@ -278,11 +279,12 @@ book's sentences.
 writes one. The app looks for a book's atmosphere in the score inside the book, then in
 imported scores, then in imported atmosphere tracks.
 
-**Sounds**, an `Atmosphere` folder inside the music folder:
+**Sounds**, an `Atmosphere` folder inside the sounds folder (still called `LofiMusic` on
+the Mac and in iCloud Drive, from when it held the music):
 
 ```
 LofiMusic/
-  Calm/ Cozy/ …              the music
+  Calm/ Cozy/ …              the shelved music's folders, if still there: the import skips them
   Atmosphere/
     Rain/ rain-fs123.m4a …   one folder per sound family (names match loosely: "HeavyRain", "heavy rain")
     Crowd.SchoolCorridor/ …  one folder per more specific kind: <Family>.<Kind>
@@ -293,7 +295,7 @@ LofiMusic/
   tracks/                    *.track.json, *.atmosphere.json, *.score.json
 ```
 
-Importing the music folder in Settings copies all of it. Sounds with no recording play the
+Importing the sounds folder in Settings copies all of it. Sounds with no recording play the
 synthesised stand-ins, rendered on the phone into Caches the first time. Settings shows how
 many sounds are imported and has a "Sound credits" button for `Atmosphere/CREDITS.md`.
 Published builds play only CC0, CC BY and CC BY-SA recordings (see "Personal and published
@@ -308,15 +310,15 @@ and builds the tools into `~/Storyteller Lofi/scoring-tools`, asks for the Story
 server's address and login (optional; the password goes into the login keychain), and
 installs a launchd job that runs `Tools/mac/lofi-sync.sh` whenever a book lands in
 `~/Storyteller Lofi/Books` and every half hour. From then on a book synced in Storyteller
-gets its music and atmosphere by itself: the job fetches newly synced read-aloud books
-(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan (first its
-mood track, `Tools/mac/make-tracks.sh --engine claude --prompt 3`, Opus with prompt 3 as
-the Claude check chose, see MoodDetection.md; then its atmosphere, combined with the mood
-track into `<book>.score.json`), fetches any new sounds, copies everything into
+gets its atmosphere by itself: the job fetches newly synced read-aloud books
+(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan (its
+atmosphere, written as `<book>.score.json`; the shelved music's mood track,
+`Tools/mac/make-tracks.sh --engine claude --prompt 3`, only with `--with-mood-tracks` or
+`LOFI_MOOD_TRACKS=1`), fetches any new sounds, copies everything into
 `~/Storyteller Lofi/LofiMusic` and its iCloud Drive copy, and puts the score inside the
 book on the server (`Tools/mac/push-scores.sh`, the fork's `lofi-score` route). The phone's
-linked music folder and the book itself bring the score to the reader. Each step is capped
-per book at API list prices (20 dollars for the mood, 25 for the atmosphere; edit
+linked sounds folder and the book itself bring the score to the reader. Each step is capped
+per book at API list prices (25 dollars for the atmosphere, 20 for a mood track; edit
 `lofi-sync.sh` to change them), so a run that goes wrong can't use up the plan; the next
 run carries on. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
 turns the job off. `~/Storyteller Lofi/Score atmosphere.command` (a copy of
@@ -352,8 +354,9 @@ dropped into `Books/` by hand. The atmosphere steps it runs:
    would fetch.
 2. **Tracks.** `Tools/mac/make-atmosphere.sh --dry-run BOOK.epub` prints the cost estimate.
    `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--rescore] [--no-fetch] [--no-copy] BOOK.epub …`
-   writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` (and `<book>.score.json` when
-   the mood track is there too), offering the catalogue and the variants in
+   writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` and, once the track is
+   finished, `<book>.score.json` (with the shelved music's mood track in it when
+   `<book>.track.json` is there too), offering the catalogue and the variants in
    `Atmosphere/variants.json`. A book with a track is left alone; `--rescore` moves its
    track and score to `tracks/old/` first, for a book scored before the catalogue grew.
    `--via plan` (the default) runs through Claude Code on the signed-in plan; `--via api`
@@ -365,8 +368,8 @@ dropped into `Books/` by hand. The atmosphere steps it runs:
 3. **Phone.** Put `LofiMusic` in iCloud Drive and import it in Settings once. The folder
    stays linked: the app checks it for new scores and sounds when it starts, comes to the
    front or opens a book without a score, and Settings has "Check for new files now". A
-   book whose score is inside it (the server route) needs no music folder at all for its
-   mood and atmosphere tracks, only for the recordings.
+   book whose score is inside it (the server route) needs no sounds folder at all for its
+   atmosphere track, only for the recordings.
 
 Rough cost: one request per ~250 words plus probes, so a 100,000-word novel is ~650
 requests: about $9 with Opus 5.5 at list prices, $4.50 with Sonnet 5.5, $0.25 with Haiku 5.5.

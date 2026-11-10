@@ -1,8 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiAudio
-import LofiPlaceholders
+import LofiAudioCore
 import LofiText
 
 /// One-off sounds: a knock or a clap of thunder on the sentence that says it happens.

@@ -1,19 +1,5 @@
-// LOFI-FORK: the Storyteller Lofi fork's lofi music module (see FORK.md).
+// LOFI-FORK: the Storyteller Lofi fork's atmosphere module (see FORK.md).
 import { requireOptionalNativeModule } from "expo-modules-core"
-
-export type LofiMood =
-  | "calm"
-  | "cozy"
-  | "playful"
-  | "hopeful"
-  | "melancholy"
-  | "mysterious"
-  | "tense"
-  | "somber"
-  | "romantic"
-  | "dreamy"
-  | "adventurous"
-  | (string & {})
 
 /** A sound of the atmosphere, as the native module names it. */
 export type LofiAmbientSound =
@@ -75,10 +61,11 @@ export type LofiAtmosphereStatus = {
   /** The level of a sound at full, in dB under the voice. */
   levelDB: number
   defaultLevelDB: number
+  /** The slider's range, quietest first. */
   levelRange: number[]
   /** How much is going on, 0 to 1: how many of a scene's sounds play, how far the quieter ones sit back, how much it lifts in the gaps between sentences. */
-  intensity?: number
-  defaultIntensity?: number
+  intensity: number
+  defaultIntensity: number
   /** Imported recordings, synthesised stand-ins, both, or nothing. */
   source: "imported" | "standIns" | "mixed" | "none"
   preparing: boolean
@@ -86,114 +73,28 @@ export type LofiAtmosphereStatus = {
   sounds: number
   totalSounds: number
   /** More specific sounds (church bells, a waterfall) with recordings. */
-  variants?: number
+  variants: number
   /** "personal" in your own builds, which may play personal-use recordings; "publish" in an App Store build. */
-  edition?: "personal" | "publish"
+  edition: "personal" | "publish"
   /** Short narration pauses where the sound swells or hushes: the setting, and whether this app can pause its narrator. */
-  pausesEnabled?: boolean
-  pausesAvailable?: boolean
+  pausesEnabled: boolean
+  pausesAvailable: boolean
   /** One-off sounds (a knock, a clap of thunder, the door of a change of scene): the setting (on by default), and how many of `totalOneShots` have a recording or stand-in. */
-  oneShotsEnabled?: boolean
-  oneShots?: number
-  totalOneShots?: number
-  /** The open book has an atmosphere track. */
+  oneShotsEnabled: boolean
+  oneShots: number
+  totalOneShots: number
+  /** The open book has an atmosphere track, and where it came from. */
   track: boolean
   trackOrigin?: string
   /** The place being narrated and its sounds. Only ever the present. */
   place?: string
   playing: LofiAmbientSound[]
-  /** The music has faded out for a crowd. */
-  musicYielding: boolean
   chapterDip: boolean
+  /** Off because the narration plays through the car. */
+  routeMuted: boolean
   missingSounds: LofiAmbientSound[]
   engineRunning: boolean
   lastError?: string
-}
-
-/** The music's state, as the native module reports it. */
-export type LofiMusicStatus = {
-  enabled: boolean
-  mutedInCar: boolean
-  /** The music's level under the voice, in dB (negative: quieter than the voice). */
-  musicLevelDB: number
-  defaultMusicLevelDB: number
-  /** The slider's range, quietest first. */
-  musicLevelRange: number[]
-  library: {
-    /** Imported music, synthesised stand-ins, or nothing yet. */
-    source: "imported" | "placeholders" | "none"
-    preparing: boolean
-    importedFolderName?: string
-    tracks: number
-    moods: { mood: LofiMood; tracks: number }[]
-    /**
-     * The music folder the app keeps up to date with: whatever is added to it
-     * (scores from the Mac, new sounds or tracks) is copied when the app opens,
-     * comes back to the foreground, or opens a book without a score. Missing
-     * when no folder is linked, and from older builds.
-     */
-    linkedFolder?: LofiLinkedFolder
-  }
-  /** The book the narrator has loaded, if any. */
-  book?: {
-    id: string
-    text: "off" | "waiting" | "loading" | "ready" | "unavailable"
-    detail?: string
-    engine?: string
-    /** Claude has scored this book; its mood track is playing. */
-    moodTrack: boolean
-  }
-  /** Music while reading on screen with the narration stopped. Missing from older builds. */
-  followsReading?: boolean
-  playback: {
-    narrating: boolean
-    /** Following the pages you read on screen, with the narration stopped. */
-    reading?: boolean
-    sentence?: number
-    estimatedRate: number
-    readings: number
-    /** The mood playing now. Only ever the present, never what comes next. */
-    musicMood?: LofiMood
-    engineRunning: boolean
-    routeMuted: boolean
-    recentMoods: LofiMood[]
-    /** The track playing now, for the "now playing" line and its credit. */
-    nowPlaying?: LofiNowPlaying
-  }
-  /** The "Wrong mood" button's counts, for the listening test. */
-  feedback?: LofiMoodFeedback
-  /** Missing from builds before the atmosphere sounds. */
-  atmosphere?: LofiAtmosphereStatus
-  recentEvents: string[]
-  lastError?: string
-}
-
-/** The track playing now. */
-export type LofiNowPlaying = {
-  title: string
-  artist?: string
-  /** The track's licence, such as "CC BY 4.0", when the music folder lists it. */
-  license?: string
-  mood: LofiMood
-}
-
-/** Mood changes the music made, and how many of them you marked wrong. */
-export type LofiMoodFeedback = {
-  bookChanges: number
-  bookWrong: number
-  totalChanges: number
-  totalWrong: number
-}
-
-/** What the "Wrong mood" button did. */
-export type LofiMoodOverride = {
-  rejected: LofiMood
-  chosen: LofiMood
-  /** You chose the mood; false when it was the engine's next guess. */
-  picked: boolean
-  /** It replaced a guess made moments before: the same miss, not a new one. */
-  correction: boolean
-  sentence?: number
 }
 
 export type LofiLinkedFolder = {
@@ -205,17 +106,51 @@ export type LofiLinkedFolder = {
   syncing: boolean
 }
 
+/** The atmosphere's state, as the native module reports it. */
+export type LofiStatus = {
+  mutedInCar: boolean
+  /** The sounds while reading on screen with the narration stopped. */
+  followsReading: boolean
+  /** The imported sounds folder. */
+  folder: {
+    /** A folder has been imported. */
+    imported: boolean
+    importedFolderName?: string
+    /**
+     * The sounds folder the app keeps up to date with: whatever is added to it
+     * (scores from the Mac, new sounds or tracks) is copied when the app opens,
+     * comes back to the foreground, or opens a book without a score. Missing
+     * when no folder is linked.
+     */
+    linkedFolder?: LofiLinkedFolder
+  }
+  /** The book the narrator has loaded, if any. */
+  book?: {
+    id: string
+    text: "off" | "waiting" | "loading" | "ready" | "unavailable"
+    detail?: string
+  }
+  playback: {
+    narrating: boolean
+    /** Following the pages you read on screen, with the narration stopped. */
+    reading: boolean
+    sentence?: number
+    estimatedRate: number
+  }
+  atmosphere: LofiAtmosphereStatus
+  recentEvents: string[]
+  lastError?: string
+}
+
 /** What a look at the linked folder copied. */
 export type LofiSyncSummary = {
   folderName: string
   added: number
   updated: number
   notDownloaded: number
-  music: number
-  models: number
-  moodTracks: number
+  scores: number
   atmosphereTracks: number
-  atmosphereRecordings: number
+  recordings: number
   /** The whole folder was imported afresh. */
   fresh: boolean
   /** One line: "New: 2 book scores, 1 sound". */
@@ -224,63 +159,49 @@ export type LofiSyncSummary = {
 
 export type LofiImportSummary = {
   folderName: string
-  tracks: number
-  moodTracks: number
-  /** True when the folder held a mood model for the phone (embedding or Core ML). */
-  hasClassifier: boolean
+  /** Recordings from the folder's Atmosphere folder. */
+  recordings: number
+  /** Book scores and plain atmosphere tracks. */
+  scores: number
+  atmosphereTracks: number
   /** Files that were still only in iCloud and were left out. */
   notDownloaded: number
-  /** Recordings from the folder's Atmosphere folder, and atmosphere tracks. */
-  atmosphereRecordings?: number
-  atmosphereTracks?: number
 }
 
 type LofiScoreNativeModule = {
-  getStatus(): Promise<LofiMusicStatus>
-  setEnabled(enabled: boolean): Promise<LofiMusicStatus>
-  setMutedInCar(muted: boolean): Promise<LofiMusicStatus>
-  /** null goes back to the default level. */
-  setMusicLevel(level: number | null): Promise<LofiMusicStatus>
+  getStatus(): Promise<LofiStatus>
+  setMutedInCar(muted: boolean): Promise<LofiStatus>
   /**
-   * Shows the Files folder picker, copies the music and keeps a link to the
+   * Shows the Files folder picker, copies the sounds and keeps a link to the
    * folder; null when the listener cancels.
    */
-  importMusicFolder(): Promise<LofiImportSummary | null>
+  importSoundsFolder(): Promise<LofiImportSummary | null>
   /** Copies what is new in the linked folder now; null when none is linked. */
-  syncMusicFolder(): Promise<LofiSyncSummary | null>
-  /** Forgets the linked folder; the music already copied stays. */
-  unlinkMusicFolder(): Promise<LofiMusicStatus>
+  syncSoundsFolder(): Promise<LofiSyncSummary | null>
+  /** Forgets the linked folder; the sounds already copied stay. */
+  unlinkSoundsFolder(): Promise<LofiStatus>
   /**
    * Keeps a score fetched from the server (the text of
    * `GET /api/v2/books/<id>/lofi-score`) with its book, and reads the book
    * again with it when it is the one open. Rejects when the text is not a
    * score or the book is not on the device.
    */
-  installBookScore(bookUuid: string, score: string): Promise<LofiMusicStatus>
-  /** Deletes the imported music and forgets the linked folder. */
-  removeImportedMusic(): Promise<LofiMusicStatus>
-  /** The imported music's CREDITS.md, or null when it had none. */
-  getMusicCredits(): Promise<string | null>
-  setAtmosphereEnabled(enabled: boolean): Promise<LofiMusicStatus>
+  installBookScore(bookUuid: string, score: string): Promise<LofiStatus>
+  /** Deletes the imported sounds and forgets the linked folder. */
+  removeImportedSounds(): Promise<LofiStatus>
+  setAtmosphereEnabled(enabled: boolean): Promise<LofiStatus>
   /** null goes back to the default level. */
-  setAtmosphereLevel(level: number | null): Promise<LofiMusicStatus>
+  setAtmosphereLevel(level: number | null): Promise<LofiStatus>
   /** How much is going on, 0 to 1; null goes back to the default. */
-  setAtmosphereIntensity(intensity: number | null): Promise<LofiMusicStatus>
+  setAtmosphereIntensity(intensity: number | null): Promise<LofiStatus>
   /** Short narration pauses where the sound swells (a crowded hall, a storm breaking) or hushes. */
-  setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
+  setAtmospherePauses(enabled: boolean): Promise<LofiStatus>
   /** One-off sounds on the sentences that say they happen, and the door, engine or splash of a change of scene. On by default. */
-  setAtmosphereOneShots(enabled: boolean): Promise<LofiMusicStatus>
+  setAtmosphereOneShots(enabled: boolean): Promise<LofiStatus>
   /** The imported sounds' Atmosphere/CREDITS.md, or null when they had none. */
   getAtmosphereCredits(): Promise<string | null>
-  /**
-   * The music's mood is wrong: move to `mood`, or to the engine's next guess
-   * with null, and log it. null when nothing was playing or nothing changed.
-   */
-  markWrongMood(mood: LofiMood | null): Promise<LofiMoodOverride | null>
-  /** The wrong-mood log as text to share, or null when nothing was marked. */
-  getMoodFeedback(): Promise<string | null>
-  /** Music while reading on screen with the narration stopped. */
-  setFollowsReading(enabled: boolean): Promise<LofiMusicStatus>
+  /** The sounds while reading on screen with the narration stopped. */
+  setFollowsReading(enabled: boolean): Promise<LofiStatus>
   /** The page you are reading now starts at this clip (as `getClip` finds it). */
   readerReached(
     bookUuid: string,

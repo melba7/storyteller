@@ -22,7 +22,7 @@ import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import { DiscordIcon } from "@/icons/DiscordIcon"
 import { usesSystemHeader } from "@/lib/nativeChrome"
-import { LofiMusicSettings } from "@/lofi/LofiMusicSettings" // LOFI-FORK
+import { LofiAtmosphereSettings } from "@/lofi/LofiAtmosphereSettings" // LOFI-FORK
 import {
   useDeleteServerMutation,
   useGetGlobalPreferencesQuery,
@@ -188,8 +188,8 @@ export default function Settings() {
           </View>
         </View>
         <ReadingSettings />
-        {/* LOFI-FORK: the lofi music's settings, see FORK.md */}
-        <LofiMusicSettings />
+        {/* LOFI-FORK: the atmosphere's settings, see FORK.md */}
+        <LofiAtmosphereSettings />
         <View className="mt-8 gap-4">
           <Text variant="h2">Logging</Text>
           <Button

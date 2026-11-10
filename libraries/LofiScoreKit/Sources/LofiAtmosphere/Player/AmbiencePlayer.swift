@@ -1,6 +1,5 @@
 import Foundation
-import LofiAudio
-import LofiDirector
+import LofiAudioCore
 
 /// What the atmosphere player reports, for the log and the status screen.
 public enum AmbienceEvent: Sendable, Hashable {

@@ -1,9 +1,11 @@
 # Storyteller Lofi
 
 This is a personal fork of
-[Storyteller](https://gitlab.com/storyteller-platform/storyteller). It adds lofi
-background music that follows the mood of what has already been narrated, and it
-keeps taking upstream's mobile releases through small, reviewed merges.
+[Storyteller](https://gitlab.com/storyteller-platform/storyteller). It adds
+atmosphere sounds under the narration, the sounds of each scene scored ahead of
+time from what has already been narrated and never from what comes next, and it
+keeps taking upstream's mobile releases through small, reviewed merges. The lofi
+music it began with is shelved in `shelved/lofi-music/`, ready to come back.
 
 Upstream code stays as upstream wrote it. The fork's own code lives in new
 folders, and the few edits to upstream files are marked `LOFI-FORK` so that
@@ -22,9 +24,9 @@ every sync keeps them.
   as the base of a pull request from a fork. Check that the base is this fork's
   `main`, and pass `--repo` to `gh pr create` (`tools/fork/setup-clone.sh` makes
   this fork the default for `gh`).
-- **No music in git.** This repository is public and the music is for personal
-  listening. Keep tracks in git-ignored folders; CI fails if the fork commits an
-  audio file.
+- **No audio in git.** This repository is public and the recordings (and the
+  shelved music) are for personal listening. Keep them in git-ignored folders;
+  CI fails if the fork commits an audio file.
 - **Keep the license.** Storyteller is MIT licensed, Copyright (c) 2023 Shane
   Friedman. `LICENSE` stays as it is.
 
@@ -36,8 +38,9 @@ Files and folders that belong to the fork, which upstream never touches:
 - `.github/workflows/`: fork CI and the upstream sync.
 - `tools/fork/`: the fork checks and the sync scripts.
 - `applications/mobile/fork.config.ts`: the fork's app name and bundle ID, and
-  the pods for the music engine.
-- `libraries/LofiScoreKit/`: the Swift music engine. Next to its
+  the pods for the atmosphere engine.
+- `libraries/LofiScoreKit/`: the Swift atmosphere engine, with the mood
+  detection the shelved music used. Next to its
   `Package.swift`, one podspec per target lets CocoaPods build it from source
   for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
@@ -47,12 +50,17 @@ Files and folders that belong to the fork, which upstream never touches:
   module, because the player's observers and `Track` are internal to it. It adds
   observers and reads state, and holds the narration for a moment when the
   atmosphere swells at a big scene change (see the touch point below). It also
-  looks up the clip at the top of the page, so the music can follow the pages
+  looks up the clip at the top of the page, so the sounds can follow the pages
   while you read with the narration stopped.
 - `applications/mobile/lofi/`: the React Native UI.
 - `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`: the server route
-  that keeps a book's score (its mood track and atmosphere cues) inside the
-  read-aloud EPUB, `GET` for the app and `PUT` for the Mac's tools.
+  that keeps a book's score (its atmosphere track, and a mood track when the
+  shelved music has one) inside the read-aloud EPUB, `GET` for the app and `PUT`
+  for the Mac's tools.
+- `shelved/lofi-music/`: the lofi music that played under the narration before
+  the atmosphere became the app's focus: its Swift engine, demo, app panel,
+  library scripts and docs, moved whole and not built. Its `README.md` says how
+  to bring it back.
 - Planned: `tools/lofi-library/` (music library scripts).
 
 Touch points are the only edits to upstream files. Each one carries `LOFI-FORK`
@@ -61,17 +69,17 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
 - `applications/mobile/app.config.ts` (3 markers): passes upstream's config
   through `withForkIdentity` from `fork.config.ts`, so the fork installs beside
   the official app.
-- `applications/mobile/components/Toolbar.tsx` (2 markers): the music button in
-  the player's toolbar for readaloud books, in the read-along and listening
-  screens. It opens a panel with on and off, the music's volume and the car
-  setting.
-- `applications/mobile/app/(root)/settings.tsx` (2 markers): the music's section
-  in Settings, which also imports a music folder.
+- `applications/mobile/components/Toolbar.tsx` (2 markers): the atmosphere
+  button in the player's toolbar for readaloud books, in the read-along and
+  listening screens. It opens a panel with on and off, the sounds' volume, how
+  much is going on and the car setting.
+- `applications/mobile/app/(root)/settings.tsx` (2 markers): the atmosphere's
+  section in Settings, which also imports a sounds folder.
 - `applications/mobile/store/store.ts` (1 marker): imports
   `lofi/readerFollow.ts` for its listeners. With the narration stopped, it finds
   the clip at the top of each page you turn to, the same way the app keeps the
-  audio in step with the page, and hands it to the music, which judges the mood
-  from there and never from further down the page.
+  audio in step with the page, and hands it to the atmosphere, which plays the
+  scene from there and never from further down the page.
 - `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift` (8
   markers): the narration hold. When the atmosphere swells at a big scene
   change, the bridge stops the narrator at the end of the sentence for under a

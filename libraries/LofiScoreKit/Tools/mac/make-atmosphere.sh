@@ -16,10 +16,11 @@
 #
 # --dry-run prints each book's entries and estimated cost per model and spends
 # nothing. Otherwise each book's track goes to
-# "~/Storyteller Lofi/tracks/<book>.atmosphere.json". When the mood track
-# "<book>.track.json" is there too, the two are also combined into
-# "<book>.score.json" (the file that can go inside the book). A run stopped by
-# the cap, a network error or Ctrl-C resumes where it stopped when run again.
+# "~/Storyteller Lofi/tracks/<book>.atmosphere.json", and a finished track is
+# written again as "<book>.score.json" (the file that can go inside the book).
+# When the shelved music's mood track "<book>.track.json" is there too
+# (make-tracks.sh), the score carries both. A run stopped by the cap, a network
+# error or Ctrl-C resumes where it stopped when run again.
 #
 # Each book's first pass runs in order, because every request is told the
 # places met so far (that is how a place keeps its sounds when the story comes
@@ -35,8 +36,9 @@
 #
 # The API key is never printed. Use the read-aloud EPUBs as Storyteller serves them: the app matches
 # a track to its book by the digests of its first sentences. To get the tracks
-# onto the phone, put the tracks folder inside the music folder before
-# importing it in the app; the import picks up every *.atmosphere.json in it.
+# onto the phone, put the tracks folder inside the sounds folder before
+# importing it in the app; the import picks up every *.score.json and
+# *.atmosphere.json in it.
 set -uo pipefail
 
 ROOT="$HOME/Storyteller Lofi"
@@ -132,11 +134,16 @@ score_one() {
   fi
   "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" --variants "$VARIANTS" \
     --out "$TRACKS/$name.atmosphere.json" "${cap[@]+"${cap[@]}"}" 2> "$log"
+  local status=$?
   # One block per book, even when books finish together.
   local report
   report="== $name"$'\n'"$(grep -vE "^  [0-9]+ scored, now at" "$log")"
-  if [ -s "$TRACKS/$name.track.json" ] && [ -s "$TRACKS/$name.atmosphere.json" ]; then
-    report="$report"$'\n'"$("$B/lofi-atmosphere" score --mood "$TRACKS/$name.track.json" \
+  # The score, once the track is finished (not stopped by the cap or an error),
+  # with the mood track beside it when there is one.
+  if [ "$status" = 0 ] && [ -s "$TRACKS/$name.atmosphere.json" ] && ! grep -q "stopped at --max-dollars" "$log"; then
+    local mood=()
+    [ -s "$TRACKS/$name.track.json" ] && mood=(--mood "$TRACKS/$name.track.json")
+    report="$report"$'\n'"$("$B/lofi-atmosphere" score "${mood[@]+"${mood[@]}"}" \
       --atmosphere "$TRACKS/$name.atmosphere.json" --out "$TRACKS/$name.score.json" 2>&1)"
   fi
   printf '%s\n' "$report"
@@ -194,8 +201,8 @@ if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
     [ -f "$file" ] && cp "$file" "$MUSIC/tracks/"
   done
   [ -d "$ROOT/Atmosphere" ] && rsync -a --exclude skipped.csv "$ROOT/Atmosphere/" "$MUSIC/Atmosphere/"
-  echo "Copied the tracks and sounds into $MUSIC. Put that folder in iCloud Drive and import it in the app (Settings > Import a music folder)."
+  echo "Copied the tracks and sounds into $MUSIC. Put that folder in iCloud Drive and import it in the app (Settings > Atmosphere Sounds > Import a sounds folder)."
 else
-  echo "To hear them on the phone, copy the tracks and the Atmosphere folder into the music folder and import it in the app."
+  echo "To hear them on the phone, copy the tracks and the Atmosphere folder into the sounds folder and import it in the app."
 fi
 echo "Check a track's scenes with: $B/lofi-atmosphere show \"$TRACKS/<book>.atmosphere.json\" --places"

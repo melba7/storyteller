@@ -34,9 +34,7 @@ describe("withLofiScorePods", () => {
       "LofiScoreCore",
       "LofiText",
       "LofiMood",
-      "LofiDirector",
-      "LofiAudio",
-      "LofiPlaceholders",
+      "LofiAudioCore",
       "LofiAtmosphere",
       "LofiScoreHost",
     ])

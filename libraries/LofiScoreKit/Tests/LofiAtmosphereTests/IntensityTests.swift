@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 @testable import LofiAtmosphere
-import LofiAudio
+import LofiAudioCore
 
 /// The dial next to the volume (how much of a scene plays, how far the quieter sounds
 /// sit back), the trim that keeps a rich scene no louder than one sound, and the small
