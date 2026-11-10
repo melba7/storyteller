@@ -41,6 +41,10 @@ STYLE_CLASSES = [
     "Soundtrack music", "Background music", "New-age music", "Music",
     "Orchestra", "String section", "Bell", "Chime", "Wind chime", "Whistling", "Saxophone",
     "Trumpet", "Flute", "Harp", "Glockenspiel", "Theremin",
+    # Instruments, to tell solo piano from piano over a beat.
+    "Keyboard (musical)", "Percussion", "Drum kit", "Snare drum", "Bass drum", "Cymbal", "Hi-hat",
+    "Mallet percussion", "Bowed string instrument", "Violin, fiddle", "Cello", "Classical music",
+    "Organ", "Harpsichord",
 ]
 
 MAJOR = np.array([6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88])

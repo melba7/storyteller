@@ -1,0 +1,35 @@
+# Piano picks for Somber, Melancholy and Mysterious, 10 November 2026.
+# The scores put the right pieces at the top; these pins settle which mood a piece that
+# suits two of them goes to, and which modern tracks were seen to be one piano on a
+# close-up spectrogram (zoom_sheet.py). id,mood,weight: -9 on * drops, 5 or more pins.
+id,mood,weight
+# Somber
+c0908,somber,5
+c0911,somber,5
+c0832,somber,5
+c0876,somber,5
+c0830,somber,5
+c0950,somber,5
+c0946,somber,5
+c0829,somber,5
+# Melancholy
+c0890,melancholy,5
+c0898,melancholy,5
+c0896,melancholy,5
+c0885,melancholy,5
+c0920,melancholy,5
+c0912,melancholy,5
+c0811,melancholy,5
+c0745,melancholy,5
+# Mysterious
+c0907,mysterious,5
+c0903,mysterious,5
+c0900,mysterious,5
+c0891,mysterious,5
+c0847,mysterious,5
+c0943,mysterious,5
+c0961,mysterious,5
+c0817,mysterious,5
+# Not one piano on the close-up: a pad or strings run under it.
+c0788,*,-9
+c0806,*,-9

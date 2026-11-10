@@ -62,6 +62,45 @@ It takes a little off music with rain, birds or traffic recorded into it, becaus
 
 A pick needs real evidence of its mood, from tags, title, album or the model, not just a matching sound.
 
+## Solo piano for Somber, Melancholy and Mysterious
+
+Mo listened to the lofi picks and found that lofi hip-hop does not carry sadness, and
+that Mysterious missed too. Those three moods are now one piano and nothing else.
+
+| Step | Script | What it does |
+|---|---|---|
+| 1 | `build_candidates.py fsm-piano fma-piano ia-musopen analysis pack` | Adds a piano pool tagged `phase:piano`: modern piano from the same two sites, and Musopen's public-domain recordings of Chopin, Bach, Schubert and Beethoven on archive.org. |
+| 2 | `analyze.py`, then `instruments.py` and `sustain.py` | The usual measures, then two checks for "is it really one piano". `instruments.py` keeps how long each kind of instrument sounds. `sustain.py` looks for notes that swell or hold level, which a piano cannot do. |
+| 3 | `pick_piano.py` with `overrides-piano.csv` | Scores, filters and picks 8 per mood. |
+| 4 | `zoom_sheet.py`, `sheet.py` | Close-up spectrograms. A piano note is a sharp edge whose partials fade; a pad is a level line with no edge. |
+| 5 | `finalize.py`, `install_library.py`, `make_samplers.py` | As before, plus the two changes below. |
+
+**Telling solo piano apart.** The Musopen recordings are known to be one piano, so they
+set the limits: on them YAMNet never hears ambient music or a synthesizer, and almost
+never strings or drums. Modern stock "piano" tracks are a different matter. Most have a
+pad or strings under the piano, and YAMNet hears most of them as plain "Music". A modern
+track must pass the limits and then be seen to be one piano on a close-up sheet. Three
+made it; the rest of the picks are classical.
+
+**Mood for classical pieces** comes from `piano_pieces.py`, a table of what each piece
+is like, keyed by form and opus number. Sound measures cannot tell a nocturne that
+grieves from one that dreams, and nicknames mislead. Pieces with a loud middle section
+are marked and ranked lower.
+
+**Two changes to the files**, both made by `install_library.py` when `install.csv` asks
+for them, and both recorded in `CREDITS.md` and `SOURCES.csv`:
+
+- **Trim.** The player starts a track at its first sample. A classical recording often
+  opens with one or two seconds of room silence, which would be a late start.
+- **Even out.** A classical recording can swing 20 LU between its quietest and loudest
+  passage, where a lofi track swings 6. Under a voice the quiet half vanishes and the
+  loud half pokes out. The installer rides the gain slowly (7.5 s window, at most
+  +10 dB), so notes keep their shape and whole passages move. The loudness range of the
+  evened picks fell from 10-21 LU to 6-13 LU.
+
+Share-alike tracks are never changed. The samplers for these moods play the first 20 s
+of each track, since that is what the app plays first.
+
 ## Re-running
 
 ```sh
@@ -80,5 +119,23 @@ python3 install_library.py FINAL/install.csv ~/Storyteller\ Lofi/LofiCandidates 
 python3 make_samplers.py ~/Storyteller\ Lofi/LofiMusic-new ~/Storyteller\ Lofi/Renders/Mood\ samplers
 ```
 
-When swapping folders, carry the text side's model files (`LofiMood-embed-*.json`) over
-into the new `LofiMusic`. The app imports them from the same folder.
+For the piano moods:
+
+```sh
+python -I instruments.py OUT/instruments.jsonl YAMNET --list paths.txt
+python -I sustain.py OUT/sustain.csv --list paths.txt
+python -I pick_piano.py candidates.csv OUT/features.csv OUT/yamnet OUT/instruments.jsonl OUT/sustain.csv PIANO overrides-piano.csv
+python -I zoom_sheet.py SHEETS/zoom.png candidates.csv ANALYSIS_COPIES c0811 c0817
+# Join PIANO/picks.csv (mood, id, process) with the other moods' rows of PICKS/picks.csv, then finalize.py.
+
+# Mac: build only the changed moods, move them in, then measure the whole library
+python3 install_library.py FINAL/install.csv LofiCandidates LofiMusic-build --moods Somber,Melancholy,Mysterious --no-measure
+#   mv the old mood folders to Retired/, mv the built ones into LofiMusic/
+python3 install_library.py FINAL/install.csv LofiCandidates LofiMusic --measure-only
+python3 make_samplers.py LofiMusic "Renders/Mood samplers" 20 1.0 Somber,Melancholy,Mysterious start
+```
+
+`LofiMusic` also holds things other tools put there: the text side's model files
+(`LofiMood-embed-*.json`), the atmosphere sounds, each book's mood track, and a section
+at the end of `CREDITS.md`. So change mood folders in place rather than swapping the
+whole folder, and keep that section when `CREDITS.md` is rewritten.

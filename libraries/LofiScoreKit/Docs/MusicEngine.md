@@ -197,14 +197,21 @@ original tracks (two per mood, 30 to 42 s, distinct tempos and keys) normalised
 to −16 LUFS, into `PlaceholderLibrary/`. The demo makes them on first launch.
 
 **The library on Mo's Mac.** `~/Storyteller Lofi/LofiMusic` holds 90 instrumental
-tracks: 8 per mood, 10 for calm. They are by Purrple Cat, HoliznaCC0, FSM Team and
-nine other artists, and every one is CC0, CC BY or CC BY-SA. They were chosen from
-740 license-checked candidates by measuring and scoring, not by ear. Vocals, wide
-dynamics, holiday themes and the busiest tracks were filtered out, and steady, warm
-tracks ranked higher. `SOURCES.csv` and `CREDITS.md` in the folder give each track's
-page, its license and the credit that license asks for.
-[`Tools/library`](../Tools/library/README.md) has the scripts and the method. The
-first set (32 CC0 tracks by HoliznaCC0) is in `~/Storyteller Lofi/Retired/`.
+tracks: 8 per mood, 10 for calm. Eight moods are lofi, by Purrple Cat, HoliznaCC0,
+FSM Team and nine other artists. They were chosen from 740 license-checked candidates
+by measuring and scoring, not by ear. Vocals, wide dynamics, holiday themes and the
+busiest tracks were filtered out, and steady, warm tracks ranked higher.
+
+Somber, Melancholy and Mysterious are solo piano, because lofi hip-hop did not carry
+those moods: Chopin, Bach and Beethoven in Musopen's public-domain recordings, and
+three modern pieces. Their silent lead-ins are trimmed, since the player starts a track
+at its first sample, and their loud and quiet passages are brought closer together so
+they sit under a voice.
+
+Every track is CC0, public domain, CC BY or CC BY-SA. `SOURCES.csv` and `CREDITS.md`
+in the folder give each track's page, its license, the credit that license asks for and
+any change made to the file. [`Tools/library`](../Tools/library/README.md) has the
+scripts and the method. Earlier sets are in `~/Storyteller Lofi/Retired/`.
 
 ## The demo
 

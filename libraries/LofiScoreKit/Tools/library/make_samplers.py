@@ -1,10 +1,12 @@
 """One short listening sampler per mood: an excerpt of every track, crossfaded.
 
-Usage: python3 make_samplers.py LIBRARY_DIR OUT_DIR [SECONDS_PER_TRACK] [CROSSFADE]
+Usage: python3 make_samplers.py LIBRARY_DIR OUT_DIR [SECONDS_PER_TRACK] [CROSSFADE] [MOODS] [start|middle]
 
 Reads LIBRARY_DIR/library.json, takes SECONDS_PER_TRACK (default 16) from 40% into each
 track, levels every excerpt to -16 LUFS from its measured loudness, crossfades them and
-writes OUT_DIR/<Mood>.m4a plus OUT_DIR/<Mood>.txt with what plays when.
+writes OUT_DIR/<Mood>.m4a plus OUT_DIR/<Mood>.txt with what plays when. MOODS is a
+comma-separated list (default all). With "start" the excerpt is the opening of the track,
+which is what the player plays first: it always starts a track from the top.
 """
 import json
 import os
@@ -19,7 +21,8 @@ def main():
     lib, out = sys.argv[1], sys.argv[2]
     seconds = float(sys.argv[3]) if len(sys.argv) > 3 else 16.0
     fade = float(sys.argv[4]) if len(sys.argv) > 4 else 2.5
-    only = set(sys.argv[5].split(",")) if len(sys.argv) > 5 else None
+    only = set(sys.argv[5].split(",")) if len(sys.argv) > 5 and sys.argv[5] else None
+    from_start = len(sys.argv) > 6 and sys.argv[6] == "start"
     os.makedirs(out, exist_ok=True)
     manifest = json.load(open(os.path.join(lib, "library.json"), encoding="utf-8"))
     for mood in MOODS:
@@ -34,7 +37,7 @@ def main():
         t0 = 0.0
         for n, t in enumerate(tracks):
             duration = t.get("duration") or 180
-            start = max(10.0, 0.4 * duration)
+            start = 0.0 if from_start else max(10.0, 0.4 * duration)
             cmd += ["-ss", f"{start:.2f}", "-t", f"{seconds + fade:.2f}", "-i", os.path.join(lib, t["file"])]
             gain = -16.0 - (t.get("loudness") if t.get("loudness") is not None else -16.0)
             filters.append(f"[{n}:a]aresample=44100,aformat=channel_layouts=stereo,volume={gain:.2f}dB[a{n}]")

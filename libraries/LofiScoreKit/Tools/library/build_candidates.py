@@ -124,7 +124,8 @@ def process(st, rec, referer=None):
     d = rec.get("duration_s")
     if d in (None, ""): return skip(st, rec, "duration not shown on page")
     if d < MIN_S: return skip(st, rec, "too short (<1:30)")
-    if d > MAX_S: return skip(st, rec, "too long (>6:30)")
+    mx = rec.pop("max_s", MAX_S)
+    if d > mx: return skip(st, rec, "too long (>%d:%02d)" % (mx // 60, mx % 60))
     if VOCAL_RE.search(rec["title"]): return skip(st, rec, "title says vocals/featured singer")
     if rec.get("vocal_tag"): return skip(st, rec, "page tags say vocals")
     na = (norm(rec["artist"]), norm(rec["title"]))
@@ -213,7 +214,7 @@ def fma_track_meta(page_url):
     meta["bpm"] = ""
     return meta
 
-def fma_album(st, url, artist_hint):
+def fma_album(st, url, artist_hint, piano=False):
     if url in [a["url"] for a in st["albums"] if a.get("done")]:
         log("album already done:", url); return
     try: tracks = fma_album_tracks(url)
@@ -230,6 +231,11 @@ def fma_album(st, url, artist_hint):
         except Exception as e:
             st["seen"][page] = 1; st["errors"].append(page + ": " + str(e))
             skip(st, rec, "track page failed: " + str(e)); continue
+        if piano:
+            rec["max_s"] = PIANO_MAX_S; rec["tags"] = "phase:piano;" + rec.get("tags", "")
+            why = piano_reject(rec)
+            if why:
+                st["seen"][page] = 1; skip(st, rec, why); continue
         process(st, rec)
     st["albums"].append({"url": url, "title": title, "tracks": len(tracks), "done": True})
     save_state(st)
@@ -243,7 +249,7 @@ def fma_artist_albums(artist):
     return out
 
 # ---------- FSM ----------
-def fsm_track(st, slug, deadline=None, vocal_screen=False):
+def fsm_track(st, slug, deadline=None, vocal_screen=False, piano=False):
     page = FSM + slug + ".html"
     if page in st["seen"]: return
     try: p = fetch(page)
@@ -273,6 +279,11 @@ def fsm_track(st, slug, deadline=None, vocal_screen=False):
            "file_url": urllib.parse.urljoin(FSM, fm.group(1)) if fm else ""}
     if vocal_screen and any(re.search(r"\b(vocals?|singing|singer|lyrics|rap|female voice|male voice)\b", t, re.I) for t in tags):
         rec["vocal_tag"] = True
+    if piano:
+        rec["max_s"] = PIANO_MAX_S; rec["tags"] = "phase:piano;" + rec["tags"]
+        why = piano_reject(rec)
+        if why:
+            st["seen"][page] = 1; return skip(st, rec, why)
     process(st, rec, referer=page)
 
 def fsm_list_slugs(url):
@@ -368,12 +379,118 @@ def ph_pack(st):
     for i in range(1, n + 1):
         p = os.path.join(ROOT, "pack-%d.tar" % i); log("pack", p, os.path.getsize(p))
 
+
+# ---------- piano phases ----------
+PIANO_MAX_S = 420
+BEAT_RE = re.compile(r"lo-?fi|hip-?hop|chill-?hop|jazz-?hop|trip-?hop|beats?\b|drum|trap|dance|edm|house|techno|dubstep|rock|pop\b|funk|reggae|r&b|corporate|synthwave|chiptune|8-?bit|rap\b|electro\b|breakbeat", re.I)
+def piano_reject(rec):
+    """'' if the page says piano and names no beat/drum genre, else the reason."""
+    text = " ".join([rec.get("genres", ""), rec.get("tags", "").replace("phase:piano", ""), rec.get("title", ""), rec.get("album", "")])
+    if not re.search(r"piano", text, re.I): return "not piano (page genres/tags do not list piano)"
+    m = BEAT_RE.search(rec.get("genres", "") + " " + rec.get("tags", ""))
+    if m: return "piano but page lists a beat genre/tag: " + m.group(0)
+    return ""
+
+def fsm_pages(first, nxt, minutes, st, label):
+    deadline = time.time() + minutes * 60
+    n, prev = 1, None
+    while time.time() < deadline:
+        url = FSM + (first if n == 1 else nxt % n)
+        try: slugs = fsm_list_slugs(url)
+        except Exception as e:
+            log("  ! list", url, e); break
+        if not slugs or slugs == prev: break
+        prev = slugs
+        log("FSM", label, "page", n, len(slugs), "tracks")
+        st["albums"].append({"url": url, "title": "FSM " + label + " page " + str(n), "tracks": len(slugs), "done": True})
+        for s in slugs:
+            if time.time() >= deadline: break
+            fsm_track(st, s, vocal_screen=True, piano=True)
+        save_state(st); n += 1
+    st["notes"].append("FSM %s stopped at page %d (time box %d min)" % (label, n, minutes)); save_state(st)
+
+def ph_fsm_piano(st, minutes=8):
+    t_end = time.time() + minutes * 60
+    fsm_pages("piano.html", "piano-%d.html", minutes * 0.6, st, "piano")
+    for mood in ("sad", "melancholic", "dark", "strange"):
+        left = (t_end - time.time()) / 60
+        if left <= 0.5: st["notes"].append("FSM piano moods: no time left for " + mood); break
+        fsm_pages("mood.%s.html" % mood, "mood." + mood + ".page-%d.html", min(left, 2.0), st, "mood " + mood)
+
+FMA_PIANO = [("Sergey_Cheremisinov", None), ("lee-rosevere", ["music-for-podcasts-serious", "music-for-podcasts-ambient", "singles"]),
+             ("Kevin_MacLeod", ["Calming", "Classical_Sampler", "Contemporary_Sampler"]), ("Borrtex", None),
+             ("holiznacc0", ["depression", "will-you-miss-me", "scores", "transformations", "music-from-the-vault", "orphaned-media", "orphaned-media-pt-2"]),
+             ("Kai_Engel", None), ("Chris_Zabriskie", None)]
+def ph_fma_piano(st, minutes=6):
+    deadline = time.time() + minutes * 60
+    for artist, albums in FMA_PIANO:
+        if albums is None:
+            try: albums = fma_artist_albums(artist)
+            except Exception as e:
+                st["errors"].append("fma " + artist + ": " + str(e)); log("  ! artist", artist, e); continue
+        log(artist, "albums:", albums)
+        for a in albums:
+            if time.time() >= deadline:
+                st["notes"].append("FMA piano stopped by %d-min time box at %s/%s" % (minutes, artist, a)); save_state(st); return
+            fma_album(st, FMA + artist + "/" + a, artist.replace("_", " "), piano=True)
+
+IA_ITEMS = [  # (identifier, composer-or-None, include regex, exclude regex)
+    ("musopen-chopin-complete-works-flac", "Frédéric Chopin",
+     r"nocturne|prelude|waltz|valse|mazurka|largo|berceuse|cantabile|albumleaf|funeral march|marche funebre|tristesse|lament|'cello'|andantino|lento|impromptu|barcarolle|contredanse",
+     r"cello sonata|trio|concerto|song|duo|flute|variations|krakowiak|fantasia|polonaise|rondo|op\. 74|scherzo|presto|finale"),
+    ("MusopenCollectionAsFlac", None,
+     r"schubert-sonata|beethoven.*sonata|goldberg|chopin|satie|debussy|schumann|liszt|mozart.*sonata|grieg-lyric",
+     r"symphon|quartet|overture|concerto|trio|quintet|peergynt|violin|cello|allegro|presto|scherzo|rondo|vivace|fug"),
+    ("MoonlightSonatamv.1", "Ludwig van Beethoven", r".", r"presto|allegretto"),
+]
+def ia_len(v):
+    if not v: return None
+    v = str(v)
+    return mmss(v) if ":" in v else int(round(float(v)))
+def ph_ia_musopen(st, minutes=9):
+    deadline = time.time() + minutes * 60
+    for ident, composer, inc, exc in IA_ITEMS:
+        try: md = json.loads(fetch("https://archive.org/metadata/" + ident))
+        except Exception as e:
+            st["errors"].append("ia " + ident + ": " + str(e)); log("  ! ia", ident, e); continue
+        meta = md.get("metadata", {})
+        lurl = meta.get("licenseurl") or ""
+        lshort = lic_short(lurl)
+        files = [f for f in md.get("files", []) if f.get("name", "").lower().endswith(".mp3")]
+        log("IA", ident, lshort or lurl or "no licenseurl", len(files), "mp3")
+        st["albums"].append({"url": "https://archive.org/details/" + ident, "title": "archive.org " + (meta.get("title") or ident), "tracks": len(files), "done": True})
+        for f in files:
+            if time.time() >= deadline:
+                st["notes"].append("archive.org Musopen stopped by %d-min time box in %s" % (minutes, ident)); save_state(st); return
+            name = f["name"]
+            q = urllib.parse.quote(name)
+            base = os.path.splitext(os.path.basename(name))[0]
+            comp = composer
+            if not comp:
+                comp = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", base.split("-")[0]) if "-" in base else (meta.get("creator") or "unknown")
+                if isinstance(comp, list): comp = comp[0]
+            title = base
+            perf = f.get("creator") or f.get("artist") or ""
+            rec = {"source": "archive.org", "artist": comp, "album": "Musopen - " + (meta.get("title") or ident)[:80], "title": title,
+                   "page_url": "https://archive.org/details/" + ident + "/" + q, "file_url": "https://archive.org/download/" + ident + "/" + q,
+                   "license_url": lurl, "license": lshort, "license_raw": lurl or "item has no licenseurl",
+                   "duration_s": ia_len(f.get("length")), "genres": "Classical;Piano",
+                   "tags": ";".join(x for x in ["phase:piano", "musopen", "archive:" + ident, ("performer:" + perf) if perf else ""] if x),
+                   "listens": "", "downloads": str(meta.get("downloads", "") or ""), "favorites": "", "bpm": "", "max_s": PIANO_MAX_S}
+            key = rec["page_url"]
+            if key in st["seen"]: continue
+            if not re.search(inc, name, re.I) or re.search(exc, name, re.I):
+                st["seen"][key] = 1; rec.pop("max_s"); skip(st, rec, "not a quiet solo-piano piece (title filter)"); continue
+            process(st, rec)
+        save_state(st)
+
 PHASES = {"fma-purrple": ph_fma_purrple, "fma-holizna": ph_fma_holizna, "fsm-tmw": ph_fsm_tmw,
-          "fsm-cats": ph_fsm_cats, "fma-extra": ph_fma_extra, "analysis": ph_analysis, "pack": ph_pack}
+          "fsm-cats": ph_fsm_cats, "fma-extra": ph_fma_extra, "analysis": ph_analysis, "pack": ph_pack,
+          "fsm-piano": ph_fsm_piano, "fma-piano": ph_fma_piano, "ia-musopen": ph_ia_musopen}
 
 def main():
     os.makedirs(ROOT, exist_ok=True)
-    phases = sys.argv[1:] or list(PHASES)
+    phases = sys.argv[1:] or [p for p in PHASES if p not in ("fsm-piano", "fma-piano", "ia-musopen")]
     st = load_state()
     for ph in phases:
         log("=== phase", ph)
