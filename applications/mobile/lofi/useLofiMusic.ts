@@ -119,6 +119,26 @@ export function useLofiMusic(pollInterval: number | null) {
     [apply],
   )
 
+  /** How much is going on in the atmosphere, 0 to 1, or null for the default. */
+  const setAtmosphereIntensity = useCallback(
+    (intensity: number | null) =>
+      apply(
+        (current) =>
+          current.atmosphere
+            ? {
+                ...current,
+                atmosphere: {
+                  ...current.atmosphere,
+                  intensity:
+                    intensity ?? current.atmosphere.defaultIntensity ?? 0.75,
+                },
+              }
+            : current,
+        () => LofiScore?.setAtmosphereIntensity(intensity),
+      ),
+    [apply],
+  )
+
   /** Short narration pauses where the sound swells or hushes. */
   const setAtmospherePauses = useCallback(
     (enabled: boolean) =>
@@ -235,6 +255,7 @@ export function useLofiMusic(pollInterval: number | null) {
     setMusicLevel,
     setAtmosphereEnabled,
     setAtmosphereLevel,
+    setAtmosphereIntensity,
     setAtmospherePauses,
     setFollowsReading,
     setAtmosphereOneShots,

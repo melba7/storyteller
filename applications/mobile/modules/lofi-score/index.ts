@@ -43,6 +43,18 @@ export type LofiAmbientSound =
   | "ship"
   | "machinery"
   | "clock"
+  | "roomTone"
+  | "hushedRoom"
+  | "murmur"
+  | "emptyHall"
+  | "electricHum"
+  | "kitchen"
+  | "workshop"
+  | "farmyard"
+  | "motorVehicle"
+  | "aircraft"
+  | "spaceship"
+  | "deepDrone"
   | (string & {})
 
 /** The atmosphere sounds' state: quiet sounds of the scene under the voice. */
@@ -54,6 +66,9 @@ export type LofiAtmosphereStatus = {
   levelDB: number
   defaultLevelDB: number
   levelRange: number[]
+  /** How much is going on, 0 to 1: how many of a scene's sounds play, how far the quieter ones sit back, how much it lifts in the gaps between sentences. */
+  intensity?: number
+  defaultIntensity?: number
   /** Imported recordings, synthesised stand-ins, both, or nothing. */
   source: "imported" | "standIns" | "mixed" | "none"
   preparing: boolean
@@ -239,6 +254,8 @@ type LofiScoreNativeModule = {
   setAtmosphereEnabled(enabled: boolean): Promise<LofiMusicStatus>
   /** null goes back to the default level. */
   setAtmosphereLevel(level: number | null): Promise<LofiMusicStatus>
+  /** How much is going on, 0 to 1; null goes back to the default. */
+  setAtmosphereIntensity(intensity: number | null): Promise<LofiMusicStatus>
   /** Short narration pauses where the sound swells (a crowded hall, a storm breaking) or hushes. */
   setAtmospherePauses(enabled: boolean): Promise<LofiMusicStatus>
   /** One-off sounds on the sentences that say they happen. Off by default. */

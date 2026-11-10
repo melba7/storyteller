@@ -11,6 +11,11 @@ import Foundation
 /// with the music, such as a crowd, make the music step aside while they play
 /// (``musicPolicy``).
 ///
+/// Each sound is a *family*: the more specific kinds of it (a café is a kind of crowd, a
+/// waterfall a kind of river) are ``SoundVariant``s, listed in ``SoundCatalog``. A family
+/// decides the behaviour (weather or place, what the music does, the filter, the level,
+/// the synthesised stand-in); a variant only changes the recording.
+///
 /// New cases go at the end, so saved tracks and libraries keep their meaning.
 public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, CodingKeyRepresentable {
     // Weather
@@ -44,6 +49,21 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
     case ship
     case machinery
     case clock
+    // Rooms, from empty to full of people (added with the big catalogue)
+    case roomTone
+    case hushedRoom
+    case murmur
+    case emptyHall
+    case electricHum
+    case kitchen
+    case workshop
+    case farmyard
+    // More vehicles
+    case motorVehicle
+    case aircraft
+    case spaceship
+    // Elsewhere
+    case deepDrone
 
     /// Sounds that belong to the weather rather than to a place.
     public enum Scope: String, Codable, Sendable {
@@ -64,6 +84,33 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case replacesMusic
     }
 
+    /// The groups the sounds are listed under, for the scorer and the docs.
+    public enum Group: String, CaseIterable, Codable, Sendable {
+        case weather
+        case fire
+        case water
+        case nature
+        case rooms
+        case people
+        case places
+        case travel
+        case elsewhere
+
+        public var title: String {
+            switch self {
+            case .weather: "Weather"
+            case .fire: "Fire"
+            case .water: "Water"
+            case .nature: "Nature"
+            case .rooms: "Rooms"
+            case .people: "People"
+            case .places: "Towns and places"
+            case .travel: "Travel"
+            case .elsewhere: "Elsewhere"
+            }
+        }
+    }
+
     public var scope: Scope {
         switch self {
         case .rain, .heavyRain, .rainIndoors, .thunder, .wind, .strongWind, .snow: .weather
@@ -75,6 +122,29 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         switch self {
         case .crowd: .replacesMusic
         default: .underMusic
+        }
+    }
+
+    /// True for sounds made of human voices, which get the speech-safe filter so no
+    /// words can be made out under the narrator.
+    public var isVoices: Bool {
+        switch self {
+        case .crowd, .murmur: true
+        default: false
+        }
+    }
+
+    public var group: Group {
+        switch self {
+        case .rain, .heavyRain, .rainIndoors, .thunder, .wind, .strongWind, .snow: .weather
+        case .fireplace, .campfire: .fire
+        case .seaShore, .openSea, .river, .dripping: .water
+        case .forest, .birdsong, .nightInsects, .nightForest, .swamp, .farmyard: .nature
+        case .roomTone, .hushedRoom, .emptyHall, .electricHum, .clock, .kitchen, .workshop: .rooms
+        case .murmur, .crowd: .people
+        case .city, .oldTown: .places
+        case .horses, .train, .ship, .machinery, .motorVehicle, .aircraft, .spaceship: .travel
+        case .deepDrone: .elsewhere
         }
     }
 
@@ -96,21 +166,33 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
         case .campfire: "an outdoor fire: a camp, a bonfire, torches"
         case .seaShore: "waves on a beach or rocks: a coast, a harbour, cliffs"
         case .openSea: "aboard or beside a boat at sea: water against the hull, the swell"
-        case .river: "running water nearby: a stream, a brook, a river, a fountain"
+        case .river: "running water nearby: a stream, a brook, a river, a fountain, a tap"
         case .dripping: "drips echoing in a cave, cellar, dungeon, mine, tunnel or sewer"
         case .forest: "woods by day: leaves, branches, birds in the distance"
         case .birdsong: "a garden, park, meadow or countryside by day: birdsong"
         case .nightInsects: "a warm night outdoors: crickets and insects"
         case .nightForest: "woods or countryside at night: an owl now and then, a soft breeze"
-        case .swamp: "a marsh, bog, swamp or lake shore: frogs and insects"
-        case .crowd: "many people around whose words cannot be made out: a busy school corridor, a market, a feast or dining hall, a station, a busy inn"
+        case .swamp: "a marsh, bog, swamp, pond or lake shore: frogs and insects"
+        case .crowd: "many people right around the characters, words not made out: a packed corridor, a market, a feast or dining hall, a station, a busy inn. The music pauses for it"
         case .city: "a modern town or city around you: distant traffic, no single voices"
         case .oldTown: "a town or village street before cars: hooves, carts, footsteps, distant bells"
-        case .horses: "riding, or travelling in a horse-drawn carriage or cart: hooves and wheels"
-        case .train: "inside a moving train: wheels and rails"
+        case .horses: "riding, or travelling by horse, carriage, cart, caravan or sled: hooves and wheels"
+        case .train: "inside a moving train, tram or underground train: wheels and rails"
         case .ship: "aboard a wooden sailing ship: creaking timbers and ropes"
-        case .machinery: "engines or machines running: a spaceship, an engine room, a factory, a car's cabin"
+        case .machinery: "engines or machines running: an engine room, a factory, a mill, a generator"
         case .clock: "a quiet room where a clock ticks: a study, a parlour, a waiting room"
+        case .roomTone: "an ordinary quiet room with nobody else making a sound: the faint hush and hum of a house or building. The default indoors when nothing else is heard"
+        case .hushedRoom: "a quiet room with people keeping quiet, no voices: pages turning, pens, chairs shifting, a cough: a library, a classroom at work, an exam, a church before the service"
+        case .murmur: "a few people talking low nearby, words not made out: whispers in a corridor, the next table, voices through a wall, a small group. The music stays"
+        case .emptyHall: "a big empty indoor space with an echo: a corridor after hours, a hospital or castle corridor, a stairwell, a cathedral, a museum, a garage: distant footsteps and doors"
+        case .electricHum: "the hum of electric light, appliances, monitors or ventilation: an office, a hospital ward, a lab, a server room, a basement, a diner at night"
+        case .kitchen: "cooking going on: a sizzle, pots, water, chopping, a kettle: a home kitchen, a restaurant kitchen, a camp cook"
+        case .workshop: "hand work going on: a smithy, a carpenter, a sewing room, a garage, a printing shop, a loom"
+        case .farmyard: "a farm: hens, cattle, sheep, a dog far off, a breeze: a farmyard, a barn, a stable, a pasture"
+        case .motorVehicle: "riding inside a motor vehicle: a car, taxi, bus, truck or motorbike: engine and road"
+        case .aircraft: "inside an aircraft: an airliner's cabin, a small plane, a helicopter, an airship"
+        case .spaceship: "inside a spacecraft or space station: a deep hum, ventilation, faint instruments"
+        case .deepDrone: "a deep steady presence with no natural source: the void outside a hull, a dream, a magical stillness, a dread. Use sparingly, and only where the place has no sound of its own"
         }
     }
 
@@ -120,11 +202,59 @@ public enum AmbientSound: String, CaseIterable, Codable, Sendable, Hashable, Cod
     public var levelOffsetDB: Double {
         switch self {
         case .clock: -8
+        case .roomTone: -6
+        case .electricHum: -5
+        case .hushedRoom, .murmur, .deepDrone: -4
         case .crowd: -3
-        case .dripping, .nightForest, .thunder: -2
-        case .machinery, .train: -1
+        case .dripping, .nightForest, .thunder, .emptyHall, .spaceship: -2
+        case .machinery, .train, .kitchen, .motorVehicle, .aircraft: -1
         case .heavyRain, .strongWind: 1
         default: 0
+        }
+    }
+
+    /// Words to search a sound library with for recordings of the plain sound. The fetch
+    /// script reads them from the exported catalogue (``SoundCatalog``).
+    public var searchQueries: [String] {
+        switch self {
+        case .rain: ["light rain ambience", "gentle rain", "steady rain"]
+        case .heavyRain: ["heavy rain downpour", "heavy rain ambience", "torrential rain"]
+        case .rainIndoors: ["rain on window", "rain on roof interior", "rain inside house"]
+        case .thunder: ["distant thunderstorm rain", "thunder rumble rain ambience"]
+        case .wind: ["gentle wind ambience", "soft wind", "wind field"]
+        case .strongWind: ["strong wind howling", "storm wind gusts", "gale wind"]
+        case .snow: ["winter wind snow ambience", "snowy quiet winter ambience", "snow forest winter"]
+        case .fireplace: ["fireplace crackling", "fireplace fire crackle", "wood stove crackle"]
+        case .campfire: ["campfire crackling outdoors", "campfire night"]
+        case .seaShore: ["waves beach ambience", "ocean waves shore", "waves rocks"]
+        case .openSea: ["open sea waves boat", "ocean swell", "boat hull water"]
+        case .river: ["river stream ambience", "babbling brook", "creek water flowing"]
+        case .dripping: ["cave dripping water", "water drips cave ambience"]
+        case .forest: ["forest ambience day", "woodland ambience birds wind"]
+        case .birdsong: ["birdsong morning", "dawn chorus birds", "garden birds"]
+        case .nightInsects: ["crickets night", "night insects ambience"]
+        case .nightForest: ["night forest ambience", "forest at night owl"]
+        case .swamp: ["swamp frogs night", "marsh frogs ambience"]
+        case .crowd: ["crowd murmur indoor", "walla crowd indistinct", "school hallway ambience"]
+        case .city: ["city street ambience", "city traffic distant ambience"]
+        case .oldTown: ["medieval town ambience", "market square ambience horses", "village square ambience"]
+        case .horses: ["horse carriage hooves cobblestones", "horse drawn carriage"]
+        case .train: ["train interior ambience", "steam train journey"]
+        case .ship: ["ship creaking wood", "sailing ship ambience"]
+        case .machinery: ["factory machinery ambience", "engine room ambience"]
+        case .clock: ["clock ticking", "grandfather clock ticking"]
+        case .roomTone: ["room tone quiet house", "empty room ambience quiet", "house interior room tone"]
+        case .hushedRoom: ["library ambience quiet pages", "quiet classroom ambience", "exam hall ambience"]
+        case .murmur: ["quiet conversation murmur distant", "people whispering ambience", "muffled voices next room"]
+        case .emptyHall: ["empty corridor ambience footsteps", "large hall reverb ambience", "hospital corridor ambience"]
+        case .electricHum: ["fluorescent light hum", "air conditioning hum room", "electrical hum ambience"]
+        case .kitchen: ["kitchen cooking ambience", "restaurant kitchen ambience", "frying pan sizzle kitchen"]
+        case .workshop: ["workshop ambience tools", "blacksmith hammering ambience", "carpentry workshop"]
+        case .farmyard: ["farm ambience animals", "farmyard chickens cows", "barn ambience"]
+        case .motorVehicle: ["car interior driving", "driving car ambience interior", "bus interior ambience"]
+        case .aircraft: ["airplane cabin ambience", "aircraft cabin interior flight"]
+        case .spaceship: ["spaceship interior hum", "sci-fi spaceship ambience hum", "space station ambience"]
+        case .deepDrone: ["deep space ambience", "dark ambience low rumble", "eerie ambience low hum"]
         }
     }
 
@@ -144,6 +274,9 @@ public enum AmbientLevel: String, CaseIterable, Codable, Sendable, Hashable, Com
     case soft
     /// The scene's main sound.
     case full
+    /// The sound presses in on the characters: a hall in uproar, a storm at its height,
+    /// a waterfall beside them, a factory floor. Rare.
+    case loud
 
     /// Offset from the sound's full level, in dB.
     public var offsetDB: Double {
@@ -151,6 +284,7 @@ public enum AmbientLevel: String, CaseIterable, Codable, Sendable, Hashable, Com
         case .faint: -10
         case .soft: -5
         case .full: 0
+        case .loud: 4
         }
     }
 
@@ -163,6 +297,21 @@ public enum AmbientLevel: String, CaseIterable, Codable, Sendable, Hashable, Com
         case .faint: 0
         case .soft: 1
         case .full: 2
+        case .loud: 3
         }
+    }
+
+    /// One step quieter (faint stays faint).
+    public var quieter: AmbientLevel {
+        switch self {
+        case .faint, .soft: .faint
+        case .full: .soft
+        case .loud: .full
+        }
+    }
+
+    /// A level from an answer's spelling; unknown words give nil.
+    public init?(lenient text: String) {
+        self.init(rawValue: text.trimmingCharacters(in: .whitespaces).lowercased())
     }
 }

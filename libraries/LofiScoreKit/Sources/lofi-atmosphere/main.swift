@@ -18,9 +18,11 @@ let usage = """
       lofi-atmosphere score --out FILE [--mood TRACK.track.json] [--atmosphere TRACK.atmosphere.json]
       lofi-atmosphere synth FOLDER [--seconds 30] [--rate 32000] [--sound rain]
       lofi-atmosphere library FOLDER [--edition personal|publish]
+      lofi-atmosphere catalog [--out Tools/atmosphere/catalog.json] [--prompt]
 
-    --variants offers the more specific sounds in that catalog (the fetch script's starter set and
-    other books' requests) to Claude, besides the ones it asks for in this book.
+    The built-in catalogue (every sound family, its more specific kinds and the place guide) is
+    always offered to Claude. --variants adds the Mac's catalog of other books' requests. catalog
+    writes the catalogue as JSON for the fetch script (--prompt prints the system prompt instead).
 
     Claude is reached like lofi-eval: LOFI_CLAUDE_VIA=api uses the Anthropic API with the key from
     ANTHROPIC_API_KEY, or the file named by ANTHROPIC_API_KEY_FILE (never printed); LOFI_CLAUDE_VIA=plan
@@ -41,7 +43,7 @@ struct Arguments {
     var positional: [String] = []
     var options: [String: String] = [:]
     var flags: Set<String> = []
-    static let flagNames: Set<String> = ["dry-run", "places"]
+    static let flagNames: Set<String> = ["dry-run", "places", "prompt"]
 
     init(_ raw: [String]) {
         var i = 0
@@ -169,10 +171,11 @@ func trackCommand(_ args: Arguments) async throws {
                 fail("could not read \(path): \(error)")
             }
         } else {
-            note("no variants catalog at \(path) yet; Claude gets only the variants it asks for")
+            note("no variants catalog at \(path) yet; Claude gets the built-in catalogue and the variants it asks for")
         }
     }
     let builder = AtmosphereTrackBuilder(spoilerGuard: spoilerGuard, plan: plan, offeredVariants: offered)
+    offered = builder.offeredVariants
 
     if args.flag("dry-run") {
         let all = try builder.narratedPositions()
@@ -186,13 +189,14 @@ func trackCommand(_ args: Arguments) async throws {
         let cueChecks = Int((Double(positions.count) * plan.oneShotCheckBudget * 0.25).rounded(.up))
         let requests = positions.count + probes + cueChecks
         let averageWords = Double(passageWords) / Double(max(1, positions.count))
-        // Passage at ~1.35 tokens a word, plus ~450 for the place list and framing;
-        // the system prompt (~2,700 tokens plus ~20 a shared variant) is read from the
-        // cache after the first request.
-        let input = Int(Double(requests) * (averageWords * 1.35 + 450))
-        let cached = requests * (2_700 + 20 * min(offered.count, ClaudeScenePrompt.maxVariantsListed))
+        // Passage at ~1.35 tokens a word, plus ~500 for the place list and framing;
+        // the system prompt (the catalogue and the place guide, about four characters a
+        // token) is read from the cache after the first request.
+        let input = Int(Double(requests) * (averageWords * 1.35 + 500))
+        let systemTokens = ClaudeScenePrompt.system(sharedVariants: offered).count / 4
+        let cached = requests * systemTokens
         let output = requests * 450
-        note("\(book): \(all.count) narrated sentences, \(positions.count) entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter), up to \(probes) probes, \(offered.count) shared variants offered")
+        note("\(book): \(all.count) narrated sentences, \(positions.count) entries (one per ~\(plan.wordsBetweenEntries) words plus one per chapter), up to \(probes) probes, \(offered.count) specific sounds offered (\(SoundCatalog.variants.count) built in), system prompt ~\(systemTokens) tokens")
         for prices in ScenePrices.known {
             var totals = SceneUsage.Totals()
             totals.inputTokens = input
@@ -296,7 +300,8 @@ func showCommand(_ args: Arguments) throws {
         let memory = PlaceMemory(entries: track.entries)
         print("-- places")
         for place in memory.places.values.sorted(by: { Int($0.id.dropFirst()) ?? 0 < Int($1.id.dropFirst()) ?? 0 }) {
-            print("\(place.id) \(place.name) (\(place.setting.rawValue)), \(place.visits) visit(s)")
+            let state = place.state.map { ", \($0)" } ?? ""
+            print("\(place.id) \(place.name) (\(place.setting.rawValue)\(state)), \(place.visits) visit(s)")
         }
         if let world = memory.world { print("world: \(world)") }
     }
@@ -376,6 +381,22 @@ func libraryCommand(_ args: Arguments) throws {
     }
 }
 
+// MARK: - catalog
+
+func catalogCommand(_ args: Arguments) throws {
+    if args.flag("prompt") {
+        print(ClaudeScenePrompt.system)
+        return
+    }
+    let data = try SoundCatalog.export()
+    if let out = args.string("out") {
+        try data.write(to: URL(fileURLWithPath: out), options: .atomic)
+        note("wrote \(AmbientSound.allCases.count) sounds, \(SoundCatalog.variants.count) specific sounds, \(OneShotSound.allCases.count) one-off sounds and \(SoundCatalog.placeGuide.count) place guides to \(out)")
+    } else {
+        print(String(decoding: data, as: UTF8.self))
+    }
+}
+
 // MARK: - main
 
 let args = Arguments(Array(CommandLine.arguments.dropFirst()))
@@ -386,6 +407,7 @@ do {
     case "score": try scoreCommand(args)
     case "synth": try synthCommand(args)
     case "library": try libraryCommand(args)
+    case "catalog": try catalogCommand(args)
     default: fail(usage)
     }
 } catch {

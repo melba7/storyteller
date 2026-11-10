@@ -118,6 +118,15 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
+    // How much is going on in the atmosphere, 0 to 1: how many of a scene's sounds play,
+    // how far the quieter ones sit back, how much it lifts in the gaps between sentences.
+    // null goes back to the default.
+    AsyncFunction("setAtmosphereIntensity") { (intensity: Double?) async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.setAtmosphereIntensity(intensity)
+      return await host.status().jsonObject()
+    }
+
     // Short narration pauses where the atmosphere swells or hushes.
     AsyncFunction("setAtmospherePauses") { (enabled: Bool) async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host

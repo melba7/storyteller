@@ -1,0 +1,4553 @@
+{
+  "oneShots" : [
+    {
+      "about" : "a single clap or crack of thunder",
+      "folder" : "ThunderClap",
+      "id" : "thunderClap",
+      "longestSeconds" : 8,
+      "queries" : [
+        "thunder clap",
+        "thunder crack",
+        "single thunder strike"
+      ]
+    },
+    {
+      "about" : "knocking at a door",
+      "folder" : "DoorKnock",
+      "id" : "doorKnock",
+      "longestSeconds" : 4,
+      "queries" : [
+        "knocking on door",
+        "door knock"
+      ]
+    },
+    {
+      "about" : "a door slamming shut",
+      "folder" : "DoorSlam",
+      "id" : "doorSlam",
+      "longestSeconds" : 3,
+      "queries" : [
+        "door slam",
+        "door slamming shut"
+      ]
+    },
+    {
+      "about" : "a door creaking open",
+      "folder" : "DoorCreak",
+      "id" : "doorCreak",
+      "longestSeconds" : 4,
+      "queries" : [
+        "door creak",
+        "creaky door opening"
+      ]
+    },
+    {
+      "about" : "a doorbell ringing",
+      "folder" : "Doorbell",
+      "id" : "doorbell",
+      "longestSeconds" : 4,
+      "queries" : [
+        "doorbell ding dong",
+        "doorbell"
+      ]
+    },
+    {
+      "about" : "a telephone ringing",
+      "folder" : "PhoneRing",
+      "id" : "phoneRing",
+      "longestSeconds" : 6,
+      "queries" : [
+        "old telephone ring",
+        "telephone ringing bell"
+      ]
+    },
+    {
+      "about" : "a large bell tolling (a church or tower bell)",
+      "folder" : "BellToll",
+      "id" : "bellToll",
+      "longestSeconds" : 8,
+      "queries" : [
+        "church bell toll single",
+        "bell toll"
+      ]
+    },
+    {
+      "about" : "a clock striking or chiming the hour",
+      "folder" : "ClockChime",
+      "id" : "clockChime",
+      "longestSeconds" : 12,
+      "queries" : [
+        "clock chime hour",
+        "grandfather clock chime"
+      ]
+    },
+    {
+      "about" : "glass breaking or shattering",
+      "folder" : "GlassBreak",
+      "id" : "glassBreak",
+      "longestSeconds" : 3,
+      "queries" : [
+        "glass break",
+        "glass shatter"
+      ]
+    },
+    {
+      "about" : "a dog barking",
+      "folder" : "DogBark",
+      "id" : "dogBark",
+      "longestSeconds" : 4,
+      "queries" : [
+        "dog bark",
+        "dog barking"
+      ]
+    },
+    {
+      "about" : "an owl hooting",
+      "folder" : "OwlHoot",
+      "id" : "owlHoot",
+      "longestSeconds" : 4,
+      "queries" : [
+        "owl hoot",
+        "tawny owl call"
+      ]
+    },
+    {
+      "about" : "a wolf howling",
+      "folder" : "WolfHowl",
+      "id" : "wolfHowl",
+      "longestSeconds" : 7,
+      "queries" : [
+        "wolf howl"
+      ]
+    },
+    {
+      "about" : "a horse neighing or whinnying",
+      "folder" : "HorseNeigh",
+      "id" : "horseNeigh",
+      "longestSeconds" : 4,
+      "queries" : [
+        "horse neigh",
+        "horse whinny"
+      ]
+    },
+    {
+      "about" : "a train whistle",
+      "folder" : "TrainWhistle",
+      "id" : "trainWhistle",
+      "longestSeconds" : 6,
+      "queries" : [
+        "steam train whistle",
+        "train whistle"
+      ]
+    },
+    {
+      "about" : "a ship's horn or foghorn",
+      "folder" : "ShipHorn",
+      "id" : "shipHorn",
+      "longestSeconds" : 7,
+      "queries" : [
+        "ship horn",
+        "foghorn"
+      ]
+    },
+    {
+      "about" : "a school bell ringing for the end of a lesson",
+      "folder" : "SchoolBell",
+      "id" : "schoolBell",
+      "longestSeconds" : 5,
+      "queries" : [
+        "school bell ring",
+        "school bell"
+      ]
+    },
+    {
+      "about" : "a rooster crowing",
+      "folder" : "RoosterCrow",
+      "id" : "roosterCrow",
+      "longestSeconds" : 4,
+      "queries" : [
+        "rooster crow",
+        "cockerel crowing"
+      ]
+    },
+    {
+      "about" : "a cat meowing",
+      "folder" : "CatMeow",
+      "id" : "catMeow",
+      "longestSeconds" : 3,
+      "queries" : [
+        "cat meow",
+        "cat meowing"
+      ]
+    },
+    {
+      "about" : "a car horn, once",
+      "folder" : "CarHorn",
+      "id" : "carHorn",
+      "longestSeconds" : 3,
+      "queries" : [
+        "car horn single",
+        "car horn honk"
+      ]
+    }
+  ],
+  "places" : [
+    {
+      "place" : "school corridor",
+      "states" : [
+        {
+          "sounds" : "emptyHall.schoolHallwayEmpty soft",
+          "when" : "after hours, empty"
+        },
+        {
+          "sounds" : "emptyHall.schoolHallwayEmpty soft, murmur.hallwayWhispers faint",
+          "when" : "lessons on, a few people passing"
+        },
+        {
+          "sounds" : "crowd.schoolCorridor full",
+          "when" : "between lessons, the bell"
+        },
+        {
+          "sounds" : "murmur.hallwayWhispers soft, emptyHall.schoolHallwayEmpty faint",
+          "when" : "everyone whispering or staring at the character"
+        },
+        {
+          "sounds" : "crowd.schoolCorridor loud",
+          "when" : "a fight, uproar, everyone talking about the character"
+        }
+      ]
+    },
+    {
+      "place" : "classroom",
+      "states" : [
+        {
+          "sounds" : "roomTone.classroomEmpty faint",
+          "when" : "empty"
+        },
+        {
+          "sounds" : "hushedRoom.classroomQuiet soft",
+          "when" : "the teacher talking, pupils quiet"
+        },
+        {
+          "sounds" : "hushedRoom.examHall soft, clock faint",
+          "when" : "a test or silent work"
+        },
+        {
+          "sounds" : "murmur.classroomWhispers soft",
+          "when" : "teacher out, pupils whispering"
+        },
+        {
+          "sounds" : "crowd.classroomChatter full",
+          "when" : "before the teacher arrives, chaos"
+        }
+      ]
+    },
+    {
+      "place" : "school cafeteria or dining hall",
+      "states" : [
+        {
+          "sounds" : "crowd.cafeteria full",
+          "when" : "lunchtime"
+        },
+        {
+          "sounds" : "murmur.quietConversation soft, emptyHall faint",
+          "when" : "emptying out"
+        }
+      ]
+    },
+    {
+      "place" : "schoolyard or playground",
+      "states" : [
+        {
+          "sounds" : "crowd.schoolyard full",
+          "when" : "break time"
+        },
+        {
+          "sounds" : "birdsong.park faint, city.suburbanStreet faint",
+          "when" : "lessons on, empty"
+        }
+      ]
+    },
+    {
+      "place" : "library",
+      "states" : [
+        {
+          "sounds" : "hushedRoom.library soft",
+          "when" : "open, people reading"
+        },
+        {
+          "sounds" : "hushedRoom.library soft, murmur.whispers faint",
+          "when" : "a whispered conversation"
+        },
+        {
+          "sounds" : "roomTone faint, clock faint",
+          "when" : "closed, empty"
+        }
+      ]
+    },
+    {
+      "place" : "ordinary house or flat",
+      "states" : [
+        {
+          "sounds" : "roomTone faint",
+          "when" : "daytime, quiet"
+        },
+        {
+          "sounds" : "fireplace soft, clock faint",
+          "when" : "evening with a fire"
+        },
+        {
+          "sounds" : "roomTone.houseAtNight faint",
+          "when" : "night, everyone asleep"
+        },
+        {
+          "sounds" : "rainIndoors soft, roomTone faint",
+          "when" : "rain outside"
+        },
+        {
+          "sounds" : "birdsong.garden soft, roomTone faint",
+          "when" : "a window open on a summer day"
+        },
+        {
+          "sounds" : "murmur.dinnerTable soft, kitchen.homeKitchen faint",
+          "when" : "a family meal"
+        },
+        {
+          "sounds" : "crowd.partyIndoors full",
+          "when" : "a party"
+        }
+      ]
+    },
+    {
+      "place" : "kitchen",
+      "states" : [
+        {
+          "sounds" : "kitchen.homeKitchen soft",
+          "when" : "cooking"
+        },
+        {
+          "sounds" : "kitchen.dishwashing soft",
+          "when" : "washing up"
+        },
+        {
+          "sounds" : "electricHum.fridgeAtNight faint",
+          "when" : "at night"
+        }
+      ]
+    },
+    {
+      "place" : "bedroom",
+      "states" : [
+        {
+          "sounds" : "roomTone.houseAtNight faint",
+          "when" : "night"
+        },
+        {
+          "sounds" : "roomTone.bedroomMorning faint, birdsong faint",
+          "when" : "morning, birds outside"
+        },
+        {
+          "sounds" : "rainIndoors.rainOnWindowNight soft",
+          "when" : "rain at night"
+        }
+      ]
+    },
+    {
+      "place" : "office",
+      "states" : [
+        {
+          "sounds" : "electricHum.office faint, hushedRoom.officeQuiet soft",
+          "when" : "working day, quiet"
+        },
+        {
+          "sounds" : "crowd.openPlanOffice full",
+          "when" : "busy open-plan"
+        },
+        {
+          "sounds" : "roomTone.officeAfterHours faint",
+          "when" : "after hours"
+        }
+      ]
+    },
+    {
+      "place" : "hospital",
+      "states" : [
+        {
+          "sounds" : "electricHum.hospitalWard soft, murmur.hospitalRoom faint",
+          "when" : "a ward by day"
+        },
+        {
+          "sounds" : "electricHum.hospitalNight soft",
+          "when" : "a ward at night"
+        },
+        {
+          "sounds" : "emptyHall.hospitalCorridor soft",
+          "when" : "a corridor"
+        },
+        {
+          "sounds" : "crowd.hospitalWaitingRoom full",
+          "when" : "the waiting room"
+        }
+      ]
+    },
+    {
+      "place" : "cafe or restaurant",
+      "states" : [
+        {
+          "sounds" : "crowd.cafe full",
+          "when" : "busy"
+        },
+        {
+          "sounds" : "murmur.quietConversation soft, kitchen faint",
+          "when" : "nearly empty"
+        },
+        {
+          "sounds" : "kitchen.restaurantKitchen full",
+          "when" : "the kitchen"
+        }
+      ]
+    },
+    {
+      "place" : "pub, bar or tavern",
+      "states" : [
+        {
+          "sounds" : "crowd.tavern full, fireplace faint",
+          "when" : "busy night"
+        },
+        {
+          "sounds" : "murmur.quietBar soft, fireplace faint",
+          "when" : "quiet afternoon"
+        },
+        {
+          "sounds" : "crowd.pubCrowd loud",
+          "when" : "a brawl, uproar"
+        }
+      ]
+    },
+    {
+      "place" : "church or cathedral",
+      "states" : [
+        {
+          "sounds" : "emptyHall.cathedral soft",
+          "when" : "empty"
+        },
+        {
+          "sounds" : "crowd.congregation soft, emptyHall.cathedral faint",
+          "when" : "before the service, people gathering"
+        },
+        {
+          "sounds" : "hushedRoom.chapel soft",
+          "when" : "during the service, hushed"
+        },
+        {
+          "sounds" : "oldTown.churchBells soft",
+          "when" : "bells ringing outside"
+        }
+      ]
+    },
+    {
+      "place" : "courtroom",
+      "states" : [
+        {
+          "sounds" : "hushedRoom.courtroom soft",
+          "when" : "in session"
+        },
+        {
+          "sounds" : "crowd.courtroomGallery full",
+          "when" : "the gallery stirring, uproar"
+        }
+      ]
+    },
+    {
+      "place" : "shop",
+      "states" : [
+        {
+          "sounds" : "murmur.smallShop faint",
+          "when" : "small, quiet"
+        },
+        {
+          "sounds" : "crowd.supermarket full",
+          "when" : "supermarket or mall"
+        }
+      ]
+    },
+    {
+      "place" : "city street",
+      "states" : [
+        {
+          "sounds" : "city.busyStreet full",
+          "when" : "daytime"
+        },
+        {
+          "sounds" : "city.cityNight soft",
+          "when" : "night"
+        },
+        {
+          "sounds" : "city.rainyStreetNight soft, rain soft",
+          "when" : "rain at night"
+        },
+        {
+          "sounds" : "city.suburbanStreet soft, birdsong faint",
+          "when" : "a quiet suburb"
+        },
+        {
+          "sounds" : "city.cityPark soft",
+          "when" : "a park"
+        }
+      ]
+    },
+    {
+      "place" : "old town or village (before cars)",
+      "states" : [
+        {
+          "sounds" : "oldTown full",
+          "when" : "day, streets busy"
+        },
+        {
+          "sounds" : "crowd.marketplace full, oldTown faint",
+          "when" : "market day"
+        },
+        {
+          "sounds" : "oldTown.cobbledNight soft",
+          "when" : "night"
+        },
+        {
+          "sounds" : "oldTown.villageMorning soft, birdsong faint",
+          "when" : "dawn"
+        }
+      ]
+    },
+    {
+      "place" : "castle",
+      "states" : [
+        {
+          "sounds" : "crowd.feastHall full, fireplace soft",
+          "when" : "the great hall, a feast"
+        },
+        {
+          "sounds" : "emptyHall.stoneHall soft, fireplace faint",
+          "when" : "the great hall, empty"
+        },
+        {
+          "sounds" : "emptyHall.castleCorridor soft, campfire.torches faint",
+          "when" : "a corridor at night"
+        },
+        {
+          "sounds" : "oldTown.castleCourtyard soft",
+          "when" : "the courtyard"
+        },
+        {
+          "sounds" : "wind.battlements soft",
+          "when" : "the battlements"
+        },
+        {
+          "sounds" : "dripping.dungeon soft",
+          "when" : "the dungeon"
+        }
+      ]
+    },
+    {
+      "place" : "forest",
+      "states" : [
+        {
+          "sounds" : "forest soft, birdsong faint",
+          "when" : "day"
+        },
+        {
+          "sounds" : "nightForest soft",
+          "when" : "night"
+        },
+        {
+          "sounds" : "rain.rainOnLeaves soft",
+          "when" : "rain"
+        },
+        {
+          "sounds" : "snow.snowyForest soft",
+          "when" : "winter"
+        },
+        {
+          "sounds" : "forest soft, river faint",
+          "when" : "a stream nearby"
+        }
+      ]
+    },
+    {
+      "place" : "open country",
+      "states" : [
+        {
+          "sounds" : "birdsong.summerMeadow soft, wind faint",
+          "when" : "summer day"
+        },
+        {
+          "sounds" : "wind soft",
+          "when" : "windy hills or moor"
+        },
+        {
+          "sounds" : "nightInsects soft",
+          "when" : "night"
+        },
+        {
+          "sounds" : "farmyard soft",
+          "when" : "a farm"
+        }
+      ]
+    },
+    {
+      "place" : "sea and coast",
+      "states" : [
+        {
+          "sounds" : "seaShore soft",
+          "when" : "a beach"
+        },
+        {
+          "sounds" : "seaShore.harbour soft",
+          "when" : "a harbour"
+        },
+        {
+          "sounds" : "seaShore.cliffs soft",
+          "when" : "cliffs"
+        },
+        {
+          "sounds" : "seaShore.stormySea full, strongWind soft",
+          "when" : "a storm on the coast"
+        },
+        {
+          "sounds" : "ship soft, openSea soft",
+          "when" : "at sea on a sailing ship"
+        },
+        {
+          "sounds" : "ship.shipStorm full, strongWind soft, thunder faint",
+          "when" : "at sea in a storm"
+        },
+        {
+          "sounds" : "ship.belowDecks soft",
+          "when" : "below decks"
+        }
+      ]
+    },
+    {
+      "place" : "camp",
+      "states" : [
+        {
+          "sounds" : "campfire soft, nightInsects faint",
+          "when" : "evening, a fire"
+        },
+        {
+          "sounds" : "rainIndoors.tentRain soft",
+          "when" : "a tent in the rain"
+        },
+        {
+          "sounds" : "wind.tentWind soft",
+          "when" : "a tent in the wind"
+        },
+        {
+          "sounds" : "crowd.armyCamp soft, campfire faint",
+          "when" : "an army camp"
+        }
+      ]
+    },
+    {
+      "place" : "car journey",
+      "states" : [
+        {
+          "sounds" : "motorVehicle.car soft",
+          "when" : "driving"
+        },
+        {
+          "sounds" : "motorVehicle.car soft, rainIndoors.rainOnCarRoof faint",
+          "when" : "driving in rain"
+        },
+        {
+          "sounds" : "rainIndoors.rainOnCarRoof soft",
+          "when" : "parked, rain on the roof"
+        },
+        {
+          "sounds" : "motorVehicle.bus soft",
+          "when" : "a bus"
+        }
+      ]
+    },
+    {
+      "place" : "train journey",
+      "states" : [
+        {
+          "sounds" : "train soft",
+          "when" : "daytime"
+        },
+        {
+          "sounds" : "train.sleeperNight faint",
+          "when" : "night, a sleeper"
+        },
+        {
+          "sounds" : "crowd.trainStation full",
+          "when" : "the station"
+        },
+        {
+          "sounds" : "train.subway soft",
+          "when" : "the underground"
+        }
+      ]
+    },
+    {
+      "place" : "plane journey",
+      "states" : [
+        {
+          "sounds" : "aircraft.airliner soft",
+          "when" : "in flight"
+        },
+        {
+          "sounds" : "crowd.airportTerminal full",
+          "when" : "the terminal"
+        }
+      ]
+    },
+    {
+      "place" : "horse and carriage",
+      "states" : [
+        {
+          "sounds" : "horses soft",
+          "when" : "riding"
+        },
+        {
+          "sounds" : "horses.stagecoach soft",
+          "when" : "inside a coach"
+        },
+        {
+          "sounds" : "farmyard.stable soft",
+          "when" : "a stable"
+        }
+      ]
+    },
+    {
+      "place" : "spaceship",
+      "states" : [
+        {
+          "sounds" : "spaceship.bridge soft",
+          "when" : "the bridge"
+        },
+        {
+          "sounds" : "spaceship soft",
+          "when" : "a corridor or quarters"
+        },
+        {
+          "sounds" : "spaceship.engineDeck full",
+          "when" : "the engine deck"
+        },
+        {
+          "sounds" : "deepDrone.deepSpace soft",
+          "when" : "outside, in space"
+        }
+      ]
+    },
+    {
+      "place" : "underground",
+      "states" : [
+        {
+          "sounds" : "dripping.cave soft",
+          "when" : "a cave"
+        },
+        {
+          "sounds" : "dripping.dungeon soft",
+          "when" : "a dungeon or cell"
+        },
+        {
+          "sounds" : "machinery.mineWorkings soft, dripping faint",
+          "when" : "a mine at work"
+        },
+        {
+          "sounds" : "dripping.sewer soft",
+          "when" : "a sewer or tunnel"
+        }
+      ]
+    },
+    {
+      "place" : "workplaces",
+      "states" : [
+        {
+          "sounds" : "workshop.blacksmith full",
+          "when" : "a smithy"
+        },
+        {
+          "sounds" : "workshop.carpentry soft",
+          "when" : "a carpenter"
+        },
+        {
+          "sounds" : "machinery.factoryFloor full",
+          "when" : "a factory"
+        },
+        {
+          "sounds" : "electricHum.laboratory faint",
+          "when" : "a laboratory"
+        },
+        {
+          "sounds" : "farmyard soft",
+          "when" : "a farm"
+        }
+      ]
+    },
+    {
+      "place" : "prison",
+      "states" : [
+        {
+          "sounds" : "emptyHall.prisonBlock faint",
+          "when" : "a cell"
+        },
+        {
+          "sounds" : "emptyHall.prisonBlock soft",
+          "when" : "the block, doors and echoes"
+        },
+        {
+          "sounds" : "crowd.prisonYard full",
+          "when" : "the yard"
+        }
+      ]
+    },
+    {
+      "place" : "dreams, visions, the uncanny",
+      "states" : [
+        {
+          "sounds" : "deepDrone.dreamscape faint",
+          "when" : "a dream"
+        },
+        {
+          "sounds" : "deepDrone.eerieStillness faint",
+          "when" : "something wrong, a dread"
+        },
+        {
+          "sounds" : "deepDrone.magicalHush faint",
+          "when" : "magic at work"
+        }
+      ]
+    }
+  ],
+  "promptVersion" : 4,
+  "sounds" : [
+    {
+      "about" : "steady rain, heard outdoors or under a light shelter",
+      "folder" : "Rain",
+      "group" : "weather",
+      "id" : "rain",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "light rain ambience",
+        "gentle rain",
+        "steady rain"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "a downpour or storm rain, outdoors",
+      "folder" : "HeavyRain",
+      "group" : "weather",
+      "id" : "heavyRain",
+      "levelOffsetDB" : 1,
+      "queries" : [
+        "heavy rain downpour",
+        "heavy rain ambience",
+        "torrential rain"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "rain heard from inside: on a roof, a window or a tent",
+      "folder" : "RainIndoors",
+      "group" : "weather",
+      "id" : "rainIndoors",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "rain on window",
+        "rain on roof interior",
+        "rain inside house"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "distant rolling thunder; only while a storm is actually going on",
+      "folder" : "Thunder",
+      "group" : "weather",
+      "id" : "thunder",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "distant thunderstorm rain",
+        "thunder rumble rain ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "a breeze in the open: fields, hills, a ship's deck, through trees",
+      "folder" : "Wind",
+      "group" : "weather",
+      "id" : "wind",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "gentle wind ambience",
+        "soft wind",
+        "wind field"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "a gale or howling wind: storms, mountain tops, blizzards, a moor at night",
+      "folder" : "StrongWind",
+      "group" : "weather",
+      "id" : "strongWind",
+      "levelOffsetDB" : 1,
+      "queries" : [
+        "strong wind howling",
+        "storm wind gusts",
+        "gale wind"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "the hush of a snowy day outdoors: very soft, muffled air",
+      "folder" : "Snow",
+      "group" : "weather",
+      "id" : "snow",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "winter wind snow ambience",
+        "snowy quiet winter ambience",
+        "snow forest winter"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : true
+    },
+    {
+      "about" : "a fire in a hearth, stove or brazier, indoors",
+      "folder" : "Fireplace",
+      "group" : "fire",
+      "id" : "fireplace",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "fireplace crackling",
+        "fireplace fire crackle",
+        "wood stove crackle"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "an outdoor fire: a camp, a bonfire, torches",
+      "folder" : "Campfire",
+      "group" : "fire",
+      "id" : "campfire",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "campfire crackling outdoors",
+        "campfire night"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "waves on a beach or rocks: a coast, a harbour, cliffs",
+      "folder" : "SeaShore",
+      "group" : "water",
+      "id" : "seaShore",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "waves beach ambience",
+        "ocean waves shore",
+        "waves rocks"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "aboard or beside a boat at sea: water against the hull, the swell",
+      "folder" : "OpenSea",
+      "group" : "water",
+      "id" : "openSea",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "open sea waves boat",
+        "ocean swell",
+        "boat hull water"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "running water nearby: a stream, a brook, a river, a fountain, a tap",
+      "folder" : "River",
+      "group" : "water",
+      "id" : "river",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "river stream ambience",
+        "babbling brook",
+        "creek water flowing"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "drips echoing in a cave, cellar, dungeon, mine, tunnel or sewer",
+      "folder" : "Dripping",
+      "group" : "water",
+      "id" : "dripping",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "cave dripping water",
+        "water drips cave ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "woods by day: leaves, branches, birds in the distance",
+      "folder" : "Forest",
+      "group" : "nature",
+      "id" : "forest",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "forest ambience day",
+        "woodland ambience birds wind"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a garden, park, meadow or countryside by day: birdsong",
+      "folder" : "Birdsong",
+      "group" : "nature",
+      "id" : "birdsong",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "birdsong morning",
+        "dawn chorus birds",
+        "garden birds"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a warm night outdoors: crickets and insects",
+      "folder" : "NightInsects",
+      "group" : "nature",
+      "id" : "nightInsects",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "crickets night",
+        "night insects ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "woods or countryside at night: an owl now and then, a soft breeze",
+      "folder" : "NightForest",
+      "group" : "nature",
+      "id" : "nightForest",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "night forest ambience",
+        "forest at night owl"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a marsh, bog, swamp, pond or lake shore: frogs and insects",
+      "folder" : "Swamp",
+      "group" : "nature",
+      "id" : "swamp",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "swamp frogs night",
+        "marsh frogs ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "many people right around the characters, words not made out: a packed corridor, a market, a feast or dining hall, a station, a busy inn. The music pauses for it",
+      "folder" : "Crowd",
+      "group" : "people",
+      "id" : "crowd",
+      "levelOffsetDB" : -3,
+      "queries" : [
+        "crowd murmur indoor",
+        "walla crowd indistinct",
+        "school hallway ambience"
+      ],
+      "replacesMusic" : true,
+      "voices" : true,
+      "weather" : false
+    },
+    {
+      "about" : "a modern town or city around you: distant traffic, no single voices",
+      "folder" : "City",
+      "group" : "places",
+      "id" : "city",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "city street ambience",
+        "city traffic distant ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a town or village street before cars: hooves, carts, footsteps, distant bells",
+      "folder" : "OldTown",
+      "group" : "places",
+      "id" : "oldTown",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "medieval town ambience",
+        "market square ambience horses",
+        "village square ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "riding, or travelling by horse, carriage, cart, caravan or sled: hooves and wheels",
+      "folder" : "Horses",
+      "group" : "travel",
+      "id" : "horses",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "horse carriage hooves cobblestones",
+        "horse drawn carriage"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "inside a moving train, tram or underground train: wheels and rails",
+      "folder" : "Train",
+      "group" : "travel",
+      "id" : "train",
+      "levelOffsetDB" : -1,
+      "queries" : [
+        "train interior ambience",
+        "steam train journey"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "aboard a wooden sailing ship: creaking timbers and ropes",
+      "folder" : "Ship",
+      "group" : "travel",
+      "id" : "ship",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "ship creaking wood",
+        "sailing ship ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "engines or machines running: an engine room, a factory, a mill, a generator",
+      "folder" : "Machinery",
+      "group" : "travel",
+      "id" : "machinery",
+      "levelOffsetDB" : -1,
+      "queries" : [
+        "factory machinery ambience",
+        "engine room ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a quiet room where a clock ticks: a study, a parlour, a waiting room",
+      "folder" : "Clock",
+      "group" : "rooms",
+      "id" : "clock",
+      "levelOffsetDB" : -8,
+      "queries" : [
+        "clock ticking",
+        "grandfather clock ticking"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "an ordinary quiet room with nobody else making a sound: the faint hush and hum of a house or building. The default indoors when nothing else is heard",
+      "folder" : "RoomTone",
+      "group" : "rooms",
+      "id" : "roomTone",
+      "levelOffsetDB" : -6,
+      "queries" : [
+        "room tone quiet house",
+        "empty room ambience quiet",
+        "house interior room tone"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a quiet room with people keeping quiet, no voices: pages turning, pens, chairs shifting, a cough: a library, a classroom at work, an exam, a church before the service",
+      "folder" : "HushedRoom",
+      "group" : "rooms",
+      "id" : "hushedRoom",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "library ambience quiet pages",
+        "quiet classroom ambience",
+        "exam hall ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a few people talking low nearby, words not made out: whispers in a corridor, the next table, voices through a wall, a small group. The music stays",
+      "folder" : "Murmur",
+      "group" : "people",
+      "id" : "murmur",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "quiet conversation murmur distant",
+        "people whispering ambience",
+        "muffled voices next room"
+      ],
+      "replacesMusic" : false,
+      "voices" : true,
+      "weather" : false
+    },
+    {
+      "about" : "a big empty indoor space with an echo: a corridor after hours, a hospital or castle corridor, a stairwell, a cathedral, a museum, a garage: distant footsteps and doors",
+      "folder" : "EmptyHall",
+      "group" : "rooms",
+      "id" : "emptyHall",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "empty corridor ambience footsteps",
+        "large hall reverb ambience",
+        "hospital corridor ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "the hum of electric light, appliances, monitors or ventilation: an office, a hospital ward, a lab, a server room, a basement, a diner at night",
+      "folder" : "ElectricHum",
+      "group" : "rooms",
+      "id" : "electricHum",
+      "levelOffsetDB" : -5,
+      "queries" : [
+        "fluorescent light hum",
+        "air conditioning hum room",
+        "electrical hum ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "cooking going on: a sizzle, pots, water, chopping, a kettle: a home kitchen, a restaurant kitchen, a camp cook",
+      "folder" : "Kitchen",
+      "group" : "rooms",
+      "id" : "kitchen",
+      "levelOffsetDB" : -1,
+      "queries" : [
+        "kitchen cooking ambience",
+        "restaurant kitchen ambience",
+        "frying pan sizzle kitchen"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "hand work going on: a smithy, a carpenter, a sewing room, a garage, a printing shop, a loom",
+      "folder" : "Workshop",
+      "group" : "rooms",
+      "id" : "workshop",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "workshop ambience tools",
+        "blacksmith hammering ambience",
+        "carpentry workshop"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a farm: hens, cattle, sheep, a dog far off, a breeze: a farmyard, a barn, a stable, a pasture",
+      "folder" : "Farmyard",
+      "group" : "nature",
+      "id" : "farmyard",
+      "levelOffsetDB" : 0,
+      "queries" : [
+        "farm ambience animals",
+        "farmyard chickens cows",
+        "barn ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "riding inside a motor vehicle: a car, taxi, bus, truck or motorbike: engine and road",
+      "folder" : "MotorVehicle",
+      "group" : "travel",
+      "id" : "motorVehicle",
+      "levelOffsetDB" : -1,
+      "queries" : [
+        "car interior driving",
+        "driving car ambience interior",
+        "bus interior ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "inside an aircraft: an airliner's cabin, a small plane, a helicopter, an airship",
+      "folder" : "Aircraft",
+      "group" : "travel",
+      "id" : "aircraft",
+      "levelOffsetDB" : -1,
+      "queries" : [
+        "airplane cabin ambience",
+        "aircraft cabin interior flight"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "inside a spacecraft or space station: a deep hum, ventilation, faint instruments",
+      "folder" : "Spaceship",
+      "group" : "travel",
+      "id" : "spaceship",
+      "levelOffsetDB" : -2,
+      "queries" : [
+        "spaceship interior hum",
+        "sci-fi spaceship ambience hum",
+        "space station ambience"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    },
+    {
+      "about" : "a deep steady presence with no natural source: the void outside a hull, a dream, a magical stillness, a dread. Use sparingly, and only where the place has no sound of its own",
+      "folder" : "DeepDrone",
+      "group" : "elsewhere",
+      "id" : "deepDrone",
+      "levelOffsetDB" : -4,
+      "queries" : [
+        "deep space ambience",
+        "dark ambience low rumble",
+        "eerie ambience low hum"
+      ],
+      "replacesMusic" : false,
+      "voices" : false,
+      "weather" : false
+    }
+  ],
+  "variants" : [
+    {
+      "about" : "a light drizzle, barely there",
+      "folder" : "Rain.Drizzle",
+      "id" : "drizzle",
+      "of" : "rain",
+      "queries" : [
+        "light drizzle rain",
+        "drizzle ambience"
+      ],
+      "search" : "light drizzle rain"
+    },
+    {
+      "about" : "rain falling through a forest canopy",
+      "folder" : "Rain.RainOnLeaves",
+      "id" : "rainOnLeaves",
+      "of" : "rain",
+      "queries" : [
+        "rain forest leaves",
+        "rain on leaves"
+      ],
+      "search" : "rain forest leaves"
+    },
+    {
+      "about" : "rain on a pavement or street, puddles",
+      "folder" : "Rain.RainyStreet",
+      "id" : "rainyStreet",
+      "of" : "rain",
+      "queries" : [
+        "rain street ambience",
+        "rain on pavement"
+      ],
+      "search" : "rain street ambience"
+    },
+    {
+      "about" : "walking under an umbrella in the rain",
+      "folder" : "Rain.RainOnUmbrella",
+      "id" : "rainOnUmbrella",
+      "of" : "rain",
+      "queries" : [
+        "rain on umbrella",
+        "umbrella rain walking"
+      ],
+      "search" : "rain on umbrella"
+    },
+    {
+      "about" : "rain in a garden or yard, on plants and paving",
+      "folder" : "Rain.RainInGarden",
+      "id" : "rainInGarden",
+      "of" : "rain",
+      "queries" : [
+        "rain garden ambience",
+        "rain backyard"
+      ],
+      "search" : "rain garden ambience"
+    },
+    {
+      "about" : "monsoon rain, warm and relentless",
+      "folder" : "HeavyRain.Monsoon",
+      "id" : "monsoon",
+      "of" : "heavyRain",
+      "queries" : [
+        "monsoon rain",
+        "tropical heavy rain"
+      ],
+      "search" : "monsoon rain"
+    },
+    {
+      "about" : "a tropical storm: driving rain and wind",
+      "folder" : "HeavyRain.TropicalStorm",
+      "id" : "tropicalStorm",
+      "of" : "heavyRain",
+      "queries" : [
+        "tropical storm rain wind",
+        "hurricane rain"
+      ],
+      "search" : "tropical storm rain wind"
+    },
+    {
+      "about" : "rain drumming on a tent",
+      "folder" : "RainIndoors.TentRain",
+      "id" : "tentRain",
+      "of" : "rainIndoors",
+      "queries" : [
+        "rain on tent",
+        "rain tent canvas"
+      ],
+      "search" : "rain on tent"
+    },
+    {
+      "about" : "rain on a tin or metal roof",
+      "folder" : "RainIndoors.RainOnTinRoof",
+      "id" : "rainOnTinRoof",
+      "of" : "rainIndoors",
+      "queries" : [
+        "rain on tin roof",
+        "rain metal roof"
+      ],
+      "search" : "rain on tin roof"
+    },
+    {
+      "about" : "rain on the roof of a parked car",
+      "folder" : "RainIndoors.RainOnCarRoof",
+      "id" : "rainOnCarRoof",
+      "of" : "rainIndoors",
+      "queries" : [
+        "rain on car roof",
+        "rain inside car"
+      ],
+      "search" : "rain on car roof"
+    },
+    {
+      "about" : "rain on a window at night, the room quiet",
+      "folder" : "RainIndoors.RainOnWindowNight",
+      "id" : "rainOnWindowNight",
+      "of" : "rainIndoors",
+      "queries" : [
+        "rain on window night",
+        "rain window interior night"
+      ],
+      "search" : "rain on window night"
+    },
+    {
+      "about" : "a blizzard of driving snow and wind",
+      "folder" : "StrongWind.Blizzard",
+      "id" : "blizzard",
+      "of" : "strongWind",
+      "queries" : [
+        "blizzard wind snow",
+        "blizzard ambience"
+      ],
+      "search" : "blizzard wind snow"
+    },
+    {
+      "about" : "a sandstorm or dust storm",
+      "folder" : "StrongWind.Sandstorm",
+      "id" : "sandstorm",
+      "of" : "strongWind",
+      "queries" : [
+        "sandstorm wind",
+        "desert dust storm wind"
+      ],
+      "search" : "sandstorm wind"
+    },
+    {
+      "about" : "a hurricane or typhoon at its height",
+      "folder" : "StrongWind.Hurricane",
+      "id" : "hurricane",
+      "of" : "strongWind",
+      "queries" : [
+        "hurricane wind",
+        "typhoon wind howling"
+      ],
+      "search" : "hurricane wind"
+    },
+    {
+      "about" : "a gale over open moorland or heath",
+      "folder" : "StrongWind.MoorGale",
+      "id" : "moorGale",
+      "of" : "strongWind",
+      "queries" : [
+        "moor wind gale",
+        "windy moor ambience"
+      ],
+      "search" : "moor wind gale"
+    },
+    {
+      "about" : "polar wind over ice and snow",
+      "folder" : "StrongWind.ArcticWind",
+      "id" : "arcticWind",
+      "of" : "strongWind",
+      "queries" : [
+        "arctic wind",
+        "polar wind ice"
+      ],
+      "search" : "arctic wind"
+    },
+    {
+      "about" : "wind blowing over sand in a desert",
+      "folder" : "Wind.DesertWind",
+      "id" : "desertWind",
+      "of" : "wind",
+      "queries" : [
+        "desert wind",
+        "desert wind ambience"
+      ],
+      "search" : "desert wind"
+    },
+    {
+      "about" : "wind on a high mountain ridge",
+      "folder" : "Wind.MountainWind",
+      "id" : "mountainWind",
+      "of" : "wind",
+      "queries" : [
+        "mountain wind",
+        "mountain top wind"
+      ],
+      "search" : "mountain wind"
+    },
+    {
+      "about" : "a breeze with wind chimes on a porch",
+      "folder" : "Wind.WindChimes",
+      "id" : "windChimes",
+      "of" : "wind",
+      "queries" : [
+        "wind chimes breeze",
+        "wind chimes ambience"
+      ],
+      "search" : "wind chimes breeze"
+    },
+    {
+      "about" : "wind through tall grass, a wheat field, a prairie",
+      "folder" : "Wind.WindInTallGrass",
+      "id" : "windInTallGrass",
+      "of" : "wind",
+      "queries" : [
+        "wind grass field",
+        "wind in tall grass"
+      ],
+      "search" : "wind grass field"
+    },
+    {
+      "about" : "wind sighing through pine trees",
+      "folder" : "Wind.WindInPines",
+      "id" : "windInPines",
+      "of" : "wind",
+      "queries" : [
+        "wind in pines",
+        "wind through pine trees"
+      ],
+      "search" : "wind in pines"
+    },
+    {
+      "about" : "wind through ruins or an abandoned building",
+      "folder" : "Wind.Ruins",
+      "id" : "ruins",
+      "of" : "wind",
+      "queries" : [
+        "wind ruins ambience",
+        "wind abandoned building"
+      ],
+      "search" : "wind ruins ambience"
+    },
+    {
+      "about" : "wind on castle walls or a high tower",
+      "folder" : "Wind.Battlements",
+      "id" : "battlements",
+      "of" : "wind",
+      "queries" : [
+        "wind castle walls",
+        "wind tower high"
+      ],
+      "search" : "wind castle walls"
+    },
+    {
+      "about" : "a sea breeze through palms or dune grass",
+      "folder" : "Wind.SeaBreeze",
+      "id" : "seaBreeze",
+      "of" : "wind",
+      "queries" : [
+        "sea breeze palms",
+        "wind palm trees beach"
+      ],
+      "search" : "sea breeze palms"
+    },
+    {
+      "about" : "wind against a tent's canvas",
+      "folder" : "Wind.TentWind",
+      "id" : "tentWind",
+      "of" : "wind",
+      "queries" : [
+        "wind tent canvas",
+        "wind flapping tent"
+      ],
+      "search" : "wind tent canvas"
+    },
+    {
+      "about" : "snow falling at night, utterly still",
+      "folder" : "Snow.SnowfallNight",
+      "id" : "snowfallNight",
+      "of" : "snow",
+      "queries" : [
+        "snow falling night quiet",
+        "snowfall ambience quiet"
+      ],
+      "search" : "snow falling night quiet"
+    },
+    {
+      "about" : "a snowy forest, muffled, a branch dropping snow",
+      "folder" : "Snow.SnowyForest",
+      "id" : "snowyForest",
+      "of" : "snow",
+      "queries" : [
+        "snowy forest ambience",
+        "winter forest snow quiet"
+      ],
+      "search" : "snowy forest ambience"
+    },
+    {
+      "about" : "a storm far off, rumbling now and then",
+      "folder" : "Thunder.DistantStorm",
+      "id" : "distantStorm",
+      "of" : "thunder",
+      "queries" : [
+        "distant thunder rumble",
+        "far thunder storm"
+      ],
+      "search" : "distant thunder rumble"
+    },
+    {
+      "about" : "a wood stove burning, its iron ticking",
+      "folder" : "Fireplace.WoodStove",
+      "id" : "woodStove",
+      "of" : "fireplace",
+      "queries" : [
+        "wood stove burning",
+        "wood burning stove crackle"
+      ],
+      "search" : "wood stove burning"
+    },
+    {
+      "about" : "a fire burned down to embers, soft",
+      "folder" : "Fireplace.DyingEmbers",
+      "id" : "dyingEmbers",
+      "of" : "fireplace",
+      "queries" : [
+        "embers fire crackling soft",
+        "fire embers glowing"
+      ],
+      "search" : "embers fire crackling soft"
+    },
+    {
+      "about" : "a big roaring bonfire",
+      "folder" : "Campfire.Bonfire",
+      "id" : "bonfire",
+      "of" : "campfire",
+      "queries" : [
+        "bonfire roaring",
+        "large bonfire crackling"
+      ],
+      "search" : "bonfire roaring"
+    },
+    {
+      "about" : "torches flickering in a passage or hall",
+      "folder" : "Campfire.Torches",
+      "id" : "torches",
+      "of" : "campfire",
+      "queries" : [
+        "torch flame flicker",
+        "fire torch burning"
+      ],
+      "search" : "torch flame flicker"
+    },
+    {
+      "about" : "a campfire at night with crickets around",
+      "folder" : "Campfire.CampAtNight",
+      "id" : "campAtNight",
+      "of" : "campfire",
+      "queries" : [
+        "campfire night crickets",
+        "campfire ambience night"
+      ],
+      "search" : "campfire night crickets"
+    },
+    {
+      "about" : "a tropical beach: gentle waves, palms",
+      "folder" : "SeaShore.TropicalBeach",
+      "id" : "tropicalBeach",
+      "of" : "seaShore",
+      "queries" : [
+        "tropical beach waves",
+        "beach waves palms"
+      ],
+      "search" : "tropical beach waves"
+    },
+    {
+      "about" : "waves crashing on rocks in a storm",
+      "folder" : "SeaShore.StormySea",
+      "id" : "stormySea",
+      "of" : "seaShore",
+      "queries" : [
+        "stormy sea waves crashing rocks",
+        "storm waves cliffs"
+      ],
+      "search" : "stormy sea waves crashing rocks"
+    },
+    {
+      "about" : "a cliff top: waves far below, wind, gulls",
+      "folder" : "SeaShore.Cliffs",
+      "id" : "cliffs",
+      "of" : "seaShore",
+      "queries" : [
+        "cliff top waves wind gulls",
+        "sea cliffs ambience"
+      ],
+      "search" : "cliff top waves wind gulls"
+    },
+    {
+      "about" : "a pier or jetty: water under the boards, gulls",
+      "folder" : "SeaShore.Pier",
+      "id" : "pier",
+      "of" : "seaShore",
+      "queries" : [
+        "pier ambience waves gulls",
+        "jetty water boards"
+      ],
+      "search" : "pier ambience waves gulls"
+    },
+    {
+      "about" : "an estuary or mudflats: wading birds, lapping water",
+      "folder" : "SeaShore.Estuary",
+      "id" : "estuary",
+      "of" : "seaShore",
+      "queries" : [
+        "estuary birds ambience",
+        "mudflats birds water"
+      ],
+      "search" : "estuary birds ambience"
+    },
+    {
+      "about" : "a beach at night, waves in the dark",
+      "folder" : "SeaShore.BeachNight",
+      "id" : "beachNight",
+      "of" : "seaShore",
+      "queries" : [
+        "beach night waves",
+        "ocean waves night"
+      ],
+      "search" : "beach night waves"
+    },
+    {
+      "about" : "waves dragging over a pebble beach",
+      "folder" : "SeaShore.PebbleBeach",
+      "id" : "pebbleBeach",
+      "of" : "seaShore",
+      "queries" : [
+        "pebble beach waves",
+        "shingle beach waves"
+      ],
+      "search" : "pebble beach waves"
+    },
+    {
+      "about" : "small waves lapping a lake shore",
+      "folder" : "SeaShore.LakeShore",
+      "id" : "lakeShore",
+      "of" : "seaShore",
+      "queries" : [
+        "lake shore lapping water",
+        "lake waves lapping"
+      ],
+      "search" : "lake shore lapping water"
+    },
+    {
+      "about" : "a harbour: water against the quay, gulls, rigging",
+      "folder" : "SeaShore.Harbour",
+      "id" : "harbour",
+      "of" : "seaShore",
+      "queries" : [
+        "harbour ambience gulls",
+        "harbor boats rigging"
+      ],
+      "search" : "harbour ambience gulls"
+    },
+    {
+      "about" : "under water, muffled and deep",
+      "folder" : "OpenSea.Underwater",
+      "id" : "underwater",
+      "of" : "openSea",
+      "queries" : [
+        "underwater ambience",
+        "underwater bubbles ambience"
+      ],
+      "search" : "underwater ambience"
+    },
+    {
+      "about" : "a small rowing boat on calm water",
+      "folder" : "OpenSea.RowingBoat",
+      "id" : "rowingBoat",
+      "of" : "openSea",
+      "queries" : [
+        "rowing boat oars water",
+        "rowboat oars lake"
+      ],
+      "search" : "rowing boat oars water"
+    },
+    {
+      "about" : "a ferry crossing: engine, water, wind on deck",
+      "folder" : "OpenSea.Ferry",
+      "id" : "ferry",
+      "of" : "openSea",
+      "queries" : [
+        "ferry deck ambience",
+        "ferry engine water"
+      ],
+      "search" : "ferry deck ambience"
+    },
+    {
+      "about" : "a motorboat under way",
+      "folder" : "OpenSea.Motorboat",
+      "id" : "motorboat",
+      "of" : "openSea",
+      "queries" : [
+        "motorboat engine water",
+        "speedboat ambience"
+      ],
+      "search" : "motorboat engine water"
+    },
+    {
+      "about" : "a canal boat or barge, slow engine, still water",
+      "folder" : "OpenSea.Narrowboat",
+      "id" : "narrowboat",
+      "of" : "openSea",
+      "queries" : [
+        "canal boat engine",
+        "narrowboat ambience"
+      ],
+      "search" : "canal boat engine"
+    },
+    {
+      "about" : "a cold sea with ice creaking and knocking",
+      "folder" : "OpenSea.ArcticSea",
+      "id" : "arcticSea",
+      "of" : "openSea",
+      "queries" : [
+        "sea ice creaking",
+        "arctic sea ice ambience"
+      ],
+      "search" : "sea ice creaking"
+    },
+    {
+      "about" : "a calm sea at night, water lapping the hull",
+      "folder" : "OpenSea.CalmNightSea",
+      "id" : "calmNightSea",
+      "of" : "openSea",
+      "queries" : [
+        "boat night water lapping hull",
+        "calm sea night boat"
+      ],
+      "search" : "boat night water lapping hull"
+    },
+    {
+      "about" : "a waterfall close by",
+      "folder" : "River.Waterfall",
+      "id" : "waterfall",
+      "of" : "river",
+      "queries" : [
+        "waterfall",
+        "waterfall ambience"
+      ],
+      "search" : "waterfall"
+    },
+    {
+      "about" : "a fountain splashing in a courtyard",
+      "folder" : "River.Fountain",
+      "id" : "fountain",
+      "of" : "river",
+      "queries" : [
+        "fountain courtyard",
+        "fountain water splashing"
+      ],
+      "search" : "fountain courtyard"
+    },
+    {
+      "about" : "a tap running into a basin",
+      "folder" : "River.RunningTap",
+      "id" : "runningTap",
+      "of" : "river",
+      "queries" : [
+        "running tap water sink",
+        "faucet running water"
+      ],
+      "search" : "running tap water sink"
+    },
+    {
+      "about" : "a fast cold mountain stream",
+      "folder" : "River.MountainStream",
+      "id" : "mountainStream",
+      "of" : "river",
+      "queries" : [
+        "mountain stream",
+        "alpine stream water"
+      ],
+      "search" : "mountain stream"
+    },
+    {
+      "about" : "river rapids, roaring white water",
+      "folder" : "River.Rapids",
+      "id" : "rapids",
+      "of" : "river",
+      "queries" : [
+        "river rapids",
+        "white water rapids"
+      ],
+      "search" : "river rapids"
+    },
+    {
+      "about" : "a canal or slow river: still water, a lock",
+      "folder" : "River.Canal",
+      "id" : "canal",
+      "of" : "river",
+      "queries" : [
+        "canal water ambience",
+        "slow river ambience"
+      ],
+      "search" : "canal water ambience"
+    },
+    {
+      "about" : "a jungle river with birds and insects",
+      "folder" : "River.JungleRiver",
+      "id" : "jungleRiver",
+      "of" : "river",
+      "queries" : [
+        "jungle river ambience",
+        "rainforest river"
+      ],
+      "search" : "jungle river ambience"
+    },
+    {
+      "about" : "a hot spring bubbling and steaming",
+      "folder" : "River.HotSpring",
+      "id" : "hotSpring",
+      "of" : "river",
+      "queries" : [
+        "hot spring bubbling",
+        "thermal spring water"
+      ],
+      "search" : "hot spring bubbling"
+    },
+    {
+      "about" : "a shower running",
+      "folder" : "River.Shower",
+      "id" : "shower",
+      "of" : "river",
+      "queries" : [
+        "shower running water",
+        "shower ambience bathroom"
+      ],
+      "search" : "shower running water"
+    },
+    {
+      "about" : "a bath filling",
+      "folder" : "River.BathFilling",
+      "id" : "bathFilling",
+      "of" : "river",
+      "queries" : [
+        "bath filling water",
+        "bathtub filling"
+      ],
+      "search" : "bath filling water"
+    },
+    {
+      "about" : "a water mill: the wheel turning, water pouring",
+      "folder" : "River.MillWheel",
+      "id" : "millWheel",
+      "of" : "river",
+      "queries" : [
+        "water mill wheel",
+        "watermill ambience"
+      ],
+      "search" : "water mill wheel"
+    },
+    {
+      "about" : "a cave: drips, a far echo, still air",
+      "folder" : "Dripping.Cave",
+      "id" : "cave",
+      "of" : "dripping",
+      "queries" : [
+        "cave ambience drips",
+        "cave interior echo"
+      ],
+      "search" : "cave ambience drips"
+    },
+    {
+      "about" : "a dungeon: drips, chains, stone",
+      "folder" : "Dripping.Dungeon",
+      "id" : "dungeon",
+      "of" : "dripping",
+      "queries" : [
+        "dungeon ambience drips",
+        "dungeon ambience stone"
+      ],
+      "search" : "dungeon ambience drips"
+    },
+    {
+      "about" : "a sewer or storm drain: trickling, echo",
+      "folder" : "Dripping.Sewer",
+      "id" : "sewer",
+      "of" : "dripping",
+      "queries" : [
+        "sewer ambience water",
+        "sewer tunnel dripping"
+      ],
+      "search" : "sewer ambience water"
+    },
+    {
+      "about" : "a mine shaft or tunnel: drips, timbers",
+      "folder" : "Dripping.Mine",
+      "id" : "mine",
+      "of" : "dripping",
+      "queries" : [
+        "mine shaft ambience",
+        "mine tunnel dripping"
+      ],
+      "search" : "mine shaft ambience"
+    },
+    {
+      "about" : "a crypt or catacomb, still and damp",
+      "folder" : "Dripping.Crypt",
+      "id" : "crypt",
+      "of" : "dripping",
+      "queries" : [
+        "crypt ambience",
+        "catacombs ambience"
+      ],
+      "search" : "crypt ambience"
+    },
+    {
+      "about" : "a long tunnel: distant echoes, drips",
+      "folder" : "Dripping.Tunnel",
+      "id" : "tunnel",
+      "of" : "dripping",
+      "queries" : [
+        "tunnel ambience echo",
+        "tunnel dripping echo"
+      ],
+      "search" : "tunnel ambience echo"
+    },
+    {
+      "about" : "an ice cave: drips and creaking ice",
+      "folder" : "Dripping.IceCave",
+      "id" : "iceCave",
+      "of" : "dripping",
+      "queries" : [
+        "ice cave ambience",
+        "glacier cave dripping"
+      ],
+      "search" : "ice cave ambience"
+    },
+    {
+      "about" : "a tropical jungle: insects, birds, humid air",
+      "folder" : "Forest.Jungle",
+      "id" : "jungle",
+      "of" : "forest",
+      "queries" : [
+        "jungle ambience",
+        "rainforest ambience day"
+      ],
+      "search" : "jungle ambience"
+    },
+    {
+      "about" : "a bamboo grove creaking and rustling",
+      "folder" : "Forest.BambooGrove",
+      "id" : "bambooGrove",
+      "of" : "forest",
+      "queries" : [
+        "bamboo forest wind",
+        "bamboo grove ambience"
+      ],
+      "search" : "bamboo forest wind"
+    },
+    {
+      "about" : "autumn woods: dry leaves, a crow, wind",
+      "folder" : "Forest.AutumnWoods",
+      "id" : "autumnWoods",
+      "of" : "forest",
+      "queries" : [
+        "autumn forest ambience",
+        "autumn woods leaves wind"
+      ],
+      "search" : "autumn forest ambience"
+    },
+    {
+      "about" : "a pine forest: wind in the needles, birds far off",
+      "folder" : "Forest.PineForest",
+      "id" : "pineForest",
+      "of" : "forest",
+      "queries" : [
+        "pine forest ambience",
+        "coniferous forest ambience"
+      ],
+      "search" : "pine forest ambience"
+    },
+    {
+      "about" : "a summer meadow: bees, grasshoppers, birds",
+      "folder" : "Birdsong.SummerMeadow",
+      "id" : "summerMeadow",
+      "of" : "birdsong",
+      "queries" : [
+        "summer meadow insects",
+        "meadow ambience bees birds"
+      ],
+      "search" : "summer meadow insects"
+    },
+    {
+      "about" : "a garden by day: birds, a bee, leaves",
+      "folder" : "Birdsong.Garden",
+      "id" : "garden",
+      "of" : "birdsong",
+      "queries" : [
+        "garden ambience birds",
+        "backyard birds ambience"
+      ],
+      "search" : "garden ambience birds"
+    },
+    {
+      "about" : "an early spring morning, birds everywhere",
+      "folder" : "Birdsong.SpringMorning",
+      "id" : "springMorning",
+      "of" : "birdsong",
+      "queries" : [
+        "spring morning birds",
+        "dawn chorus spring"
+      ],
+      "search" : "spring morning birds"
+    },
+    {
+      "about" : "an orchard or vineyard: birds, bees, a light wind",
+      "folder" : "Birdsong.Orchard",
+      "id" : "orchard",
+      "of" : "birdsong",
+      "queries" : [
+        "orchard ambience birds",
+        "vineyard ambience"
+      ],
+      "search" : "orchard ambience birds"
+    },
+    {
+      "about" : "the African savanna by day: birds, insects, wind",
+      "folder" : "Birdsong.Savanna",
+      "id" : "savanna",
+      "of" : "birdsong",
+      "queries" : [
+        "savanna ambience",
+        "african savanna birds"
+      ],
+      "search" : "savanna ambience"
+    },
+    {
+      "about" : "an alpine meadow: wind, birds, cowbells far off",
+      "folder" : "Birdsong.AlpineMeadow",
+      "id" : "alpineMeadow",
+      "of" : "birdsong",
+      "queries" : [
+        "alpine meadow cowbells",
+        "mountain meadow ambience"
+      ],
+      "search" : "alpine meadow cowbells"
+    },
+    {
+      "about" : "bees humming around a hive",
+      "folder" : "Birdsong.Beehive",
+      "id" : "beehive",
+      "of" : "birdsong",
+      "queries" : [
+        "bees hive humming",
+        "beehive ambience"
+      ],
+      "search" : "bees hive humming"
+    },
+    {
+      "about" : "a town park: birds, children far off, a distant road",
+      "folder" : "Birdsong.Park",
+      "id" : "park",
+      "of" : "birdsong",
+      "queries" : [
+        "park ambience birds",
+        "city park ambience"
+      ],
+      "search" : "park ambience birds"
+    },
+    {
+      "about" : "a desert at night: a few insects, a thin wind",
+      "folder" : "NightInsects.DesertNight",
+      "id" : "desertNight",
+      "of" : "nightInsects",
+      "queries" : [
+        "desert night ambience",
+        "desert night insects"
+      ],
+      "search" : "desert night ambience"
+    },
+    {
+      "about" : "a tropical night: loud insects, frogs far off",
+      "folder" : "NightInsects.TropicalNight",
+      "id" : "tropicalNight",
+      "of" : "nightInsects",
+      "queries" : [
+        "tropical night insects",
+        "tropical night ambience"
+      ],
+      "search" : "tropical night insects"
+    },
+    {
+      "about" : "a porch on a summer evening: crickets, chimes",
+      "folder" : "NightInsects.PorchEvening",
+      "id" : "porchEvening",
+      "of" : "nightInsects",
+      "queries" : [
+        "summer evening porch crickets",
+        "crickets evening ambience"
+      ],
+      "search" : "summer evening porch crickets"
+    },
+    {
+      "about" : "the savanna at night, insects and far calls",
+      "folder" : "NightInsects.SavannaNight",
+      "id" : "savannaNight",
+      "of" : "nightInsects",
+      "queries" : [
+        "savanna night ambience",
+        "african night insects"
+      ],
+      "search" : "savanna night ambience"
+    },
+    {
+      "about" : "a lake at night: crickets, water lapping",
+      "folder" : "NightInsects.LakeNight",
+      "id" : "lakeNight",
+      "of" : "nightInsects",
+      "queries" : [
+        "lake night ambience crickets",
+        "lakeside night"
+      ],
+      "search" : "lake night ambience crickets"
+    },
+    {
+      "about" : "a jungle at night: insects, frogs, a call",
+      "folder" : "NightForest.JungleNight",
+      "id" : "jungleNight",
+      "of" : "nightForest",
+      "queries" : [
+        "jungle night ambience",
+        "rainforest night"
+      ],
+      "search" : "jungle night ambience"
+    },
+    {
+      "about" : "a graveyard at night: wind, an owl, stillness",
+      "folder" : "NightForest.GraveyardNight",
+      "id" : "graveyardNight",
+      "of" : "nightForest",
+      "queries" : [
+        "graveyard night ambience",
+        "cemetery night wind"
+      ],
+      "search" : "graveyard night ambience"
+    },
+    {
+      "about" : "a winter night outdoors, very still, an owl",
+      "folder" : "NightForest.WinterNight",
+      "id" : "winterNight",
+      "of" : "nightForest",
+      "queries" : [
+        "winter night ambience quiet",
+        "cold night owl"
+      ],
+      "search" : "winter night ambience quiet"
+    },
+    {
+      "about" : "a mountain at night: wind, a far animal",
+      "folder" : "NightForest.MountainNight",
+      "id" : "mountainNight",
+      "of" : "nightForest",
+      "queries" : [
+        "mountain night ambience",
+        "mountain night wind"
+      ],
+      "search" : "mountain night ambience"
+    },
+    {
+      "about" : "a pond with ducks and geese",
+      "folder" : "Swamp.DuckPond",
+      "id" : "duckPond",
+      "of" : "swamp",
+      "queries" : [
+        "pond ducks ambience",
+        "duck pond"
+      ],
+      "search" : "pond ducks ambience"
+    },
+    {
+      "about" : "rice paddies: frogs, water, birds",
+      "folder" : "Swamp.RicePaddy",
+      "id" : "ricePaddy",
+      "of" : "swamp",
+      "queries" : [
+        "rice paddy frogs",
+        "rice field ambience"
+      ],
+      "search" : "rice paddy frogs"
+    },
+    {
+      "about" : "a mangrove or bayou: insects, water, birds",
+      "folder" : "Swamp.Mangrove",
+      "id" : "mangrove",
+      "of" : "swamp",
+      "queries" : [
+        "mangrove ambience",
+        "bayou ambience"
+      ],
+      "search" : "mangrove ambience"
+    },
+    {
+      "about" : "reed beds in the wind, water birds",
+      "folder" : "Swamp.ReedBed",
+      "id" : "reedBed",
+      "of" : "swamp",
+      "queries" : [
+        "reeds wind birds",
+        "reed bed ambience"
+      ],
+      "search" : "reeds wind birds"
+    },
+    {
+      "about" : "inside a barn: animals shifting, straw, a breeze",
+      "folder" : "Farmyard.Barn",
+      "id" : "barn",
+      "of" : "farmyard",
+      "queries" : [
+        "barn ambience animals",
+        "barn interior cows"
+      ],
+      "search" : "barn ambience animals"
+    },
+    {
+      "about" : "a stable: horses shifting, snorting, straw",
+      "folder" : "Farmyard.Stable",
+      "id" : "stable",
+      "of" : "farmyard",
+      "queries" : [
+        "stable horses ambience",
+        "horse stable interior"
+      ],
+      "search" : "stable horses ambience"
+    },
+    {
+      "about" : "hens clucking in a yard or henhouse",
+      "folder" : "Farmyard.Henhouse",
+      "id" : "henhouse",
+      "of" : "farmyard",
+      "queries" : [
+        "chickens clucking",
+        "hens farmyard"
+      ],
+      "search" : "chickens clucking"
+    },
+    {
+      "about" : "sheep on a hillside, bleating now and then",
+      "folder" : "Farmyard.SheepPasture",
+      "id" : "sheepPasture",
+      "of" : "farmyard",
+      "queries" : [
+        "sheep field bleating",
+        "sheep pasture ambience"
+      ],
+      "search" : "sheep field bleating"
+    },
+    {
+      "about" : "cattle in a field, lowing, grazing",
+      "folder" : "Farmyard.CattleField",
+      "id" : "cattleField",
+      "of" : "farmyard",
+      "queries" : [
+        "cows field ambience",
+        "cattle lowing field"
+      ],
+      "search" : "cows field ambience"
+    },
+    {
+      "about" : "an alpine pasture: cowbells, wind",
+      "folder" : "Farmyard.AlpinePasture",
+      "id" : "alpinePasture",
+      "of" : "farmyard",
+      "queries" : [
+        "cowbells alpine",
+        "cow bells pasture"
+      ],
+      "search" : "cowbells alpine"
+    },
+    {
+      "about" : "dogs in kennels or a yard, barking far off",
+      "folder" : "Farmyard.Kennels",
+      "id" : "kennels",
+      "of" : "farmyard",
+      "queries" : [
+        "dogs kennel ambience",
+        "dogs barking distant"
+      ],
+      "search" : "dogs kennel ambience"
+    },
+    {
+      "about" : "a house at night: the fridge, a creak, silence",
+      "folder" : "RoomTone.HouseAtNight",
+      "id" : "houseAtNight",
+      "of" : "roomTone",
+      "queries" : [
+        "house at night ambience",
+        "quiet house night room tone"
+      ],
+      "search" : "house at night ambience"
+    },
+    {
+      "about" : "an old house creaking, wind in the chimney",
+      "folder" : "RoomTone.OldHouseCreaks",
+      "id" : "oldHouseCreaks",
+      "of" : "roomTone",
+      "queries" : [
+        "old house creaking",
+        "haunted house ambience creaks"
+      ],
+      "search" : "old house creaking"
+    },
+    {
+      "about" : "an attic: wind under the eaves, timbers",
+      "folder" : "RoomTone.Attic",
+      "id" : "attic",
+      "of" : "roomTone",
+      "queries" : [
+        "attic ambience",
+        "attic wind creaks"
+      ],
+      "search" : "attic ambience"
+    },
+    {
+      "about" : "a cellar: damp, still, a far drip",
+      "folder" : "RoomTone.Cellar",
+      "id" : "cellar",
+      "of" : "roomTone",
+      "queries" : [
+        "cellar ambience",
+        "basement quiet ambience"
+      ],
+      "search" : "cellar ambience"
+    },
+    {
+      "about" : "a hotel room: hum, the city muffled",
+      "folder" : "RoomTone.HotelRoom",
+      "id" : "hotelRoom",
+      "of" : "roomTone",
+      "queries" : [
+        "hotel room ambience",
+        "hotel room tone"
+      ],
+      "search" : "hotel room ambience"
+    },
+    {
+      "about" : "a bedroom in the morning, birds outside",
+      "folder" : "RoomTone.BedroomMorning",
+      "id" : "bedroomMorning",
+      "of" : "roomTone",
+      "queries" : [
+        "bedroom morning ambience",
+        "morning room birds window"
+      ],
+      "search" : "bedroom morning ambience"
+    },
+    {
+      "about" : "an empty classroom: lights hum, the hallway far off",
+      "folder" : "RoomTone.ClassroomEmpty",
+      "id" : "classroomEmpty",
+      "of" : "roomTone",
+      "queries" : [
+        "empty classroom ambience",
+        "classroom room tone"
+      ],
+      "search" : "empty classroom ambience"
+    },
+    {
+      "about" : "an office after hours, lights and a fan",
+      "folder" : "RoomTone.OfficeAfterHours",
+      "id" : "officeAfterHours",
+      "of" : "roomTone",
+      "queries" : [
+        "empty office night ambience",
+        "office after hours"
+      ],
+      "search" : "empty office night ambience"
+    },
+    {
+      "about" : "a log cabin: timbers, wind outside",
+      "folder" : "RoomTone.CabinInterior",
+      "id" : "cabinInterior",
+      "of" : "roomTone",
+      "queries" : [
+        "cabin interior ambience",
+        "log cabin ambience wind"
+      ],
+      "search" : "cabin interior ambience"
+    },
+    {
+      "about" : "a stone chamber: still, cold, a draught",
+      "folder" : "RoomTone.CastleChamber",
+      "id" : "castleChamber",
+      "of" : "roomTone",
+      "queries" : [
+        "castle room ambience",
+        "stone room ambience"
+      ],
+      "search" : "castle room ambience"
+    },
+    {
+      "about" : "inside a stationary carriage or coach",
+      "folder" : "RoomTone.CarriageInterior",
+      "id" : "carriageInterior",
+      "of" : "roomTone",
+      "queries" : [
+        "carriage interior creaks",
+        "coach interior ambience"
+      ],
+      "search" : "carriage interior creaks"
+    },
+    {
+      "about" : "a hushed library: pages turning, soft footsteps",
+      "folder" : "HushedRoom.Library",
+      "id" : "library",
+      "of" : "hushedRoom",
+      "queries" : [
+        "library ambience quiet",
+        "library pages turning"
+      ],
+      "search" : "library ambience quiet"
+    },
+    {
+      "about" : "a classroom at work: pens, a cough, a chair",
+      "folder" : "HushedRoom.ClassroomQuiet",
+      "id" : "classroomQuiet",
+      "of" : "hushedRoom",
+      "queries" : [
+        "classroom quiet writing",
+        "classroom ambience students writing"
+      ],
+      "search" : "classroom quiet writing"
+    },
+    {
+      "about" : "an exam hall: pens scratching, a clock",
+      "folder" : "HushedRoom.ExamHall",
+      "id" : "examHall",
+      "of" : "hushedRoom",
+      "queries" : [
+        "exam hall ambience",
+        "exam room writing quiet"
+      ],
+      "search" : "exam hall ambience"
+    },
+    {
+      "about" : "a study hall or reading room",
+      "folder" : "HushedRoom.StudyHall",
+      "id" : "studyHall",
+      "of" : "hushedRoom",
+      "queries" : [
+        "reading room ambience",
+        "study hall quiet"
+      ],
+      "search" : "reading room ambience"
+    },
+    {
+      "about" : "a chapel or church with a few people, hushed",
+      "folder" : "HushedRoom.Chapel",
+      "id" : "chapel",
+      "of" : "hushedRoom",
+      "queries" : [
+        "church interior quiet",
+        "chapel ambience quiet"
+      ],
+      "search" : "church interior quiet"
+    },
+    {
+      "about" : "a courtroom in session: creaks, papers, a cough",
+      "folder" : "HushedRoom.Courtroom",
+      "id" : "courtroom",
+      "of" : "hushedRoom",
+      "queries" : [
+        "courtroom ambience",
+        "courtroom quiet"
+      ],
+      "search" : "courtroom ambience"
+    },
+    {
+      "about" : "a quiet office: keyboards, a phone far off",
+      "folder" : "HushedRoom.OfficeQuiet",
+      "id" : "officeQuiet",
+      "of" : "hushedRoom",
+      "queries" : [
+        "office ambience keyboards",
+        "quiet office typing"
+      ],
+      "search" : "office ambience keyboards"
+    },
+    {
+      "about" : "a typewriter clacking in a quiet room",
+      "folder" : "HushedRoom.Typewriter",
+      "id" : "typewriter",
+      "of" : "hushedRoom",
+      "queries" : [
+        "typewriter typing",
+        "typewriter ambience"
+      ],
+      "search" : "typewriter typing"
+    },
+    {
+      "about" : "a monastery: stone, sandals, a far bell",
+      "folder" : "HushedRoom.Monastery",
+      "id" : "monastery",
+      "of" : "hushedRoom",
+      "queries" : [
+        "monastery ambience",
+        "cloister ambience"
+      ],
+      "search" : "monastery ambience"
+    },
+    {
+      "about" : "an audience in the dark: a cough, a creak",
+      "folder" : "HushedRoom.TheatreAudience",
+      "id" : "theatreAudience",
+      "of" : "hushedRoom",
+      "queries" : [
+        "theater audience quiet",
+        "audience silence coughs"
+      ],
+      "search" : "theater audience quiet"
+    },
+    {
+      "about" : "a bookshop: pages, a till, soft steps",
+      "folder" : "HushedRoom.Bookshop",
+      "id" : "bookshop",
+      "of" : "hushedRoom",
+      "queries" : [
+        "bookshop ambience",
+        "bookstore ambience"
+      ],
+      "search" : "bookshop ambience"
+    },
+    {
+      "about" : "a museum gallery: footsteps, hush",
+      "folder" : "HushedRoom.Museum",
+      "id" : "museum",
+      "of" : "hushedRoom",
+      "queries" : [
+        "museum ambience",
+        "museum gallery footsteps"
+      ],
+      "search" : "museum ambience"
+    },
+    {
+      "about" : "a studio: brushes, a radio off, a window open",
+      "folder" : "HushedRoom.ArtStudio",
+      "id" : "artStudio",
+      "of" : "hushedRoom",
+      "queries" : [
+        "art studio ambience",
+        "painting studio quiet"
+      ],
+      "search" : "art studio ambience"
+    },
+    {
+      "about" : "people whispering around the characters",
+      "folder" : "Murmur.Whispers",
+      "id" : "whispers",
+      "of" : "murmur",
+      "queries" : [
+        "people whispering ambience",
+        "whispering crowd"
+      ],
+      "search" : "people whispering ambience"
+    },
+    {
+      "about" : "a corridor where people whisper and glance as you pass",
+      "folder" : "Murmur.HallwayWhispers",
+      "id" : "hallwayWhispers",
+      "of" : "murmur",
+      "queries" : [
+        "hallway whispering",
+        "school hallway whispers"
+      ],
+      "search" : "hallway whispering"
+    },
+    {
+      "about" : "one quiet conversation at the next table",
+      "folder" : "Murmur.QuietConversation",
+      "id" : "quietConversation",
+      "of" : "murmur",
+      "queries" : [
+        "quiet conversation restaurant",
+        "two people talking distant"
+      ],
+      "search" : "quiet conversation restaurant"
+    },
+    {
+      "about" : "voices muffled through a wall or door",
+      "folder" : "Murmur.VoicesNextRoom",
+      "id" : "voicesNextRoom",
+      "of" : "murmur",
+      "queries" : [
+        "muffled voices next room",
+        "voices through wall"
+      ],
+      "search" : "muffled voices next room"
+    },
+    {
+      "about" : "a waiting room: a few low voices, a cough",
+      "folder" : "Murmur.WaitingRoom",
+      "id" : "waitingRoom",
+      "of" : "murmur",
+      "queries" : [
+        "waiting room ambience",
+        "doctor waiting room"
+      ],
+      "search" : "waiting room ambience"
+    },
+    {
+      "about" : "a family meal: cutlery, low talk",
+      "folder" : "Murmur.DinnerTable",
+      "id" : "dinnerTable",
+      "of" : "murmur",
+      "queries" : [
+        "dinner table ambience",
+        "family dinner cutlery"
+      ],
+      "search" : "dinner table ambience"
+    },
+    {
+      "about" : "a dormitory at night: whispers in the dark",
+      "folder" : "Murmur.DormitoryNight",
+      "id" : "dormitoryNight",
+      "of" : "murmur",
+      "queries" : [
+        "dormitory night whispers",
+        "bedroom whispering night"
+      ],
+      "search" : "dormitory night whispers"
+    },
+    {
+      "about" : "pupils whispering while the teacher is out",
+      "folder" : "Murmur.ClassroomWhispers",
+      "id" : "classroomWhispers",
+      "of" : "murmur",
+      "queries" : [
+        "classroom whispering students",
+        "classroom chatter quiet"
+      ],
+      "search" : "classroom whispering students"
+    },
+    {
+      "about" : "a near-empty bar: a few voices, glasses",
+      "folder" : "Murmur.QuietBar",
+      "id" : "quietBar",
+      "of" : "murmur",
+      "queries" : [
+        "quiet bar ambience",
+        "empty bar ambience"
+      ],
+      "search" : "quiet bar ambience"
+    },
+    {
+      "about" : "a hospital room: low voices, a monitor",
+      "folder" : "Murmur.HospitalRoom",
+      "id" : "hospitalRoom",
+      "of" : "murmur",
+      "queries" : [
+        "hospital room ambience",
+        "hospital ward quiet voices"
+      ],
+      "search" : "hospital room ambience"
+    },
+    {
+      "about" : "a small shop: a customer, a till, the door",
+      "folder" : "Murmur.SmallShop",
+      "id" : "smallShop",
+      "of" : "murmur",
+      "queries" : [
+        "small shop ambience",
+        "store ambience quiet"
+      ],
+      "search" : "small shop ambience"
+    },
+    {
+      "about" : "backstage: hushed voices, the hall beyond",
+      "folder" : "Murmur.Backstage",
+      "id" : "backstage",
+      "of" : "murmur",
+      "queries" : [
+        "backstage ambience",
+        "theater backstage"
+      ],
+      "search" : "backstage ambience"
+    },
+    {
+      "about" : "a school corridor after hours: lockers, far steps",
+      "folder" : "EmptyHall.SchoolHallwayEmpty",
+      "id" : "schoolHallwayEmpty",
+      "of" : "emptyHall",
+      "queries" : [
+        "empty school hallway",
+        "school corridor empty"
+      ],
+      "search" : "empty school hallway"
+    },
+    {
+      "about" : "a hospital corridor: far trolleys, a door, hum",
+      "folder" : "EmptyHall.HospitalCorridor",
+      "id" : "hospitalCorridor",
+      "of" : "emptyHall",
+      "queries" : [
+        "hospital corridor ambience",
+        "hospital hallway"
+      ],
+      "search" : "hospital corridor ambience"
+    },
+    {
+      "about" : "a stone corridor: echo, a draught",
+      "folder" : "EmptyHall.CastleCorridor",
+      "id" : "castleCorridor",
+      "of" : "emptyHall",
+      "queries" : [
+        "castle corridor ambience",
+        "stone hallway echo"
+      ],
+      "search" : "castle corridor ambience"
+    },
+    {
+      "about" : "a stairwell: footsteps and doors echoing",
+      "folder" : "EmptyHall.Stairwell",
+      "id" : "stairwell",
+      "of" : "emptyHall",
+      "queries" : [
+        "stairwell ambience",
+        "stairwell echo footsteps"
+      ],
+      "search" : "stairwell ambience"
+    },
+    {
+      "about" : "a cathedral: a vast hush, far footsteps",
+      "folder" : "EmptyHall.Cathedral",
+      "id" : "cathedral",
+      "of" : "emptyHall",
+      "queries" : [
+        "cathedral ambience",
+        "cathedral interior reverb"
+      ],
+      "search" : "cathedral ambience"
+    },
+    {
+      "about" : "a parking garage: echo, a distant car",
+      "folder" : "EmptyHall.ParkingGarage",
+      "id" : "parkingGarage",
+      "of" : "emptyHall",
+      "queries" : [
+        "parking garage ambience",
+        "underground car park"
+      ],
+      "search" : "parking garage ambience"
+    },
+    {
+      "about" : "a cell block: echoes, far clangs, a voice",
+      "folder" : "EmptyHall.PrisonBlock",
+      "id" : "prisonBlock",
+      "of" : "emptyHall",
+      "queries" : [
+        "prison ambience",
+        "prison cell block"
+      ],
+      "search" : "prison ambience"
+    },
+    {
+      "about" : "a great hall, empty: echo, a fire far off",
+      "folder" : "EmptyHall.StoneHall",
+      "id" : "stoneHall",
+      "of" : "emptyHall",
+      "queries" : [
+        "great hall ambience empty",
+        "large stone hall reverb"
+      ],
+      "search" : "great hall ambience empty"
+    },
+    {
+      "about" : "a warehouse: vast, a fan, far clatter",
+      "folder" : "EmptyHall.Warehouse",
+      "id" : "warehouse",
+      "of" : "emptyHall",
+      "queries" : [
+        "warehouse ambience",
+        "warehouse interior"
+      ],
+      "search" : "warehouse ambience"
+    },
+    {
+      "about" : "a hangar or vast shed",
+      "folder" : "EmptyHall.Hangar",
+      "id" : "hangar",
+      "of" : "emptyHall",
+      "queries" : [
+        "hangar ambience",
+        "aircraft hangar interior"
+      ],
+      "search" : "hangar ambience"
+    },
+    {
+      "about" : "a lobby at night, nearly empty",
+      "folder" : "EmptyHall.LobbyNight",
+      "id" : "lobbyNight",
+      "of" : "emptyHall",
+      "queries" : [
+        "lobby ambience night",
+        "empty lobby ambience"
+      ],
+      "search" : "lobby ambience night"
+    },
+    {
+      "about" : "a hotel corridor: carpet, a far lift, doors",
+      "folder" : "EmptyHall.HotelCorridor",
+      "id" : "hotelCorridor",
+      "of" : "emptyHall",
+      "queries" : [
+        "hotel corridor ambience",
+        "hotel hallway"
+      ],
+      "search" : "hotel corridor ambience"
+    },
+    {
+      "about" : "a station at night, nearly empty",
+      "folder" : "EmptyHall.EmptyStation",
+      "id" : "emptyStation",
+      "of" : "emptyHall",
+      "queries" : [
+        "empty train station night",
+        "station ambience night"
+      ],
+      "search" : "empty train station night"
+    },
+    {
+      "about" : "a quiet office: air conditioning, distant keyboards",
+      "folder" : "ElectricHum.Office",
+      "id" : "office",
+      "of" : "electricHum",
+      "queries" : [
+        "office ambience",
+        "office room tone air conditioning"
+      ],
+      "search" : "office ambience"
+    },
+    {
+      "about" : "a hospital ward: monitors, hum, far voices",
+      "folder" : "ElectricHum.HospitalWard",
+      "id" : "hospitalWard",
+      "of" : "electricHum",
+      "queries" : [
+        "hospital ward ambience",
+        "hospital monitor beeping ambience"
+      ],
+      "search" : "hospital ward ambience"
+    },
+    {
+      "about" : "a hospital at night: a monitor, hum, a far cart",
+      "folder" : "ElectricHum.HospitalNight",
+      "id" : "hospitalNight",
+      "of" : "electricHum",
+      "queries" : [
+        "hospital night ambience",
+        "hospital room night monitor"
+      ],
+      "search" : "hospital night ambience"
+    },
+    {
+      "about" : "a server room or control room: fans, hum",
+      "folder" : "ElectricHum.ServerRoom",
+      "id" : "serverRoom",
+      "of" : "electricHum",
+      "queries" : [
+        "server room ambience",
+        "computer room fans"
+      ],
+      "search" : "server room ambience"
+    },
+    {
+      "about" : "a laboratory: hum, a fridge, glass",
+      "folder" : "ElectricHum.Laboratory",
+      "id" : "laboratory",
+      "of" : "electricHum",
+      "queries" : [
+        "laboratory ambience",
+        "science lab ambience"
+      ],
+      "search" : "laboratory ambience"
+    },
+    {
+      "about" : "a basement: a boiler, pipes, hum",
+      "folder" : "ElectricHum.Basement",
+      "id" : "basement",
+      "of" : "electricHum",
+      "queries" : [
+        "basement ambience boiler",
+        "basement hum pipes"
+      ],
+      "search" : "basement ambience boiler"
+    },
+    {
+      "about" : "a diner late at night: a fridge, a fan, a cup",
+      "folder" : "ElectricHum.LateNightDiner",
+      "id" : "lateNightDiner",
+      "of" : "electricHum",
+      "queries" : [
+        "diner ambience night",
+        "late night diner"
+      ],
+      "search" : "diner ambience night"
+    },
+    {
+      "about" : "a bunker or shelter: ventilation, close walls",
+      "folder" : "ElectricHum.Bunker",
+      "id" : "bunker",
+      "of" : "electricHum",
+      "queries" : [
+        "bunker ambience",
+        "shelter ventilation hum"
+      ],
+      "search" : "bunker ambience"
+    },
+    {
+      "about" : "radio static between stations",
+      "folder" : "ElectricHum.RadioStatic",
+      "id" : "radioStatic",
+      "of" : "electricHum",
+      "queries" : [
+        "radio static",
+        "radio static hiss"
+      ],
+      "search" : "radio static"
+    },
+    {
+      "about" : "a kitchen at night, the fridge humming",
+      "folder" : "ElectricHum.FridgeAtNight",
+      "id" : "fridgeAtNight",
+      "of" : "electricHum",
+      "queries" : [
+        "refrigerator hum",
+        "fridge humming kitchen night"
+      ],
+      "search" : "refrigerator hum"
+    },
+    {
+      "about" : "a neon sign buzzing",
+      "folder" : "ElectricHum.NeonBuzz",
+      "id" : "neonBuzz",
+      "of" : "electricHum",
+      "queries" : [
+        "neon sign buzz",
+        "neon light hum"
+      ],
+      "search" : "neon sign buzz"
+    },
+    {
+      "about" : "inside a submarine: hum, a ping, creaks",
+      "folder" : "ElectricHum.Submarine",
+      "id" : "submarine",
+      "of" : "electricHum",
+      "queries" : [
+        "submarine interior ambience",
+        "submarine sonar ambience"
+      ],
+      "search" : "submarine interior ambience"
+    },
+    {
+      "about" : "inside a lift: hum, cables",
+      "folder" : "ElectricHum.Elevator",
+      "id" : "elevator",
+      "of" : "electricHum",
+      "queries" : [
+        "elevator interior ambience",
+        "lift ride hum"
+      ],
+      "search" : "elevator interior ambience"
+    },
+    {
+      "about" : "a home kitchen: a kettle, a sizzle, dishes",
+      "folder" : "Kitchen.HomeKitchen",
+      "id" : "homeKitchen",
+      "of" : "kitchen",
+      "queries" : [
+        "kitchen ambience cooking",
+        "home kitchen breakfast cooking"
+      ],
+      "search" : "kitchen ambience cooking"
+    },
+    {
+      "about" : "a restaurant kitchen at full tilt",
+      "folder" : "Kitchen.RestaurantKitchen",
+      "id" : "restaurantKitchen",
+      "of" : "kitchen",
+      "queries" : [
+        "restaurant kitchen ambience",
+        "busy kitchen ambience"
+      ],
+      "search" : "restaurant kitchen ambience"
+    },
+    {
+      "about" : "cooking over a camp fire",
+      "folder" : "Kitchen.CampCooking",
+      "id" : "campCooking",
+      "of" : "kitchen",
+      "queries" : [
+        "campfire cooking",
+        "camp cooking fire pot"
+      ],
+      "search" : "campfire cooking"
+    },
+    {
+      "about" : "a ship's galley: pots, creaks",
+      "folder" : "Kitchen.ShipsGalley",
+      "id" : "shipsGalley",
+      "of" : "kitchen",
+      "queries" : [
+        "ship galley ambience",
+        "kitchen boat ambience"
+      ],
+      "search" : "ship galley ambience"
+    },
+    {
+      "about" : "washing up: water, plates, cutlery",
+      "folder" : "Kitchen.Dishwashing",
+      "id" : "dishwashing",
+      "of" : "kitchen",
+      "queries" : [
+        "washing dishes",
+        "dishwashing sink"
+      ],
+      "search" : "washing dishes"
+    },
+    {
+      "about" : "a bakery: ovens, trays, flour",
+      "folder" : "Kitchen.Bakery",
+      "id" : "bakery",
+      "of" : "kitchen",
+      "queries" : [
+        "bakery ambience",
+        "bakery kitchen"
+      ],
+      "search" : "bakery ambience"
+    },
+    {
+      "about" : "a smithy: the forge roaring, hammer on iron",
+      "folder" : "Workshop.Blacksmith",
+      "id" : "blacksmith",
+      "of" : "workshop",
+      "queries" : [
+        "blacksmith forge",
+        "blacksmith hammering anvil"
+      ],
+      "search" : "blacksmith forge"
+    },
+    {
+      "about" : "a carpenter's shop: saw, plane, chisel",
+      "folder" : "Workshop.Carpentry",
+      "id" : "carpentry",
+      "of" : "workshop",
+      "queries" : [
+        "carpentry workshop",
+        "woodworking workshop ambience"
+      ],
+      "search" : "carpentry workshop"
+    },
+    {
+      "about" : "a sewing room: a machine, scissors",
+      "folder" : "Workshop.SewingRoom",
+      "id" : "sewingRoom",
+      "of" : "workshop",
+      "queries" : [
+        "sewing machine",
+        "sewing room ambience"
+      ],
+      "search" : "sewing machine"
+    },
+    {
+      "about" : "a printing shop: the press, paper",
+      "folder" : "Workshop.PrintingShop",
+      "id" : "printingShop",
+      "of" : "workshop",
+      "queries" : [
+        "printing press",
+        "print shop ambience"
+      ],
+      "search" : "printing press"
+    },
+    {
+      "about" : "a mechanic's garage: tools, a compressor",
+      "folder" : "Workshop.Garage",
+      "id" : "garage",
+      "of" : "workshop",
+      "queries" : [
+        "mechanic garage ambience",
+        "auto repair shop"
+      ],
+      "search" : "mechanic garage ambience"
+    },
+    {
+      "about" : "a loom or spinning wheel at work",
+      "folder" : "Workshop.Loom",
+      "id" : "loom",
+      "of" : "workshop",
+      "queries" : [
+        "loom weaving",
+        "weaving loom ambience"
+      ],
+      "search" : "loom weaving"
+    },
+    {
+      "about" : "a potter's wheel, clay and water",
+      "folder" : "Workshop.Pottery",
+      "id" : "pottery",
+      "of" : "workshop",
+      "queries" : [
+        "pottery wheel",
+        "potter wheel ambience"
+      ],
+      "search" : "pottery wheel"
+    },
+    {
+      "about" : "a shipyard or dock: hammering, gulls, water",
+      "folder" : "Workshop.Shipyard",
+      "id" : "shipyard",
+      "of" : "workshop",
+      "queries" : [
+        "shipyard ambience",
+        "dockyard hammering"
+      ],
+      "search" : "shipyard ambience"
+    },
+    {
+      "about" : "a cafe: low chatter, cups and saucers",
+      "folder" : "Crowd.Cafe",
+      "id" : "cafe",
+      "of" : "crowd",
+      "queries" : [
+        "cafe ambience",
+        "coffee shop ambience"
+      ],
+      "search" : "cafe ambience"
+    },
+    {
+      "about" : "a busy tavern or pub: murmur, mugs, laughter",
+      "folder" : "Crowd.Tavern",
+      "id" : "tavern",
+      "of" : "crowd",
+      "queries" : [
+        "tavern pub ambience",
+        "medieval tavern ambience"
+      ],
+      "search" : "tavern pub ambience"
+    },
+    {
+      "about" : "an open-air market: stalls, chatter, footsteps",
+      "folder" : "Crowd.Marketplace",
+      "id" : "marketplace",
+      "of" : "crowd",
+      "queries" : [
+        "market ambience",
+        "outdoor market crowd"
+      ],
+      "search" : "market ambience"
+    },
+    {
+      "about" : "a packed school corridor between lessons",
+      "folder" : "Crowd.SchoolCorridor",
+      "id" : "schoolCorridor",
+      "of" : "crowd",
+      "queries" : [
+        "school hallway ambience",
+        "school corridor crowd"
+      ],
+      "search" : "school hallway ambience"
+    },
+    {
+      "about" : "a great hall at a feast: many voices, cutlery",
+      "folder" : "Crowd.FeastHall",
+      "id" : "feastHall",
+      "of" : "crowd",
+      "queries" : [
+        "banquet hall crowd",
+        "feast hall ambience"
+      ],
+      "search" : "banquet hall crowd"
+    },
+    {
+      "about" : "a railway station concourse",
+      "folder" : "Crowd.TrainStation",
+      "id" : "trainStation",
+      "of" : "crowd",
+      "queries" : [
+        "train station ambience",
+        "railway station crowd"
+      ],
+      "search" : "train station ambience"
+    },
+    {
+      "about" : "a school or works cafeteria: trays, chatter",
+      "folder" : "Crowd.Cafeteria",
+      "id" : "cafeteria",
+      "of" : "crowd",
+      "queries" : [
+        "cafeteria ambience",
+        "school cafeteria crowd"
+      ],
+      "search" : "cafeteria ambience"
+    },
+    {
+      "about" : "a classroom before the teacher arrives",
+      "folder" : "Crowd.ClassroomChatter",
+      "id" : "classroomChatter",
+      "of" : "crowd",
+      "queries" : [
+        "classroom chatter students",
+        "classroom noisy students"
+      ],
+      "search" : "classroom chatter students"
+    },
+    {
+      "about" : "a schoolyard or playground at break",
+      "folder" : "Crowd.Schoolyard",
+      "id" : "schoolyard",
+      "of" : "crowd",
+      "queries" : [
+        "playground children ambience",
+        "schoolyard ambience"
+      ],
+      "search" : "playground children ambience"
+    },
+    {
+      "about" : "a gym hall: balls, shoes squeaking, shouts",
+      "folder" : "Crowd.Gymnasium",
+      "id" : "gymnasium",
+      "of" : "crowd",
+      "queries" : [
+        "gymnasium ambience basketball",
+        "sports hall ambience"
+      ],
+      "search" : "gymnasium ambience basketball"
+    },
+    {
+      "about" : "a changing room: lockers, voices, showers",
+      "folder" : "Crowd.LockerRoom",
+      "id" : "lockerRoom",
+      "of" : "crowd",
+      "queries" : [
+        "locker room ambience",
+        "changing room ambience"
+      ],
+      "search" : "locker room ambience"
+    },
+    {
+      "about" : "a school bus full of children",
+      "folder" : "Crowd.SchoolBus",
+      "id" : "schoolBus",
+      "of" : "crowd",
+      "queries" : [
+        "school bus interior kids",
+        "bus full of children"
+      ],
+      "search" : "school bus interior kids"
+    },
+    {
+      "about" : "a hall filling up before an assembly or lecture",
+      "folder" : "Crowd.AssemblyHall",
+      "id" : "assemblyHall",
+      "of" : "crowd",
+      "queries" : [
+        "auditorium crowd before",
+        "lecture hall crowd ambience"
+      ],
+      "search" : "auditorium crowd before"
+    },
+    {
+      "about" : "a stadium crowd during a match",
+      "folder" : "Crowd.Stadium",
+      "id" : "stadium",
+      "of" : "crowd",
+      "queries" : [
+        "stadium crowd ambience",
+        "football crowd ambience"
+      ],
+      "search" : "stadium crowd ambience"
+    },
+    {
+      "about" : "a theatre before the curtain: the audience settling",
+      "folder" : "Crowd.TheatreFoyer",
+      "id" : "theatreFoyer",
+      "of" : "crowd",
+      "queries" : [
+        "theater audience before show",
+        "theatre foyer crowd"
+      ],
+      "search" : "theater audience before show"
+    },
+    {
+      "about" : "a congregation gathering, murmuring",
+      "folder" : "Crowd.Congregation",
+      "id" : "congregation",
+      "of" : "crowd",
+      "queries" : [
+        "church congregation murmur",
+        "church crowd ambience"
+      ],
+      "search" : "church congregation murmur"
+    },
+    {
+      "about" : "a courtroom stirring, a gallery murmuring",
+      "folder" : "Crowd.CourtroomGallery",
+      "id" : "courtroomGallery",
+      "of" : "crowd",
+      "queries" : [
+        "courtroom crowd murmur",
+        "courtroom gallery"
+      ],
+      "search" : "courtroom crowd murmur"
+    },
+    {
+      "about" : "a party in a house or flat: voices, glasses",
+      "folder" : "Crowd.PartyIndoors",
+      "id" : "partyIndoors",
+      "of" : "crowd",
+      "queries" : [
+        "house party ambience",
+        "party chatter indoors"
+      ],
+      "search" : "house party ambience"
+    },
+    {
+      "about" : "a garden party or reception outdoors",
+      "folder" : "Crowd.GardenParty",
+      "id" : "gardenParty",
+      "of" : "crowd",
+      "queries" : [
+        "garden party ambience",
+        "outdoor party chatter"
+      ],
+      "search" : "garden party ambience"
+    },
+    {
+      "about" : "a busy restaurant: plates, chatter",
+      "folder" : "Crowd.Restaurant",
+      "id" : "restaurant",
+      "of" : "crowd",
+      "queries" : [
+        "restaurant ambience",
+        "busy restaurant"
+      ],
+      "search" : "restaurant ambience"
+    },
+    {
+      "about" : "a hotel lobby: luggage, a bell, voices",
+      "folder" : "Crowd.HotelLobby",
+      "id" : "hotelLobby",
+      "of" : "crowd",
+      "queries" : [
+        "hotel lobby ambience",
+        "hotel lobby crowd"
+      ],
+      "search" : "hotel lobby ambience"
+    },
+    {
+      "about" : "an airport terminal: voices, wheels, echo",
+      "folder" : "Crowd.AirportTerminal",
+      "id" : "airportTerminal",
+      "of" : "crowd",
+      "queries" : [
+        "airport terminal ambience",
+        "airport crowd"
+      ],
+      "search" : "airport terminal ambience"
+    },
+    {
+      "about" : "a shopping mall or department store",
+      "folder" : "Crowd.ShoppingMall",
+      "id" : "shoppingMall",
+      "of" : "crowd",
+      "queries" : [
+        "shopping mall ambience",
+        "department store ambience"
+      ],
+      "search" : "shopping mall ambience"
+    },
+    {
+      "about" : "a supermarket: trolleys, tills, voices",
+      "folder" : "Crowd.Supermarket",
+      "id" : "supermarket",
+      "of" : "crowd",
+      "queries" : [
+        "supermarket ambience",
+        "grocery store ambience"
+      ],
+      "search" : "supermarket ambience"
+    },
+    {
+      "about" : "a bus station or stop with a crowd",
+      "folder" : "Crowd.BusStation",
+      "id" : "busStation",
+      "of" : "crowd",
+      "queries" : [
+        "bus station ambience",
+        "bus terminal crowd"
+      ],
+      "search" : "bus station ambience"
+    },
+    {
+      "about" : "an underground platform with a crowd",
+      "folder" : "Crowd.SubwayStation",
+      "id" : "subwayStation",
+      "of" : "crowd",
+      "queries" : [
+        "subway station platform ambience",
+        "metro station crowd"
+      ],
+      "search" : "subway station platform ambience"
+    },
+    {
+      "about" : "a busy emergency waiting room",
+      "folder" : "Crowd.HospitalWaitingRoom",
+      "id" : "hospitalWaitingRoom",
+      "of" : "crowd",
+      "queries" : [
+        "hospital waiting room",
+        "emergency room waiting ambience"
+      ],
+      "search" : "hospital waiting room"
+    },
+    {
+      "about" : "an open-plan office: phones, chatter, printers",
+      "folder" : "Crowd.OpenPlanOffice",
+      "id" : "openPlanOffice",
+      "of" : "crowd",
+      "queries" : [
+        "open plan office ambience",
+        "busy office ambience"
+      ],
+      "search" : "open plan office ambience"
+    },
+    {
+      "about" : "a newsroom or busy office in a hurry",
+      "folder" : "Crowd.Newsroom",
+      "id" : "newsroom",
+      "of" : "crowd",
+      "queries" : [
+        "newsroom ambience",
+        "busy newsroom"
+      ],
+      "search" : "newsroom ambience"
+    },
+    {
+      "about" : "a trading floor or exchange",
+      "folder" : "Crowd.TradingFloor",
+      "id" : "tradingFloor",
+      "of" : "crowd",
+      "queries" : [
+        "trading floor ambience",
+        "stock exchange floor"
+      ],
+      "search" : "trading floor ambience"
+    },
+    {
+      "about" : "a prison yard: voices, a ball, a whistle",
+      "folder" : "Crowd.PrisonYard",
+      "id" : "prisonYard",
+      "of" : "crowd",
+      "queries" : [
+        "prison yard ambience",
+        "prison yard crowd"
+      ],
+      "search" : "prison yard ambience"
+    },
+    {
+      "about" : "an army camp: men, horses, hammering",
+      "folder" : "Crowd.ArmyCamp",
+      "id" : "armyCamp",
+      "of" : "crowd",
+      "queries" : [
+        "army camp ambience",
+        "military camp ambience"
+      ],
+      "search" : "army camp ambience"
+    },
+    {
+      "about" : "a bazaar or souk: close, loud, bells",
+      "folder" : "Crowd.Bazaar",
+      "id" : "bazaar",
+      "of" : "crowd",
+      "queries" : [
+        "bazaar ambience",
+        "souk market ambience"
+      ],
+      "search" : "bazaar ambience"
+    },
+    {
+      "about" : "a fairground or carnival crowd",
+      "folder" : "Crowd.Fairground",
+      "id" : "fairground",
+      "of" : "crowd",
+      "queries" : [
+        "fairground ambience crowd",
+        "carnival crowd ambience"
+      ],
+      "search" : "fairground ambience crowd"
+    },
+    {
+      "about" : "a casino: machines, chips, voices",
+      "folder" : "Crowd.Casino",
+      "id" : "casino",
+      "of" : "crowd",
+      "queries" : [
+        "casino ambience",
+        "casino slot machines ambience"
+      ],
+      "search" : "casino ambience"
+    },
+    {
+      "about" : "an indoor pool: splashes, echoing voices",
+      "folder" : "Crowd.SwimmingPool",
+      "id" : "swimmingPool",
+      "of" : "crowd",
+      "queries" : [
+        "indoor swimming pool ambience",
+        "swimming pool echo"
+      ],
+      "search" : "indoor swimming pool ambience"
+    },
+    {
+      "about" : "a busy beach: children, waves, gulls",
+      "folder" : "Crowd.Beach",
+      "id" : "beach",
+      "of" : "crowd",
+      "queries" : [
+        "beach crowd ambience",
+        "busy beach children waves"
+      ],
+      "search" : "beach crowd ambience"
+    },
+    {
+      "about" : "a seaside promenade or boardwalk",
+      "folder" : "Crowd.Boardwalk",
+      "id" : "boardwalk",
+      "of" : "crowd",
+      "queries" : [
+        "boardwalk ambience",
+        "promenade crowd seaside"
+      ],
+      "search" : "boardwalk ambience"
+    },
+    {
+      "about" : "a train's dining car",
+      "folder" : "Crowd.DiningCar",
+      "id" : "diningCar",
+      "of" : "crowd",
+      "queries" : [
+        "dining car train ambience",
+        "train restaurant car"
+      ],
+      "search" : "dining car train ambience"
+    },
+    {
+      "about" : "a ballroom before the dance: voices, glasses",
+      "folder" : "Crowd.Ballroom",
+      "id" : "ballroom",
+      "of" : "crowd",
+      "queries" : [
+        "ballroom crowd ambience",
+        "gala reception crowd"
+      ],
+      "search" : "ballroom crowd ambience"
+    },
+    {
+      "about" : "a barracks: boots, voices, kit",
+      "folder" : "Crowd.Barracks",
+      "id" : "barracks",
+      "of" : "crowd",
+      "queries" : [
+        "barracks ambience",
+        "military barracks interior"
+      ],
+      "search" : "barracks ambience"
+    },
+    {
+      "about" : "a lecture hall or auditorium filling up",
+      "folder" : "Crowd.LectureHall",
+      "id" : "lectureHall",
+      "of" : "crowd",
+      "queries" : [
+        "lecture hall ambience",
+        "auditorium crowd"
+      ],
+      "search" : "lecture hall ambience"
+    },
+    {
+      "about" : "a night market: stalls, sizzling, voices",
+      "folder" : "Crowd.NightMarket",
+      "id" : "nightMarket",
+      "of" : "crowd",
+      "queries" : [
+        "night market ambience",
+        "street food market night"
+      ],
+      "search" : "night market ambience"
+    },
+    {
+      "about" : "a festival or fete crowd outdoors",
+      "folder" : "Crowd.Festival",
+      "id" : "festival",
+      "of" : "crowd",
+      "queries" : [
+        "festival crowd ambience",
+        "outdoor festival crowd"
+      ],
+      "search" : "festival crowd ambience"
+    },
+    {
+      "about" : "a town square on a busy day",
+      "folder" : "Crowd.TownSquare",
+      "id" : "townSquare",
+      "of" : "crowd",
+      "queries" : [
+        "town square ambience",
+        "plaza crowd ambience"
+      ],
+      "search" : "town square ambience"
+    },
+    {
+      "about" : "a packed pub on a loud night",
+      "folder" : "Crowd.PubCrowd",
+      "id" : "pubCrowd",
+      "of" : "crowd",
+      "queries" : [
+        "busy pub ambience",
+        "crowded pub"
+      ],
+      "search" : "busy pub ambience"
+    },
+    {
+      "about" : "an auction room or sale",
+      "folder" : "Crowd.Auction",
+      "id" : "auction",
+      "of" : "crowd",
+      "queries" : [
+        "auction room ambience",
+        "auction crowd"
+      ],
+      "search" : "auction room ambience"
+    },
+    {
+      "about" : "a crowd at a race, a fight or a match outdoors",
+      "folder" : "Crowd.SportsCrowd",
+      "id" : "sportsCrowd",
+      "of" : "crowd",
+      "queries" : [
+        "racetrack crowd ambience",
+        "sports crowd outdoor"
+      ],
+      "search" : "racetrack crowd ambience"
+    },
+    {
+      "about" : "a city at night: distant traffic, quiet streets",
+      "folder" : "City.CityNight",
+      "id" : "cityNight",
+      "of" : "city",
+      "queries" : [
+        "city night ambience",
+        "city night distant traffic"
+      ],
+      "search" : "city night ambience"
+    },
+    {
+      "about" : "a busy city street: traffic close, footsteps",
+      "folder" : "City.BusyStreet",
+      "id" : "busyStreet",
+      "of" : "city",
+      "queries" : [
+        "busy street ambience",
+        "city street traffic ambience"
+      ],
+      "search" : "busy street ambience"
+    },
+    {
+      "about" : "a highway or motorway, cars passing",
+      "folder" : "City.Highway",
+      "id" : "highway",
+      "of" : "city",
+      "queries" : [
+        "highway ambience",
+        "motorway traffic ambience"
+      ],
+      "search" : "highway ambience"
+    },
+    {
+      "about" : "a suburban street: a car, a dog, birds",
+      "folder" : "City.SuburbanStreet",
+      "id" : "suburbanStreet",
+      "of" : "city",
+      "queries" : [
+        "suburban street ambience",
+        "suburb ambience quiet"
+      ],
+      "search" : "suburban street ambience"
+    },
+    {
+      "about" : "a rainy city street at night, tyres hissing",
+      "folder" : "City.RainyStreetNight",
+      "id" : "rainyStreetNight",
+      "of" : "city",
+      "queries" : [
+        "city rain night ambience",
+        "rainy street night traffic"
+      ],
+      "search" : "city rain night ambience"
+    },
+    {
+      "about" : "a rooftop: the city below, wind",
+      "folder" : "City.Rooftop",
+      "id" : "rooftop",
+      "of" : "city",
+      "queries" : [
+        "rooftop city ambience",
+        "city rooftop wind traffic"
+      ],
+      "search" : "rooftop city ambience"
+    },
+    {
+      "about" : "a back alley at night, the city far off",
+      "folder" : "City.AlleyNight",
+      "id" : "alleyNight",
+      "of" : "city",
+      "queries" : [
+        "alley night ambience",
+        "city alley night"
+      ],
+      "search" : "alley night ambience"
+    },
+    {
+      "about" : "modern docks: cranes, water, engines",
+      "folder" : "City.Docks",
+      "id" : "docks",
+      "of" : "city",
+      "queries" : [
+        "docks ambience cranes",
+        "harbor industrial ambience"
+      ],
+      "search" : "docks ambience cranes"
+    },
+    {
+      "about" : "an industrial district: hum, trucks, clatter",
+      "folder" : "City.IndustrialZone",
+      "id" : "industrialZone",
+      "of" : "city",
+      "queries" : [
+        "industrial ambience",
+        "industrial area ambience"
+      ],
+      "search" : "industrial ambience"
+    },
+    {
+      "about" : "a small town's main street, a car now and then",
+      "folder" : "City.SmallTownStreet",
+      "id" : "smallTownStreet",
+      "of" : "city",
+      "queries" : [
+        "small town street ambience",
+        "quiet town street"
+      ],
+      "search" : "small town street ambience"
+    },
+    {
+      "about" : "a city park: birds, a road beyond the trees",
+      "folder" : "City.CityPark",
+      "id" : "cityPark",
+      "of" : "city",
+      "queries" : [
+        "city park ambience traffic birds",
+        "urban park ambience"
+      ],
+      "search" : "city park ambience traffic birds"
+    },
+    {
+      "about" : "church bells ringing across a town",
+      "folder" : "OldTown.ChurchBells",
+      "id" : "churchBells",
+      "of" : "oldTown",
+      "queries" : [
+        "church bells distant",
+        "church bells town"
+      ],
+      "search" : "church bells distant"
+    },
+    {
+      "about" : "a village waking: a cart, hens, a far bell",
+      "folder" : "OldTown.VillageMorning",
+      "id" : "villageMorning",
+      "of" : "oldTown",
+      "queries" : [
+        "village morning ambience",
+        "old village ambience"
+      ],
+      "search" : "village morning ambience"
+    },
+    {
+      "about" : "a cobbled street at night: a dog, a cart, a watchman",
+      "folder" : "OldTown.CobbledNight",
+      "id" : "cobbledNight",
+      "of" : "oldTown",
+      "queries" : [
+        "old town night ambience",
+        "medieval street night"
+      ],
+      "search" : "old town night ambience"
+    },
+    {
+      "about" : "a castle courtyard: horses, armour, bustle",
+      "folder" : "OldTown.CastleCourtyard",
+      "id" : "castleCourtyard",
+      "of" : "oldTown",
+      "queries" : [
+        "castle courtyard ambience",
+        "medieval castle ambience"
+      ],
+      "search" : "castle courtyard ambience"
+    },
+    {
+      "about" : "an old harbour town: gulls, carts, rigging",
+      "folder" : "OldTown.HarbourTown",
+      "id" : "harbourTown",
+      "of" : "oldTown",
+      "queries" : [
+        "old harbour town ambience",
+        "harbour town gulls carts"
+      ],
+      "search" : "old harbour town ambience"
+    },
+    {
+      "about" : "market day in an old town square",
+      "folder" : "OldTown.MarketDay",
+      "id" : "marketDay",
+      "of" : "oldTown",
+      "queries" : [
+        "medieval market ambience",
+        "market day old town"
+      ],
+      "search" : "medieval market ambience"
+    },
+    {
+      "about" : "a village at dusk: smoke, a dog, voices far off",
+      "folder" : "OldTown.VillageEvening",
+      "id" : "villageEvening",
+      "of" : "oldTown",
+      "queries" : [
+        "village evening ambience",
+        "village dusk ambience"
+      ],
+      "search" : "village evening ambience"
+    },
+    {
+      "about" : "riding at a gallop",
+      "folder" : "Horses.Gallop",
+      "id" : "gallop",
+      "of" : "horses",
+      "queries" : [
+        "horse galloping",
+        "horse gallop ride"
+      ],
+      "search" : "horse galloping"
+    },
+    {
+      "about" : "inside a stagecoach or carriage on the road",
+      "folder" : "Horses.Stagecoach",
+      "id" : "stagecoach",
+      "of" : "horses",
+      "queries" : [
+        "stagecoach interior",
+        "horse carriage ride interior"
+      ],
+      "search" : "stagecoach interior"
+    },
+    {
+      "about" : "a wagon or ox cart on a rough track",
+      "folder" : "Horses.WagonTrain",
+      "id" : "wagonTrain",
+      "of" : "horses",
+      "queries" : [
+        "wagon wheels dirt road",
+        "ox cart wheels"
+      ],
+      "search" : "wagon wheels dirt road"
+    },
+    {
+      "about" : "a camel caravan: bells, sand, wind",
+      "folder" : "Horses.CamelCaravan",
+      "id" : "camelCaravan",
+      "of" : "horses",
+      "queries" : [
+        "camel caravan",
+        "camels walking desert bells"
+      ],
+      "search" : "camel caravan"
+    },
+    {
+      "about" : "a dog sled over snow: runners, panting dogs",
+      "folder" : "Horses.DogSled",
+      "id" : "dogSled",
+      "of" : "horses",
+      "queries" : [
+        "dog sled snow",
+        "sled dogs running snow"
+      ],
+      "search" : "dog sled snow"
+    },
+    {
+      "about" : "an army on the march: boots, harness, wagons",
+      "folder" : "Horses.MarchingColumn",
+      "id" : "marchingColumn",
+      "of" : "horses",
+      "queries" : [
+        "marching army ambience",
+        "soldiers marching boots"
+      ],
+      "search" : "marching army ambience"
+    },
+    {
+      "about" : "a steam train on the move",
+      "folder" : "Train.SteamTrain",
+      "id" : "steamTrain",
+      "of" : "train",
+      "queries" : [
+        "steam train",
+        "steam train journey interior"
+      ],
+      "search" : "steam train"
+    },
+    {
+      "about" : "inside an underground train",
+      "folder" : "Train.Subway",
+      "id" : "subway",
+      "of" : "train",
+      "queries" : [
+        "subway train interior",
+        "metro train interior"
+      ],
+      "search" : "subway train interior"
+    },
+    {
+      "about" : "a sleeping car at night, the rails soft",
+      "folder" : "Train.SleeperNight",
+      "id" : "sleeperNight",
+      "of" : "train",
+      "queries" : [
+        "train night interior quiet",
+        "sleeper train ambience"
+      ],
+      "search" : "train night interior quiet"
+    },
+    {
+      "about" : "inside a tram or streetcar",
+      "folder" : "Train.Tram",
+      "id" : "tram",
+      "of" : "train",
+      "queries" : [
+        "tram interior ambience",
+        "streetcar interior"
+      ],
+      "search" : "tram interior ambience"
+    },
+    {
+      "about" : "riding in a freight car or on a slow goods train",
+      "folder" : "Train.FreightTrain",
+      "id" : "freightTrain",
+      "of" : "train",
+      "queries" : [
+        "freight train interior",
+        "boxcar train ambience"
+      ],
+      "search" : "freight train interior"
+    },
+    {
+      "about" : "a ship in a storm: groaning timbers, heavy seas",
+      "folder" : "Ship.ShipStorm",
+      "id" : "shipStorm",
+      "of" : "ship",
+      "queries" : [
+        "ship storm creaking waves",
+        "sailing ship storm"
+      ],
+      "search" : "ship storm creaking waves"
+    },
+    {
+      "about" : "below decks: creaks, water, muffled voices",
+      "folder" : "Ship.BelowDecks",
+      "id" : "belowDecks",
+      "of" : "ship",
+      "queries" : [
+        "ship below deck creaking",
+        "ship hold interior"
+      ],
+      "search" : "ship below deck creaking"
+    },
+    {
+      "about" : "a sailing ship in a light wind, calm sea",
+      "folder" : "Ship.CalmSailing",
+      "id" : "calmSailing",
+      "of" : "ship",
+      "queries" : [
+        "sailing boat calm",
+        "sailboat gentle sailing"
+      ],
+      "search" : "sailing boat calm"
+    },
+    {
+      "about" : "a steamship: engine throb, water, gulls",
+      "folder" : "Ship.Steamship",
+      "id" : "steamship",
+      "of" : "ship",
+      "queries" : [
+        "steamship engine",
+        "steam boat engine water"
+      ],
+      "search" : "steamship engine"
+    },
+    {
+      "about" : "a factory floor: presses, belts, hum",
+      "folder" : "Machinery.FactoryFloor",
+      "id" : "factoryFloor",
+      "of" : "machinery",
+      "queries" : [
+        "factory floor ambience",
+        "factory machines"
+      ],
+      "search" : "factory floor ambience"
+    },
+    {
+      "about" : "an engine room: pistons, steam, heat",
+      "folder" : "Machinery.EngineRoom",
+      "id" : "engineRoom",
+      "of" : "machinery",
+      "queries" : [
+        "engine room ambience",
+        "ship engine room"
+      ],
+      "search" : "engine room ambience"
+    },
+    {
+      "about" : "a building site: machines, hammering, a crane",
+      "folder" : "Machinery.Construction",
+      "id" : "construction",
+      "of" : "machinery",
+      "queries" : [
+        "construction site ambience",
+        "building site ambience"
+      ],
+      "search" : "construction site ambience"
+    },
+    {
+      "about" : "a sawmill: saws, belts, timber",
+      "folder" : "Machinery.Sawmill",
+      "id" : "sawmill",
+      "of" : "machinery",
+      "queries" : [
+        "sawmill ambience",
+        "sawmill machinery"
+      ],
+      "search" : "sawmill ambience"
+    },
+    {
+      "about" : "a working mine: carts, drills, pumps",
+      "folder" : "Machinery.MineWorkings",
+      "id" : "mineWorkings",
+      "of" : "machinery",
+      "queries" : [
+        "mine machinery ambience",
+        "underground mine working"
+      ],
+      "search" : "mine machinery ambience"
+    },
+    {
+      "about" : "a windmill: sails creaking, gears, grain",
+      "folder" : "Machinery.Windmill",
+      "id" : "windmill",
+      "of" : "machinery",
+      "queries" : [
+        "windmill ambience",
+        "windmill creaking gears"
+      ],
+      "search" : "windmill ambience"
+    },
+    {
+      "about" : "a power plant or turbine hall",
+      "folder" : "Machinery.PowerPlant",
+      "id" : "powerPlant",
+      "of" : "machinery",
+      "queries" : [
+        "power plant ambience",
+        "turbine hall hum"
+      ],
+      "search" : "power plant ambience"
+    },
+    {
+      "about" : "clockwork or gears turning close by",
+      "folder" : "Machinery.Clockwork",
+      "id" : "clockwork",
+      "of" : "machinery",
+      "queries" : [
+        "clockwork gears",
+        "gears mechanism ticking"
+      ],
+      "search" : "clockwork gears"
+    },
+    {
+      "about" : "a generator running outside",
+      "folder" : "Machinery.Generator",
+      "id" : "generator",
+      "of" : "machinery",
+      "queries" : [
+        "generator running",
+        "diesel generator ambience"
+      ],
+      "search" : "generator running"
+    },
+    {
+      "about" : "a grandfather clock ticking in a hall",
+      "folder" : "Clock.GrandfatherClock",
+      "id" : "grandfatherClock",
+      "of" : "clock",
+      "queries" : [
+        "grandfather clock ticking",
+        "long case clock tick"
+      ],
+      "search" : "grandfather clock ticking"
+    },
+    {
+      "about" : "a small clock ticking in a quiet study",
+      "folder" : "Clock.MantelClock",
+      "id" : "mantelClock",
+      "of" : "clock",
+      "queries" : [
+        "mantel clock ticking",
+        "small clock ticking room"
+      ],
+      "search" : "mantel clock ticking"
+    },
+    {
+      "about" : "a clockmaker's: many clocks ticking",
+      "folder" : "Clock.ClockShop",
+      "id" : "clockShop",
+      "of" : "clock",
+      "queries" : [
+        "many clocks ticking",
+        "clock shop ambience"
+      ],
+      "search" : "many clocks ticking"
+    },
+    {
+      "about" : "inside a moving car",
+      "folder" : "MotorVehicle.Car",
+      "id" : "car",
+      "of" : "motorVehicle",
+      "queries" : [
+        "car interior driving",
+        "car driving interior ambience"
+      ],
+      "search" : "car interior driving"
+    },
+    {
+      "about" : "inside a bus or coach",
+      "folder" : "MotorVehicle.Bus",
+      "id" : "bus",
+      "of" : "motorVehicle",
+      "queries" : [
+        "bus interior ambience",
+        "coach interior driving"
+      ],
+      "search" : "bus interior ambience"
+    },
+    {
+      "about" : "a truck's cab on the road",
+      "folder" : "MotorVehicle.Truck",
+      "id" : "truck",
+      "of" : "motorVehicle",
+      "queries" : [
+        "truck cab interior",
+        "truck driving interior"
+      ],
+      "search" : "truck cab interior"
+    },
+    {
+      "about" : "riding a motorbike: engine and wind",
+      "folder" : "MotorVehicle.Motorbike",
+      "id" : "motorbike",
+      "of" : "motorVehicle",
+      "queries" : [
+        "motorcycle riding",
+        "motorbike engine wind"
+      ],
+      "search" : "motorcycle riding"
+    },
+    {
+      "about" : "an old car rattling along",
+      "folder" : "MotorVehicle.OldCar",
+      "id" : "oldCar",
+      "of" : "motorVehicle",
+      "queries" : [
+        "vintage car driving",
+        "old car engine interior"
+      ],
+      "search" : "vintage car driving"
+    },
+    {
+      "about" : "an electric car, nearly silent, tyres on the road",
+      "folder" : "MotorVehicle.ElectricCar",
+      "id" : "electricCar",
+      "of" : "motorVehicle",
+      "queries" : [
+        "electric car interior",
+        "electric vehicle driving quiet"
+      ],
+      "search" : "electric car interior"
+    },
+    {
+      "about" : "a taxi at night through the city",
+      "folder" : "MotorVehicle.TaxiNight",
+      "id" : "taxiNight",
+      "of" : "motorVehicle",
+      "queries" : [
+        "taxi interior night city",
+        "car interior city night"
+      ],
+      "search" : "taxi interior night city"
+    },
+    {
+      "about" : "inside an airliner in flight",
+      "folder" : "Aircraft.Airliner",
+      "id" : "airliner",
+      "of" : "aircraft",
+      "queries" : [
+        "airplane cabin ambience",
+        "airliner cabin interior"
+      ],
+      "search" : "airplane cabin ambience"
+    },
+    {
+      "about" : "a small propeller plane",
+      "folder" : "Aircraft.SmallPlane",
+      "id" : "smallPlane",
+      "of" : "aircraft",
+      "queries" : [
+        "small plane interior",
+        "propeller plane cabin"
+      ],
+      "search" : "small plane interior"
+    },
+    {
+      "about" : "inside a helicopter",
+      "folder" : "Aircraft.Helicopter",
+      "id" : "helicopter",
+      "of" : "aircraft",
+      "queries" : [
+        "helicopter interior",
+        "helicopter cabin ambience"
+      ],
+      "search" : "helicopter interior"
+    },
+    {
+      "about" : "an airship's gondola: engines far off, wind",
+      "folder" : "Aircraft.Airship",
+      "id" : "airship",
+      "of" : "aircraft",
+      "queries" : [
+        "airship ambience",
+        "zeppelin interior"
+      ],
+      "search" : "airship ambience"
+    },
+    {
+      "about" : "a spaceship's bridge: instruments, soft beeps",
+      "folder" : "Spaceship.Bridge",
+      "id" : "bridge",
+      "of" : "spaceship",
+      "queries" : [
+        "spaceship bridge ambience",
+        "starship bridge ambience"
+      ],
+      "search" : "spaceship bridge ambience"
+    },
+    {
+      "about" : "a cryo bay or medical bay: a hiss, a slow pulse",
+      "folder" : "Spaceship.CryoBay",
+      "id" : "cryoBay",
+      "of" : "spaceship",
+      "queries" : [
+        "sci-fi medical bay ambience",
+        "cryo chamber ambience"
+      ],
+      "search" : "sci-fi medical bay ambience"
+    },
+    {
+      "about" : "a space station corridor: ventilation, hum",
+      "folder" : "Spaceship.SpaceStation",
+      "id" : "spaceStation",
+      "of" : "spaceship",
+      "queries" : [
+        "space station ambience",
+        "sci-fi corridor ambience"
+      ],
+      "search" : "space station ambience"
+    },
+    {
+      "about" : "a small shuttle or lander, rougher engines",
+      "folder" : "Spaceship.Shuttle",
+      "id" : "shuttle",
+      "of" : "spaceship",
+      "queries" : [
+        "sci-fi shuttle interior",
+        "small spacecraft interior"
+      ],
+      "search" : "sci-fi shuttle interior"
+    },
+    {
+      "about" : "a spaceship's engine deck, a deep throb",
+      "folder" : "Spaceship.EngineDeck",
+      "id" : "engineDeck",
+      "of" : "spaceship",
+      "queries" : [
+        "spaceship engine room",
+        "starship engine hum"
+      ],
+      "search" : "spaceship engine room"
+    },
+    {
+      "about" : "the void of space, a faint hull hum",
+      "folder" : "DeepDrone.DeepSpace",
+      "id" : "deepSpace",
+      "of" : "deepDrone",
+      "queries" : [
+        "deep space ambience",
+        "outer space ambience"
+      ],
+      "search" : "deep space ambience"
+    },
+    {
+      "about" : "a dream or vision, soft and unreal",
+      "folder" : "DeepDrone.Dreamscape",
+      "id" : "dreamscape",
+      "of" : "deepDrone",
+      "queries" : [
+        "dream ambience",
+        "ethereal ambience soft"
+      ],
+      "search" : "dream ambience"
+    },
+    {
+      "about" : "an eerie stillness, a low dread",
+      "folder" : "DeepDrone.EerieStillness",
+      "id" : "eerieStillness",
+      "of" : "deepDrone",
+      "queries" : [
+        "eerie ambience",
+        "horror ambience low"
+      ],
+      "search" : "eerie ambience"
+    },
+    {
+      "about" : "a magical presence, a shimmering stillness",
+      "folder" : "DeepDrone.MagicalHush",
+      "id" : "magicalHush",
+      "of" : "deepDrone",
+      "queries" : [
+        "magical ambience",
+        "mystical ambience"
+      ],
+      "search" : "magical ambience"
+    }
+  ],
+  "version" : 2
+}

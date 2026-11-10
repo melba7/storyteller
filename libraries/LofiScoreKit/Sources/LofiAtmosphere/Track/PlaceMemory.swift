@@ -13,6 +13,8 @@ public struct PlaceMemory: Sendable, Hashable {
         public var setting: StoryScene.Setting
         /// The sounds the last time the story was here.
         public var layers: [SceneLayer]
+        /// What the place was like then ("between lessons"), if the scorer said.
+        public var state: String?
         public var visits: Int
         /// Global index of the last entry in this place.
         public var lastSeen: Int
@@ -65,6 +67,7 @@ public struct PlaceMemory: Sendable, Hashable {
         if let name = scene.placeName, !name.isEmpty { place.name = name }
         if scene.setting != .unclear { place.setting = scene.setting }
         place.layers = scene.layers
+        place.state = scene.state
         // A visit is a stretch of entries in the same place.
         if place.visits == 0 || previousPlaceID != id { place.visits += 1 }
         place.lastSeen = entry.globalIndex

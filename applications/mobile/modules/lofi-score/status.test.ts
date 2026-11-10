@@ -8,6 +8,7 @@ import {
   canMarkWrongMood,
   describeAtmosphere,
   describeMusic,
+  intensityLabel,
   linkedFolderLabel,
   moodCounts,
   moodFeedbackLine,
@@ -174,6 +175,16 @@ describe("labels", () => {
   it("shows the level relative to the voice", () => {
     expect(musicLevelLabel(-12)).toBe("12 dB under the voice")
     expect(musicLevelLabel(0)).toBe("As loud as the voice")
+  })
+
+  it("says how much of the scene the intensity dial lets through", () => {
+    expect(intensityLabel(0)).toBe("Just the main sound")
+    expect(intensityLabel(0.25)).toBe("Sparse")
+    expect(intensityLabel(0.5)).toBe("Some of the scene")
+    expect(intensityLabel(0.75)).toBe("Most of the scene")
+    expect(intensityLabel(1)).toBe("The whole scene")
+    expect(soundName("murmur")).toBe("murmuring voices")
+    expect(soundName("emptyHall")).toBe("an empty hall")
   })
 
   it("names the music's source and moods", () => {

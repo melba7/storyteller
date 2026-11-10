@@ -382,6 +382,18 @@ public final class LofiMusicHost: @unchecked Sendable {
         settings.atmosphereLevelDB ?? environment.atmosphereConfig.bedLevelDB
     }
 
+    /// How much is going on in the atmosphere, 0 to 1; nil goes back to the default.
+    public func setAtmosphereIntensity(_ intensity: Double?) async {
+        await onQueue { [self] in
+            settings.atmosphereIntensity = intensity
+            atmosphere?.setIntensity(atmosphereIntensity)
+        }
+    }
+
+    private var atmosphereIntensity: Double {
+        settings.atmosphereIntensity ?? environment.atmosphereConfig.intensity
+    }
+
     /// The music's level under the voice in dB; nil goes back to the default.
     public func setMusicLevel(dB: Double?) async {
         await onQueue { [self] in
@@ -970,9 +982,12 @@ public final class LofiMusicHost: @unchecked Sendable {
     static func loadAmbience(_ environment: Environment) -> (AmbienceLibrary, String) {
         let importedFolder = environment.musicFolder.appendingPathComponent(MusicFolderImport.atmosphereFolderName, isDirectory: true)
         let imported = (try? AmbienceLibrary.load(from: importedFolder, edition: environment.soundEdition)) ?? .empty(at: importedFolder)
-        guard imported.sounds.count < AmbientSound.allCases.count,
+        // Stand-ins are rendered only for the sounds that have no recording, so a full
+        // import renders none and a first launch renders a few at a time.
+        let missing = AmbientSound.allCases.filter { !imported.sounds.contains($0) }
+        guard !missing.isEmpty,
               let folder = environment.atmospherePlaceholderFolder,
-              let standIns = try? AmbienceSynth.prepare(at: folder, seconds: 20, sampleRate: 24_000)
+              let standIns = try? AmbienceSynth.prepare(at: folder, sounds: missing, seconds: 20, sampleRate: 24_000)
         else {
             return (imported, imported.recordings.isEmpty ? "none" : "imported")
         }
@@ -999,6 +1014,7 @@ public final class LofiMusicHost: @unchecked Sendable {
     private func installAtmosphere(_ library: AmbienceLibrary, oneShots: OneShotLibrary, source: String, backend: AmbienceBackend) {
         var config = environment.atmosphereConfig
         config.bedLevelDB = atmosphereLevelDB
+        config.intensity = atmosphereIntensity
         let player = AmbiencePlayer(
             library: library, oneShots: oneShots, backend: backend, scheduler: environment.makeAtmosphereScheduler(), config: config
         )
@@ -1132,6 +1148,8 @@ public final class LofiMusicHost: @unchecked Sendable {
                 levelDB: atmosphereLevelDB,
                 defaultLevelDB: environment.atmosphereConfig.bedLevelDB,
                 levelRange: [MusicSettings.atmosphereLevelRange.lowerBound, MusicSettings.atmosphereLevelRange.upperBound],
+                intensity: atmosphereIntensity,
+                defaultIntensity: environment.atmosphereConfig.intensity,
                 source: atmosphereSource,
                 preparing: preparingAtmosphere,
                 sounds: atmosphereSounds,
@@ -1250,6 +1268,10 @@ public struct LofiMusicStatus: Codable, Sendable, Hashable {
         public var levelDB: Double
         public var defaultLevelDB: Double
         public var levelRange: [Double]
+        /// How much is going on, 0 to 1 (``AtmosphereConfig/intensity``): the dial next to
+        /// the volume.
+        public var intensity: Double
+        public var defaultIntensity: Double
         /// "imported", "standIns" (synthesised), "mixed" or "none".
         public var source: String
         public var preparing: Bool

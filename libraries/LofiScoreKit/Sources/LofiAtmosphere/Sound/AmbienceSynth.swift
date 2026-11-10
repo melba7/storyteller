@@ -261,6 +261,36 @@ private struct Sketch {
         }
     }
 
+    /// A murmur of `count` voices, words never made out.
+    mutating func voices(count: Int, gain scale: Float) {
+        for _ in 0..<count {
+            let pan = randomPan(0.9)
+            let gain = Float(uniform(0.3, 0.7)) * scale
+            let syllable = uniform(0.16, 0.26)
+            var formant1 = [Double](repeating: 500, count: frames)
+            var formant2 = [Double](repeating: 1500, count: frames)
+            var envelope = [Float](repeating: 0, count: frames)
+            var t = 0
+            let pitch = uniform(0.8, 1.25)
+            while t < frames {
+                let length = Int(syllable * uniform(0.7, 1.3) * rate)
+                let f1 = uniform(300, 800) * pitch
+                let f2 = uniform(900, 2200) * pitch
+                let talking = rng.nextUnit() < 0.75
+                for k in 0..<length where t + k < frames {
+                    formant1[t + k] = f1
+                    formant2[t + k] = f2
+                    envelope[t + k] = talking ? Float(sin(.pi * Double(k) / Double(length))) : 0
+                }
+                t += length
+            }
+            let source = white()
+            let a = bandpass(source, center: { formant1[$0] }, q: 5)
+            let b = bandpass(source, center: { formant2[$0] }, q: 7)
+            add((0..<frames).map { (a[$0] + 0.6 * b[$0]) * envelope[$0] }, gain: gain, pan: pan)
+        }
+    }
+
     // MARK: The sketches
 
     mutating func draw(_ sound: AmbientSound) {
@@ -407,36 +437,13 @@ private struct Sketch {
                     }
                 }
             }
-        case .crowd:
+        case .crowd, .murmur:
             // A murmur of many voices: noise through moving vowel formants, a syllable at a time.
-            for _ in 0..<14 {
-                let pan = randomPan(0.9)
-                let gain = Float(uniform(0.3, 0.7))
-                let syllable = uniform(0.16, 0.26)
-                var formant1 = [Double](repeating: 500, count: frames)
-                var formant2 = [Double](repeating: 1500, count: frames)
-                var envelope = [Float](repeating: 0, count: frames)
-                var t = 0
-                let pitch = uniform(0.8, 1.25)
-                while t < frames {
-                    let length = Int(syllable * uniform(0.7, 1.3) * rate)
-                    let f1 = uniform(300, 800) * pitch
-                    let f2 = uniform(900, 2200) * pitch
-                    let talking = rng.nextUnit() < 0.75
-                    for k in 0..<length where t + k < frames {
-                        formant1[t + k] = f1
-                        formant2[t + k] = f2
-                        envelope[t + k] = talking ? Float(sin(.pi * Double(k) / Double(length))) : 0
-                    }
-                    t += length
-                }
-                let source = white()
-                let a = bandpass(source, center: { formant1[$0] }, q: 5)
-                let b = bandpass(source, center: { formant2[$0] }, q: 7)
-                add((0..<frames).map { (a[$0] + 0.6 * b[$0]) * envelope[$0] }, gain: gain, pan: pan)
-            }
-            out.left = lowpass(out.left, 2500)
-            out.right = lowpass(out.right, 2500)
+            // A murmur is a few voices, lower and more muffled.
+            let few = sound == .murmur
+            voices(count: few ? 3 : 14, gain: few ? 0.5 : 1)
+            out.left = lowpass(out.left, few ? 1600 : 2500)
+            out.right = lowpass(out.right, few ? 1600 : 2500)
         case .city:
             addWide(gain: 0.6) { s in s.lowpass(s.brown(), 250) }
             scatter(perSecond: 0.25) { s, i in
@@ -513,7 +520,141 @@ private struct Sketch {
                 tick.toggle()
                 t += 1
             }
+        case .roomTone, .hushedRoom, .emptyHall:
+            // The hush of a building: a low rumble, a faint mains hum, a little air.
+            addWide(gain: 0.6) { s in s.lowpass(s.brown(), 110) }
+            hum(frequencies: [50, 100], gain: 0.03)
+            addWide(gain: 0.03) { s in s.lowpass(s.white(), 1800) }
+            if sound == .hushedRoom {
+                // Pages and pens now and then, a chair, a cough far off.
+                scatter(perSecond: 0.7) { s, i in s.crackle(at: i, gain: Float(s.uniform(0.05, 0.12)), decay: s.uniform(60, 140)) }
+                scatter(perSecond: 1.0 / 7) { s, i in s.thud(at: Double(i) / s.rate, frequency: 140, gain: 0.08, decay: 14) }
+            }
+            if sound == .emptyHall {
+                // Footsteps far down a corridor, with the hall's echo, and a door.
+                scatter(perSecond: 1.0 / 5) { s, i in
+                    let steps = Int(s.uniform(3, 7))
+                    let pan = s.randomPan(0.7)
+                    let stride = s.uniform(0.5, 0.7)
+                    for n in 0..<steps {
+                        let at = i + Int(Double(n) * stride * s.rate)
+                        for echo in 0..<3 {
+                            s.place(at: at + Int(Double(echo) * 0.09 * s.rate), length: 0.12, gain: 0.12 * pow(0.5, Float(echo)), pan: pan) { t in
+                                sin(2 * .pi * 110 * t) * exp(-t * 40)
+                            }
+                        }
+                    }
+                }
+                scatter(perSecond: 1.0 / 11) { s, i in s.thud(at: Double(i) / s.rate, frequency: 70, gain: 0.2, decay: 6) }
+                out.left = lowpass(out.left, 1500)
+                out.right = lowpass(out.right, 1500)
+            }
+        case .electricHum:
+            // Mains hum with its harmonics, a touch of buzz, and the hiss of a vent.
+            hum(frequencies: [60, 120, 180, 240], gain: 0.12)
+            addWide(gain: 0.08) { s in s.lowpass(s.white(), 900) }
+            addWide(gain: 0.02) { s in s.bandpass(s.white(), center: { _ in 4000 }, q: 0.7) }
+        case .kitchen:
+            // A pan sizzling, water now and then, a clink of crockery, the fridge behind it.
+            hum(frequencies: [50, 100], gain: 0.03)
+            addWide(gain: 0.25) { s in
+                let swell = s.wander(0.3)
+                return zip(s.bandpass(s.white(), center: { _ in 4500 }, q: 0.5), swell).map { $0 * (0.3 + $1) }
+            }
+            scatter(perSecond: 0.5) { s, i in
+                let pitch = s.uniform(2400, 4200)
+                s.place(at: i, length: 0.25, gain: 0.12, pan: s.randomPan()) { t in sin(2 * .pi * pitch * t) * exp(-t * 18) }
+            }
+            scatter(perSecond: 1.0 / 6) { s, i in
+                let length = s.uniform(1.5, 3)
+                var seed = s.rng.next()
+                s.place(at: i, length: length, gain: 0.15, pan: s.randomPan(0.5)) { t in
+                    seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                    return Double(Int64(bitPattern: seed)) / Double(Int64.max) * sin(.pi * t / length)
+                }
+            }
+            out.left = lowpass(out.left, 7000)
+            out.right = lowpass(out.right, 7000)
+        case .workshop:
+            // Sawing in spells, a hammer now and then, tools put down.
+            addWide(gain: 0.3) { s in s.lowpass(s.brown(), 200) }
+            scatter(perSecond: 1.0 / 8) { s, i in
+                let strokes = Int(s.uniform(4, 9))
+                let pan = s.randomPan(0.6)
+                var seed = s.rng.next()
+                for n in 0..<strokes {
+                    s.place(at: i + Int(Double(n) * 0.75 * s.rate), length: 0.5, gain: 0.18, pan: pan) { t in
+                        seed = seed &* 6364136223846793005 &+ 1442695040888963407
+                        let noise = Double(Int64(bitPattern: seed)) / Double(Int64.max)
+                        return noise * sin(.pi * t / 0.5)
+                    }
+                }
+            }
+            scatter(perSecond: 1.0 / 4) { s, i in s.thud(at: Double(i) / s.rate, frequency: 220, gain: 0.25, decay: 25) }
+            scatter(perSecond: 0.3) { s, i in s.crackle(at: i, gain: 0.12, decay: 90) }
+            out.left = lowpass(out.left, 3500)
+            out.right = lowpass(out.right, 3500)
+        case .farmyard:
+            // A breeze, hens pecking about, a cow far off, a bird.
+            addWide(gain: 0.5) { s in
+                let swell = s.wander(0.15)
+                return zip(s.bandpass(s.white(), center: { _ in 320 }, q: 0.9), swell).map { $0 * (0.2 + $1) }
+            }
+            scatter(perSecond: 1.2) { s, i in
+                let pan = s.randomPan()
+                for n in 0..<Int(s.uniform(2, 5)) {
+                    s.chirp(at: i + Int(Double(n) * 0.16 * s.rate), gain: 0.06, from: 900, to: 650, length: 0.07, pan: pan)
+                }
+            }
+            scatter(perSecond: 1.0 / 9) { s, i in
+                s.blow(at: Double(i) / s.rate, frequencies: [130, 150], harmonics: 5, length: 1.2, attack: 0.3, release: 0.5, gain: 0.08, vibrato: 4)
+            }
+            scatter(perSecond: 0.4) { s, i in s.chirp(at: i, gain: 0.05, from: 3000, to: 3800, length: 0.1, pan: s.randomPan()) }
+        case .motorVehicle, .aircraft:
+            // The engine's hum and the road or the air rushing past.
+            let flying = sound == .aircraft
+            let drift = wander(0.2)
+            let base = flying ? 110.0 : 75.0
+            add((0..<frames).map { i in
+                let t = Double(i) / rate
+                let h = sin(2 * .pi * base * t) + 0.5 * sin(2 * .pi * base * 2 * t) + 0.25 * sin(2 * .pi * base * 3.02 * t)
+                return Float(h) * (0.8 + 0.2 * drift[i])
+            }, gain: flying ? 0.1 : 0.14)
+            addWide(gain: flying ? 0.9 : 0.6) { s in s.lowpass(s.white(), flying ? 1200 : 400) }
+            if !flying { addWide(gain: 0.5) { s in s.lowpass(s.brown(), 140) } }
+        case .spaceship:
+            // A deep hum, the air system breathing, an instrument now and then.
+            hum(frequencies: [40, 80, 121], gain: 0.16)
+            addWide(gain: 0.25) { s in
+                let breath = s.wander(0.08)
+                return zip(s.lowpass(s.white(), 600), breath).map { $0 * (0.3 + $1) }
+            }
+            scatter(perSecond: 1.0 / 7) { s, i in
+                let pan = s.randomPan(0.6)
+                s.tone(at: i, gain: 0.05, frequency: 1320, length: 0.12, attack: 0.01, pan: pan)
+                s.tone(at: i + Int(0.2 * s.rate), gain: 0.04, frequency: 1760, length: 0.12, attack: 0.01, pan: pan)
+            }
+        case .deepDrone:
+            // Two slightly detuned low tones that beat slowly, and a breath of air.
+            let slow = wander(0.05)
+            add((0..<frames).map { i in
+                let t = Double(i) / rate
+                let d = sin(2 * .pi * 55 * t) + sin(2 * .pi * 55.4 * t) + 0.5 * sin(2 * .pi * 82.4 * t) + 0.3 * sin(2 * .pi * 110.3 * t)
+                return Float(d) * (0.5 + 0.5 * slow[i])
+            }, gain: 0.12)
+            addWide(gain: 0.06) { s in s.lowpass(s.white(), 500) }
         }
+    }
+
+    /// A steady hum made of these frequencies, drifting a little in level.
+    mutating func hum(frequencies: [Double], gain: Float) {
+        let drift = wander(0.1)
+        add((0..<frames).map { i in
+            let t = Double(i) / rate
+            var v = 0.0
+            for (n, f) in frequencies.enumerated() { v += sin(2 * .pi * f * t) / Double(n + 1) }
+            return Float(v) * (0.85 + 0.15 * drift[i])
+        }, gain: gain)
     }
 }
 

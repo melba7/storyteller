@@ -210,6 +210,19 @@ final class AtmosphereHostTests: XCTestCase {
         status = await host.status()
         XCTAssertEqual(status.atmosphere.levelDB, -30)
         XCTAssertEqual(MusicSettings(defaults: defaults).atmosphereLevelDB, -30, "settings persist")
+        XCTAssertEqual(status.atmosphere.levelRange, [-40, -14])
+        XCTAssertEqual(status.atmosphere.intensity, 0.75, "the default")
+        XCTAssertEqual(status.atmosphere.defaultIntensity, 0.75)
+
+        await host.setAtmosphereIntensity(0.4)
+        status = await host.status()
+        XCTAssertEqual(status.atmosphere.intensity, 0.4)
+        XCTAssertEqual(MusicSettings(defaults: defaults).atmosphereIntensity, 0.4, "settings persist")
+        await host.setAtmosphereIntensity(nil)
+        status = await host.status()
+        XCTAssertEqual(status.atmosphere.intensity, 0.75)
+        XCTAssertNil(MusicSettings(defaults: defaults).atmosphereIntensity)
+        XCTAssertEqual((json["atmosphere"] as? [String: Any])?["intensity"] as? Double, 0.75)
 
         await host.setAtmosphereEnabled(false)
         status = try await waitFor(host) { !$0.atmosphere.musicYielding && $0.atmosphere.playing.isEmpty }

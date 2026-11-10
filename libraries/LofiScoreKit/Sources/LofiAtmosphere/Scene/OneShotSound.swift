@@ -27,6 +27,10 @@ public enum OneShotSound: String, CaseIterable, Codable, Sendable, Hashable {
     case horseNeigh
     case trainWhistle
     case shipHorn
+    case schoolBell
+    case roosterCrow
+    case catMeow
+    case carHorn
 
     /// Its folder under `Atmosphere/OneShots/`, e.g. "DoorKnock".
     public var folderName: String { rawValue.prefix(1).uppercased() + rawValue.dropFirst() }
@@ -49,6 +53,37 @@ public enum OneShotSound: String, CaseIterable, Codable, Sendable, Hashable {
         case .horseNeigh: "a horse neighing or whinnying"
         case .trainWhistle: "a train whistle"
         case .shipHorn: "a ship's horn or foghorn"
+        case .schoolBell: "a school bell ringing for the end of a lesson"
+        case .roosterCrow: "a rooster crowing"
+        case .catMeow: "a cat meowing"
+        case .carHorn: "a car horn, once"
+        }
+    }
+
+    /// Words to search a sound library with, and the longest a recording is kept, in
+    /// seconds (the rest is trimmed). The fetch script reads them from the exported
+    /// catalogue (``SoundCatalog``).
+    public var search: (queries: [String], longestSeconds: Double) {
+        switch self {
+        case .thunderClap: (["thunder clap", "thunder crack", "single thunder strike"], 8)
+        case .doorKnock: (["knocking on door", "door knock"], 4)
+        case .doorSlam: (["door slam", "door slamming shut"], 3)
+        case .doorCreak: (["door creak", "creaky door opening"], 4)
+        case .doorbell: (["doorbell ding dong", "doorbell"], 4)
+        case .phoneRing: (["old telephone ring", "telephone ringing bell"], 6)
+        case .bellToll: (["church bell toll single", "bell toll"], 8)
+        case .clockChime: (["clock chime hour", "grandfather clock chime"], 12)
+        case .glassBreak: (["glass break", "glass shatter"], 3)
+        case .dogBark: (["dog bark", "dog barking"], 4)
+        case .owlHoot: (["owl hoot", "tawny owl call"], 4)
+        case .wolfHowl: (["wolf howl"], 7)
+        case .horseNeigh: (["horse neigh", "horse whinny"], 4)
+        case .trainWhistle: (["steam train whistle", "train whistle"], 6)
+        case .shipHorn: (["ship horn", "foghorn"], 7)
+        case .schoolBell: (["school bell ring", "school bell"], 5)
+        case .roosterCrow: (["rooster crow", "cockerel crowing"], 4)
+        case .catMeow: (["cat meow", "cat meowing"], 3)
+        case .carHorn: (["car horn single", "car horn honk"], 3)
         }
     }
 
@@ -57,8 +92,8 @@ public enum OneShotSound: String, CaseIterable, Codable, Sendable, Hashable {
     public var levelOffsetDB: Double {
         switch self {
         case .glassBreak, .phoneRing, .doorbell: -4
-        case .doorSlam, .dogBark, .trainWhistle: -3
-        case .clockChime, .horseNeigh: -2
+        case .doorSlam, .dogBark, .trainWhistle, .carHorn: -3
+        case .clockChime, .horseNeigh, .schoolBell: -2
         case .thunderClap, .shipHorn, .bellToll: 1
         default: 0
         }

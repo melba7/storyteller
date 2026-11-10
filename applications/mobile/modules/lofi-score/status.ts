@@ -102,6 +102,18 @@ export function soundName(sound: string): string {
     clock: "a ticking clock",
     fireplace: "a fire",
     campfire: "a campfire",
+    roomTone: "a quiet room",
+    hushedRoom: "a hushed room",
+    murmur: "murmuring voices",
+    emptyHall: "an empty hall",
+    electricHum: "an electric hum",
+    kitchen: "a kitchen",
+    workshop: "a workshop",
+    farmyard: "a farmyard",
+    motorVehicle: "an engine",
+    aircraft: "an aircraft",
+    spaceship: "a spaceship",
+    deepDrone: "a deep drone",
   }
   return named[sound] ?? sound.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase()
 }
@@ -160,6 +172,15 @@ export function atmosphereSourceLabel(
         ? "Getting the sounds ready…"
         : "No sounds yet"
   }
+}
+
+/** How much is going on in the atmosphere, as the slider shows it. */
+export function intensityLabel(intensity: number): string {
+  if (intensity <= 0.05) return "Just the main sound"
+  if (intensity < 0.35) return "Sparse"
+  if (intensity < 0.65) return "Some of the scene"
+  if (intensity < 0.95) return "Most of the scene"
+  return "The whole scene"
 }
 
 /** The music level, as the slider shows it. */

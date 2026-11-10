@@ -6,7 +6,9 @@ import LofiAudio
 public final class MusicSettings: @unchecked Sendable {
     public static let musicLevelRange: ClosedRange<Double> = -30 ... -4
     /// Matches `AtmosphereConfig.levelRange`.
-    public static let atmosphereLevelRange: ClosedRange<Double> = -40 ... -16
+    public static let atmosphereLevelRange: ClosedRange<Double> = -40 ... -14
+    /// Matches `AtmosphereConfig.intensityRange`.
+    public static let atmosphereIntensityRange: ClosedRange<Double> = 0 ... 1
 
     private let defaults: UserDefaults
     private let prefix = "LofiScore."
@@ -79,6 +81,21 @@ public final class MusicSettings: @unchecked Sendable {
                 defaults.set(min(range.upperBound, max(range.lowerBound, newValue)), forKey: prefix + "atmosphereLevelDB")
             } else {
                 defaults.removeObject(forKey: prefix + "atmosphereLevelDB")
+            }
+        }
+    }
+
+    /// How much is going on in the atmosphere, 0 to 1 (how many of a scene's sounds play,
+    /// how far the quieter ones sit back, how much the bed lifts in the narration's gaps),
+    /// if the listener moved the dial. Nil means the player's default.
+    public var atmosphereIntensity: Double? {
+        get { defaults.object(forKey: prefix + "atmosphereIntensity") as? Double }
+        set {
+            if let newValue {
+                let range = Self.atmosphereIntensityRange
+                defaults.set(min(range.upperBound, max(range.lowerBound, newValue)), forKey: prefix + "atmosphereIntensity")
+            } else {
+                defaults.removeObject(forKey: prefix + "atmosphereIntensity")
             }
         }
     }

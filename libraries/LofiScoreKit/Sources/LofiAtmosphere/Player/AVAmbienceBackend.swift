@@ -14,6 +14,8 @@ import LofiAudio
 public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     public weak var delegate: AmbienceBackendDelegate?
     public let slotCount: Int
+    /// Enough for a scene's ``StoryScene/maxLayers`` sounds and the old scene's fading out.
+    public static let defaultSlotCount = 12
 
     private let notifications: NotificationCenter
     private var engine = AVAudioEngine()
@@ -40,7 +42,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
     private let offline: (format: AVAudioFormat, maximumFrameCount: AVAudioFrameCount)?
     private var offlineSetupError: Error?
 
-    public init(slotCount: Int = 8, notificationCenter: NotificationCenter = .default) {
+    public init(slotCount: Int = AVAmbienceBackend.defaultSlotCount, notificationCenter: NotificationCenter = .default) {
         self.slotCount = slotCount
         notifications = notificationCenter
         offline = nil
@@ -53,7 +55,7 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
 
     /// A backend that renders on request instead of to the output. Nothing is played and
     /// the audio session is not observed. Pull audio with ``renderOffline(_:into:)``.
-    public init(offlineFormat format: AVAudioFormat, maximumFrameCount: AVAudioFrameCount = 4096, slotCount: Int = 8) throws {
+    public init(offlineFormat format: AVAudioFormat, maximumFrameCount: AVAudioFrameCount = 4096, slotCount: Int = AVAmbienceBackend.defaultSlotCount) throws {
         self.slotCount = slotCount
         notifications = NotificationCenter()
         offline = (format, maximumFrameCount)

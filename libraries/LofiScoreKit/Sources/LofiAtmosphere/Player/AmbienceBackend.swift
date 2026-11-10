@@ -10,7 +10,7 @@ public enum AmbienceFilter: String, Sendable, Hashable, Codable {
     case speechSafe
 
     public init(for sound: AmbientSound) {
-        self = sound == .crowd ? .speechSafe : .standard
+        self = sound.isVoices ? .speechSafe : .standard
     }
 }
 
@@ -82,7 +82,7 @@ public final class FakeAmbienceBackend: AmbienceBackend {
     /// One-off sounds played, with their gains, oldest first.
     public private(set) var oneShots: [(file: String, gain: Float)] = []
 
-    public init(slotCount: Int = 8) {
+    public init(slotCount: Int = 12) {
         self.slotCount = slotCount
         slots = Array(repeating: Slot(), count: slotCount)
     }

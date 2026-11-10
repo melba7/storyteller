@@ -1,16 +1,26 @@
 # Atmosphere sounds
 
-Quiet sounds of the scene under the narration: rain while it rains, a fire in the inn, the sea
-on the shore, a murmuring crowd in a school hallway. It's an option next to the music
-("Atmosphere sounds" in the player's music panel and in Settings), on by default, with its
-own volume.
+Steady sounds of the scene under the narration, the whole time: rain while it rains, a fire
+in the inn, the sea on the shore, a murmuring crowd in a school hallway, the quiet of an
+ordinary room. It's an option next to the music ("Atmosphere sounds" in the player's music
+panel and in Settings), on by default, with its own volume and a dial for how much is going
+on. The words stay clear through all of it.
 
 ## What it does
 
 - **Follows the story's place, not single words.** Claude reads the book once, off the phone,
   and writes an *atmosphere track*: for every ~250 words (and every chapter start), where the
-  story is, whether it is inside or outside, and up to four steady sounds at `faint`, `soft`
-  or `full`.
+  story is, whether it is inside or outside, what state it is in, and up to five steady
+  sounds at `faint`, `soft`, `full` or (rarely) `loud`.
+- **Every place has a sound.** A listener in a quiet room hears the room; a ship creaks and
+  has water around it; a packed corridor has a crowd. Claude infers the sound even when the
+  text does not mention it, so the bed never falls silent just because the author did not
+  describe the weather. It answers with no sounds only when it cannot tell where the
+  characters are.
+- **A place changes with its state.** The same corridor sounds different after hours (an
+  empty hall), between lessons (a crowd), when everyone is whispering about you (the
+  whispers come forward, the hall sits under them) and when a fight breaks out (the crowd at
+  `loud`). Claude reports the state with the scene, and the place remembers it.
 - **Places keep their sounds.** Each place gets an id (`p1`, `p2`, …) and Claude is shown
   the places met so far with the sounds they had. When the story returns to a place it
   reuses that place's sounds, changed only where the text says something changed (the fire
@@ -25,10 +35,19 @@ own volume.
 - **Changes are calm.** A new scene crossfades over 6 s, a level change over 4 s, and two
   changes are at least 20 s apart unless the listener seeks. When a new chapter starts and
   has not said where it is yet, the last scene drops 8 dB until it does.
-- **More specific sounds.** Besides the 26 built-in sounds, a scene can use a more specific
-  kind of one: church bells across a town, a waterfall, a café, a train station. Claude asks
-  for a new one when a place clearly calls for it, the Mac fetches recordings for it, and
-  until they are imported the phone plays the built-in sound it is a kind of.
+- **A catalogue of sounds.** 38 sound families (rain, fireplace, crowd, murmur, room tone,
+  an empty hall, a kitchen, a workshop, a farmyard, an engine, a spaceship, …) with 288 more
+  specific kinds under them (a drizzle, a school corridor between lessons, hallway whispers,
+  a hushed library, a hospital ward at night, a submarine, …) and a guide to what 31 kinds
+  of place sound like in each of their states. Claude asks for a new kind when a place
+  clearly calls for one, the Mac fetches recordings for every kind, and until they are
+  imported the phone plays the family it is a kind of.
+- **A steady bed, kept clear of the voice.** The sounds play under the narration the whole
+  time, 24 dB under it by default, with the voice's band dipped and the voices in a crowd
+  blurred. A scene with many sounds is trimmed so that together they are no louder than one
+  sound alone; the dial turns the quieter sounds down and off before the main one. In the
+  gaps between sentences (a paragraph, a chapter end, a breath) the bed comes forward a
+  little and drops back the moment the voice returns.
 - **Short pauses for big moments.** When a sentence is the moment a scene arrives
   (stepping into a crowded hall) or falls silent (a door shutting on the noise), the
   narrator can stop for under a second while the sound swells or hushes, then carry on.
@@ -60,11 +79,10 @@ of `oldTown`, `waterfall` of `river`, `cafe` of `crowd`. It behaves exactly like
 stores it on the layer (`{"sound":"oldTown","level":"soft","variant":"churchBells"}`) and the
 track lists the book's variants with the entry that first asked for each (`firstIndex`).
 
-- **Where they come from.** `Atmosphere/variants.json` on the Mac: the fetch script's 32
-  starter variants (drizzle, blizzard, waterfall, harbour, café, tavern, feast hall, train
-  station, church bells, library, spaceship, …) plus every variant a scored book asked for,
-  with the books that asked. Shared variants go into the cached system prompt, so they cost
-  almost nothing per request.
+- **Where they come from.** The built-in catalogue (`SoundCatalog`, 288 kinds, below) is
+  always offered, in the cached system prompt. `Atmosphere/variants.json` on the Mac adds
+  every variant a scored book asked for, with the books that asked; those that are not in
+  the catalogue go into the system prompt too, so they cost almost nothing per request.
 - **New ones.** Claude may add at most one new variant per answer, only when no built-in
   sound or listed variant fits and the place clearly calls for it, with words to search a
   sound library with. The CLI reports them, and the next fetch pulls recordings for them.
@@ -75,6 +93,50 @@ track lists the book's variants with the entry that first asked for each (`first
 - **On the phone.** Recordings live in `Atmosphere/<Sound>.<Variant>/`, e.g.
   `OldTown.ChurchBells/`. Without them the built-in sound plays, so a track never depends on
   a fetch having run.
+
+## The catalogue and the place guide
+
+`Sources/LofiAtmosphere/Scene/SoundCatalog.swift` is the one source of truth for what the
+scorer may use and what the Mac fetches:
+
+- **Families** (`AmbientSound`, 38) in groups: weather (rain, heavy rain, rain on the
+  windows, thunder, wind, strong wind, snow), fire (fireplace, campfire), water (sea shore,
+  open sea, river, dripping), nature (forest, birdsong, night insects, night forest, swamp,
+  farmyard), rooms (room tone, hushed room, empty hall, electric hum, clock, kitchen,
+  workshop), people (murmur, crowd), places (city, old town), travel (horses, train, ship,
+  machinery, motor vehicle, aircraft, spaceship) and elsewhere (deep drone). A family
+  decides behaviour: weather carries over between places, `crowd` replaces the music,
+  `crowd` and `murmur` are the only sounds made of voices (filtered so no word can be made
+  out), each has its own level offset, and each has a synthesised stand-in.
+- **Kinds** (`SoundCatalog.variants`, 288), each a kind of one family with a line on what it
+  is and words to search a sound library with: `crowd.schoolCorridor`,
+  `murmur.hallwayWhispers`, `emptyHall.schoolHallwayEmpty`, `hushedRoom.library`,
+  `electricHum.office`, `motorVehicle.car`, `aircraft.airliner`, `kitchen.restaurantKitchen`,
+  `roomTone.bedroomNight`, `deepDrone.magicalHush`, … Ids are unique across families, so a
+  kind can move to a better family (an office is now a kind of electric hum, not of
+  machinery) and its recordings still play.
+- **The people ladder.** `roomTone` (nobody else heard), `hushedRoom` (people keeping quiet,
+  no voices), `murmur` (a few low voices; the music stays), `crowd` (many voices right
+  around the characters; the music pauses). Claude climbs or descends it as a place fills
+  or empties.
+- **The place guide** (`SoundCatalog.placeGuide`, 31 places, 118 states): what a school
+  corridor, a classroom, a hospital ward, a tavern, a ship's cabin, a forest, a battlefield,
+  a spaceship bridge … sound like in each state they can be in, e.g. the corridor after
+  hours (`emptyHall.schoolHallwayEmpty soft`), between lessons (`crowd.schoolCorridor
+  full`), everyone whispering (`murmur.hallwayWhispers soft, emptyHall.schoolHallwayEmpty
+  faint`), an uproar (`crowd.schoolCorridor loud`). It is typical, the text decides.
+- **Consistency.** A place keeps its sounds and its recordings across visits, and its last
+  state is shown to Claude with it, so the corridor that was whispering is still whispering
+  when the story comes back to it unless the text says otherwise.
+
+The whole catalogue and the guide are in the system prompt (about 9,000 tokens, cached, so
+it costs about a cent a request on Opus after the first). To add or move a kind, edit
+`SoundCatalog.swift`, then write the JSON the fetch script reads:
+`swift run lofi-atmosphere catalog --out Tools/atmosphere/catalog.json` (`CatalogTests` fails
+until the committed file matches). `lofi-atmosphere catalog --prompt` prints the system
+prompt. Tracks scored with an older prompt (engine id `…/a3`) still play; a book is rescored
+only when its track is moved aside (`make-atmosphere.sh --rescore`), since a rescore costs
+plan usage.
 
 ## Short pauses for big moments
 
@@ -148,29 +210,47 @@ sound. So:
 
 - Every sound is a steady, seamless loop. One-off sounds are a separate extra, off by
   default (see "One-off sounds").
-- A crowd is the only sound made of voices. It is filtered so words can't be made out
-  (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz), and it pushes the music out.
-- Everything sits far under the voice: a sound at `full` is 28 dB under the narrator
-  (the music bed is 16 dB under), and the slider goes from 40 to 16 dB under. Each sound
-  also has its own offset (a ticking clock -8 dB, a crowd -3 dB, heavy rain +1 dB).
+- A crowd and a murmur are the only sounds made of voices. They are filtered so words can't
+  be made out (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz), and a crowd
+  pushes the music out.
+- Everything sits well under the voice: a sound at `full` is 24 dB under the narrator (the
+  music bed is 16 dB under), and the slider goes from 40 to 14 dB under, never closer. Each
+  sound also has its own offset (a ticking clock -8 dB, room tone -6, an electric hum -5, a
+  hushed room, a murmur or a deep drone -4, a crowd -3, heavy rain +1 dB), and `loud` is
+  only 4 dB over `full`.
+- A scene is never louder than one sound. Its sounds are ranked loudest first and trimmed
+  together so their sum is no louder than the main one alone (two sounds at the same level
+  each lose 3 dB), so a rich scene adds texture, not level.
+- The dial ("How much is going on", `AtmosphereConfig.intensity`, 0 to 1, 0.75 by default)
+  decides how many of the scene's sounds play (one at 0, all five at 1) and how far the
+  quieter ones sit behind the main one (6 dB further at 0). It never changes the main
+  sound's level: that is the volume slider's job.
+- In the gaps between sentences the bed lifts 4 dB at full intensity (3 at the default),
+  starting 0.7 s after the sentence should have ended so a sentence that follows at once
+  gets no lift, rising over 0.6 s and dropping back in 0.25 s when the next sentence starts.
+  Pausing, seeking and a narration hold end it too. Reading on screen has no sentence
+  timing, so no lift.
 - Each sound gets the music's presence dip around 2.5 kHz, where speech is clearest.
 
-The 26 sounds: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
+The 38 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,
-night forest, swamp, crowd, city, old town, horses, train, ship, machinery, clock.
+night forest, swamp, crowd, city, old town, horses, train, ship, machinery, clock, room
+tone, hushed room, murmur, empty hall, electric hum, kitchen, workshop, farmyard, motor
+vehicle, aircraft, spaceship, deep drone.
 
 ## The pieces
 
 | Piece | Where |
 |---|---|
-| Scene model, sounds, place memory, track file | `Sources/LofiAtmosphere/Scene`, `Track` |
+| Scene model, sounds, the catalogue and place guide, place memory, track file | `Sources/LofiAtmosphere/Scene`, `Track` |
 | Claude prompt and engine (`ClaudeSceneEngine`) | `Sources/LofiAtmosphere/Claude` |
 | Track builder (order, memory, refinement) | `Track/AtmosphereTrackBuilder.swift` |
 | Director (which scene now) and player (fades, slots, crowd yield) | `Sources/LofiAtmosphere/Player` |
-| Audio: its own `AVAudioEngine`, 8 looping slots | `Player/AVAmbienceBackend.swift` |
+| Audio: its own `AVAudioEngine`, 12 looping slots | `Player/AVAmbienceBackend.swift` |
 | Synthesised stand-ins for every sound | `Sound/AmbienceSynth.swift` |
 | App host: setting, finding the track, music fade | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiMusicHost.swift` |
-| CLI: `lofi-atmosphere track / show / score / synth / library` | `Sources/lofi-atmosphere` |
+| CLI: `lofi-atmosphere track / show / score / synth / library / catalog` | `Sources/lofi-atmosphere` |
+| The catalogue as the fetch script reads it | `Tools/atmosphere/catalog.json` |
 
 The atmosphere's engine never touches the audio session, Now Playing, the remote commands
 or the microphone (`AtmosphereBoundaryTests` scans for it), like the music.
@@ -194,8 +274,8 @@ imported scores, then in imported atmosphere tracks.
 LofiMusic/
   Calm/ Cozy/ …              the music
   Atmosphere/
-    Rain/ rain-fs123.m4a …   one folder per sound (names match loosely: "HeavyRain", "heavy rain")
-    OldTown.ChurchBells/ …   one folder per more specific sound: <Sound>.<Variant>
+    Rain/ rain-fs123.m4a …   one folder per sound family (names match loosely: "HeavyRain", "heavy rain")
+    Crowd.SchoolCorridor/ …  one folder per more specific kind: <Family>.<Kind>
     sounds.json              loudness, duration, title, author, source, licence, variant, use
     variants.json            the more specific sounds known on the Mac
     OneShots/DoorKnock/ …    one-off sounds, with OneShots/sounds.json
@@ -241,9 +321,12 @@ dropped into `Books/` by hand. The atmosphere steps it runs:
    - `publish` uses Wikimedia Commons only, with commercial-safe licences, and writes
      `~/Storyteller Lofi/AtmospherePublish`.
 
-   It keeps up to `--per-sound 4` recordings per built-in sound, `--per-variant 2` per
-   more specific sound (the starter set plus those the tracks in `--tracks` asked for;
-   `--no-variants` skips them, `--sound OldTown.ChurchBells` fetches only that) and
+   What it fetches comes from `Tools/atmosphere/catalog.json` (`--catalog FILE`), the
+   catalogue the app itself uses, so the two never drift. It keeps up to `--per-sound 4`
+   recordings per sound family, `--per-variant 2` per more specific kind (the catalogue's
+   288 plus those the tracks in `--tracks` asked for; `--no-variants` skips them,
+   `--sound Crowd.SchoolCorridor` fetches only that; a kind the catalogue has moved to
+   another family is moved along with its credits) and
    `--per-one-shot 2` per one-off sound (`--no-one-shots` skips them; each is trimmed of
    silence, cut to a few seconds and faded out, not looped). It keeps only recordings
    whose title (or Freesound tags) names the sound, because search also matches long
@@ -258,9 +341,11 @@ dropped into `Books/` by hand. The atmosphere steps it runs:
    doesn't know: the app plays those too, without credits. `--dry-run` lists what it
    would fetch.
 2. **Tracks.** `Tools/mac/make-atmosphere.sh --dry-run BOOK.epub` prints the cost estimate.
-   `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--no-fetch] [--no-copy] BOOK.epub …`
+   `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--rescore] [--no-fetch] [--no-copy] BOOK.epub …`
    writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` (and `<book>.score.json` when
-   the mood track is there too), offering the variants in `Atmosphere/variants.json`.
+   the mood track is there too), offering the catalogue and the variants in
+   `Atmosphere/variants.json`. A book with a track is left alone; `--rescore` moves its
+   track and score to `tracks/old/` first, for a book scored before the catalogue grew.
    `--via plan` (the default) runs through Claude Code on the signed-in plan; `--via api`
    uses the key file and needs `--cap`. Runs resume. Afterwards it fetches recordings for
    new variants (unless `--no-fetch`; needs ffmpeg) and copies the tracks and `Atmosphere/`
@@ -283,7 +368,9 @@ hour; `--parallel` scores several books at once.
 `swift test --filter "LofiAtmosphereTests|LofiScoreHostTests"` (Linux in Docker or the Mac).
 The player is tested against `FakeAmbienceBackend` with a manual clock: scenes follow the
 narration, places keep their recordings, crowd yield on and off, pauses, muted routes,
-headphones pulled, media reset, the level slider. `VariantTests` covers variant ids and
+headphones pulled, media reset, the level slider. `IntensityTests` covers the dial, the
+scene trim and the lift in the gaps; `CatalogTests` the catalogue, the place guide, the
+committed `catalog.json`, the prompt and moved kinds. `VariantTests` covers variant ids and
 folders, the catalog's spoiler rule, editions, Claude's new variants and moments, and the
 narration holds (swell, hush, too early, refused, dropped, setting off). The synth tests check every sound renders
 at -23 LUFS and loops without a seam.

@@ -119,16 +119,23 @@ public struct AtmosphereTrackBuilder: Sendable {
 
     public let spoilerGuard: SpoilerGuard
     public let plan: Plan
-    /// More specific sounds the scorer may use anywhere in the book: the starter set and
-    /// other books' variants (``SoundVariantCatalog/offered(toBook:)``), never this book's
-    /// own from an earlier run. The book's own variants come from its track, each only
-    /// after the entry that first asked for it.
+    /// More specific sounds the scorer may use anywhere in the book: the built-in
+    /// catalogue and other books' variants (``SoundVariantCatalog/offered(toBook:)``),
+    /// never this book's own from an earlier run. The book's own variants come from its
+    /// track, each only after the entry that first asked for it.
     public let offeredVariants: [SoundVariant]
 
+    /// `offeredVariants` are added to the built-in catalogue (``SoundCatalog``), which is
+    /// always offered; one with a catalogue id is ignored.
     public init(spoilerGuard: SpoilerGuard, plan: Plan = Plan(), offeredVariants: [SoundVariant] = []) {
         self.spoilerGuard = spoilerGuard
         self.plan = plan
-        self.offeredVariants = offeredVariants
+        var merged = SoundCatalog.starterVariants
+        var seen = Set(merged.map(\.id))
+        for variant in offeredVariants where seen.insert(variant.id).inserted {
+            merged.append(variant)
+        }
+        self.offeredVariants = merged
     }
 
     /// Every narrated sentence, in order.
