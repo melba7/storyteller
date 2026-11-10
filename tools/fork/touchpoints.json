@@ -15,6 +15,11 @@
   ],
   "touchpoints": [
     {
+      "file": "README.md",
+      "markers": 2,
+      "purpose": "A short banner at the top of upstream's README saying what this fork adds and pointing at FORK.md."
+    },
+    {
       "file": "applications/mobile/app.config.ts",
       "markers": 3,
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
@@ -22,17 +27,17 @@
     {
       "file": "applications/mobile/app/(root)/settings.tsx",
       "markers": 2,
-      "purpose": "Shows the lofi music's section (on and off, volume, the car, importing a music folder) under the reading settings."
+      "purpose": "Shows the atmosphere's section (on and off, volume, how much is going on, pauses, one-off sounds, the car, importing a sounds folder) under the reading settings."
     },
     {
       "file": "applications/mobile/components/Toolbar.tsx",
       "markers": 2,
-      "purpose": "Adds the lofi music button to the player's toolbar for readaloud books, in both the read-along and listening screens."
+      "purpose": "Adds the atmosphere button to the player's toolbar for readaloud books, in both the read-along and listening screens."
     },
     {
       "file": "applications/mobile/store/store.ts",
       "markers": 1,
-      "purpose": "Imports lofi/readerFollow.ts for its listeners, so the music follows the pages while the listener reads a readaloud book on screen with the narration stopped."
+      "purpose": "Imports lofi/readerFollow.ts for its listeners, so the sounds follow the pages while the listener reads a readaloud book on screen with the narration stopped."
     },
     {
       "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",

@@ -139,7 +139,9 @@ public enum ClaudeScenePrompt {
             - quote: copy, word for word, the fewest words (at most eight) from the passage that \
             say the sound happens, ending on the word for the sound, e.g. "there came a knock at \
             the door". If several happen, take the last one in the passage.
-            - They are rare: most passages have none. Then sound is "none" and quote is "".
+            - They are rare: most passages have none. Then sound is "none" and quote is "". \
+            But a sound the text does say happens (a bell rings, a door opens, a chain is \
+            dragged) is named even when it is also what starts the scene or the transition.
 
             The one-off sounds:
             \(oneShots)
@@ -181,9 +183,11 @@ public enum ClaudeScenePrompt {
             passage, copy exactly the first three to eight words of the sentence where the \
             story enters it: the sentence where they arrive, the door opens, the storm breaks, \
             the hall falls quiet. When it begins on the last sentence, copy the last sentence's \
-            first words. "" when the scene was already under way before the passage, or when \
-            place is "none". The player starts the new sound on that sentence, so pick the \
-            sentence a listener would feel the change on, not one that only hints at it.
+            first words. "" when the scene was already under way before the passage (the same \
+            place with the same sounds as the current scene, even if the text adds detail or \
+            the mood deepens), or when place is "none". The player starts the new sound on \
+            that sentence, so pick the sentence a listener would feel the change on, not one \
+            that only hints at it.
             - confidence: from 0 to 1, how sure you are of the place and its sounds.
             """
     }
