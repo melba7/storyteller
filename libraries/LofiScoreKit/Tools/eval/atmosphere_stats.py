@@ -17,8 +17,9 @@ book, so they are printed only with --names; the words quoted for one-off
 sounds are never printed.
 
 --skeleton writes the track with everything but its structure removed:
-sentence numbers, place ids, sounds, levels, confidence, moments, the
-sentence number each answer says its scene began on, and one-off sound ids. Each state note becomes a number ("s4"), and of the place names
+sentence numbers, place ids, sounds, levels, confidence, moments, transition
+ids, the sentence number each answer says its scene began on, and one-off
+sound ids. Each state note becomes a number ("s4"), and of the place names
 only the pairs of ids whose names match are kept. So the numbers can be
 studied on another machine without any of the book or of the scorer's words
 about it.
@@ -27,8 +28,9 @@ about it.
 in LofiAtmosphere, which the track builder uses to decide where to score
 next: a change is heard only at an entry sure enough to be played whose
 place or sounds differ from what was playing; it is pinned when the entry
-before it is within --resolution sentences, or when the entry's own answer
-says its scene begins on its own sentence.
+before it is within --resolution sentences (one sentence for a swell, a
+hush, or a change that plays a door or an engine), or when the entry's own
+answer says its scene begins on its own sentence.
 
 "After the director" follows AtmosphereDirector: the newest entry at or
 before the sentence whose confidence is at least --min-confidence and that
@@ -65,6 +67,7 @@ SKIP_WORDS = {"the", "a", "an", "of", "in", "at", "on"}
 LEVEL_WEIGHT = {"faint": 1.0, "soft": 2.0, "full": 3.0, "loud": 4.0}
 PLACE_COST = 0.2  # another place with the very same sounds: other recordings, little else
 TAIL_SENTENCES = 15  # how long the last entry is taken to last
+VOICES = {"crowd", "murmur"}  # AmbientSound.isVoices
 
 
 def name_words(name):
@@ -82,7 +85,7 @@ def name_words(name):
 
 
 class Entry:
-    __slots__ = ("g", "place", "layers", "keys", "conf", "moment", "state", "name", "words", "setting", "start")
+    __slots__ = ("g", "place", "layers", "keys", "conf", "moment", "transition", "state", "name", "words", "setting", "start")
 
     def __init__(self, raw):
         scene = raw.get("scene") or {}
@@ -96,6 +99,7 @@ class Entry:
         self.keys = frozenset(k for k, _ in layers)
         self.conf = float(scene.get("confidence", 1.0))
         self.moment = scene.get("moment")
+        self.transition = scene.get("transition")
         self.setting = scene.get("setting", "unclear")
         # A skeleton holds a number for each state note; a full track holds the words.
         state = scene.get("stateID") or (scene.get("state") or "").strip().lower()
@@ -167,6 +171,8 @@ def skeleton(track, entries):
         }
         if e.moment:
             scene["moment"] = e.moment
+        if e.transition:
+            scene["transition"] = e.transition
         if e.state:
             scene["stateID"] = states.setdefault(e.state, f"s{len(states) + 1}")
         out["entries"].append(dict(globalIndex=e.g, scene=scene, **({"sceneStart": e.start} if e.start is not None else {})))
@@ -260,6 +266,25 @@ def settle(entries, change, min_conf, moment_discount=0.5):
     return played
 
 
+def infers_transition(old, new):
+    """SceneTransition.inferred in Swift, as yes or no: the player gives this change of
+    place a door, an engine or a crowd left behind."""
+    if not old.place or old.place == new.place or old.silent or new.silent:
+        return False
+
+    def voices(e):
+        return any(k.split(".")[0] in VOICES and LEVEL_WEIGHT.get(level, 2.0) >= 2.0 for k, level in e.layers)
+
+    a, b = old.setting, new.setting
+    if a == "vehicle" or b == "vehicle":
+        return not (a == "vehicle" and b == "vehicle")
+    if {a, b} == {"indoors", "outdoors"}:
+        return True
+    if a == b and a in ("indoors", "outdoors"):
+        return voices(old) or voices(new)
+    return False
+
+
 def changes(entries, min_conf, max_lag, resolution):
     """SceneChangeFinder.changes in Swift: the changes of sound the listener hears, each
     with the entry before it, how different the sounds are, and the sentence to score
@@ -274,7 +299,7 @@ def changes(entries, min_conf, max_lag, resolution):
             before = playing if playing is not None and e.g - 1 - playing.g <= max_lag else SILENT
             if not (before.silent and e.silent) and (before.place != e.place or before.keys != e.keys):
                 gap = e.g - previous.g
-                needed = 1 if e.moment else resolution
+                needed = 1 if e.moment or e.transition or infers_transition(before, e) else resolution
                 own = e.start == e.g
                 probe, hinted = None, False
                 if not own and gap > needed:
@@ -532,7 +557,7 @@ def report(path, args):
         near = sum(1 for c in found if c["probe"] is None and not c["own"])
         still = [c for c in found if c["probe"] is not None]
         print(f"  pinned: {own + near} ({pct(own + near, len(found))}): {own} by an answer that says its scene begins on its own sentence,"
-              f" {near} with the entry before within {args.resolution} sentences")
+              f" {near} with the entry before within {args.resolution} sentences (1 where a door or engine plays)")
         if still:
             requests = 0
             for c in still:

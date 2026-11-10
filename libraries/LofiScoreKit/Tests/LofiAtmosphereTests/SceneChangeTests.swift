@@ -140,6 +140,18 @@ final class SceneChangeTests: XCTestCase {
         var swell = Self.street
         swell.moment = .swell
         XCTAssertEqual(finder.changes(in: [Self.entry(0, Self.tavern), Self.entry(3, swell)]).map(\.probe), [1])
+        // So is a transition, whose door or engine plays on that sentence.
+        var throughADoor = Self.street
+        throughADoor.transition = SceneTransition.allCases.first
+        XCTAssertNotNil(throughADoor.transition)
+        XCTAssertEqual(finder.changes(in: [Self.entry(0, Self.tavern), Self.entry(3, throughADoor)]).map(\.probe), [1])
+        // And a change the player gives a door by itself: out of a room with voices.
+        var indoors = Self.tavern
+        indoors.setting = .indoors
+        var outdoors = Self.street
+        outdoors.setting = .outdoors
+        XCTAssertNotNil(SceneTransition.inferred(from: indoors, to: outdoors))
+        XCTAssertEqual(finder.changes(in: [Self.entry(0, indoors), Self.entry(3, outdoors)]).map(\.probe), [1])
     }
 
     func testAHintInsideTheGapIsScoredFirst() {
@@ -227,10 +239,15 @@ final class SceneChangeTests: XCTestCase {
         XCTAssertEqual(hinted.report.changes, turns.count + 1)
         XCTAssertEqual(hinted.report.pinnedChanges, turns.count + 1)
         XCTAssertEqual(hinted.report.unrefinedChanges, 0)
-        // Without hints the same changes are found by halving: more requests, and only
-        // to within three sentences.
+        // Without hints the same changes are found by halving: more requests, each change
+        // within three sentences, and the budget runs out before the ones that play a
+        // door are all on their own sentence.
         XCTAssertEqual(plain.report.changes, turns.count + 1)
-        XCTAssertEqual(plain.report.pinnedChanges, turns.count + 1)
+        XCTAssertLessThan(plain.report.pinnedChanges, hinted.report.pinnedChanges)
+        for turn in turns {
+            let first = try XCTUnwrap(plain.track.entries.first { $0.globalIndex >= turn })
+            XCTAssertLessThanOrEqual(first.globalIndex - turn, 3, "change at \(turn) pinned at \(first.globalIndex)")
+        }
         XCTAssertLessThan(hinted.report.probes, plain.report.probes)
     }
 

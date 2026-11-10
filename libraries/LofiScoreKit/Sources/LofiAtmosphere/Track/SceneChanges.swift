@@ -65,7 +65,7 @@ extension StoryScene {
 /// it: the sentence the later entry's own answer says its scene began on
 /// (``AtmosphereTrack/Entry/sceneStart``), when it lies between the two; otherwise the
 /// sentence halfway. A change counts as pinned when the two entries are within
-/// `resolutionSentences` of each other (one sentence for a swell or hush), or when the
+/// `resolutionSentences` of each other (one sentence for a swell, hush or transition), or when the
 /// later entry's answer, made from the text up to its own sentence, says the scene
 /// begins on that very sentence.
 ///
@@ -131,9 +131,13 @@ public struct SceneChangeFinder: Sendable, Hashable {
             guard Self.differ(before, after) else { continue }
 
             let gap = entry.globalIndex - previous.globalIndex
-            // A swell or hush pauses the narration right after its sentence, so it is
-            // pinned to the sentence itself.
-            let needed = after.moment == nil ? resolutionSentences : 1
+            // A swell or hush pauses the narration right after its sentence, and a
+            // transition (named by the scorer, or the plain one the player infers from
+            // the two scenes) plays its door or engine on it, so those are pinned to the
+            // sentence itself. Being narrow already, they are narrowed after the rest.
+            let onItsSentence = after.moment != nil || after.transition != nil
+                || SceneTransition.inferred(from: before, to: after) != nil
+            let needed = onItsSentence ? 1 : resolutionSentences
             let byAnswer = entry.sceneStart == entry.globalIndex
             var probe: Int?
             var hinted = false
