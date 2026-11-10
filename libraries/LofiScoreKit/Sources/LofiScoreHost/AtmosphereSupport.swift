@@ -88,19 +88,18 @@ public enum AtmosphereTrackFinder {
            matches(track, spoilerGuard: spoilerGuard) {
             return (track, "the book's score")
         }
-        for (folders, origin) in [(scoreFolders, "an imported score"), (trackFolders, "an imported atmosphere track")] {
-            var named: [URL] = []
-            var others: [URL] = []
-            for folder in folders {
-                let files = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-                for file in files where isCandidate(file, scores: folders == scoreFolders) {
-                    if bookName(of: file) == bookID { named.append(file) } else { others.append(file) }
-                }
-            }
-            for file in named + others.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).prefix(200) {
-                guard let track = (try? BookScore.atmosphereTrack(at: file)) ?? nil else { continue }
-                if matches(track, spoilerGuard: spoilerGuard) { return (track, origin) }
-            }
+        for (folders, origin, scores) in [(scoreFolders, "an imported score", true), (trackFolders, "an imported atmosphere track", false)] {
+            let found = TrackMatchMemory.lookUp(
+                key: (scores ? "atmosphere-score:" : "atmosphere:") + bookID,
+                bookID: bookID,
+                folders: folders,
+                isCandidate: { isCandidate($0, scores: scores) },
+                bookName: bookName(of:),
+                decode: { (try? BookScore.atmosphereTrack(at: $0)) ?? nil },
+                matches: { matches($0, spoilerGuard: spoilerGuard) },
+                fileManager: fileManager
+            )
+            if let found { return (found.track, origin) }
         }
         return nil
     }

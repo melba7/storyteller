@@ -13,6 +13,7 @@ import { getCurrentlyPlayingBookUuid } from "@/store/selectors/bookshelfSelector
 
 import { LofiMusicControls } from "./LofiMusicControls"
 import { readerHidden, readerShown } from "./readerFollow"
+import { useBookScore } from "./useBookScore"
 import { useLofiMusic } from "./useLofiMusic"
 
 type Props = {
@@ -30,6 +31,10 @@ export function LofiMusicToolbarItem({ mode }: Props) {
   const insets = useSafeAreaInsets()
 
   const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
+
+  // A book without a score asks the server for one (the Mac puts each score
+  // inside the book on the server), so it arrives with the book.
+  useBookScore(music.status, music.refresh)
 
   // The reader's toolbar comes and goes with the reader. The music that
   // follows the pages waits for the first page turn after the book opens, and

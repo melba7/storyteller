@@ -375,6 +375,33 @@ final class OneShotTests: XCTestCase {
         XCTAssertEqual(h.played, [])
     }
 
+    func testPausingAJumpOrPullingTheHeadphonesCutsAPlayingSound() throws {
+        let h = try Harness(cues: [(5, .doorKnock, 0, 4), (50, .owlHoot, 0, 4), (100, .doorKnock, 0, 4)])
+        h.player.setOneShotsEnabled(true)
+        for index in 1...4 { h.narrate(index, then: 4) }
+        h.narrate(5, then: 0.1)
+        XCTAssertEqual(h.backend.oneShotPlaying, "knock.wav")
+        h.player.narratorDidPause()
+        XCTAssertNil(h.backend.oneShotPlaying, "a knock does not carry on after the narrator stops")
+        XCTAssertEqual(h.backend.log.last, "stop once 1.0")
+
+        h.player.narratorDidPlay()
+        h.scheduler.advance(by: 40)
+        h.narrate(50, then: 0.1)
+        XCTAssertEqual(h.backend.oneShotPlaying, "owl.wav")
+        h.player.narratorDidSeek(toGlobalSentenceIndex: 70)
+        XCTAssertNil(h.backend.oneShotPlaying, "cut when the listener jumps")
+        XCTAssertEqual(h.backend.log.last, "stop once 0.3")
+
+        h.scheduler.advance(by: 40)
+        for index in 96...99 { h.narrate(index, then: 4) }
+        h.narrate(100, then: 0.1)
+        XCTAssertEqual(h.backend.oneShotPlaying, "knock.wav")
+        h.backend.simulateRoute(.builtIn, previousOutputLost: true)
+        XCTAssertNil(h.backend.oneShotPlaying, "and at once when the headphones are pulled")
+        XCTAssertEqual(h.backend.log.last, "stop once 0.1")
+    }
+
     func testASoundWithNoRecordingIsListedAsMissing() throws {
         let h = try Harness(cues: [(5, .wolfHowl, 0, 4)])
         h.player.setOneShotsEnabled(true)

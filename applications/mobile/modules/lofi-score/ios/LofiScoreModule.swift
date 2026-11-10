@@ -42,11 +42,12 @@ public final class LofiScoreModule: Module {
       return await host.status().jsonObject()
     }
 
-    // Shows the Files folder picker and copies the music into the app. Resolves to null
-    // when the listener cancels.
+    // Shows the Files folder picker, copies the music into the app and keeps a link to the
+    // folder, so whatever is added to it later (scores from the Mac, new sounds or tracks)
+    // is copied without importing again. Resolves to null when the listener cancels.
     AsyncFunction("importMusicFolder") { () async throws -> [String: Any]? in
       guard let folder = await LofiFolderPicker.pick() else { return nil }
-      let summary = try await LofiScoreRuntime.shared.host.importMusic(from: folder)
+      let summary = try await LofiScoreRuntime.shared.host.linkMusicFolder(folder)
       return [
         "folderName": summary.folderName,
         "tracks": summary.tracks,
@@ -56,6 +57,47 @@ public final class LofiScoreModule: Module {
         "atmosphereRecordings": summary.atmosphereRecordings,
         "atmosphereTracks": summary.atmosphereTracks,
       ]
+    }
+
+    // Looks at the linked music folder now and copies what is new. Resolves to null when
+    // no folder is linked; rejects when the folder cannot be read.
+    AsyncFunction("syncMusicFolder") { () async throws -> [String: Any]? in
+      guard let summary = try await LofiScoreRuntime.shared.host.syncMusicFolder(reason: .manual) else { return nil }
+      return [
+        "folderName": summary.folderName,
+        "added": summary.added,
+        "updated": summary.updated,
+        "notDownloaded": summary.notDownloaded,
+        "music": summary.music,
+        "models": summary.models,
+        "moodTracks": summary.moodTracks,
+        "atmosphereTracks": summary.atmosphereTracks,
+        "atmosphereRecordings": summary.atmosphereRecordings,
+        "fresh": summary.fresh,
+        "description": summary.description,
+      ]
+    }
+
+    // Forgets the linked folder; the music already copied stays.
+    AsyncFunction("unlinkMusicFolder") { () async -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      await host.unlinkMusicFolder()
+      return await host.status().jsonObject()
+    }
+
+    // Keeps a score fetched from the server (GET /api/v2/books/<id>/lofi-score) with the
+    // book, and reads the book again with it when it is the one open. Rejects when the
+    // text is not a score or the book is not on the device.
+    AsyncFunction("installBookScore") { (bookUuid: String, score: String) async throws -> [String: Any] in
+      let host = LofiScoreRuntime.shared.host
+      try await host.installScore(Data(score.utf8), forBook: bookUuid)
+      return await host.status().jsonObject()
+    }
+
+    // Back from the background: anything new in the linked folder (a score the Mac
+    // finished) is copied, at most once a minute.
+    OnAppEntersForeground {
+      LofiScoreRuntime.shared.host.syncMusicFolderIfDue(reason: .foreground)
     }
 
     // The imported music's CREDITS.md, or null.

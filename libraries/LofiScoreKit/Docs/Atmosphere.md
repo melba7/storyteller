@@ -213,16 +213,25 @@ sounds"), and audio is never committed (the fork is public).
 
 From the clone in `~/Storyteller Lofi`, in `libraries/LofiScoreKit`:
 
-The easy way: put read-aloud EPUBs in `~/Storyteller Lofi/Books` and double-click
-`~/Storyteller Lofi/Score atmosphere.command` (a copy of `Tools/mac/score-atmosphere.command`).
-It updates the tools clone in `~/Storyteller Lofi/atmosphere-tools`, then scores every book
-through the Claude plan: first its mood track (`Tools/mac/make-tracks.sh --engine claude
---prompt 3`, Opus with prompt 3 as the Claude check chose; see MoodDetection.md), then its
-atmosphere, which is combined with the mood track into `<book>.score.json`. It fetches any
-new sounds and copies everything into `~/Storyteller Lofi/LofiMusic`. Each step is capped
-per book at API list prices (20 dollars for the mood, 25 for the atmosphere; edit the
-command to change them), so a run that goes wrong can't use up the plan; double-click
-again to carry on. The atmosphere steps it runs:
+The easy way: double-click `Tools/mac/install-automatic-scoring.command` once. It fetches
+and builds the tools into `~/Storyteller Lofi/scoring-tools`, asks for the Storyteller
+server's address and login (optional; the password goes into the login keychain), and
+installs a launchd job that runs `Tools/mac/lofi-sync.sh` whenever a book lands in
+`~/Storyteller Lofi/Books` and every half hour. From then on a book synced in Storyteller
+gets its music and atmosphere by itself: the job fetches newly synced read-aloud books
+(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan (first its
+mood track, `Tools/mac/make-tracks.sh --engine claude --prompt 3`, Opus with prompt 3 as
+the Claude check chose, see MoodDetection.md; then its atmosphere, combined with the mood
+track into `<book>.score.json`), fetches any new sounds, copies everything into
+`~/Storyteller Lofi/LofiMusic` and its iCloud Drive copy, and puts the score inside the
+book on the server (`Tools/mac/push-scores.sh`, the fork's `lofi-score` route). The phone's
+linked music folder and the book itself bring the score to the reader. Each step is capped
+per book at API list prices (20 dollars for the mood, 25 for the atmosphere; edit
+`lofi-sync.sh` to change them), so a run that goes wrong can't use up the plan; the next
+run carries on. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
+turns the job off. `~/Storyteller Lofi/Score atmosphere.command` (a copy of
+`Tools/mac/score-atmosphere.command`) runs the same sync once, in a window, for books
+dropped into `Books/` by hand. The atmosphere steps it runs:
 
 1. **Recordings.** `python3 -I Tools/atmosphere/fetch_ambience.py [--edition personal|publish]`.
    - `personal` (the default) searches Freesound with the API key in
@@ -258,7 +267,11 @@ again to carry on. The atmosphere steps it runs:
    into `~/Storyteller Lofi/LofiMusic` (unless `--no-copy`).
    `lofi-atmosphere show FILE --places` prints the scenes, places and variants, and
    `lofi-atmosphere library DIR [--edition publish]` lists what a build would play.
-3. **Phone.** Put `LofiMusic` in iCloud Drive and import it in Settings.
+3. **Phone.** Put `LofiMusic` in iCloud Drive and import it in Settings once. The folder
+   stays linked: the app checks it for new scores and sounds when it starts, comes to the
+   front or opens a book without a score, and Settings has "Check for new files now". A
+   book whose score is inside it (the server route) needs no music folder at all for its
+   mood and atmosphere tracks, only for the recordings.
 
 Rough cost: one request per ~250 words plus probes, so a 100,000-word novel is ~650
 requests: about $9 with Opus 5.5 at list prices, $4.50 with Sonnet 5.5, $0.25 with Haiku 5.5.

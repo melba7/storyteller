@@ -47,6 +47,9 @@ public protocol AmbienceBackend: AnyObject {
     /// Plays a short recording once, at a gain, on a voice of its own beside the slots
     /// (a one-off sound). A one-off sound still playing is cut off.
     func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws
+    /// Fades a one-off sound still playing out over `fade` seconds and stops it (the
+    /// narrator paused, or the listener jumped). Nothing happens when none is playing.
+    func stopOnce(fade: TimeInterval)
 }
 
 extension AmbienceBackend {
@@ -54,6 +57,8 @@ extension AmbienceBackend {
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {
         throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "this backend plays no one-off sounds")
     }
+
+    public func stopOnce(fade: TimeInterval) {}
 }
 
 /// Records what the player asked for, for tests and the headless demo.
@@ -130,6 +135,16 @@ public final class FakeAmbienceBackend: AmbienceBackend {
         }
         oneShots.append((url.lastPathComponent, gain))
         log.append("once \(url.lastPathComponent)")
+        oneShotPlaying = url.lastPathComponent
+    }
+
+    /// The one-off sound playing, until it is stopped (the fake never finishes one by itself).
+    public private(set) var oneShotPlaying: String?
+
+    public func stopOnce(fade: TimeInterval) {
+        guard oneShotPlaying != nil else { return }
+        oneShotPlaying = nil
+        log.append("stop once \(fade)")
     }
 
     /// The files playing now with their gains, by file name.

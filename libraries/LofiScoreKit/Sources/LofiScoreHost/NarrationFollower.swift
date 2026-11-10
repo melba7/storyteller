@@ -280,12 +280,44 @@ public final class NarrationFollower: @unchecked Sendable {
         }
     }
 
+    /// A better text for the open book, with the score that has since arrived. The book
+    /// stays open and the music plays on: from the next reading, taken at the sentence
+    /// being narrated, the new engine decides. Readings of the old one still in flight
+    /// are dropped.
+    public func replaceText(_ bookText: BookText, toBook id: String) {
+        scheduler.perform { [self] in
+            guard id == bookID else { return }
+            guard text != nil else {
+                text = bookText
+                sink?.openBook(id: id)
+                if let waiting = waitingClip {
+                    waitingClip = nil
+                    handle(waiting.clip, audioTime: waiting.audioTime)
+                }
+                return
+            }
+            text = bookText
+            lock.withLock { generation += 1 }
+            if narrating || reading, let position {
+                enqueueReading(bookText.tracker, position, isSeek: true)
+            }
+        }
+    }
+
     public func playingChanged(_ isPlaying: Bool) {
         scheduler.perform { [self] in
             if isPlaying {
+                let wasPausing = pauseTimer != nil
                 pauseTimer?.cancel()
                 pauseTimer = nil
-                guard !narrating else { return }
+                if narrating {
+                    // A pause too short to count, as far as the follower is concerned. The
+                    // players may have stopped on their own in the meantime (headphones
+                    // pulled: the narrator pauses itself and may be resumed at once), so
+                    // the resume is passed on; they treat a repeated play as nothing new.
+                    if wasPausing { sink?.narratorDidPlay() }
+                    return
+                }
                 // The narrator takes over from the pages: the music carries on.
                 readerIdleTimer?.cancel()
                 readerIdleTimer = nil

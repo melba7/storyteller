@@ -8,6 +8,7 @@ import {
   type LofiMood,
   type LofiMoodOverride,
   type LofiMusicStatus,
+  type LofiSyncSummary,
   LofiScore,
 } from "@/modules/lofi-score"
 
@@ -193,6 +194,29 @@ export function useLofiMusic(pollInterval: number | null) {
       return summary
     }, [refresh])
 
+  /** Copies what is new in the linked folder now; null when none is linked. */
+  const syncMusicFolder =
+    useCallback(async (): Promise<LofiSyncSummary | null> => {
+      if (!LofiScore) return null
+      try {
+        return await LofiScore.syncMusicFolder()
+      } finally {
+        await refresh()
+      }
+    }, [refresh])
+
+  const unlinkMusicFolder = useCallback(
+    () =>
+      apply(
+        (current) => {
+          const { linkedFolder: _unlinked, ...library } = current.library
+          return { ...current, library }
+        },
+        () => LofiScore?.unlinkMusicFolder(),
+      ),
+    [apply],
+  )
+
   const removeImportedMusic = useCallback(
     () =>
       apply(
@@ -217,6 +241,8 @@ export function useLofiMusic(pollInterval: number | null) {
     markWrongMood,
     getMoodFeedback,
     importMusicFolder,
+    syncMusicFolder,
+    unlinkMusicFolder,
     removeImportedMusic,
   }
 }

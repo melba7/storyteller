@@ -45,6 +45,8 @@ public enum BookScore {
 
     public enum ScoreError: Error, Equatable {
         case unsupportedFormat(Int)
+        /// Neither a mood track nor an atmosphere track.
+        case empty
     }
 
     private struct File: Decodable {
@@ -55,7 +57,19 @@ public enum BookScore {
     /// The mood track in a file that holds either a plain mood track or a score. Nil when
     /// the file is a score without a mood part.
     public static func moodTrack(at url: URL) throws -> MoodTrack? {
-        let data = try Data(contentsOf: url)
+        try moodTrack(in: Data(contentsOf: url))
+    }
+
+    /// What a score holds. Throws when the data is neither a score nor a plain mood track.
+    public static func contents(of data: Data) throws -> (mood: Bool, atmosphere: Bool) {
+        let mood = try moodTrack(in: data) != nil
+        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let atmosphere = object?["atmosphere"] is [String: Any]
+        guard mood || atmosphere else { throw ScoreError.empty }
+        return (mood, atmosphere)
+    }
+
+    static func moodTrack(in data: Data) throws -> MoodTrack? {
         if let track = try? MoodTrack.decode(data) { return track }
         let file = try JSONDecoder().decode(File.self, from: data)
         guard file.format == currentFormat else { throw ScoreError.unsupportedFormat(file.format) }
@@ -80,24 +94,18 @@ public enum MoodTrackFinder {
         spoilerGuard: SpoilerGuard,
         fileManager: FileManager = .default
     ) -> MoodTrack? {
-        var named: [URL] = []
-        var others: [URL] = []
-        for folder in folders {
-            let files = (try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
-            for file in files where file.pathExtension.lowercased() == "json" {
-                // "<id>.json", "<id>.track.json" and "<id>.score.json" all name the book.
-                if bookName(of: file) == bookID {
-                    named.append(file)
-                } else {
-                    others.append(file)
-                }
-            }
-        }
-        for file in named + others.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }).prefix(200) {
-            guard let track = (try? BookScore.moodTrack(at: file)) ?? nil else { continue }
-            if matches(track, spoilerGuard: spoilerGuard) { return track }
-        }
-        return nil
+        // "<id>.json", "<id>.track.json" and "<id>.score.json" all name the book. Any
+        // number of files may be looked through; the answer is remembered per book.
+        TrackMatchMemory.lookUp(
+            key: "mood:" + bookID,
+            bookID: bookID,
+            folders: folders,
+            isCandidate: { $0.pathExtension.lowercased() == "json" },
+            bookName: bookName(of:),
+            decode: { (try? BookScore.moodTrack(at: $0)) ?? nil },
+            matches: { matches($0, spoilerGuard: spoilerGuard) },
+            fileManager: fileManager
+        )?.track
     }
 
     /// The mood part of the score inside the book itself, if it has one that still matches

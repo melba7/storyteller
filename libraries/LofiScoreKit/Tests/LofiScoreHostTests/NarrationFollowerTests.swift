@@ -274,7 +274,8 @@ final class NarrationFollowerTests: XCTestCase {
         scheduler.advance(by: 0.3)
         follower.playingChanged(true)
         scheduler.advance(by: 5)
-        XCTAssertEqual(sink.calls, [], "a seek's stall does not stop the music")
+        XCTAssertEqual(sink.calls, [.play], "a seek's stall does not stop the music; the resume is passed on for players that stopped on their own (headphones pulled)")
+        sink.clear()
 
         follower.playingChanged(false)
         scheduler.advance(by: 1)

@@ -89,6 +89,35 @@ public final class MusicSettings: @unchecked Sendable {
         set { defaults.set(newValue, forKey: prefix + "importedFolderName") }
     }
 
+    /// The music folder the app keeps up to date with (a security-scoped bookmark of the
+    /// folder picked in Files), or nil when none is linked. See ``LofiMusicHost/syncMusicFolder(reason:)``.
+    public var linkedFolderBookmark: Data? {
+        get { defaults.data(forKey: prefix + "linkedFolderBookmark") }
+        set {
+            if let newValue {
+                defaults.set(newValue, forKey: prefix + "linkedFolderBookmark")
+            } else {
+                defaults.removeObject(forKey: prefix + "linkedFolderBookmark")
+            }
+        }
+    }
+
+    public var linkedFolderName: String? {
+        get { defaults.string(forKey: prefix + "linkedFolderName") }
+        set { defaults.set(newValue, forKey: prefix + "linkedFolderName") }
+    }
+
+    /// When the linked folder was last looked at, and what that found, for the settings screen.
+    public var lastSyncDate: Date? {
+        get { defaults.object(forKey: prefix + "lastSyncDate") as? Date }
+        set { defaults.set(newValue, forKey: prefix + "lastSyncDate") }
+    }
+
+    public var lastSyncResult: String? {
+        get { defaults.string(forKey: prefix + "lastSyncResult") }
+        set { defaults.set(newValue, forKey: prefix + "lastSyncResult") }
+    }
+
     /// The player's ducking with the listener's level applied.
     public func ducking(base: DuckingSettings = DuckingSettings()) -> DuckingSettings {
         var ducking = base

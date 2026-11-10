@@ -50,6 +50,9 @@ Files and folders that belong to the fork, which upstream never touches:
   looks up the clip at the top of the page, so the music can follow the pages
   while you read with the narration stopped.
 - `applications/mobile/lofi/`: the React Native UI.
+- `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`: the server route
+  that keeps a book's score (its mood track and atmosphere cues) inside the
+  read-aloud EPUB, `GET` for the app and `PUT` for the Mac's tools.
 - Planned: `tools/lofi-library/` (music library scripts).
 
 Touch points are the only edits to upstream files. Each one carries `LOFI-FORK`
