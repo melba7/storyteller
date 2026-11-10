@@ -110,11 +110,16 @@ public struct ClaudeCodeTransport: HTTPTransport {
             throw ClaudeCodeError.badRequest("the user message has no text")
         }
 
+        // No tools, MCP servers or skills: some runs on Mo's Mac sent about
+        // 97k tokens per request instead of about 3k, most likely the
+        // account's claude.ai connectors loading into the context.
         var arguments = [
             "-p",
             "--output-format", "json",
             "--no-session-persistence",
             "--tools", "",
+            "--strict-mcp-config",
+            "--disable-slash-commands",
             "--model", model,
         ]
         let output = body["output_config"] as? [String: Any]
@@ -346,6 +351,7 @@ public struct ClaudeCodeTransport: HTTPTransport {
             child.process.currentDirectoryURL = directory
             var environment = ProcessInfo.processInfo.environment
             environment.removeValue(forKey: "ANTHROPIC_API_KEY")
+            environment["ENABLE_CLAUDEAI_MCP_SERVERS"] = "false"
             child.process.environment = environment
             child.process.standardInput = child.stdin
             child.process.standardOutput = child.stdout

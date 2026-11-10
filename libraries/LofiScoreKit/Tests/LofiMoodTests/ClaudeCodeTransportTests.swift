@@ -51,6 +51,8 @@ struct ClaudeCodeTransportTests {
         #expect(args.first == "-p")
         #expect(args.contains("--no-session-persistence"))
         #expect(!args.contains("--bare"), "bare mode never uses the subscription login")
+        #expect(args.contains("--strict-mcp-config"), "no connectors' tools in the context")
+        #expect(args.contains("--disable-slash-commands"))
         func value(_ flag: String) -> String? {
             args.firstIndex(of: flag).flatMap { $0 + 1 < args.count ? args[$0 + 1] : nil }
         }
