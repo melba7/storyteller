@@ -64,8 +64,15 @@ The same rules as the mood track:
 - Each entry is judged from the narrated text up to and including its own sentence
   (`SpoilerGuard.window(at:)`) plus the memory of places from *earlier* entries only. The
   builder's first pass runs in book order for that reason, one request at a time.
-- Scene changes are pinned to within 3 sentences by bisecting between entries that disagree.
-  A probe sees only the text up to its own sentence and the places before it.
+- Changes of sound are pinned to their sentence by scoring more sentences between two
+  entries that disagree (`SceneChangeFinder`). Only changes the listener would hear are
+  narrowed: the later entry must be sure enough to be played, and the sound must differ.
+  The sentence scored next is the one the later answer says its scene began on, when it
+  named one (`sceneStart` in the track), otherwise the one halfway. That hint only picks
+  the sentence: a probe sees only the text up to its own sentence and the places before
+  it, so a sound still starts only where the text up to that sentence gives it. A change
+  is pinned when the entries are within 3 sentences, or when an answer made from the text
+  up to its own sentence says the scene begins right there.
 - On the phone, the sound at sentence *n* comes from the newest entry at or before *n*,
   never a later one. Entries Claude was unsure of (confidence under 0.35) are skipped.
 - The status screen shows only the scene playing now.
@@ -256,6 +263,7 @@ vehicle, aircraft, spaceship, deep drone.
 | Scene model, sounds, the catalogue and place guide, place memory, track file | `Sources/LofiAtmosphere/Scene`, `Track` |
 | Claude prompt and engine (`ClaudeSceneEngine`) | `Sources/LofiAtmosphere/Claude` |
 | Track builder (order, memory, refinement) | `Track/AtmosphereTrackBuilder.swift` |
+| Which changes are heard, how different two scenes sound, where to score next | `Track/SceneChanges.swift` |
 | Director (which scene now) and player (fades, slots, crowd yield) | `Sources/LofiAtmosphere/Player` |
 | Audio: its own `AVAudioEngine`, 12 looping slots | `Player/AVAmbienceBackend.swift` |
 | Synthesised stand-ins for every sound | `Sound/AmbienceSynth.swift` |
@@ -376,6 +384,19 @@ requests: about $9 with Opus 5.5 at list prices, $4.50 with Sonnet 5.5, $0.25 wi
 The first pass takes about 6 s a request (it runs in order), so a long novel takes most of an
 hour; `--parallel` scores several books at once.
 
+## Measuring a whole book
+
+`python3 -I Tools/eval/atmosphere_stats.py BOOK.atmosphere.json` reads a track (never the
+book) and prints what a listener gets over the whole book: changes of sound an hour and
+how long a scene is held after the director's rules, time with no sound at all, flicker
+there and back, places heard once or returned to and whether a return brings the same
+sounds, ids whose names match (one place under two ids), how many changes are pinned to
+their sentence and how many requests pinning the rest would take, and a table of what
+settling short scenes would do. It prints numbers, sound ids and place ids only; place
+names need `--names`. `--skeleton OUT.json` writes the track's structure with none of its
+words (no names, state notes, cues or quotes), which gives the same report and can leave
+the Mac.
+
 ## Testing
 
 `swift test --filter "LofiAtmosphereTests|LofiScoreHostTests"` (Linux in Docker or the Mac).
@@ -385,5 +406,7 @@ headphones pulled, media reset, the level slider. `IntensityTests` covers the di
 scene trim and the lift in the gaps; `CatalogTests` the catalogue, the place guide, the
 committed `catalog.json`, the prompt and moved kinds. `VariantTests` covers variant ids and
 folders, the catalog's spoiler rule, editions, Claude's new variants and moments, and the
-narration holds (swell, hush, too early, refused, dropped, setting off). The synth tests check every sound renders
+narration holds (swell, hush, too early, refused, dropped, setting off). `SceneChangeTests`
+covers which changes are heard, how different two scenes sound, where the builder scores
+next, and a build where every change lands on its own sentence. The synth tests check every sound renders
 at -23 LUFS and loops without a seam.

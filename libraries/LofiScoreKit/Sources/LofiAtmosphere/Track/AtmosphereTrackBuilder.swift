@@ -8,18 +8,23 @@ import LofiText
 /// It has to go in order: each request carries the ``PlaceMemory`` of the entries
 /// before it, so a return to a place is recognised and keeps its sounds.
 ///
-/// Then, with refinement on, it pins each change of scene to within a few sentences,
-/// the way ``MoodTrackBuilder`` pins mood changes: between two neighbouring entries
-/// whose scenes differ it scores the sentence halfway, then halfway again on the side
-/// the change fell, until the change is known to within `resolutionSentences`.
+/// Then, with refinement on, it pins each change of sound to its sentence
+/// (``SceneChangeFinder``). Only changes the listener would hear count: the later entry
+/// must be sure enough for the director to play it, and the sound must differ. Between
+/// the two entries it scores the sentence the later answer says its scene began on,
+/// when the answer gave one, and otherwise the sentence halfway, then again on the side
+/// the change fell, until the change is known to within `resolutionSentences` or an
+/// answer made from the text up to its own sentence says the scene begins right there.
+/// The changes the listener hears most are narrowed first.
 ///
 /// Spoiler safety: every entry, probes included, is judged from
 /// `SpoilerGuard.window(at:)` for its own sentence and the memory of entries before it,
 /// so it depends only on text up to its sentence. What does depend on later text is
-/// where probes are spent (only between entries that disagree), the same accepted cost
-/// as for mood tracks. Place ids are labels: a probe that finds the start of a place
-/// first named by the next entry takes that entry's id, which changes nothing audible
-/// before the text reaches the place.
+/// where probes are spent (only between entries that disagree, and first where a later
+/// answer says its scene began), the same accepted cost as for mood tracks. Place ids
+/// are labels: a probe that finds the start of a place first named by the next entry
+/// takes that entry's id, which changes nothing audible before the text reaches the
+/// place.
 ///
 /// One-off sounds (``AtmosphereTrack/Cue``): an answer may say a sound happens on one of
 /// its passage's sentences. On the passage's last sentence it is kept as it is. On an
@@ -55,10 +60,24 @@ public struct AtmosphereTrackBuilder: Sendable {
         public var resolutionSentences: Int
         /// Extra requests allowed, as a share of the planned entries.
         public var probeBudget: Double
+        /// What the director will play, so that requests go only to changes that are
+        /// heard: its ``AtmosphereConfig/minConfidence`` and ``AtmosphereConfig/maxLagSentences``.
+        public var minConfidence: Double
+        public var maxLagSentences: Int
 
-        public init(resolutionSentences: Int = 3, probeBudget: Double = 0.5) {
+        public init(
+            resolutionSentences: Int = 3, probeBudget: Double = 0.5,
+            minConfidence: Double = AtmosphereConfig().minConfidence,
+            maxLagSentences: Int = AtmosphereConfig().maxLagSentences
+        ) {
             self.resolutionSentences = max(1, resolutionSentences)
             self.probeBudget = max(0, probeBudget)
+            self.minConfidence = minConfidence
+            self.maxLagSentences = max(0, maxLagSentences)
+        }
+
+        public var finder: SceneChangeFinder {
+            SceneChangeFinder(minConfidence: minConfidence, maxLagSentences: maxLagSentences, resolutionSentences: resolutionSentences)
         }
 
         public func maxProbes(planned: Int) -> Int {
@@ -73,6 +92,10 @@ public struct AtmosphereTrackBuilder: Sendable {
         public var probes = 0
         public var probeBudget = 0
         public var unrefinedChanges = 0
+        /// Changes of sound the listener will hear, and how many of them are pinned (to
+        /// within the resolution, or by an answer that starts on its own sentence).
+        public var changes = 0
+        public var pinnedChanges = 0
         public var failed = 0
         public var failures: [String] = []
         public var stoppedEarly = false
@@ -230,8 +253,7 @@ public struct AtmosphereTrackBuilder: Sendable {
             let roundSize = max(4, concurrency * 2)
             while true {
                 let candidates = Self.refinableChanges(
-                    in: store.snapshot.entries, narrated: all,
-                    resolution: refinement.resolutionSentences, excluding: failedProbes
+                    in: store.snapshot.entries, narrated: all, finder: refinement.finder, excluding: failedProbes
                 )
                 report.unrefinedChanges = candidates.count
                 guard budget > 0, !candidates.isEmpty else { break }
@@ -255,6 +277,9 @@ public struct AtmosphereTrackBuilder: Sendable {
             }
         }
         let track = store.snapshot
+        let heard = (plan.refinement ?? Refinement()).finder.changes(in: track.entries)
+        report.changes = heard.count
+        report.pinnedChanges = heard.filter(\.isPinned).count
         report.places = Set(track.entries.compactMap(\.scene.placeID)).count
         report.variants = track.variants.count
         let offered = Set(offeredVariants.map(\.id))
@@ -265,34 +290,23 @@ public struct AtmosphereTrackBuilder: Sendable {
         return report
     }
 
-    /// Two scenes the listener would hear as different: another place, or other sounds
-    /// (a variant counts as its own sound).
-    static func differ(_ a: StoryScene, _ b: StoryScene) -> Bool {
-        a.placeID != b.placeID || Set(a.layers.map(\.key)) != Set(b.layers.map(\.key))
-    }
-
-    /// The sentence halfway between each pair of neighbouring entries whose scenes differ
-    /// and that are more than `resolution` sentences apart; a change of place first, then
-    /// the widest gaps.
+    /// The sentence to score next for each change of sound that is not pinned yet
+    /// (``SceneChangeFinder``), the changes worth most first: how different the two
+    /// sounds are times how many sentences the change may be off by.
     static func refinableChanges(
         in entries: [AtmosphereTrack.Entry],
         narrated: [SentencePosition],
-        resolution: Int,
+        finder: SceneChangeFinder,
         excluding failed: Set<Int>
     ) -> [SentencePosition] {
-        var found: [(value: Int, probe: SentencePosition)] = []
-        for (a, b) in zip(entries, entries.dropFirst()) where differ(a.scene, b.scene) {
-            // A swell or hush pauses the narration right after its sentence, so it is
-            // pinned to the sentence itself.
-            let needed = b.scene.moment == nil ? resolution : 1
-            guard b.globalIndex - a.globalIndex > needed else { continue }
-            let target = a.globalIndex + (b.globalIndex - a.globalIndex) / 2
-            guard let probe = position(atOrAfter: target, in: narrated),
-                  probe.globalIndex > a.globalIndex, probe.globalIndex < b.globalIndex,
+        var found: [(value: Double, probe: SentencePosition)] = []
+        for change in finder.changes(in: entries) {
+            guard let target = change.probe,
+                  let probe = position(atOrAfter: target, in: narrated),
+                  probe.globalIndex > change.from, probe.globalIndex < change.at,
                   !failed.contains(probe.globalIndex)
             else { continue }
-            let weight = a.scene.placeID != b.scene.placeID ? 2 : 1
-            found.append((weight * (b.globalIndex - a.globalIndex), probe))
+            found.append((change.value, probe))
         }
         return found
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.probe.globalIndex < $1.probe.globalIndex }
@@ -369,6 +383,7 @@ public struct AtmosphereTrackBuilder: Sendable {
         let window = try spoilerGuard.window(at: position)
         let memory = PlaceMemory(track: store.snapshot, before: position.globalIndex, offered: offeredVariants)
         let answer = try await engine.scene(for: window, memory: memory)
+        let sceneStart = answer.since.flatMap { self.startOfScene(quoted: $0, in: window) }
         var entry: AtmosphereTrack.Entry!
         store.update { track in
             // Every variant the scene uses goes into the track, first used here at the
@@ -393,7 +408,8 @@ public struct AtmosphereTrackBuilder: Sendable {
                 position: position,
                 sentence: window.lines.last?.text ?? "",
                 scene: scene,
-                world: answer.world ?? memory.world
+                world: answer.world ?? memory.world,
+                sceneStart: sceneStart
             )
             track.insert(entry)
         }
@@ -401,6 +417,13 @@ public struct AtmosphereTrackBuilder: Sendable {
             await placeCue(mention, foundIn: window, into: store, engine: engine, ledger: cues)
         }
         return entry
+    }
+
+    /// The sentence an answer says its scene began on, from the first words it quoted.
+    func startOfScene(quoted quote: String, in window: CausalWindow) -> Int? {
+        guard let index = SceneChangeFinder.line(startingWith: quote, in: window) else { return nil }
+        let line = window.lines[index]
+        return (try? spoilerGuard.position(chapterOrdinal: line.chapterOrdinal, sentenceIndex: line.sentenceIndex))?.globalIndex
     }
 
     /// Puts a one-off sound on the sentence its words are in. A sentence before the

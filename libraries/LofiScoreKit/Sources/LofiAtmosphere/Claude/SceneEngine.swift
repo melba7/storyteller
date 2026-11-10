@@ -23,13 +23,21 @@ public struct SceneAnswer: Sendable, Hashable {
     /// builder finds its sentence and keeps it only if the text up to that sentence alone
     /// says so.
     public var oneShot: OneShotMention?
+    /// The first words of the passage's sentence where the story enters this scene, when
+    /// the answer says it began inside the passage. The builder finds that sentence and
+    /// scores it from its own window, so the hint never starts a sound by itself.
+    public var since: String?
 
-    public init(place: Place, scene: StoryScene, world: String?, newVariants: [SoundVariant] = [], oneShot: OneShotMention? = nil) {
+    public init(
+        place: Place, scene: StoryScene, world: String?, newVariants: [SoundVariant] = [], oneShot: OneShotMention? = nil,
+        since: String? = nil
+    ) {
         self.place = place
         self.scene = scene
         self.world = world
         self.newVariants = newVariants
         self.oneShot = oneShot
+        self.since = since
     }
 }
 
