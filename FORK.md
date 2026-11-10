@@ -40,9 +40,8 @@ Files and folders that belong to the fork, which upstream never touches:
 - `applications/mobile/fork.config.ts`: the fork's app name and bundle ID, and
   the pods for the atmosphere engine.
 - `libraries/LofiScoreKit/`: the Swift atmosphere engine, with the mood
-  detection the shelved music used. Next to its
-  `Package.swift`, one podspec per target lets CocoaPods build it from source
-  for the app.
+  detection the shelved music used. Next to its `Package.swift`, one podspec per
+  target lets CocoaPods build it from source for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
 - `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on
