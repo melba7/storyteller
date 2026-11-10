@@ -1,0 +1,114 @@
+{
+ "title": "A pause does not wipe the mood",
+ "duration": 1112,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   },
+   "expect": "melancholy"
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 62,
+   "index": 14,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 82,
+   "index": 18,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 102,
+   "index": 22,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 122,
+   "index": 26,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 142,
+   "index": 30,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 162,
+   "index": 34,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 163,
+   "playing": false,
+   "note": "pause"
+  },
+  {
+   "t": 1062,
+   "playing": true,
+   "note": "resume 15 minutes later"
+  },
+  {
+   "t": 1082,
+   "index": 38,
+   "trigger": "start",
+   "reading": {
+    "bucket": "playful",
+    "confidence": 0.6
+   },
+   "expect": "melancholy",
+   "note": "resume reading continues the stretch"
+  },
+  {
+   "t": 1102,
+   "index": 42,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   },
+   "expect": "melancholy"
+  }
+ ]
+}

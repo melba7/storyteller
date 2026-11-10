@@ -1,0 +1,155 @@
+{
+ "title": "A stray reading versus a sustained change",
+ "duration": 352,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 62,
+   "index": 14,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 82,
+   "index": 18,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 102,
+   "index": 22,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 122,
+   "index": 26,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 142,
+   "index": 30,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.6
+   },
+   "expect": "calm",
+   "note": "one stray reading"
+  },
+  {
+   "t": 162,
+   "index": 34,
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   },
+   "expect": "calm"
+  },
+  {
+   "t": 182,
+   "index": 38,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 202,
+   "index": 42,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 222,
+   "index": 46,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 242,
+   "index": 50,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 262,
+   "index": 54,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 282,
+   "index": 58,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 302,
+   "index": 62,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 322,
+   "index": 66,
+   "reading": {
+    "bucket": "melancholy",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 323,
+   "expect": "melancholy",
+   "note": "a sustained run of melancholy text moves the music"
+  }
+ ]
+}

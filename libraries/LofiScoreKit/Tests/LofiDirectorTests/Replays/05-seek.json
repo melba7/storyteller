@@ -1,0 +1,63 @@
+{
+ "title": "Seek: stale readings ignored, new place decides",
+ "duration": 60,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "hopeful",
+    "confidence": 0.7
+   },
+   "expect": "hopeful"
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "hopeful",
+    "confidence": 0.7
+   }
+  },
+  {
+   "t": 30,
+   "seek": 900,
+   "note": "listener jumps far ahead"
+  },
+  {
+   "t": 31,
+   "index": 8,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.9
+   },
+   "expect": "hopeful",
+   "note": "a reading from before the seek is ignored"
+  },
+  {
+   "t": 33,
+   "index": 900,
+   "trigger": "seek",
+   "reading": {
+    "bucket": "somber",
+    "confidence": 0.7
+   },
+   "expect": "somber",
+   "note": "the seek reading decides inside the dwell"
+  },
+  {
+   "t": 53,
+   "index": 904,
+   "reading": {
+    "bucket": "somber",
+    "confidence": 0.7
+   },
+   "expect": "somber"
+  }
+ ]
+}
