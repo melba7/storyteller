@@ -151,13 +151,18 @@ public struct ClaudeCodeTransport: HTTPTransport {
         """
 
     /// The first complete JSON object in `text` (skipping any words, code
-    /// fence or stray brace around it), or nil when there is none.
+    /// fence or stray brace around it), or nil when there is none. An object that
+    /// never closes (an answer cut short) yields nothing: the objects inside it are
+    /// its parts, not an answer.
     static func jsonObjectText(in text: String) -> String? {
         let chars = Array(text.unicodeScalars)
-        for start in chars.indices where chars[start] == "{" {
+        var start = chars.startIndex
+        while let open = chars[start...].firstIndex(of: "{") {
+            start = open
             var depth = 0
             var inString = false
             var escaped = false
+            var closedAt: Int?
             scan: for i in start..<chars.count {
                 let c = chars[i]
                 if inString {
@@ -176,11 +181,16 @@ public struct ClaudeCodeTransport: HTTPTransport {
                         if (try? JSONSerialization.jsonObject(with: Data(candidate.utf8))) is [String: Any] {
                             return candidate
                         }
+                        closedAt = i
                         break scan
                     }
                 default: break
                 }
             }
+            // A closed object that is not valid JSON is skipped whole; an unclosed one
+            // ends the search.
+            guard let closedAt else { return nil }
+            start = closedAt + 1
         }
         return nil
     }

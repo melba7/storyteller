@@ -116,7 +116,10 @@ struct ClaudeCodeTransportTests {
 
     @Test func findsTheFirstWholeJSONObject() {
         #expect(ClaudeCodeTransport.jsonObjectText(in: #"x {"a": "}{", "b": {"c": 1}} y {"d": 2}"#) == #"{"a": "}{", "b": {"c": 1}}"#)
-        #expect(ClaudeCodeTransport.jsonObjectText(in: #"{broken {"ok": "\"q\""}"#) == #"{"ok": "\"q\""}"#)
+        #expect(ClaudeCodeTransport.jsonObjectText(in: #"{broken {"ok": "\"q\""}"#) == nil, "an object that never closes is an answer cut short")
+        #expect(ClaudeCodeTransport.jsonObjectText(in: #"{"place": "p1", "sounds": [{"sound": "murmur", "level": "soft"}"#) == nil,
+                "the sounds inside a cut-off answer are not the answer")
+        #expect(ClaudeCodeTransport.jsonObjectText(in: #"{bad: json} then {"fine": true}"#) == #"{"fine": true}"#, "a closed object that is not JSON is skipped whole")
         #expect(ClaudeCodeTransport.jsonObjectText(in: "no object here") == nil)
     }
 

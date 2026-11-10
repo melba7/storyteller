@@ -2,9 +2,10 @@
 
 Steady sounds of the scene under the narration, the whole time: rain while it rains, a fire
 in the inn, the sea on the shore, a murmuring crowd in a school hallway, the quiet of an
-ordinary room. It is what the app plays ("Atmosphere sounds" in the player's panel and in
-Settings), on by default, with its own volume and a dial for how much is going
-on. The words stay clear through all of it.
+ordinary room. It is what the fork is for ("Atmosphere sounds" in the player's toolbar panel
+and in Settings), on by default, with its own volume and a dial for how much is going on.
+The words stay clear through all of it. The lofi music that used to play alongside is
+shelved (`shelved/lofi-music/` at the repository root).
 
 ## What it does
 
@@ -36,13 +37,13 @@ on. The words stay clear through all of it.
 - **Changes are calm.** A new scene crossfades over 6 s, a level change over 4 s, and two
   changes are at least 20 s apart unless the listener seeks. When a new chapter starts and
   has not said where it is yet, the last scene drops 8 dB until it does.
-- **A catalogue of sounds.** 38 sound families (rain, fireplace, crowd, murmur, room tone,
-  an empty hall, a kitchen, a workshop, a farmyard, an engine, a spaceship, …) with 288 more
-  specific kinds under them (a drizzle, a school corridor between lessons, hallway whispers,
-  a hushed library, a hospital ward at night, a submarine, …) and a guide to what 31 kinds
-  of place sound like in each of their states. Claude asks for a new kind when a place
-  clearly calls for one, the Mac fetches recordings for every kind, and until they are
-  imported the phone plays the family it is a kind of.
+- **A catalogue of sounds.** 48 sound families (rain, fireplace, crowd, murmur, room tone,
+  an empty hall, a kitchen, a workshop, a farmyard, an engine, a spaceship, footsteps, …)
+  with 360 more specific kinds under them (a drizzle, a school corridor between lessons,
+  hallway whispers, a hushed library, a hospital ward at night, a submarine, …) and a guide
+  to what 31 kinds of place sound like in each of their states. Claude asks for a new kind
+  when a place clearly calls for one, the Mac fetches recordings for every kind, and until
+  they are imported the phone plays the family it is a kind of.
 - **A steady bed, kept clear of the voice.** The sounds play under the narration the whole
   time, 24 dB under it by default, with the voice's band dipped and the voices in a crowd
   blurred. A scene with many sounds is trimmed so that together they are no louder than one
@@ -53,13 +54,17 @@ on. The words stay clear through all of it.
   (stepping into a crowded hall) or falls silent (a door shutting on the noise), the
   narrator can stop for under a second while the sound swells or hushes, then carry on.
   It's a setting ("Short pauses for big scene changes"), on by default, and rare.
-- **One-off sounds, if you want them.** A single sound on the sentence that says it
-  happens: a knock at the door, a clap of thunder, a clock striking. Off by default
-  ("One-off sounds" in Settings), rare, and well under the voice.
+- **One-off sounds.** A single sound on the sentence that says it happens: a knock at the
+  door, a clap of thunder, a clock striking, and the door, engine or splash of a change of
+  scene. On by default ("One-off sounds" in Settings), rare, and well under the voice.
+- **Measured.** A test set of 114 passages from 18 public-domain books, labelled by hand,
+  says how often the scorer gets the place, the sounds, the state, the moment and the
+  one-off right, so a change to the prompt is a number, not a feeling (see "Scoring
+  accuracy" below).
 
 ## Spoiler safety
 
-The same rules as the mood track:
+The rules every scorer in this package follows:
 
 - Each entry is judged from the narrated text up to and including its own sentence
   (`SpoilerGuard.window(at:)`) plus the memory of places from *earlier* entries only. The
@@ -68,7 +73,8 @@ The same rules as the mood track:
   entries that disagree (`SceneChangeFinder`). Only changes the listener would hear are
   narrowed: the later entry must be sure enough to be played, and the sound must differ.
   The sentence scored next is the one the later answer says its scene began on, when it
-  named one (`sceneStart` in the track), otherwise the one halfway. That hint only picks
+  named one (`since` in the answer, the first words of that sentence copied from the
+  passage; `sceneStart` in the track), otherwise the one halfway. That hint only picks
   the sentence: a probe sees only the text up to its own sentence and the places before
   it, so a sound still starts only where the text up to that sentence gives it. A change
   is pinned when the entries are within 3 sentences, or when an answer made from the text
@@ -78,6 +84,75 @@ The same rules as the mood track:
 - The status screen shows only the scene playing now.
 
 `BuilderTests`, `DirectorTests` and `AtmosphereHostTests` check these rules.
+
+## Scoring accuracy
+
+`Tools/atmosphere/eval/cases.jsonl` is a test set for the scorer: 114 passages from 18
+public-domain books (Dracula, Treasure Island, A Christmas Carol, The Wind in the Willows,
+Jane Eyre, The Secret Garden, The Railway Children, The Call of the Wild, The Hound of the
+Baskervilles, The War of the Worlds, Frankenstein, Wuthering Heights, Alice, Pride and
+Prejudice, Anne of Green Gables, Black Beauty, The Time Machine, Silas Marner), each with
+the memory the scorer is shown (the places met so far, what they sounded like, the current
+scene) and what the right answer is: the place (new, a listed one by id, or none), the
+setting, which families may be the main sound, which must or must not be there, which
+kinds, words that should be in the state note, the moment, the transition, the one-off
+sound and the sentence the scene begins on. The labels were written by reading the
+passages, not by running the scorer, so the set measures the scorer instead of agreeing
+with it. `Tools/atmosphere/eval/build_cases.py` holds the cases (a passage is named by the
+words its last sentence ends with, resolved against `Tools/data/books/json`, which
+`Tools/data/fetch_books.py` and `make_readaloud.py` fill from Project Gutenberg) and checks
+every label against `catalog.json`.
+
+```sh
+swift run -c release lofi-atmosphere eval Tools/atmosphere/eval/cases.jsonl --out results.jsonl --verbose
+swift run -c release lofi-atmosphere eval Tools/atmosphere/eval/cases.jsonl --replay results.jsonl   # re-check saved answers
+```
+
+The report gives the share of cases that pass every check, each check on its own (place,
+setting, main, required, forbidden, kinds, state, moment, transition, oneShot, since,
+heard), each tag (place, sounds, state, transition, oneShot, kinds), and for each failed
+case what the scorer answered and what was wanted. `--only id,id`, `--book slug`,
+`--tag tag` and `--limit N` pick cases; `--model` and `--effort` pick the scorer; the plan
+route (`LOFI_CLAUDE_VIA=plan`) costs plan usage, under two dollars' worth at list prices for
+the whole set on Opus 5.5 at low effort, in about 4 minutes at `--concurrency 4`.
+
+What the set found, and what changed because of it (`EvalTests` covers the checks):
+
+- **Prompt 5** (the catalogue with transitions and action sounds) passed 97 of 114 cases.
+  It went silent on passages that describe the place the story is in (a tunnel, London
+  during the exodus), called a known road a new place under another name, used the plain
+  family where the text names the sound (steeples calling to church, not church bells),
+  called a court "unclear" instead of indoors, missed a ship setting sail as a departure,
+  and had no way to say where a scene begins.
+- **Prompt 6** adds `since` (the first words of the sentence the story enters the scene on,
+  so the builder pins the change there instead of bisecting), keeps the current scene
+  through descriptive passages, compares a new place's name with every listed place
+  first (and the parser maps a two-word match to the listed id), names the kind when the
+  text names the sound, settles indoors and outdoors from the kind of place, and spells
+  out ship and coach departures. The parser drops `since` when the answer is the current
+  scene with the same sounds, so a scene is pinned only on a real change (a change of
+  sound at the same place counts). Prompt 6 passes 107 of 114 cases: 104 on the live run,
+  and three more once labels were widened where the scorer's reading was as good as the
+  label's (bolts drawn back as a lock sound, the crowd at Fezziwig's filling when "in they
+  all came", "imprisoned, hiding in silence" for the scullery). By check: place 67 of 68,
+  setting 100 of 102, main 100 of 103, required 10 of 10, forbidden 100 of 100, kinds 33
+  of 33, state 23 of 24, moment 9 of 9, transition 12 of 13, one-off 13 of 15, since 18 of
+  18, heard 110 of 111.
+- **Still missed** (seven cases): two descriptive passages in the second person are still
+  answered with no place (the Railway Children tunnel, Mrs Lynde at her window); a bell
+  that both starts the scene and should be a one-off (the Lowood school bell) is not named;
+  a one-off whose quote spans a sentence the splitter broke in two (the chain under
+  Scrooge's floor; the builder would drop that cue too, so the fix is in the book text, not
+  the scorer); a state note that ignores the passage's last sentence (the gloomy dining-room
+  at Baskerville Hall); no enter transition at the Meryton assembly; and garden birdsong as
+  the first sound in the Perks's kitchen. A different book, a different answer: the scorer's
+  answers vary a little from run to run even at low effort, so compare runs by the per-check
+  lines and read the "got/want" lines before changing anything.
+
+As a whole-book check, the first eight chapters of Treasure Island (645 sentences) were
+scored end to end with prompt 6 on the plan route: 62 planned sentences and 31 probes, 93
+entries, 52 of them with a pinned `sceneStart`, 17 places, 0 failures, about $2.50 at list
+prices in under ten minutes. The track is in the project's shared files for the timing work.
 
 ## More specific sounds (variants)
 
@@ -142,9 +217,9 @@ it costs about a cent a request on Opus after the first). To add or move a kind,
 `SoundCatalog.swift`, then write the JSON the fetch script reads:
 `swift run lofi-atmosphere catalog --out Tools/atmosphere/catalog.json` (`CatalogTests` fails
 until the committed file matches). `lofi-atmosphere catalog --prompt` prints the system
-prompt. Tracks scored with an older prompt (engine id `…/a3`) still play; a book is rescored
-only when its track is moved aside (`make-atmosphere.sh --rescore`), since a rescore costs
-plan usage.
+prompt. Tracks scored with an older prompt (engine id `…/a3` to `…/a5`; the current one is
+`…/a6`) still play; a book is rescored only when its track is moved aside
+(`make-atmosphere.sh --rescore`), since a rescore costs plan usage.
 
 ## Short pauses for big moments
 
@@ -165,15 +240,17 @@ old sounds over 0.3 s. A moment also waives the 20 s gap between changes.
 It stays rare and never surprises: at most one pause every 2 minutes, none in the first
 10 s after play or a seek, never while seeking, only when the moment's sound is actually
 heard, and only when the setting is on and the app's narrator accepts (it refuses while
-paused or already holding). `LofiAtmosphereHost.Environment.holdNarration` is the app's side;
-the app calls `narrationHold(began:)` when the hold starts and ends.
+paused or already holding). `LofiAtmosphereHost.Environment.holdNarration` is the app's
+side; the app calls `narrationHold(began:)` when the hold starts and ends.
 
 ## One-off sounds
 
-15 single sounds (`OneShotSound`): thunder clap, door knock, door slam, door creak,
+63 single sounds (`OneShotSound`): thunder clap, door knock, door slam, door creak,
 doorbell, telephone ring, bell toll, clock chime, breaking glass, dog bark, owl hoot, wolf
-howl, horse neigh, train whistle, ship's horn. Loud, startling sounds (gunshots,
-explosions, screams) are left out on purpose.
+howl, horse neigh, train whistle, ship's horn, a door opened and closed, a car door, an
+engine, chains rattling, a sword drawn, applause, a kettle, a gull, keys, coins, a cork and
+more (see "Scene transitions"). Loud, startling sounds (gunshots, explosions, screams) are
+left out on purpose.
 
 - **Scoring.** Each answer may name one (`oneShot`: the sound and up to eight words copied
   from the passage that say it happens), only when the text says the sound itself happens
@@ -185,7 +262,7 @@ explosions, screams) are left out on purpose.
   sentence explains is dropped). These checks are capped at a fifth of the planned entries.
 - **Track.** `cues` in the atmosphere track: sentence, digest, sound, and where in the
   sentence it falls (the quote's last word), so it lands when its words are read.
-- **Playback**, only with the setting on: when the narration reaches the sentence the sound
+- **Playback**, with the setting on (it is by default): when the narration reaches the sentence the sound
   waits for its place in it (sentence duration × position, at most 8 s; if the next
   sentence starts first, it plays then). It plays 10 dB above a sound at `full`, still well
   under the voice, with the same presence dip. At most one every 30 s, none in the first
@@ -226,13 +303,12 @@ The irrelevant-sound effect: background sound that changes from moment to moment
 above all, then intermittent events) disrupts listening and reading far more than steady
 sound. So:
 
-- Every sound is a steady, seamless loop. One-off sounds are a separate extra, off by
-  default (see "One-off sounds").
+- Every sound is a steady, seamless loop. One-off sounds are a separate extra, rare and
+  short, and can be turned off (see "One-off sounds").
 - A crowd and a murmur are the only sounds made of voices. They are filtered so words can't
-  be made out (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz), and a crowd
-  pushes the music out.
-- Everything sits well under the voice: a sound at `full` is 24 dB under the narrator (the
-  shelved music's bed was 16 dB under), and the slider goes from 40 to 14 dB under, never closer. Each
+  be made out (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz).
+- Everything sits well under the voice: a sound at `full` is 24 dB under the narrator, and
+  the slider goes from 40 to 14 dB under, never closer. Each
   sound also has its own offset (a ticking clock -8 dB, room tone -6, an electric hum -5, a
   hushed room, a murmur or a deep drone -4, a crowd -3, heavy rain +1 dB), and `loud` is
   only 4 dB over `full`.
@@ -250,11 +326,12 @@ sound. So:
   timing, so no lift.
 - Each sound gets a presence dip around 2.5 kHz, where speech is clearest.
 
-The 38 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
+The 48 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,
 night forest, swamp, crowd, city, old town, horses, train, ship, machinery, clock, room
 tone, hushed room, murmur, empty hall, electric hum, kitchen, workshop, farmyard, motor
-vehicle, aircraft, spaceship, deep drone.
+vehicle, aircraft, spaceship, deep drone, and what the characters are doing: footsteps,
+running, breathing, heartbeat, swimming, climbing, fighting, writing, meal, work.
 
 ## The pieces
 
@@ -264,11 +341,12 @@ vehicle, aircraft, spaceship, deep drone.
 | Claude prompt and engine (`ClaudeSceneEngine`) | `Sources/LofiAtmosphere/Claude` |
 | Track builder (order, memory, refinement) | `Track/AtmosphereTrackBuilder.swift` |
 | Which changes are heard, how different two scenes sound, where to score next | `Track/SceneChanges.swift` |
+| The eval set and its runner (`SceneEvaluator`) | `Sources/LofiAtmosphere/Eval`, `Tools/atmosphere/eval` |
 | Director (which scene now) and player (fades, slots, crowd yield) | `Sources/LofiAtmosphere/Player` |
 | Audio: its own `AVAudioEngine`, 12 looping slots | `Player/AVAmbienceBackend.swift` |
 | Synthesised stand-ins for every sound | `Sound/AmbienceSynth.swift` |
-| App host: settings, finding the track, the sounds folder | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiAtmosphereHost.swift` |
-| CLI: `lofi-atmosphere track / show / score / synth / library / catalog` | `Sources/lofi-atmosphere` |
+| App host: settings, finding the track, the sounds folder, the narration hold | `Sources/LofiScoreHost/AtmosphereSupport.swift`, `LofiAtmosphereHost.swift` |
+| CLI: `lofi-atmosphere track / show / score / synth / library / catalog / eval` | `Sources/lofi-atmosphere` |
 | The catalogue as the fetch script reads it | `Tools/atmosphere/catalog.json` |
 
 The atmosphere's engine never touches the audio session, Now Playing, the remote commands
@@ -282,17 +360,17 @@ and the world note). The app uses a track only when its first entries' digests m
 book's sentences.
 
 **Book score**, `<book>.score.json` or inside the book at
-`META-INF/storyteller-lofi/score.json`: `{"format":1,"mood":<mood track>,"atmosphere":<atmosphere track>}`.
-`lofi-atmosphere score --mood A.track.json --atmosphere A.atmosphere.json --out A.score.json`
+`META-INF/storyteller-lofi/score.json`: `{"format":1,"atmosphere":<atmosphere track>}`, with
+a `"mood"` track too when the shelved music made one.
+`lofi-atmosphere score --atmosphere A.atmosphere.json [--mood A.track.json] --out A.score.json`
 writes one. The app looks for a book's atmosphere in the score inside the book, then in
 imported scores, then in imported atmosphere tracks.
 
 **Sounds**, an `Atmosphere` folder inside the sounds folder (still called `LofiMusic` on
-the Mac and in iCloud Drive, from when it held the music):
+the Mac, from when it held the music):
 
 ```
 LofiMusic/
-  Calm/ Cozy/ …              the shelved music's folders, if still there: the import skips them
   Atmosphere/
     Rain/ rain-fs123.m4a …   one folder per sound family (names match loosely: "HeavyRain", "heavy rain")
     Crowd.SchoolCorridor/ …  one folder per more specific kind: <Family>.<Kind>
@@ -319,16 +397,15 @@ server's address and login (optional; the password goes into the login keychain)
 installs a launchd job that runs `Tools/mac/lofi-sync.sh` whenever a book lands in
 `~/Storyteller Lofi/Books` and every half hour. From then on a book synced in Storyteller
 gets its atmosphere by itself: the job fetches newly synced read-aloud books
-(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan (its
-atmosphere, written as `<book>.score.json`; the shelved music's mood track,
-`Tools/mac/make-tracks.sh --engine claude --prompt 3`, only with `--with-mood-tracks` or
-`LOFI_MOOD_TRACKS=1`), fetches any new sounds, copies everything into
-`~/Storyteller Lofi/LofiMusic` and its iCloud Drive copy, and puts the score inside the
-book on the server (`Tools/mac/push-scores.sh`, the fork's `lofi-score` route). The phone's
-linked sounds folder and the book itself bring the score to the reader. Each step is capped
-per book at API list prices (25 dollars for the atmosphere, 20 for a mood track; edit
-`lofi-sync.sh` to change them), so a run that goes wrong can't use up the plan; the next
-run carries on. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
+(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan
+(`Tools/mac/make-atmosphere.sh`, written as `<book>.score.json`), fetches any new sounds,
+copies everything into `~/Storyteller Lofi/LofiMusic` and its iCloud Drive copy, and puts
+the score inside the book on the server (`Tools/mac/push-scores.sh`, the fork's
+`lofi-score` route). The phone's linked sounds folder and the book itself bring the score
+to the reader. The shelved music's mood track (`Tools/mac/make-tracks.sh`) is made only
+with `--with-mood-tracks` or `LOFI_MOOD_TRACKS=1`. Each step is capped per book at API
+list prices (25 dollars for the atmosphere; edit `lofi-sync.sh` to change it), so a run
+that goes wrong can't use up the plan; the next run carries on. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
 turns the job off. `~/Storyteller Lofi/Score atmosphere.command` (a copy of
 `Tools/mac/score-atmosphere.command`) runs the same sync once, in a window, for books
 dropped into `Books/` by hand. The atmosphere steps it runs:
@@ -362,9 +439,8 @@ dropped into `Books/` by hand. The atmosphere steps it runs:
    would fetch.
 2. **Tracks.** `Tools/mac/make-atmosphere.sh --dry-run BOOK.epub` prints the cost estimate.
    `Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model …] [--parallel N] [--rescore] [--no-fetch] [--no-copy] BOOK.epub …`
-   writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` and, once the track is
-   finished, `<book>.score.json` (with the shelved music's mood track in it when
-   `<book>.track.json` is there too), offering the catalogue and the variants in
+   writes `~/Storyteller Lofi/tracks/<book>.atmosphere.json` (and `<book>.score.json` when
+   the mood track is there too), offering the catalogue and the variants in
    `Atmosphere/variants.json`. A book with a track is left alone; `--rescore` moves its
    track and score to `tracks/old/` first, for a book scored before the catalogue grew.
    `--via plan` (the default) runs through Claude Code on the signed-in plan; `--via api`
@@ -404,7 +480,8 @@ The player is tested against `FakeAmbienceBackend` with a manual clock: scenes f
 narration, places keep their recordings, crowd yield on and off, pauses, muted routes,
 headphones pulled, media reset, the level slider. `IntensityTests` covers the dial, the
 scene trim and the lift in the gaps; `CatalogTests` the catalogue, the place guide, the
-committed `catalog.json`, the prompt and moved kinds. `VariantTests` covers variant ids and
+committed `catalog.json`, the prompt and moved kinds. `EvalTests` covers the eval set:
+loading cases, their memory and window, every check, replay and the report. `VariantTests` covers variant ids and
 folders, the catalog's spoiler rule, editions, Claude's new variants and moments, and the
 narration holds (swell, hush, too early, refused, dropped, setting off). `SceneChangeTests`
 covers which changes are heard, how different two scenes sound, where the builder scores

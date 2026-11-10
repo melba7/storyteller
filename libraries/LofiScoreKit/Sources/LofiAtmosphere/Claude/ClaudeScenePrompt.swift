@@ -8,7 +8,7 @@ import LofiText
 /// and a JSON schema for the answer.
 public enum ClaudeScenePrompt {
     /// Bump when the wording or schema changes; engine ids and saved tracks record it.
-    public static let version = 5
+    public static let version = 6
 
     /// Places listed with each passage, most recent first.
     public static let maxPlacesListed = 15
@@ -48,14 +48,20 @@ public enum ClaudeScenePrompt {
             does not mention it: a ship at sea creaks and has water around it; woods by day have \
             leaves and birds; a packed school corridor has a crowd; an ordinary quiet room has \
             roomTone. Fit the book's world and era: no traffic before cars, no engines in a \
-            medieval town. Answer with no sounds only when you cannot tell where the characters \
-            are at all, or the passage ends on a chapter heading or a jump the text has not \
-            described yet (then place "none" and confidence below 0.3).
+            medieval town. A passage that describes the place the story is in (what the hall \
+            looks like, the crowd filling the streets, what it is like inside a tunnel), a diary \
+            or a letter written from a place, or a summary of what people did there is still at \
+            that place: answer it. Answer with no sounds only when you cannot tell where the \
+            characters are at all, or the passage ends on a chapter heading or a jump the text \
+            has not described yet (then place "none" and confidence below 0.3). Silence is the \
+            last resort: while the current scene has not clearly ended, keep it.
             - Pick the most specific sound that fits. Each sound below is a family (crowd, river, \
             roomTone) with more specific kinds listed under it (crowd.schoolCorridor, \
             river.waterfall). Use the kind when the place clearly is that; otherwise the plain \
-            family. A kind inherits everything from its family, so a kind of crowd still pauses \
-            the music.
+            family. When the text names the sound itself (bells, a fiddler, a waterfall, a loom, \
+            a steam engine), use the kind that is that sound: steeples calling people to church \
+            are oldTown.churchBells, not plain oldTown. A kind inherits everything from its \
+            family, so a kind of crowd still pauses the music.
             - People make a ladder: roomTone (nobody else heard), hushedRoom (people keeping \
             quiet, no voices), murmur (a few low voices; the music stays), crowd (many voices \
             right around the characters; the music pauses). Climb or descend it as the place \
@@ -69,8 +75,10 @@ public enum ClaudeScenePrompt {
             rain becomes rainIndoors. Thunder only while a storm is actually going on.
             - Returning to a known place: answer with its id and start from the sounds remembered \
             there (listed with the state they had), changing only what the text says changed. \
-            A place not in the list: place "new" and a short name ("the Weasleys' kitchen"). \
-            The same place under another name is still the known place.
+            Before answering "new", compare the place with every listed one: the same road, \
+            room, ship, garden or house under other words, or seen from another spot, is that \
+            listed place, so answer its id. One id per real place. A place not in the list: \
+            place "new" and a short name ("the Weasleys' kitchen").
             - Usually two or three sounds, at most five: one main sound and a few quieter ones \
             behind it (a hall: crowd full, fireplace faint; a street in rain: rain soft, city \
             faint). Never more than one kind of the same family.
@@ -131,7 +139,9 @@ public enum ClaudeScenePrompt {
             - quote: copy, word for word, the fewest words (at most eight) from the passage that \
             say the sound happens, ending on the word for the sound, e.g. "there came a knock at \
             the door". If several happen, take the last one in the passage.
-            - They are rare: most passages have none. Then sound is "none" and quote is "".
+            - They are rare: most passages have none. Then sound is "none" and quote is "". \
+            But a sound the text does say happens (a bell rings, a door opens, a chain is \
+            dragged) is named even when it is also what starts the scene or the transition.
 
             The one-off sounds:
             \(oneShots)
@@ -149,13 +159,17 @@ public enum ClaudeScenePrompt {
             text itself makes), or when the characters were already there. Choosing one is \
             not a one-off sound: a knock before the door opens is still a oneShot.
             - A transition and a moment can go together: enterThroughDoor with swell when the \
-            hall's noise floods in; stepInside with hush when a door shuts on a storm.
+            hall's noise floods in; stepInside with hush when a door shuts on a storm. A ship \
+            weighing anchor and setting sail, a coach moving off, a train pulling out with the \
+            characters aboard is vehicleDeparts; the ship coming alongside is vehicleArrives.
 
             The transitions:
             \(transitions)
 
             Also answer:
-            - setting: indoors, outdoors, vehicle (a carriage, train, ship, spaceship) or unclear.
+            - setting: indoors, outdoors, vehicle (a carriage, train, ship, spaceship) or unclear. \
+            A hall, a court, a room, a cellar or a tunnel is indoors and a road, a field or a shore \
+            is outdoors even when the text does not say so; unclear only when nothing tells.
             - state: a few words on what the place is like right now ("between lessons", "after \
             hours, empty", "everyone whispering about her", "fire dying, late"), or "" when \
             nothing marks it out.
@@ -163,6 +177,17 @@ public enum ClaudeScenePrompt {
             updated from the passage; repeat the previous note when nothing new is learned.
             - cue: up to ten words copied from the passage that best show the scene, or "" if the \
             scene is inferred.
+            - since: where this scene begins inside the passage. When the scene you answer with \
+            differs from "Current scene before this passage" (another place, or the same place \
+            in a changed state, or new weather) and the text makes that change inside the \
+            passage, copy exactly the first three to eight words of the sentence where the \
+            story enters it: the sentence where they arrive, the door opens, the storm breaks, \
+            the hall falls quiet. When it begins on the last sentence, copy the last sentence's \
+            first words. "" when the scene was already under way before the passage (the same \
+            place with the same sounds as the current scene, even if the text adds detail or \
+            the mood deepens), or when place is "none". The player starts the new sound on \
+            that sentence, so pick the sentence a listener would feel the change on, not one \
+            that only hints at it.
             - confidence: from 0 to 1, how sure you are of the place and its sounds.
             """
     }
@@ -298,9 +323,13 @@ public enum ClaudeScenePrompt {
                 ] as [String: Any],
                 "world": ["type": "string"],
                 "cue": ["type": "string"],
+                "since": ["type": "string"],
                 "confidence": ["type": "number"],
             ] as [String: Any],
-            "required": ["place", "placeName", "setting", "state", "sounds", "newSounds", "moment", "transition", "oneShot", "world", "cue", "confidence"],
+            "required": [
+                "place", "placeName", "setting", "state", "sounds", "newSounds", "moment", "transition", "oneShot", "world", "cue", "since",
+                "confidence",
+            ],
             "additionalProperties": false,
         ]
     }

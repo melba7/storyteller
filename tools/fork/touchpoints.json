@@ -16,6 +16,11 @@
   ],
   "touchpoints": [
     {
+      "file": "README.md",
+      "markers": 2,
+      "purpose": "A short banner at the top of upstream's README saying what this fork adds and pointing at FORK.md."
+    },
+    {
       "file": "applications/mobile/app.config.ts",
       "markers": 3,
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."

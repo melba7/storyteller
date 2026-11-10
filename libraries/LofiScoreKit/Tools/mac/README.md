@@ -13,18 +13,21 @@ Scripts for the Mac in `~/Storyteller Lofi`. The two to double-click:
 
 `lofi-sync.sh` is the pipeline: `fetch-books.sh` downloads newly synced
 read-aloud books from the server into `Books/`; each unscored book gets an
-atmosphere (`make-atmosphere.sh`, through the Claude plan), written as
-`tracks/<book>.score.json` and copied with any new sounds into `LofiMusic` (the
-folder the phone follows; the name is from when it held the music); `LofiMusic`
-is mirrored into its iCloud Drive copy (added and updated, never deleted), where
-the phone's linked sounds folder picks it up; and `push-scores.sh` puts each
-score inside its book on the server (`PUT /api/v2/books/<id>/lofi-score`, the
-fork's route) so the book carries its own score. Logs are in
-`~/Storyteller Lofi/logs`. The shelved music's mood track (`make-tracks.sh`,
-Claude Opus, prompt 3) is only made with `--with-mood-tracks` or
-`LOFI_MOOD_TRACKS=1`; see `shelved/lofi-music/README.md` at the repository root.
+atmosphere track (`make-atmosphere.sh`, Claude Opus through the Claude plan),
+written as `tracks/<book>.score.json` and copied with any new sounds into
+`LofiMusic` (the folder the phone follows; the name is from when it held the
+music); `LofiMusic` is mirrored into its iCloud Drive copy (added and updated,
+never deleted), where the phone's linked sounds folder picks it up; and
+`push-scores.sh` puts each score inside its book on the server
+(`PUT /api/v2/books/<id>/lofi-score`, the fork's route) so the book carries its
+own score. Logs are in `~/Storyteller Lofi/logs`. The shelved music's mood
+track (`make-tracks.sh`, Claude Opus, prompt 3) is only made with
+`--with-mood-tracks` or `LOFI_MOOD_TRACKS=1`; see `shelved/lofi-music/README.md`
+at the repository root.
 
-The rest: `make-tracks.sh` and `make-atmosphere.sh` (one book at a time, with
-`--dry-run` cost estimates), `claude-check.sh`, `run-mood-eval.sh`,
+The rest: `make-atmosphere.sh` and `make-tracks.sh` (one book at a time, with
+`--dry-run` cost estimates), `claude-check.sh`, and `run-mood-eval.sh`,
 `try-recipes.sh` and `finetune.sh` for the mood-model work (see
-`Docs/MoodDetection.md`).
+`Docs/MoodDetection.md`). To measure the scorer itself rather than a book, run
+`lofi-atmosphere eval` from the clone (see "Scoring accuracy" in
+`Docs/Atmosphere.md`).

@@ -1,11 +1,15 @@
 # Storyteller Lofi
 
 This is a personal fork of
-[Storyteller](https://gitlab.com/storyteller-platform/storyteller). It adds
-atmosphere sounds under the narration, the sounds of each scene scored ahead of
-time from what has already been narrated and never from what comes next, and it
-keeps taking upstream's mobile releases through small, reviewed merges. The lofi
-music it began with is shelved in `shelved/lofi-music/`, ready to come back.
+[Storyteller](https://gitlab.com/storyteller-platform/storyteller). It plays the
+sounds of each scene under the narration: rain while it rains, a fire in the
+inn, the sea on the shore, a murmuring crowd, the quiet of an ordinary room.
+Claude reads the book once, off the phone, and writes down where the story is at
+every point and what that place sounds like, judged only from what has already
+been narrated and never from what comes next, so nothing is given away. The
+phone plays that track well under the narrator's voice. The lofi music the fork
+began with is shelved in `shelved/lofi-music/`, ready to come back. The fork
+keeps taking upstream's mobile releases through small, reviewed merges.
 
 Upstream code stays as upstream wrote it. The fork's own code lives in new
 folders, and the few edits to upstream files are marked `LOFI-FORK` so that
@@ -39,9 +43,12 @@ Files and folders that belong to the fork, which upstream never touches:
 - `tools/fork/`: the fork checks and the sync scripts.
 - `applications/mobile/fork.config.ts`: the fork's app name and bundle ID, and
   the pods for the atmosphere engine.
-- `libraries/LofiScoreKit/`: the Swift atmosphere engine, with the mood
-  detection the shelved music used. Next to its `Package.swift`, one podspec per
-  target lets CocoaPods build it from source for the app.
+- `libraries/LofiScoreKit/`: the Swift atmosphere engine: the scene scorer and
+  its prompt, the track builder, the catalogue of sounds, the player, the app
+  host, the `lofi-atmosphere` tool and the eval set that measures the scorer
+  (`Docs/Atmosphere.md`), with the mood detection the shelved music used
+  (`Docs/MoodDetection.md`). Next to its `Package.swift`, one podspec per target
+  lets CocoaPods build it from source for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
 - `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on
@@ -60,11 +67,12 @@ Files and folders that belong to the fork, which upstream never touches:
   the atmosphere became the app's focus: its Swift engine, demo, app panel,
   library scripts and docs, moved whole and not built. Its `README.md` says how
   to bring it back.
-- Planned: `tools/lofi-library/` (music library scripts).
 
 Touch points are the only edits to upstream files. Each one carries `LOFI-FORK`
 markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
 
+- `README.md` (2 markers): a short banner at the top of upstream's README that
+  says what the fork adds and points here.
 - `applications/mobile/app.config.ts` (3 markers): passes upstream's config
   through `withForkIdentity` from `fork.config.ts`, so the fork installs beside
   the official app.
