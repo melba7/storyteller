@@ -26,6 +26,13 @@ reads sentences at or before the position it is given. The property test in
 `Tests/LofiTextTests` checks this on 1,000 random positions: changing any text
 after the position never changes the window. Engines receive nothing else.
 
+A book's mood track is made from those windows, one per entry, so no entry
+knows more than a listener at its sentence does. Playback of a track makes one
+use of entries later in the book, described under "Scenes" below: it decides
+which turns of mood last long enough to follow. It never changes what plays
+before a mood's own text: the music turns to a mood only on a sentence whose
+own reading is that mood.
+
 ### Engines
 
 | Engine id | What it is | Needs |
@@ -51,10 +58,10 @@ labels, so Mo chose **Claude scoring with the Fast engine as fallback**:
    `SpoilerGuard.window(at:)` for that sentence: no title, no author, no other
    answers. Entries arrive into a `MoodTrackStore` and are saved as they come,
    so an interrupted build resumes.
-2. During playback, `TrackedMoodEngine` answers each reading with the newest
+2. During playback, `TrackedMoodEngine` answers each reading from the newest
    track entry **at or before** the sentence being narrated, never a later
-   one, so the music depends only on narrated text, as with a live engine.
-   It uses the Fast engine instead before the first entry, past the part
+   one: that entry's own mood, or the mood of the scene the entry is in (see
+   7). It uses the Fast engine instead before the first entry, past the part
    scored so far (more than 60 sentences behind), or when the entry's
    sentence in the current window no longer matches the digest stored with it
    (the book was re-aligned since the track was made).
@@ -81,9 +88,8 @@ labels, so Mo chose **Claude scoring with the Fast engine as fallback**:
    spent: only between entries that disagree. A mood that comes and goes
    between two entries is not looked for, so a change heard in playback is
    slightly more likely than chance to last. That is the accepted price of
-   not scoring every sentence. On the lexicon stand-in (which flips far more
-   than Claude should), the budget ran out with about half the changes
-   pinned, biggest first.
+   not scoring every sentence. Since 10 Nov 2026 the moods compared are the
+   settled ones (see 7), so the probes go to the changes the listener hears.
 6. **Reading on every sentence.** `MoodEngineCatalog.cadence(for:)` gives
    `ReadingCadence.Configuration.everySentence` to track and Fast engines
    (both answer in milliseconds) and keeps the plan's 4 sentences / 20 s for
@@ -94,6 +100,70 @@ labels, so Mo chose **Claude scoring with the Fast engine as fallback**:
    (neighbouring live readings share most of their window, so a run of them
    agreeing proves little). The director in the audio thread weighs them
    differently.
+7. **Scenes** (`MoodSettling`, added 10 Nov 2026). The director follows every
+   turn of a track, waiting at most 45 s, and the first real track showed
+   what that does. *Redwood* (13.5 h, Opus 5.5 with prompt v3, 760 entries):
+   the readings turn 333 times, in 197 of them the old mood is still listed
+   as also fitting, and the music would have changed 24 times an hour and
+   held a mood for a median of 85 seconds. Claude was not wrong about the
+   passages; neighbouring passages of one scene simply read as tense, then
+   mysterious, then tense.
+
+   Playback now cuts the track into scenes: the cheapest way to give every
+   entry a mood, where a sentence of narration costs 0 on the reading's own
+   mood, 0.25 on a mood the reading lists as also fitting, 0.6 to 1 on any
+   other (more the further apart the two are on the map), and every change
+   of music costs 9 sentences, about a minute. So a turn is followed when
+   the new mood fits better for about a minute, sooner for a big jump and
+   much later when the old mood still fits. A mood that comes and goes in
+   under two minutes or so is left out.
+
+   | Redwood, after the director | changes an hour | median hold | holds under 2 min | on the reading's mood | on a mood it lists | far off |
+   |---|---|---|---|---|---|---|
+   | every turn (before) | 24.3 | 1.4 min | 64% | 98% | 99% | 1.1% |
+   | best backwards-only rule tried ("keep 0/600") | 12.8 | 2.8 min | 41% | 69% | 99% | 0.7% |
+   | scenes, a change costs 6 sentences | 7.6 | 4.5 min | 12% | 78% | 97% | 1.8% |
+   | **scenes, 9 sentences (the default)** | **5.9** | **6.9 min** | **4%** | **75%** | **95%** | **3.1%** |
+   | scenes, 12 sentences | 3.5 | 11.5 min | 2% | 68% | 90% | 5.3% |
+
+   (Shares are of narrated time. "Far off" is a mood the reading does not
+   list and that is 0.8 or more away on the map. Measured in the cloud by
+   `Tools/eval/track_stats.py` on the track's moods and their times on the
+   simulated narration clock, with no book text; sentence positions were
+   taken from those times at the book's average of 6.9 s a sentence, so the
+   Mac's own `lofi-eval settle` and `simulate` on the real track may differ
+   a little.)
+
+   What this does and does not use from later in the book. A scene may only
+   start on an entry whose own mood it is, and every entry was judged from
+   the text up to its own sentence, so the music still never turns to a mood
+   before the narrated text itself reads as that mood. What settling takes
+   from later entries is which turns to follow: a mood that passes again
+   within a minute or two is skipped, and the music stays where it was. So a
+   change heard in playback tells the listener the new mood lasts a while,
+   and the absence of a change during a tense paragraph tells them it will
+   pass. Rules that look only backwards were tried first and do worse: at
+   best they halve the changes, and to get calmer than that they must wait
+   before every change, which makes every change late and the fit poor
+   (8 to 10 changes an hour at 85 to 87% on a listed mood). Mo asked for
+   music that matches and does not jump about; this is the trade taken, and
+   `TrackedMoodEngine(settling: nil)` or `--settle off` turns it off.
+
+   Settling happens at playback, not in the file: a track keeps every
+   reading, so the setting can change without scoring a book again. The
+   builder uses the same rule to choose its probes (5), so they pin the
+   scene changes: on a 376-entry test track the probes fell from 226 to 32
+   with no change left wider than three sentences. A track made before this
+   (Redwood's) spent its probes on every turn; its 80 scene changes are
+   pinned to a median of about 6 sentences (44 s), and `make-tracks.sh
+   --refine-budget 1.0` tops it up.
+
+   `lofi-eval settle TRACK.json` reports all of this for a saved track
+   without the book, and `lofi-eval simulate ... --track TRACK.json
+   [--settle off|N[:A]]` plays it on the narration clock. `track_stats.py`
+   holds the same rule in Python ("app"); `MoodSettlingTests` checks the
+   Swift against it, and the two give identical scenes for all 760 of
+   Redwood's entries.
 
 Cost, estimated by `lofi-eval track <book> --dry-run` before any call (prompt
 v2, about 1,000 tokens of instructions per request): *A Christmas Carol*
@@ -131,6 +201,8 @@ $B/lofi-eval run --engine claude:haiku-5-5 --in $W/train/test-windows.jsonl --ou
 $B/lofi-eval track <epub-dir> --dry-run                                       # entries and cost, no calls
 $B/lofi-eval track <epub-dir> --engine claude --out book.track.json           # resumable
 $B/lofi-eval simulate <epub-dir> --engine fast:Models/LofiMood-maxent-3.mlmodel --track book.track.json
+$B/lofi-eval settle book.track.json                                           # scenes, changes an hour, how closely pinned
+python3 -I Tools/eval/track_stats.py book.track.json --sim sim.jsonl          # the settling rules compared on this track
 ```
 
 Still to decide with Mo once the numbers are in: which model (Opus, Sonnet

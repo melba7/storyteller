@@ -8,6 +8,7 @@ makes the music restless. This script measures that, and tries rules that
 settle the readings into scene-length moods before the director sees them:
 
     python3 -I Tools/eval/track_stats.py TRACK.json [--sim SIM.jsonl] [--dwell 45] [--dump]
+                                         [--settle N[:A]] [--settled-out FILE]
 
 SIM comes from `lofi-eval simulate BOOK --engine lexicon --cadence sentence
 --track TRACK.json --out SIM.jsonl`; only its clock is used (when each
@@ -34,14 +35,23 @@ Rules:
                    never turns to a mood before the narrated text reads as
                    that mood; what looking ahead decides is which turns are
                    worth following.
+  app N/A          what playback does (MoodSettling in Swift): the scenes
+                   rule counted in sentences instead of seconds, so a track
+                   settles the same way whatever the narrator's pace. N is
+                   the cost of a change in sentences (--settle, default 9,
+                   about a minute) and A the also-fits cost (default 0.25).
 
---dump prints the track as "seconds mood[+also...]" tokens with no text, to
-study elsewhere. Standard library only.
+--settled-out writes one line per entry (sentence, its own mood, the mood
+the app rule plays), the same lines as `lofi-eval settle TRACK --out FILE`,
+so the two can be compared. --dump prints the track as "seconds
+mood[+also...]" tokens with no text, to study elsewhere. Standard library
+only.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 
 ANCHORS = {
@@ -51,11 +61,13 @@ ANCHORS = {
 }
 MOODS = list(ANCHORS)
 BIG_JUMP = 1.0  # DirectorConfig.bigJumpDistance
+ALSO_SHARE = 0.4  # MoodSettling.alsoShare
+TAIL_SENTENCES = 15.0  # MoodSettling.tailSentences
 
 
 def distance(a: str, b: str) -> float:
     (va, aa), (vb, ab) = ANCHORS[a], ANCHORS[b]
-    return ((va - vb) ** 2 + ((aa - ab) * 2) ** 2) ** 0.5
+    return math.sqrt((va - vb) ** 2 + ((aa - ab) * 2) ** 2)
 
 
 def load(track_path: str, sim_path: str | None, seconds_per_sentence: float) -> tuple[list[dict], float, dict]:
@@ -91,7 +103,11 @@ def load(track_path: str, sim_path: str | None, seconds_per_sentence: float) -> 
         mood = r["bucket"]
         if mood not in ANCHORS:
             continue
-        also = [m for m in (r.get("scores") or {}) if m != mood and m in ANCHORS]
+        # Also fitting: scored at least ALSO_SHARE of the best mood (Claude's
+        # `also` moods get half of it; a classifier's long tail does not count).
+        scores = {m: v for m, v in (r.get("scores") or {}).items() if m in ANCHORS and isinstance(v, (int, float))}
+        top = scores.get(mood) or max(scores.values(), default=0.0)
+        also = [m for m, v in scores.items() if m != mood and v > 0 and top > 0 and v >= ALSO_SHARE * top]
         entries.append({"g": e["globalIndex"], "t": seconds(e["globalIndex"]), "mood": mood, "also": also,
                         "conf": r.get("confidence", 0.0)})
     if not entries:
@@ -174,6 +190,13 @@ def scenes(entries: list[dict], change: float, also_cost: float, start: str = "b
     return out[::-1]
 
 
+def app(entries: list[dict], change: float = 9.0, also_cost: float = 0.25) -> list[str]:
+    """MoodSettling.moods(for:) in Swift: scenes, with sentences for seconds."""
+    counted = [dict(a, d=float(max(0, b["g"] - a["g"]))) for a, b in zip(entries, entries[1:])]
+    counted.append(dict(entries[-1], d=TAIL_SENTENCES))
+    return scenes(counted, change, also_cost)
+
+
 def director(entries: list[dict], wanted: list[str], dwell: float) -> list[tuple[float, float, str, int]]:
     """Pieces (start, end, playing mood, entry index) after the director's rule for
     track readings: follow a turn at once, but not within `dwell` of the last change;
@@ -227,7 +250,11 @@ def main() -> None:
     ap.add_argument("--seconds-per-sentence", type=float, default=6.5)
     ap.add_argument("--dwell", type=float, default=45)
     ap.add_argument("--dump", action="store_true")
+    ap.add_argument("--settle", default="9:0.25", help="the app rule: SENTENCES[:ALSO]")
+    ap.add_argument("--settled-out")
     args = ap.parse_args()
+    settle = [float(x) for x in args.settle.split(":")]
+    app_change, app_also = settle[0], settle[1] if len(settle) > 1 else 0.25
     entries, end, track = load(args.track, args.sim, args.seconds_per_sentence)
     hours = (end - entries[0]["t"]) / 3600
 
@@ -265,6 +292,12 @@ def main() -> None:
         for also_cost in (0.25, 0.5):
             rules.append((f"scenes {change}/{also_cost}", scenes(entries, change, also_cost)))
     rules.append(("scenes 180/0.25 fits", scenes(entries, 180, 0.25, start="fits")))
+    played = app(entries, app_change, app_also)
+    rules.append((f"app {app_change:g}/{app_also:g}", played))
+    if args.settled_out:
+        with open(args.settled_out, "w", encoding="utf-8") as f:
+            for e, mood in zip(entries, played):
+                f.write(f"{e['g']}\t{e['mood']}\t{mood}\n")
     for name, wanted in rules:
         m = measure(entries, wanted, args.dwell)
         print(f"  {name:<22}{m['per_hour']:>10.1f}{m['median_hold'] / 60:>9.1f} min{m['short_holds']:>13.0%}"

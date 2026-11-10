@@ -15,7 +15,10 @@ import LofiText
 /// scores the sentence halfway between, then halfway again on whichever side
 /// the change fell, until the change is known to within a few sentences.
 /// Without this, playback could switch up to `wordsBetweenEntries` words (about
-/// 100 seconds) after the text turned; with it, within a few sentences.
+/// 100 seconds) after the text turned; with it, within a few sentences. With
+/// `Plan.settling` (the default) the moods compared are the settled ones, the
+/// scene-length moods playback uses, so the probes go to the changes the
+/// listener hears.
 ///
 /// Spoiler safety: every probe is an ordinary entry, judged only from
 /// `SpoilerGuard.window(at:)` for its own sentence, and playback still uses the
@@ -34,11 +37,20 @@ public struct MoodTrackBuilder: Sendable {
         public var sentencesIntoNewChapter: Int
         /// Narrowing mood changes down between entries; nil turns it off.
         public var refinement: Refinement?
+        /// How playback will settle the track into scenes. Refinement then
+        /// pins down the changes between scenes, the ones the listener
+        /// hears, and spends nothing on turns that settling leaves out. nil
+        /// pins down every turn between neighbouring entries.
+        public var settling: MoodSettling?
 
-        public init(wordsBetweenEntries: Int = 250, sentencesIntoNewChapter: Int = 3, refinement: Refinement? = Refinement()) {
+        public init(
+            wordsBetweenEntries: Int = 250, sentencesIntoNewChapter: Int = 3,
+            refinement: Refinement? = Refinement(), settling: MoodSettling? = .standard
+        ) {
             self.wordsBetweenEntries = max(20, wordsBetweenEntries)
             self.sentencesIntoNewChapter = max(1, sentencesIntoNewChapter)
             self.refinement = refinement
+            self.settling = settling
         }
     }
 
@@ -198,7 +210,7 @@ public struct MoodTrackBuilder: Sendable {
         while true {
             let candidates = Self.refinableChanges(
                 in: store.snapshot.entries.filter(inRange), narrated: all,
-                resolution: refinement.resolutionSentences, excluding: failedProbes
+                resolution: refinement.resolutionSentences, excluding: failedProbes, settling: plan.settling
             )
             report.unrefinedChanges = candidates.count
             guard budget > 0, !candidates.isEmpty else { break }
@@ -221,21 +233,26 @@ public struct MoodTrackBuilder: Sendable {
     /// The sentence halfway between each pair of neighbouring entries that
     /// disagree and are more than `resolution` sentences apart, most useful
     /// first: mood jump times the sentences the change could be late by.
+    /// With `settling`, the moods compared are the settled ones, so only the
+    /// changes between scenes are narrowed.
     static func refinableChanges(
         in entries: [MoodTrack.Entry],
         narrated: [SentencePosition],
         resolution: Int,
-        excluding failed: Set<Int>
+        excluding failed: Set<Int>,
+        settling: MoodSettling? = nil
     ) -> [SentencePosition] {
+        let moods = settling?.moods(for: entries) ?? entries.map(\.reading.bucket)
         var found: [(value: Double, probe: SentencePosition)] = []
-        for (a, b) in zip(entries, entries.dropFirst()) where a.reading.bucket != b.reading.bucket {
+        for i in entries.indices.dropLast() where moods[i] != moods[i + 1] {
+            let (a, b) = (entries[i], entries[i + 1])
             guard b.globalIndex - a.globalIndex > resolution else { continue }
             let target = a.globalIndex + (b.globalIndex - a.globalIndex) / 2
             guard let probe = position(atOrAfter: target, in: narrated),
                   probe.globalIndex > a.globalIndex, probe.globalIndex < b.globalIndex,
                   !failed.contains(probe.globalIndex)
             else { continue }
-            let jump = a.reading.bucket.anchor.distance(to: b.reading.bucket.anchor)
+            let jump = moods[i].anchor.distance(to: moods[i + 1].anchor)
             found.append((jump * Double(b.globalIndex - a.globalIndex), probe))
         }
         return found
@@ -321,11 +338,19 @@ public struct TrackedMoodEngine: MoodEngine {
     public let fallback: any MoodEngine
     /// An entry further back than this many sentences is too old to use.
     public let maxLagSentences: Int
+    /// Settles the track's readings into scene-length moods (see
+    /// `MoodSettling`); nil plays every reading as it is.
+    public let settling: MoodSettling?
+    private let settled = SettledMoods()
 
-    public init(store: MoodTrackStore, fallback: any MoodEngine, maxLagSentences: Int = 60) {
+    public init(
+        store: MoodTrackStore, fallback: any MoodEngine, maxLagSentences: Int = 60,
+        settling: MoodSettling? = .standard
+    ) {
         self.store = store
         self.fallback = fallback
         self.maxLagSentences = max(0, maxLagSentences)
+        self.settling = settling
     }
 
     public var id: String { "track[\(store.engineID)]>\(fallback.id)" }
@@ -338,15 +363,48 @@ public struct TrackedMoodEngine: MoodEngine {
     /// The track's reading for this window, or nil when the track does not apply.
     public func trackReading(for window: CausalWindow) -> MoodReading? {
         let position = window.position
-        guard let entry = store.entry(atOrBefore: position),
-              position.globalIndex - entry.globalIndex <= maxLagSentences
-        else { return nil }
+        let view = settled.view(of: store, settling: settling)
+        guard let index = view.track.index(atOrBefore: position) else { return nil }
+        let entry = view.track.entries[index]
+        guard position.globalIndex - entry.globalIndex <= maxLagSentences else { return nil }
         // The entry's own sentence must be in this window, unchanged; otherwise
         // the track was made for a different alignment of the book.
         guard let line = window.lines.last(where: {
             $0.chapterOrdinal == entry.chapterOrdinal && $0.sentenceIndex == entry.sentenceIndex
         }), TextDigest.fnv1a64(line.text) == entry.sentenceDigest
         else { return nil }
-        return entry.reading
+        guard let moods = view.moods, moods[index] != entry.reading.bucket else { return entry.reading }
+        // The scene's mood, at that mood's own place on the map and without
+        // scores: the entry's point and scores describe its own mood, and a
+        // reading that named one mood and pointed at another would pull the
+        // director two ways.
+        let mood = moods[index]
+        return MoodReading(
+            bucket: mood, valence: mood.anchor.valence, arousal: mood.anchor.arousal,
+            confidence: entry.reading.confidence, engineID: entry.reading.engineID
+        )
+    }
+}
+
+/// A track's settled moods, worked out once per version of the track.
+final class SettledMoods: @unchecked Sendable {
+    struct View {
+        let track: MoodTrack
+        /// One mood per entry, or nil when settling is off.
+        let moods: [MoodBucket]?
+        let version: Int
+    }
+
+    private let lock = NSLock()
+    private var current: View?
+
+    func view(of store: MoodTrackStore, settling: MoodSettling?) -> View {
+        lock.lock()
+        defer { lock.unlock() }
+        if let current, current.version == store.version { return current }
+        let (track, version) = store.versioned
+        let view = View(track: track, moods: settling?.moods(for: track.entries), version: version)
+        current = view
+        return view
     }
 }

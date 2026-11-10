@@ -7,9 +7,11 @@ import LofiText
 ///
 /// Spoiler safety: every entry was made from `SpoilerGuard.window(at:)` for the
 /// entry's own position, and playback only ever looks up the newest entry at or
-/// before the sentence being narrated. So the music at any moment depends only
-/// on text that has already been narrated, exactly as with a live engine. The
-/// file does hold moods for later chapters, but nothing reads them early.
+/// before the sentence being narrated. So the music never turns to a mood
+/// before the narrated text itself reads as that mood. The file does hold
+/// moods for later chapters; the only use made of them is `MoodSettling`'s,
+/// which decides which turns last long enough to follow, never what plays
+/// before its own text.
 public struct MoodTrack: Codable, Sendable, Hashable {
     public static let currentFormat = 1
 
@@ -70,10 +72,15 @@ public struct MoodTrack: Codable, Sendable, Hashable {
 
     /// The newest entry at or before `position`, never one after it.
     public func entry(atOrBefore position: SentencePosition) -> Entry? {
+        index(atOrBefore: position).map { entries[$0] }
+    }
+
+    /// Where the newest entry at or before `position` is in `entries`.
+    public func index(atOrBefore position: SentencePosition) -> Int? {
         let key = SentenceKey(position)
         let index = firstIndex(notBefore: key)
-        if index < entries.count, entries[index].key == key { return entries[index] }
-        return index > 0 ? entries[index - 1] : nil
+        if index < entries.count, entries[index].key == key { return index }
+        return index > 0 ? index - 1 : nil
     }
 
     /// Index of the first entry whose position is not before `key`.
@@ -156,9 +163,25 @@ public enum TextDigest {
 public final class MoodTrackStore: @unchecked Sendable {
     private let lock = NSLock()
     private var track: MoodTrack
+    private var changes = 0
 
     public init(_ track: MoodTrack) {
         self.track = track
+    }
+
+    /// The track and a number that goes up with every insert, so a view made
+    /// from the track (its settled moods) knows when it is out of date.
+    public var versioned: (track: MoodTrack, version: Int) {
+        lock.lock()
+        defer { lock.unlock() }
+        return (track, changes)
+    }
+
+    /// Goes up with every insert.
+    public var version: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return changes
     }
 
     public var snapshot: MoodTrack {
@@ -173,6 +196,7 @@ public final class MoodTrackStore: @unchecked Sendable {
     public func insert(_ entry: MoodTrack.Entry) {
         lock.lock()
         track.insert(entry)
+        changes += 1
         lock.unlock()
     }
 

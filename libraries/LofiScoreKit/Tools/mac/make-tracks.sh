@@ -5,9 +5,15 @@
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
 #   Tools/mac/make-tracks.sh [--via plan|api] [--cap DOLLARS] [--engine claude|claude:sonnet-5-5|claude:haiku-5-5]
-#                            [--prompt 2|3] [--no-copy] [--dry-run] BOOK.epub|EPUB-DIR ...
+#                            [--prompt 2|3] [--refine-budget 0.6] [--no-copy] [--dry-run] BOOK.epub|EPUB-DIR ...
 #
 # --prompt picks the prompt version (default 2; claude-check.sh compares them).
+#
+# --refine-budget is how many extra readings may go to pinning down the mood
+# changes the music follows, as a share of the planned readings (default
+# 0.6). Running a finished book again with a higher number (1.0, say) only
+# makes the extra readings, which is how a track made before settling gets
+# its scene changes pinned.
 #
 # --via plan (the default) runs every request through Claude Code (`claude -p`)
 # on the Claude subscription it is signed in with: no API key and no money,
@@ -42,6 +48,7 @@ VIA=plan
 DRY=0
 COPY=1
 PROMPT=""
+REFINE=""
 BOOKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -50,6 +57,7 @@ while [ $# -gt 0 ]; do
     --via) VIA="$2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --prompt) PROMPT="$2"; shift 2 ;;
+    --refine-budget) REFINE="$2"; shift 2 ;;
     --no-copy) COPY=0; shift ;;
     -*) echo "unknown option $1"; exit 2 ;;
     *) BOOKS+=("$1"); shift ;;
@@ -76,6 +84,8 @@ ATMOS=""
 for candidate in "$B/lofi-atmosphere" "$ROOT/atmosphere-tools/libraries/LofiScoreKit/.build/release/lofi-atmosphere"; do
   [ -x "$candidate" ] && { ATMOS="$candidate"; break; }
 done
+EXTRA=()
+[ -z "$REFINE" ] || EXTRA+=(--refine-budget "$REFINE")
 DONE=()
 SPENT=0
 NOCAP=0
@@ -94,7 +104,7 @@ for book in "${BOOKS[@]}"; do
   [ -d "$dir/META-INF" ] || { echo "$name: not an EPUB folder ($dir)"; continue; }
 
   if [ "$DRY" = 1 ]; then
-    $B/lofi-eval track "$dir" --book "$name" --dry-run 2>&1
+    $B/lofi-eval track "$dir" --book "$name" --dry-run ${EXTRA[@]+"${EXTRA[@]}"} 2>&1
     continue
   fi
   left=$(python3 -c "print(round(max(0.0, $CAP - $SPENT), 2))")
@@ -102,7 +112,7 @@ for book in "${BOOKS[@]}"; do
     if [ "$NOCAP" = 1 ]; then echo "== $name (on the Claude plan, no cap)"; else echo "== $name (up to \$$left of the \$$CAP cap)"; fi
     log="$TRACKS/logs/$name.$(date +%Y%m%d-%H%M%S).log"
     $B/lofi-eval track "$dir" --book "$name" --engine "$ENGINE" --out "$TRACKS/$name.track.json" \
-      --concurrency 4 --max-dollars "$left" 2> "$log"
+      --concurrency 4 --max-dollars "$left" ${EXTRA[@]+"${EXTRA[@]}"} 2> "$log"
     grep -v "^  [0-9]* scored$" "$log"
     cost=$(grep -oE 'about \$[0-9.]+ at' "$log" | tail -1 | sed -E 's/about \$([0-9.]+) at/\1/')
     [ -n "$cost" ] && SPENT=$(python3 -c "print(round($SPENT + $cost, 3))")
