@@ -313,6 +313,29 @@ def changes(entries, min_conf, max_lag, resolution):
     return out
 
 
+def repeated_moves(entries, min_conf):
+    """AtmosphereTrack.dropRepeatedMoves in Swift, as a count: a swell, hush or transition
+    on an entry whose own answer says its scene began earlier, when an entry at or after
+    that sentence, sure enough to be played, already makes the same move."""
+    count = 0
+    for i, e in enumerate(entries):
+        if not (e.moment or e.transition) or e.start is None or e.start >= e.g:
+            continue
+        moment, transition = e.moment, e.transition
+        for earlier in reversed(entries[:i]):
+            if earlier.g < e.start:
+                break
+            if earlier.conf < min_conf:
+                continue
+            if transition and earlier.transition == transition:
+                transition = None
+                count += 1
+            if moment and earlier.moment == moment:
+                moment = None
+                count += 1
+    return count
+
+
 # ---- the director
 
 def targets(entries, end, min_conf, max_lag, played=None):
@@ -583,6 +606,10 @@ def report(path, args):
     for c in cues:
         by_cue[c["sound"]] = by_cue.get(c["sound"], 0) + 1
     print("## Moments and one-off sounds")
+    doors = sum(1 for e in entries if e.transition)
+    again = repeated_moves(entries, args.min_confidence)
+    print(f"  transitions named by the scorer: {doors}; a swell, hush or transition an earlier entry of the same scene already makes"
+          f" (the builder takes these off, or a door would play twice): {again}")
     print(f"  swells {swells}, hushes {hushes} ({(swells + hushes) / hours:.1f} an hour); one-off sounds {len(cues)} ({len(cues) / hours:.1f} an hour)"
           + (": " + ", ".join(f"{k} {v}" for k, v in sorted(by_cue.items(), key=lambda x: -x[1])[:8]) if by_cue else ""))
 

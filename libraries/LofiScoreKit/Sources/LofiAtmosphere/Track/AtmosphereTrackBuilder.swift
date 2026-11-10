@@ -24,7 +24,9 @@ import LofiText
 /// answer says its scene began), the same accepted cost as for mood tracks. Place ids
 /// are labels: a probe that finds the start of a place first named by the next entry
 /// takes that entry's id, which changes nothing audible before the text reaches the
-/// place.
+/// place. And a swell, hush or transition is made once: when a probe has scored the
+/// sentence a later entry says its scene began on, and makes the same move, the later
+/// entry's copy is taken off.
 ///
 /// One-off sounds (``AtmosphereTrack/Cue``): an answer may say a sound happens on one of
 /// its passage's sentences. On the passage's last sentence it is kept as it is. On an
@@ -96,6 +98,9 @@ public struct AtmosphereTrackBuilder: Sendable {
         /// within the resolution, or by an answer that starts on its own sentence).
         public var changes = 0
         public var pinnedChanges = 0
+        /// Swells, hushes and transitions taken off entries because an earlier entry of
+        /// the same scene already makes them (``AtmosphereTrack/dropRepeatedMoves(minConfidence:)``).
+        public var repeatedMovesDropped = 0
         public var failed = 0
         public var failures: [String] = []
         public var stoppedEarly = false
@@ -276,8 +281,11 @@ public struct AtmosphereTrackBuilder: Sendable {
                 }
             }
         }
+        let finder = (plan.refinement ?? Refinement()).finder
+        // A probe may have scored the sentence a later entry's door or swell was on.
+        store.update { report.repeatedMovesDropped = $0.dropRepeatedMoves(minConfidence: finder.minConfidence) }
         let track = store.snapshot
-        let heard = (plan.refinement ?? Refinement()).finder.changes(in: track.entries)
+        let heard = finder.changes(in: track.entries)
         report.changes = heard.count
         report.pinnedChanges = heard.filter(\.isPinned).count
         report.places = Set(track.entries.compactMap(\.scene.placeID)).count
@@ -471,10 +479,15 @@ public struct AtmosphereTrackBuilder: Sendable {
     }
 
     /// A fresh id, unique in the whole track; or the id of the following entry's place
-    /// when that place starts there (first named by that entry) under a matching name.
+    /// when that place starts there (first named by that entry) under a matching name, or
+    /// when that entry's own answer says its scene had begun by this sentence. With less
+    /// text to go on, a probe often gives the place a name that does not match ("the
+    /// road from the inn" for "the coast path"); it is the same place, and under two ids
+    /// it would be left one sentence later, with its door played again.
     static func idForNewPlace(named name: String, before globalIndex: Int, nextEntry: AtmosphereTrack.Entry?, in track: AtmosphereTrack) -> String {
         if let next = nextEntry, let id = next.scene.placeID,
-           let nextName = next.scene.placeName, PlaceMemory.namesMatch(name, nextName),
+           (next.scene.placeName.map { PlaceMemory.namesMatch(name, $0) } ?? false)
+               || (next.sceneStart.map { $0 <= globalIndex } ?? false),
            !track.entries(before: next.globalIndex).contains(where: { $0.scene.placeID == id && $0.globalIndex < globalIndex }) {
             return id
         }
