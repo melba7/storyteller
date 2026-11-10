@@ -2,7 +2,14 @@
 """Build a pool of candidate lofi tracks (download, catalog, convert). No ranking.
 
 Usage: python3 build_candidates.py [phase ...]
-  phases: fma-purrple fma-holizna fsm-tmw fsm-cats fma-extra analysis pack   (default: all)
+  phases: fma-purrple fma-holizna fsm-tmw fsm-cats fma-extra analysis pack   (default: these)
+  piano phases, run by name:
+    first pass   fsm-piano fma-piano ia-musopen
+    second pass  commons-piano2 fsm-piano2 pack-piano2
+    third pass   commons-dl3 commons-reg3 ia-piano3 pack-piano3
+  The Commons phases read piano2_commons.json beside this script: recordings picked by hand on
+  Wikimedia Commons, each with the license read from its file page. upload.wikimedia.org answered
+  429 to all but two of them (it wants a contact in the User-Agent), so most are still unfetched.
 Resume-safe: state in LofiCandidates/.state.json; files already present with the right size are kept.
 """
 import csv, hashlib, html, json, os, re, subprocess, sys, tarfile, time, urllib.parse, urllib.request
@@ -100,7 +107,17 @@ def mmss(s):
     for x in p: v = v * 60 + x
     return v
 
+FFPROBE = "/opt/homebrew/bin/ffprobe"; FFMPEG = "/opt/homebrew/bin/ffmpeg"
 def afinfo(path):
+    if os.path.splitext(path)[1].lower() in (".ogg", ".oga", ".opus"):
+        try:
+            j = json.loads(subprocess.run([FFPROBE, "-v", "error", "-print_format", "json", "-show_format", "-show_streams", path],
+                                          capture_output=True, text=True).stdout or "{}")
+            a = [x for x in j.get("streams", []) if x.get("codec_type") == "audio"][0]
+            f = j.get("format", {})
+            return {"dur": float(f.get("duration") or a.get("duration")), "kbps": round(int(f.get("bit_rate", 0)) / 1000) or "",
+                    "ch": int(a.get("channels") or 0), "sr": int(a.get("sample_rate") or 0)}
+        except Exception: return {"dur": None, "kbps": "", "ch": "", "sr": ""}
     out = subprocess.run(["afinfo", path], capture_output=True, text=True).stdout
     d = {}
     m = re.search(r"estimated duration: ([\d.]+)", out); d["dur"] = float(m.group(1)) if m else None
@@ -113,6 +130,11 @@ def skip(st, rec, reason):
     r = dict(rec); r["reason"] = reason
     st["skipped"].append(r); log("  - skip", rec.get("title"), "|", reason)
 
+def _discard(path):
+    """mv instead of delete: files go to LofiCandidates/.discarded/"""
+    d = os.path.join(ROOT, ".discarded"); os.makedirs(d, exist_ok=True)
+    os.replace(path, os.path.join(d, time.strftime("%Y%m%d-%H%M%S-") + os.path.basename(path)))
+
 # ---------- core: one track ----------
 def process(st, rec, referer=None):
     """rec has source, artist, album, title, page_url, license, license_url, duration_s, file_url, + meta."""
@@ -123,8 +145,10 @@ def process(st, rec, referer=None):
         return skip(st, rec, "license not allowed: " + (rec["license"] or rec.get("license_raw") or "unknown"))
     d = rec.get("duration_s")
     if d in (None, ""): return skip(st, rec, "duration not shown on page")
-    if d < MIN_S: return skip(st, rec, "too short (<1:30)")
-    if d > MAX_S: return skip(st, rec, "too long (>6:30)")
+    mn = rec.pop("min_s", MIN_S)
+    if d < mn: return skip(st, rec, "too short (<%d:%02d)" % (mn // 60, mn % 60))
+    mx = rec.pop("max_s", MAX_S)
+    if d > mx: return skip(st, rec, "too long (>%d:%02d)" % (mx // 60, mx % 60))
     if VOCAL_RE.search(rec["title"]): return skip(st, rec, "title says vocals/featured singer")
     if rec.get("vocal_tag"): return skip(st, rec, "page tags say vocals")
     na = (norm(rec["artist"]), norm(rec["title"]))
@@ -133,11 +157,14 @@ def process(st, rec, referer=None):
             return skip(st, rec, "duplicate of " + k["id"] + " (same artist+title from other source)")
     if not rec.get("file_url"): return skip(st, rec, "no audio file url")
     ext = os.path.splitext(urllib.parse.urlparse(rec["file_url"]).path)[1].lower() or ".mp3"
-    title = re.sub(r"\.(mp3|wav|flac)$", "", rec["title"], flags=re.I)
+    title = rec.pop("fname", None) or re.sub(r"\.(mp3|wav|flac)$", "", rec["title"], flags=re.I)
     rel = os.path.join(san(rec["artist"]), san(rec["album"]), san(title + " - " + rec["artist"], 150) + ext)
     path = os.path.join(ROOT, rel)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     try:
+        if not os.path.exists(path) and rec.pop("no_download", False):
+            return skip(st, rec, "not downloaded: upload.wikimedia.org answered 429 (rate limit for this User-Agent); retry later")
+        rec.pop("no_download", None)
         if not os.path.exists(path):
             fetch(rec["file_url"], referer=referer, dest=path)
         else:
@@ -147,15 +174,15 @@ def process(st, rec, referer=None):
         return skip(st, rec, "download failed: " + str(e))
     info = afinfo(path)
     if not info["dur"]:
-        os.remove(path); return skip(st, rec, "file does not decode (afinfo)")
+        _discard(path); return skip(st, rec, "file does not decode (afinfo)")
     if abs(info["dur"] - d) > 0.05 * d:
         st["errors"].append("%s: afinfo %.1fs vs page %ss" % (rec["title"], info["dur"], d))
-        os.remove(path); return skip(st, rec, "afinfo duration %.1fs differs >5%% from page %ss" % (info["dur"], d))
+        _discard(path); return skip(st, rec, "afinfo duration %.1fs differs >5%% from page %ss" % (info["dur"], d))
     data = open(path, "rb").read()
     sha = hashlib.sha256(data).hexdigest()
     for k in st["kept"]:
         if k["sha256"] == sha:
-            if k["local_path"] != rel: os.remove(path)
+            if k["local_path"] != rel: _discard(path)
             return skip(st, rec, "duplicate of " + k["id"] + " (identical file)")
     rec.update(id="c%04d" % (len(st["kept"]) + 1), local_path=rel, bytes=len(data), sha256=sha,
                bitrate_kbps=info["kbps"], sample_rate=info["sr"], channels=info["ch"], analysis_file="")
@@ -213,7 +240,7 @@ def fma_track_meta(page_url):
     meta["bpm"] = ""
     return meta
 
-def fma_album(st, url, artist_hint):
+def fma_album(st, url, artist_hint, piano=False):
     if url in [a["url"] for a in st["albums"] if a.get("done")]:
         log("album already done:", url); return
     try: tracks = fma_album_tracks(url)
@@ -230,6 +257,11 @@ def fma_album(st, url, artist_hint):
         except Exception as e:
             st["seen"][page] = 1; st["errors"].append(page + ": " + str(e))
             skip(st, rec, "track page failed: " + str(e)); continue
+        if piano:
+            rec["max_s"] = PIANO_MAX_S; rec["tags"] = "phase:piano;" + rec.get("tags", "")
+            why = piano_reject(rec)
+            if why:
+                st["seen"][page] = 1; skip(st, rec, why); continue
         process(st, rec)
     st["albums"].append({"url": url, "title": title, "tracks": len(tracks), "done": True})
     save_state(st)
@@ -243,7 +275,7 @@ def fma_artist_albums(artist):
     return out
 
 # ---------- FSM ----------
-def fsm_track(st, slug, deadline=None, vocal_screen=False):
+def fsm_track(st, slug, deadline=None, vocal_screen=False, piano=False):
     page = FSM + slug + ".html"
     if page in st["seen"]: return
     try: p = fetch(page)
@@ -273,6 +305,11 @@ def fsm_track(st, slug, deadline=None, vocal_screen=False):
            "file_url": urllib.parse.urljoin(FSM, fm.group(1)) if fm else ""}
     if vocal_screen and any(re.search(r"\b(vocals?|singing|singer|lyrics|rap|female voice|male voice)\b", t, re.I) for t in tags):
         rec["vocal_tag"] = True
+    if piano:
+        rec["max_s"] = PIANO_MAX_S; rec["tags"] = "phase:piano;" + rec["tags"]
+        why = piano_reject(rec)
+        if why:
+            st["seen"][page] = 1; return skip(st, rec, why)
     process(st, rec, referer=page)
 
 def fsm_list_slugs(url):
@@ -340,8 +377,14 @@ def ph_analysis(st):
     for r in st["kept"]:
         out = os.path.join(adir, r["id"] + ".m4a")
         if not (os.path.exists(out) and os.path.getsize(out) > 1000):
+            src = os.path.join(ROOT, r["local_path"]); tmpwav = None
+            if os.path.splitext(src)[1].lower() in (".ogg", ".oga", ".opus"):
+                tmpwav = out + ".tmp.wav"
+                subprocess.run([FFMPEG, "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "2", "-c:a", "pcm_s16le", tmpwav], capture_output=True)
+                src = tmpwav
             res = subprocess.run(["afconvert", "-f", "m4af", "-d", "aac@22050", "-c", "1", "-b", "48000",
-                                  os.path.join(ROOT, r["local_path"]), out + ".tmp.m4a"], capture_output=True, text=True)
+                                  src, out + ".tmp.m4a"], capture_output=True, text=True)
+            if tmpwav and os.path.exists(tmpwav): os.replace(tmpwav, os.path.join(ROOT, ".trash-tmp.wav"))
             if res.returncode != 0:
                 st["errors"].append(r["id"] + ": afconvert failed: " + res.stderr.strip()[:200]); continue
             os.replace(out + ".tmp.m4a", out)
@@ -368,12 +411,290 @@ def ph_pack(st):
     for i in range(1, n + 1):
         p = os.path.join(ROOT, "pack-%d.tar" % i); log("pack", p, os.path.getsize(p))
 
-PHASES = {"fma-purrple": ph_fma_purrple, "fma-holizna": ph_fma_holizna, "fsm-tmw": ph_fsm_tmw,
-          "fsm-cats": ph_fsm_cats, "fma-extra": ph_fma_extra, "analysis": ph_analysis, "pack": ph_pack}
 
+# ---------- piano phases ----------
+PIANO_MAX_S = 420
+BEAT_RE = re.compile(r"lo-?fi|hip-?hop|chill-?hop|jazz-?hop|trip-?hop|beats?\b|drum|trap|dance|edm|house|techno|dubstep|rock|pop\b|funk|reggae|r&b|corporate|synthwave|chiptune|8-?bit|rap\b|electro\b|breakbeat", re.I)
+def piano_reject(rec):
+    """'' if the page says piano and names no beat/drum genre, else the reason."""
+    text = " ".join([rec.get("genres", ""), rec.get("tags", "").replace("phase:piano", ""), rec.get("title", ""), rec.get("album", "")])
+    if not re.search(r"piano", text, re.I): return "not piano (page genres/tags do not list piano)"
+    m = BEAT_RE.search(rec.get("genres", "") + " " + rec.get("tags", ""))
+    if m: return "piano but page lists a beat genre/tag: " + m.group(0)
+    return ""
+
+def fsm_pages(first, nxt, minutes, st, label):
+    deadline = time.time() + minutes * 60
+    n, prev = 1, None
+    while time.time() < deadline:
+        url = FSM + (first if n == 1 else nxt % n)
+        try: slugs = fsm_list_slugs(url)
+        except Exception as e:
+            log("  ! list", url, e); break
+        if not slugs or slugs == prev: break
+        prev = slugs
+        log("FSM", label, "page", n, len(slugs), "tracks")
+        st["albums"].append({"url": url, "title": "FSM " + label + " page " + str(n), "tracks": len(slugs), "done": True})
+        for s in slugs:
+            if time.time() >= deadline: break
+            fsm_track(st, s, vocal_screen=True, piano=True)
+        save_state(st); n += 1
+    st["notes"].append("FSM %s stopped at page %d (time box %d min)" % (label, n, minutes)); save_state(st)
+
+def ph_fsm_piano(st, minutes=8):
+    t_end = time.time() + minutes * 60
+    fsm_pages("piano.html", "piano-%d.html", minutes * 0.6, st, "piano")
+    for mood in ("sad", "melancholic", "dark", "strange"):
+        left = (t_end - time.time()) / 60
+        if left <= 0.5: st["notes"].append("FSM piano moods: no time left for " + mood); break
+        fsm_pages("mood.%s.html" % mood, "mood." + mood + ".page-%d.html", min(left, 2.0), st, "mood " + mood)
+
+FMA_PIANO = [("Sergey_Cheremisinov", None), ("lee-rosevere", ["music-for-podcasts-serious", "music-for-podcasts-ambient", "singles"]),
+             ("Kevin_MacLeod", ["Calming", "Classical_Sampler", "Contemporary_Sampler"]), ("Borrtex", None),
+             ("holiznacc0", ["depression", "will-you-miss-me", "scores", "transformations", "music-from-the-vault", "orphaned-media", "orphaned-media-pt-2"]),
+             ("Kai_Engel", None), ("Chris_Zabriskie", None)]
+def ph_fma_piano(st, minutes=6):
+    deadline = time.time() + minutes * 60
+    for artist, albums in FMA_PIANO:
+        if albums is None:
+            try: albums = fma_artist_albums(artist)
+            except Exception as e:
+                st["errors"].append("fma " + artist + ": " + str(e)); log("  ! artist", artist, e); continue
+        log(artist, "albums:", albums)
+        for a in albums:
+            if time.time() >= deadline:
+                st["notes"].append("FMA piano stopped by %d-min time box at %s/%s" % (minutes, artist, a)); save_state(st); return
+            fma_album(st, FMA + artist + "/" + a, artist.replace("_", " "), piano=True)
+
+IA_ITEMS = [  # (identifier, composer-or-None, include regex, exclude regex)
+    ("musopen-chopin-complete-works-flac", "Frédéric Chopin",
+     r"nocturne|prelude|waltz|valse|mazurka|largo|berceuse|cantabile|albumleaf|funeral march|marche funebre|tristesse|lament|'cello'|andantino|lento|impromptu|barcarolle|contredanse",
+     r"cello sonata|trio|concerto|song|duo|flute|variations|krakowiak|fantasia|polonaise|rondo|op\. 74|scherzo|presto|finale"),
+    ("MusopenCollectionAsFlac", None,
+     r"schubert-sonata|beethoven.*sonata|goldberg|chopin|satie|debussy|schumann|liszt|mozart.*sonata|grieg-lyric",
+     r"symphon|quartet|overture|concerto|trio|quintet|peergynt|violin|cello|allegro|presto|scherzo|rondo|vivace|fug"),
+    ("MoonlightSonatamv.1", "Ludwig van Beethoven", r".", r"presto|allegretto"),
+]
+def ia_len(v):
+    if not v: return None
+    v = str(v)
+    return mmss(v) if ":" in v else int(round(float(v)))
+def ph_ia_musopen(st, minutes=9):
+    deadline = time.time() + minutes * 60
+    for ident, composer, inc, exc in IA_ITEMS:
+        try: md = json.loads(fetch("https://archive.org/metadata/" + ident))
+        except Exception as e:
+            st["errors"].append("ia " + ident + ": " + str(e)); log("  ! ia", ident, e); continue
+        meta = md.get("metadata", {})
+        lurl = meta.get("licenseurl") or ""
+        lshort = lic_short(lurl)
+        files = [f for f in md.get("files", []) if f.get("name", "").lower().endswith(".mp3")]
+        log("IA", ident, lshort or lurl or "no licenseurl", len(files), "mp3")
+        st["albums"].append({"url": "https://archive.org/details/" + ident, "title": "archive.org " + (meta.get("title") or ident), "tracks": len(files), "done": True})
+        for f in files:
+            if time.time() >= deadline:
+                st["notes"].append("archive.org Musopen stopped by %d-min time box in %s" % (minutes, ident)); save_state(st); return
+            name = f["name"]
+            q = urllib.parse.quote(name)
+            base = os.path.splitext(os.path.basename(name))[0]
+            comp = composer
+            if not comp:
+                comp = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", base.split("-")[0]) if "-" in base else (meta.get("creator") or "unknown")
+                if isinstance(comp, list): comp = comp[0]
+            title = base
+            perf = f.get("creator") or f.get("artist") or ""
+            rec = {"source": "archive.org", "artist": comp, "album": "Musopen - " + (meta.get("title") or ident)[:80], "title": title,
+                   "page_url": "https://archive.org/details/" + ident + "/" + q, "file_url": "https://archive.org/download/" + ident + "/" + q,
+                   "license_url": lurl, "license": lshort, "license_raw": lurl or "item has no licenseurl",
+                   "duration_s": ia_len(f.get("length")), "genres": "Classical;Piano",
+                   "tags": ";".join(x for x in ["phase:piano", "musopen", "archive:" + ident, ("performer:" + perf) if perf else ""] if x),
+                   "listens": "", "downloads": str(meta.get("downloads", "") or ""), "favorites": "", "bpm": "", "max_s": PIANO_MAX_S}
+            key = rec["page_url"]
+            if key in st["seen"]: continue
+            if not re.search(inc, name, re.I) or re.search(exc, name, re.I):
+                st["seen"][key] = 1; rec.pop("max_s"); skip(st, rec, "not a quiet solo-piano piece (title filter)"); continue
+            process(st, rec)
+        save_state(st)
+
+PHASES = {"fma-purrple": ph_fma_purrple, "fma-holizna": ph_fma_holizna, "fsm-tmw": ph_fsm_tmw,
+          "fsm-cats": ph_fsm_cats, "fma-extra": ph_fma_extra, "analysis": ph_analysis, "pack": ph_pack,
+          "fsm-piano": ph_fsm_piano, "fma-piano": ph_fma_piano, "ia-musopen": ph_ia_musopen}
+
+# ---------- piano pass 2 (mysterious) ----------
+P2_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "piano2_commons.json")
+def ph_commons_piano2(st, gap=12):
+    retry = {r["page_url"] for r in st["skipped"] if r.get("source") == "commons" and r.get("reason", "").startswith("download failed")}
+    st["skipped"] = [r for r in st["skipped"] if r["page_url"] not in retry]
+    for u in retry: st["seen"].pop(u, None)
+    for e in json.load(open(P2_JSON)):
+        if e["page"] in st["seen"]: continue
+        if not os.environ.get("P2_NODL"): time.sleep(gap)
+        lurl = e["license_url"] or e["commons_license_url"] or ""
+        lic = e["license"] or lic_short(lurl) or e["commons_license"]
+        tags = ["phase:piano", "phase:piano2", "commons"] + (["performer:" + e["performer"]] if e["performer"] else [])
+        if e["note"]: tags.append("note:" + e["note"].replace(";", ","))
+        rec = {"source": "commons", "artist": e["composer"], "album": "Wikimedia Commons", "title": e["title"],
+               "page_url": e["page"], "file_url": e["url"], "license": lic, "license_url": lurl,
+               "license_raw": e["commons_license"], "duration_s": int(round(e["duration"])), "genres": "Classical;Piano",
+               "tags": ";".join(tags), "listens": "", "downloads": "", "favorites": "", "bpm": "",
+               "min_s": 60, "max_s": 480, "no_download": bool(os.environ.get("P2_NODL")), "fname": e["title"] + (" - " + e["performer"] if e["performer"] else "")}
+        process(st, rec)
+    save_state(st)
+
+def ph_fsm_piano2(st, minutes=6):
+    t_end = time.time() + minutes * 60
+    for mood in ("melancholic", "dark", "strange", "mysterious", "mystical"):
+        left = (t_end - time.time()) / 60
+        if left <= 0.3: st["notes"].append("FSM piano2 moods: no time left for " + mood); break
+        before = len(st["kept"])
+        fsm_pages("mood.%s.html" % mood, "mood." + mood + ".page-%d.html", min(left, 1.6), st, "mood " + mood)
+        for r in st["kept"][before:]:
+            if "phase:piano2" not in r["tags"]: r["tags"] = r["tags"].replace("phase:piano;", "phase:piano;phase:piano2;", 1)
+    save_state(st)
+
+def ph_pack_piano2(st):
+    rows = [r for r in st["kept"] if "phase:piano2" in r.get("tags", "") and r.get("analysis_file")]
+    out = os.path.join(ROOT, "piano-pack-2.tar")
+    args = ["tar", "-cf", out + ".tmp", "-C", ROOT, "candidates.csv"] + [r["analysis_file"] for r in rows]
+    subprocess.run(args, check=True, env=dict(os.environ, COPYFILE_DISABLE="1"))
+    os.replace(out + ".tmp", out)
+    log("pack", out, os.path.getsize(out), len(rows), "analysis files")
+
+PHASES.update({"commons-piano2": ph_commons_piano2, "fsm-piano2": ph_fsm_piano2, "pack-piano2": ph_pack_piano2})
+
+# ---------- piano pass 3 ----------
+WM_UA = "PianoLibraryBuilder/0.3 (personal one-time download of about 45 freely licensed piano recordings)"
+# piano2_commons.json indices, most wanted first
+P3_ORDER = [3, 2, 5, 6, 7, 18, 20, 19, 15, 16, 17, 27, 28, 30, 26, 29, 23, 24, 25,
+            36, 37, 42, 43, 34, 35, 38, 39, 40, 41, 44, 22, 33, 21, 8, 9, 10, 11, 12, 1, 13, 14, 31, 32]
+P3_LOG = os.path.join(ROOT, "commons3-dl.json")
+def p3_path(e):
+    fname = e["title"] + (" - " + e["performer"] if e["performer"] else "")
+    ext = os.path.splitext(urllib.parse.urlparse(e["url"]).path)[1].lower()
+    return os.path.join(ROOT, san(e["composer"]), san("Wikimedia Commons"), san(fname + " - " + e["composer"], 150) + ext)
+def wm_get(url, dest):
+    """one request, Wikimedia UA; returns (status, retry_after, info)"""
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": WM_UA}), timeout=120) as r:
+            if "text/html" in r.headers.get("Content-Type", ""): return (r.status, None, "html instead of audio")
+            clen = r.headers.get("Content-Length")
+            with open(dest + ".part", "wb") as f:
+                while True:
+                    b = r.read(1 << 16)
+                    if not b: break
+                    f.write(b)
+            if clen and os.path.getsize(dest + ".part") != int(clen): return (r.status, None, "short download")
+            os.replace(dest + ".part", dest)
+            return (r.status, None, "ok %d bytes" % os.path.getsize(dest))
+    except urllib.error.HTTPError as e:
+        return (e.code, e.headers.get("Retry-After"), e.read(300).decode("utf-8", "replace"))
+    except Exception as e:
+        return (None, None, repr(e))
+def ph_commons_dl3(st):
+    """Download only (no state writes). 30 s between files; on 429 wait Retry-After (300 s if none), retry once;
+    stop for good after two files in a row still fail."""
+    entries = json.load(open(P2_JSON))
+    res = json.load(open(P3_LOG)) if os.path.exists(P3_LOG) else []
+    first_wait = int(os.environ.get("P3_FIRST_WAIT", "0"))
+    if first_wait: log("commons3: waiting %ds first (earlier Retry-After)" % first_wait); time.sleep(first_wait)
+    fails, first = 0, True
+    for i in P3_ORDER:
+        e = entries[i]; dest = p3_path(e)
+        if os.path.exists(dest): continue
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        if not first: time.sleep(30)
+        first = False
+        tries = []
+        for attempt in (1, 2):
+            code, ra, info = wm_get(e["url"], dest)
+            tries.append({"t": time.strftime("%H:%M:%S"), "status": code, "retry_after": ra, "info": info[:300]})
+            log("commons3", i, e["title"], e["performer"], "->", code, ra, info[:80].replace("\n", " "))
+            if code == 429 and attempt == 1:
+                w = int(ra) if (ra or "").isdigit() else 300
+                log("commons3: 429, waiting", w, "s"); time.sleep(w); continue
+            break
+        ok = os.path.exists(dest)
+        res.append({"idx": i, "title": e["title"], "performer": e["performer"], "ok": ok, "tries": tries})
+        json.dump(res, open(P3_LOG, "w"), indent=1)
+        fails = 0 if ok else fails + 1
+        if fails >= 2:
+            log("commons3: two files in a row failed; stopping Commons for good"); break
+def ph_commons_reg3(st):
+    entries = json.load(open(P2_JSON))
+    for i in P3_ORDER:
+        e = entries[i]
+        if not os.path.exists(p3_path(e)) or any(k["page_url"] == e["page"] for k in st["kept"]): continue
+        st["skipped"] = [r for r in st["skipped"] if r["page_url"] != e["page"]]
+        st["seen"].pop(e["page"], None)
+        lurl = e["license_url"] or e["commons_license_url"] or ""
+        lic = e["license"] or lic_short(lurl) or e["commons_license"]
+        tags = ["phase:piano", "phase:piano3", "phase:piano2", "commons"] + (["performer:" + e["performer"]] if e["performer"] else [])
+        if e["note"]: tags.append("note:" + e["note"].replace(";", ","))
+        rec = {"source": "commons", "artist": e["composer"], "album": "Wikimedia Commons", "title": e["title"],
+               "page_url": e["page"], "file_url": e["url"], "license": lic, "license_url": lurl,
+               "license_raw": e["commons_license"], "duration_s": int(round(e["duration"])), "genres": "Classical;Piano",
+               "tags": ";".join(tags), "listens": "", "downloads": "", "favorites": "", "bpm": "",
+               "min_s": 60, "max_s": 480, "fname": e["title"] + (" - " + e["performer"] if e["performer"] else "")}
+        process(st, rec)
+    save_state(st)
+# archive.org piano3: (identifier, file name, composer, title, performer). Licenses read from each item's metadata.
+WTC = "bach-well-tempered-clavier-book-1"
+def _wtc(n, kind, key, bwv):
+    return (WTC, "Kimiko Ishizaka - Bach- Well-Tempered Clavier, Book 1 - %02d %s No. %s, BWV %s.mp3" % (n, kind, key, bwv),
+            "Johann Sebastian Bach", None, "Kimiko Ishizaka")
+IA3 = [_wtc(15, "Prelude", "8 in E-flat minor", 853), _wtc(16, "Fugue", "8 in D-sharp minor", 853),
+       _wtc(43, "Prelude", "22 in B-flat minor", 867), _wtc(44, "Fugue", "22 in B-flat minor", 867),
+       _wtc(7, "Prelude", "4 in C-sharp minor", 849), _wtc(8, "Fugue", "4 in C-sharp minor", 849),
+       _wtc(23, "Prelude", "12 in F minor", 857), _wtc(24, "Fugue", "12 in F minor", 857),
+       _wtc(31, "Prelude", "16 in G minor", 861), _wtc(32, "Fugue", "16 in G minor", 861),
+       _wtc(47, "Prelude", "24 in B minor", 869),
+       ("satie-gnossienne-gymnopedie", "Satie Gnossienne 3.mp3", "Erik Satie", "Gnossienne No. 3 (Gregory Tait)", "Gregory Tait"),
+       ("satie-gnossienne-gymnopedie", "Satie Gnossienne 1.mp3", "Erik Satie", "Gnossienne No. 1 (Gregory Tait)", "Gregory Tait"),
+       ("satie-gnossienne-gymnopedie", "Satie Gymnopedie 1.mp3", "Erik Satie", "Gymnopédie No. 1 (Gregory Tait)", "Gregory Tait"),
+       ("satie-gnossienne-gymnopedie", "Satie Gymnopedie 3.mp3", "Erik Satie", "Gymnopédie No. 3 (Gregory Tait)", "Gregory Tait"),
+       ("a-02-gnossienne", "A02_Gnossienne.mp3", "Erik Satie", "Gnossienne No. 1 (Gregor Horvath, live)", "Gregor Horvath"),
+       ("satie_gymnopedieI_20251213", "satie_gymnopedieI_20251213.mp3", "Erik Satie", "Gymnopédie No. 1 (Gregor Horvath)", "Gregor Horvath"),
+       ("ThreeGnossiennesErikSatie", "Satie.mp3", "Erik Satie", "Gymnopédie No. 1 (Rafi Simcha)", "Rafi Simcha")]
+def ph_ia_piano3(st):
+    p2 = json.load(open(P2_JSON))
+    meta = {}
+    for ident, name, comp, title, perf in IA3:
+        if ident not in meta:
+            meta[ident] = json.loads(fetch("https://archive.org/metadata/" + ident))
+            m = meta[ident]["metadata"]
+            log("IA3", ident, "| licenseurl", m.get("licenseurl"), "| rights", m.get("rights"), "| date", m.get("date"))
+        md = meta[ident]; m = md["metadata"]
+        f = [x for x in md["files"] if x["name"] == name][0]
+        lurl = m.get("licenseurl") or ""; lic = lic_short(lurl); raw = lurl
+        tags = ["phase:piano", "phase:piano3", "performer:" + perf, "archive:" + ident]
+        if ident == WTC:
+            # item: licenseurl PDM 1.0, rights field 'Released under CC0 1.0 Universal'
+            if "CC0" in (m.get("rights") or ""): lic, lurl = "CC0 1.0", "https://creativecommons.org/publicdomain/zero/1.0/"
+            tags.append("note:item licenseurl PDM 1.0, rights CC0 1.0")
+            bwv = re.search(r"BWV (\d+)", name).group(1); kind = "Prelude" if "Prelude" in name else "Fugue"
+            title = [e["title"] for e in p2 if e["performer"] == "Kimiko Ishizaka" and bwv in e["title"] and kind in e["title"]][0]
+        q = urllib.parse.quote(name)
+        rec = {"source": "archive.org", "artist": comp, "album": "archive.org - " + re.sub(r"[​]", "", m.get("title") or ident)[:80], "title": title,
+               "page_url": "https://archive.org/details/" + ident + "/" + q, "file_url": "https://archive.org/download/" + ident + "/" + q,
+               "license": lic, "license_url": lurl, "license_raw": raw, "duration_s": ia_len(f.get("length")), "genres": "Classical;Piano",
+               "tags": ";".join(tags), "listens": "", "downloads": str(m.get("downloads", "") or ""), "favorites": "", "bpm": "",
+               "min_s": 60, "max_s": 480, "fname": title if ident != WTC else title + " - " + perf}
+        if int(f.get("size", 0)) > 40e6: skip(st, rec, "file over 40 MB"); continue
+        process(st, rec)
+    save_state(st)
+def ph_pack_piano3(st):
+    rows = [r for r in st["kept"] if int(r["id"][1:]) >= 962 and r.get("analysis_file")]
+    out = os.path.join(ROOT, "piano-pack-3.tar")
+    args = ["tar", "-cf", out + ".tmp", "-C", ROOT, "candidates.csv"] + [r["analysis_file"] for r in rows]
+    if os.path.exists(os.path.join(ROOT, "piano3-measure.csv")): args.append("piano3-measure.csv")
+    subprocess.run(args, check=True, env=dict(os.environ, COPYFILE_DISABLE="1"))
+    os.replace(out + ".tmp", out)
+    log("pack", out, os.path.getsize(out), len(rows), "analysis files")
+PHASES.update({"ia-piano3": ph_ia_piano3, "pack-piano3": ph_pack_piano3})
+PHASES.update({"commons-dl3": ph_commons_dl3, "commons-reg3": ph_commons_reg3})
 def main():
     os.makedirs(ROOT, exist_ok=True)
-    phases = sys.argv[1:] or list(PHASES)
+    phases = sys.argv[1:] or ["fma-purrple", "fma-holizna", "fsm-tmw", "fsm-cats", "fma-extra", "analysis", "pack"]
     st = load_state()
     for ph in phases:
         log("=== phase", ph)
