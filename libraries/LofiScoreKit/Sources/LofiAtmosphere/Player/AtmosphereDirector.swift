@@ -4,9 +4,26 @@ import LofiAudio
 /// Timings and levels for the atmosphere.
 public struct AtmosphereConfig: Sendable, Hashable {
     /// Where a sound at "full" sits, in dB under a voice at ``voiceLoudnessLUFS``.
-    /// The music's bed is 16 dB under; the atmosphere sits well below it.
-    public var bedLevelDB: Double = -28
+    /// The music's bed is 16 dB under; the atmosphere sits below it, present the whole
+    /// time but never over the words (see ``levelRange`` for how far the slider goes).
+    public var bedLevelDB: Double = -24
     public var voiceLoudnessLUFS: Double = -18
+    /// How much is going on, from 0 (only the scene's main sound, the rest cut) to 1 (every
+    /// sound the scene has, the quieter ones at their full level, the biggest lifts in the
+    /// gaps between sentences). It is a dial next to the volume: turn it down for a calmer
+    /// scene without turning the whole atmosphere down.
+    public var intensity: Double = 0.75
+    /// At intensity 0 the sounds behind the scene's main one sit this far lower.
+    public var secondaryCutDB: Double = 6
+    /// In a gap in the narration longer than ``gapLiftDelay`` (a paragraph break, a chapter
+    /// end, the narrator drawing breath) the atmosphere comes forward by up to this much
+    /// (times the intensity), rising over ``gapLiftRise`` and settling back over
+    /// ``gapLiftFall`` when the next sentence starts. Ordinary gaps between sentences are
+    /// shorter than the delay, so the bed does not pump.
+    public var gapLiftDB: Double = 4
+    public var gapLiftDelay: TimeInterval = 0.7
+    public var gapLiftRise: TimeInterval = 0.6
+    public var gapLiftFall: TimeInterval = 0.25
     /// A new place or new sounds fade in this long, the old ones out.
     public var sceneFade: TimeInterval = 6
     /// The same sound getting louder or softer.
@@ -43,6 +60,15 @@ public struct AtmosphereConfig: Sendable, Hashable {
     public var maxOneShotDelay: TimeInterval = 8
     /// A one-off sound still playing when the listener jumps is faded out this fast.
     public var oneShotCut: TimeInterval = 0.3
+    /// Scene transitions (``SceneTransition``): when the track does not say how the story
+    /// moved from one place to the next, infer a plain one (a door between indoors and
+    /// out, a vehicle boarded) from the two scenes.
+    public var inferTransitions = true
+    /// A sound fully muffled (behind a shut door, under water) is also this much quieter.
+    public var muffleCutDB: Double = 9
+    /// A transition's one-off sounds (the door, the engine) skip the usual spacing between
+    /// one-off sounds, but never play this soon after the narrator starts or the listener seeks.
+    public var noTransitionSoundAfterStart: TimeInterval = 1.5
     /// A scene this many sentences old with no newer one (a track scored only part way)
     /// fades to silence.
     public var maxLagSentences: Int = 80
@@ -53,8 +79,17 @@ public struct AtmosphereConfig: Sendable, Hashable {
     /// Routes where the atmosphere stays off (like the music's "off in the car").
     public var mutedRoutes: Set<OutputRoute> = []
 
-    /// The level slider's range, in dB under the voice.
-    public static let levelRange: ClosedRange<Double> = -40 ... -16
+    /// The level slider's range, in dB under the voice. The top keeps the words clear: a
+    /// steady bed 14 dB under speech is well inside what listeners follow without effort,
+    /// and sounds made of voices sit a further 3 to 4 dB down with the speech band filtered.
+    public static let levelRange: ClosedRange<Double> = -40 ... -14
+    public static let intensityRange: ClosedRange<Double> = 0 ... 1
+
+    /// How many of a scene's sounds play at `intensity`: 1 at 0, all ``StoryScene/maxLayers`` at 1.
+    public static func layersKept(intensity: Double) -> Int {
+        let clamped = min(1, max(0, intensity.isFinite ? intensity : 0))
+        return max(1, min(StoryScene.maxLayers, Int((1 + clamped * Double(StoryScene.maxLayers - 1)).rounded())))
+    }
 
     public init() {}
 }
@@ -130,9 +165,9 @@ public struct AtmosphereDirector: Sendable {
             applied.entryIndex = next.entryIndex
             return .dip(next.dipped)
         }
-        // A swell or hush starting at this very sentence does not wait: it is the story's
-        // own change of sound, and its pause belongs right after this sentence.
-        let isMoment = next.scene.moment != nil && next.entryIndex == globalIndex
+        // A swell, hush or transition starting at this very sentence does not wait: it is
+        // the story's own change of sound, and belongs right after this sentence.
+        let isMoment = (next.scene.moment != nil || next.scene.transition != nil) && next.entryIndex == globalIndex
         if !seek, !isMoment, now - appliedAt < config.minDwell {
             return .wait(until: appliedAt + config.minDwell)
         }

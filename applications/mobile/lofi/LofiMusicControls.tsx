@@ -11,6 +11,7 @@ import {
   canMarkWrongMood,
   describeAtmosphere,
   describeMusic,
+  intensityLabel,
   moodFeedbackLine,
   moodName,
   musicLevelLabel,
@@ -216,10 +217,17 @@ function AtmosphereControls({
 }: Props & { status: NonNullable<LofiMusic["status"]> }) {
   const atmosphere = status.atmosphere
   if (!atmosphere) return null
-  const [quietest = -40, loudest = -16] = atmosphere.levelRange
+  const [quietest = -40, loudest = -14] = atmosphere.levelRange
   const level = Math.min(loudest, Math.max(quietest, atmosphere.levelDB))
   const isDefaultLevel =
     Math.round(level) === Math.round(atmosphere.defaultLevelDB)
+  const defaultIntensity = atmosphere.defaultIntensity ?? 0.75
+  const intensity = Math.min(
+    1,
+    Math.max(0, atmosphere.intensity ?? defaultIntensity),
+  )
+  const isDefaultIntensity =
+    Math.round(intensity * 20) === Math.round(defaultIntensity * 20)
 
   return (
     <View className="w-full gap-2">
@@ -269,6 +277,38 @@ function AtmosphereControls({
           </Button>
         )}
         <Text variant="muted">Louder</Text>
+      </View>
+      <View className="w-full flex-row items-center justify-between gap-4">
+        <Text maxFontSizeMultiplier={1.5}>How much is going on</Text>
+        <Text maxFontSizeMultiplier={1.5} className="shrink-0 text-sm">
+          {intensityLabel(intensity)}
+        </Text>
+      </View>
+      <Slider
+        accessibilityLabel="How much is going on in the atmosphere"
+        disabled={!atmosphere.enabled}
+        className="w-full"
+        start={0}
+        stop={1}
+        step={0.05}
+        value={intensity}
+        onValueChange={(value) =>
+          void music.setAtmosphereIntensity(Math.round(value * 20) / 20)
+        }
+      />
+      <View className="w-full flex-row items-center justify-between">
+        <Text variant="muted">Just the main sound</Text>
+        {!isDefaultIntensity && (
+          <Button
+            accessibilityLabel="Reset how much is going on in the atmosphere"
+            variant="ghost"
+            size="sm"
+            onPress={() => void music.setAtmosphereIntensity(null)}
+          >
+            <Text>Reset</Text>
+          </Button>
+        )}
+        <Text variant="muted">The whole scene</Text>
       </View>
     </View>
   )

@@ -209,8 +209,12 @@ public struct AmbienceLibrary: Sendable, Hashable {
     /// The recording for a scene's layer: its variant's when there is one, otherwise the
     /// plain sound's.
     public func recording(for layer: SceneLayer, key: String) -> AmbienceRecording? {
-        if let variant = layer.variant, let recording = recording(of: layer.sound, variant: variant, key: key) {
-            return recording
+        if let variant = layer.variant {
+            if let recording = recording(of: layer.sound, variant: variant, key: key) { return recording }
+            // Variant ids are unique across families, so recordings fetched when the kind
+            // belonged to another family (an older catalogue) still play.
+            let moved = recordings.filter { $0.variant == variant }
+            if !moved.isEmpty { return moved[Int(StableHash.fnv1a(key) % UInt64(moved.count))] }
         }
         return recording(of: layer.sound, key: key)
     }

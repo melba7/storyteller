@@ -19,15 +19,19 @@ Copy that Atmosphere folder into the music folder (next to Calm/, Cozy/, ...)
 before importing the music folder in the app. Sounds with no recording keep
 the app's synthesised stand-ins; a variant with none plays its plain sound.
 
-What it fetches:
-  - the 26 built-in sounds (Rain, Fireplace, Crowd, ...), --per-sound each;
-  - the more specific sounds (variants), --per-variant each: a starter set
-    (STARTER_VARIANTS below) plus every variant a book's atmosphere track
-    asked for (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json);
-  - the 15 one-off sounds (ONE_SHOTS below), --per-one-shot each: short single
-    sounds, trimmed of silence, not looped.
+What it fetches comes from the app's own sound catalogue, catalog.json next to
+this script (written by `lofi-atmosphere catalog`, kept in step by a test):
+  - every sound family (Rain, Fireplace, Crowd, Murmur, ...), --per-sound each;
+  - the more specific kinds of each (variants), --per-variant each: the
+    catalogue's own (a drizzle, a school corridor between lessons, a hushed
+    library ...) plus every variant a book's atmosphere track asked for
+    (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json);
+  - the one-off sounds (a knock, a clap of thunder), --per-one-shot each:
+    short single sounds, trimmed of silence, not looped.
 Runs add what is missing, so run it again after scoring new books. One run at a
-time writes a folder; a second one waits for it.
+time writes a folder; a second one waits for it. When the catalogue moves a
+kind to another family (an office is now a kind of electric hum, not of
+machinery), the run moves its folder and credits along.
 
 Two editions:
   personal (default)  For Mo's own app. Searches Freesound (needs
@@ -45,7 +49,8 @@ A published app build also refuses any recording marked personal
 
     python3 -I fetch_ambience.py [--edition personal|publish] [--per-sound 4]
                                  [--per-variant 2] [--per-one-shot 2] [--sound Rain]
-                                 [--no-variants] [--no-one-shots] [--out DIR] [--dry-run]
+                                 [--no-variants] [--no-one-shots] [--out DIR]
+                                 [--catalog FILE] [--dry-run]
 
 Audio is never committed: the fork is public. Run with python3 -I and keep the
 downloads folder away from this script.
@@ -68,97 +73,36 @@ from pathlib import Path
 ROOT = Path.home() / "Storyteller Lofi"
 USER_AGENT = "StorytellerLofi-atmosphere/2.0 (personal app; python urllib)"
 
-# What to search for, per built-in sound (folder name as the app expects it).
-# Steady beds only: the narrator must stay easy to follow, so nothing with words,
-# music or sudden one-off events.
-QUERIES = {
-    "Rain": ["light rain ambience", "gentle rain", "steady rain"],
-    "HeavyRain": ["heavy rain downpour", "heavy rain ambience", "torrential rain"],
-    "RainIndoors": ["rain on window", "rain on roof interior", "rain inside house"],
-    "Thunder": ["distant thunderstorm rain", "thunder rumble rain ambience"],
-    "Wind": ["gentle wind ambience", "soft wind", "wind field"],
-    "StrongWind": ["strong wind howling", "storm wind gusts", "gale wind"],
-    "Snow": ["winter wind snow ambience", "snowy quiet winter ambience", "snow forest winter"],
-    "Fireplace": ["fireplace crackling", "fireplace fire crackle", "wood stove crackle"],
-    "Campfire": ["campfire crackling outdoors", "campfire night"],
-    "SeaShore": ["waves beach ambience", "ocean waves shore", "waves rocks"],
-    "OpenSea": ["open sea waves boat", "ocean swell", "boat hull water"],
-    "River": ["river stream ambience", "babbling brook", "creek water flowing"],
-    "Dripping": ["cave dripping water", "water drips cave ambience"],
-    "Forest": ["forest ambience day", "woodland ambience birds wind"],
-    "Birdsong": ["birdsong morning", "dawn chorus birds", "garden birds"],
-    "NightInsects": ["crickets night", "night insects ambience"],
-    "NightForest": ["night forest ambience", "forest at night owl"],
-    "Swamp": ["swamp frogs night", "marsh frogs ambience"],
-    "Crowd": ["crowd murmur indoor", "walla crowd indistinct", "school hallway ambience"],
-    "City": ["city street ambience", "city traffic distant ambience"],
-    "OldTown": ["medieval town ambience", "market square ambience horses", "village square ambience"],
-    "Horses": ["horse carriage hooves cobblestones", "horse drawn carriage"],
-    "Train": ["train interior ambience", "steam train journey"],
-    "Ship": ["ship creaking wood", "sailing ship ambience"],
-    "Machinery": ["factory machinery ambience", "engine room ambience"],
-    "Clock": ["clock ticking", "grandfather clock ticking"],
-}
+CATALOG = Path(__file__).resolve().parent / "catalog.json"
 
-# More specific kinds of the built-in sounds, fetched up front so Claude can use
-# them in any book (it can also ask for new ones while scoring). Each plays its
-# `of` sound until a recording is imported. id: camelCase, never a built-in name.
-STARTER_VARIANTS = [
-    ("drizzle", "rain", "a light drizzle, barely there", "light drizzle rain"),
-    ("rainOnLeaves", "rain", "rain falling through a forest canopy", "rain forest leaves"),
-    ("tentRain", "rainIndoors", "rain drumming on a tent", "rain on tent"),
-    ("blizzard", "strongWind", "a blizzard of driving snow and wind", "blizzard wind snow"),
-    ("desertWind", "wind", "wind blowing over sand in a desert", "desert wind"),
-    ("mountainWind", "wind", "wind on a high mountain ridge", "mountain wind"),
-    ("windChimes", "wind", "a breeze with wind chimes on a porch", "wind chimes breeze"),
-    ("bonfire", "campfire", "a big roaring bonfire", "bonfire roaring"),
-    ("waterfall", "river", "a waterfall close by", "waterfall"),
-    ("fountain", "river", "a fountain splashing in a courtyard", "fountain courtyard"),
-    ("lakeShore", "seaShore", "small waves lapping a lake shore", "lake shore lapping water"),
-    ("harbour", "seaShore", "a harbour: water against the quay, gulls, rigging", "harbour ambience gulls"),
-    ("underwater", "openSea", "under water, muffled and deep", "underwater ambience"),
-    ("rowingBoat", "openSea", "a small rowing boat on calm water", "rowing boat oars water"),
-    ("shipStorm", "ship", "a ship in a storm: groaning timbers, heavy seas", "ship storm creaking waves"),
-    ("jungle", "forest", "a tropical jungle: insects, birds, humid air", "jungle ambience"),
-    ("summerMeadow", "birdsong", "a summer meadow: bees, grasshoppers, birds", "summer meadow insects"),
-    ("cafe", "crowd", "a cafe: low chatter, cups and saucers", "cafe ambience"),
-    ("tavern", "crowd", "a busy tavern or pub: murmur, mugs, laughter", "tavern pub ambience"),
-    ("marketplace", "crowd", "an open-air market: stalls, chatter, footsteps", "market ambience"),
-    ("schoolCorridor", "crowd", "a busy school corridor between lessons", "school hallway ambience"),
-    ("feastHall", "crowd", "a great hall at a feast: many voices, cutlery", "banquet hall crowd"),
-    ("trainStation", "crowd", "a railway station concourse", "train station ambience"),
-    ("churchBells", "oldTown", "church bells ringing across a town", "church bells distant"),
-    ("cityNight", "city", "a city at night: distant traffic, quiet streets", "city night ambience"),
-    ("library", "clock", "a hushed library: pages turning, soft footsteps", "library ambience quiet"),
-    ("office", "machinery", "a quiet office: air conditioning, distant keyboards", "office ambience"),
-    ("carInterior", "machinery", "inside a moving car", "car interior driving"),
-    ("airplaneCabin", "machinery", "inside an airliner in flight", "airplane cabin ambience"),
-    ("spaceship", "machinery", "the hum inside a spaceship", "spaceship interior hum"),
-    ("subway", "train", "inside an underground train", "subway train interior"),
-    ("steamTrain", "train", "a steam train on the move", "steam train"),
-]
+# Filled from the catalogue by load_catalog(): the app's sound families, their
+# more specific kinds and the one-off sounds. Nothing here is written by hand.
+QUERIES = {}            # family folder (Rain) -> search queries
+STARTER_VARIANTS = []   # (id, of, about, search, queries) for each catalogue kind
+ONE_SHOTS = {}          # one-off folder (DoorKnock) -> (queries, longest kept in seconds)
+BUILTINS = []           # family ids (rain, heavyRain, ...)
+SPEECH_OK = set()       # families made of voices: a title that says "talking" is fine
+VARIANT_FAMILY = {}     # catalogue kind id -> the family it belongs to now
 
-BUILTINS = [name[0].lower() + name[1:] for name in QUERIES]
 
-# One-off sounds (the app's OneShotSound), folder name: (queries, longest kept in seconds).
-# Played once, on the sentence that says they happen, when the listener turns them on.
-ONE_SHOTS = {
-    "ThunderClap": (["thunder clap", "thunder crack", "single thunder strike"], 8),
-    "DoorKnock": (["knocking on door", "door knock"], 4),
-    "DoorSlam": (["door slam", "door slamming shut"], 3),
-    "DoorCreak": (["door creak", "creaky door opening"], 4),
-    "Doorbell": (["doorbell ding dong", "doorbell"], 4),
-    "PhoneRing": (["old telephone ring", "telephone ringing bell"], 6),
-    "BellToll": (["church bell toll single", "bell toll"], 8),
-    "ClockChime": (["clock chime hour", "grandfather clock chime"], 12),
-    "GlassBreak": (["glass break", "glass shatter"], 3),
-    "DogBark": (["dog bark", "dog barking"], 4),
-    "OwlHoot": (["owl hoot", "tawny owl call"], 4),
-    "WolfHowl": (["wolf howl"], 7),
-    "HorseNeigh": (["horse neigh", "horse whinny"], 4),
-    "TrainWhistle": (["steam train whistle", "train whistle"], 6),
-    "ShipHorn": (["ship horn", "foghorn"], 7),
-}
+def load_catalog(path):
+    """Reads catalog.json (lofi-atmosphere catalog) into the tables above."""
+    global QUERIES, STARTER_VARIANTS, ONE_SHOTS, BUILTINS, SPEECH_OK, VARIANT_FAMILY
+    data = json.loads(path.read_text())
+    if not isinstance(data, dict) or not data.get("sounds"):
+        sys.exit(f"{path} is not a sound catalogue; write it with: swift run lofi-atmosphere catalog --out {path}")
+    QUERIES = {sound["folder"]: list(sound["queries"]) for sound in data["sounds"]}
+    BUILTINS = [sound["id"] for sound in data["sounds"]]
+    SPEECH_OK = {sound["id"] for sound in data["sounds"] if sound.get("voices")}
+    STARTER_VARIANTS = [
+        (v["id"], v["of"], v["about"], v.get("search") or (v.get("queries") or [v["about"]])[0], list(v.get("queries") or []))
+        for v in data.get("variants", [])
+    ]
+    VARIANT_FAMILY = {v["id"]: v["of"] for v in data.get("variants", [])}
+    ONE_SHOTS = {o["folder"]: (list(o["queries"]), float(o["longestSeconds"])) for o in data.get("oneShots", [])}
+    return data
+
+
 ONE_SHOT_FOLDER = "OneShots"
 
 # Words in a title or tags that mean the recording would fight the narrator.
@@ -168,7 +112,6 @@ AVOID = re.compile(
     r"synth|drone music|meditation music|asmr)\b",
     re.I,
 )
-SPEECH_OK = {"crowd"}
 # For one-off sounds: no words or music, and single events rather than long beds.
 ONE_SHOT_AVOID = re.compile(
     r"\b(music|song|melody|singing|voice ?over|speech|talking|dialogue|narrat|announcement|"
@@ -541,13 +484,18 @@ def merge_catalog(catalog, starter, from_tracks):
     by_id = {}
     for entry in catalog.get("variants", []):
         vid = normalized_id(entry.get("id", ""))
+        if vid in VARIANT_FAMILY:
+            entry["of"] = VARIANT_FAMILY[vid]
         if vid and entry.get("of") in BUILTINS:
             entry["id"] = vid
             entry["books"] = sorted(set(entry.get("books") or []))
+            entry.pop("starter", None)
             by_id[vid] = entry
-    for vid, of, about, search in starter:
-        # Offered to every book, even one that asked for it too.
-        by_id.setdefault(vid, {"id": vid, "of": of, "about": about, "search": search, "books": []})["starter"] = True
+    for vid, of, about, search, queries in starter:
+        # Offered to every book, even one that asked for it too, and kept in step with
+        # the catalogue: its family, wording and queries are the catalogue's.
+        entry = by_id.setdefault(vid, {"id": vid, "books": []})
+        entry.update({"of": of, "about": about, "search": search, "queries": queries, "starter": True})
     for v, book in from_tracks:
         vid = normalized_id(v.get("id", ""))
         of = v.get("of")
@@ -562,6 +510,44 @@ def merge_catalog(catalog, starter, from_tracks):
         if book not in entry["books"]:
             entry["books"] = sorted(entry["books"] + [book])
     return {"version": 1, "variants": sorted(by_id.values(), key=lambda e: (e["of"], e["id"]))}
+
+
+def relocate(out, manifest, dry_run):
+    """Moves recordings whose kind the catalogue has moved to another family, or made a
+    family of its own (Machinery.Spaceship became Spaceship): the folder, the file and
+    the credits entry, so the app finds them under the new name."""
+    moved = 0
+    for entry in manifest["sounds"]:
+        variant, sound = entry.get("variant"), entry.get("sound")
+        if not variant:
+            continue
+        if variant in BUILTINS:
+            new_sound, new_variant = variant, None
+        elif VARIANT_FAMILY.get(variant, sound) != sound:
+            new_sound, new_variant = VARIANT_FAMILY[variant], variant
+        else:
+            continue
+        old_file = entry["file"]
+        folder = folder_name(new_sound, new_variant)
+        new_file = f"{folder}/{new_variant or new_sound}-{entry['id'].rsplit('/', 1)[-1]}.m4a"
+        note(f"{old_file}: now {new_file} (the catalogue moved this kind)")
+        if not dry_run:
+            source, target = out / old_file, out / new_file
+            if source.is_file():
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(source), str(target))
+                old_folder = source.parent
+                if old_folder.is_dir() and not any(old_folder.iterdir()):
+                    old_folder.rmdir()
+        entry["file"] = new_file
+        entry["sound"] = new_sound
+        entry["id"] = f"{new_sound}{'.' + new_variant if new_variant else ''}/{entry['id'].rsplit('/', 1)[-1]}"
+        if new_variant:
+            entry["variant"] = new_variant
+        else:
+            entry.pop("variant", None)
+        moved += 1
+    return moved
 
 
 # MARK: - Main
@@ -630,12 +616,18 @@ def main():
     parser.add_argument("--tracks", type=Path, default=ROOT / "tracks", help="where the atmosphere tracks are")
     parser.add_argument("--out", type=Path)
     parser.add_argument("--downloads", type=Path, default=ROOT / "AtmosphereDownloads")
+    parser.add_argument("--catalog", type=Path, default=CATALOG, help="the sound catalogue (lofi-atmosphere catalog)")
     parser.add_argument("--dry-run", action="store_true", help="list what would be fetched")
     args = parser.parse_args()
 
     for tool in ("ffmpeg", "ffprobe"):
         if not shutil.which(tool):
             sys.exit(f"{tool} is needed (brew install ffmpeg)")
+    if not args.catalog.is_file():
+        sys.exit(f"no sound catalogue at {args.catalog}; write it with: swift run lofi-atmosphere catalog --out {args.catalog}")
+    catalogue = load_catalog(args.catalog)
+    note(f"catalogue {args.catalog}: {len(QUERIES)} sounds, {len(STARTER_VARIANTS)} specific kinds, {len(ONE_SHOTS)} one-off sounds "
+         f"(catalogue version {catalogue.get('version')})")
     personal = args.edition == "personal"
     out = args.out or ROOT / ("Atmosphere" if personal else "AtmospherePublish")
     key_file = ROOT / ".freesound-key"
@@ -662,6 +654,8 @@ def main():
     manifest_path = out / "sounds.json"
     manifest = json.loads(manifest_path.read_text()) if manifest_path.is_file() else {"version": 1, "sounds": []}
     mark_freesound_personal(manifest)
+    if relocate(out, manifest, args.dry_run) and not args.dry_run:
+        (out / "sounds.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     one_shot_path = out / ONE_SHOT_FOLDER / "sounds.json"
     one_shots = json.loads(one_shot_path.read_text()) if one_shot_path.is_file() else {"version": 1, "sounds": []}
     catalog_path = out / "variants.json"
@@ -674,7 +668,7 @@ def main():
     targets = [(folder, folder[0].lower() + folder[1:], None, queries, args.per_sound, None) for folder, queries in QUERIES.items()]
     if not args.no_variants:
         for v in catalog["variants"]:
-            queries = list(dict.fromkeys([v["search"], f"{v['search']} ambience"]))
+            queries = list(dict.fromkeys((v.get("queries") or []) + [v["search"], f"{v['search']} ambience"]))
             targets.append((folder_name(v["of"], v["id"]), v["of"], v["id"], queries, args.per_variant, None))
     if not args.no_one_shots:
         for folder, (queries, longest) in ONE_SHOTS.items():

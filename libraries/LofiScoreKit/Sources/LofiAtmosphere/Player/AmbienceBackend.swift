@@ -10,7 +10,7 @@ public enum AmbienceFilter: String, Sendable, Hashable, Codable {
     case speechSafe
 
     public init(for sound: AmbientSound) {
-        self = sound == .crowd ? .speechSafe : .standard
+        self = sound.isVoices ? .speechSafe : .standard
     }
 }
 
@@ -43,6 +43,10 @@ public protocol AmbienceBackend: AnyObject {
     func play(slot: Int, from offset: TimeInterval) throws
     func stop(slot: Int)
     func setGain(_ gain: Float, slot: Int)
+    /// How muffled the slot sounds, 0 (clear) to 1 (behind a shut door, under water): the
+    /// top rolled off. The player also takes the gain down with it. Backends that cannot
+    /// filter leave it to the gain.
+    func setMuffle(_ amount: Float, slot: Int)
 
     /// Plays a short recording once, at a gain, on a voice of its own beside the slots
     /// (a one-off sound). A one-off sound still playing is cut off.
@@ -59,6 +63,8 @@ extension AmbienceBackend {
     }
 
     public func stopOnce(fade: TimeInterval) {}
+
+    public func setMuffle(_ amount: Float, slot: Int) {}
 }
 
 /// Records what the player asked for, for tests and the headless demo.
@@ -75,6 +81,8 @@ public final class FakeAmbienceBackend: AmbienceBackend {
         public var filter: AmbienceFilter = .standard
         public var playing = false
         public var gain: Float = 0
+        /// 0 clear, 1 fully muffled.
+        public var muffle: Float = 0
     }
 
     public private(set) var slots: [Slot]
@@ -82,7 +90,7 @@ public final class FakeAmbienceBackend: AmbienceBackend {
     /// One-off sounds played, with their gains, oldest first.
     public private(set) var oneShots: [(file: String, gain: Float)] = []
 
-    public init(slotCount: Int = 8) {
+    public init(slotCount: Int = 12) {
         self.slotCount = slotCount
         slots = Array(repeating: Slot(), count: slotCount)
     }
@@ -108,7 +116,7 @@ public final class FakeAmbienceBackend: AmbienceBackend {
         if failLoads.contains(url.lastPathComponent) {
             throw LofiAudioError.loadFailed(trackID: url.lastPathComponent, reason: "test")
         }
-        slots[slot] = Slot(url: url, filter: filter, playing: false, gain: slots[slot].gain)
+        slots[slot] = Slot(url: url, filter: filter, playing: false, gain: slots[slot].gain, muffle: 0)
         log.append("load \(slot) \(url.lastPathComponent)")
         return duration
     }
@@ -126,6 +134,19 @@ public final class FakeAmbienceBackend: AmbienceBackend {
 
     public func setGain(_ gain: Float, slot: Int) {
         slots[slot].gain = gain
+    }
+
+    public func setMuffle(_ amount: Float, slot: Int) {
+        slots[slot].muffle = amount
+    }
+
+    /// The muffle of each file playing now, by file name.
+    public var muffles: [String: Float] {
+        var result: [String: Float] = [:]
+        for slot in slots where slot.playing {
+            if let name = slot.url?.lastPathComponent { result[name] = slot.muffle }
+        }
+        return result
     }
 
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {

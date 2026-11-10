@@ -24,8 +24,17 @@ final class PlayerTests: XCTestCase {
         var yields: [Bool] = []
         var events: [AmbienceEvent] = []
 
-        init(track: AtmosphereTrack?) {
-            player = AmbiencePlayer(library: PlayerTests.library, backend: backend, scheduler: scheduler, seed: 7)
+        /// The steady bed as these tests know it: the whole scene, and no lift in the
+        /// gaps between sentences (``IntensityTests`` cover the dial and the lift).
+        static var steadyConfig: AtmosphereConfig {
+            var config = AtmosphereConfig()
+            config.intensity = 1
+            config.gapLiftDB = 0
+            return config
+        }
+
+        init(track: AtmosphereTrack?, config: AtmosphereConfig = Harness.steadyConfig) {
+            player = AmbiencePlayer(library: PlayerTests.library, backend: backend, scheduler: scheduler, config: config, seed: 7)
             player.onMusicYieldChanged = { [unowned self] in yields.append($0) }
             player.onEvent = { [unowned self] in events.append($0) }
             player.openBook(id: "book")
@@ -65,8 +74,8 @@ final class PlayerTests: XCTestCase {
         XCTAssertEqual(h.audible.count, 1)
         let tavernFire = try XCTUnwrap(h.audible.first)
         XCTAssertTrue(tavernFire.hasPrefix("fire-"))
-        // fire at full: -18 voice, -28 bed, file at -23 LUFS: 23 dB down.
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[tavernFire])), pow(10, -23 / 20), accuracy: 0.002)
+        // fire at full: -18 voice, -24 bed, file at -23 LUFS: 19 dB down.
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[tavernFire])), pow(10, -19 / 20), accuracy: 0.002)
 
         // The street arrives at 10 but the tavern has only played 8 s: it waits for the dwell.
         h.narrate(10, then: 4)
@@ -74,7 +83,9 @@ final class PlayerTests: XCTestCase {
         h.scheduler.advance(by: 16)
         XCTAssertEqual(h.audible, ["town.wav", h.audible.first { $0.hasPrefix("rain-") } ?? "missing rain"])
         let rain = try XCTUnwrap(h.audible.first { $0.hasPrefix("rain-") })
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible["town.wav"])), pow(10, -21 / 20), accuracy: 0.002,
+        // town at soft: -18 voice, -24 bed, -5 soft, file at -30: 17 dB down, then the scene
+        // (two sounds at the same level) is trimmed 3 dB so it is no louder than one.
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible["town.wav"])), pow(10, -17 / 20) / 2, accuracy: 0.002,
                        "a quieter file is turned up to the same level")
 
         // The hall has a crowd: the music steps aside, and comes back when the scene moves on.
@@ -187,6 +198,6 @@ final class PlayerTests: XCTestCase {
         XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -17 / 20), accuracy: 0.002)
         h.player.setLevel(dB: 0)
         h.scheduler.advance(by: 2)
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -11 / 20), accuracy: 0.002, "capped at -16 dB")
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -9 / 20), accuracy: 0.002, "capped at -14 dB")
     }
 }

@@ -4,7 +4,7 @@
 #
 #   cd "~/Storyteller Lofi/<clone>/libraries/LofiScoreKit"
 #   Tools/mac/make-atmosphere.sh [--via plan|api] [--cap DOLLARS] [--model claude-opus-5-5|claude-sonnet-5-5|claude-haiku-5-5]
-#                                [--parallel N] [--dry-run] [--no-fetch] [--no-copy] BOOK.epub|EPUB-DIR ...
+#                                [--parallel N] [--dry-run] [--rescore] [--no-fetch] [--no-copy] BOOK.epub|EPUB-DIR ...
 #
 # --via works as in make-tracks.sh. plan (the default) runs every request
 # through Claude Code (`claude -p`) on the Claude subscription it is signed in
@@ -50,10 +50,12 @@ PARALLEL=1
 DRY=0
 FETCH=1
 COPY=1
+RESCORE=0
 BOOKS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --cap) CAP="$2"; shift 2 ;;
+    --rescore) RESCORE=1; shift ;;
     --model) MODEL="$2"; shift 2 ;;
     --via) VIA="$2"; shift 2 ;;
     --parallel) PARALLEL="$2"; shift 2 ;;
@@ -120,6 +122,14 @@ score_one() {
   local dir="$1" name="$2" log="$3"
   local cap=()
   [ -n "$EACH" ] && cap=(--max-dollars "$EACH")
+  if [ "$RESCORE" = 1 ]; then
+    # A track from an older prompt or catalogue is kept aside, never overwritten.
+    mkdir -p "$TRACKS/old"
+    local stamp; stamp="$(date +%Y%m%d-%H%M%S)"
+    for kind in atmosphere score; do
+      [ -s "$TRACKS/$name.$kind.json" ] && mv "$TRACKS/$name.$kind.json" "$TRACKS/old/$name.$stamp.$kind.json"
+    done
+  fi
   "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" --variants "$VARIANTS" \
     --out "$TRACKS/$name.atmosphere.json" "${cap[@]+"${cap[@]}"}" 2> "$log"
   # One block per book, even when books finish together.

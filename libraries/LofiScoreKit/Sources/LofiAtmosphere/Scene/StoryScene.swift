@@ -14,6 +14,18 @@ public struct SceneLayer: Codable, Sendable, Hashable {
         self.variant = variant
     }
 
+    private enum CodingKeys: String, CodingKey {
+        case sound, level, variant
+    }
+
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sound = try c.decode(AmbientSound.self, forKey: .sound)
+        // A level this version does not know (from a newer scorer) plays as soft.
+        level = (try? c.decode(AmbientLevel.self, forKey: .level)) ?? .soft
+        variant = try c.decodeIfPresent(String.self, forKey: .variant)
+    }
+
     /// "oldTown" or "oldTown.churchBells": what the listener hears, for comparing scenes.
     public var key: String {
         variant.map { "\(sound.rawValue).\($0)" } ?? sound.rawValue
@@ -63,8 +75,18 @@ public struct StoryScene: Codable, Sendable, Hashable {
     /// Set when the entry's own sentence is such a moment. Only the entry that starts a
     /// new scene uses it.
     public var moment: Moment?
+    /// What the place is like right now, in a few words ("between lessons", "after
+    /// hours, empty", "everyone whispering about her"): the state that explains the
+    /// sounds. Shown to the scorer with the place's memory, so a change of state at a
+    /// known place changes the sounds the same way each time. Never played.
+    public var state: String?
+    /// How the sound moves from the last scene to this one, when the entry's own sentence
+    /// is the move (a door opened on a party and shut behind them, a train boarded). Only
+    /// the entry that starts a new scene uses it; without one the player infers a plain
+    /// transition from the two scenes (``SceneTransition/inferred(from:to:)``).
+    public var transition: SceneTransition?
 
-    public static let maxLayers = 4
+    public static let maxLayers = 5
 
     public init(
         placeID: String?,
@@ -73,7 +95,9 @@ public struct StoryScene: Codable, Sendable, Hashable {
         layers: [SceneLayer],
         confidence: Double = 1,
         cue: String? = nil,
-        moment: Moment? = nil
+        moment: Moment? = nil,
+        state: String? = nil,
+        transition: SceneTransition? = nil
     ) {
         self.placeID = placeID
         self.placeName = placeName
@@ -82,6 +106,8 @@ public struct StoryScene: Codable, Sendable, Hashable {
         self.confidence = confidence.isFinite ? min(1, max(0, confidence)) : 0
         self.cue = cue
         self.moment = moment
+        self.state = state
+        self.transition = transition
     }
 
     /// No place and no sound.
@@ -127,7 +153,7 @@ public struct StoryScene: Codable, Sendable, Hashable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case placeID, placeName, setting, layers, confidence, cue, moment
+        case placeID, placeName, setting, layers, confidence, cue, moment, state, transition
     }
 
     public init(from decoder: any Decoder) throws {
@@ -140,7 +166,10 @@ public struct StoryScene: Codable, Sendable, Hashable {
             confidence: try c.decodeIfPresent(Double.self, forKey: .confidence) ?? 1,
             cue: try c.decodeIfPresent(String.self, forKey: .cue),
             // An unknown moment from a newer scorer is ignored, not an error.
-            moment: (try? c.decodeIfPresent(Moment.self, forKey: .moment)) ?? nil
+            moment: (try? c.decodeIfPresent(Moment.self, forKey: .moment)) ?? nil,
+            state: try c.decodeIfPresent(String.self, forKey: .state),
+            // A transition this build does not know plays as a plain change.
+            transition: (try? c.decodeIfPresent(SceneTransition.self, forKey: .transition)) ?? nil
         )
     }
 }
@@ -149,6 +178,7 @@ extension StoryScene: CustomStringConvertible {
     public var description: String {
         let place = placeName.map { "\(placeID ?? "?") \($0)" } ?? (placeID ?? "nowhere")
         let sounds = layers.isEmpty ? "silence" : layers.map { "\($0.key) \($0.level.rawValue)" }.joined(separator: ", ")
-        return "\(place) [\(setting.rawValue)]: \(sounds)" + (moment.map { " <\($0.rawValue)>" } ?? "")
+        return "\(place) [\(setting.rawValue)]" + (state.map { " (\($0))" } ?? "") + ": \(sounds)"
+            + (moment.map { " <\($0.rawValue)>" } ?? "") + (transition.map { " >\($0.rawValue)" } ?? "")
     }
 }

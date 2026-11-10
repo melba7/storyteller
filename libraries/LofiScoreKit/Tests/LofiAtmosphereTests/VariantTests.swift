@@ -182,21 +182,24 @@ final class VariantTests: XCTestCase {
         let memory = try memory(variants: [waterfall])
         let answer = try ClaudeSceneEngine.answer(fromJSON: """
             {"place":"p1","placeName":"the square","setting":"outdoors",
-             "sounds":[{"sound":"oldTown","level":"soft","variant":"church bells"},{"sound":"forest","level":"faint","variant":"waterfall"},
-                       {"sound":"wind","level":"faint","variant":"ghostWail"},{"sound":"rain","level":"faint","variant":""}],
-             "newSounds":[{"id":"churchBells","of":"oldTown","about":"church bells across the square","search":"church bells town"},
+             "sounds":[{"sound":"oldTown","level":"soft","variant":"temple gong"},{"sound":"forest","level":"faint","variant":"waterfall"},
+                       {"sound":"wind","level":"faint","variant":"ghostWail"},{"sound":"rain","level":"faint","variant":""},
+                       {"sound":"crowd.schoolCorridor","level":"loud","variant":""}],
+             "newSounds":[{"id":"templeGong","of":"oldTown","about":"a temple gong across the square","search":"temple gong"},
                           {"id":"pigeons","of":"birdsong","about":"pigeons cooing","search":"pigeons"}],
-             "moment":"swell","world":"","cue":"","confidence":0.8}
+             "moment":"swell","state":"the festival in full swing","world":"","cue":"","confidence":0.8}
             """, memory: memory)
         XCTAssertEqual(Set(answer.scene.layers), [
-            SceneLayer(.oldTown, .soft, variant: "churchBells"),
+            SceneLayer(.oldTown, .soft, variant: "templeGong"),
             SceneLayer(.river, .faint, variant: "waterfall"),
             SceneLayer(.wind, .faint),
             SceneLayer(.rain, .faint),
-        ], "a variant decides its own sound; an unknown variant leaves the plain sound")
-        XCTAssertEqual(answer.newVariants, [SoundVariant(id: "churchBells", of: .oldTown, about: "church bells across the square", search: "church bells town")],
+            SceneLayer(.crowd, .loud, variant: "schoolCorridor"),
+        ], "a variant decides its own sound; an unknown variant leaves the plain sound; family.kind names a catalogue kind")
+        XCTAssertEqual(answer.newVariants, [SoundVariant(id: "templeGong", of: .oldTown, about: "a temple gong across the square", search: "temple gong")],
                        "one new sound per answer, and only one the scene uses")
         XCTAssertEqual(answer.scene.moment, .swell)
+        XCTAssertEqual(answer.scene.state, "the festival in full swing")
 
         let rejected = try ClaudeSceneEngine.answer(fromJSON: """
             {"place":"none","placeName":"","setting":"unclear","sounds":[{"sound":"rain","level":"soft","variant":"heavyRain"}],
@@ -206,6 +209,16 @@ final class VariantTests: XCTestCase {
         XCTAssertEqual(rejected.scene.layers, [SceneLayer(.rain, .soft)])
         XCTAssertEqual(rejected.newVariants, [], "built-in names and variants already offered are not new")
         XCTAssertNil(rejected.scene.moment, "no moment without a place")
+        XCTAssertNil(rejected.scene.state)
+
+        let catalogued = try ClaudeSceneEngine.answer(fromJSON: """
+            {"place":"p1","placeName":"the square","setting":"outdoors","sounds":[{"sound":"oldTown","level":"soft","variant":"churchBells"}],
+             "newSounds":[{"id":"churchBells","of":"oldTown","about":"bells","search":"bells"}],
+             "moment":"none","state":"none","world":"","cue":"","confidence":0.8}
+            """, memory: memory)
+        XCTAssertEqual(catalogued.scene.layers, [SceneLayer(.oldTown, .soft, variant: "churchBells")], "a catalogue kind is always available")
+        XCTAssertEqual(catalogued.newVariants, [], "and never new")
+        XCTAssertNil(catalogued.scene.state, "\"none\" is no state")
 
         let before = try ClaudeSceneEngine.answer(fromJSON: """
             {"place":"p1","placeName":"","setting":"outdoors","sounds":[],"world":"","cue":"","confidence":0.9}
@@ -215,8 +228,11 @@ final class VariantTests: XCTestCase {
     }
 
     func testThePromptOffersSharedVariantsOnceAndTheBooksOwnWithThePassage() throws {
-        let shared = [SoundVariant(id: "cafe", of: .crowd, about: "a cafe: low chatter, cups", search: "cafe ambience")]
-        let own = SoundVariant(id: "churchBells", of: .oldTown, about: "church bells across a town", search: "church bells", firstIndex: 0)
+        let shared = [
+            SoundVariant(id: "zeppelinHangar", of: .machinery, about: "a zeppelin hangar: wind in the girders, distant engines", search: "hangar ambience"),
+            SoundVariant(id: "cafe", of: .crowd, about: "a cafe (already in the catalogue)", search: "cafe ambience"),
+        ]
+        let own = SoundVariant(id: "templeGong", of: .oldTown, about: "a temple gong across a town", search: "temple gong", firstIndex: 0)
         let memory = try memory(variants: [own] + shared)
         let guardian = try SpoilerGuard(chapters: [["One.", "The bells rang out over the square."]])
         let window = try guardian.window(at: try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: 1)))
@@ -224,16 +240,20 @@ final class VariantTests: XCTestCase {
         let body = engine.body(for: window, memory: memory)
         let system = try XCTUnwrap(((body["system"] as? [[String: Any]])?.first)?["text"] as? String)
         let message = try XCTUnwrap(((body["messages"] as? [[String: Any]])?.first)?["content"] as? String)
-        XCTAssertTrue(system.contains("- cafe (crowd): a cafe: low chatter, cups"))
+        XCTAssertTrue(system.contains("- zeppelinHangar (machinery): a zeppelin hangar: wind in the girders, distant engines"))
+        XCTAssertFalse(system.contains("already in the catalogue"), "a shared variant the catalogue has is not listed twice")
+        XCTAssertTrue(system.contains("crowd.cafe:"), "the catalogue lists it")
         XCTAssertTrue(system.contains("swell"))
-        XCTAssertFalse(message.contains("cafe"), "shared variants sit in the cached system prompt only")
-        XCTAssertTrue(message.contains("- churchBells (oldTown): church bells across a town"))
-        XCTAssertTrue(ClaudeScenePrompt.system.contains("available in every book (variant (the sound it is a kind of): what it is): none"))
+        XCTAssertFalse(message.contains("zeppelinHangar"), "shared variants sit in the cached system prompt only")
+        XCTAssertFalse(message.contains("cafe"), "and catalogue kinds too")
+        XCTAssertTrue(message.contains("- templeGong (oldTown): a temple gong across a town"))
+        XCTAssertTrue(ClaudeScenePrompt.system.contains("Specific sounds other books have added (kind (family): what it is): none"))
 
         let properties = try XCTUnwrap(ClaudeScenePrompt.schema["properties"] as? [String: Any])
         XCTAssertNotNil(properties["newSounds"])
         XCTAssertEqual((properties["moment"] as? [String: Any])?["enum"] as? [String], ["none", "swell", "hush"])
-        XCTAssertEqual(engine.id, "claude.haiku-5-5/a3")
+        XCTAssertNotNil(properties["state"])
+        XCTAssertEqual(engine.id, "claude.haiku-5-5/a5")
     }
 
     // MARK: - Builder
@@ -260,9 +280,9 @@ final class VariantTests: XCTestCase {
             var layers = [SceneLayer(.oldTown, .soft)]
             var new: [SoundVariant] = []
             if text.contains("[bells]") {
-                layers = [SceneLayer(.oldTown, .soft, variant: "churchBells")]
-                if memory.variant("churchBells") == nil {
-                    new = [SoundVariant(id: "churchBells", of: .oldTown, about: "church bells", search: "church bells")]
+                layers = [SceneLayer(.oldTown, .soft, variant: "templeGong")]
+                if memory.variant("templeGong") == nil {
+                    new = [SoundVariant(id: "templeGong", of: .oldTown, about: "a temple gong", search: "temple gong")]
                 }
             }
             let scene = StoryScene(placeID: nil, placeName: "the square", setting: .outdoors, layers: layers, confidence: 0.9)
@@ -283,22 +303,23 @@ final class VariantTests: XCTestCase {
         let report = try await builder.build(into: store, engine: engine, concurrency: 2)
 
         let track = store.snapshot
-        let bells = try XCTUnwrap(track.variants.first { $0.id == "churchBells" })
+        let bells = try XCTUnwrap(track.variants.first { $0.id == "templeGong" })
         let first = try XCTUnwrap(bells.firstIndex)
         XCTAssertEqual(bells.of, .oldTown)
         XCTAssertTrue((40...43).contains(first), "refinement pins the first use near its sentence, never before it (\(first))")
-        XCTAssertEqual(track.variants.map(\.id), ["churchBells"], "an offered variant nobody used stays out of the track")
+        XCTAssertEqual(track.variants.map(\.id), ["templeGong"], "an offered variant nobody used stays out of the track")
         for call in engine.offered {
             XCTAssertTrue(call.variants.contains("cafe"), "the starter set is offered everywhere")
-            if call.variants.contains("churchBells") {
+            XCTAssertTrue(call.variants.contains("churchBells"), "and so is the whole catalogue")
+            if call.variants.contains("templeGong") {
                 XCTAssertGreaterThan(call.position, first, "the book's own variant only after a sentence that asked for it")
             }
         }
-        XCTAssertTrue(engine.offered.contains { $0.variants.contains("churchBells") }, "and offered from then on")
+        XCTAssertTrue(engine.offered.contains { $0.variants.contains("templeGong") }, "and offered from then on")
         XCTAssertEqual(report.variants, 1)
         XCTAssertEqual(report.newVariants, 1)
         XCTAssertEqual(track.entry(atOrBefore: first - 1)?.scene.layers.compactMap(\.variant), [], "no bells before they ring")
-        XCTAssertEqual(track.entry(atOrBefore: first)?.scene.layers, [SceneLayer(.oldTown, .soft, variant: "churchBells")])
+        XCTAssertEqual(track.entry(atOrBefore: first)?.scene.layers, [SceneLayer(.oldTown, .soft, variant: "templeGong")])
     }
 
     func testASwellIsPinnedToItsOwnSentence() async throws {
@@ -329,7 +350,9 @@ final class VariantTests: XCTestCase {
                 AmbienceRecording(id: "oldTown/a", file: "OldTown/town.wav", sound: .oldTown, loudness: -23),
                 AmbienceRecording(id: "crowd/a", file: "Crowd/crowd.wav", sound: .crowd, loudness: -23),
             ])
-            player = AmbiencePlayer(library: library, backend: backend, scheduler: scheduler, seed: 5)
+            var config = AtmosphereConfig()
+            config.gapLiftDB = 0
+            player = AmbiencePlayer(library: library, backend: backend, scheduler: scheduler, config: config, seed: 5)
             player.requestNarrationHold = { [unowned self] seconds in
                 requests.append(seconds)
                 return accept
@@ -369,8 +392,8 @@ final class VariantTests: XCTestCase {
         h.narrate(30, then: 0.1)
         XCTAssertEqual(h.requests, [0.8])
         h.scheduler.advance(by: 3.9)
-        // crowd at soft: -18 voice, -28 bed, -3 crowd, -5 soft, file at -23: 31 dB down.
-        let settled = pow(10, -31.0 / 20)
+        // crowd at soft: -18 voice, -24 bed, -3 crowd, -5 soft, file at -23: 27 dB down.
+        let settled = pow(10, -27.0 / 20)
         h.player.narrationHold(began: true)
         h.scheduler.advance(by: 0.6)
         XCTAssertEqual(h.gain("crowd.wav"), settled * pow(10, 8.0 / 20), accuracy: 0.001, "the crowd rises 8 dB while the narrator is quiet")
@@ -416,7 +439,7 @@ final class VariantTests: XCTestCase {
         dropped.player.narrationHold(began: false)
         dropped.player.narrationHold(began: true)
         dropped.scheduler.advance(by: 1)
-        XCTAssertEqual(dropped.gain("crowd.wav"), pow(10, -31.0 / 20), accuracy: 0.001)
+        XCTAssertEqual(dropped.gain("crowd.wav"), pow(10, -27.0 / 20), accuracy: 0.001)
     }
 
     func testAHushCutsTheOldSoundDuringThePause() throws {

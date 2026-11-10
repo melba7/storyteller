@@ -202,7 +202,9 @@ public struct ClaudeSceneEngine: SceneEngine {
         guard let raw = try? JSONDecoder().decode(Answer.self, from: Data(text.utf8)) else {
             throw SceneEngineError.unparseable(text)
         }
-        var available = Dictionary(memory.variants.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var available = Dictionary(
+            (SoundCatalog.starterVariants + memory.variants).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first }
+        )
         var added: [SoundVariant] = []
         for item in raw.newSounds ?? [] where added.count < maxNewVariantsPerAnswer {
             guard let id = SoundVariant.normalizedID(item.id), available[id] == nil,
@@ -217,10 +219,18 @@ public struct ClaudeSceneEngine: SceneEngine {
         }
         var used = Set<String>()
         let layers = raw.sounds.compactMap { item -> SceneLayer? in
-            guard let sound = AmbientSound(rawValue: item.sound) ?? AmbientSound(lenient: item.sound),
-                  let level = AmbientLevel(rawValue: item.level.lowercased())
+            let family = item.sound.split(separator: ".", maxSplits: 1).first.map(String.init) ?? item.sound
+            guard let sound = AmbientSound(rawValue: family) ?? AmbientSound(lenient: family),
+                  let level = AmbientLevel(lenient: item.level)
             else { return nil }
-            if let name = item.variant, let id = SoundVariant.normalizedID(name), let variant = available[id] {
+            // "crowd.cafe" in either field is the kind cafe of crowd.
+            var variantName = item.variant ?? ""
+            if variantName.isEmpty, let dot = item.sound.firstIndex(of: ".") {
+                variantName = String(item.sound[item.sound.index(after: dot)...])
+            } else if let dot = variantName.lastIndex(of: ".") {
+                variantName = String(variantName[variantName.index(after: dot)...])
+            }
+            if let id = SoundVariant.normalizedID(variantName), let variant = available[id] {
                 used.insert(id)
                 // The variant decides which sound it stands in for.
                 return SceneLayer(variant.of, level, variant: id)
@@ -250,6 +260,7 @@ public struct ClaudeSceneEngine: SceneEngine {
         }
         let cue = raw.cue.trimmingCharacters(in: .whitespacesAndNewlines)
         let world = raw.world.trimmingCharacters(in: .whitespacesAndNewlines)
+        let state = (raw.state ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let scene = StoryScene(
             placeID: nil,
             placeName: name.isEmpty ? nil : name,
@@ -257,8 +268,10 @@ public struct ClaudeSceneEngine: SceneEngine {
             layers: layers,
             confidence: raw.confidence,
             cue: cue.isEmpty ? nil : String(cue.prefix(120)),
-            // A moment needs somewhere to happen.
-            moment: place == .none ? nil : raw.moment.flatMap { StoryScene.Moment(rawValue: $0.lowercased()) }
+            // A moment or a transition needs somewhere to happen.
+            moment: place == .none ? nil : raw.moment.flatMap { StoryScene.Moment(rawValue: $0.lowercased()) },
+            state: state.isEmpty || state.lowercased() == "none" ? nil : String(state.prefix(80)),
+            transition: place == .none ? nil : raw.transition.flatMap { SceneTransition(rawValue: $0) ?? SceneTransition(lenient: $0) }
         )
         var oneShot: OneShotMention?
         if let item = raw.oneShot, let sound = OneShotSound(rawValue: item.sound) ?? OneShotSound(lenient: item.sound) {
@@ -333,6 +346,7 @@ public struct ClaudeSceneEngine: SceneEngine {
         let place: String
         let placeName: String
         let setting: String
+        let state: String?
         let sounds: [Sound]
         struct OneShot: Decodable {
             let sound: String
@@ -340,6 +354,8 @@ public struct ClaudeSceneEngine: SceneEngine {
         }
         let newSounds: [NewSound]?
         let moment: String?
+        /// Optional, so answers in the older shape (and the eval set) still read.
+        let transition: String?
         let oneShot: OneShot?
         let world: String
         let cue: String
