@@ -184,6 +184,12 @@ schema, no saved session, and `ANTHROPIC_API_KEY` removed from the child's
 environment. It turns Claude Code's JSON result back into a Messages API
 response, so `ClaudeMoodEngine`, its retries and its usage counts are
 unchanged; "Not logged in" maps to 401 (stop), usage limits to 429 (retry).
+The schema goes at the end of the system prompt and the transport reads
+the first JSON object in the reply (a reply without one is retried): with
+`--json-schema` Claude Code takes two model turns per request, a
+StructuredOutput tool call and a closing message, which sent and cached each
+prompt twice (the Redwood track cost $0.0194 per request, about 1.75 times
+the API estimate). `LOFI_CLAUDE_CODE_SCHEMA=tool` brings the tool back.
 `lofi-eval` picks the route with `LOFI_CLAUDE_VIA=plan|api` (default: the API
 when a key is set, otherwise the plan). `make-tracks.sh` and
 `claude-check.sh` default to `--via plan`. It costs no money but uses the
@@ -206,6 +212,24 @@ sorted, so it is written before the mood), and then for `also`, up to two
 other moods whose music would also suit. Those go into the reading's
 `scores` after the best mood, so playback can keep music that still fits
 instead of switching.
+
+First run on the Mac (2026-11-10, Mo's plan; the per-run caps cut the Opus
+runs to 6 of the 8 test books and Sonnet's EmoBank run to one story, so
+pairs were rescored on the windows both read). On Claude's plausible sets,
+which flatter Claude: Opus p2 76% exact / 92% fits, Opus p3 73% / 89%, Sonnet
+p2 68% / 88%, the local word-9 model 41% / 62%. On EmoBank's clearly rated
+sentences, Opus p3 against the local model: valence rho +0.15 (-0.02 to
++0.27), arousal rho +0.17 (+0.06 to +0.29), right when it takes a side 80%
+against 73%, but it answers calm or mysterious (no side) for about a
+quarter of them, so its share on the right side is lower (58% against 66%,
+-7.8 points, -17.3 to +2.3). Opus p2 was a little behind p3 on every
+EmoBank figure. Tracks use Opus with prompt v3. One run's requests carried
+about 18k input tokens each instead of about 3.5k. It was not the account's
+connectors or skills: on Claude Code 2.1.321 `--strict-mcp-config` and
+`--disable-slash-commands` change a minimal call by under 1%. If it comes
+back, `LOFI_CLAUDE_CODE_ARGS` adds flags to every plan run. A track for a
+121k-word book is about 475 entries and up to 285 probes, estimated at
+$5.30 to $8.49 at Opus list prices.
 
 Next for Claude's reading is a "story so far" note: a short summary of the
 chapters already read (who is who, what is at stake, the book's usual tone)

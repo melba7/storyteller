@@ -165,8 +165,12 @@ enum EngineFactory {
             // account's connectors and skills out of each request.
             let extra = (ProcessInfo.processInfo.environment["LOFI_CLAUDE_CODE_ARGS"] ?? "")
                 .split(whereSeparator: \.isWhitespace).map(String.init)
+            // LOFI_CLAUDE_CODE_SCHEMA=tool passes the answer's schema as
+            // --json-schema (two model turns per request) instead of in the prompt.
+            let asTool = ProcessInfo.processInfo.environment["LOFI_CLAUDE_CODE_SCHEMA"] == "tool"
             return ClaudeMoodEngine(apiKey: "subscription", configuration: configuration, usage: claudeUsage,
-                                    transport: ClaudeCodeTransport(executable: executable, extraArguments: extra))
+                                    transport: ClaudeCodeTransport(executable: executable, extraArguments: extra,
+                                                                   schemaAsTool: asTool))
             #else
             _ = executable
             throw unavailable("claude", "Claude Code runs only on a Mac")
