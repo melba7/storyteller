@@ -74,8 +74,8 @@ final class PlayerTests: XCTestCase {
         XCTAssertEqual(h.audible.count, 1)
         let tavernFire = try XCTUnwrap(h.audible.first)
         XCTAssertTrue(tavernFire.hasPrefix("fire-"))
-        // fire at full: -18 voice, -16 bed, file at -23 LUFS: 11 dB down.
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[tavernFire])), pow(10, -11 / 20), accuracy: 0.002)
+        // fire at full: -18 voice, -10 bed, file at -23 LUFS: 5 dB down.
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[tavernFire])), pow(10, -5.0 / 20), accuracy: 0.002)
 
         // The street arrives at 10 but the tavern has only played 8 s: it waits for the dwell.
         h.narrate(10, then: 4)
@@ -83,9 +83,9 @@ final class PlayerTests: XCTestCase {
         h.scheduler.advance(by: 16)
         XCTAssertEqual(h.audible, ["town.wav", h.audible.first { $0.hasPrefix("rain-") } ?? "missing rain"])
         let rain = try XCTUnwrap(h.audible.first { $0.hasPrefix("rain-") })
-        // town at soft: -18 voice, -16 bed, -5 soft, file at -30: 9 dB down, then the scene
+        // town at soft: -18 voice, -10 bed, -3 soft, file at -30: 1 dB down, then the scene
         // (two sounds at the same level) is trimmed 3 dB so it is no louder than one.
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible["town.wav"])), pow(10, -9 / 20) / 2, accuracy: 0.002,
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible["town.wav"])), pow(10, -1.0 / 20) / 2, accuracy: 0.002,
                        "a quieter file is turned up to the same level")
 
         // The hall has a crowd: the music steps aside, and comes back when the scene moves on.
@@ -198,6 +198,6 @@ final class PlayerTests: XCTestCase {
         XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -17 / 20), accuracy: 0.002)
         h.player.setLevel(dB: 0)
         h.scheduler.advance(by: 2)
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, 1.0 / 20), accuracy: 0.002, "capped at -4 dB, the file turned up 1 dB to get there")
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, 5.0 / 20), accuracy: 0.002, "level with the voice, the file turned up 5 dB to get there")
     }
 }

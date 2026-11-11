@@ -545,7 +545,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
             player.snapshot { continuation.resume(returning: $0) }
         }
         result.atmosphere.place = ambience.scene?.placeName ?? ambience.scene?.placeID
-        result.atmosphere.playing = ambience.voices.filter { $0.playing && !$0.fadingOut }.map(\.sound.rawValue)
+        result.atmosphere.playing = ambience.voices.filter { $0.playing && !$0.fadingOut }.map { $0.variant ?? $0.sound.rawValue }
         result.atmosphere.chapterDip = ambience.dipped
         result.atmosphere.routeMuted = ambience.routeMuted
         result.atmosphere.missingSounds = ambience.missingSounds.map(\.rawValue)
