@@ -11,7 +11,9 @@ public struct AtmosphereConfig: Sendable, Hashable {
     /// (6 is 15.5 dB). A recording was only ever turned down before, so a quiet one (a
     /// running tap at -35 LUFS) stayed far under the level the slider asked for.
     public var maxGain: Double = 6
-    public var voiceLoudnessLUFS: Double = -18
+    /// How loud a narrator is taken to be. Audiobooks are mastered hotter than the -18 this
+    /// began at: Mo's first book measured -15 to -16 LUFS across three chapters.
+    public var voiceLoudnessLUFS: Double = -16
     /// How much is going on, from 0 (only the scene's main sound, the rest cut) to 1 (every
     /// sound the scene has, the quieter ones at their full level, the biggest lifts in the
     /// gaps between sentences). It is a dial next to the volume: turn it down for a calmer

@@ -28,8 +28,8 @@ final class IntensityTests: XCTestCase {
         XCTAssertEqual(h.audible.count, 1, "at zero, only the scene's main sound")
         let fire = try XCTUnwrap(h.audible.first)
         XCTAssertTrue(fire.hasPrefix("fire-"))
-        // fire at full: -18 voice, -10 bed, file at -23: 5 dB down, alone so untrimmed.
-        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -5.0 / 20), accuracy: 0.002)
+        // fire at full: -16 voice, -10 bed, file at -23: 3 dB down, alone so untrimmed.
+        XCTAssertEqual(Double(try XCTUnwrap(h.backend.audible[fire])), pow(10, -3.0 / 20), accuracy: 0.002)
         XCTAssertEqual(h.snapshot.intensity, 0)
 
         h.player.setIntensity(1)
@@ -42,9 +42,9 @@ final class IntensityTests: XCTestCase {
         // The scene is trimmed so that fire + rain (-3) + wind (-8) together are no louder
         // than the fire alone: 10 log10(1 + 0.501 + 0.158) = 2.2 dB off everything.
         let trim = 1 / (1 + pow(10, -0.3) + pow(10, -0.8))
-        XCTAssertEqual(full, pow(10, -5.0 / 20) * trim, accuracy: 0.002)
-        XCTAssertEqual(indoors, pow(10, -8.0 / 20) * trim, accuracy: 0.002)
-        XCTAssertEqual(wind, pow(10, -13.0 / 20) * trim, accuracy: 0.002)
+        XCTAssertEqual(full, pow(10, -3.0 / 20) * trim, accuracy: 0.002)
+        XCTAssertEqual(indoors, pow(10, -6.0 / 20) * trim, accuracy: 0.002)
+        XCTAssertEqual(wind, pow(10, -11.0 / 20) * trim, accuracy: 0.002)
 
         h.player.setIntensity(0.5)
         h.scheduler.advance(by: 6)
@@ -54,8 +54,8 @@ final class IntensityTests: XCTestCase {
         // The rain sits 3 dB further back (half of the 6 dB secondary cut); the fire, being
         // the main sound, only gains from the lighter trim.
         let halfTrim = 1 / (1 + pow(10, -0.6) + pow(10, -1.1))
-        XCTAssertEqual(halfFire, pow(10, -5.0 / 20) * halfTrim, accuracy: 0.002)
-        XCTAssertEqual(halfIndoors, pow(10, -11.0 / 20) * halfTrim, accuracy: 0.002)
+        XCTAssertEqual(halfFire, pow(10, -3.0 / 20) * halfTrim, accuracy: 0.002)
+        XCTAssertEqual(halfIndoors, pow(10, -9.0 / 20) * halfTrim, accuracy: 0.002)
         XCTAssertGreaterThan(halfFire, full, "the main sound comes forward as the rest step back")
 
         h.player.setIntensity(2)
