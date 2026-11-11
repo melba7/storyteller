@@ -4,8 +4,9 @@
  * app.config.ts builds upstream's config and then passes it through
  * `withForkIdentity` (the LOFI-FORK lines there), so the fork gets its own
  * name and bundle ID and installs next to the official Storyteller app instead
- * of replacing it. Change the values here, never in app.config.ts, so upstream
- * syncs keep merging cleanly.
+ * of replacing it. It also adds the pods for the fork's atmosphere module.
+ * Change the values here, never in app.config.ts, so upstream syncs keep
+ * merging cleanly.
  *
  * app.config.ts imports this file with its `.ts` extension, because Expo loads
  * app.config.ts with Node's `require`, which only finds TypeScript files by
@@ -36,6 +37,65 @@ export const forkIdentity: ForkIdentity = {
   appId: "io.github.melba7.storytellerlofi",
 }
 
+/**
+ * The Swift package in libraries/LofiScoreKit, built from source by CocoaPods
+ * for the fork's atmosphere module (modules/lofi-score). Each target has a
+ * podspec next to Package.swift. The path is relative to the generated `ios`
+ * folder. (The shelved music's pods live in shelved/lofi-music.)
+ */
+const lofiScorePods = [
+  "LofiScoreCore",
+  "LofiText",
+  "LofiMood",
+  "LofiAudioCore",
+  "LofiAtmosphere",
+  "LofiScoreHost",
+].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" }))
+
+type PluginEntry = NonNullable<ExpoConfig["plugins"]>[number]
+
+interface BuildPropertiesOptions {
+  ios?: { extraPods?: unknown[] }
+}
+
+/**
+ * Adds the LofiScoreKit pods to expo-build-properties' `ios.extraPods`, next
+ * to upstream's own extra pods.
+ */
+export function withLofiScorePods(plugins: PluginEntry[]): PluginEntry[] {
+  return plugins.map((entry) => {
+    const [name, options] = (Array.isArray(entry) ? entry : [entry]) as [
+      unknown,
+      BuildPropertiesOptions | undefined,
+    ]
+    if (name !== "expo-build-properties") return entry
+    const ios = options?.ios ?? {}
+    return [
+      "expo-build-properties",
+      {
+        ...options,
+        ios: {
+          ...ios,
+          extraPods: [...(ios.extraPods ?? []), ...lofiScorePods],
+        },
+      },
+    ]
+  })
+}
+
+/**
+ * Which atmosphere recordings the build may play, read by LofiScoreKit from
+ * the Info.plist key `LofiScoreSoundEdition`. "personal" (the default, for
+ * your own builds) may play recordings that are licensed for personal use
+ * only; "publish" leaves them out, for a build that goes on the App Store.
+ * Build with LOFI_SOUND_EDITION=publish to get the publishing edition.
+ */
+export function soundEdition(
+  value: string | undefined = process.env["LOFI_SOUND_EDITION"],
+): "personal" | "publish" {
+  return value?.trim().toLowerCase() === "publish" ? "publish" : "personal"
+}
+
 export function withForkIdentity(
   upstreamConfig: (context: ConfigContext) => ExpoConfig,
 ): (context: ConfigContext) => ExpoConfig {
@@ -50,6 +110,10 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const ios: NonNullable<ExpoConfig["ios"]> = {
     ...config.ios,
     bundleIdentifier: appId,
+    infoPlist: {
+      ...config.ios?.infoPlist,
+      LofiScoreSoundEdition: soundEdition(),
+    },
   }
   // Set by .github/workflows/testflight.yml: every TestFlight upload needs its
   // own build number, and the signing team for an App Store build.
@@ -64,6 +128,7 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
     slug: forkIdentity.slug,
     ios,
     android: { ...config.android, package: appId },
+    plugins: withLofiScorePods(config.plugins ?? []),
   }
 
   // Upstream's EAS account and project belong to upstream. Drop them unless

@@ -1,0 +1,51 @@
+{
+ "title": "Readings ahead of the playhead are refused",
+ "duration": 20,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 1,
+   "playhead": 2
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "calm",
+    "confidence": 0.7
+   },
+   "expect": "calm"
+  },
+  {
+   "t": 10,
+   "playhead": 5
+  },
+  {
+   "t": 11,
+   "index": 40,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.95,
+    "valence": -0.6,
+    "arousal": 0.95
+   },
+   "expect": "calm",
+   "note": "reading for sentence 40 while sentence 5 plays"
+  },
+  {
+   "t": 12,
+   "index": 41,
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.95,
+    "valence": -0.6,
+    "arousal": 0.95
+   },
+   "expect": "calm"
+  }
+ ]
+}

@@ -1,0 +1,32 @@
+.build/
+.swiftpm/
+*.xcodeproj/
+!Demo/LofiScoreDemo.xcodeproj/
+Demo/LofiScoreDemo.xcodeproj/xcuserdata/
+Demo/LofiScoreDemo.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+Tools/data/work/
+Tools/data/books/
+*.mlmodel
+*.mlmodelc
+__pycache__/
+.DS_Store
+
+# Music never goes into git: the fork is public and the tracks are Mo's (or CC0
+# downloads kept on the Mac). Placeholders are synthesised at run time.
+/Library/
+/LofiMusic/
+/PlaceholderLibrary/
+*.m4a
+*.mp3
+*.aac
+*.wav
+*.aif
+*.aiff
+*.aifc
+*.caf
+*.flac
+*.ogg
+*.opus
+# ...except the tiny test fixtures the text side ships.
+!Tests/**/Fixtures/**

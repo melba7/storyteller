@@ -1,0 +1,320 @@
+{"id": "a-christmas-carol:0:66", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:0:72", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:0:98", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:0:120", "bucket": "calm", "accept": ["calm", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:0:180", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:0:244", "bucket": "mysterious", "accept": ["mysterious", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:22", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:69", "bucket": "mysterious", "accept": ["mysterious", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:71", "bucket": "playful", "accept": ["playful", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:230", "bucket": "calm", "accept": ["calm", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:240", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:286", "bucket": "romantic", "accept": ["romantic", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:291", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:298", "bucket": "melancholy", "accept": ["melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:299", "bucket": "melancholy", "accept": ["melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:1:314", "bucket": "mysterious", "accept": ["mysterious", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:60", "bucket": "cozy", "accept": ["cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:88", "bucket": "dreamy", "accept": ["dreamy", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:99", "bucket": "cozy", "accept": ["cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:109", "bucket": "cozy", "accept": ["cozy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:129", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:191", "bucket": "cozy", "accept": ["cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:207", "bucket": "dreamy", "accept": ["dreamy", "mysterious", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:218", "bucket": "cozy", "accept": ["cozy", "playful", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:276", "bucket": "playful", "accept": ["playful", "romantic"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:310", "bucket": "mysterious", "accept": ["mysterious", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:2:329", "bucket": "somber", "accept": ["somber", "tense"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:32", "bucket": "somber", "accept": ["somber", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:40", "bucket": "somber", "accept": ["somber", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:86", "bucket": "mysterious", "accept": ["mysterious", "somber"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:90", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:111", "bucket": "mysterious", "accept": ["mysterious", "somber"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:156", "bucket": "somber", "accept": ["somber"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:187", "bucket": "hopeful", "accept": ["hopeful", "somber"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:191", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:254", "bucket": "melancholy", "accept": ["melancholy", "somber"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:276", "bucket": "somber", "accept": ["somber", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:3:286", "bucket": "somber", "accept": ["somber", "tense"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:4:113", "bucket": "cozy", "accept": ["cozy", "hopeful", "playful"], "labeller": "claude-g2-sets"}
+{"id": "a-christmas-carol:4:151", "bucket": "hopeful", "accept": ["hopeful", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:0:8", "bucket": "calm", "accept": ["calm", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:3:14", "bucket": "dreamy", "accept": ["dreamy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:3:67", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:4:14", "bucket": "playful", "accept": ["playful", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:4:16", "bucket": "playful", "accept": ["playful", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:4:65", "bucket": "melancholy", "accept": ["melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:5:35", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:5:40", "bucket": "melancholy", "accept": ["melancholy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:7:9", "bucket": "playful", "accept": ["playful", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:7:37", "bucket": "dreamy", "accept": ["dreamy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:7:59", "bucket": "melancholy", "accept": ["melancholy", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:9:28", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:10:57", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:14:100", "bucket": "tense", "accept": ["tense", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:14:127", "bucket": "playful", "accept": ["playful", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:14:163", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:15:70", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:18", "bucket": "melancholy", "accept": ["melancholy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:27", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:35", "bucket": "hopeful", "accept": ["hopeful", "cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:43", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:55", "bucket": "cozy", "accept": ["cozy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:16:64", "bucket": "cozy", "accept": ["cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:18:48", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:18:110", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:21:20", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:26:55", "bucket": "playful", "accept": ["playful", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:26:68", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:28:23", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:31:51", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:31:97", "bucket": "hopeful", "accept": ["hopeful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:32:92", "bucket": "tense", "accept": ["tense", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:32:97", "bucket": "romantic", "accept": ["romantic", "calm"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:35:54", "bucket": "melancholy", "accept": ["melancholy", "somber"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:35:63", "bucket": "calm", "accept": ["calm", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:36:37", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:37:13", "bucket": "melancholy", "accept": ["melancholy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:37:36", "bucket": "hopeful", "accept": ["hopeful", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:37:64", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "anne-of-green-gables:37:70", "bucket": "hopeful", "accept": ["hopeful", "romantic", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:3:15", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:3:69", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:4:214", "bucket": "playful", "accept": ["playful", "hopeful", "romantic"], "labeller": "claude-g2-sets"}
+{"id": "dracula:5:11", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:5:98", "bucket": "calm", "accept": ["calm", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:5:238", "bucket": "mysterious", "accept": ["mysterious", "calm", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:6:19", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:7:41", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:7:102", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:7:159", "bucket": "mysterious", "accept": ["mysterious", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:7:216", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:9:49", "bucket": "tense", "accept": ["tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "dracula:10:100", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:11:141", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:11:269", "bucket": "cozy", "accept": ["cozy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:12:9", "bucket": "somber", "accept": ["somber"], "labeller": "claude-g2-sets"}
+{"id": "dracula:13:93", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:14:16", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:14:144", "bucket": "mysterious", "accept": ["mysterious", "somber"], "labeller": "claude-g2-sets"}
+{"id": "dracula:14:242", "bucket": "somber", "accept": ["somber", "tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:16:131", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:16:246", "bucket": "melancholy", "accept": ["melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:17:71", "bucket": "tense", "accept": ["tense", "mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:17:89", "bucket": "hopeful", "accept": ["hopeful", "adventurous", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:17:190", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:19:182", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:20:89", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "dracula:20:168", "bucket": "somber", "accept": ["somber", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:21:87", "bucket": "tense", "accept": ["tense", "calm", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "dracula:21:145", "bucket": "hopeful", "accept": ["hopeful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:22:131", "bucket": "tense", "accept": ["tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "dracula:23:220", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:25:87", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:25:97", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:25:104", "bucket": "tense", "accept": ["tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "dracula:26:41", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:26:103", "bucket": "tense", "accept": ["tense", "adventurous", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "dracula:27:56", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "dracula:27:93", "bucket": "cozy", "accept": ["cozy", "calm"], "labeller": "claude-g2-sets"}
+{"id": "dracula:27:191", "bucket": "tense", "accept": ["tense", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:0:4", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:0:63", "bucket": "somber", "accept": ["somber", "melancholy", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:1:84", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:2:81", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:4:98", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:5:40", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:5:107", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:6:16", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:7:41", "bucket": "somber", "accept": ["somber", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:8:115", "bucket": "calm", "accept": ["calm", "romantic"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:8:120", "bucket": "mysterious", "accept": ["mysterious", "somber"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:11:5", "bucket": "tense", "accept": ["tense", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:11:25", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:13:63", "bucket": "playful", "accept": ["playful", "romantic"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:14:24", "bucket": "tense", "accept": ["tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:15:96", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:16:70", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:17:64", "bucket": "melancholy", "accept": ["melancholy", "romantic"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:18:33", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:19:53", "bucket": "melancholy", "accept": ["melancholy", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:21:71", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:23:7", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:24:40", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:26:28", "bucket": "mysterious", "accept": ["mysterious", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:28:10", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:28:25", "bucket": "melancholy", "accept": ["melancholy", "somber"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:30:27", "bucket": "hopeful", "accept": ["hopeful", "romantic", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:31:56", "bucket": "tense", "accept": ["tense", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:32:43", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:33:57", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:35:48", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:38:8", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:38:50", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:39:26", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:39:68", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:39:80", "bucket": "mysterious", "accept": ["mysterious", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:41:56", "bucket": "hopeful", "accept": ["hopeful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:42:9", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:42:56", "bucket": "calm", "accept": ["calm", "tense"], "labeller": "claude-g2-sets"}
+{"id": "heart-of-a-mystery:42:65", "bucket": "melancholy", "accept": ["melancholy", "calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:0:61", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:0:90", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:2:50", "bucket": "mysterious", "accept": ["mysterious", "playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:2:103", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:2:126", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:17", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:79", "bucket": "playful", "accept": ["playful", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:90", "bucket": "playful", "accept": ["playful", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:102", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:115", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:3:145", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:4:42", "bucket": "mysterious", "accept": ["mysterious", "playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:4:66", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:5:25", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:6:62", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:6:86", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:6:90", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:6:183", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:6:229", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:7:16", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:7:29", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:8:107", "bucket": "hopeful", "accept": ["hopeful", "mysterious", "playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:8:120", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:8:143", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:8:265", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:8:267", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:9:17", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:9:71", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:10:23", "bucket": "calm", "accept": ["calm", "mysterious", "playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:10:120", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:10:160", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:10:166", "bucket": "mysterious", "accept": ["mysterious", "adventurous", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:10:202", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:11:127", "bucket": "somber", "accept": ["somber", "tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:11:137", "bucket": "somber", "accept": ["somber", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:11:140", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:11:162", "bucket": "mysterious", "accept": ["mysterious", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:11:182", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:12:100", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "hound-of-the-baskervilles:13:116", "bucket": "hopeful", "accept": ["hopeful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:0:72", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:1:36", "bucket": "hopeful", "accept": ["hopeful", "playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:1:39", "bucket": "hopeful", "accept": ["hopeful", "playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:2:75", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:2:77", "bucket": "melancholy", "accept": ["melancholy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:2:136", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:2:138", "bucket": "melancholy", "accept": ["melancholy", "somber", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:3:12", "bucket": "cozy", "accept": ["cozy", "playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:4:81", "bucket": "calm", "accept": ["calm", "cozy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:4:175", "bucket": "calm", "accept": ["calm", "tense", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:5:45", "bucket": "mysterious", "accept": ["mysterious", "tense", "calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:7:88", "bucket": "hopeful", "accept": ["hopeful", "cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:18", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:37", "bucket": "hopeful", "accept": ["hopeful", "melancholy", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:72", "bucket": "hopeful", "accept": ["hopeful", "cozy", "playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:77", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:79", "bucket": "playful", "accept": ["playful", "melancholy", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:101", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:8:132", "bucket": "mysterious", "accept": ["mysterious", "hopeful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:10:80", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:10:87", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:10:94", "bucket": "tense", "accept": ["tense", "playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:11:138", "bucket": "melancholy", "accept": ["melancholy", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:12:57", "bucket": "melancholy", "accept": ["melancholy", "somber"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:13:58", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:13:83", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:14:90", "bucket": "playful", "accept": ["playful", "calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:15:13", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:15:22", "bucket": "playful", "accept": ["playful", "romantic", "calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:15:23", "bucket": "calm", "accept": ["calm"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:16:217", "bucket": "calm", "accept": ["calm", "playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:17:5", "bucket": "melancholy", "accept": ["melancholy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:17:97", "bucket": "hopeful", "accept": ["hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:17:191", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:17:244", "bucket": "cozy", "accept": ["cozy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:17:247", "bucket": "cozy", "accept": ["cozy", "melancholy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:18:127", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:19:16", "bucket": "hopeful", "accept": ["hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:19:21", "bucket": "calm", "accept": ["calm", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "polly-of-lady-gay-cottage:19:68", "bucket": "cozy", "accept": ["cozy", "hopeful", "playful"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:2:18", "bucket": "mysterious", "accept": ["mysterious", "tense", "calm"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:3:68", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:3:85", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:4:75", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:5:75", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:5:114", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:5:117", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:12", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:14", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:28", "bucket": "mysterious", "accept": ["mysterious", "tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:39", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:82", "bucket": "mysterious", "accept": ["mysterious", "tense", "somber"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:6:103", "bucket": "somber", "accept": ["somber", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:7:29", "bucket": "mysterious", "accept": ["mysterious", "calm"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:9:57", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:10:38", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:13:82", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:14:30", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:15:7", "bucket": "mysterious", "accept": ["mysterious", "calm", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:15:8", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:15:10", "bucket": "mysterious", "accept": ["mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:15:27", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:15:72", "bucket": "calm", "accept": ["calm", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:16:72", "bucket": "melancholy", "accept": ["melancholy", "tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:17:27", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:17:33", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:17:61", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:19:16", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:19:18", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:20:119", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:20:125", "bucket": "mysterious", "accept": ["mysterious", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:20:135", "bucket": "tense", "accept": ["tense", "hopeful", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:21:50", "bucket": "mysterious", "accept": ["mysterious", "calm", "tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:21:53", "bucket": "mysterious", "accept": ["mysterious", "tense", "calm"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:9", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:53", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:104", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:105", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:109", "bucket": "tense", "accept": ["tense"], "labeller": "claude-g2-sets"}
+{"id": "turn-of-the-screw:23:123", "bucket": "somber", "accept": ["somber"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:0:56", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:0:91", "bucket": "mysterious", "accept": ["mysterious", "calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:0:148", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:0:182", "bucket": "cozy", "accept": ["cozy", "hopeful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:1:4", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:2:49", "bucket": "tense", "accept": ["tense", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:2:163", "bucket": "playful", "accept": ["playful", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:2:166", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:3:58", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:3:132", "bucket": "calm", "accept": ["calm", "adventurous", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:3:133", "bucket": "calm", "accept": ["calm", "hopeful", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:4:16", "bucket": "cozy", "accept": ["cozy", "calm", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:4:112", "bucket": "playful", "accept": ["playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:4:141", "bucket": "cozy", "accept": ["cozy", "hopeful", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:4:168", "bucket": "cozy", "accept": ["cozy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:5:59", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:5:73", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:5:77", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:5:117", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:6:12", "bucket": "calm", "accept": ["calm", "playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:6:14", "bucket": "melancholy", "accept": ["melancholy", "tense"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:6:76", "bucket": "dreamy", "accept": ["dreamy", "mysterious"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:6:97", "bucket": "mysterious", "accept": ["mysterious", "dreamy", "melancholy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:12", "bucket": "calm", "accept": ["calm", "playful", "cozy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:35", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:56", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:98", "bucket": "hopeful", "accept": ["hopeful", "playful", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:126", "bucket": "hopeful", "accept": ["hopeful", "adventurous", "tense"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:7:137", "bucket": "adventurous", "accept": ["adventurous", "tense"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:8:31", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:8:54", "bucket": "melancholy", "accept": ["melancholy", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:8:148", "bucket": "melancholy", "accept": ["melancholy", "dreamy"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:9:52", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:9:80", "bucket": "playful", "accept": ["playful", "tense"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:9:85", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:10:60", "bucket": "tense", "accept": ["tense", "playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:10:117", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:10:138", "bucket": "playful", "accept": ["playful"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:10:187", "bucket": "playful", "accept": ["playful", "adventurous"], "labeller": "claude-g2-sets"}
+{"id": "wind-in-the-willows:11:21", "bucket": "playful", "accept": ["playful", "adventurous", "tense"], "labeller": "claude-g2-sets"}

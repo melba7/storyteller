@@ -17,6 +17,7 @@ import "./listeners/serverListeners"
 import "./listeners/sleepTimerListener"
 import "./listeners/syncListeners"
 import "./listeners/themeListener"
+import "@/lofi/readerFollow" // LOFI-FORK: sounds while reading, see FORK.md
 import { localApi } from "./localApi"
 import { serverApi } from "./serverApi"
 import { bookshelfSlice } from "./slices/bookshelfSlice"

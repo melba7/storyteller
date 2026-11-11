@@ -150,7 +150,7 @@ public actor AudiobookPlayerActor {
 
         remoteCommandCenter.playCommand.addTarget { event in
             Task { @AudiobookPlayerActor in
-                if await AudiobookPlayerActor.shared.player.timeControlStatus == .playing {
+                if await AudiobookPlayerActor.shared.getIsPlaying() { // LOFI-FORK: a narration hold counts as playing
                     await AudiobookPlayerActor.shared.pause()
                 } else {
                     await AudiobookPlayerActor.shared.play(automaticRewind: true)
@@ -162,7 +162,7 @@ public actor AudiobookPlayerActor {
 
         remoteCommandCenter.togglePlayPauseCommand.addTarget { event in
             Task { @AudiobookPlayerActor in
-                if await AudiobookPlayerActor.shared.player.timeControlStatus == .playing {
+                if await AudiobookPlayerActor.shared.getIsPlaying() { // LOFI-FORK: a narration hold counts as playing
                     await AudiobookPlayerActor.shared.pause()
                 } else {
                     await AudiobookPlayerActor.shared.play(automaticRewind: true)
@@ -266,7 +266,7 @@ public actor AudiobookPlayerActor {
     }
 
     func getIsPlaying() -> Bool {
-        return player.timeControlStatus == .playing
+        return player.timeControlStatus == .playing || lofiHoldIsActive // LOFI-FORK: a narration hold counts as playing
     }
 
     func getPosition() -> Double {
@@ -331,6 +331,7 @@ public actor AudiobookPlayerActor {
     }
 
     func play(automaticRewind: Bool) async {
+        if lofiResumeHeldNarration() { return } // LOFI-FORK: play during a narration hold carries on now, with no rewind
         guard automaticRewind && self.automaticRewind else {
             player.play()
             player.rate = Float(playbackRate)
@@ -351,6 +352,7 @@ public actor AudiobookPlayerActor {
     }
 
     func pause() {
+        if lofiEndHold() { lofiReportPaused() } // LOFI-FORK: a pause ends a narration hold
         player.pause()
     }
 
@@ -376,6 +378,7 @@ public actor AudiobookPlayerActor {
 
         sleepTimerDeadline = nil
         sleepTimerTask = nil
+        if lofiEndHold() { lofiReportPaused() } // LOFI-FORK: the sleep timer ends a narration hold
         player.pause()
         sleepTimerExpiredCallbacks.forEach { $0(deadline) }
     }
@@ -634,6 +637,7 @@ public actor AudiobookPlayerActor {
         isPlayingObserver = player.observe(\.timeControlStatus, options: []) {
             _, _ in
             Task { @AudiobookPlayerActor in
+                if await AudiobookPlayerActor.shared.lofiHoldOwnsPlayerState() { return } // LOFI-FORK: a narration hold is not a pause
                 if await AudiobookPlayerActor.shared.player.timeControlStatus == .paused {
                     await AudiobookPlayerActor.shared.setLastPaused(date: Date.now)
                 }
@@ -800,4 +804,15 @@ func searchForClip(clips: [OverlayPar], position: Double) -> OverlayPar? {
         return midItem
     }
     return nil
+}
+
+// LOFI-FORK: access for the lofi narration hold in LofiNarratorBridge.swift (see FORK.md).
+extension AudiobookPlayerActor {
+    var lofiPlayer: AVPlayer { player }
+    var lofiPlaybackRate: Double { playbackRate }
+    func lofiClips(relativeUri: String) -> [OverlayPar] { relativeUriToClips[relativeUri] ?? [] }
+    func lofiReportPaused() {
+        lastPaused = Date.now
+        isPlayingChangedCallbacks.forEach { $0(false) }
+    }
 }

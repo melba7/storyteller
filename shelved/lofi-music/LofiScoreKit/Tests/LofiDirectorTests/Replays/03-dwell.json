@@ -1,0 +1,74 @@
+{
+ "title": "Minimum dwell holds a confirmed change",
+ "duration": 90,
+ "events": [
+  {
+   "t": 0,
+   "playing": true
+  },
+  {
+   "t": 2,
+   "index": 2,
+   "trigger": "start",
+   "reading": {
+    "bucket": "tense",
+    "confidence": 0.5
+   },
+   "expect": "tense",
+   "note": "first reading sets the mood"
+  },
+  {
+   "t": 12,
+   "index": 4,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 22,
+   "index": 6,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 32,
+   "index": 8,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   }
+  },
+  {
+   "t": 42,
+   "index": 10,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   },
+   "expect": "tense",
+   "note": "cozy has led for 20 s, but the music is only 40 s into its 60 s dwell"
+  },
+  {
+   "t": 52,
+   "index": 12,
+   "reading": {
+    "bucket": "cozy",
+    "confidence": 0.75
+   },
+   "expect": "tense"
+  },
+  {
+   "t": 61,
+   "expect": "tense",
+   "note": "still inside the dwell"
+  },
+  {
+   "t": 63,
+   "expect": "cozy",
+   "note": "the held change fires on its own when the dwell ends at 62 s"
+  }
+ ]
+}

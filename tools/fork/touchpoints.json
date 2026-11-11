@@ -7,15 +7,43 @@
     "applications/mobile/fork.config.ts",
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
+    "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
+    "applications/web/src/app/api/v2/books/[bookId]/lofi-score/",
     "libraries/LofiScoreKit/",
+    "shelved/",
     "tools/fork/",
     "tools/lofi-library/"
   ],
   "touchpoints": [
     {
+      "file": "README.md",
+      "markers": 2,
+      "purpose": "A short banner at the top of upstream's README saying what this fork adds and pointing at FORK.md."
+    },
+    {
       "file": "applications/mobile/app.config.ts",
       "markers": 3,
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
+    },
+    {
+      "file": "applications/mobile/app/(root)/settings.tsx",
+      "markers": 2,
+      "purpose": "Shows the atmosphere sounds' section (on and off, volume, how much is going on, the car, importing a sounds folder) under the reading settings."
+    },
+    {
+      "file": "applications/mobile/components/Toolbar.tsx",
+      "markers": 2,
+      "purpose": "Adds the atmosphere sounds button to the player's toolbar for readaloud books, in both the read-along and listening screens."
+    },
+    {
+      "file": "applications/mobile/store/store.ts",
+      "markers": 1,
+      "purpose": "Imports lofi/readerFollow.ts for its listeners, so the sounds follow the pages while the listener reads a readaloud book on screen with the narration stopped."
+    },
+    {
+      "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",
+      "markers": 8,
+      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer."
     }
   ],
   "allowedChanges": [],
