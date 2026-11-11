@@ -88,6 +88,27 @@ final class SoundTests: XCTestCase {
         XCTAssertEqual(try AmbienceLibrary.load(from: folder.appendingPathComponent("nowhere")).recordings, [])
     }
 
+    func testTheLibraryLeavesOutTheFilesTheManifestRejects() throws {
+        let folder = try temporaryFolder()
+        for file in ["River.RunningTap/tap.m4a", "River.RunningTap/drip.m4a", "River/stream.m4a", "River/quiet.m4a"] {
+            let url = folder.appendingPathComponent(file)
+            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try Data([0]).write(to: url)
+        }
+        // As the fetch script writes it: a poor loop stays in the folder (nothing deletes
+        // from the copy in iCloud) and is named here, whether or not it is still listed.
+        let json = """
+        {"version": 1,
+         "sounds": [{"id": "river/stream", "file": "River/stream.m4a", "sound": "river", "loudness": -27, "range": 4.2},
+                    {"id": "river/quiet", "file": "River/quiet.m4a", "sound": "river", "loudness": -48}],
+         "rejected": [{"file": "River.RunningTap/drip.m4a", "id": "river.runningTap/drip", "title": "Faucet Drip", "why": "drips"},
+                      {"file": "River/quiet.m4a", "why": "too quiet"}]}
+        """
+        try Data(json.utf8).write(to: folder.appendingPathComponent(AmbienceLibrary.manifestName))
+        let library = try AmbienceLibrary.load(from: folder)
+        XCTAssertEqual(library.recordings.map(\.file), ["River.RunningTap/tap.m4a", "River/stream.m4a"])
+    }
+
     func testTheSameKeyAlwaysGetsTheSameRecording() {
         let library = PlayerTests.library
         let first = library.recording(of: .fireplace, key: "book|p1|fireplace")

@@ -334,6 +334,12 @@ sound. So:
   Pausing, seeking and a narration hold end it too. Reading on screen has no sentence
   timing, so no lift.
 - Each sound gets a light presence dip (3 dB) around 2.5 kHz, where speech is clearest.
+- The narrator is taken to be at -16 LUFS (Mo's first book measured -15 to -16).
+- The fetch script keeps poor loops out: a title that says it drips under running water or
+  is a set of separate events, a steady sound whose loudness range is over 12 LU, anything
+  under -45 LUFS. Each run checks the loops already fetched the same way; a poor one stays
+  in the folder (nothing deletes from the copy in iCloud) and `sounds.json` names it under
+  `rejected`, which the app skips.
 
 The 48 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,

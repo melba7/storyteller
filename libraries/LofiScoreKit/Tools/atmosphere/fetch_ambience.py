@@ -28,7 +28,11 @@ this script (written by `lofi-atmosphere catalog`, kept in step by a test):
     (~/Storyteller Lofi/tracks/*.atmosphere.json and *.score.json);
   - the one-off sounds (a knock, a clap of thunder), --per-one-shot each:
     short single sounds, trimmed of silence, not looped.
-Runs add what is missing, so run it again after scoring new books. One run at a
+Runs add what is missing, so run it again after scoring new books. Each run also
+checks the loops it already has and leaves the poor ones out (a drip under a
+running tap, a sound that comes and goes, one too quiet to turn up): their
+files stay, sounds.json lists them under "rejected", the app skips them, and
+the run looks for better ones (--no-audit to skip the check). One run at a
 time writes a folder; a second one waits for it. When the catalogue moves a
 kind to another family (an office is now a kind of electric hum, not of
 machinery), the run moves its folder and credits along.
@@ -119,6 +123,29 @@ ONE_SHOT_AVOID = re.compile(
     re.I,
 )
 
+# A looped sound has to be one steady stretch: not something struck, switched on and off,
+# or a set of separate takes.
+UNSTEADY = re.compile(
+    r"\b(percussion|foley|one ?shot|turn(s|ed|ing)? (on|off)|on and off|on off|squeak|compilation|collection|various|sfx pack)\b",
+    re.I,
+)
+# Running water is not a drip: a "faucet drip" matched a running tap by the word "faucet".
+DRIPS = re.compile(r"\b(drip|drips|dripping|droplet|droplets|leak|leaks|leaking|leaky)\b", re.I)
+RUNNING_WATER = {"river"}
+
+# A bed that comes and goes, or is next to silent, is no bed. Measured on the finished
+# loop: its loudness range (EBU R 128 LRA; a dripping tap measured 20 LU, a stream 3 to 6)
+# and its loudness (the app turns a quiet recording up, but only about 15 dB).
+MAX_RANGE = 12.0
+MIN_LOUDNESS = -45.0
+# The families that are one steady texture, where a wide range means a poor recording.
+# The rest (thunder, a town with bells, footsteps, a kitchen) are uneven by nature.
+STEADY = {
+    "rain", "heavyRain", "rainIndoors", "wind", "strongWind", "snow", "fireplace", "campfire", "openSea", "river",
+    "forest", "nightInsects", "nightForest", "swamp", "roomTone", "hushedRoom", "murmur", "emptyHall", "electricHum",
+    "machinery", "motorVehicle", "aircraft", "spaceship", "deepDrone",
+}
+
 # Words too general to show that a recording is of the sound being searched for.
 GENERIC = {
     "a", "an", "and", "at", "by", "in", "of", "on", "the", "with",
@@ -151,7 +178,27 @@ def names_the_sound(candidate, keys):
     turns up under rain. The title has to name it."""
     if not keys:
         return True
-    return any(w.startswith(k) for w in re.findall(r"[a-z]+", candidate["match"].lower()) for k in keys)
+    words = re.findall(r"[a-z]+", candidate["match"].lower())
+    # A short key has to be the whole word: "tap" is not "tape".
+    return any((w.startswith(k) if len(k) > 3 else stem(w) == k) for w in words for k in keys)
+
+
+def title_reason(sound, text):
+    """Why a looped recording's title (and tags) rules it out, or None."""
+    if UNSTEADY.search(text):
+        return "title or tags suggest separate events, not one steady sound"
+    if sound in RUNNING_WATER and DRIPS.search(text):
+        return "title or tags say it drips, and this sound is running water"
+    return None
+
+
+def level_reason(sound, level, spread):
+    """Why a finished loop's measured loudness rules it out, or None."""
+    if level is not None and level < MIN_LOUDNESS:
+        return f"too quiet to turn up ({level:.1f} LUFS)"
+    if sound in STEADY and spread is not None and spread > MAX_RANGE:
+        return f"comes and goes (loudness range {spread:.1f} LU)"
+    return None
 
 
 LABELS = {
@@ -421,13 +468,46 @@ def make_loop(source, target, start, length):
         wav.unlink(missing_ok=True)
 
 
-def loudness(path):
+def measure(path):
+    """Integrated loudness in LUFS and loudness range in LU (either may be None)."""
     out = subprocess.run(
         ["ffmpeg", "-hide_banner", "-nostats", "-i", str(path), "-af", "ebur128=framelog=quiet", "-f", "null", "-"],
         capture_output=True, text=True,
     )
-    found = re.findall(r"I:\s+(-?[0-9.]+) LUFS", out.stderr)
-    return float(found[-1]) if found else None
+    level = re.findall(r"I:\s+(-?[0-9.]+) LUFS", out.stderr)
+    spread = re.findall(r"LRA:\s+([0-9.]+) LU", out.stderr)
+    return (float(level[-1]) if level else None, float(spread[-1]) if spread else None)
+
+
+def loudness(path):
+    return measure(path)[0]
+
+
+def audit(out, manifest, dry_run):
+    """Takes the poor loops out of the list: drips for running water, sounds that come and
+    go, ones too quiet to turn up. Their files stay where they are, and sounds.json names
+    them under "rejected" so the app leaves them alone and a later run does not fetch them
+    again. Returns how many it took out."""
+    rejected = manifest.setdefault("rejected", [])
+    kept, out_now = [], 0
+    for entry in manifest["sounds"]:
+        path = out / entry["file"]
+        if "range" not in entry and path.is_file() and not dry_run:
+            level, spread = measure(path)
+            entry["range"] = spread
+            if entry.get("loudness") is None and level is not None:
+                entry["loudness"] = round(level, 1)
+        why = title_reason(entry["sound"], entry.get("title") or "") or level_reason(entry["sound"], entry.get("loudness"), entry.get("range"))
+        if why is None:
+            kept.append(entry)
+            continue
+        out_now += 1
+        note(f"{entry['file']}: {'would leave' if dry_run else 'left'} out, {why} ({entry.get('title')})")
+        if not dry_run:
+            rejected.append({"file": entry["file"], "id": entry["id"], "title": entry.get("title"), "source": entry.get("source"), "why": why})
+    if not dry_run:
+        manifest["sounds"] = kept
+    return out_now
 
 
 def make_one_shot(source, target, longest):
@@ -618,6 +698,7 @@ def main():
     parser.add_argument("--downloads", type=Path, default=ROOT / "AtmosphereDownloads")
     parser.add_argument("--catalog", type=Path, default=CATALOG, help="the sound catalogue (lofi-atmosphere catalog)")
     parser.add_argument("--dry-run", action="store_true", help="list what would be fetched")
+    parser.add_argument("--no-audit", action="store_true", help="do not check the recordings already fetched for poor ones")
     args = parser.parse_args()
 
     for tool in ("ffmpeg", "ffprobe"):
@@ -656,6 +737,12 @@ def main():
     mark_freesound_personal(manifest)
     if relocate(out, manifest, args.dry_run) and not args.dry_run:
         (out / "sounds.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
+    if not args.no_audit:
+        dropped = audit(out, manifest, args.dry_run)
+        if dropped:
+            note(f"{dropped} poor recording(s) {'would be' if args.dry_run else ''} left out; the run looks for better ones")
+        if not args.dry_run:
+            (out / "sounds.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
     one_shot_path = out / ONE_SHOT_FOLDER / "sounds.json"
     one_shots = json.loads(one_shot_path.read_text()) if one_shot_path.is_file() else {"version": 1, "sounds": []}
     catalog_path = out / "variants.json"
@@ -678,6 +765,7 @@ def main():
         targets = [t for t in targets if t[0].lower() in wanted or t[0].lower().removeprefix(ONE_SHOT_FOLDER.lower() + "/") in wanted]
 
     have = {entry["id"] for entry in manifest["sounds"]} | {f"once.{entry['id']}" for entry in one_shots["sounds"]}
+    refused = {entry["id"] for entry in manifest.get("rejected", [])}
     skipped = []
     fetched = 0
     for folder, sound, variant, queries, count, longest in targets:
@@ -707,6 +795,10 @@ def main():
                         if not one_shot and sound not in SPEECH_OK and AVOID.search(text):
                             skipped.append((folder, c, "title or tags suggest music, speech or sudden events"))
                             continue
+                        why = None if one_shot else title_reason(sound, text)
+                        if why:
+                            skipped.append((folder, c, why))
+                            continue
                         if not names_the_sound(c, keys):
                             skipped.append((folder, c, "its title does not name the sound"))
                             continue
@@ -729,7 +821,7 @@ def main():
                 if taken >= need:
                     break
                 rid = f"{sound}{'.' + variant if variant else ''}/{c['key']}"
-                if (f"once.{rid}" if one_shot else rid) in have:
+                if (f"once.{rid}" if one_shot else rid) in have or (not one_shot and rid in refused):
                     continue
                 if args.dry_run:
                     note(f"{folder}: would fetch {c['title']} by {c['author']} ({c['licence_text'].strip()}) {c['page']}")
@@ -764,9 +856,15 @@ def main():
                         target = out / file
                         target.parent.mkdir(parents=True, exist_ok=True)
                         make_loop(raw, target, start, length)
-                    level = loudness(target)
+                    level, spread = measure(target)
                 except Exception as error:  # noqa: BLE001
                     skipped.append((folder, c, f"could not process: {error}"))
+                    continue
+                why = None if one_shot else level_reason(sound, level, spread)
+                if why:
+                    # The loop stays out of the folder: the app plays every file it finds there.
+                    target.unlink(missing_ok=True)
+                    skipped.append((folder, c, why))
                     continue
                 entry = {
                     "id": rid,
@@ -781,6 +879,8 @@ def main():
                 }
                 if variant:
                     entry["variant"] = variant
+                if not one_shot:
+                    entry["range"] = spread
                 reason = personal_reason(kind, source.name)
                 if reason:
                     entry["use"] = "personal"
