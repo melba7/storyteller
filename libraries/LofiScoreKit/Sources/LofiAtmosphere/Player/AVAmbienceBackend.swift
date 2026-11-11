@@ -201,6 +201,11 @@ public final class AVAmbienceBackend: AmbienceBackend, @unchecked Sendable {
 
     public func setGain(_ gain: Float, slot: Int) {
         players[slot].volume = min(1, max(0, gain))
+        // A player's volume stops at 1: what is asked above that comes from the slot's
+        // filter, as gain in dB (up to 12).
+        guard filters.indices.contains(slot) else { return }
+        let boost: Float = gain > 1 ? min(12, 20 * log10(gain)) : 0
+        if abs(filters[slot].globalGain - boost) > 0.05 { filters[slot].globalGain = boost }
     }
 
     public func playOnce(_ url: URL, gain: Float, filter: AmbienceFilter) throws {

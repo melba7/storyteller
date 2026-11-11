@@ -619,7 +619,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private func gain(for sound: AmbientSound, level: AmbientLevel, recording: AmbienceRecording, rank: Int) -> Double {
         let targetLUFS = config.voiceLoudnessLUFS + config.bedLevelDB + sound.levelOffsetDB + level.offsetDB
             + Self.secondaryCut(rank: rank, intensity: config.intensity, cutDB: config.secondaryCutDB)
-        return min(1, Gain.linear(fromDB: targetLUFS - library.loudness(of: recording)) * sceneTrim)
+        return min(config.maxGain, Gain.linear(fromDB: targetLUFS - library.loudness(of: recording)) * sceneTrim)
     }
 
     private func freeSlot() -> Int? {
@@ -925,7 +925,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
             let value = voice.ramp.value(at: now)
             let muffle = Float(min(1, max(0, voice.muffle.value(at: now))))
             let cut = muffle > 0 ? Gain.linear(fromDB: -config.muffleCutDB * Double(muffle)) : 1
-            backend.setGain(Float(min(1, max(0, value * cut * master * (voice.retiring ? 1 : swelling)))), slot: slot)
+            backend.setGain(Float(min(config.maxGain, max(0, value * cut * master * (voice.retiring ? 1 : swelling)))), slot: slot)
             if muffle != pushedMuffles[slot] {
                 pushedMuffles[slot] = muffle
                 backend.setMuffle(muffle, slot: slot)
