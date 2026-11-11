@@ -31,7 +31,8 @@
 # (church bells, a waterfall, a cafe...) and may ask for new ones. After scoring,
 # the script runs Tools/atmosphere/fetch_ambience.py to fetch recordings for any
 # new ones (--no-fetch skips that; it needs ffmpeg), then copies the tracks and
-# the Atmosphere folder into "~/Storyteller Lofi/LofiMusic" (--no-copy skips that),
+# the Atmosphere folder into "~/Storyteller Lofi/LofiMusic" and its iCloud Drive copy
+# (--no-copy skips that),
 # ready to import on the phone.
 #
 # The API key is never printed. Use the read-aloud EPUBs as Storyteller serves them: the app matches
@@ -203,7 +204,22 @@ if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
     [ -f "$file" ] && cp "$file" "$MUSIC/tracks/"
   done
   [ -d "$ROOT/Atmosphere" ] && rsync -a --exclude skipped.csv "$ROOT/Atmosphere/" "$MUSIC/Atmosphere/"
-  echo "Copied the tracks and sounds into $MUSIC. Put that folder in iCloud Drive and import it in the app (Settings > Atmosphere Sounds > Import a sounds folder)."
+  echo "Copied the tracks and sounds into $MUSIC."
+  # The iCloud Drive copy is the folder the phone follows: keep it up to date here,
+  # so a finished run reaches the phone with nothing more to do on the Mac. Nothing is
+  # deleted there, and the lists go last so they never name a file that is not there yet.
+  ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Storyteller Lofi/LofiMusic"
+  if [ -d "$ICLOUD" ]; then
+    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' \
+         --exclude sounds.json --exclude variants.json "$MUSIC/" "$ICLOUD/" \
+       && rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/"; then
+      echo "iCloud copy up to date ($ICLOUD). The phone picks it up when the app opens, or tap Settings > Atmosphere Sounds > Check for new files now."
+    else
+      echo "Could not update the iCloud copy at $ICLOUD; copy $MUSIC there by hand."
+    fi
+  else
+    echo "No iCloud copy yet: put $MUSIC in iCloud Drive as \"Storyteller Lofi/LofiMusic\" once and import it in the app (Settings > Atmosphere Sounds > Import a sounds folder). Later runs keep it up to date."
+  fi
 else
   echo "To hear them on the phone, copy the tracks and the Atmosphere folder into the sounds folder and import it in the app."
 fi
