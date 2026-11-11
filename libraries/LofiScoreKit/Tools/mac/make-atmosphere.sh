@@ -132,12 +132,14 @@ score_one() {
       [ -s "$TRACKS/$name.$kind.json" ] && mv "$TRACKS/$name.$kind.json" "$TRACKS/old/$name.$stamp.$kind.json"
     done
   fi
+  # The tool writes a progress line with the expected finish time every 10 entries.
+  echo "$(date '+%H:%M:%S') scoring $name; progress and expected finish time: tail -f \"$log\"" >&2
   "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" --variants "$VARIANTS" \
     --out "$TRACKS/$name.atmosphere.json" "${cap[@]+"${cap[@]}"}" 2> "$log"
   local status=$?
   # One block per book, even when books finish together.
   local report
-  report="== $name"$'\n'"$(grep -vE "^  [0-9]+ scored, now at" "$log")"
+  report="== $name"$'\n'"$(grep -vE "^  ([0-9]+ of [0-9]+ scenes|all [0-9]+ scenes done|main pass over) .*now at ch" "$log")"
   # The score, once the track is finished (not stopped by the cap or an error),
   # with the mood track beside it when there is one.
   if [ "$status" = 0 ] && [ -s "$TRACKS/$name.atmosphere.json" ] && ! grep -q "stopped at --max-dollars" "$log"; then

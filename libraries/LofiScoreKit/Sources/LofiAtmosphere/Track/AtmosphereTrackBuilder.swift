@@ -218,6 +218,7 @@ public struct AtmosphereTrackBuilder: Sendable {
         engine: any SceneEngine,
         concurrency: Int = 4,
         continueIf: (@Sendable () -> Bool)? = nil,
+        onFailure: (@Sendable (String) -> Void)? = nil,
         onEntry: (@Sendable (AtmosphereTrack.Entry, Int) -> Void)? = nil
     ) async throws -> Report {
         let all = try narratedPositions()
@@ -245,6 +246,7 @@ public struct AtmosphereTrackBuilder: Sendable {
                 onEntry?(entry, added)
             } catch {
                 report.failed += 1
+                onFailure?("\(position): \(error)")
                 if report.failures.count < 20 { report.failures.append("\(position): \(error)") }
             }
         }
@@ -273,6 +275,7 @@ public struct AtmosphereTrackBuilder: Sendable {
                 report.failed += result.failed.count
                 for (position, error) in result.failed {
                     failedProbes.insert(position.globalIndex)
+                    onFailure?("probe \(position): \(error)")
                     if report.failures.count < 20 { report.failures.append("probe \(position): \(error)") }
                 }
                 if result.stopped {
