@@ -5,6 +5,7 @@ import type { LofiAtmosphereStatus, LofiStatus } from "./index"
 import {
   atmosphereSourceLabel,
   bookNeedingScore,
+  copyingLabel,
   describeAtmosphere,
   intensityLabel,
   levelLabel,
@@ -258,5 +259,36 @@ describe("plainCredits", () => {
         "Source: https://example.com and SOURCES.csv",
       ].join("\n"),
     )
+  })
+})
+
+describe("copyingLabel", () => {
+  it("counts the files while the folder is being copied", () => {
+    expect(
+      copyingLabel({
+        name: "LofiMusic",
+        syncing: true,
+        copied: 120,
+        toCopy: 513,
+      }),
+    ).toBe("Copying 120 of 513 files…")
+    expect(
+      linkedFolderLabel({
+        name: "LofiMusic",
+        syncing: true,
+        copied: 0,
+        toCopy: 1,
+      }),
+    ).toBe("Kept up to date with “LofiMusic”. Copying 0 of 1 file…")
+  })
+
+  it("says nothing when there is nothing to copy", () => {
+    expect(copyingLabel({ name: "LofiMusic", syncing: true })).toBeNull()
+    expect(
+      copyingLabel({ name: "LofiMusic", syncing: true, copied: 0, toCopy: 0 }),
+    ).toBeNull()
+    expect(
+      copyingLabel({ name: "LofiMusic", syncing: false, copied: 3, toCopy: 9 }),
+    ).toBeNull()
   })
 })

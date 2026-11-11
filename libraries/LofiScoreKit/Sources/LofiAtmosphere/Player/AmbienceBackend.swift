@@ -55,6 +55,8 @@ public protocol AmbienceBackend: AnyObject {
     /// Plays the slot's recording from `offset`, looping without a gap until stopped.
     func play(slot: Int, from offset: TimeInterval) throws
     func stop(slot: Int)
+    /// Linear gain. Above 1 a quiet recording is turned up (the player asks for at most
+    /// `AtmosphereConfig.maxGain`); a backend that cannot boost plays it at 1.
     func setGain(_ gain: Float, slot: Int)
     /// How muffled the slot sounds, 0 (clear) to 1 (behind a shut door, under water): the
     /// top rolled off. The player also takes the gain down with it. Backends that cannot

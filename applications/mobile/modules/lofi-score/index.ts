@@ -104,6 +104,9 @@ export type LofiLinkedFolder = {
   /** What the last look found, or why it failed. */
   lastResult?: string
   syncing: boolean
+  /** While files are being copied: how many are done, of how many. */
+  copied?: number
+  toCopy?: number
 }
 
 /** The atmosphere's state, as the native module reports it. */

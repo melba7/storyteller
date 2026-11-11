@@ -224,6 +224,46 @@ final class SoundsFolderTests: XCTestCase {
         XCTAssertEqual(summary.description, "Nothing new yet; 1 file is still downloading from iCloud")
     }
 
+    func testAFirstImportBringsScoresFirstCountsItsFilesAndCarriesOnAfterBeingCutShort() throws {
+        let source = folder.appendingPathComponent("Linked", isDirectory: true)
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+        try touch("app/Music/Atmosphere/Crowd/old-stand-in.wav")
+        try touch("Linked/Atmosphere/Rain/rain.m4a")
+        try touch("Linked/Atmosphere/Crowd/crowd.m4a")
+        try touch("Linked/Atmosphere/sounds.json", contents: Data("{}".utf8))
+        try touch("Linked/tracks/Book One.score.json")
+        try touch("Linked/tracks/Book One.atmosphere.json")
+
+        // Cut short after the third file: what was copied stays and is remembered.
+        struct Stop: Error {}
+        var seen: [SoundsFolderImport.Progress] = []
+        var order: [[String]] = []
+        XCTAssertThrowsError(try SoundsFolderImport.sync(source, into: destination) { progress in
+            seen.append(progress)
+            order.append(self.files(under: destination))
+            if progress.copied == 3 { try? self.fileManager.removeItem(at: source.appendingPathComponent("Atmosphere/Rain/rain.m4a")) }
+        })
+        XCTAssertEqual(seen.first, .init(copied: 0, total: 5, scoresReady: false))
+        XCTAssertEqual(seen.map(\.copied), [0, 1, 2, 3])
+        XCTAssertEqual(seen.map(\.scoresReady), [false, false, true, true], "the track and the score go first")
+        XCTAssertEqual(files(under: destination), [
+            ".imported.json", "Atmosphere/Crowd/crowd.m4a", "AtmosphereTracks/Book One.atmosphere.json", "Scores/Book One.score.json",
+        ], "what sat there before a first import is replaced; the list of sounds is not in yet")
+
+        // The next look copies only the rest, the list of sounds last, and clears nothing.
+        try touch("Linked/Atmosphere/Rain/rain.m4a")
+        seen = []
+        let summary = try SoundsFolderImport.sync(source, into: destination) { seen.append($0) }
+        XCTAssertFalse(summary.fresh)
+        XCTAssertEqual(summary.added, 2)
+        XCTAssertEqual(summary.recordings, 1)
+        XCTAssertEqual(seen.last, .init(copied: 2, total: 2, scoresReady: true))
+        XCTAssertEqual(files(under: destination), [
+            ".imported.json", "Atmosphere/Crowd/crowd.m4a", "Atmosphere/Rain/rain.m4a", "Atmosphere/sounds.json",
+            "AtmosphereTracks/Book One.atmosphere.json", "Scores/Book One.score.json",
+        ])
+    }
+
     func testTidiesWhatTheMusicLeftBehind() throws {
         let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
         try touch("app/Music/Calm/a.mp3")
