@@ -31,7 +31,7 @@ finish() {
 
 # The branch this copy of the installer came from, when it is inside a checkout.
 HERE="$(cd "$(dirname "$0")" && pwd)"
-BRANCH="feat/lofi-app"
+BRANCH="main"
 if git -C "$HERE" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   found="$(git -C "$HERE" rev-parse --abbrev-ref HEAD 2>/dev/null)"
   [ -n "$found" ] && [ "$found" != HEAD ] && BRANCH="$found"
