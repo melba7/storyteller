@@ -71,6 +71,10 @@ describe("describeAtmosphere", () => {
   it("names the sounds playing", () => {
     expect(describeAtmosphere(status())).toBe("Rain on the windows and a fire")
     expect(describeAtmosphere(withSounds({ playing: ["crowd"] }))).toBe("Crowd")
+    // A kind of a sound is named as itself, not as its family ("river").
+    expect(describeAtmosphere(withSounds({ playing: ["runningTap"] }))).toBe(
+      "Running tap",
+    )
     expect(describeAtmosphere(withSounds({ playing: [] }))).toBe("Quiet here")
   })
 
