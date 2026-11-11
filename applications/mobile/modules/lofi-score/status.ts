@@ -75,6 +75,15 @@ export function describeAtmosphere(status: LofiStatus): string {
   return soundList(atmosphere.playing)
 }
 
+/**
+ * "Copying 120 of 513 files…" while a look at the linked folder is copying, or
+ * null when it is not (or has nothing to copy).
+ */
+export function copyingLabel(folder: LofiLinkedFolder): string | null {
+  if (!folder.syncing || !folder.toCopy) return null
+  return `Copying ${folder.copied ?? 0} of ${folder.toCopy} ${folder.toCopy === 1 ? "file" : "files"}…`
+}
+
 /** Where the atmosphere's sounds come from, for Settings. */
 export function atmosphereSourceLabel(
   atmosphere: LofiAtmosphereStatus,
@@ -122,7 +131,7 @@ export function linkedFolderLabel(
 ): string {
   const parts = [`Kept up to date with “${folder.name}”.`]
   if (folder.syncing) {
-    parts.push("Checking it now…")
+    parts.push(copyingLabel(folder) ?? "Checking it now…")
   } else if (folder.lastSync !== undefined) {
     parts.push(`Last checked ${timeAgo(folder.lastSync * 1000, now)}.`)
   }

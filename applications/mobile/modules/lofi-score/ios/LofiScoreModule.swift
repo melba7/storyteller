@@ -11,6 +11,37 @@ import Readium
 import UIKit
 import UniformTypeIdentifiers
 
+/// A little more time for a copy to carry on after the app leaves the screen. iOS gives
+/// about half a minute, not the whole of a long import; what is not copied by then is
+/// picked up from where it stopped when the app comes back (the import remembers each file).
+final class LofiBackgroundTime: @unchecked Sendable {
+  private let lock = NSLock()
+  private var task: UIBackgroundTaskIdentifier = .invalid
+
+  @MainActor
+  static func begin(_ name: String) -> LofiBackgroundTime {
+    let time = LofiBackgroundTime()
+    let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak time] in
+      time?.end()
+    }
+    time.lock.lock()
+    time.task = task
+    time.lock.unlock()
+    return time
+  }
+
+  func end() {
+    lock.lock()
+    let task = self.task
+    self.task = .invalid
+    lock.unlock()
+    guard task != .invalid else { return }
+    DispatchQueue.main.async {
+      UIApplication.shared.endBackgroundTask(task)
+    }
+  }
+}
+
 public final class LofiScoreModule: Module {
   public func definition() -> ModuleDefinition {
     Name("LofiScore")
@@ -34,6 +65,8 @@ public final class LofiScoreModule: Module {
     // is copied without importing again. Resolves to null when the listener cancels.
     AsyncFunction("importSoundsFolder") { () async throws -> [String: Any]? in
       guard let folder = await LofiFolderPicker.pick() else { return nil }
+      let background = await LofiBackgroundTime.begin("Importing sounds")
+      defer { background.end() }
       let summary = try await LofiScoreRuntime.shared.host.linkSoundsFolder(folder)
       return [
         "folderName": summary.folderName,
@@ -47,6 +80,8 @@ public final class LofiScoreModule: Module {
     // Looks at the linked sounds folder now and copies what is new. Resolves to null when
     // no folder is linked; rejects when the folder cannot be read.
     AsyncFunction("syncSoundsFolder") { () async throws -> [String: Any]? in
+      let background = await LofiBackgroundTime.begin("Copying new sounds")
+      defer { background.end() }
       guard let summary = try await LofiScoreRuntime.shared.host.syncSoundsFolder(reason: .manual) else { return nil }
       return [
         "folderName": summary.folderName,
