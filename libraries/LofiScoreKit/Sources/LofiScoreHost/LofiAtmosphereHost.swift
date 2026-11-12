@@ -97,6 +97,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
     private var recentEvents: [String] = []
     // The linked sounds folder (on `queue`).
     private var syncing = false
+    private var syncProgress: SoundsFolderImport.Progress?
     private var lastSyncStarted: Date?
     /// Automatic looks at the linked folder are at least this far apart.
     static let syncInterval: TimeInterval = 60
@@ -311,23 +312,47 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
     /// Imports the folder like ``importSounds(from:)`` and keeps a link to it, so new scores,
     /// sounds and tracks put into it later are copied without importing again (see
     /// ``syncSoundsFolder(reason:)``).
+    ///
+    /// The link is kept before anything is copied, and the copy goes file by file (book
+    /// scores first), so an import cut short (the app closed, the phone locked for long)
+    /// carries on from where it stopped at the next look at the folder instead of starting
+    /// again. ``status()`` reports how far it has got.
     public func linkSoundsFolder(_ folder: URL) async throws -> SoundsFolderImport.Summary {
-        let summary = try await importSounds(from: folder)
-        let bookmark: Data?
+        let bookmark: Data
         do {
             bookmark = try environment.makeBookmark(folder)
         } catch {
+            // No link can be kept: copy the folder in one go, as before.
             HostLog.error("could not keep a link to \(folder.lastPathComponent): \(error)")
-            bookmark = nil
+            let summary = try await importSounds(from: folder)
+            await onQueue { [self] in
+                settings.linkedFolderBookmark = nil
+                settings.linkedFolderName = nil
+            }
+            return summary
         }
+        let destination = environment.soundsFolder
         await onQueue { [self] in
+            // Another folder than last time replaces the sounds; the same folder picked
+            // again carries on with (or adds to) what is there.
+            let before = settings.linkedFolderName ?? settings.importedFolderName
+            if let before, before != folder.lastPathComponent {
+                try? FileManager.default.removeItem(at: destination.appendingPathComponent(SoundsFolderImport.manifestFileName))
+            }
             settings.linkedFolderBookmark = bookmark
-            settings.linkedFolderName = bookmark == nil ? nil : folder.lastPathComponent
-            settings.lastSyncDate = Date()
+            settings.linkedFolderName = folder.lastPathComponent
             settings.lastSyncResult = nil
-            lastSyncStarted = Date()
         }
-        return summary
+        guard let synced = try await syncSoundsFolder(reason: .manual) else {
+            return .init(folderName: folder.lastPathComponent, recordings: 0, scores: 0, atmosphereTracks: 0, notDownloaded: 0)
+        }
+        return .init(
+            folderName: synced.folderName,
+            recordings: synced.recordings,
+            scores: synced.scores,
+            atmosphereTracks: synced.atmosphereTracks,
+            notDownloaded: synced.notDownloaded
+        )
     }
 
     /// Forgets the linked folder. The sounds already imported stay.
@@ -381,7 +406,9 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         work.async { [weak self] in
             let result = Result { () -> (SoundsFolderImport.SyncSummary, Data?) in
                 let folder = try environment.resolveBookmark(bookmark)
-                let summary = try SoundsFolderImport.sync(folder, into: destination)
+                let summary = try SoundsFolderImport.sync(folder, into: destination) { progress in
+                    self?.queue.async { self?.noteSyncProgress(progress) }
+                }
                 // A bookmark goes stale when the folder moves; a fresh one keeps the link.
                 let refreshed = try? environment.makeBookmark(folder)
                 return (summary, refreshed)
@@ -393,6 +420,15 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         }
     }
 
+    /// On `queue`. Keeps the count for the settings screen, and lets the open book find
+    /// its score as soon as the scores are in, while the recordings are still being copied.
+    private func noteSyncProgress(_ progress: SoundsFolderImport.Progress) {
+        guard syncing else { return }
+        let scoresJustArrived = progress.scoresReady && syncProgress?.scoresReady != true && progress.copied > 0
+        syncProgress = progress
+        if scoresJustArrived { reopenBookIfUnscored() }
+    }
+
     /// On `queue`.
     private func finishSync(
         reason: SyncReason,
@@ -400,6 +436,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         completion: (Result<SoundsFolderImport.SyncSummary?, Error>) -> Void
     ) {
         syncing = false
+        syncProgress = nil
         settings.lastSyncDate = Date()
         switch result {
         case let .success((summary, refreshed)):
@@ -508,7 +545,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
             player.snapshot { continuation.resume(returning: $0) }
         }
         result.atmosphere.place = ambience.scene?.placeName ?? ambience.scene?.placeID
-        result.atmosphere.playing = ambience.voices.filter { $0.playing && !$0.fadingOut }.map(\.sound.rawValue)
+        result.atmosphere.playing = ambience.voices.filter { $0.playing && !$0.fadingOut }.map { $0.variant ?? $0.sound.rawValue }
         result.atmosphere.chapterDip = ambience.dipped
         result.atmosphere.routeMuted = ambience.routeMuted
         result.atmosphere.missingSounds = ambience.missingSounds.map(\.rawValue)
@@ -761,7 +798,9 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
                     name: settings.linkedFolderName ?? settings.importedFolderName ?? "sounds folder",
                     lastSync: settings.lastSyncDate?.timeIntervalSince1970,
                     lastResult: settings.lastSyncResult,
-                    syncing: syncing
+                    syncing: syncing,
+                    copied: syncing ? syncProgress?.copied : nil,
+                    toCopy: syncing ? syncProgress?.total : nil
                 )
             ),
             book: text,
@@ -823,6 +862,9 @@ public struct LofiHostStatus: Codable, Sendable, Hashable {
         /// What the last look found, or why it failed.
         public var lastResult: String?
         public var syncing: Bool
+        /// While a look at the folder is copying files: how many are done, of how many.
+        public var copied: Int?
+        public var toCopy: Int?
     }
 
     /// The imported sounds folder.

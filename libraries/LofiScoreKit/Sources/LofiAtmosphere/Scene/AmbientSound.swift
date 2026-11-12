@@ -326,8 +326,8 @@ public enum AmbientLevel: String, CaseIterable, Codable, Sendable, Hashable, Com
     /// Offset from the sound's full level, in dB.
     public var offsetDB: Double {
         switch self {
-        case .faint: -10
-        case .soft: -5
+        case .faint: -8
+        case .soft: -3
         case .full: 0
         case .loud: 4
         }

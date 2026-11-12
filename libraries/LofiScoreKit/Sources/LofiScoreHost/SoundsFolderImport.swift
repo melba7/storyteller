@@ -338,23 +338,38 @@ extension SoundsFolderImport {
     typealias Manifest = [String: Stamp]
     static let manifestFileName = ".imported.json"
 
+    /// How far a sync has got, for a count on the settings screen.
+    public struct Progress: Sendable, Hashable {
+        /// Files copied so far, of the files this sync has to copy.
+        public var copied: Int
+        public var total: Int
+        /// The book scores and atmosphere tracks are all in: a book can start playing
+        /// while the recordings are still being copied.
+        public var scoresReady: Bool
+    }
+
+    /// The manifest is saved every this many files, so a copy cut short (the app closed,
+    /// iCloud unreachable) carries on from there the next time.
+    static let manifestSaveInterval = 25
+
     /// Copies into `destination` whatever in `source` is new or changed since the last
     /// import or sync, by the same rules as ``importFolder(_:into:fileManager:)``, and never
-    /// deletes anything. When nothing has been imported yet, this is a plain import.
+    /// deletes anything (but a first import, with nothing imported before, replaces what
+    /// sat in `destination`). This is also the first import of a linked folder: the files go in
+    /// one at a time, book scores and tracks first (so the open book can start), then the
+    /// recordings, then the lists that describe them, and a copy cut short carries on from
+    /// where it stopped the next time.
     ///
     /// Files still only in iCloud are asked to download, so a later sync gets them.
-    public static func sync(_ source: URL, into destination: URL, fileManager: FileManager = .default) throws -> SyncSummary {
+    /// `progress` is called before the first copy and after every file, on the caller's thread.
+    public static func sync(
+        _ source: URL,
+        into destination: URL,
+        fileManager: FileManager = .default,
+        progress: ((Progress) -> Void)? = nil
+    ) throws -> SyncSummary {
         var summary = SyncSummary(folderName: source.lastPathComponent)
-        guard isImported(destination, fileManager: fileManager) else {
-            let full = try importFolder(source, into: destination, fileManager: fileManager)
-            summary.fresh = true
-            summary.recordings = full.recordings
-            summary.scores = full.scores
-            summary.atmosphereTracks = full.atmosphereTracks
-            summary.notDownloaded = full.notDownloaded
-            summary.added = (loadManifest(in: destination, fileManager: fileManager) ?? [:]).count
-            return summary
-        }
+        summary.fresh = !isImported(destination, fileManager: fileManager)
 
         #if canImport(Darwin)
         let scoped = source.startAccessingSecurityScopedResource()
@@ -362,21 +377,59 @@ extension SoundsFolderImport {
         #endif
 
         let plan = try plan(for: source, fileManager: fileManager)
+        if summary.fresh, plan.items.isEmpty, plan.notDownloaded == 0 {
+            throw ImportError.noSounds(source.lastPathComponent)
+        }
         summary.notDownloaded = plan.notDownloaded
         requestDownloads(plan.placeholders, fileManager: fileManager)
+        if summary.fresh {
+            // A first import replaces whatever sat there (stand-ins, an older import that
+            // kept no list). The empty list written at once marks the import as begun, so
+            // a copy cut short carries on next time instead of clearing the folder again.
+            try? fileManager.removeItem(at: destination)
+            try fileManager.createDirectory(at: destination, withIntermediateDirectories: true)
+            try saveManifest([:], in: destination, fileManager: fileManager)
+        }
         var manifest = loadManifest(in: destination, fileManager: fileManager) ?? [:]
-        var changed = false
-        defer { if changed { try? saveManifest(manifest, in: destination, fileManager: fileManager) } }
+        var unsaved = 0
+        defer {
+            if unsaved > 0 { try? saveManifest(manifest, in: destination, fileManager: fileManager) }
+            if summary.fresh { excludeFromBackup(destination) }
+        }
 
+        // What has to be copied, in the order it is most useful to have it.
+        struct Pending {
+            var item: Item
+            var stamp: Stamp
+            var exists: Bool
+        }
+        var pending: [Pending] = []
         for item in plan.items {
             let target = destination.appendingPathComponent(item.relativePath)
             let stamp = stamp(of: item.url, fileManager: fileManager)
             let exists = fileManager.fileExists(atPath: target.path)
             if exists, manifest[item.relativePath] == stamp { continue }
+            pending.append(Pending(item: item, stamp: stamp, exists: exists))
+        }
+        func rank(_ item: Item) -> Int {
+            if item.isScore || item.isAtmosphereTrack { return 0 }
+            return item.isRecording ? 1 : 2
+        }
+        pending.sort { (rank($0.item), $0.item.relativePath) < (rank($1.item), $1.item.relativePath) }
+        let scoreCount = pending.filter { rank($0.item) == 0 }.count
+        progress?(Progress(copied: 0, total: pending.count, scoresReady: scoreCount == 0))
+
+        for (index, next) in pending.enumerated() {
+            let item = next.item
+            let target = destination.appendingPathComponent(item.relativePath)
             try replace(target, with: item.url, fileManager: fileManager)
-            manifest[item.relativePath] = stamp
-            changed = true
-            if exists { summary.updated += 1 } else { summary.added += 1 }
+            manifest[item.relativePath] = next.stamp
+            unsaved += 1
+            if unsaved >= manifestSaveInterval {
+                try? saveManifest(manifest, in: destination, fileManager: fileManager)
+                unsaved = 0
+            }
+            if next.exists { summary.updated += 1 } else { summary.added += 1 }
             if item.isScore {
                 summary.scores += 1
             } else if item.isAtmosphereTrack {
@@ -384,6 +437,7 @@ extension SoundsFolderImport {
             } else if item.isRecording {
                 summary.recordings += 1
             }
+            progress?(Progress(copied: index + 1, total: pending.count, scoresReady: index + 1 >= scoreCount))
         }
         return summary
     }

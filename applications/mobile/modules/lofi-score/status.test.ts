@@ -5,6 +5,7 @@ import type { LofiAtmosphereStatus, LofiStatus } from "./index"
 import {
   atmosphereSourceLabel,
   bookNeedingScore,
+  copyingLabel,
   describeAtmosphere,
   intensityLabel,
   levelLabel,
@@ -70,6 +71,10 @@ describe("describeAtmosphere", () => {
   it("names the sounds playing", () => {
     expect(describeAtmosphere(status())).toBe("Rain on the windows and a fire")
     expect(describeAtmosphere(withSounds({ playing: ["crowd"] }))).toBe("Crowd")
+    // A kind of a sound is named as itself, not as its family ("river").
+    expect(describeAtmosphere(withSounds({ playing: ["runningTap"] }))).toBe(
+      "Running tap",
+    )
     expect(describeAtmosphere(withSounds({ playing: [] }))).toBe("Quiet here")
   })
 
@@ -258,5 +263,36 @@ describe("plainCredits", () => {
         "Source: https://example.com and SOURCES.csv",
       ].join("\n"),
     )
+  })
+})
+
+describe("copyingLabel", () => {
+  it("counts the files while the folder is being copied", () => {
+    expect(
+      copyingLabel({
+        name: "LofiMusic",
+        syncing: true,
+        copied: 120,
+        toCopy: 513,
+      }),
+    ).toBe("Copying 120 of 513 files…")
+    expect(
+      linkedFolderLabel({
+        name: "LofiMusic",
+        syncing: true,
+        copied: 0,
+        toCopy: 1,
+      }),
+    ).toBe("Kept up to date with “LofiMusic”. Copying 0 of 1 file…")
+  })
+
+  it("says nothing when there is nothing to copy", () => {
+    expect(copyingLabel({ name: "LofiMusic", syncing: true })).toBeNull()
+    expect(
+      copyingLabel({ name: "LofiMusic", syncing: true, copied: 0, toCopy: 0 }),
+    ).toBeNull()
+    expect(
+      copyingLabel({ name: "LofiMusic", syncing: false, copied: 3, toCopy: 9 }),
+    ).toBeNull()
   })
 })

@@ -4,10 +4,16 @@ import LofiAudioCore
 /// Timings and levels for the atmosphere.
 public struct AtmosphereConfig: Sendable, Hashable {
     /// Where a sound at "full" sits, in dB under a voice at ``voiceLoudnessLUFS``.
-    /// The music's bed is 16 dB under; the atmosphere sits below it, present the whole
-    /// time but never over the words (see ``levelRange`` for how far the slider goes).
-    public var bedLevelDB: Double = -24
-    public var voiceLoudnessLUFS: Double = -18
+    /// 10 under is a scene that can be heard while the narrator is speaking; at 16 under it
+    /// was only there in the gaps (see ``levelRange`` for how far the slider goes).
+    public var bedLevelDB: Double = -10
+    /// The most a quiet recording is turned up to reach its level, as a linear gain
+    /// (6 is 15.5 dB). A recording was only ever turned down before, so a quiet one (a
+    /// running tap at -35 LUFS) stayed far under the level the slider asked for.
+    public var maxGain: Double = 6
+    /// How loud a narrator is taken to be. Audiobooks are mastered hotter than the -18 this
+    /// began at: Mo's first book measured -15 to -16 LUFS across three chapters.
+    public var voiceLoudnessLUFS: Double = -16
     /// How much is going on, from 0 (only the scene's main sound, the rest cut) to 1 (every
     /// sound the scene has, the quieter ones at their full level, the biggest lifts in the
     /// gaps between sentences). It is a dial next to the volume: turn it down for a calmer
@@ -79,10 +85,12 @@ public struct AtmosphereConfig: Sendable, Hashable {
     /// Routes where the atmosphere stays off (like the music's "off in the car").
     public var mutedRoutes: Set<OutputRoute> = []
 
-    /// The level slider's range, in dB under the voice. The top keeps the words clear: a
-    /// steady bed 14 dB under speech is well inside what listeners follow without effort,
-    /// and sounds made of voices sit a further 3 to 4 dB down with the speech band filtered.
-    public static let levelRange: ClosedRange<Double> = -40 ... -14
+    /// The level slider's range, in dB under the voice. The default (10 under) is a
+    /// scene that is heard under a narrator on a phone's speaker; 24 under could not be
+    /// heard at all, and 16 under only between sentences. The top (level with the voice)
+    /// is for a listener who wants the scene as present as the voice; sounds made of voices still sit a further 3 to 4 dB down with the speech
+    /// band filtered.
+    public static let levelRange: ClosedRange<Double> = -40 ... 0
     public static let intensityRange: ClosedRange<Double> = 0 ... 1
 
     /// How many of a scene's sounds play at `intensity`: 1 at 0, all ``StoryScene/maxLayers`` at 1.

@@ -45,7 +45,7 @@ shelved (`shelved/lofi-music/` at the repository root).
   when a place clearly calls for one, the Mac fetches recordings for every kind, and until
   they are imported the phone plays the family it is a kind of.
 - **A steady bed, kept clear of the voice.** The sounds play under the narration the whole
-  time, 24 dB under it by default, with the voice's band dipped and the voices in a crowd
+  time, 10 dB under it by default, with the voice's band dipped and the voices in a crowd
   blurred. A scene with many sounds is trimmed so that together they are no louder than one
   sound alone; the dial turns the quieter sounds down and off before the main one. In the
   gaps between sentences (a paragraph, a chapter end, a breath) the bed comes forward a
@@ -314,8 +314,10 @@ sound. So:
   short, and can be turned off (see "One-off sounds").
 - A crowd and a murmur are the only sounds made of voices. They are filtered so words can't
   be made out (1 to 4 kHz taken down 12 dB, the top rolled off above 6 kHz).
-- Everything sits well under the voice: a sound at `full` is 24 dB under the narrator, and
-  the slider goes from 40 to 14 dB under, never closer. Each
+- Everything sits well under the voice: a sound at `full` is 10 dB under the narrator, and
+  the slider goes from 40 dB under to level with the voice. (Earlier defaults, 24 and then
+  16 under, could not be heard while the narrator was speaking on a phone's speaker.) A
+  quiet recording is turned up by as much as 15 dB to reach its level. Each
   sound also has its own offset (a ticking clock -8 dB, room tone -6, an electric hum -5, a
   hushed room, a murmur or a deep drone -4, a crowd -3, heavy rain +1 dB), and `loud` is
   only 4 dB over `full`.
@@ -331,7 +333,13 @@ sound. So:
   gets no lift, rising over 0.6 s and dropping back in 0.25 s when the next sentence starts.
   Pausing, seeking and a narration hold end it too. Reading on screen has no sentence
   timing, so no lift.
-- Each sound gets a presence dip around 2.5 kHz, where speech is clearest.
+- Each sound gets a light presence dip (3 dB) around 2.5 kHz, where speech is clearest.
+- The narrator is taken to be at -16 LUFS (Mo's first book measured -15 to -16).
+- The fetch script keeps poor loops out: a title that says it drips under running water or
+  is a set of separate events, a steady sound whose loudness range is over 12 LU, anything
+  under -45 LUFS. Each run checks the loops already fetched the same way; a poor one stays
+  in the folder (nothing deletes from the copy in iCloud) and `sounds.json` names it under
+  `rejected`, which the app skips.
 
 The 48 families: rain, heavy rain, rain on the windows, thunder, wind, strong wind, snow,
 fireplace, campfire, sea shore, open sea, river, dripping, forest, birdsong, night insects,

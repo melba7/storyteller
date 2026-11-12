@@ -31,7 +31,8 @@
 # (church bells, a waterfall, a cafe...) and may ask for new ones. After scoring,
 # the script runs Tools/atmosphere/fetch_ambience.py to fetch recordings for any
 # new ones (--no-fetch skips that; it needs ffmpeg), then copies the tracks and
-# the Atmosphere folder into "~/Storyteller Lofi/LofiMusic" (--no-copy skips that),
+# the Atmosphere folder into "~/Storyteller Lofi/LofiMusic" and its iCloud Drive copy
+# (--no-copy skips that),
 # ready to import on the phone.
 #
 # The API key is never printed. Use the read-aloud EPUBs as Storyteller serves them: the app matches
@@ -132,12 +133,14 @@ score_one() {
       [ -s "$TRACKS/$name.$kind.json" ] && mv "$TRACKS/$name.$kind.json" "$TRACKS/old/$name.$stamp.$kind.json"
     done
   fi
+  # The tool writes a progress line with the expected finish time every 10 entries.
+  echo "$(date '+%H:%M:%S') scoring $name; progress and expected finish time: tail -f \"$log\"" >&2
   "$B/lofi-atmosphere" track "$dir" --book "$name" --model "$MODEL" --variants "$VARIANTS" \
     --out "$TRACKS/$name.atmosphere.json" "${cap[@]+"${cap[@]}"}" 2> "$log"
   local status=$?
   # One block per book, even when books finish together.
   local report
-  report="== $name"$'\n'"$(grep -vE "^  [0-9]+ scored, now at" "$log")"
+  report="== $name"$'\n'"$(grep -vE "^  ([0-9]+ of [0-9]+ scenes|all [0-9]+ scenes done|main pass over) .*now at ch" "$log")"
   # The score, once the track is finished (not stopped by the cap or an error),
   # with the mood track beside it when there is one.
   if [ "$status" = 0 ] && [ -s "$TRACKS/$name.atmosphere.json" ] && ! grep -q "stopped at --max-dollars" "$log"; then
@@ -201,7 +204,22 @@ if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
     [ -f "$file" ] && cp "$file" "$MUSIC/tracks/"
   done
   [ -d "$ROOT/Atmosphere" ] && rsync -a --exclude skipped.csv "$ROOT/Atmosphere/" "$MUSIC/Atmosphere/"
-  echo "Copied the tracks and sounds into $MUSIC. Put that folder in iCloud Drive and import it in the app (Settings > Atmosphere Sounds > Import a sounds folder)."
+  echo "Copied the tracks and sounds into $MUSIC."
+  # The iCloud Drive copy is the folder the phone follows: keep it up to date here,
+  # so a finished run reaches the phone with nothing more to do on the Mac. Nothing is
+  # deleted there, and the lists go last so they never name a file that is not there yet.
+  ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Storyteller Lofi/LofiMusic"
+  if [ -d "$ICLOUD" ]; then
+    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' \
+         --exclude sounds.json --exclude variants.json "$MUSIC/" "$ICLOUD/" \
+       && rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/"; then
+      echo "iCloud copy up to date ($ICLOUD). The phone picks it up when the app opens, or tap Settings > Atmosphere Sounds > Check for new files now."
+    else
+      echo "Could not update the iCloud copy at $ICLOUD; copy $MUSIC there by hand."
+    fi
+  else
+    echo "No iCloud copy yet: put $MUSIC in iCloud Drive as \"Storyteller Lofi/LofiMusic\" once and import it in the app (Settings > Atmosphere Sounds > Import a sounds folder). Later runs keep it up to date."
+  fi
 else
   echo "To hear them on the phone, copy the tracks and the Atmosphere folder into the sounds folder and import it in the app."
 fi

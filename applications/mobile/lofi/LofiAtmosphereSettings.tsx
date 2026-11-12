@@ -11,6 +11,7 @@ import { Text } from "@/components/ui/text"
 import { LofiScore } from "@/modules/lofi-score"
 import {
   atmosphereSourceLabel,
+  copyingLabel,
   linkedFolderLabel,
   plainCredits,
 } from "@/modules/lofi-score/status"
@@ -28,6 +29,12 @@ export function LofiAtmosphereSettings() {
 
   if (!atmosphere.available) return null
   const { status } = atmosphere
+  // The copy runs in the app, not in this screen: coming back to the screen while it
+  // is still going shows its count again.
+  const copying = status?.folder.linkedFolder
+    ? copyingLabel(status.folder.linkedFolder)
+    : null
+  const busy = importing || syncing || !!status?.folder.linkedFolder?.syncing
 
   async function importFolder() {
     setImporting(true)
@@ -48,7 +55,7 @@ export function LofiAtmosphereSettings() {
         }
         if (summary.notDownloaded > 0) {
           parts.push(
-            `${summary.notDownloaded} files were still in iCloud and were left out: open the folder in Files to download them, then import again.`,
+            `${summary.notDownloaded} files were still in iCloud and are downloading: tap “Check for new files now” in a while to copy them.`,
           )
         }
         setMessage(parts.join(" "))
@@ -184,13 +191,13 @@ export function LofiAtmosphereSettings() {
                 : "Import a sounds folder"
             }
             variant="secondary"
-            disabled={importing || syncing}
+            disabled={busy}
             onPress={() => void importFolder()}
           >
             <Icon as={FolderInput} />
             <Text>
               {importing
-                ? "Importing…"
+                ? (copying ?? "Importing…")
                 : status.folder.linkedFolder
                   ? "Pick a different sounds folder"
                   : "Import a sounds folder"}
@@ -207,11 +214,15 @@ export function LofiAtmosphereSettings() {
               <Button
                 accessibilityLabel="Check the sounds folder for new files now"
                 variant="secondary"
-                disabled={importing || syncing}
+                disabled={busy}
                 onPress={() => void syncFolder()}
               >
                 <Icon as={FolderSync} />
-                <Text>{syncing ? "Checking…" : "Check for new files now"}</Text>
+                <Text>
+                  {syncing || (!importing && copying)
+                    ? (copying ?? "Checking…")
+                    : "Check for new files now"}
+                </Text>
               </Button>
             </>
           ) : (
@@ -236,7 +247,7 @@ export function LofiAtmosphereSettings() {
             <Button
               accessibilityLabel="Stop keeping the sounds folder up to date"
               variant="ghost"
-              disabled={importing || syncing}
+              disabled={busy}
               onPress={() => void atmosphere.unlinkSoundsFolder()}
             >
               <Text>Stop keeping it up to date</Text>
@@ -246,7 +257,7 @@ export function LofiAtmosphereSettings() {
             <Button
               accessibilityLabel="Remove the imported sounds"
               variant="ghost"
-              disabled={importing || syncing}
+              disabled={busy}
               onPress={() => void atmosphere.removeImportedSounds()}
             >
               <Text>Remove imported sounds</Text>

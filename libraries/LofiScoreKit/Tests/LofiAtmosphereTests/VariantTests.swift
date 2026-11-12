@@ -392,8 +392,8 @@ final class VariantTests: XCTestCase {
         h.narrate(30, then: 0.1)
         XCTAssertEqual(h.requests, [0.8])
         h.scheduler.advance(by: 3.9)
-        // crowd at soft: -18 voice, -24 bed, -3 crowd, -5 soft, file at -23: 27 dB down.
-        let settled = pow(10, -27.0 / 20)
+        // crowd at soft: -16 voice, -10 bed, -3 crowd, -3 soft, file at -23: 9 dB down.
+        let settled = pow(10, -9.0 / 20)
         h.player.narrationHold(began: true)
         h.scheduler.advance(by: 0.6)
         XCTAssertEqual(h.gain("crowd.wav"), settled * pow(10, 8.0 / 20), accuracy: 0.001, "the crowd rises 8 dB while the narrator is quiet")
@@ -439,7 +439,7 @@ final class VariantTests: XCTestCase {
         dropped.player.narrationHold(began: false)
         dropped.player.narrationHold(began: true)
         dropped.scheduler.advance(by: 1)
-        XCTAssertEqual(dropped.gain("crowd.wav"), pow(10, -27.0 / 20), accuracy: 0.001)
+        XCTAssertEqual(dropped.gain("crowd.wav"), pow(10, -9.0 / 20), accuracy: 0.001)
     }
 
     func testAHushCutsTheOldSoundDuringThePause() throws {

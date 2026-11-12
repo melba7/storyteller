@@ -240,14 +240,33 @@ func trackCommand(_ args: Arguments) async throws {
     let store = AtmosphereTrackStore(track)
     let cap = SpendCap(dollars: args.string("max-dollars").flatMap(Double.init), prices: prices, usage: usage)
     let started = Date()
+    let concurrency = args.int("concurrency", default: 4)
+    // What this run has to do, for the progress lines: the scenes not in the file yet
+    // and the in-between checks the budget still allows.
+    let positions = try builder.scoringPositions(builder.narratedPositions())
+    let plannedIndexes = Set(positions.map(\.globalIndex))
+    let checksMade = store.snapshot.entries.filter { !plannedIndexes.contains($0.globalIndex) }.count
+    let progress = ScoringProgress(
+        planned: positions.count,
+        alreadyScored: positions.filter { store.contains($0) }.count,
+        probeBudget: max(0, (plan.refinement?.maxProbes(planned: positions.count) ?? 0) - checksMade),
+        concurrency: concurrency,
+        started: started
+    )
+    note("  \(progress.toScore) of \(progress.planned) scenes to score, then up to \(progress.probeBudget) in-between checks; a progress line with the expected finish time follows every 10")
     let report = try await builder.build(
         into: store, engine: engine,
-        concurrency: args.int("concurrency", default: 4),
-        continueIf: { cap.allowsAnother() }
+        concurrency: concurrency,
+        continueIf: { cap.allowsAnother() },
+        onFailure: { reason in
+            if let line = progress.failure(reason) { note(line) }
+        }
     ) { entry, added in
         if added % 10 == 0 {
             try? store.snapshot.save(to: outURL)
-            note("  \(added) scored, now at ch\(entry.chapterOrdinal):s\(entry.sentenceIndex): \(entry.scene)")
+        }
+        if let line = progress.line(added: added, dollars: prices.dollars(usage.totals)) {
+            note(line + "; now at ch\(entry.chapterOrdinal):s\(entry.sentenceIndex)")
         }
     }
     try store.snapshot.save(to: outURL)

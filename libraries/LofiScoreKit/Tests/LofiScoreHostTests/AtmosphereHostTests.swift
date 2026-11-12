@@ -211,7 +211,7 @@ final class AtmosphereHostTests: XCTestCase {
         status = await host.status()
         XCTAssertEqual(status.atmosphere.levelDB, -30)
         XCTAssertEqual(AtmosphereSettings(defaults: defaults).atmosphereLevelDB, -30, "settings persist")
-        XCTAssertEqual(status.atmosphere.levelRange, [-40, -14])
+        XCTAssertEqual(status.atmosphere.levelRange, [-40, 0])
         XCTAssertEqual(status.atmosphere.intensity, 0.75, "the default")
         XCTAssertEqual(status.atmosphere.defaultIntensity, 0.75)
 

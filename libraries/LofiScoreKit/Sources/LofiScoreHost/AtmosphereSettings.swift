@@ -6,7 +6,7 @@ import LofiAudioCore
 /// so an update keeps the listener's choices and the linked folder.
 public final class AtmosphereSettings: @unchecked Sendable {
     /// Matches `AtmosphereConfig.levelRange`.
-    public static let atmosphereLevelRange: ClosedRange<Double> = -40 ... -14
+    public static let atmosphereLevelRange: ClosedRange<Double> = -40 ... 0
     /// Matches `AtmosphereConfig.intensityRange`.
     public static let atmosphereIntensityRange: ClosedRange<Double> = 0 ... 1
 

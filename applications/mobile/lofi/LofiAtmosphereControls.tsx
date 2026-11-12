@@ -29,7 +29,7 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
     )
   }
   const sounds = status.atmosphere
-  const [quietest = -40, loudest = -14] = sounds.levelRange
+  const [quietest = -40, loudest = 0] = sounds.levelRange
   const level = Math.min(loudest, Math.max(quietest, sounds.levelDB))
   const isDefaultLevel = Math.round(level) === Math.round(sounds.defaultLevelDB)
   const intensity = Math.min(1, Math.max(0, sounds.intensity))

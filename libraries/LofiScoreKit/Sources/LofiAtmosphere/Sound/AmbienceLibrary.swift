@@ -66,7 +66,8 @@ public struct AmbienceRecording: Codable, Sendable, Hashable {
 /// ```
 ///
 /// Folder names match loosely ("HeavyRain", "heavy rain", "heavy_rain"). Files that
-/// `sounds.json` does not list still play, at an assumed loudness. A plain sound plays
+/// `sounds.json` does not list still play, at an assumed loudness, unless it lists them
+/// as rejected. A plain sound plays
 /// only its own recordings, never a variant's.
 public struct AmbienceLibrary: Sendable, Hashable {
     public static let manifestName = "sounds.json"
@@ -77,10 +78,25 @@ public struct AmbienceLibrary: Sendable, Hashable {
     public struct Manifest: Codable, Sendable, Hashable {
         public var version: Int
         public var sounds: [AmbienceRecording]
+        /// Files in the folder that are not to be played: the fetch script found them to
+        /// be poor recordings (a drip under a running tap, a sound that comes and goes).
+        /// They stay in the folder, because nothing deletes from the copy in iCloud.
+        public var rejected: [Rejected]?
 
-        public init(version: Int = 1, sounds: [AmbienceRecording]) {
+        public struct Rejected: Codable, Sendable, Hashable {
+            public var file: String
+            public var why: String?
+
+            public init(file: String, why: String? = nil) {
+                self.file = file
+                self.why = why
+            }
+        }
+
+        public init(version: Int = 1, sounds: [AmbienceRecording], rejected: [Rejected]? = nil) {
             self.version = version
             self.sounds = sounds
+            self.rejected = rejected
         }
     }
 
@@ -117,10 +133,12 @@ public struct AmbienceLibrary: Sendable, Hashable {
     /// empty library.
     public static func load(from folder: URL, edition: SoundEdition = .personal, fileManager: FileManager = .default) throws -> AmbienceLibrary {
         var byFile: [String: AmbienceRecording] = [:]
+        var rejected: Set<String> = []
         let manifestURL = folder.appendingPathComponent(manifestName)
         if let data = try? Data(contentsOf: manifestURL) {
             let manifest = try JSONDecoder().decode(Manifest.self, from: data)
-            for var recording in manifest.sounds where isSafePath(recording.file) {
+            rejected = Set((manifest.rejected ?? []).map(\.file))
+            for var recording in manifest.sounds where isSafePath(recording.file) && !rejected.contains(recording.file) {
                 if let variant = recording.variant {
                     guard let id = SoundVariant.normalizedID(variant) else { continue }
                     recording.variant = id
@@ -146,7 +164,7 @@ public struct AmbienceLibrary: Sendable, Hashable {
             let files = (try? fileManager.contentsOfDirectory(at: subfolder, includingPropertiesForKeys: nil)) ?? []
             for file in files where audioExtensions.contains(file.pathExtension.lowercased()) {
                 let relative = name + "/" + file.lastPathComponent
-                guard byFile[relative] == nil else { continue }
+                guard byFile[relative] == nil, !rejected.contains(relative) else { continue }
                 byFile[relative] = AmbienceRecording(
                     id: sound.rawValue + (variant.map { "." + $0 } ?? "") + "/" + file.deletingPathExtension().lastPathComponent,
                     file: relative,
