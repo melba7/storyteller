@@ -174,6 +174,8 @@ if [ -f "$ROOT/server.json" ]; then
   fi
 fi
 echo "While a sound fetch is running it scores nothing and tries again at the next run."
+echo "So that the job can copy into iCloud Drive (macOS keeps background jobs out of it), once:"
+echo "System Settings > Privacy & Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on."
 echo "Progress: $ROOT/logs/lofi-sync.log. On the phone, pick the LofiMusic folder in iCloud Drive once"
 echo "(Settings > Atmosphere Sounds > Import a sounds folder); from then on new scores and sounds arrive by themselves."
 finish "Done."

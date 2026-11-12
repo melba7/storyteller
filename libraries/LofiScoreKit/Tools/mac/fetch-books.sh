@@ -51,13 +51,28 @@ PASSWORD="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USERNAME"
 # quotes and backslashes escaped), so the password is never a command-line argument.
 QUOTED="${PASSWORD//\\/\\\\}"
 QUOTED="${QUOTED//\"/\\\"}"
-TOKEN="$(curl -sS -f -K - "$URL/api/v2/token" <<EOF2 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["access_token"])'
+# Newer servers read "usernameOrEmail", older ones "username"; both are sent.
+STATUS_FILE="$(mktemp)"
+TOKEN="$(curl -sS -K - -w '%{http_code}' -o "$STATUS_FILE.body" "$URL/api/v2/token" <<EOF2 > "$STATUS_FILE"
 request = "POST"
 form-string = "usernameOrEmail=$USERNAME"
+form-string = "username=$USERNAME"
 form-string = "password=$QUOTED"
 EOF2
-)" || { echo "Could not sign in to $URL as $USERNAME"; exit 1; }
+python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["access_token"])' "$STATUS_FILE.body" 2>/dev/null
+)"
 unset PASSWORD QUOTED
+STATUS="$(cat "$STATUS_FILE" 2>/dev/null)"
+rm -f "$STATUS_FILE" "$STATUS_FILE.body"
+if [ -z "$TOKEN" ]; then
+  case "$STATUS" in
+    401) echo "The server at $URL refused the username or password for $USERNAME. Double-click install-automatic-scoring.command and type them again (the username or email you log in to Storyteller with)." ;;
+    403) echo "$URL answered 403 to the sign-in: something in front of the server (a login wall or proxy) is blocking it." ;;
+    000|"") echo "Could not reach $URL (no network, or the address is wrong)." ;;
+    *) echo "Could not sign in to $URL as $USERNAME (HTTP $STATUS)." ;;
+  esac
+  exit 1
+fi
 
 LIST="$(curl -sS -f -H "Authorization: Bearer $TOKEN" "$URL/api/v2/books?mediaFilter=synced")" \
   || { echo "Could not list the books on $URL"; exit 1; }
