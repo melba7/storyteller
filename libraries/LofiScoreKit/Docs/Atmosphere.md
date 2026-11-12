@@ -412,7 +412,9 @@ server's address and login (optional; the password goes into the login keychain)
 installs a launchd job that runs `Tools/mac/lofi-sync.sh` whenever a book lands in
 `~/Storyteller Lofi/Books` and every half hour. From then on a book synced in Storyteller
 gets its atmosphere by itself: the job fetches newly synced read-aloud books
-(`Tools/mac/fetch-books.sh`), scores each unscored one through the Claude plan
+(`Tools/mac/fetch-books.sh`; by default only books whose read-aloud version is made after
+the install, plus the titles listed in `~/Storyteller Lofi/Books/wanted.txt`, so the books
+already on the server are left alone), scores each unscored one through the Claude plan
 (`Tools/mac/make-atmosphere.sh`, written as `<book>.score.json`), fetches any new sounds,
 copies everything into `~/Storyteller Lofi/LofiMusic` and its iCloud Drive copy, and puts
 the score inside the book on the server (`Tools/mac/push-scores.sh`, the fork's
@@ -420,7 +422,8 @@ the score inside the book on the server (`Tools/mac/push-scores.sh`, the fork's
 to the reader. The shelved music's mood track (`Tools/mac/make-tracks.sh`) is made only
 with `--with-mood-tracks` or `LOFI_MOOD_TRACKS=1`. Each step is capped per book at API
 list prices (25 dollars for the atmosphere; edit `lofi-sync.sh` to change it), so a run
-that goes wrong can't use up the plan; the next run carries on. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
+that goes wrong can't use up the plan; the next run carries on. While a sound fetch
+(`Tools/mac/fetch-sounds.sh`) is running, nothing is scored until it ends. Logs are in `~/Storyteller Lofi/logs`; `stop-automatic-scoring.command`
 turns the job off. `~/Storyteller Lofi/Score atmosphere.command` (a copy of
 `Tools/mac/score-atmosphere.command`) runs the same sync once, in a window, for books
 dropped into `Books/` by hand. The atmosphere steps it runs:
