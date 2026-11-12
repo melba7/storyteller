@@ -5,6 +5,8 @@
 #   - a copy of the fork's tools in "~/Storyteller Lofi/scoring-tools", built once;
 #   - your Storyteller server's address and login (optional: without it, books
 #     are scored when you drop their read-aloud EPUBs into "~/Storyteller Lofi/Books");
+#     only books whose read-aloud version is made from the install on are fetched,
+#     unless you say otherwise, plus the titles listed in "Books/wanted.txt";
 #   - a launchd job that runs Tools/mac/lofi-sync.sh when a book lands in Books/
 #     and every half hour: it fetches newly synced books, scores them through your
 #     Claude plan (capped per book), copies the results into LofiMusic (the
@@ -13,8 +15,9 @@
 #     score inside its book on the server.
 #
 # Run it again to change the login or update the tools. stop-automatic-scoring.command
-# turns the job off. Logs: "~/Storyteller Lofi/logs". Nothing here touches the
-# Freesound or Anthropic key files.
+# turns the job off. Logs: "~/Storyteller Lofi/logs". While a sound fetch
+# (fetch-sounds.sh) is running, the job scores nothing and tries again later.
+# Nothing here touches the Freesound or Anthropic key files.
 ROOT="$HOME/Storyteller Lofi"
 TOOLS="$ROOT/scoring-tools"
 REPO="https://github.com/melba7/storyteller.git"
@@ -59,8 +62,9 @@ echo "Building the scoring tools (a few minutes the first time)..."
 echo
 current_url=""
 current_user=""
+current_since=""
 if [ -f "$ROOT/server.json" ]; then
-  read -r current_url current_user < <(python3 -I -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c.get("url",""), c.get("username",""))' "$ROOT/server.json")
+  read -r current_url current_user current_since < <(python3 -I -c 'import json,sys; c=json.load(open(sys.argv[1])); print(c.get("url",""), c.get("username",""), str(c.get("since","") or ""))' "$ROOT/server.json")
   echo "Storyteller server: $current_url as $current_user (press Return to keep)"
 else
   echo "Your Storyteller server fetches newly synced books by itself. Leave the address empty to skip this"
@@ -78,7 +82,33 @@ if [ -n "$url" ]; then
       security add-generic-password -U -s "$KEYCHAIN_SERVICE" -a "$user" -w "$password" || finish "Could not save the password in the keychain." 1
     fi
     unset password
-    python3 -I -c 'import json,sys; json.dump({"url": sys.argv[1].rstrip("/"), "username": sys.argv[2]}, open(sys.argv[3], "w"), indent=1)' "$url" "$user" "$ROOT/server.json"
+    # Which books: from now on only (the default), or everything already on the
+    # server too. Kept on a re-run; "since" in server.json is the switch.
+    since="$current_since"
+    if [ ! -f "$ROOT/server.json" ] || [ -z "$current_url" ]; then
+      since="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo "Books already on the server are left alone: only a book whose read-aloud version is made from now on"
+      echo "is scored, plus any title you list in $ROOT/Books/wanted.txt."
+      read -r -p "Score the books already on the server as well? Each costs plan usage. [y/N] " all_books
+      case "$all_books" in y|Y|yes|YES|Yes) since="" ;; esac
+    fi
+    python3 -I - "$url" "$user" "$since" "$ROOT/server.json" <<'PY'
+import json, sys
+url, user, since, path = sys.argv[1:5]
+config = {"url": url.rstrip("/"), "username": user}
+if since:
+    config["since"] = since
+json.dump(config, open(path, "w"), indent=1)
+PY
+    mkdir -p "$ROOT/Books"
+    if [ ! -f "$ROOT/Books/wanted.txt" ]; then
+      cat > "$ROOT/Books/wanted.txt" <<'TXT'
+# Books already on the server that should get sounds as well, one per line.
+# Part of the title is enough; capitals don't matter; lines starting with # are ignored.
+# Example:
+# Treasure Island
+TXT
+    fi
     echo "Checking the login..."
     if "$TOOLS/libraries/LofiScoreKit/Tools/mac/fetch-books.sh" > /dev/null 2>&1; then
       echo "Signed in. Newly synced books will be fetched from $url."
@@ -121,6 +151,15 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
 launchctl bootstrap "gui/$(id -u)" "$PLIST" || finish "Could not start the job (launchctl)." 1
 echo
 echo "Automatic scoring is on. It runs now, when a book lands in $ROOT/Books, and every half hour."
+if [ -f "$ROOT/server.json" ]; then
+  if python3 -I -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("since") else 1)' "$ROOT/server.json" 2>/dev/null; then
+    echo "From the server it takes only books whose read-aloud version is made from now on, plus the titles"
+    echo "in $ROOT/Books/wanted.txt (edit that file any time)."
+  else
+    echo "From the server it takes every read-aloud book that has no score yet."
+  fi
+fi
+echo "While a sound fetch is running it scores nothing and tries again at the next run."
 echo "Progress: $ROOT/logs/lofi-sync.log. On the phone, pick the LofiMusic folder in iCloud Drive once"
 echo "(Settings > Atmosphere Sounds > Import a sounds folder); from then on new scores and sounds arrive by themselves."
 finish "Done."

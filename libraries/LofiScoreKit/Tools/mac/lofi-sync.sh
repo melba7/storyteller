@@ -27,6 +27,12 @@
 #
 #   lofi-sync.sh [--tools DIR] [--no-pull] [--interactive] [--with-mood-tracks]
 #
+# While a sound fetch (fetch-sounds.sh) is running nothing is scored: from
+# launchd the run ends and the next one tries again; in a window it waits.
+# With "since" in server.json (the installer writes it) only books whose
+# read-aloud version was made from then on are fetched, plus the titles listed
+# in Books/wanted.txt; books put into Books/ by hand are always scored.
+#
 # --tools is the fork checkout to use (default: the one this script is in).
 # --no-pull skips updating it. --interactive prints progress for a Terminal
 # window instead of the log. --with-mood-tracks also makes each book's mood
@@ -72,6 +78,21 @@ if ! mkdir "$LOCK" 2>/dev/null; then
   fi
 fi
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT
+
+# A sound fetch (fetch-sounds.sh, hours long) fills the same folders and uses the
+# same Freesound quota, and a book scored before it ends would miss the new
+# sounds. From launchd, scoring waits for the next run; in a window, it waits here.
+sound_fetch_running() { pgrep -f 'fetch_ambience\.py|fetch-sounds\.sh' > /dev/null 2>&1; }
+if sound_fetch_running; then
+  if [ "$INTERACTIVE" = 1 ]; then
+    say "a sound fetch is still running; scoring waits for it to finish (Ctrl-C stops waiting)"
+    while sound_fetch_running; do sleep 60; done
+    say "the sound fetch has finished"
+  else
+    say "a sound fetch is still running; scoring waits for the next run"
+    exit 0
+  fi
+fi
 
 [ -d "$PKG" ] || { say "no tools at $TOOLS"; exit 1; }
 if ! command -v claude > /dev/null; then
