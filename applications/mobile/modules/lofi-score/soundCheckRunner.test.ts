@@ -1,18 +1,19 @@
 // LOFI-FORK: tests for running the sound check against a fake player (see FORK.md).
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it } from "vitest"
 
 import type { LofiSoundCheckStop, LofiStatus } from "./index"
 import {
   keepResults,
   keptResults,
+  restoreLeftoverPlace,
   RESULTS_KEY,
-  SAVED_PLACE_KEY,
+  savedPlaceKey,
   type SoundCheckDeps,
   SoundCheckRunner,
   type SoundCheckState,
 } from "./soundCheckRunner"
 
-const stops: LofiSoundCheckStop[] = [
+const twoStops: LofiSoundCheckStop[] = [
   {
     globalIndex: 100,
     lastIndex: 120,
@@ -31,11 +32,38 @@ const stops: LofiSoundCheckStop[] = [
   },
 ]
 
+/** The runners a test made: each one's check is ended after the test. */
+const made: SoundCheckRunner[] = []
+afterEach(async () => {
+  for (const runner of made.splice(0)) await runner.stop()
+})
+
+/** A knock at sentence 311, in a stop that starts 11 sentences before it. */
+const knock: LofiSoundCheckStop = {
+  globalIndex: 300,
+  lastIndex: 312,
+  kind: "oneOff",
+  sounds: [{ key: "doorKnock" }],
+  cueIndex: 311,
+  relativeUrl: "c.mp3",
+  start: 5,
+}
+
 /**
  * A player that lands on a stop's first sentence when it seeks to the stop and
- * moves on a sentence every 2 s while playing. `brokenUrls` never land.
+ * moves on a sentence every 2 s while playing. `brokenUrls` never land,
+ * `throwingUrls` fail, and `knockAt` is the sentence where a one-off plays.
  */
-function fakes(options: { brokenUrls?: string[]; muted?: boolean } = {}) {
+function fakes(
+  options: {
+    stops?: LofiSoundCheckStop[]
+    brokenUrls?: string[]
+    throwingUrls?: string[]
+    muted?: boolean
+    knockAt?: number
+  } = {},
+) {
+  const stops = options.stops ?? twoStops
   const store = new Map<string, string>()
   const calls: string[] = []
   let clock = 0
@@ -68,6 +96,7 @@ function fakes(options: { brokenUrls?: string[]; muted?: boolean } = {}) {
       getIsPlaying: async () => playing,
       seekTo: async (to, at) => {
         hooks.beforeSeek?.()
+        if (options.throwingUrls?.includes(to)) throw new Error("boom")
         calls.push(`seek ${to} ${at}`)
         uri = to
         position = at
@@ -103,6 +132,11 @@ function fakes(options: { brokenUrls?: string[]; muted?: boolean } = {}) {
     getReading: async () => ({
       voices: [],
       missingSounds: [],
+      missingOneShots: [],
+      oneShotsPlayed:
+        options.knockAt !== undefined && (current() ?? 0) >= options.knockAt
+          ? 1
+          : 0,
       route: "builtIn",
       routeMuted: false,
       voiceLoudnessLUFS: -16,
@@ -110,6 +144,9 @@ function fakes(options: { brokenUrls?: string[]; muted?: boolean } = {}) {
       oneShotsEnabled: true,
       pausesEnabled: true,
     }),
+    willJump: async (globalIndex) => {
+      calls.push(`jump ${globalIndex}`)
+    },
     wait: async (ms) => {
       clock += ms
     },
@@ -117,7 +154,8 @@ function fakes(options: { brokenUrls?: string[]; muted?: boolean } = {}) {
   }
   const states: SoundCheckState[] = []
   const runner = new SoundCheckRunner(deps, (state) => states.push(state))
-  return { runner, deps, store, calls, states, hooks }
+  made.push(runner)
+  return { runner, deps, store, calls, states, hooks, now }
 }
 
 describe("running the sound check", () => {
@@ -126,8 +164,10 @@ describe("running the sound check", () => {
     await runner.start("book")
     expect(runner.current.phase).toBe("asking")
     expect(runner.current.index).toBe(0)
-    expect(store.has(SAVED_PLACE_KEY)).toBe(true)
+    expect(store.has(savedPlaceKey("book"))).toBe(true)
     expect(runner.current.results[0]?.reading?.route).toBe("builtIn")
+    // The sounds are told of each jump first, so even a near one starts afresh.
+    expect(calls.slice(0, 3)).toEqual(["jump 100", "seek a.mp3 10", "play"])
 
     await runner.answer("clear")
     expect(runner.current.phase).toBe("asking")
@@ -140,7 +180,58 @@ describe("running the sound check", () => {
       "faint",
     ])
     expect(calls.slice(-3)).toEqual(["pause", "seek home.mp3 77", "play"])
-    expect(store.has(SAVED_PLACE_KEY)).toBe(false)
+    expect(store.size).toBe(0)
+  })
+
+  it("takes one answer for the last stop, however fast the taps", async () => {
+    const { runner, calls, states } = fakes()
+    await runner.start("book")
+    await runner.answer("clear")
+    await Promise.all([runner.answer("faint"), runner.answer("tooLoud")])
+    expect(runner.current.results[1]?.answer).toBe("faint")
+    expect(states.filter((s) => s.phase === "done")).toHaveLength(1)
+    expect(calls.filter((c) => c === "seek home.mp3 77")).toHaveLength(1)
+  })
+
+  it("reads what played even at a stop shorter than the fade-in", async () => {
+    const short = { ...twoStops[0]!, lastIndex: 100 }
+    const { runner } = fakes({ stops: [short] })
+    await runner.start("book")
+    expect(runner.current.phase).toBe("asking")
+    expect(runner.current.results[0]?.reading?.route).toBe("builtIn")
+  })
+
+  it("plays a one-off stop to the end of its sound, past 20 s, and notes that it played", async () => {
+    const { runner, now } = fakes({ stops: [knock], knockAt: 311 })
+    await runner.start("book")
+    expect(runner.current.phase).toBe("asking")
+    // 13 sentences at 2 s each.
+    expect(now()).toBeGreaterThan(25_000)
+    expect(runner.current.results[0]?.oneOffPlayed).toBe(true)
+
+    const silent = fakes({ stops: [knock] })
+    await silent.runner.start("book")
+    expect(silent.runner.current.results[0]?.oneOffPlayed).toBe(false)
+  })
+
+  it("leaves the narration paused at the listener's place when the app goes to the background", async () => {
+    const { runner, calls, store } = fakes()
+    await runner.start("book")
+    await runner.stop(false)
+    expect(calls.slice(-2)).toEqual(["pause", "seek home.mp3 77"])
+    expect(runner.current.phase).toBe("idle")
+    expect(store.size).toBe(0)
+  })
+
+  it("puts the narration back and says why when a jump fails", async () => {
+    const { runner, calls, store } = fakes({ throwingUrls: ["b.mp3"] })
+    await runner.start("book")
+    await runner.answer("clear")
+    expect(runner.current.phase).toBe("done")
+    expect(runner.current.message).toMatch(/boom/)
+    expect(runner.current.results[0]?.answer).toBe("clear")
+    expect(calls.slice(-3)).toEqual(["pause", "seek home.mp3 77", "play"])
+    expect(store.size).toBe(0)
   })
 
   it("ends a stop when the scene ends, before the 20 s", async () => {
@@ -180,7 +271,7 @@ describe("running the sound check", () => {
     expect(calls.filter((c) => c === "seek home.mp3 77")).toHaveLength(1)
     expect(calls.at(-1)).toBe("play")
     expect(runner.current.phase).toBe("idle")
-    expect(store.has(SAVED_PLACE_KEY)).toBe(false)
+    expect(store.size).toBe(0)
   })
 
   it("plays a stop again on request", async () => {
@@ -200,19 +291,48 @@ describe("running the sound check", () => {
   })
 
   it("puts back a place a closed app left behind, only for its book", async () => {
-    const { runner, store, calls } = fakes()
+    const { deps, store, calls } = fakes()
     const place = {
       bookID: "book",
       relativeUri: "x.mp3",
       position: 5,
       wasPlaying: true,
     }
-    store.set(SAVED_PLACE_KEY, JSON.stringify(place))
-    await runner.restoreLeftover("other")
+    store.set(savedPlaceKey("book"), JSON.stringify(place))
+    await restoreLeftoverPlace(deps.player, deps.storage, "other")
     expect(calls).toEqual([])
-    await runner.restoreLeftover("book")
-    expect(calls).toEqual(["pause", "seek x.mp3 5"])
-    expect(store.has(SAVED_PLACE_KEY)).toBe(false)
+    await restoreLeftoverPlace(deps.player, deps.storage, "book")
+    expect(calls).toEqual(["seek x.mp3 5"])
+    expect(store.size).toBe(0)
+  })
+
+  it("keeps a left-behind place until the player is really back there", async () => {
+    const { deps, store } = fakes()
+    store.set(
+      savedPlaceKey("book"),
+      JSON.stringify({ bookID: "book", relativeUri: "x.mp3", position: 5 }),
+    )
+    // The player has not loaded the book yet: it ignores the file.
+    const notLoaded = {
+      seekTo: async () => {},
+      getCurrentTrack: async () => null,
+    }
+    await restoreLeftoverPlace(notLoaded, deps.storage, "book")
+    expect(store.has(savedPlaceKey("book"))).toBe(true)
+    await restoreLeftoverPlace(deps.player, deps.storage, "book")
+    expect(store.size).toBe(0)
+
+    store.set(savedPlaceKey("book"), "not json")
+    await restoreLeftoverPlace(deps.player, deps.storage, "book")
+    expect(store.size).toBe(0)
+  })
+
+  it("leaves a left-behind place alone while a check is running", async () => {
+    const { runner, deps, calls } = fakes()
+    await runner.start("book")
+    const before = calls.length
+    await restoreLeftoverPlace(deps.player, deps.storage, "book")
+    expect(calls).toHaveLength(before)
   })
 
   it("keeps the last five runs' results, newest first", async () => {

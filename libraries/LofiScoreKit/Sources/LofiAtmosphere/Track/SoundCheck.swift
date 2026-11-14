@@ -59,8 +59,10 @@ public struct SoundCheckSpot: Sendable, Hashable {
 /// Picks the sound check's spots from a book's atmosphere track.
 ///
 /// A spot is a run of sentences where the same main sound (same kind, same level) plays
-/// steadily: a confident scene, no transition or moment cutting in, no chapter start
-/// (the sounds dip there) and no one-off. Runs of at least ``minRunSentences`` qualify.
+/// steadily at its full level, the way ``AtmosphereDirector`` plays the track: a confident
+/// scene, no transition or moment cutting in, no chapter start (the sounds dip there until
+/// the new chapter has a scene of its own) and no one-off. Runs of at least
+/// ``minRunSentences`` qualify.
 public enum SoundCheck {
     static let sceneKinds: [SoundCheckSpot.Kind] = [.quietRoom, .loud, .outdoors, .water, .weather, .travel]
     static let quietRoomSounds: Set<AmbientSound> = [.roomTone, .hushedRoom, .clock, .electricHum, .emptyHall]
@@ -69,9 +71,10 @@ public enum SoundCheck {
 
     /// Up to `count` spots, all ending before `limit` (the first sentence not yet heard),
     /// returned in book order. One place goes to a one-off when the book has one before the
-    /// limit and `oneOffs` is on; the rest go to one scene per kind, then to scenes with a
-    /// main sound not played yet. Within a kind it prefers a level no spot covers yet, then
-    /// a main sound not picked yet, then the earliest, so the same spots come back on the
+    /// limit and `oneOffs` is on; the rest go to one steady scene per kind, then to steady
+    /// scenes with a main sound not played yet, then to the longest run of each kind that
+    /// has no steady one. Among steady runs it prefers a level no spot covers yet, then a
+    /// main sound not picked yet, then the earliest, so the same spots come back on the
     /// next run.
     public static func spots(
         in track: AtmosphereTrack,
@@ -79,12 +82,15 @@ public enum SoundCheck {
         count: Int = 6,
         oneOffs: Bool = true,
         oneOffAllowed: (AtmosphereTrack.Cue) -> Bool = { _ in true },
-        minConfidence: Double = AtmosphereConfig().minConfidence
+        minConfidence: Double = AtmosphereConfig().minConfidence,
+        maxLag: Int = AtmosphereConfig().maxLagSentences
     ) -> [SoundCheckSpot] {
         guard count > 0, limit > 0 else { return [] }
         let cues = track.cues.filter { $0.globalIndex + 1 < limit }
         let cue = oneOffs ? cues.first { oneOffAllowed($0) } : nil
-        let runs = Self.runs(in: track, before: limit, minConfidence: minConfidence, splitAt: Set(cues.map(\.globalIndex)))
+        let runs = Self.runs(
+            in: track, before: limit, minConfidence: minConfidence, maxLag: maxLag, splitAt: Set(cues.map(\.globalIndex))
+        )
 
         var picked: [SoundCheckSpot] = []
         let sceneSlots = count - (cue == nil ? 0 : 1)
@@ -108,18 +114,20 @@ public enum SoundCheck {
             )
         }
 
+        let steady = runs.filter { $0.length >= minRunSentences }
         for kind in sceneKinds where picked.count < sceneSlots {
-            let ofKind = runs.filter { free($0) && matches($0.scene, kind) }
-            let steady = ofKind.filter { $0.length >= minRunSentences }
-            // A kind with no steady run falls back to its longest one, the earliest on a tie.
-            let choice = best(steady) ?? ofKind.min { ($1.length, $0.first) < ($0.length, $1.first) }
-            if let choice { picked.append(spot(choice, kind)) }
+            if let choice = best(steady.filter { free($0) && matches($0.scene, kind) }) { picked.append(spot(choice, kind)) }
         }
         while picked.count < sceneSlots {
             let keys = Set(picked.compactMap { $0.sounds.first?.key })
-            let fresh = runs.filter { free($0) && $0.length >= minRunSentences && !keys.contains($0.main.key) }
-            guard let choice = best(fresh) else { break }
+            guard let choice = best(steady.filter { free($0) && !keys.contains($0.main.key) }) else { break }
             picked.append(spot(choice, .other))
+        }
+        // Places still free go to the kinds with no steady run: their longest one, the
+        // earliest on a tie. A short stop tells less, so a steady one goes first.
+        for kind in sceneKinds where picked.count < sceneSlots && !picked.contains(where: { $0.kind == kind }) {
+            let ofKind = runs.filter { free($0) && matches($0.scene, kind) }
+            if let choice = ofKind.min(by: { ($1.length, $0.first) < ($0.length, $1.first) }) { picked.append(spot(choice, kind)) }
         }
         if let cue {
             picked.append(SoundCheckSpot(
@@ -138,44 +146,51 @@ public enum SoundCheck {
         var length: Int { last - first + 1 }
     }
 
-    /// Steady runs of a confident scene's main sound, cut at chapter starts and one-offs,
-    /// all ending before `limit`.
-    static func runs(in track: AtmosphereTrack, before limit: Int, minConfidence: Double, splitAt cues: Set<Int>) -> [Run] {
-        let entries = track.entries.filter { $0.globalIndex < limit }
-        let playable = { (scene: StoryScene) in !scene.isSilent && scene.confidence >= minConfidence }
+    /// Steady runs of a main sound as the director plays them, all ending before `limit`.
+    ///
+    /// Only confident entries count: the director passes over the others. An entry plays at
+    /// its full level from its own sentence until the next confident entry, the next chapter
+    /// start (the sounds dip there until the new chapter has a scene of its own) or `maxLag`
+    /// sentences on, whichever comes first. Entries that follow on with the same main sound
+    /// and level join into one run, unless the later one cuts in with a transition or a
+    /// moment. Runs are then cut around one-offs. Each run gives up its last sentence: the
+    /// stop is ended while that sentence plays, so nothing after the run is ever heard.
+    static func runs(in track: AtmosphereTrack, before limit: Int, minConfidence: Double, maxLag: Int, splitAt cues: Set<Int>) -> [Run] {
+        let entries = track.entries.filter { $0.globalIndex < limit && $0.scene.confidence >= minConfidence }
+        /// The last sentence entry `i` plays at its full level.
+        func lastPlayed(_ i: Int) -> Int {
+            let index = entries[i].globalIndex
+            var last = min(limit - 1, index + maxLag)
+            if i + 1 < entries.count { last = min(last, entries[i + 1].globalIndex - 1) }
+            if let chapter = track.chapterStarts.first(where: { $0 > index }) { last = min(last, chapter - 1) }
+            return last
+        }
         var spans: [Run] = []
         var i = 0
         while i < entries.count {
             let start = entries[i]
-            guard playable(start.scene) else { i += 1; continue }
+            guard let main = start.scene.layers.first else { i += 1; continue }
+            var last = lastPlayed(i)
             var j = i + 1
-            while j < entries.count {
+            while j < entries.count, entries[j].globalIndex == last + 1 {
                 let next = entries[j].scene
-                guard playable(next), next.transition == nil, next.moment == nil,
-                      next.layers[0].key == start.scene.layers[0].key,
-                      next.layers[0].level == start.scene.layers[0].level else { break }
+                guard next.transition == nil, next.moment == nil,
+                      next.layers.first?.key == main.key, next.layers.first?.level == main.level else { break }
+                last = lastPlayed(j)
                 j += 1
             }
-            let end = j < entries.count ? entries[j].globalIndex - 1 : limit - 1
-            spans.append(Run(first: start.globalIndex, last: min(end, limit - 1), scene: start.scene))
+            if last >= start.globalIndex { spans.append(Run(first: start.globalIndex, last: last, scene: start.scene)) }
             i = j
         }
-        // Cut at chapter starts (the run may begin at one) and around one-offs.
-        let chapterStarts = Set(track.chapterStarts)
         return spans.flatMap { run -> [Run] in
             var pieces: [Run] = []
             var first = run.first
-            for index in run.first...run.last {
-                if cues.contains(index) {
-                    if index > first { pieces.append(Run(first: first, last: index - 1, scene: run.scene)) }
-                    first = index + 1
-                } else if index > first, chapterStarts.contains(index) {
-                    pieces.append(Run(first: first, last: index - 1, scene: run.scene))
-                    first = index
-                }
+            for index in run.first...run.last where cues.contains(index) {
+                if index > first { pieces.append(Run(first: first, last: index - 1, scene: run.scene)) }
+                first = index + 1
             }
             if first <= run.last { pieces.append(Run(first: first, last: run.last, scene: run.scene)) }
-            return pieces
+            return pieces.map { $0.length > 1 ? Run(first: $0.first, last: $0.last - 1, scene: $0.scene) : $0 }
         }
     }
 

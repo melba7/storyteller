@@ -66,25 +66,44 @@ extension LofiAtmosphereHost {
         let missing = Set(snapshot?.missingOneShots ?? [])
         return try Self.soundCheckStops(
             track: source.track, spoilerGuard: source.spoilerGuard, playingNow: now.globalIndex, count: count,
-            oneOffs: snapshot?.oneShotsEnabled ?? false, oneOffSound: { !missing.contains($0) }
+            oneOffs: snapshot?.oneShotsEnabled ?? false, oneOffSound: { !missing.contains($0) },
+            rate: followerStatus.estimatedRate
         )
     }
 
-    /// The seconds of narration a one-off stop plays before its sound: the player plays no
-    /// one-off in the first 3 s after a jump.
+    /// The app is about to jump the narration to a stop that starts at this sentence: the
+    /// sounds treat it as a seek however near it is (see ``NarrationFollower/expectJump(toGlobalSentenceIndex:)``).
+    public func soundCheckWillJump(toGlobalSentenceIndex index: Int) {
+        follower.expectJump(toGlobalSentenceIndex: index)
+    }
+
+    /// The seconds a one-off stop plays before its sound: the player plays no one-off in
+    /// the first 3 s after a jump. At a faster narration speed the stop starts that much
+    /// more audio ahead.
     static let oneOffLeadIn: Double = 5
+    /// How many sentences back a one-off stop may start.
+    static let oneOffLeadInSentences = 20
 
     /// The stops among the sentences before `playingNow`. Spots whose audio cannot be found
-    /// are left out, and so is a one-off with no room for its lead-in in the same file.
+    /// are left out, and so is a one-off with no clean lead-in in the same file: room for
+    /// ``oneOffLeadIn`` seconds at the narration speed `rate`, with no other one-off in
+    /// them and no transition or moment cutting in before the stop ends.
     static func soundCheckStops(
         track: AtmosphereTrack, spoilerGuard: SpoilerGuard, playingNow: Int, count: Int,
-        oneOffs: Bool = true, oneOffSound: (OneShotSound) -> Bool = { _ in true }
+        oneOffs: Bool = true, oneOffSound: (OneShotSound) -> Bool = { _ in true }, rate: Double = 1
     ) throws -> [SoundCheckStop] {
+        let needed = oneOffLeadIn * max(1, rate.isFinite ? rate : 1)
+        let otherCues = Set(track.cues.map(\.globalIndex))
+        let cutIns = Set(track.entries.filter { $0.scene.transition != nil || $0.scene.moment != nil }.map(\.globalIndex))
         func leadIn(to cue: Int) -> (index: Int, clip: NarrationClip)? {
             guard let target = try? spoilerGuard.clip(atGlobalIndex: cue) else { return nil }
-            for index in stride(from: cue - 1, through: max(0, cue - 20), by: -1) {
-                guard let clip = try? spoilerGuard.clip(atGlobalIndex: index), clip.audioPath == target.audioPath else { return nil }
-                if target.start - clip.start >= oneOffLeadIn { return (index, clip) }
+            for index in stride(from: cue - 1, through: max(0, cue - oneOffLeadInSentences), by: -1) {
+                // Anything further back only adds to what is in the way.
+                guard !otherCues.contains(index), !cutIns.contains(index + 1),
+                      let clip = try? spoilerGuard.clip(atGlobalIndex: index), clip.audioPath == target.audioPath else { return nil }
+                if target.start - clip.start >= needed {
+                    return cutIns.contains(cue + 1) ? nil : (index, clip)
+                }
             }
             return nil
         }
@@ -120,8 +139,8 @@ extension LofiAtmosphereHost {
     }
 
     /// What is playing now, for a sound check answer: each sound with its level, recording,
-    /// gain and whether it sits at the gain cap, plus where the sound goes and the levels in
-    /// use. Nil when the sounds are not running.
+    /// gain and whether it sits at the gain cap, plus where the sound goes, the levels in
+    /// use and how many one-offs have played. Nil when the sounds are not running.
     public func soundCheckReading() async -> [String: Any]? {
         guard let player = await soundCheckSource()?.player else { return nil }
         let snapshot = await withCheckedContinuation { continuation in player.snapshot { continuation.resume(returning: $0) } }
@@ -138,6 +157,8 @@ extension LofiAtmosphereHost {
                 return object
             },
             "missingSounds": snapshot.missingSounds.map(\.rawValue),
+            "missingOneShots": snapshot.missingOneShots.map(\.rawValue),
+            "oneShotsPlayed": snapshot.oneShotsPlayed,
             "route": snapshot.route.rawValue,
             "routeMuted": snapshot.routeMuted,
             "voiceLoudnessLUFS": snapshot.voiceLoudnessLUFS,

@@ -52,6 +52,8 @@ const reading: LofiSoundCheckReading = {
     },
   ],
   missingSounds: ["clock"],
+  missingOneShots: [],
+  oneShotsPlayed: 0,
   route: "wired",
   routeMuted: false,
   voiceLoudnessLUFS: -16,
@@ -76,10 +78,12 @@ describe("sound check wording", () => {
     expect(stopLabel(stops[0]!)).toBe(
       "Listen for a quiet room (soft) in the study. Also there: a ticking clock.",
     )
-    expect(stopLabel(stops[1]!)).toBe("Listen for running tap (full).")
-    expect(stopLabel(stops[2]!)).toBe("Listen for a one-off sound: door knock.")
+    expect(stopLabel(stops[1]!)).toBe("Listen for the running tap (full).")
+    expect(stopLabel(stops[2]!)).toBe(
+      "Listen for a one-off sound: the door knock.",
+    )
     expect(stopQuestion(stops[1]!)).toBe(
-      "How did running tap come through under the voice?",
+      "How did the running tap come through under the voice?",
     )
   })
 })
@@ -88,10 +92,26 @@ describe("sound check results", () => {
   it("writes the run's conditions, each answer and what played", () => {
     const text = resultsText(
       stops,
-      [{ answer: "clear", reading }, { couldNotPlay: true }, {}],
+      [
+        { answer: "clear", reading },
+        { couldNotPlay: true },
+        {
+          answer: "cantHear",
+          oneOffPlayed: false,
+          reading: {
+            ...reading,
+            voices: [],
+            missingSounds: [],
+            missingOneShots: ["doorKnock"],
+            bedLevelDB: -4,
+            route: "builtIn",
+          },
+        },
+      ],
       {
         book: "Redwood",
-        appVersion: "2.12.0",
+        appVersion: "2.12.0 (12.1)",
+        edition: "personal",
         levelDB: -10,
         defaultLevelDB: -10,
         intensity: 0.5,
@@ -104,15 +124,19 @@ describe("sound check results", () => {
     expect(text).toBe(
       [
         "Sound check: Redwood (2026-11-14 18:00)",
-        "App 2.12.0, sounds imported, narration speed 1.25x",
+        "App 2.12.0 (12.1), sounds imported (personal edition), narration speed 1.25x",
         "Sounds volume -10 dB (default), how much is going on 50%",
         "Output wired, bed -10 dB under a -16 LUFS voice, one-offs on, pauses off",
         "1. #12-25 quietRoom roomTone soft, clock faint (the study): Clear",
         "    roomTone soft: fs123, gain +6 dB (at the gain cap)",
         "    missing: clock",
         "2. #300-320 water river.runningTap full: could not play",
-        "3. #405-411 oneOff doorKnock: not answered",
-        "    (nothing read)",
+        "3. #405-411 oneOff doorKnock: Can't hear",
+        "    (no sounds playing)",
+        "    one-offs missing: doorKnock",
+        "    (sounds volume changed to -4 dB)",
+        "    (output changed to builtIn)",
+        "    the one-off did not play",
       ].join("\n"),
     )
   })

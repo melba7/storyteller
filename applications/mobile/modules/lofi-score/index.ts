@@ -200,6 +200,10 @@ export type LofiSoundCheckReading = {
     atGainCap: boolean
   }[]
   missingSounds: string[]
+  /** One-off sounds asked for that have no recording. */
+  missingOneShots: string[]
+  /** How many one-off sounds have played since the book opened. */
+  oneShotsPlayed: number
   /** builtIn, wired, bluetooth, airPlay, carPlay or other. */
   route: string
   routeMuted: boolean
@@ -259,6 +263,8 @@ type LofiScoreNativeModule = {
   getSoundCheckStops(count: number): Promise<LofiSoundCheckStop[]>
   /** What plays now, with each sound's level, recording and gain; null when the sounds are off. */
   getSoundCheckReading(): Promise<LofiSoundCheckReading | null>
+  /** Says the narration is about to be moved to a stop starting at this sentence. */
+  soundCheckWillJump(globalIndex: number): Promise<void>
 }
 
 /**

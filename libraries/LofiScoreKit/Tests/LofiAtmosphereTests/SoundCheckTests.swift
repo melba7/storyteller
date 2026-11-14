@@ -47,7 +47,7 @@ final class SoundCheckTests: XCTestCase {
         XCTAssertEqual(spots.map(\.globalIndex), spots.map(\.globalIndex).sorted(), "played in book order")
         let loud = try XCTUnwrap(spots.first { $0.kind == .loud })
         XCTAssertEqual(loud.globalIndex, 20)
-        XCTAssertEqual(loud.lastIndex, 29, "the stop ends where the scene changes")
+        XCTAssertEqual(loud.lastIndex, 28, "the stop ends a sentence before the scene changes")
         XCTAssertEqual(loud.sounds, [.init(key: "crowd", level: .loud)])
         XCTAssertEqual(loud.placeName, "the hall")
         let knock = try XCTUnwrap(spots.first { $0.kind == .oneOff })
@@ -81,11 +81,13 @@ final class SoundCheckTests: XCTestCase {
         for spot in spots where spot.kind != .oneOff {
             XCTAssertFalse(spot.globalIndex < 55 && spot.lastIndex >= 55, "no chapter start inside a stop")
         }
-        // The rain (50 to 59) is cut in two by the chapter start at 55: both too short, so
-        // the weather falls back to its longest piece, the earlier on a tie.
+        // The rain (50 to 59) dips at the chapter start at 55, so only its first half is a
+        // stop: too short, but the weather has no longer one to fall back to.
         let weather = try XCTUnwrap(spots.first { $0.kind == .weather })
         XCTAssertEqual(weather.globalIndex, 50)
-        XCTAssertEqual(weather.lastIndex, 54)
+        XCTAssertEqual(weather.lastIndex, 53)
+        // The unsure crowd at 20 never plays, so the quiet room before it plays on to the forest.
+        XCTAssertEqual(spots.first { $0.kind == .quietRoom }?.lastIndex, 28)
     }
 
     func testRunsOfTheSameMainSoundMakeOneLongerStop() throws {
@@ -97,7 +99,7 @@ final class SoundCheckTests: XCTestCase {
         let spots = SoundCheck.spots(in: try track(steady), before: 200, count: 4)
         let fire = try XCTUnwrap(spots.first { $0.sounds.first?.key == "fireplace" })
         XCTAssertEqual(fire.globalIndex, 0)
-        XCTAssertEqual(fire.lastIndex, 19)
+        XCTAssertEqual(fire.lastIndex, 18)
     }
 
     func testNeverReachesPastWhatWasHeard() throws {
@@ -106,7 +108,7 @@ final class SoundCheckTests: XCTestCase {
         XCTAssertFalse(spots.isEmpty)
         XCTAssertTrue(spots.allSatisfy { $0.lastIndex < 45 })
         XCTAssertFalse(spots.contains { $0.kind == .oneOff }, "the knock at 75 is past the limit")
-        XCTAssertEqual(spots.first { $0.kind == .water }?.lastIndex, 44, "the river is cut short at the limit")
+        XCTAssertEqual(spots.first { $0.kind == .water }?.lastIndex, 43, "the river ends a sentence before the limit")
     }
 
     func testPrefersLevelsNotCoveredAndTheEarliestSpot() throws {
@@ -120,6 +122,60 @@ final class SoundCheckTests: XCTestCase {
         XCTAssertEqual(spots.map(\.globalIndex), [0, 30], "the outdoors pick is full, a level the room did not cover")
         // The same stops come back on the next run.
         XCTAssertEqual(SoundCheck.spots(in: try track(rooms), before: 200, count: 2), spots)
+    }
+
+    /// What the picker promises is what the director plays: at every sentence of a stop,
+    /// the stop's main sound at its level, not dipped.
+    private func assertPlaysSteadily(_ spots: [SoundCheckSpot], in track: AtmosphereTrack, file: StaticString = #filePath, line: UInt = #line) {
+        var director = AtmosphereDirector()
+        director.setTrack(track)
+        for spot in spots where spot.kind != .oneOff {
+            for index in spot.globalIndex...spot.lastIndex + 1 {
+                let target = director.target(at: index)
+                let main = target.scene.layers.first
+                XCTAssertEqual(main?.key, spot.sounds.first?.key, "sentence \(index) of the stop at \(spot.globalIndex)", file: file, line: line)
+                XCTAssertEqual(main?.level, spot.sounds.first?.level, "sentence \(index) of the stop at \(spot.globalIndex)", file: file, line: line)
+                XCTAssertFalse(target.dipped, "sentence \(index) of the stop at \(spot.globalIndex) is dipped", file: file, line: line)
+            }
+        }
+    }
+
+    func testAStopNeverStartsWhereAChapterStartDipsTheSounds() throws {
+        // The fire burns across the chapter start at 15, but from 15 to 19 it is dipped: the
+        // new chapter has no scene of its own until 20.
+        let fire = scene("p1", .indoors, [SceneLayer(.fireplace, .full)])
+        let track = try track([fire, fire, fire, scene("p2", .outdoors, [SceneLayer(.rain, .full)])], chapterStarts: [0, 15])
+        let runs = SoundCheck.runs(in: track, before: 200, minConfidence: 0.35, maxLag: 80, splitAt: [])
+        XCTAssertEqual(runs.map(\.first), [0, 20, 30])
+        XCTAssertEqual(runs.map(\.last), [13, 28, 109], "each ends a sentence early; the last fades out 80 sentences on")
+        assertPlaysSteadily(SoundCheck.spots(in: track, before: 200, count: 6), in: track)
+    }
+
+    func testEveryStopPlaysItsMainSoundSteadily() throws {
+        var mixed = scenes
+        mixed[2] = scene("p2", .indoors, [SceneLayer(.crowd, .loud)], confidence: 0.2)
+        mixed[7] = scene("p1", .indoors, [SceneLayer(.train, .full)], transition: .enterThroughDoor)
+        for limit in [200, 97, 64, 33] {
+            let track = try track(mixed, cues: [44, 75], chapterStarts: [0, 35, 62, 90])
+            let spots = SoundCheck.spots(in: track, before: limit, count: 8)
+            XCTAssertFalse(spots.isEmpty)
+            XCTAssertTrue(spots.allSatisfy { $0.lastIndex < limit })
+            assertPlaysSteadily(spots, in: track)
+        }
+    }
+
+    func testASteadySceneGoesBeforeAShortOneOfAMissingKind() throws {
+        // The rain lasts three sentences before the fire takes over for good.
+        let guardian = try SpoilerGuard(chapters: [(0..<200).map { "Sentence \($0)." }])
+        let entries = try [(0, SceneLayer(.rain, .full)), (3, SceneLayer(.fireplace, .soft)), (40, SceneLayer(.kitchen, .faint))].map { index, layer in
+            AtmosphereTrack.Entry(
+                position: try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: index)),
+                sentence: "Sentence \(index).", scene: scene("p\(index)", .indoors, [layer])
+            )
+        }
+        let track = AtmosphereTrack(engineID: "test", bookID: "book", wordsBetweenEntries: 250, chapterStarts: [0], entries: entries)
+        XCTAssertEqual(SoundCheck.spots(in: track, before: 200, count: 2).map(\.kind), [.other, .other], "the fire and the kitchen")
+        XCTAssertEqual(SoundCheck.spots(in: track, before: 200, count: 3).map(\.kind), [.weather, .other, .other], "the short rain when there is room")
     }
 
     func testAnEmptyOrSilentTrackHasNoSpots() throws {

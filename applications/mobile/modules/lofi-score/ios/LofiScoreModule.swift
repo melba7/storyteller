@@ -201,6 +201,12 @@ public final class LofiScoreModule: Module {
       return found
     }
 
+    // The sound check is about to seek the narration to a stop that starts at this sentence:
+    // the sounds treat it as a jump however near it is, so a stop played again starts afresh.
+    AsyncFunction("soundCheckWillJump") { (globalIndex: Int) in
+      LofiScoreRuntime.shared.host.soundCheckWillJump(toGlobalSentenceIndex: globalIndex)
+    }
+
     // What plays now, for a sound check answer: each sound's level, recording, gain and
     // whether it is at the gain cap, plus the route and the levels in use. Null when the
     // sounds are not running.

@@ -36,12 +36,17 @@ export type SoundCheckResult = {
   couldNotPlay?: boolean
   /** What played, read a few seconds into the stop. */
   reading?: LofiSoundCheckReading | null
+  /** For a one-off stop: whether the player played its sound at all. */
+  oneOffPlayed?: boolean
 }
 
 /** The run's conditions, written once at the top of the results. */
 export type SoundCheckContext = {
   book: string
+  /** The version, with the build number when the build has one. */
   appVersion: string
+  /** "personal" or "publish": which recordings this build may play. */
+  edition: string
   levelDB: number
   defaultLevelDB: number
   intensity: number
@@ -58,10 +63,12 @@ export function soundKeyName(key: string): string {
   return soundName(raw)
 }
 
-/** The sound to listen for: the stop's main sound. */
+/** The sound to listen for, as it reads in a sentence: "the waves", "a quiet room". */
 export function mainSoundName(stop: LofiSoundCheckStop): string {
   const main = stop.sounds[0]
-  return main ? soundKeyName(main.key) : "the sounds"
+  if (!main) return "the sounds"
+  const name = soundKeyName(main.key)
+  return /^(a|an|the) /.test(name) ? name : `the ${name}`
 }
 
 /** "Listen for the waves (soft). Also there: wind." */
@@ -86,7 +93,10 @@ function signed(value: number): string {
   return `${rounded > 0 ? "+" : ""}${rounded}`
 }
 
-function describeReading(reading: LofiSoundCheckReading | null | undefined) {
+function describeReading(
+  reading: LofiSoundCheckReading | null | undefined,
+  first: LofiSoundCheckReading | null | undefined,
+) {
   if (!reading) return "    (nothing read)"
   const lines = reading.voices.map(
     (voice) =>
@@ -96,6 +106,17 @@ function describeReading(reading: LofiSoundCheckReading | null | undefined) {
     lines.push(`    missing: ${reading.missingSounds.join(", ")}`)
   }
   if (lines.length === 0) lines.push("    (no sounds playing)")
+  if (reading.missingOneShots.length > 0) {
+    lines.push(`    one-offs missing: ${reading.missingOneShots.join(", ")}`)
+  }
+  // The sliders stay in reach during the check, so a stop says when it played
+  // at another volume or through another output than the first.
+  if (first && reading.bedLevelDB !== first.bedLevelDB) {
+    lines.push(`    (sounds volume changed to ${reading.bedLevelDB} dB)`)
+  }
+  if (first && reading.route !== first.route) {
+    lines.push(`    (output changed to ${reading.route})`)
+  }
   return lines.join("\n")
 }
 
@@ -113,7 +134,7 @@ export function resultsText(
   const first = results.find((result) => result.reading)?.reading
   const lines = [
     `Sound check: ${context.book} (${context.startedAt})`,
-    `App ${context.appVersion}, sounds ${context.source}, narration speed ${context.playbackRate}x`,
+    `App ${context.appVersion}, sounds ${context.source} (${context.edition} edition), narration speed ${context.playbackRate}x`,
     `Sounds volume ${level} dB${levelDefault ? " (default)" : ""}, how much is going on ${Math.round(context.intensity * 100)}%${intensityDefault ? " (default)" : ""}`,
   ]
   if (first) {
@@ -134,8 +155,16 @@ export function resultsText(
     lines.push(
       `${index + 1}. #${stop.globalIndex}-${stop.lastIndex} ${stop.kind} ${sounds}${place}: ${answer}`,
     )
-    if (result && !result.couldNotPlay)
-      lines.push(describeReading(result.reading))
+    if (result && !result.couldNotPlay) {
+      lines.push(describeReading(result.reading, first))
+      if (result.oneOffPlayed !== undefined) {
+        lines.push(
+          result.oneOffPlayed
+            ? "    the one-off played"
+            : "    the one-off did not play",
+        )
+      }
+    }
   })
   return lines.join("\n")
 }

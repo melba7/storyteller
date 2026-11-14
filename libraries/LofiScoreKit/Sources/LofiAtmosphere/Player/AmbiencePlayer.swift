@@ -63,6 +63,10 @@ public struct AmbienceSnapshot: Sendable, Hashable {
     public var route: OutputRoute = .builtIn
     public var voiceLoudnessLUFS: Double = AtmosphereConfig().voiceLoudnessLUFS
     public var bedLevelDB: Double = AtmosphereConfig().bedLevelDB
+    /// How many of the track's one-off sounds have played since the book opened. The sound
+    /// check reads it before and after a one-off stop, to tell a sound that was too quiet
+    /// from one that never played.
+    public var oneShotsPlayed = 0
 }
 
 /// Plays the atmosphere: the sounds of the scene being narrated, looped seamlessly
@@ -150,6 +154,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
     private var oneShotsEnabled = false
     private var lastOneShotAt: TimeInterval = -.infinity
     private var lastOneShotIndex: Int?
+    private var oneShotsPlayed = 0
     /// A one-off sound waiting for its moment inside the sentence being narrated.
     private var pendingCue: (cue: AtmosphereTrack.Cue, timer: LofiCancellable)?
     private var missingOneShots: Set<OneShotSound> = []
@@ -805,6 +810,7 @@ public final class AmbiencePlayer: @unchecked Sendable {
         do {
             try backend.playOnce(oneShots.url(for: recording), gain: Float(gain), filter: .standard)
             lastOneShotAt = now
+            oneShotsPlayed += 1
             onEvent?(.oneShot(cue.sound))
         } catch {
             report("could not play \(recording.file): \(error)")
@@ -994,7 +1000,8 @@ public final class AmbiencePlayer: @unchecked Sendable {
             lastError: lastError,
             route: backend.currentRoute,
             voiceLoudnessLUFS: config.voiceLoudnessLUFS,
-            bedLevelDB: config.bedLevelDB
+            bedLevelDB: config.bedLevelDB,
+            oneShotsPlayed: oneShotsPlayed
         )
     }
 }

@@ -369,6 +369,7 @@ final class OneShotTests: XCTestCase {
         h.player.narratorDidSeek(toGlobalSentenceIndex: 3)
         for index in 3...5 { h.narrate(index, then: 4) }
         XCTAssertEqual(h.played, ["knock.wav", "knock.wav"], "a deliberate jump is a fresh start")
+        XCTAssertEqual(h.snapshot().oneShotsPlayed, 2, "the sound check reads this to see that it played")
     }
 
     func testPausingOrTurningThemOffDropsAWaitingSound() throws {

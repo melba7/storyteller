@@ -1,5 +1,6 @@
 // LOFI-FORK: the atmosphere button in the player's toolbar, and the panel it
 // opens (see FORK.md).
+import AsyncStorage from "@react-native-async-storage/async-storage"
 import { AudioLines } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Modal, Pressable, View } from "react-native"
@@ -8,6 +9,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
+import { logger } from "@/logger"
+import { restoreLeftoverPlace } from "@/modules/lofi-score/soundCheckRunner"
+import { Storyteller } from "@/modules/readium"
 import { useAppSelector } from "@/store/appState"
 import { getCurrentlyPlayingBookUuid } from "@/store/selectors/bookshelfSelectors"
 
@@ -48,6 +52,18 @@ export function LofiAtmosphereToolbarItem({ mode }: Props) {
       readerHidden()
     }
   }, [mode, bookUuid])
+
+  // A sound check the app closed in the middle of left the narration at one
+  // of its stops. Put it back as soon as the book is on screen, before the
+  // listener plays on from the wrong place.
+  useEffect(() => {
+    if (!bookUuid) return
+    restoreLeftoverPlace(Storyteller, AsyncStorage, bookUuid).catch(
+      (error: unknown) => {
+        logger.error(`Lofi sound check, restoring: ${String(error)}`)
+      },
+    )
+  }, [bookUuid])
 
   if (!atmosphere.available) return null
   const enabled = atmosphere.status?.atmosphere.enabled ?? true

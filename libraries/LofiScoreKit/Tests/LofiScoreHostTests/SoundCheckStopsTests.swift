@@ -25,7 +25,7 @@ final class SoundCheckStopsTests: XCTestCase {
 
         let all = try LofiAtmosphereHost.soundCheckStops(track: track, spoilerGuard: guardian, playingNow: 9, count: 6)
         XCTAssertEqual(all.map(\.spot.globalIndex), [0, 3, 6])
-        XCTAssertEqual(all.last?.spot.lastIndex, 8, "never the sentence playing now")
+        XCTAssertEqual(all.last?.spot.lastIndex, 7, "it ends while the sentence before the one playing now plays")
         for stop in all {
             XCTAssertEqual(stop.audioPath, "OEBPS/audio.wav")
             XCTAssertEqual(stop.start, Double(stop.spot.globalIndex) * 3, accuracy: 1e-9, "3 s clips")
@@ -51,6 +51,37 @@ final class SoundCheckStopsTests: XCTestCase {
         XCTAssertEqual(knock.spot.cueIndex, 5)
         XCTAssertEqual(knock.spot.globalIndex, 3)
         XCTAssertEqual(knock.start, 9, accuracy: 1e-9)
+    }
+
+    func testAOneOffStopNeedsACleanLeadInAtTheNarrationSpeed() throws {
+        let (guardian, entry) = try book()
+        let position = { (i: Int) in try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: i)) }
+        func knock(_ index: Int) throws -> AtmosphereTrack.Cue {
+            AtmosphereTrack.Cue(position: try position(index), sentence: "s", sound: .doorKnock, wordsBefore: 0, words: 2)
+        }
+        func oneOff(_ track: AtmosphereTrack, rate: Double = 1) throws -> SoundCheckStop? {
+            try LofiAtmosphereHost.soundCheckStops(track: track, spoilerGuard: guardian, playingNow: 9, count: 6, rate: rate)
+                .first { $0.spot.kind == .oneOff }
+        }
+        let room = try entry(0, [SceneLayer(.roomTone, .soft)], .indoors)
+
+        // At twice the speed, 5 s of listening is 10 s of audio: four 3 s sentences back.
+        let plain = AtmosphereTrack(engineID: "test", bookID: "book", wordsBetweenEntries: 250, entries: [room], cues: [try knock(6)])
+        XCTAssertEqual(try oneOff(plain)?.spot.globalIndex, 4)
+        XCTAssertEqual(try oneOff(plain, rate: 2)?.spot.globalIndex, 2)
+        XCTAssertEqual(try oneOff(plain, rate: 2)?.start ?? -1, 6, accuracy: 1e-9)
+
+        // Another one-off in the lead-in would play in its place: 30 s must pass between two.
+        let crowded = AtmosphereTrack(engineID: "test", bookID: "book", wordsBetweenEntries: 250, entries: [room], cues: [try knock(1), try knock(3)])
+        XCTAssertNil(try oneOff(crowded), "the first is too near the file's start, the second has the first in its lead-in")
+
+        // A door closing on the way to the knock would be heard as the one-off.
+        let position5 = try position(5)
+        let door = AtmosphereTrack.Entry(position: position5, sentence: "s", scene: StoryScene(
+            placeID: "p5", setting: .outdoors, layers: [SceneLayer(.wind, .soft)], transition: .enterThroughDoor
+        ))
+        let moving = AtmosphereTrack(engineID: "test", bookID: "book", wordsBetweenEntries: 250, entries: [room, door], cues: [try knock(6)])
+        XCTAssertNil(try oneOff(moving))
     }
 
     func testThePlayersNameForTheFileIsFoundFromShorterTails() async {

@@ -3,6 +3,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { skipToken } from "@reduxjs/toolkit/query"
 import Constants from "expo-constants"
+import { useKeepAwake } from "expo-keep-awake"
 import { useEffect, useRef, useState } from "react"
 import { AppState, Share, View } from "react-native"
 
@@ -20,6 +21,7 @@ import {
   cannotStartReason,
   keepResults,
   keptResults,
+  restoreLeftoverPlace,
   SoundCheckRunner,
   type SoundCheckState,
 } from "@/modules/lofi-score/soundCheckRunner"
@@ -47,11 +49,25 @@ function makeRunner(onChange: (state: SoundCheckState) => void) {
       getStatus: () => native.getStatus(),
       getStops: (count) => native.getSoundCheckStops(count),
       getReading: () => native.getSoundCheckReading(),
+      willJump: (globalIndex) => native.soundCheckWillJump(globalIndex),
       wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
       now: () => Date.now(),
     },
     onChange,
   )
+}
+
+/** The screen stays on while a check runs: a lock in the middle would end it. */
+function KeepAwake() {
+  useKeepAwake("lofi-sound-check")
+  return null
+}
+
+/** The app's version, with the build number when the build has one. */
+function appVersion() {
+  const version = Constants.expoConfig?.version ?? "unknown"
+  const build = Constants.expoConfig?.ios?.buildNumber
+  return build ? `${version} (${build})` : version
 }
 
 export function LofiSoundCheck({ atmosphere }: Props) {
@@ -66,13 +82,16 @@ export function LofiSoundCheck({ atmosphere }: Props) {
     bookUuid ? { uuid: bookUuid } : skipToken,
   )
 
-  // A check the app closed in the middle of: put the narration back, and
+  // A check the app closed in the middle of: put the narration back (the
+  // toolbar tries first, when the book opens; this is the second try), and
   // show the last results kept on the phone.
   useEffect(() => {
     if (bookUuid) {
-      runner.current?.restoreLeftover(bookUuid).catch((error: unknown) => {
-        logger.error(`Lofi sound check, restoring: ${String(error)}`)
-      })
+      restoreLeftoverPlace(Storyteller, AsyncStorage, bookUuid).catch(
+        (error: unknown) => {
+          logger.error(`Lofi sound check, restoring: ${String(error)}`)
+        },
+      )
     }
     void keptResults(AsyncStorage).then((runs) =>
       setLastResults(runs[0] ?? null),
@@ -80,11 +99,12 @@ export function LofiSoundCheck({ atmosphere }: Props) {
   }, [bookUuid])
 
   // Closing the panel or leaving the app stops the check and puts the
-  // narration back.
+  // narration back. In the background it stays paused there: the phone may
+  // have locked with nobody listening.
   useEffect(() => {
     const current = runner.current
     const subscription = AppState.addEventListener("change", (next) => {
-      if (next === "background") void current?.stop()
+      if (next === "background") void current?.stop(false)
     })
     return () => {
       subscription.remove()
@@ -103,7 +123,8 @@ export function LofiSoundCheck({ atmosphere }: Props) {
     written.current = finished
     const text = resultsText(finished.stops, finished.results, {
       book: title,
-      appVersion: Constants.expoConfig?.version ?? "unknown",
+      appVersion: appVersion(),
+      edition: sounds?.edition ?? "unknown",
       levelDB: sounds?.levelDB ?? 0,
       defaultLevelDB: sounds?.defaultLevelDB ?? 0,
       intensity: sounds?.intensity ?? 0,
@@ -123,12 +144,19 @@ export function LofiSoundCheck({ atmosphere }: Props) {
     const stop = state.stops[state.index]
     return (
       <View className="w-full gap-3">
+        <KeepAwake />
         <Text maxFontSizeMultiplier={1.5} className="text-lg">
           Sound check, {state.index + 1} of {state.stops.length}
         </Text>
         {stop && <Text variant="muted">{stopLabel(stop)}</Text>}
         {phase === "jumping" && <Text>Finding the spot…</Text>}
-        {phase === "listening" && <Text>Listening… {state.secondsLeft} s</Text>}
+        {phase === "listening" && (
+          <Text>
+            {stop?.cueIndex === undefined
+              ? `Listening… ${state.secondsLeft} s`
+              : "Listening… the sound comes after a few seconds"}
+          </Text>
+        )}
         {phase === "asking" && stop && (
           <View className="w-full gap-2">
             <Text>{stopQuestion(stop)}</Text>
@@ -181,7 +209,12 @@ export function LofiSoundCheck({ atmosphere }: Props) {
           accessibilityLabel="Start the sound check"
           variant="secondary"
           size="sm"
-          disabled={phase === "starting" || reason !== null || !bookUuid}
+          disabled={
+            phase === "starting" ||
+            phase === "restoring" ||
+            reason !== null ||
+            !bookUuid
+          }
           onPress={() => {
             if (bookUuid) void check.start(bookUuid)
           }}
@@ -189,6 +222,9 @@ export function LofiSoundCheck({ atmosphere }: Props) {
           <Text>{phase === "starting" ? "Starting…" : "Start"}</Text>
         </Button>
       </View>
+      {phase === "restoring" && (
+        <Text variant="muted">Putting your place back…</Text>
+      )}
       {message && <Text variant="muted">{message}</Text>}
       {standIns && !reason && (
         <Text variant="muted">

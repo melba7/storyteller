@@ -40,8 +40,12 @@ locally too.
     sound, or play it again. Then it puts the narration back where it was (also
     after closing the panel, leaving the app, or the app closing). The last 5
     runs are kept on the phone, and "Share results" copies them as text with
-    what played at each stop (recording, gain, route) and the run's settings.
-    Fable 5.2 reviewed it (round 1 applied).
+    what played at each stop (recording, gain, route) and the run's settings. It
+    was reviewed twice. The second pass added: every jump of the check is told
+    to the sounds first (`soundCheckWillJump`), a one-off stop starts 5 s of
+    listening ahead at any narration speed and records whether its sound played,
+    the screen stays on, and leaving the app leaves the narration paused at the
+    listener's place.
   - Test first: JS tests for the session logic (next spot, answers, the results
     text), and a host test for the limit.
   - Done when: check.sh passes, the iOS build passes in CI, and Mo runs it once
