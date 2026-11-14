@@ -555,6 +555,15 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         return result
     }
 
+    /// The open book's atmosphere track and text, for the sound check (`SoundCheckHost.swift`).
+    func soundCheckSource() async -> (bookID: String, track: AtmosphereTrack, spoilerGuard: SpoilerGuard)? {
+        await onQueue { [self] in
+            guard case let .ready(id, spoilerGuard) = bookText,
+                  let given = track, given.bookID == id, let found = given.track else { return nil }
+            return (id, found, spoilerGuard)
+        }
+    }
+
     // MARK: - Book text
 
     /// Opens the book's text and looks for its atmosphere track. With `replacing`, the text

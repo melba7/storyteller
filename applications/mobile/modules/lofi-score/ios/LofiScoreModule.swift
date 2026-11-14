@@ -180,6 +180,22 @@ public final class LofiScoreModule: Module {
       LofiScoreRuntime.shared.host.readerReached(bookID: bookUuid, clip: NarratorClip(clip))
     }
 
+    // The sound check's stops in the open book, up to where the narration is now. Each one
+    // names its audio the way the player does (`relativeUrl`), ready for seekTo. Throws a
+    // readable reason when there is no track or nothing has been heard yet.
+    AsyncFunction("getSoundCheckStops") { (count: Int) async throws -> [[String: Any]] in
+      let stops = try await LofiScoreRuntime.shared.host.soundCheckStops(count: count)
+      var found: [[String: Any]] = []
+      for stop in stops {
+        guard let clip = await LofiScoreRuntime.playerClip(audioPath: stop.audioPath, start: stop.start) else { continue }
+        var object = stop.jsonObject()
+        object["relativeUrl"] = clip.audioResource
+        object["start"] = clip.start
+        found.append(object)
+      }
+      return found
+    }
+
     // The reader left the book or the app: the sounds that follow the pages stop.
     AsyncFunction("readerStopped") {
       LofiScoreRuntime.shared.host.readerStopped()
@@ -190,6 +206,20 @@ public final class LofiScoreModule: Module {
 /// The app's one atmosphere host, wired to the audiobook player once.
 final class LofiScoreRuntime: @unchecked Sendable {
   static let shared = LofiScoreRuntime()
+
+  /// The player's own clip for a sentence the book's media overlays place at `start` in
+  /// `audioPath` (a path from the book's root). The player may name the file from another
+  /// folder (the package's), so shorter tails of the path are tried too.
+  static func playerClip(audioPath: String, start: Double) async -> LofiNarratorClip? {
+    var parts = audioPath.split(separator: "/").map(String.init)
+    while !parts.isEmpty {
+      if let clip = await AudiobookPlayerActor.shared.lofiClip(audioResource: parts.joined(separator: "/"), at: start + 0.001) {
+        return clip
+      }
+      parts.removeFirst()
+    }
+    return nil
+  }
 
   let host: LofiAtmosphereHost
   private let holds: LofiNarrationHoldRelay

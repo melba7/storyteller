@@ -29,9 +29,10 @@ locally too.
     their tests.
 
 - [ ] **2b. Sound check in the app** (Mo's hearing test, replaces the manual
-      one)
-  - Host: `soundCheckSpots()` for the playing book, limited to the furthest
-    sentence heard, each with its audio clip. Module: `getSoundCheckSpots`.
+      one). Status: built and passing `check.sh`; waiting for the iOS build in
+      CI and Mo's first run on TestFlight.
+  - Host: `soundCheckStops()` for the playing book, limited to the sentence
+    playing now, each with its audio clip. Module: `getSoundCheckStops`.
   - App: a "Sound check" button in the sounds panel. For each spot it seeks the
     narration there (`Storyteller.seekTo(audioPath, start)`), plays 20 s, then
     asks: Too loud / Clear / Faint / Can't hear / Wrong sound. Then it puts the

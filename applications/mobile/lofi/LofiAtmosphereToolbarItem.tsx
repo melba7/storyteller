@@ -12,6 +12,7 @@ import { useAppSelector } from "@/store/appState"
 import { getCurrentlyPlayingBookUuid } from "@/store/selectors/bookshelfSelectors"
 
 import { LofiAtmosphereControls } from "./LofiAtmosphereControls"
+import { LofiSoundCheck } from "./LofiSoundCheck"
 import { readerHidden, readerShown } from "./readerFollow"
 import { useBookScore } from "./useBookScore"
 import { useLofiAtmosphere } from "./useLofiAtmosphere"
@@ -95,7 +96,10 @@ export function LofiAtmosphereToolbarItem({ mode }: Props) {
             <View className="h-6 items-center justify-center">
               <View className="bg-muted-foreground/40 h-1 w-12 rounded-full" />
             </View>
-            <LofiAtmosphereControls atmosphere={atmosphere} />
+            <View className="gap-5">
+              <LofiAtmosphereControls atmosphere={atmosphere} />
+              <LofiSoundCheck atmosphere={atmosphere} />
+            </View>
           </View>
         </View>
       </Modal>

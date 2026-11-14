@@ -171,6 +171,19 @@ export type LofiImportSummary = {
   notDownloaded: number
 }
 
+/** One stop of the sound check: a spot already heard, and where its narration starts. */
+export type LofiSoundCheckStop = {
+  globalIndex: number
+  /** quietRoom, loud, outdoors, water, weather, travel, oneOff or other. */
+  kind: string
+  /** Layer keys ("river.runningTap") or a one-off sound's name ("doorKnock"). */
+  sounds: string[]
+  placeName?: string
+  /** The audio file as the player names it, for `seekTo`. */
+  relativeUrl: string
+  start: number
+}
+
 type LofiScoreNativeModule = {
   getStatus(): Promise<LofiStatus>
   setMutedInCar(muted: boolean): Promise<LofiStatus>
@@ -213,6 +226,12 @@ type LofiScoreNativeModule = {
   ): Promise<void>
   /** You stopped reading on screen (left the app or the book). */
   readerStopped(): Promise<void>
+  /**
+   * Up to `count` sound check stops in the open book, all at or before where
+   * the narration is now. Rejects with a readable reason when the book has no
+   * sounds or nothing has been heard yet.
+   */
+  getSoundCheckStops(count: number): Promise<LofiSoundCheckStop[]>
 }
 
 /**
