@@ -231,7 +231,7 @@ async function main() {
       appId: forkIdentity.appId,
       appName: forkIdentity.name,
     })
-    for (const note of notes) console.log(note)
+    for (const note of notes) process.stdout.write(`${note}\n`)
     if (summary) {
       appendFileSync(
         summary,
@@ -243,7 +243,7 @@ async function main() {
     // Workflow commands end at a line break, so keep the message on one line.
     const message = error.message.replace(/\s*\n\s*/g, " ")
     if (inActions) {
-      console.log(`::error title=${error.title}::${message}`)
+      process.stdout.write(`::error title=${error.title}::${message}\n`)
     } else {
       console.error(`${error.title}: ${message}`)
     }

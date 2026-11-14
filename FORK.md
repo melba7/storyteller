@@ -39,6 +39,8 @@ every sync keeps them.
 Files and folders that belong to the fork, which upstream never touches:
 
 - `FORK.md`: this file.
+- `CLAUDE.md`, `docs/` and `.claude/`: the working plan for the fork (spec,
+  architecture, milestones, lessons) and the rules Claude follows on it.
 - `.github/workflows/`: fork CI and the upstream sync.
 - `tools/fork/`: the fork checks and the sync scripts.
 - `applications/mobile/fork.config.ts`: the fork's app name and bundle ID, and

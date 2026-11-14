@@ -5,7 +5,7 @@ import {
   applyForkIdentity,
   soundEdition,
   withLofiScorePods,
-} from "../../fork.config.ts"
+} from "@/fork.config.ts"
 
 describe("withLofiScorePods", () => {
   it("adds the pods next to upstream's extra pods", () => {
