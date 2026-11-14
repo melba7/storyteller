@@ -81,9 +81,6 @@ in `FORK.md`.
 
 ## Known problems
 
-- Lint fails in fork code (3 errors): a parent import in
-  `modules/lofi-score/forkConfig.test.ts` and two `console.log` calls in
-  `tools/fork/asc-preflight.mjs`. CI doesn't lint, so nobody noticed.
 - `River.RunningTap` still holds a room-noise recording (fs168470) that passes
   the gates. There is no manual reject list.
 - Sound levels were set by judgment. Mo hasn't confirmed them on a build since

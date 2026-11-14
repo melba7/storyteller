@@ -1,6 +1,6 @@
 # Plan
 
-Done: 0 | Last cleanup: none
+Done: 1 | Last cleanup: none
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -9,7 +9,7 @@ locally too.
 
 ## Milestones
 
-- [ ] **1. Make the check command green**
+- [x] **1. Make the check command green**
   - Fix the 3 lint errors in fork code: use `@/fork.config.ts` in
     `forkConfig.test.ts`, and replace `console.log` in `asc-preflight.mjs` with
     the allowed output (keep its printed text the same).
