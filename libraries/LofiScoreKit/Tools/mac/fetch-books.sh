@@ -52,16 +52,17 @@ PASSWORD="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USERNAME"
 QUOTED="${PASSWORD//\\/\\\\}"
 QUOTED="${QUOTED//\"/\\\"}"
 # Newer servers read "usernameOrEmail", older ones "username"; both are sent.
+# The Mac's bash is 3.2, which cannot parse a here-document inside $( ... ), so
+# the here-documents here stay at the top level and their output goes through files.
 STATUS_FILE="$(mktemp)"
-TOKEN="$(curl -sS -K - -w '%{http_code}' -o "$STATUS_FILE.body" "$URL/api/v2/token" <<EOF2 > "$STATUS_FILE"
+curl -sS -K - -w '%{http_code}' -o "$STATUS_FILE.body" "$URL/api/v2/token" > "$STATUS_FILE" <<EOF2
 request = "POST"
 form-string = "usernameOrEmail=$USERNAME"
 form-string = "username=$USERNAME"
 form-string = "password=$QUOTED"
 EOF2
-python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["access_token"])' "$STATUS_FILE.body" 2>/dev/null
-)"
 unset PASSWORD QUOTED
+TOKEN="$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["access_token"])' "$STATUS_FILE.body" 2>/dev/null)"
 STATUS="$(cat "$STATUS_FILE" 2>/dev/null)"
 rm -f "$STATUS_FILE" "$STATUS_FILE.body"
 if [ -z "$TOKEN" ]; then
@@ -80,7 +81,8 @@ LIST="$(curl -sS -f -H "Authorization: Bearer $TOKEN" "$URL/api/v2/books?mediaFi
 # Which books are new or re-made, as "<uuid><tab><safe title><tab><readaloud date>".
 # With "since", a book not downloaded before is taken only when its read-aloud
 # version was made from then on, or its title is listed in Books/wanted.txt.
-TODO="$(LIST="$LIST" SINCE="$SINCE" python3 -I - "$STATE" <<'PY'
+TODO_FILE="$(mktemp)"
+LIST="$LIST" SINCE="$SINCE" python3 -I - "$STATE" > "$TODO_FILE" <<'PY'
 import json, os, re, sys
 books = json.loads(os.environ["LIST"])
 state_path = sys.argv[1]
@@ -101,7 +103,7 @@ except OSError:
 
 def stamp(value):
     # "2026-11-10 21:16:00" and "2026-11-10T21:16:00.000Z" both become
-    # "2026-11-10T21:16:00" (the server's dates are UTC), so they compare as text.
+    # "2026-11-10T21:16:00" (the server gives UTC), so they compare as text.
     return str(value or "").strip().replace(" ", "T")[:19]
 
 since = stamp(os.environ.get("SINCE", ""))
@@ -122,7 +124,8 @@ for book in books:
     safe = re.sub(r"[/:\\\x00-\x1f]", "_", title).strip().strip(".") or uuid
     print(f"{uuid}\t{safe}\t{date}")
 PY
-)"
+TODO="$(cat "$TODO_FILE")"
+rm -f "$TODO_FILE"
 [ -n "$TODO" ] || exit 0
 
 while IFS=$'\t' read -r uuid safe date; do
