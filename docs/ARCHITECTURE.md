@@ -78,6 +78,7 @@ in `FORK.md`.
 | 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library          | Cost; Mo's choice                   |
 | 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                   | Mo's choice                         |
 | 2026-11-14 | `tools/fork/check.sh` is the one check command                                   | One command for every check         |
+| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)     | A limit left 161 scenes silent      |
 
 ## Known problems
 
@@ -92,6 +93,9 @@ in `FORK.md`.
   code, so Mo double-clicks `.command` files instead.
 - `Docs/Atmosphere.md` isn't formatted with oxfmt. Don't reformat it in a
   feature PR.
+- Scoring through the Claude plan shares Mo's 5-hour usage allowance with the
+  project's threads, so a daytime run can stall for an hour or more and leave
+  scenes to the retry runs.
 
 ## Glossary
 

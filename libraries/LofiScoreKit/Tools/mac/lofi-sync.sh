@@ -21,9 +21,10 @@
 #      /api/v2/books/<id>/lofi-score), when the server is the fork's, so the
 #      phone also gets the score with the book itself.
 #
-# One run at a time; a run stopped part way carries on next time. Each step is
-# capped per book at API list prices, so a run that goes wrong can't use up
-# the plan. A long novel takes about an hour.
+# One run at a time; a run stopped part way carries on next time, and scenes
+# that failed (on the plan's usage limit, say) are retried by the next runs.
+# Each step is capped per book at API list prices, so a run that goes wrong
+# can't use up the plan. A long novel takes about an hour.
 #
 #   lofi-sync.sh [--tools DIR] [--no-pull] [--interactive] [--with-mood-tracks]
 #
@@ -112,16 +113,62 @@ if [ -f "$ROOT/server.json" ]; then
   done < <("$MAC/fetch-books.sh" 2>&1 | tee -a "$LOGS/fetch-books.log" | grep -E $'^[0-9a-f-]{36}\t')
 fi
 
-# 2. Score what has no score yet. A file changed in the last minute is still
-# being copied in; it waits for the next run.
+# 2. Score what has no score yet, then retry the books whose last run left scenes
+# unscored (they keep a "<book>.retry" marker; see below). A file changed in the
+# last minute is still being copied in and waits for the next run, unless this
+# run downloaded it.
 shopt -s nullglob
+just_fetched() {
+  local file
+  for file in ${FETCHED[@]+"${FETCHED[@]}"}; do [ "$file" = "$1" ] && return 0; done
+  return 1
+}
 TODO=()
+RETRY=()
 for book in "$BOOKS_DIR"/*.epub; do
   name="$(basename "$book" .epub)"
-  [ -s "$TRACKS/$name.score.json" ] && continue
-  [ -n "$(find "$book" -mmin -1 2>/dev/null)" ] && { say "$name is still being copied; next time"; continue; }
+  if [ -s "$TRACKS/$name.score.json" ]; then
+    [ -f "$TRACKS/$name.retry" ] && RETRY+=("$book")
+    continue
+  fi
+  if [ -n "$(find "$book" -mmin -1 2>/dev/null)" ] && ! just_fetched "$(basename "$book")"; then
+    say "$name is still being copied; next time"
+    continue
+  fi
   TODO+=("$book")
 done
+TODO+=(${RETRY[@]+"${RETRY[@]}"})
+
+# A run that ends with scenes failed (its log's summary says "N failed") still
+# writes the score, with those scenes silent. The book then keeps a
+# "<book>.retry" marker, and the next runs score the missing scenes only, until
+# a run ends with none failed. Failures on the plan's usage limit go away by
+# themselves, so they are retried every run; other failures three times.
+MAX_RETRIES=3
+note_failed_scenes() {
+  local name="$1" logs log failed tries
+  logs=("$TRACKS/logs/$name.atmosphere."*.log)
+  [ ${#logs[@]} -gt 0 ] && log="$(ls -t "${logs[@]}" | head -n 1)" || log=""
+  failed="$(grep -o -E '[0-9]+ failed, [0-9]+ places' "$log" 2>/dev/null | tail -n 1 | cut -d' ' -f1)"
+  if [ -z "$failed" ] || [ "$failed" = 0 ]; then
+    rm -f "$TRACKS/$name.retry"
+    say "$name: scored"
+    return
+  fi
+  tries="$(cat "$TRACKS/$name.retry" 2>/dev/null)"
+  case "$tries" in ''|*[!0-9]*) tries=0 ;; esac
+  if grep -q "rate_limit_error" "$log"; then
+    say "$name: scored, but $failed scenes failed on the plan's usage limit; the next runs retry them"
+  elif [ "$tries" -ge "$MAX_RETRIES" ]; then
+    rm -f "$TRACKS/$name.retry"
+    say "$name: scored, but $failed scenes failed again; giving up on them after $MAX_RETRIES retries (see $log)"
+    return
+  else
+    tries=$((tries + 1))
+    say "$name: scored, but $failed scenes failed; the next run retries them ($tries of $MAX_RETRIES)"
+  fi
+  echo "$tries" > "$TRACKS/$name.retry"
+}
 if [ ${#TODO[@]} -eq 0 ]; then
   say "nothing new to score"
 else
@@ -144,7 +191,7 @@ else
       "$MAC/make-atmosphere.sh" --via plan --cap "$ATMOSPHERE_CAP_PER_BOOK" "$book" >> "$LOGS/scoring.log" 2>&1
     fi
     if [ -s "$TRACKS/$name.score.json" ]; then
-      say "$name: scored"
+      note_failed_scenes "$name"
     else
       say "$name: not finished (the cap, or an error; see $LOGS/scoring.log). Next run carries on."
     fi

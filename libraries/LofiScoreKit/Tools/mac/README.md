@@ -28,7 +28,10 @@ job can copy there only once `/bin/bash` has Full Disk Access (System
 Settings > Privacy & Security > Full Disk Access > +, Cmd-Shift-G, `/bin/bash`);
 `lofi-sync.log` says so when that is missing. While a sound fetch (`fetch-sounds.sh`) is running, nothing is
 scored: from launchd the run ends and the next one tries again, in a window it
-waits. Logs are in `~/Storyteller Lofi/logs`. The shelved music's mood
+waits. A book whose run ended with scenes failed (on the plan's usage limit,
+say) keeps its score and a `tracks/<book>.retry` marker, and the next runs
+score the missing scenes only: as often as it takes for the usage limit, three
+times for other errors. Logs are in `~/Storyteller Lofi/logs`. The shelved music's mood
 track (`make-tracks.sh`, Claude Opus, prompt 3) is only made with
 `--with-mood-tracks` or `LOFI_MOOD_TRACKS=1`; see `shelved/lofi-music/README.md`
 at the repository root.
