@@ -78,6 +78,7 @@ in `FORK.md`.
 | 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library          | Cost; Mo's choice                   |
 | 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                   | Mo's choice                         |
 | 2026-11-14 | `tools/fork/check.sh` is the one check command                                   | One command for every check         |
+| 2026-11-14 | Sound check in the app replaces hunting for spots by hand; spots only before the furthest point heard | Mo's ask; no spoilers |
 
 ## Known problems
 

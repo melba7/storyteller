@@ -39,6 +39,10 @@ Already built (each has a pass/fail check):
 
 v1, still to do:
 
+- The user can run a sound check from the sounds panel: it plays about 6 spots
+  already heard (no spoilers) for 20 s each and asks how each sounded. The
+  answers can be shared as text. Check: on TestFlight it plays every spot,
+  returns the narration to where it was, and "Share results" copies the answers.
 - The user can clearly hear the sounds while the narrator talks, at default
   settings. Check: Mo hears the three Redwood test spots without touching the
   sliders.
