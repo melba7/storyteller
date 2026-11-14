@@ -51,13 +51,29 @@ PASSWORD="$(security find-generic-password -s "$KEYCHAIN_SERVICE" -a "$USERNAME"
 # quotes and backslashes escaped), so the password is never a command-line argument.
 QUOTED="${PASSWORD//\\/\\\\}"
 QUOTED="${QUOTED//\"/\\\"}"
-TOKEN="$(curl -sS -f -K - "$URL/api/v2/token" <<EOF2 | python3 -I -c 'import json, sys; print(json.load(sys.stdin)["access_token"])'
+# Newer servers read "usernameOrEmail", older ones "username"; both are sent.
+# The Mac's bash is 3.2, which cannot parse a here-document inside $( ... ), so
+# the here-documents here stay at the top level and their output goes through files.
+STATUS_FILE="$(mktemp)"
+curl -sS -K - -w '%{http_code}' -o "$STATUS_FILE.body" "$URL/api/v2/token" > "$STATUS_FILE" <<EOF2
 request = "POST"
 form-string = "usernameOrEmail=$USERNAME"
+form-string = "username=$USERNAME"
 form-string = "password=$QUOTED"
 EOF2
-)" || { echo "Could not sign in to $URL as $USERNAME"; exit 1; }
 unset PASSWORD QUOTED
+TOKEN="$(python3 -I -c 'import json, sys; print(json.load(open(sys.argv[1]))["access_token"])' "$STATUS_FILE.body" 2>/dev/null)"
+STATUS="$(cat "$STATUS_FILE" 2>/dev/null)"
+rm -f "$STATUS_FILE" "$STATUS_FILE.body"
+if [ -z "$TOKEN" ]; then
+  case "$STATUS" in
+    401) echo "The server at $URL refused the username or password for $USERNAME. Double-click install-automatic-scoring.command and type them again (the username or email you log in to Storyteller with)." ;;
+    403) echo "$URL answered 403 to the sign-in: something in front of the server (a login wall or proxy) is blocking it." ;;
+    000|"") echo "Could not reach $URL (no network, or the address is wrong)." ;;
+    *) echo "Could not sign in to $URL as $USERNAME (HTTP $STATUS)." ;;
+  esac
+  exit 1
+fi
 
 LIST="$(curl -sS -f -H "Authorization: Bearer $TOKEN" "$URL/api/v2/books?mediaFilter=synced")" \
   || { echo "Could not list the books on $URL"; exit 1; }
@@ -65,7 +81,8 @@ LIST="$(curl -sS -f -H "Authorization: Bearer $TOKEN" "$URL/api/v2/books?mediaFi
 # Which books are new or re-made, as "<uuid><tab><safe title><tab><readaloud date>".
 # With "since", a book not downloaded before is taken only when its read-aloud
 # version was made from then on, or its title is listed in Books/wanted.txt.
-TODO="$(LIST="$LIST" SINCE="$SINCE" python3 -I - "$STATE" <<'PY'
+TODO_FILE="$(mktemp)"
+LIST="$LIST" SINCE="$SINCE" python3 -I - "$STATE" > "$TODO_FILE" <<'PY'
 import json, os, re, sys
 books = json.loads(os.environ["LIST"])
 state_path = sys.argv[1]
@@ -86,7 +103,7 @@ except OSError:
 
 def stamp(value):
     # "2026-11-10 21:16:00" and "2026-11-10T21:16:00.000Z" both become
-    # "2026-11-10T21:16:00" (the server's dates are UTC), so they compare as text.
+    # "2026-11-10T21:16:00" (the server gives UTC), so they compare as text.
     return str(value or "").strip().replace(" ", "T")[:19]
 
 since = stamp(os.environ.get("SINCE", ""))
@@ -107,7 +124,8 @@ for book in books:
     safe = re.sub(r"[/:\\\x00-\x1f]", "_", title).strip().strip(".") or uuid
     print(f"{uuid}\t{safe}\t{date}")
 PY
-)"
+TODO="$(cat "$TODO_FILE")"
+rm -f "$TODO_FILE"
 [ -n "$TODO" ] || exit 0
 
 while IFS=$'\t' read -r uuid safe date; do

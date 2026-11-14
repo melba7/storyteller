@@ -14,7 +14,8 @@
 #     iCloud copy (the phone's linked sounds folder picks them up), and puts each
 #     score inside its book on the server.
 #
-# Run it again to change the login or update the tools. stop-automatic-scoring.command
+# Run it again to change the login or update the tools (when the update changes
+# this installer, the new copy takes over the run). stop-automatic-scoring.command
 # turns the job off. Logs: "~/Storyteller Lofi/logs". While a sound fetch
 # (fetch-sounds.sh) is running, the job scores nothing and tries again later.
 # Nothing here touches the Freesound or Anthropic key files.
@@ -34,6 +35,9 @@ finish() {
 
 # The branch this copy of the installer came from, when it is inside a checkout.
 HERE="$(cd "$(dirname "$0")" && pwd)"
+SELF="$TOOLS/libraries/LofiScoreKit/Tools/mac/install-automatic-scoring.command"
+UPDATE=1
+[ "${1:-}" = "--no-update" ] && UPDATE=0
 BRANCH="main"
 if git -C "$HERE" rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   found="$(git -C "$HERE" rev-parse --abbrev-ref HEAD 2>/dev/null)"
@@ -47,12 +51,22 @@ command -v swift > /dev/null || finish "Xcode's command line tools are missing (
 mkdir -p "$ROOT/Books" "$ROOT/logs" "$HOME/Library/LaunchAgents"
 
 # 1. The tools.
-if [ -d "$TOOLS/.git" ]; then
-  echo "Updating the tools in $TOOLS ($BRANCH)..."
-  git -C "$TOOLS" fetch --quiet origin "$BRANCH" && git -C "$TOOLS" checkout --quiet "$BRANCH" && git -C "$TOOLS" pull --ff-only --quiet || echo "(could not update; using the tools as they are)"
-else
-  echo "Fetching the tools into $TOOLS ($BRANCH)..."
-  git clone --quiet --branch "$BRANCH" "$REPO" "$TOOLS" || finish "Could not fetch the tools." 1
+if [ "$UPDATE" = 1 ]; then
+  # What this installer looked like before the update: bash reads a script as it
+  # runs, so after a pull that changes the installer the rest of this run would
+  # still be the old one. The updated copy takes over instead (--no-update).
+  was="$(cksum < "$0" 2>/dev/null)"
+  if [ -d "$TOOLS/.git" ]; then
+    echo "Updating the tools in $TOOLS ($BRANCH)..."
+    git -C "$TOOLS" fetch --quiet origin "$BRANCH" && git -C "$TOOLS" checkout --quiet "$BRANCH" && git -C "$TOOLS" pull --ff-only --quiet || echo "(could not update; using the tools as they are)"
+  else
+    echo "Fetching the tools into $TOOLS ($BRANCH)..."
+    git clone --quiet --branch "$BRANCH" "$REPO" "$TOOLS" || finish "Could not fetch the tools." 1
+  fi
+  if [ -f "$SELF" ] && [ "$(cksum < "$SELF" 2>/dev/null)" != "$was" ]; then
+    echo "The installer itself was updated; carrying on with the new one."
+    exec /bin/bash "$SELF" --no-update
+  fi
 fi
 echo "Building the scoring tools (a few minutes the first time)..."
 (cd "$TOOLS/libraries/LofiScoreKit" && swift build -c release --product lofi-eval > "$ROOT/logs/build.log" 2>&1 && swift build -c release --product lofi-atmosphere >> "$ROOT/logs/build.log" 2>&1) \
@@ -160,6 +174,8 @@ if [ -f "$ROOT/server.json" ]; then
   fi
 fi
 echo "While a sound fetch is running it scores nothing and tries again at the next run."
+echo "So that the job can copy into iCloud Drive (macOS keeps background jobs out of it), once:"
+echo "System Settings > Privacy & Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on."
 echo "Progress: $ROOT/logs/lofi-sync.log. On the phone, pick the LofiMusic folder in iCloud Drive once"
 echo "(Settings > Atmosphere Sounds > Import a sounds folder); from then on new scores and sounds arrive by themselves."
 finish "Done."
