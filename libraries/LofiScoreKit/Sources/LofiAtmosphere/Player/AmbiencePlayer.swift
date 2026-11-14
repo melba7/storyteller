@@ -27,6 +27,10 @@ public struct AmbienceSnapshot: Sendable, Hashable {
         public var fadingOut: Bool
         /// 0 clear, 1 behind a shut door or under water.
         public var muffle: Double
+        /// The level the scene gave it.
+        public var level: AmbientLevel? = nil
+        /// The recording is too quiet to reach its level, even at ``AtmosphereConfig/maxGain``.
+        public var atGainCap = false
     }
 
     public var enabled: Bool
@@ -54,6 +58,11 @@ public struct AmbienceSnapshot: Sendable, Hashable {
     public var missingSounds: [AmbientSound]
     public var missingOneShots: [OneShotSound]
     public var lastError: String?
+    /// Where the sound goes (speaker, headphones…), the narrator loudness the levels are set
+    /// under, and the bed level: what the sound check reports with its answers.
+    public var route: OutputRoute = .builtIn
+    public var voiceLoudnessLUFS: Double = AtmosphereConfig().voiceLoudnessLUFS
+    public var bedLevelDB: Double = AtmosphereConfig().bedLevelDB
 }
 
 /// Plays the atmosphere: the sounds of the scene being narrated, looped seamlessly
@@ -260,6 +269,9 @@ public final class AmbiencePlayer: @unchecked Sendable {
             guard let index else { return }
             playhead = index
             settledSince = scheduler.now
+            // A deliberate jump is a fresh start: a one-off heard before it may play again.
+            lastOneShotIndex = nil
+            lastOneShotAt = -.infinity
             pendingMoment = nil
             endGapLift(over: config.gapLiftFall)
             cutOneShot(over: config.oneShotCut)
@@ -617,9 +629,15 @@ public final class AmbiencePlayer: @unchecked Sendable {
     /// Linear gain for a sound at a level, from the file's measured loudness; `rank` is the
     /// sound's place in its scene, loudest first (the quieter ones sit lower at low intensity).
     private func gain(for sound: AmbientSound, level: AmbientLevel, recording: AmbienceRecording, rank: Int) -> Double {
+        min(config.maxGain, wantedGain(for: sound, level: level, recording: recording, rank: rank))
+    }
+
+    /// The gain before the cap at ``AtmosphereConfig/maxGain``: above it, the recording is too
+    /// quiet to reach its level.
+    private func wantedGain(for sound: AmbientSound, level: AmbientLevel, recording: AmbienceRecording, rank: Int) -> Double {
         let targetLUFS = config.voiceLoudnessLUFS + config.bedLevelDB + sound.levelOffsetDB + level.offsetDB
             + Self.secondaryCut(rank: rank, intensity: config.intensity, cutDB: config.secondaryCutDB)
-        return min(config.maxGain, Gain.linear(fromDB: targetLUFS - library.loudness(of: recording)) * sceneTrim)
+        return Gain.linear(fromDB: targetLUFS - library.loudness(of: recording)) * sceneTrim
     }
 
     private func freeSlot() -> Int? {
@@ -966,13 +984,17 @@ public final class AmbiencePlayer: @unchecked Sendable {
                     AmbienceSnapshot.Voice(
                         sound: $0.sound, variant: $0.recording.variant, recording: $0.recording.file,
                         gain: $0.ramp.value(at: now) * master, playing: $0.playing, fadingOut: $0.retiring,
-                        muffle: $0.muffle.value(at: now)
+                        muffle: $0.muffle.value(at: now), level: $0.level,
+                        atGainCap: wantedGain(for: $0.sound, level: $0.level, recording: $0.recording, rank: $0.rank) >= config.maxGain
                     )
                 }
             },
             missingSounds: missing.sorted { $0.rawValue < $1.rawValue },
             missingOneShots: missingOneShots.sorted { $0.rawValue < $1.rawValue },
-            lastError: lastError
+            lastError: lastError,
+            route: backend.currentRoute,
+            voiceLoudnessLUFS: config.voiceLoudnessLUFS,
+            bedLevelDB: config.bedLevelDB
         )
     }
 }

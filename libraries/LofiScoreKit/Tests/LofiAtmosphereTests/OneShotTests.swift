@@ -358,6 +358,19 @@ final class OneShotTests: XCTestCase {
         XCTAssertEqual(h.played, ["knock.wav"], "at least 30 s apart")
     }
 
+    func testAJumpBackPlaysTheSameOneOffAgain() throws {
+        // The sound check jumps to a few seconds before a knock, more than once.
+        let h = try Harness(cues: [(5, .doorKnock, 0, 4)])
+        h.player.setOneShotsEnabled(true)
+        h.player.narratorDidSeek(toGlobalSentenceIndex: 3)
+        for index in 3...5 { h.narrate(index, then: 4) }
+        XCTAssertEqual(h.played, ["knock.wav"], "a lead-in after the jump lets it play")
+
+        h.player.narratorDidSeek(toGlobalSentenceIndex: 3)
+        for index in 3...5 { h.narrate(index, then: 4) }
+        XCTAssertEqual(h.played, ["knock.wav", "knock.wav"], "a deliberate jump is a fresh start")
+    }
+
     func testPausingOrTurningThemOffDropsAWaitingSound() throws {
         let h = try Harness(cues: [(5, .doorKnock, 5, 11), (50, .doorKnock, 5, 11)])
         h.player.setOneShotsEnabled(true)

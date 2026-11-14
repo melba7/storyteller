@@ -1,26 +1,35 @@
 // LOFI-FORK: the sound check in the atmosphere panel: plays a few spots of the
 // book already heard and asks how each one sounded (see FORK.md).
+import AsyncStorage from "@react-native-async-storage/async-storage"
+import { skipToken } from "@reduxjs/toolkit/query"
+import Constants from "expo-constants"
 import { useEffect, useRef, useState } from "react"
-import { Share, View } from "react-native"
+import { AppState, Share, View } from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 import { logger } from "@/logger"
 import { LofiScore } from "@/modules/lofi-score"
 import {
-  answerStop,
-  currentStop,
-  rememberedResults,
-  rememberResults,
   resultsText,
   SOUND_CHECK_ANSWERS,
-  SOUND_CHECK_LISTEN_MS,
-  type SoundCheckAnswer,
-  type SoundCheckSession,
-  startSoundCheck,
   stopLabel,
+  stopQuestion,
 } from "@/modules/lofi-score/soundCheck"
+import {
+  cannotStartReason,
+  keepResults,
+  keptResults,
+  SoundCheckRunner,
+  type SoundCheckState,
+} from "@/modules/lofi-score/soundCheckRunner"
 import { Storyteller } from "@/modules/readium"
+import { useAppSelector } from "@/store/appState"
+import { useGetBookQuery } from "@/store/localApi"
+import {
+  getCurrentlyPlayingBookUuid,
+  getPlaybackRate,
+} from "@/store/selectors/bookshelfSelectors"
 
 import { type LofiAtmosphere } from "./useLofiAtmosphere"
 
@@ -28,186 +37,136 @@ type Props = {
   atmosphere: LofiAtmosphere
 }
 
-type Phase =
-  | { name: "idle"; message?: string }
-  | { name: "loading" }
-  | { name: "listening"; until: number }
-  | { name: "asking" }
-  | { name: "done" }
-
-/** Where the narration was before the check, to put it back afterwards. */
-type Resume = { relativeUri: string; position: number; wasPlaying: boolean }
+function makeRunner(onChange: (state: SoundCheckState) => void) {
+  const native = LofiScore
+  if (!native) return null
+  return new SoundCheckRunner(
+    {
+      player: Storyteller,
+      storage: AsyncStorage,
+      getStatus: () => native.getStatus(),
+      getStops: (count) => native.getSoundCheckStops(count),
+      getReading: () => native.getSoundCheckReading(),
+      wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+      now: () => Date.now(),
+    },
+    onChange,
+  )
+}
 
 export function LofiSoundCheck({ atmosphere }: Props) {
-  const [phase, setPhase] = useState<Phase>({ name: "idle" })
-  const [session, setSession] = useState<SoundCheckSession | null>(null)
-  const [now, setNow] = useState(Date.now())
-  const resume = useRef<Resume | null>(null)
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [state, setState] = useState<SoundCheckState | null>(null)
+  const [lastResults, setLastResults] = useState<string | null>(null)
+  const runner = useRef<SoundCheckRunner | null>(null)
+  if (runner.current === null) runner.current = makeRunner(setState)
 
-  const clearTimer = () => {
-    if (timer.current) clearTimeout(timer.current)
-    timer.current = null
-  }
-
-  // A countdown while a stop plays.
-  useEffect(() => {
-    if (phase.name !== "listening") return
-    const tick = setInterval(() => setNow(Date.now()), 500)
-    return () => clearInterval(tick)
-  }, [phase.name])
-
-  // Closing the panel mid-check puts the narration back.
-  useEffect(
-    () => () => {
-      clearTimer()
-      void putNarrationBack()
-    },
-    [],
+  const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
+  const playbackRate = useAppSelector(getPlaybackRate)
+  const { data: book } = useGetBookQuery(
+    bookUuid ? { uuid: bookUuid } : skipToken,
   )
 
-  async function putNarrationBack() {
-    const saved = resume.current
-    resume.current = null
-    if (!saved) return
-    try {
-      await Storyteller.pause()
-      await Storyteller.seekTo(saved.relativeUri, saved.position)
-      if (saved.wasPlaying) await Storyteller.play(false)
-    } catch (error) {
-      logger.error(`Lofi sound check, going back: ${String(error)}`)
+  // A check the app closed in the middle of: put the narration back, and
+  // show the last results kept on the phone.
+  useEffect(() => {
+    if (bookUuid) {
+      runner.current?.restoreLeftover(bookUuid).catch((error: unknown) => {
+        logger.error(`Lofi sound check, restoring: ${String(error)}`)
+      })
     }
-  }
+    void keptResults(AsyncStorage).then((runs) =>
+      setLastResults(runs[0] ?? null),
+    )
+  }, [bookUuid])
 
-  async function playStop(next: SoundCheckSession) {
-    const stop = currentStop(next)
-    if (!stop) {
-      await putNarrationBack()
-      rememberResults(results(next))
-      setPhase({ name: "done" })
-      return
+  // Closing the panel or leaving the app stops the check and puts the
+  // narration back.
+  useEffect(() => {
+    const current = runner.current
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "background") void current?.stop()
+    })
+    return () => {
+      subscription.remove()
+      void current?.stop()
     }
-    try {
-      await Storyteller.seekTo(stop.relativeUrl, stop.start)
-      await Storyteller.play(false)
-    } catch (error) {
-      logger.error(`Lofi sound check, playing a stop: ${String(error)}`)
-    }
-    const until = Date.now() + SOUND_CHECK_LISTEN_MS
-    setNow(Date.now())
-    setPhase({ name: "listening", until })
-    clearTimer()
-    timer.current = setTimeout(() => {
-      void Storyteller.pause()
-      setPhase({ name: "asking" })
-    }, SOUND_CHECK_LISTEN_MS)
-  }
+  }, [])
 
-  async function start() {
-    if (!LofiScore) return
-    setPhase({ name: "loading" })
-    try {
-      const stops = await LofiScore.getSoundCheckStops(6)
-      if (stops.length === 0) {
-        setPhase({
-          name: "idle",
-          message:
-            "No spots to check yet. Listen a little further into the book first.",
-        })
-        return
-      }
-      const [track, position, wasPlaying] = await Promise.all([
-        Storyteller.getCurrentTrack(),
-        Storyteller.getPosition(),
-        atmosphere.status?.playback.narrating ?? false,
-      ])
-      resume.current = track
-        ? { relativeUri: track.relativeUri, position, wasPlaying }
-        : null
-      const fresh = startSoundCheck(stops)
-      setSession(fresh)
-      await playStop(fresh)
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      setPhase({ name: "idle", message })
-    }
-  }
-
-  function answer(value: SoundCheckAnswer) {
-    if (!session) return
-    const next = answerStop(session, value)
-    setSession(next)
-    void playStop(next)
-  }
-
-  function results(of: SoundCheckSession) {
-    const sounds = atmosphere.status?.atmosphere
-    return resultsText(of, {
-      book: atmosphere.status?.book?.id ?? "unknown book",
+  // A finished run's results are written once and kept.
+  const phase = state?.phase ?? "idle"
+  const finished = state && phase === "done" ? state : null
+  const written = useRef<SoundCheckState | null>(null)
+  const sounds = atmosphere.status?.atmosphere
+  const title = book?.title ?? bookUuid ?? "unknown book"
+  useEffect(() => {
+    if (!finished || written.current === finished) return
+    written.current = finished
+    const text = resultsText(finished.stops, finished.results, {
+      book: title,
+      appVersion: Constants.expoConfig?.version ?? "unknown",
       levelDB: sounds?.levelDB ?? 0,
       defaultLevelDB: sounds?.defaultLevelDB ?? 0,
       intensity: sounds?.intensity ?? 0,
+      defaultIntensity: sounds?.defaultIntensity ?? 0,
+      source: sounds?.source ?? "unknown",
+      playbackRate,
+      startedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
     })
-  }
+    setLastResults(text)
+    void keepResults(AsyncStorage, text)
+  }, [finished, sounds, title, playbackRate])
 
-  async function stop() {
-    clearTimer()
-    await putNarrationBack()
-    if (session && session.answers.length > 0) {
-      rememberResults(results(session))
-      setPhase({ name: "done" })
-    } else {
-      setPhase({ name: "idle" })
-    }
-  }
+  if (!runner.current) return null
+  const check = runner.current
 
-  const lastResults = rememberedResults()
-  const stopNow = session ? currentStop(session) : null
-  const position = session
-    ? `${Math.min(session.answers.length + 1, session.stops.length)} of ${session.stops.length}`
-    : ""
-
-  if (phase.name === "listening" || phase.name === "asking") {
-    const seconds = Math.max(
-      0,
-      Math.ceil((phase.name === "listening" ? phase.until - now : 0) / 1000),
-    )
+  if (state && ["jumping", "listening", "asking"].includes(phase)) {
+    const stop = state.stops[state.index]
     return (
       <View className="w-full gap-3">
         <Text maxFontSizeMultiplier={1.5} className="text-lg">
-          Sound check, {position}
+          Sound check, {state.index + 1} of {state.stops.length}
         </Text>
-        {stopNow && (
-          <Text variant="muted">Listen for: {stopLabel(stopNow)}</Text>
-        )}
-        {phase.name === "listening" ? (
-          <Text>Listening… {seconds} s</Text>
-        ) : (
+        {stop && <Text variant="muted">{stopLabel(stop)}</Text>}
+        {phase === "jumping" && <Text>Finding the spot…</Text>}
+        {phase === "listening" && <Text>Listening… {state.secondsLeft} s</Text>}
+        {phase === "asking" && stop && (
           <View className="w-full gap-2">
-            <Text>How did the sounds come through?</Text>
-            <View className="w-full flex-row flex-wrap gap-2">
-              {SOUND_CHECK_ANSWERS.map(({ value, label }) => (
-                <Button
-                  key={value}
-                  accessibilityLabel={label}
-                  variant="secondary"
-                  size="sm"
-                  onPress={() => answer(value)}
-                >
-                  <Text>{label}</Text>
-                </Button>
-              ))}
-            </View>
+            <Text>{stopQuestion(stop)}</Text>
+            {SOUND_CHECK_ANSWERS.map(({ value, label, hint }) => (
+              <Button
+                key={value}
+                accessibilityLabel={`${label}: ${hint}`}
+                variant="secondary"
+                size="sm"
+                className="w-full justify-start"
+                onPress={() => void check.answer(value)}
+              >
+                <Text>
+                  {label}: {hint}
+                </Text>
+              </Button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onPress={() => void check.playAgain()}
+            >
+              <Text>Play it again</Text>
+            </Button>
           </View>
         )}
-        <Button variant="ghost" size="sm" onPress={() => void stop()}>
+        <Button variant="ghost" size="sm" onPress={() => void check.stop()}>
           <Text>Stop the sound check</Text>
         </Button>
       </View>
     )
   }
 
-  const message = phase.name === "idle" ? phase.message : undefined
+  const reason = cannotStartReason(atmosphere.status)
+  const standIns =
+    atmosphere.status?.atmosphere.source === "standIns" ||
+    atmosphere.status?.atmosphere.source === "mixed"
+  const message = state?.message ?? reason
   return (
     <View className="w-full gap-2">
       <View className="w-full flex-row items-center justify-between gap-4">
@@ -215,23 +174,28 @@ export function LofiSoundCheck({ atmosphere }: Props) {
           <Text maxFontSizeMultiplier={1.5}>Sound check</Text>
           <Text variant="muted">
             About 3 minutes: a few spots you have already heard, then a question
-            for each.
+            for each. Your place is kept.
           </Text>
         </View>
         <Button
           accessibilityLabel="Start the sound check"
           variant="secondary"
           size="sm"
-          disabled={
-            phase.name === "loading" || !atmosphere.status?.atmosphere.enabled
-          }
-          onPress={() => void start()}
+          disabled={phase === "starting" || reason !== null || !bookUuid}
+          onPress={() => {
+            if (bookUuid) void check.start(bookUuid)
+          }}
         >
-          <Text>{phase.name === "loading" ? "Starting…" : "Start"}</Text>
+          <Text>{phase === "starting" ? "Starting…" : "Start"}</Text>
         </Button>
       </View>
       {message && <Text variant="muted">{message}</Text>}
-      {phase.name === "done" && (
+      {standIns && !reason && (
+        <Text variant="muted">
+          Some sounds are stand-ins, not recordings, so they may sound off.
+        </Text>
+      )}
+      {phase === "done" && (
         <Text>Thanks, that&apos;s the sound check done.</Text>
       )}
       {lastResults && (
@@ -239,9 +203,7 @@ export function LofiSoundCheck({ atmosphere }: Props) {
           accessibilityLabel="Share the sound check results"
           variant="ghost"
           size="sm"
-          onPress={() => {
-            if (lastResults) void Share.share({ message: lastResults })
-          }}
+          onPress={() => void Share.share({ message: lastResults })}
         >
           <Text>Share results</Text>
         </Button>

@@ -193,7 +193,19 @@ public final class LofiScoreModule: Module {
         object["start"] = clip.start
         found.append(object)
       }
+      if found.isEmpty && !stops.isEmpty {
+        throw NSError(domain: "LofiScore", code: 1, userInfo: [
+          NSLocalizedDescriptionKey: "The player could not find the book's audio for the sound check.",
+        ])
+      }
       return found
+    }
+
+    // What plays now, for a sound check answer: each sound's level, recording, gain and
+    // whether it is at the gain cap, plus the route and the levels in use. Null when the
+    // sounds are not running.
+    AsyncFunction("getSoundCheckReading") { () async -> [String: Any]? in
+      await LofiScoreRuntime.shared.host.soundCheckReading()
     }
 
     // The reader left the book or the app: the sounds that follow the pages stop.
@@ -211,14 +223,9 @@ final class LofiScoreRuntime: @unchecked Sendable {
   /// `audioPath` (a path from the book's root). The player may name the file from another
   /// folder (the package's), so shorter tails of the path are tried too.
   static func playerClip(audioPath: String, start: Double) async -> LofiNarratorClip? {
-    var parts = audioPath.split(separator: "/").map(String.init)
-    while !parts.isEmpty {
-      if let clip = await AudiobookPlayerActor.shared.lofiClip(audioResource: parts.joined(separator: "/"), at: start + 0.001) {
-        return clip
-      }
-      parts.removeFirst()
+    await LofiAtmosphereHost.resolveAudio(audioPath) { path in
+      await AudiobookPlayerActor.shared.lofiClip(audioResource: path, at: start + 0.001)
     }
-    return nil
   }
 
   let host: LofiAtmosphereHost

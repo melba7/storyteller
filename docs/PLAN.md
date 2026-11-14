@@ -21,7 +21,7 @@ locally too.
 - [x] **2a. Sound check: pick the spots** (engine side)
   - `SoundCheck.spots` picks up to 6 spots from a book's track (a quiet room,
     something loud, outdoors, water, weather, travel, a one-off), spread across
-    the book, only before the furthest point heard (no spoilers).
+    the book, all ending before the sentence playing now (no spoilers).
     `SpoilerGuard.clip(atGlobalIndex:)` gives each spot's place in the audio.
   - Done when: `SoundCheckTests` and the clip round-trip test pass.
   - Files: `Sources/LofiAtmosphere/Track/SoundCheck.swift`,
@@ -34,10 +34,14 @@ locally too.
   - Host: `soundCheckStops()` for the playing book, limited to the sentence
     playing now, each with its audio clip. Module: `getSoundCheckStops`.
   - App: a "Sound check" button in the sounds panel. For each spot it seeks the
-    narration there (`Storyteller.seekTo(audioPath, start)`), plays 20 s, then
-    asks: Too loud / Clear / Faint / Can't hear / Wrong sound. Then it puts the
-    narration back where it was. Answers are kept on the phone, and "Share
-    results" copies them as text.
+    narration there (`Storyteller.seekTo(audioPath, start)`), checks it landed,
+    plays up to 20 s (less when the scene ends), then asks how the main sound
+    came through under the voice: Too loud / Clear / Faint / Can't hear / Wrong
+    sound, or play it again. Then it puts the narration back where it was (also
+    after closing the panel, leaving the app, or the app closing). The last 5
+    runs are kept on the phone, and "Share results" copies them as text with
+    what played at each stop (recording, gain, route) and the run's settings.
+    Fable 5.2 reviewed it (round 1 applied).
   - Test first: JS tests for the session logic (next spot, answers, the results
     text), and a host test for the limit.
   - Done when: check.sh passes, the iOS build passes in CI, and Mo runs it once
@@ -46,14 +50,28 @@ locally too.
   - Files: `LofiScoreHost/LofiAtmosphereHost.swift`,
     `modules/lofi-score/ios/LofiScoreModule.swift`,
     `modules/lofi-score/index.ts`, new `modules/lofi-score/soundCheck.ts` (+
-    test), new `lofi/LofiSoundCheck.tsx`, `lofi/LofiAtmosphereControls.tsx`.
+    test), new `modules/lofi-score/soundCheckRunner.ts` (+ test), new
+    `lofi/LofiSoundCheck.tsx`, `lofi/LofiAtmosphereControls.tsx`.
 
 - [ ] **2c. Fix the levels from the sound check**
   - From Mo's results, change the `AtmosphereConfig` defaults (with a test),
-    then a new build and another sound check.
-  - Done when: Mo's sound check shows no "Faint" or "Can't hear" at the default
-    settings.
+    then a new build and another sound check. Change the global defaults when
+    the same level is off across books; a book whose narrator is much louder or
+    quieter than -16 LUFS waits for 2d instead.
+  - Done when: at the default settings, main sounds at full or loud are Clear,
+    soft ones Clear or Faint, faint ones Faint or Clear, and nothing is Can't
+    hear or Too loud.
   - Files: `Player/AmbiencePlayer.swift` (AtmosphereConfig), its tests.
+
+- [ ] **2d. Match each book's narrator loudness** (proposal, needs Mo's OK)
+  - The sounds sit under a voice assumed to be -16 LUFS. Measure each book's
+    narration on the Mac when it is scored, store it in the score, and use it in
+    place of the default, so one quiet or loud narrator does not need its own
+    settings.
+  - Done when: a test shows a book with a -20 LUFS narrator gets its bed 4 dB
+    quieter, and Redwood's measured value is in its score.
+  - Files: the scoring job (owned by the "Make adding music and atmosphere easy"
+    thread), `AtmosphereConfig`, the score format.
 
 - [ ] **3. A reject list for bad recordings**
   - Add `Tools/atmosphere/reject.txt` (one recording id per line, with a
