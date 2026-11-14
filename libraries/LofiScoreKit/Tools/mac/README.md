@@ -23,7 +23,10 @@ music); `LofiMusic` is mirrored into its iCloud Drive copy (added and updated,
 never deleted), where the phone's linked sounds folder picks it up; and
 `push-scores.sh` puts each score inside its book on the server
 (`PUT /api/v2/books/<id>/lofi-score`, the fork's route) so the book carries its
-own score. While a sound fetch (`fetch-sounds.sh`) is running, nothing is
+own score. macOS keeps background jobs out of iCloud Drive, so the launchd
+job can copy there only once `/bin/bash` has Full Disk Access (System
+Settings > Privacy & Security > Full Disk Access > +, Cmd-Shift-G, `/bin/bash`);
+`lofi-sync.log` says so when that is missing. While a sound fetch (`fetch-sounds.sh`) is running, nothing is
 scored: from launchd the run ends and the next one tries again, in a window it
 waits. Logs are in `~/Storyteller Lofi/logs`. The shelved music's mood
 track (`make-tracks.sh`, Claude Opus, prompt 3) is only made with

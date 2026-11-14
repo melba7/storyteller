@@ -155,6 +155,11 @@ fi
 if [ -d "$ICLOUD" ] && [ -d "$MUSIC" ]; then
   if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/" 2>> "$LOGS/sync.log"; then
     say "iCloud copy up to date"
+  elif tail -n 3 "$LOGS/sync.log" 2>/dev/null | grep -q "Operation not permitted"; then
+    # macOS keeps background jobs out of iCloud Drive until the interpreter
+    # has Full Disk Access; a double-clicked .command runs inside Terminal,
+    # which has it, so the installer's own copy step is unaffected.
+    say "could not update the iCloud copy: macOS blocks this background job from iCloud Drive. Once: System Settings > Privacy & Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on."
   else
     say "could not update the iCloud copy (see $LOGS/sync.log)"
   fi
