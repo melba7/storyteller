@@ -80,7 +80,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
 
     /// Why the linked sounds folder is being looked at.
     public enum SyncReason: String, Sendable {
-        case launch, foreground, bookOpened, manual
+        case launch, foreground, bookOpened, manual, background
     }
 
     public let follower: NarrationFollower
@@ -99,6 +99,11 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
     private var syncing = false
     private var syncProgress: SoundsFolderImport.Progress?
     private var lastSyncStarted: Date?
+    /// The last look at the folder left files behind (stopped, failed, or iCloud still
+    /// downloading), so the app asks iOS for background time to carry on.
+    private var syncUnfinished = false
+    /// Set by ``stopSync()``, read by the running sync before each file.
+    private let stopRequested = SyncStop()
     /// Automatic looks at the linked folder are at least this far apart.
     static let syncInterval: TimeInterval = 60
 
@@ -389,6 +394,31 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         }
     }
 
+    /// Asks a running look at the folder to stop after the file it is copying; it saves
+    /// its place, and the next look carries on. For when iOS ends the app's background time.
+    public func stopSync() {
+        stopRequested.set(true)
+    }
+
+    /// A linked folder is being copied, or the last look left files behind: worth asking
+    /// iOS for background time to finish.
+    public func wantsBackgroundSync() async -> Bool {
+        await onQueue { [self] in settings.linkedFolderBookmark != nil && (syncing || syncUnfinished) }
+    }
+
+    /// iOS gave the app background time: finish the copy. Waits for a look that is already
+    /// running (the app was suspended in the middle of it), or starts one. True when
+    /// nothing is left to do.
+    public func finishSyncInBackground() async -> Bool {
+        while await onQueue({ [self] in syncing }) {
+            try? await Task.sleep(nanoseconds: 500_000_000)
+        }
+        if await wantsBackgroundSync() {
+            _ = try? await syncSoundsFolder(reason: .background)
+        }
+        return !(await wantsBackgroundSync())
+    }
+
     /// On `queue`.
     private func startSync(reason: SyncReason, completion: @escaping (Result<SoundsFolderImport.SyncSummary?, Error>) -> Void) {
         guard let bookmark = settings.linkedFolderBookmark else {
@@ -401,12 +431,14 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         }
         syncing = true
         lastSyncStarted = Date()
+        stopRequested.set(false)
         let environment = environment
         let destination = environment.soundsFolder
+        let stop = stopRequested
         work.async { [weak self] in
             let result = Result { () -> (SoundsFolderImport.SyncSummary, Data?) in
                 let folder = try environment.resolveBookmark(bookmark)
-                let summary = try SoundsFolderImport.sync(folder, into: destination) { progress in
+                let summary = try SoundsFolderImport.sync(folder, into: destination, shouldStop: { stop.isSet }) { progress in
                     self?.queue.async { self?.noteSyncProgress(progress) }
                 }
                 // A bookmark goes stale when the folder moves; a fresh one keeps the link.
@@ -440,6 +472,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         settings.lastSyncDate = Date()
         switch result {
         case let .success((summary, refreshed)):
+            syncUnfinished = summary.stopped || summary.notDownloaded > 0
             if let refreshed, refreshed != settings.linkedFolderBookmark { settings.linkedFolderBookmark = refreshed }
             settings.lastSyncResult = summary.description
             HostLog.note("sounds folder (\(reason.rawValue)): \(summary.description)")
@@ -450,6 +483,7 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
             }
             completion(.success(summary))
         case let .failure(error):
+            syncUnfinished = true
             settings.lastSyncResult = "Could not read the folder: \(error.localizedDescription)"
             HostLog.error("sounds folder (\(reason.rawValue)): \(error)")
             completion(.failure(error))
@@ -809,7 +843,8 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
                     lastResult: settings.lastSyncResult,
                     syncing: syncing,
                     copied: syncing ? syncProgress?.copied : nil,
-                    toCopy: syncing ? syncProgress?.total : nil
+                    toCopy: syncing ? syncProgress?.total : nil,
+                    downloading: syncing ? syncProgress?.downloading : nil
                 )
             ),
             book: text,
@@ -874,6 +909,8 @@ public struct LofiHostStatus: Codable, Sendable, Hashable {
         /// While a look at the folder is copying files: how many are done, of how many.
         public var copied: Int?
         public var toCopy: Int?
+        /// Of the files still to copy, how many iCloud is still downloading.
+        public var downloading: Int?
     }
 
     /// The imported sounds folder.
@@ -962,5 +999,23 @@ public struct LofiHostStatus: Codable, Sendable, Hashable {
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return [:] }
         return object
+    }
+}
+
+/// A stop flag a sync on another queue can read.
+final class SyncStop: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stopped = false
+
+    var isSet: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return stopped
+    }
+
+    func set(_ value: Bool) {
+        lock.lock()
+        stopped = value
+        lock.unlock()
     }
 }

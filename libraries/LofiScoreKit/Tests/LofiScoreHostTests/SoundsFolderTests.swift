@@ -264,6 +264,57 @@ final class SoundsFolderTests: XCTestCase {
         ])
     }
 
+    func testAsksICloudForEveryMissingFileAtOnceAndCopiesWhatIsHereFirst() throws {
+        let source = folder.appendingPathComponent("Linked", isDirectory: true)
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+        try touch("Linked/Atmosphere/Crowd/crowd.m4a")
+        try touch("Linked/Atmosphere/Rain/rain.m4a")
+        try touch("Linked/Atmosphere/Wind/wind.m4a")
+        try touch("Linked/tracks/Book One.score.json")
+
+        // Crowd and the score are still in iCloud; rain and wind are on the phone. Each
+        // copy of a missing file downloads it (as a coordinated read does).
+        let missing = Locked(Set(["crowd.m4a", "Book One.score.json"]))
+        let requested = Locked<[String]>([])
+        let downloads = SoundsFolderImport.CloudDownloads(
+            isLocal: { !missing.value.contains($0.lastPathComponent) },
+            request: { url in requested.update { $0.append(url.lastPathComponent) } }
+        )
+        var seen: [SoundsFolderImport.Progress] = []
+        var copiedOrder: [String] = []
+        let summary = try SoundsFolderImport.sync(source, into: destination, downloads: downloads) { progress in
+            seen.append(progress)
+            let copied = Set(self.files(under: destination).map { ($0 as NSString).lastPathComponent })
+            for name in ["Book One.score.json", "crowd.m4a", "rain.m4a", "wind.m4a"] where copied.contains(name) && !copiedOrder.contains(name) {
+                copiedOrder.append(name)
+                missing.update { $0.remove(name) }
+            }
+        }
+        XCTAssertEqual(Set(requested.value), ["crowd.m4a", "Book One.score.json"], "every missing file is asked for before the first copy")
+        XCTAssertEqual(copiedOrder, ["Book One.score.json", "rain.m4a", "wind.m4a", "crowd.m4a"],
+                       "scores first, then the recordings already here, then the ones iCloud is fetching")
+        XCTAssertEqual(seen.first?.downloading, 2)
+        XCTAssertEqual(seen.last?.downloading, 0)
+        XCTAssertEqual(summary.added, 4)
+        XCTAssertFalse(summary.stopped)
+    }
+
+    func testAStoppedSyncKeepsItsPlaceAndCarriesOn() throws {
+        let source = folder.appendingPathComponent("Linked", isDirectory: true)
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+        for name in ["a", "b", "c", "d"] { try touch("Linked/Atmosphere/Rain/\(name).m4a") }
+
+        var copied = 0
+        let first = try SoundsFolderImport.sync(source, into: destination, shouldStop: { copied >= 2 }) { copied = $0.copied }
+        XCTAssertTrue(first.stopped)
+        XCTAssertEqual(first.added, 2)
+        XCTAssertEqual(first.description, "Imported 2 sounds; stopped part way, the rest comes next time")
+
+        let second = try SoundsFolderImport.sync(source, into: destination)
+        XCTAssertFalse(second.stopped)
+        XCTAssertEqual(second.added, 2, "only the files the stopped sync did not copy")
+    }
+
     func testTidiesWhatTheMusicLeftBehind() throws {
         let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
         try touch("app/Music/Calm/a.mp3")
@@ -295,5 +346,25 @@ final class SoundsFolderTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent("Scores/Book One.score.json")), Data("one".utf8))
         XCTAssertEqual(SoundsFolderImport.tidyMusicLeftovers(in: destination), 0, "nothing left to do")
         XCTAssertEqual(SoundsFolderImport.tidyMusicLeftovers(in: folder.appendingPathComponent("missing")), 0)
+    }
+}
+
+/// A value the import's `@Sendable` closures can read and change in a test.
+final class Locked<Value>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Value
+
+    init(_ value: Value) { stored = value }
+
+    var value: Value {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func update(_ change: (inout Value) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        change(&stored)
     }
 }

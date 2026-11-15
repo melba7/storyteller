@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 
 import {
   applyForkIdentity,
+  forkIdentity,
   soundEdition,
   withLofiScorePods,
 } from "@/fork.config.ts"
@@ -70,9 +71,32 @@ describe("soundEdition", () => {
       },
     })
     expect(config.ios?.infoPlist).toEqual({
-      UIBackgroundModes: ["audio"],
+      UIBackgroundModes: ["audio", "processing"],
+      BGTaskSchedulerPermittedIdentifiers: [
+        `${forkIdentity.appId}.soundsImport`,
+      ],
       LofiScoreSoundEdition: soundEdition(),
     })
+  })
+
+  it("lets the sounds import finish in the background, next to upstream's task", () => {
+    const config = applyForkIdentity({
+      name: "Storyteller",
+      slug: "storyteller",
+      ios: {
+        infoPlist: {
+          UIBackgroundModes: ["audio", "processing"],
+          BGTaskSchedulerPermittedIdentifiers: ["upstream.task"],
+        },
+      },
+    })
+    expect(config.ios?.infoPlist?.["UIBackgroundModes"]).toEqual([
+      "audio",
+      "processing",
+    ])
+    expect(
+      config.ios?.infoPlist?.["BGTaskSchedulerPermittedIdentifiers"],
+    ).toEqual(["upstream.task", `${forkIdentity.appId}.soundsImport`])
   })
 
   describe("in a TestFlight build", () => {
@@ -91,8 +115,7 @@ describe("soundEdition", () => {
       })
       expect(config.ios?.buildNumber).toBe("42")
       expect(config.ios?.appleTeamId).toBe("TEAM123456")
-      expect(config.ios?.infoPlist).toEqual({
-        UIBackgroundModes: ["audio"],
+      expect(config.ios?.infoPlist).toMatchObject({
         LofiScoreSoundEdition: "publish",
       })
     })

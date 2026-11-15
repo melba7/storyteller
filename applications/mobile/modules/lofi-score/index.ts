@@ -107,6 +107,8 @@ export type LofiLinkedFolder = {
   /** While files are being copied: how many are done, of how many. */
   copied?: number
   toCopy?: number
+  /** Of the files still to copy, how many iCloud is still downloading. */
+  downloading?: number
 }
 
 /** The atmosphere's state, as the native module reports it. */

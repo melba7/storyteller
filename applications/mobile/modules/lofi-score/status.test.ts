@@ -277,6 +277,17 @@ describe("copyingLabel", () => {
       }),
     ).toBe("Copying 120 of 513 files…")
     expect(
+      copyingLabel({
+        name: "LofiMusic",
+        syncing: true,
+        copied: 120,
+        toCopy: 513,
+        downloading: 300,
+      }),
+    ).toBe(
+      "Copying 120 of 513 files… 300 still downloading from iCloud, which carries on with the app closed.",
+    )
+    expect(
       linkedFolderLabel({
         name: "LofiMusic",
         syncing: true,

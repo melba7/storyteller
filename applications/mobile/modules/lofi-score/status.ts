@@ -76,12 +76,15 @@ export function describeAtmosphere(status: LofiStatus): string {
 }
 
 /**
- * "Copying 120 of 513 files…" while a look at the linked folder is copying, or
- * null when it is not (or has nothing to copy).
+ * "Copying 120 of 513 files…" while a look at the linked folder is copying,
+ * with how many iCloud is still downloading, or null when it is not copying
+ * (or has nothing to copy).
  */
 export function copyingLabel(folder: LofiLinkedFolder): string | null {
   if (!folder.syncing || !folder.toCopy) return null
-  return `Copying ${folder.copied ?? 0} of ${folder.toCopy} ${folder.toCopy === 1 ? "file" : "files"}…`
+  const copying = `Copying ${folder.copied ?? 0} of ${folder.toCopy} ${folder.toCopy === 1 ? "file" : "files"}…`
+  if (!folder.downloading) return copying
+  return `${copying} ${folder.downloading} still downloading from iCloud, which carries on with the app closed.`
 }
 
 /** Where the atmosphere's sounds come from, for Settings. */

@@ -32,6 +32,9 @@ Already built (each has a pass/fail check):
   take effect.
 - The user can import the sounds folder from iCloud in Settings, and it resumes
   if interrupted. Check: Settings shows the count of imported sounds.
+- The import keeps going after the user closes the app: iCloud downloads every
+  file at once, and iOS lets the app finish copying in the background. Check: an
+  import left with the app closed has moved on when the app opens again.
 - The user can drop a book into `~/Storyteller Lofi/Books` (or list it in
   `Books/wanted.txt`), and the Mac scores it and puts the score in the book on
   the server. Check: `tracks/<book>.score.json` appears and the phone finds it.

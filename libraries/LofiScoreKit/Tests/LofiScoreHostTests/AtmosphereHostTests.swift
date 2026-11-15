@@ -319,6 +319,29 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertFalse(status.atmosphere.track)
     }
 
+    func testAnUnfinishedImportAsksForBackgroundTimeAndFinishesThere() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
+        try write(Data([0]), to: "Linked/Atmosphere/Rain/rain.m4a")
+        try write(Data([0]), to: "Linked/Atmosphere/Crowd/.crowd.m4a.icloud")
+
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        let wantedBefore = await host.wantsBackgroundSync()
+        XCTAssertFalse(wantedBefore, "no linked folder, nothing to finish")
+        _ = try await host.linkSoundsFolder(folder.appendingPathComponent("Linked"))
+        let wanted = await host.wantsBackgroundSync()
+        XCTAssertTrue(wanted, "a file is still in iCloud")
+
+        // iCloud finished the download while the app was closed; iOS gives it time.
+        try fileManager.removeItem(at: folder.appendingPathComponent("Linked/Atmosphere/Crowd/.crowd.m4a.icloud"))
+        try write(Data([0]), to: "Linked/Atmosphere/Crowd/crowd.m4a")
+        let done = await host.finishSyncInBackground()
+        XCTAssertTrue(done)
+        XCTAssertTrue(fileManager.fileExists(atPath: folder.appendingPathComponent("app/Music/Atmosphere/Crowd/crowd.m4a").path))
+        let wantedAfter = await host.wantsBackgroundSync()
+        XCTAssertFalse(wantedAfter)
+    }
+
     func testALinkedFolderBringsAScoreToTheOpenBook() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook(scored: false)
