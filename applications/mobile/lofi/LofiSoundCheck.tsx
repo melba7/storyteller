@@ -1,5 +1,6 @@
 // LOFI-FORK: the sound check in the atmosphere panel: plays a few spots of the
-// book already heard and asks how each one sounded (see FORK.md).
+// book already heard (or its opening) and asks how each one sounded (see
+// FORK.md).
 import AsyncStorage from "@react-native-async-storage/async-storage"
 import { skipToken } from "@reduxjs/toolkit/query"
 import Constants from "expo-constants"
@@ -201,8 +202,9 @@ export function LofiSoundCheck({ atmosphere }: Props) {
         <View className="shrink gap-1">
           <Text maxFontSizeMultiplier={1.5}>Sound check</Text>
           <Text variant="muted">
-            About 3 minutes: a few spots you have already heard, then a question
-            for each. Your place is kept.
+            About 3 minutes: a few spots you have already heard, or from the
+            book&apos;s opening if you are not far in, then a question for each.
+            Your place is kept.
           </Text>
         </View>
         <Button

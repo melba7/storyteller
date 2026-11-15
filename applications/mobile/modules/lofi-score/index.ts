@@ -173,7 +173,7 @@ export type LofiImportSummary = {
   notDownloaded: number
 }
 
-/** One stop of the sound check: a steady scene already heard, and where its narration starts. */
+/** One stop of the sound check: a steady scene already heard (or in the book's opening), and where its narration starts. */
 export type LofiSoundCheckStop = {
   /** The stop's first sentence. */
   globalIndex: number
