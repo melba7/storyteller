@@ -1,6 +1,6 @@
 # Plan
 
-Done: 1 | Last cleanup: none
+Done: 2 | Last cleanup: none
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -18,18 +18,64 @@ locally too.
   - Files: `applications/mobile/modules/lofi-score/forkConfig.test.ts`,
     `tools/fork/asc-preflight.mjs`.
 
-- [ ] **2. Confirm the sounds are loud enough on the phone** (riskiest unknown)
-  - Check that TestFlight has a build containing main's level changes (PR #27
-    and #28). If it doesn't, push to main for a build (Mo's OK needed). Give Mo
-    a 3-spot listening check: Redwood Prologue 2:27 (running water), ch5 18:35
-    (train), ch6 30:19 (crowd), at default sliders.
-  - If they're too quiet, change `AtmosphereConfig` levels using the measured
-    narrator loudness (-15 to -16 LUFS), with a test on the new defaults.
-  - Done when: Mo says all three are audible at the default settings.
-  - Try it: play those spots with headphones and with the speaker.
-  - Files:
-    `libraries/LofiScoreKit/Sources/LofiAtmosphere/Player/AmbiencePlayer.swift`
-    (AtmosphereConfig), its tests.
+- [x] **2a. Sound check: pick the spots** (engine side)
+  - `SoundCheck.spots` picks up to 6 spots from a book's track (a quiet room,
+    something loud, outdoors, water, weather, travel, a one-off), spread across
+    the book, all ending before the sentence playing now (no spoilers).
+    `SpoilerGuard.clip(atGlobalIndex:)` gives each spot's place in the audio.
+  - Done when: `SoundCheckTests` and the clip round-trip test pass.
+  - Files: `Sources/LofiAtmosphere/Track/SoundCheck.swift`,
+    `Sources/LofiText/Guard/SpoilerGuard.swift`, `EPUB/ReadaloudBook.swift`,
+    their tests.
+
+- [ ] **2b. Sound check in the app** (Mo's hearing test, replaces the manual
+      one). Status: built and passing `check.sh`; waiting for the iOS build in
+      CI and Mo's first run on TestFlight.
+  - Host: `soundCheckStops()` for the playing book, limited to the sentence
+    playing now, each with its audio clip. Module: `getSoundCheckStops`.
+  - App: a "Sound check" button in the sounds panel. For each spot it seeks the
+    narration there (`Storyteller.seekTo(audioPath, start)`), checks it landed,
+    plays up to 20 s (less when the scene ends), then asks how the main sound
+    came through under the voice: Too loud / Clear / Faint / Can't hear / Wrong
+    sound, or play it again. Then it puts the narration back where it was (also
+    after closing the panel, leaving the app, or the app closing). The last 5
+    runs are kept on the phone, and "Share results" copies them as text with
+    what played at each stop (recording, gain, route) and the run's settings. It
+    was reviewed twice. The second pass added: every jump of the check is told
+    to the sounds first (`soundCheckWillJump`), a one-off stop starts 5 s of
+    listening ahead at any narration speed and records whether its sound played,
+    the screen stays on, and leaving the app leaves the narration paused at the
+    listener's place.
+  - Test first: JS tests for the session logic (next spot, answers, the results
+    text), and a host test for the limit.
+  - Done when: check.sh passes, the iOS build passes in CI, and Mo runs it once
+    on TestFlight and pastes the results.
+  - Try it: open Redwood, tap the sounds button, then Sound check.
+  - Files: `LofiScoreHost/LofiAtmosphereHost.swift`,
+    `modules/lofi-score/ios/LofiScoreModule.swift`,
+    `modules/lofi-score/index.ts`, new `modules/lofi-score/soundCheck.ts` (+
+    test), new `modules/lofi-score/soundCheckRunner.ts` (+ test), new
+    `lofi/LofiSoundCheck.tsx`, `lofi/LofiAtmosphereControls.tsx`.
+
+- [ ] **2c. Fix the levels from the sound check**
+  - From Mo's results, change the `AtmosphereConfig` defaults (with a test),
+    then a new build and another sound check. Change the global defaults when
+    the same level is off across books; a book whose narrator is much louder or
+    quieter than -16 LUFS waits for 2d instead.
+  - Done when: at the default settings, main sounds at full or loud are Clear,
+    soft ones Clear or Faint, faint ones Faint or Clear, and nothing is Can't
+    hear or Too loud.
+  - Files: `Player/AmbiencePlayer.swift` (AtmosphereConfig), its tests.
+
+- [ ] **2d. Match each book's narrator loudness** (proposal, needs Mo's OK)
+  - The sounds sit under a voice assumed to be -16 LUFS. Measure each book's
+    narration on the Mac when it is scored, store it in the score, and use it in
+    place of the default, so one quiet or loud narrator does not need its own
+    settings.
+  - Done when: a test shows a book with a -20 LUFS narrator gets its bed 4 dB
+    quieter, and Redwood's measured value is in its score.
+  - Files: the scoring job (owned by the "Make adding music and atmosphere easy"
+    thread), `AtmosphereConfig`, the score format.
 
 - [ ] **3. A reject list for bad recordings**
   - Add `Tools/atmosphere/reject.txt` (one recording id per line, with a

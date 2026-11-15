@@ -96,6 +96,9 @@ struct EPUBParsingTests {
         #expect(grouped.indexByFragment["OEBPS/Text/c.xhtml#c-s1"] == 1)
         // The gap before the first sentence belongs to whatever came before the chapter.
         #expect(grouped.beforeHoles[ChapterSentences.clipKey(audioPath: "OEBPS/Audio/a.mp3", clipBegin: 0)] == -1)
+        // Where each sentence's own audio starts, so the app can jump to it (the sound check).
+        #expect(grouped.clips[0] == NarrationClip(audioPath: "OEBPS/Audio/a.mp3", start: 2))
+        #expect(grouped.clips[1] == NarrationClip(audioPath: "OEBPS/Audio/a.mp3", start: 3))
     }
 
     @Test func audioOnlyChapterHeadingStillCountsAsNarrated() {

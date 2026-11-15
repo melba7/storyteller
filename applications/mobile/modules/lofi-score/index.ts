@@ -171,6 +171,48 @@ export type LofiImportSummary = {
   notDownloaded: number
 }
 
+/** One stop of the sound check: a steady scene already heard, and where its narration starts. */
+export type LofiSoundCheckStop = {
+  /** The stop's first sentence. */
+  globalIndex: number
+  /** The last sentence it may play: the scene holds until here, all heard before. */
+  lastIndex: number
+  /** quietRoom, loud, outdoors, water, weather, travel, oneOff or other. */
+  kind: string
+  /** Main sound first: a layer key ("river.runningTap") with its level, or a one-off's name. */
+  sounds: { key: string; level?: string }[]
+  placeName?: string
+  /** For a one-off stop, the sentence of the one-off. */
+  cueIndex?: number
+  /** The audio file as the player names it, for `seekTo`. */
+  relativeUrl: string
+  start: number
+}
+
+/** What plays during a sound check stop, kept with its answer. */
+export type LofiSoundCheckReading = {
+  voices: {
+    sound: string
+    variant?: string
+    level?: string
+    recording: string
+    gainDB: number
+    atGainCap: boolean
+  }[]
+  missingSounds: string[]
+  /** One-off sounds asked for that have no recording. */
+  missingOneShots: string[]
+  /** How many one-off sounds have played since the book opened. */
+  oneShotsPlayed: number
+  /** builtIn, wired, bluetooth, airPlay, carPlay or other. */
+  route: string
+  routeMuted: boolean
+  voiceLoudnessLUFS: number
+  bedLevelDB: number
+  oneShotsEnabled: boolean
+  pausesEnabled: boolean
+}
+
 type LofiScoreNativeModule = {
   getStatus(): Promise<LofiStatus>
   setMutedInCar(muted: boolean): Promise<LofiStatus>
@@ -213,6 +255,16 @@ type LofiScoreNativeModule = {
   ): Promise<void>
   /** You stopped reading on screen (left the app or the book). */
   readerStopped(): Promise<void>
+  /**
+   * Up to `count` sound check stops in the open book, all at or before where
+   * the narration is now. Rejects with a readable reason when the book has no
+   * sounds or nothing has been heard yet.
+   */
+  getSoundCheckStops(count: number): Promise<LofiSoundCheckStop[]>
+  /** What plays now, with each sound's level, recording and gain; null when the sounds are off. */
+  getSoundCheckReading(): Promise<LofiSoundCheckReading | null>
+  /** Says the narration is about to be moved to a stop starting at this sentence. */
+  soundCheckWillJump(globalIndex: number): Promise<void>
 }
 
 /**

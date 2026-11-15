@@ -82,6 +82,8 @@ public final class NarrationFollower: @unchecked Sendable {
         public var readerMaxPageStep: Int = 150
         /// Reading on screen: after this long with no page turn, the sounds fade out.
         public var readerIdleTimeout: TimeInterval = 300
+        /// How long an announced jump (``expectJump(toGlobalSentenceIndex:)``) is waited for.
+        public var expectedJumpWindow: TimeInterval = 5
 
         public init() {}
     }
@@ -122,6 +124,8 @@ public final class NarrationFollower: @unchecked Sendable {
     private var anchor: (audio: String, time: Double, wall: TimeInterval)?
     private var rate: Double = 1
     private var unmatchedClips = 0
+    /// A jump the app announced: the sentence it lands on, and until when it is expected.
+    private var expectedJump: (index: Int, until: TimeInterval)?
 
     public init(scheduler: LofiScheduler, configuration: Configuration = Configuration()) {
         self.scheduler = scheduler
@@ -271,6 +275,16 @@ public final class NarrationFollower: @unchecked Sendable {
         }
     }
 
+    /// The app is about to move the narration to this sentence itself (the sound check
+    /// jumping to a stop). The clip that lands there is a seek however near it is: without
+    /// this, a jump back of a few sentences counts as a rewind, which keeps the scene and
+    /// does not let a one-off sound that just played play again.
+    public func expectJump(toGlobalSentenceIndex index: Int) {
+        scheduler.perform { [self] in
+            expectedJump = (index, scheduler.now + configuration.expectedJumpWindow)
+        }
+    }
+
     // MARK: - Reading on screen
 
     /// The listener is reading the book's text on screen with the narrator stopped, and the
@@ -400,8 +414,17 @@ public final class NarrationFollower: @unchecked Sendable {
 
         let previous = position
         let step = previous.map { found.globalIndex - $0.globalIndex }
-        let isRewind = step.map { $0 < 0 && -$0 <= configuration.rewindTolerance } ?? false
-        let isSeek = !isRewind && (step.map { $0 < 0 || $0 > configuration.maxContinuousStep } ?? false)
+        var announced = false
+        if let expected = expectedJump {
+            if now > expected.until {
+                expectedJump = nil
+            } else if expected.index == found.globalIndex {
+                expectedJump = nil
+                announced = true
+            }
+        }
+        let isRewind = !announced && (step.map { $0 < 0 && -$0 <= configuration.rewindTolerance } ?? false)
+        let isSeek = announced || (!isRewind && (step.map { $0 < 0 || $0 > configuration.maxContinuousStep } ?? false))
         let reached = furthest
 
         updateRate(clip: clip, audioTime: audioTime, isSeek: isSeek, at: now)

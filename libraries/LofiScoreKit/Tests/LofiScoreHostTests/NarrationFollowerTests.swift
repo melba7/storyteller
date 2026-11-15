@@ -151,6 +151,30 @@ final class NarrationFollowerTests: XCTestCase {
         XCTAssertEqual(sink.seeks, [2])
     }
 
+    func testAnAnnouncedJumpIsASeekHoweverNear() throws {
+        follower.bookOpened(id: "book")
+        follower.attachText(try Books.text(), toBook: "book")
+        follower.playingChanged(true)
+        for index in 0...10 {
+            narrate(Books.clip(0, index))
+        }
+
+        // The sound check plays a stop again: back four sentences, which would be a rewind.
+        follower.expectJump(toGlobalSentenceIndex: 7)
+        narrate(Books.clip(0, 7))
+        XCTAssertEqual(sink.seeks, [7])
+        // And on to a stop two sentences ahead, which would be steady narration.
+        follower.expectJump(toGlobalSentenceIndex: 9)
+        narrate(Books.clip(0, 9))
+        XCTAssertEqual(sink.seeks, [7, 9])
+
+        // A jump that never comes is forgotten: the same rewind later is a rewind again.
+        follower.expectJump(toGlobalSentenceIndex: 6)
+        narrate(Books.clip(0, 10), then: 6)
+        narrate(Books.clip(0, 6))
+        XCTAssertEqual(sink.seeks, [7, 9])
+    }
+
     func testEstimatesTheSpeedFromTheClips() throws {
         follower.bookOpened(id: "book")
         follower.attachText(try Books.text(), toBook: "book")

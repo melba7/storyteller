@@ -20,6 +20,17 @@ struct NarratedSentence: Equatable {
     let text: String
 }
 
+/// Where a sentence's own audio starts: the file, relative to the book, and the time in it.
+public struct NarrationClip: Sendable, Hashable {
+    public let audioPath: String
+    public let start: Double
+
+    public init(audioPath: String, start: Double) {
+        self.audioPath = audioPath
+        self.start = start
+    }
+}
+
 /// The sentences of one chapter plus the lookups needed to map a player's
 /// position back to a sentence.
 struct ChapterSentences {
@@ -30,6 +41,8 @@ struct ChapterSentences {
     /// "audioPath@clipBegin" -> the index of the last sentence narrated before
     /// the hole, or -1 when the hole comes before the chapter's first sentence.
     let beforeHoles: [String: Int]
+    /// Sentence index -> where its own audio starts (not the holes before it).
+    var clips: [Int: NarrationClip] = [:]
 
     static func key(path: String, fragment: String) -> String { path + "#" + fragment }
 
@@ -104,7 +117,8 @@ struct EPUBReadaloudSource: ReadaloudSource {
         return ChapterSentences(
             sentences: sentences,
             indexByFragment: grouped.indexByFragment,
-            beforeHoles: grouped.beforeHoles
+            beforeHoles: grouped.beforeHoles,
+            clips: grouped.clips
         )
     }
 
@@ -124,6 +138,7 @@ struct EPUBReadaloudSource: ReadaloudSource {
         var order: [SentenceKey] = []
         var indexByFragment: [String: Int] = [:]
         var beforeHoles: [String: Int] = [:]
+        var clips: [Int: NarrationClip] = [:]
     }
 
     /// Turns pars into sentences. Consecutive pars of one sentence (several audio
@@ -155,6 +170,9 @@ struct EPUBReadaloudSource: ReadaloudSource {
                 index = result.order.count
                 indexByKey[key] = index
                 result.order.append(key)
+            }
+            if result.clips[index] == nil, let audio = entry.audioPath, let begin = entry.clipBegin {
+                result.clips[index] = NarrationClip(audioPath: audio, start: begin)
             }
             result.indexByFragment[ChapterSentences.key(path: entry.textPath, fragment: entry.fragmentID)] = index
             result.indexByFragment[ChapterSentences.key(path: key.path, fragment: key.fragment)] = index

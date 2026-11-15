@@ -72,6 +72,32 @@ struct SpoilerGuardPropertyTests {
         }
     }
 
+    @Test("Each sentence's audio clip leads back to the same sentence", arguments: 0..<20)
+    func clipsRoundTrip(seed: Int) throws {
+        var rng = SplitMix64(seed: UInt64(seed) &* 104_729 &+ 3)
+        let book = FixtureBook.random(&rng)
+        let base = try TemporaryDirectory()
+        try book.write(to: base.url)
+        let guardian = try SpoilerGuard(epubDirectory: base.url)
+
+        var global = 0
+        for chapter in book.narratedChapters {
+            for index in chapter.sentences.indices {
+                let clip = try #require(try guardian.clip(atGlobalIndex: global), "seed \(seed) #\(global)")
+                let found = try guardian.position(
+                    textResource: book.textPath(chapter),
+                    fragmentId: fragmentToReport(book: book, chapter: chapter, index: index, rng: &rng),
+                    audioResource: clip.audioPath,
+                    clipBegin: clip.start
+                )
+                #expect(found?.globalIndex == global, "seed \(seed) #\(global)")
+                global += 1
+            }
+        }
+        #expect(try guardian.clip(atGlobalIndex: global) == nil, "past the end")
+        #expect(try guardian.clip(atGlobalIndex: -1) == nil)
+    }
+
     @Test("Windows hold exactly the narrated text up to the position", arguments: 0..<40)
     func windowMatchesTheBookModel(seed: Int) throws {
         var rng = SplitMix64(seed: UInt64(seed) &+ 1_000)
