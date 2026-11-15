@@ -263,7 +263,7 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertEqual((status.jsonObject()["atmosphere"] as? [String: Any])?["oneShotsEnabled"] as? Bool, false)
     }
 
-    func testTheSoundCheckNeedsABookWithSoundsAndSomethingHeard() async throws {
+    func testTheSoundCheckNeedsABookWithSoundsAndWorksBeforeItStarts() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook()
         let (host, _) = makeHost(defaults: defaults)
@@ -282,13 +282,15 @@ final class AtmosphereHostTests: XCTestCase {
 
         host.narratorLoadedBook(id: "book-1", trackFile: nil)
         _ = try await waitFor(host) { $0.atmosphere.track && $0.book?.text == "ready" }
-        let notStarted = await reason()
-        XCTAssertEqual(notStarted, .nothingHeard)
+        // Not started yet: the book's opening (this short book is all opening).
+        let notStarted = try await host.soundCheckStops()
+        XCTAssertFalse(notStarted.isEmpty)
+        XCTAssertTrue(notStarted.allSatisfy { $0.spot.lastIndex < LofiAtmosphereHost.soundCheckFreeSentences })
 
         narrate(host)
         _ = try await waitFor(host) { $0.atmosphere.playing == ["crowd"] }
         let stops = try await host.soundCheckStops()
-        XCTAssertTrue(stops.allSatisfy { $0.spot.lastIndex < 2 }, "only what came before the sentence playing now")
+        XCTAssertEqual(stops.map(\.spot), notStarted.map(\.spot), "within the opening, hearing more changes nothing")
         let reading = await host.soundCheckReading()
         XCTAssertEqual((reading?["voices"] as? [[String: Any]])?.first?["sound"] as? String, "crowd")
         XCTAssertEqual(reading?["oneShotsPlayed"] as? Int, 0)

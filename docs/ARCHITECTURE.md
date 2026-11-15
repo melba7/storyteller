@@ -67,24 +67,25 @@ in `FORK.md`.
 
 ## Decisions log
 
-| Date       | Decision                                                                                                              | Why                                                  |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| 2026-11-09 | Fork code lives in new folders; upstream edits only at marked touch points                                            | Upstream syncs stay clean                            |
-| 2026-11-09 | No audio in git; personal (CC BY-NC) and publish (Commons) sound editions                                             | The repo is public; licences differ                  |
-| 2026-11-10 | Music shelved; ambience is the app's focus                                                                            | Mo's direction                                       |
-| 2026-11-10 | Scoring with Claude Opus through the plan, spoiler-safe windows                                                       | Accuracy; no look-ahead                              |
-| 2026-11-11 | Bed at -10 dB under the voice, quiet loops boosted up to maxGain 6                                                    | Mo couldn't hear the sounds                          |
-| 2026-11-11 | Fetch gates on title, loudness range and loudness; poor loops listed as rejected                                      | Drips and room noise slipped in                      |
-| 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library                                               | Cost; Mo's choice                                    |
-| 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                                                        | Mo's choice                                          |
-| 2026-11-14 | `tools/fork/check.sh` is the one check command                                                                        | One command for every check                          |
-| 2026-11-14 | Sound check in the app replaces hunting for spots by hand; spots end before the sentence playing now                  | Mo's ask; no spoilers                                |
-| 2026-11-14 | Sound check stops are steady scenes (8+ sentences, one main sound and level); results carry what played               | Fable review: answers must be traceable to a level   |
-| 2026-11-14 | Level fixes from the check are global; per-book narrator loudness is proposed as 2d                                   | One quiet narrator should not move every book        |
-| 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped                 | Second review: a near jump is a rewind otherwise     |
-| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                                          | A limit left 161 scenes silent                       |
-| 2026-11-15 | The sounds import asks iCloud for every file up front and finishes in a BGProcessingTask (`<bundle id>.soundsImport`) | Mo's ask: the import took too long with the app open |
-| 2026-11-15 | Level fixes stay global; each book's narrator loudness is measured at scoring and used in place of -16 LUFS (2d)      | Mo's choice on the review card                       |
+| Date       | Decision                                                                                                                                   | Why                                                        |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| 2026-11-09 | Fork code lives in new folders; upstream edits only at marked touch points                                                                 | Upstream syncs stay clean                                  |
+| 2026-11-09 | No audio in git; personal (CC BY-NC) and publish (Commons) sound editions                                                                  | The repo is public; licences differ                        |
+| 2026-11-10 | Music shelved; ambience is the app's focus                                                                                                 | Mo's direction                                             |
+| 2026-11-10 | Scoring with Claude Opus through the plan, spoiler-safe windows                                                                            | Accuracy; no look-ahead                                    |
+| 2026-11-11 | Bed at -10 dB under the voice, quiet loops boosted up to maxGain 6                                                                         | Mo couldn't hear the sounds                                |
+| 2026-11-11 | Fetch gates on title, loudness range and loudness; poor loops listed as rejected                                                           | Drips and room noise slipped in                            |
+| 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library                                                                    | Cost; Mo's choice                                          |
+| 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                                                                             | Mo's choice                                                |
+| 2026-11-14 | `tools/fork/check.sh` is the one check command                                                                                             | One command for every check                                |
+| 2026-11-14 | Sound check in the app replaces hunting for spots by hand; spots end before the sentence playing now                                       | Mo's ask; no spoilers                                      |
+| 2026-11-14 | Sound check stops are steady scenes (8+ sentences, one main sound and level); results carry what played                                    | Fable review: answers must be traceable to a level         |
+| 2026-11-14 | Level fixes from the check are global; per-book narrator loudness is proposed as 2d                                                        | One quiet narrator should not move every book              |
+| 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped                                      | Second review: a near jump is a rewind otherwise           |
+| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                                                               | A limit left 161 scenes silent                             |
+| 2026-11-15 | The sounds import asks iCloud for every file up front and finishes in a BGProcessingTask (`<bundle id>.soundsImport`)                      | Mo's ask: the import took too long with the app open       |
+| 2026-11-15 | Level fixes stay global; each book's narrator loudness is measured at scoring and used in place of -16 LUFS (2d)                           | Mo's choice on the review card                             |
+| 2026-11-15 | The sound check may use the book's opening (first chapter with sounds, or about 5 minutes, whichever is longer) before the user gets there | Mo's ask: check the levels before hearing most of the book |
 
 ## Known problems
 

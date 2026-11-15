@@ -34,13 +34,10 @@ public struct SoundCheckStop: Sendable, Hashable {
 public enum SoundCheckUnavailable: LocalizedError, CustomStringConvertible {
     /// No book is open, or it has no atmosphere track yet.
     case noTrack
-    /// The narration has not reached any sentence yet, so there is nothing heard to test.
-    case nothingHeard
 
     public var description: String {
         switch self {
         case .noTrack: "This book has no sounds yet."
-        case .nothingHeard: "Play the book for a moment first: the sound check only uses parts you have already heard."
         }
     }
 
@@ -48,27 +45,41 @@ public enum SoundCheckUnavailable: LocalizedError, CustomStringConvertible {
 }
 
 extension LofiAtmosphereHost {
-    /// The sound check for the open book: up to `count` stops, all ending before the
-    /// sentence the narration is at now, so nothing ahead is given away. A one-off stop is
-    /// offered only when one-off sounds are on and that sound has a recording.
+    /// The sound check for the open book: up to `count` stops, all ending before
+    /// ``soundCheckLimit(track:playingNow:)``: what has been heard, or the book's opening
+    /// for a book not far in yet. A one-off stop is offered only when one-off sounds are on
+    /// and that sound has a recording.
     public func soundCheckStops(count: Int = 6) async throws -> [SoundCheckStop] {
         let followerStatus = await withCheckedContinuation { continuation in
             follower.status { continuation.resume(returning: $0) }
         }
         guard let source = await soundCheckSource() else { throw SoundCheckUnavailable.noTrack }
-        guard let now = followerStatus.position, followerStatus.bookID == source.bookID else {
-            throw SoundCheckUnavailable.nothingHeard
-        }
+        let now = followerStatus.bookID == source.bookID ? followerStatus.position?.globalIndex : nil
         var snapshot: AmbienceSnapshot?
         if let player = source.player {
             snapshot = await withCheckedContinuation { continuation in player.snapshot { continuation.resume(returning: $0) } }
         }
         let missing = Set(snapshot?.missingOneShots ?? [])
         return try Self.soundCheckStops(
-            track: source.track, spoilerGuard: source.spoilerGuard, playingNow: now.globalIndex, count: count,
+            track: source.track, spoilerGuard: source.spoilerGuard,
+            playingNow: Self.soundCheckLimit(track: source.track, playingNow: now), count: count,
             oneOffs: snapshot?.oneShotsEnabled ?? false, oneOffSound: { !missing.contains($0) },
             rate: followerStatus.estimatedRate
         )
+    }
+
+    /// About the first 5 minutes of narration (8 sentences are about 20 s).
+    static let soundCheckFreeSentences = 120
+
+    /// The first sentence the sound check may not reach. Mo's choice: a book not far in
+    /// yet can be checked on its opening, the first chapter with sounds in it or about the
+    /// first 5 minutes, whichever is longer, so the check works before most of the book is
+    /// heard. Further in, it is the sentence playing now, so nothing ahead is given away.
+    static func soundCheckLimit(track: AtmosphereTrack, playingNow: Int?) -> Int {
+        let firstScene = track.entries.first { !$0.scene.isSilent }?.globalIndex ?? 0
+        let chapterEnd = track.chapterStarts.sorted().first { $0 > firstScene } ?? Int.max
+        let opening = max(chapterEnd == Int.max ? firstScene + soundCheckFreeSentences : chapterEnd, soundCheckFreeSentences)
+        return max(playingNow ?? 0, opening)
     }
 
     /// The app is about to jump the narration to a stop that starts at this sentence: the

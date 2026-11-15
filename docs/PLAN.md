@@ -21,7 +21,9 @@ locally too.
 - [x] **2a. Sound check: pick the spots** (engine side)
   - `SoundCheck.spots` picks up to 6 spots from a book's track (a quiet room,
     something loud, outdoors, water, weather, travel, a one-off), spread across
-    the book, all ending before the sentence playing now (no spoilers).
+    the book, all ending before the sentence playing now (no spoilers), or
+    within the book's opening (first chapter with sounds, or about the first 5
+    minutes, whichever is longer) when the user is not far in (Mo, 2026-11-15).
     `SpoilerGuard.clip(atGlobalIndex:)` gives each spot's place in the audio.
   - Done when: `SoundCheckTests` and the clip round-trip test pass.
   - Files: `Sources/LofiAtmosphere/Track/SoundCheck.swift`,

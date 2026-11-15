@@ -33,6 +33,26 @@ final class SoundCheckStopsTests: XCTestCase {
         XCTAssertEqual(try LofiAtmosphereHost.soundCheckStops(track: track, spoilerGuard: guardian, playingNow: 5, count: 6).map(\.spot.globalIndex), [0, 3])
     }
 
+    func testABookNotStartedYetCanBeCheckedOnItsFirstChapterOrFirstFiveMinutes() throws {
+        let guardian = try SpoilerGuard(chapters: [(0..<600).map { "Sentence \($0)." }])
+        func track(firstScene: Int, chapterStarts: [Int]) throws -> AtmosphereTrack {
+            let position = try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: firstScene))
+            let scene = StoryScene(placeID: "p", setting: .indoors, layers: [SceneLayer(.roomTone, .soft)])
+            return AtmosphereTrack(engineID: "test", bookID: "book", wordsBetweenEntries: 250, chapterStarts: chapterStarts,
+                                   entries: [.init(position: position, sentence: "s", scene: scene)])
+        }
+        let limit = LofiAtmosphereHost.soundCheckLimit
+        // Not started: the whole first chapter with sounds in it.
+        XCTAssertEqual(limit(try track(firstScene: 10, chapterStarts: [0, 200, 400]), nil), 200)
+        // A short first chapter gives way to about the first 5 minutes.
+        XCTAssertEqual(limit(try track(firstScene: 10, chapterStarts: [0, 50, 400]), nil), LofiAtmosphereHost.soundCheckFreeSentences)
+        // A title page with no sounds is not the first chapter.
+        XCTAssertEqual(limit(try track(firstScene: 40, chapterStarts: [0, 30, 500]), nil), 500)
+        // Further in, everything heard so far, as before.
+        XCTAssertEqual(limit(try track(firstScene: 10, chapterStarts: [0, 200, 400]), 350), 350)
+        XCTAssertEqual(limit(try track(firstScene: 10, chapterStarts: [0, 200, 400]), 20), 200)
+    }
+
     func testAOneOffStopStartsAtLeastFiveSecondsBeforeItsSound() throws {
         let (guardian, entry) = try book()
         let position = { (i: Int) in try XCTUnwrap(try guardian.position(chapterOrdinal: 0, sentenceIndex: i)) }
@@ -98,6 +118,6 @@ final class SoundCheckStopsTests: XCTestCase {
     }
 
     func testReasonsReadWellOnTheScreen() {
-        XCTAssertEqual(SoundCheckUnavailable.nothingHeard.localizedDescription, SoundCheckUnavailable.nothingHeard.description)
+        XCTAssertEqual(SoundCheckUnavailable.noTrack.localizedDescription, SoundCheckUnavailable.noTrack.description)
     }
 }
