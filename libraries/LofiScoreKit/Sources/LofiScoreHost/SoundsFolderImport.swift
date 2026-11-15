@@ -302,6 +302,9 @@ extension SoundsFolderImport {
         public var recordings = 0
         /// The whole folder was imported afresh (nothing was imported before).
         public var fresh = false
+        /// Asked to stop part way (iOS ending the app's background time); the rest is
+        /// copied the next time.
+        public var stopped = false
 
         public var changed: Bool { added + updated > 0 }
 
@@ -322,9 +325,13 @@ extension SoundsFolderImport {
             let other = added + updated - scores - atmosphereTracks - recordings
             add(other, "other file", "other files")
             let downloading = notDownloaded == 1 ? "1 file is still downloading from iCloud" : "\(notDownloaded) files are still downloading from iCloud"
-            if parts.isEmpty { return notDownloaded > 0 ? "Nothing new yet; \(downloading)" : "Nothing new" }
-            var line = (fresh ? "Imported " : "New: ") + parts.joined(separator: ", ")
-            if notDownloaded > 0 { line += "; \(notDownloaded) more still downloading from iCloud" }
+            if parts.isEmpty, !stopped { return notDownloaded > 0 ? "Nothing new yet; \(downloading)" : "Nothing new" }
+            var line = parts.isEmpty ? "Nothing copied yet" : (fresh ? "Imported " : "New: ") + parts.joined(separator: ", ")
+            if stopped {
+                line += "; stopped part way, the rest comes next time"
+            } else if notDownloaded > 0 {
+                line += "; \(notDownloaded) more still downloading from iCloud"
+            }
             return line
         }
     }
@@ -346,6 +353,38 @@ extension SoundsFolderImport {
         /// The book scores and atmosphere tracks are all in: a book can start playing
         /// while the recordings are still being copied.
         public var scoresReady: Bool
+        /// Of the files still to copy, how many iCloud is still downloading.
+        public var downloading = 0
+    }
+
+    /// Whether a file is on the device, and asking iCloud Drive for one that is not.
+    /// Injected so tests can play iCloud.
+    public struct CloudDownloads: Sendable {
+        public var isLocal: @Sendable (URL) -> Bool
+        public var request: @Sendable (URL) -> Void
+
+        public init(isLocal: @escaping @Sendable (URL) -> Bool, request: @escaping @Sendable (URL) -> Void) {
+            self.isLocal = isLocal
+            self.request = request
+        }
+
+        /// iCloud Drive's own state. Outside Apple's platforms every file is local.
+        public static let system = CloudDownloads(
+            isLocal: { url in
+                #if canImport(Darwin)
+                let values = try? url.resourceValues(forKeys: [.isUbiquitousItemKey, .ubiquitousItemDownloadingStatusKey])
+                guard values?.isUbiquitousItem == true else { return true }
+                return values?.ubiquitousItemDownloadingStatus == .current
+                #else
+                return true
+                #endif
+            },
+            request: { url in
+                #if canImport(Darwin)
+                try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+                #endif
+            }
+        )
     }
 
     /// The manifest is saved every this many files, so a copy cut short (the app closed,
@@ -360,12 +399,17 @@ extension SoundsFolderImport {
     /// recordings, then the lists that describe them, and a copy cut short carries on from
     /// where it stopped the next time.
     ///
-    /// Files still only in iCloud are asked to download, so a later sync gets them.
+    /// Every file not on the device yet is asked for from iCloud before the first copy, so
+    /// iCloud downloads them together (and carries on with the app closed), and the files
+    /// already here are copied first. `shouldStop` is asked before each file: a sync told to
+    /// stop saves its place and returns, marked `stopped`.
     /// `progress` is called before the first copy and after every file, on the caller's thread.
     public static func sync(
         _ source: URL,
         into destination: URL,
         fileManager: FileManager = .default,
+        downloads: CloudDownloads = .system,
+        shouldStop: () -> Bool = { false },
         progress: ((Progress) -> Void)? = nil
     ) throws -> SyncSummary {
         var summary = SyncSummary(folderName: source.lastPathComponent)
@@ -381,7 +425,7 @@ extension SoundsFolderImport {
             throw ImportError.noSounds(source.lastPathComponent)
         }
         summary.notDownloaded = plan.notDownloaded
-        requestDownloads(plan.placeholders, fileManager: fileManager)
+        plan.placeholders.forEach(downloads.request)
         if summary.fresh {
             // A first import replaces whatever sat there (stand-ins, an older import that
             // kept no list). The empty list written at once marks the import as begun, so
@@ -415,12 +459,35 @@ extension SoundsFolderImport {
             if item.isScore || item.isAtmosphereTrack { return 0 }
             return item.isRecording ? 1 : 2
         }
-        pending.sort { (rank($0.item), $0.item.relativePath) < (rank($1.item), $1.item.relativePath) }
+        let total = pending.count
         let scoreCount = pending.filter { rank($0.item) == 0 }.count
-        progress?(Progress(copied: 0, total: pending.count, scoresReady: scoreCount == 0))
+        var local = Set(pending.filter { downloads.isLocal($0.item.url) }.map(\.item.relativePath))
+        for next in pending where !local.contains(next.item.relativePath) { downloads.request(next.item.url) }
+        var waiting = pending.count - local.count
+        progress?(Progress(copied: 0, total: total, scoresReady: scoreCount == 0, downloading: waiting))
 
-        for (index, next) in pending.enumerated() {
+        // Scores and tracks first, then the files already on the device, then the rest, a
+        // coordinated read of each waiting for iCloud. Every so often the files iCloud has
+        // finished are looked at again, so they go before ones it is still fetching.
+        func order(_ item: Item) -> (Int, Int, String) {
+            (rank(item), local.contains(item.relativePath) ? 0 : 1, item.relativePath)
+        }
+        var index = 0
+        while !pending.isEmpty {
+            if shouldStop() {
+                summary.stopped = true
+                break
+            }
+            if index > 0, index % manifestSaveInterval == 0 {
+                for next in pending where !local.contains(next.item.relativePath) && downloads.isLocal(next.item.url) {
+                    local.insert(next.item.relativePath)
+                }
+                waiting = pending.filter { !local.contains($0.item.relativePath) }.count
+            }
+            let at = pending.indices.min { order(pending[$0].item) < order(pending[$1].item) }!
+            let next = pending.remove(at: at)
             let item = next.item
+            if !local.contains(item.relativePath) { waiting -= 1 }
             let target = destination.appendingPathComponent(item.relativePath)
             try replace(target, with: item.url, fileManager: fileManager)
             manifest[item.relativePath] = next.stamp
@@ -437,7 +504,8 @@ extension SoundsFolderImport {
             } else if item.isRecording {
                 summary.recordings += 1
             }
-            progress?(Progress(copied: index + 1, total: pending.count, scoresReady: index + 1 >= scoreCount))
+            index += 1
+            progress?(Progress(copied: index, total: total, scoresReady: index >= scoreCount, downloading: waiting))
         }
         return summary
     }
@@ -470,14 +538,5 @@ extension SoundsFolderImport {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(manifest).write(to: destination.appendingPathComponent(manifestFileName), options: .atomic)
-    }
-
-    /// Asks iCloud Drive to download files that are only placeholders on the device.
-    static func requestDownloads(_ placeholders: [URL], fileManager: FileManager) {
-        #if canImport(Darwin)
-        for url in placeholders {
-            try? fileManager.startDownloadingUbiquitousItem(at: url)
-        }
-        #endif
     }
 }

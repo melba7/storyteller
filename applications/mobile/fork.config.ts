@@ -107,11 +107,21 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const isDev = process.env["APP_VARIANT"] === "development"
   const appId = isDev ? `${forkIdentity.appId}.dev` : forkIdentity.appId
 
+  // The sounds import finishes in a background processing task
+  // (modules/lofi-score/ios/LofiBackgroundImport.swift), next to upstream's.
+  const plist = config.ios?.infoPlist ?? {}
+  const modes = (plist["UIBackgroundModes"] as string[] | undefined) ?? []
+  const tasks =
+    (plist["BGTaskSchedulerPermittedIdentifiers"] as string[] | undefined) ?? []
   const ios: NonNullable<ExpoConfig["ios"]> = {
     ...config.ios,
     bundleIdentifier: appId,
     infoPlist: {
-      ...config.ios?.infoPlist,
+      ...plist,
+      UIBackgroundModes: modes.includes("processing")
+        ? modes
+        : [...modes, "processing"],
+      BGTaskSchedulerPermittedIdentifiers: [...tasks, `${appId}.soundsImport`],
       LofiScoreSoundEdition: soundEdition(),
     },
   }

@@ -1,6 +1,7 @@
 {
   "platforms": ["ios"],
   "ios": {
-    "modules": ["LofiScoreModule"]
+    "modules": ["LofiScoreModule"],
+    "appDelegateSubscribers": ["LofiScoreAppDelegateSubscriber"]
   }
 }

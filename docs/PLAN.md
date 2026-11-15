@@ -67,7 +67,7 @@ locally too.
     hear or Too loud.
   - Files: `Player/AmbiencePlayer.swift` (AtmosphereConfig), its tests.
 
-- [ ] **2d. Match each book's narrator loudness** (proposal, needs Mo's OK)
+- [ ] **2d. Match each book's narrator loudness** (Mo's choice, 2026-11-15)
   - The sounds sit under a voice assumed to be -16 LUFS. Measure each book's
     narration on the Mac when it is scored, store it in the score, and use it in
     place of the default, so one quiet or loud narrator does not need its own
@@ -76,6 +76,31 @@ locally too.
     quieter, and Redwood's measured value is in its score.
   - Files: the scoring job (owned by the "Make adding music and atmosphere easy"
     thread), `AtmosphereConfig`, the score format.
+
+- [ ] **2e. Import sounds in the background** (Mo's ask, 2026-11-15) Status:
+      built and passing `check.sh`; waiting for the iOS build in CI and Mo's
+      next import.
+  - The first import of the sounds folder (about 500 recordings, 420 MB from
+    iCloud) took too long with the app open. Ask iCloud for every file not yet
+    on the phone at the start, so iCloud downloads them all together, even with
+    the app closed. Copy the files already on the phone first. When the app goes
+    to the background with copying unfinished, ask iOS for a background
+    processing task that carries on (iOS picks the time; no charger needed, no
+    notification). Settings shows how many files are still downloading from
+    iCloud as well as the copy count.
+  - Test first: Swift tests that `sync` asks for every missing file's download
+    before copying, copies the downloaded files first, reports the count still
+    downloading, and stops cleanly when asked to (saving its place); a JS test
+    for the label.
+  - Done when: check.sh passes, the iOS build passes in CI, and Mo's next import
+    finishes after the app was closed during it.
+  - Try it: Settings > Atmosphere Sounds, import the folder, close the app, open
+    it later and look at the count.
+  - Files: `LofiScoreHost/SoundsFolderImport.swift`,
+    `LofiScoreHost/LofiAtmosphereHost.swift`,
+    `modules/lofi-score/ios/LofiScoreModule.swift` (+ an app delegate
+    subscriber), `expo-module.config.json`, `fork.config.ts`,
+    `modules/lofi-score/status.ts`, `index.ts`, their tests.
 
 - [ ] **3. A reject list for bad recordings**
   - Add `Tools/atmosphere/reject.txt` (one recording id per line, with a

@@ -12,8 +12,9 @@ import UIKit
 import UniformTypeIdentifiers
 
 /// A little more time for a copy to carry on after the app leaves the screen. iOS gives
-/// about half a minute, not the whole of a long import; what is not copied by then is
-/// picked up from where it stopped when the app comes back (the import remembers each file).
+/// about half a minute, not the whole of a long import. When it runs out the copy stops
+/// after the current file and saves its place; the background task in
+/// LofiBackgroundImport.swift, or the app coming back, carries on from there.
 final class LofiBackgroundTime: @unchecked Sendable {
   private let lock = NSLock()
   private var task: UIBackgroundTaskIdentifier = .invalid
@@ -22,6 +23,7 @@ final class LofiBackgroundTime: @unchecked Sendable {
   static func begin(_ name: String) -> LofiBackgroundTime {
     let time = LofiBackgroundTime()
     let task = UIApplication.shared.beginBackgroundTask(withName: name) { [weak time] in
+      LofiScoreRuntime.shared.host.stopSync()
       time?.end()
     }
     time.lock.lock()
@@ -116,6 +118,15 @@ public final class LofiScoreModule: Module {
     // finished) is copied, at most once a minute.
     OnAppEntersForeground {
       LofiScoreRuntime.shared.host.syncSoundsFolderIfDue(reason: .foreground)
+    }
+
+    // Leaving the screen with the sounds folder still copying (or files still coming
+    // from iCloud): ask iOS for background time to finish it.
+    OnAppEntersBackground {
+      let host = LofiScoreRuntime.shared.host
+      Task {
+        if await host.wantsBackgroundSync() { LofiBackgroundImport.schedule() }
+      }
     }
 
     AsyncFunction("setAtmosphereEnabled") { (enabled: Bool) async -> [String: Any] in
