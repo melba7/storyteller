@@ -126,6 +126,24 @@ public final class SpoilerGuard: @unchecked Sendable {
         return try makePosition(chapterOrdinal: chapterOrdinal, sentenceIndex: sentenceIndex)
     }
 
+    /// Where the sentence at `globalIndex` starts in the book's audio, so the app can jump
+    /// the narration there (the sound check). Nil past the book's end, or for a book given
+    /// as plain text.
+    public func clip(atGlobalIndex globalIndex: Int) throws -> NarrationClip? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard globalIndex >= 0 else { return nil }
+        var remaining = globalIndex
+        for ordinal in chapters.indices {
+            let count = try loadCount(ordinal)
+            if remaining < count {
+                return try loadSentences(ordinal).clips[remaining]
+            }
+            remaining -= count
+        }
+        return nil
+    }
+
     /// The first narrated sentence of the book.
     public func firstPosition() throws -> SentencePosition? {
         try position(chapterOrdinal: 0, sentenceIndex: 0)
