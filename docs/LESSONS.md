@@ -14,3 +14,7 @@ One line per lesson.
   Code that moves the narration itself must say so first
   (`NarrationFollower.expectJump`), or one-offs and scene changes behave as if
   nothing happened.
+- A scoring run that hits the Claude plan's usage limit skips those scenes,
+  still exits 0 and writes the score, so the sync job counted the book as done
+  with silent chapters; the job now keeps a `.retry` marker and later runs fill
+  the gaps.

@@ -82,6 +82,7 @@ in `FORK.md`.
 | 2026-11-14 | Sound check stops are steady scenes (8+ sentences, one main sound and level); results carry what played | Fable review: answers must be traceable to a level |
 | 2026-11-14 | Level fixes from the check are global; per-book narrator loudness is proposed as 2d                     | One quiet narrator should not move every book      |
 | 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped   | Second review: a near jump is a rewind otherwise   |
+| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                            | A limit left 161 scenes silent                     |
 
 ## Known problems
 
@@ -96,6 +97,9 @@ in `FORK.md`.
   code, so Mo double-clicks `.command` files instead.
 - `Docs/Atmosphere.md` isn't formatted with oxfmt. Don't reformat it in a
   feature PR.
+- Scoring through the Claude plan shares Mo's 5-hour usage allowance with the
+  project's threads, so a daytime run can stall for an hour or more and leave
+  scenes to the retry runs.
 
 ## Glossary
 
