@@ -84,6 +84,7 @@ in `FORK.md`.
 | 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped                 | Second review: a near jump is a rewind otherwise     |
 | 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                                          | A limit left 161 scenes silent                       |
 | 2026-11-15 | The sounds import asks iCloud for every file up front and finishes in a BGProcessingTask (`<bundle id>.soundsImport`) | Mo's ask: the import took too long with the app open |
+| 2026-11-15 | Level fixes stay global; each book's narrator loudness is measured at scoring and used in place of -16 LUFS (2d)      | Mo's choice on the review card                       |
 
 ## Known problems
 

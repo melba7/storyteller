@@ -67,7 +67,7 @@ locally too.
     hear or Too loud.
   - Files: `Player/AmbiencePlayer.swift` (AtmosphereConfig), its tests.
 
-- [ ] **2d. Match each book's narrator loudness** (proposal, needs Mo's OK)
+- [ ] **2d. Match each book's narrator loudness** (Mo's choice, 2026-11-15)
   - The sounds sit under a voice assumed to be -16 LUFS. Measure each book's
     narration on the Mac when it is scored, store it in the score, and use it in
     place of the default, so one quiet or loud narrator does not need its own
