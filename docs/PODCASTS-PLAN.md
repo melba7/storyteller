@@ -1,7 +1,8 @@
 # Podcasts plan
 
-Status: plan only, waiting for Mo's OK. Nothing is built yet. The milestones are
-P1a to P4c in `docs/PLAN.md`.
+Status: approved by Mo on 2026-11-16 with the suggested answers below, except
+that the hosts' own plugs are skipped too, under a separate switch (question 5).
+The milestones are P1a to P4c in `docs/PLAN.md`.
 
 ## Goal
 
@@ -137,14 +138,18 @@ setting picks the detector, and each result is saved under the detector's id.
   that is still too long is split in two.
 - **Prompt shape**: the piece is sent as numbered lines (about one sentence
   each). The model answers in a fixed shape (Apple's guided generation): a list
-  of line ranges, each with the advertiser's name. Line numbers map back to word
-  times, so the model never has to copy timestamps.
+  of line ranges, each with the advertiser's name and its kind: an ad (a sponsor
+  read or a promo for another show) or the hosts' own plug (Patreon, merch,
+  their other shows). Line numbers map back to word times, so the model never
+  has to copy timestamps.
 - **Clean-up** (pure Swift, tested on Linux): join answers from overlapping
   pieces, merge ads less than 5 seconds apart, drop anything under 10 seconds,
   do not skip anything over 5 minutes (likely a mistake), and move each edge to
   the nearest pause between words.
 - **When unsure, do not skip.** A missed ad costs a tap on "skip 30 s"; a wrong
   skip loses part of the show.
+- **Two switches**: "Skip ads" and "Skip the hosts' own plugs", both on by
+  default (Mo, 2026-11-16), in Settings and per show.
 
 ### Comparing detectors later
 
@@ -220,7 +225,7 @@ in `FORK.md`. The Pocket Casts name, icons and look are not used.
 The Mac commands are double-clickable `.command` files, because the Mac's auto
 mode refuses `swift run`.
 
-## Questions for Mo (suggested answers in bold)
+## Questions for Mo (answered 2026-11-16: the answers in bold, except 5)
 
 1. **Where does the switch to Podcasts go?** **A menu button at the top left of
    the Books screen opens a side menu with Books and Podcasts.** (Bottom tabs
@@ -235,9 +240,10 @@ mode refuses `swift run`.
 4. **New episodes**: **each show can download its newest episode by itself (on
    by default), and played downloads are deleted after a day**, so ads are found
    before you listen and storage stays small.
-5. **What counts as an ad?** **Sponsor reads and promos for other shows are
-   skipped; the hosts' own plugs (Patreon, merch, their other shows) are not.**
-   When the model is unsure, it does not skip.
+5. **What counts as an ad?** Sponsor reads and promos for other shows are
+   skipped. Mo's answer: the hosts' own plugs (Patreon, merch, their other
+   shows) are skipped too, under their own switch, separate from ads. When the
+   model is unsure, it does not skip.
 
 Assumed: the podcasts are in English (other languages the recogniser and model
 support can follow), and Apple Intelligence is on on the phone.

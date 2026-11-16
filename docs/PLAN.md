@@ -1,6 +1,6 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: plan waiting for Mo's OK
+Done: 2 | Last cleanup: none | Podcasts: plan approved, P1a in progress
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -155,9 +155,10 @@ locally too.
 ## Podcasts
 
 Mo's ask (2026-11-16): a Podcasts section beside Books with ads skipped on the
-phone. Design, risks and open questions are in `docs/PODCASTS-PLAN.md`. Status:
-plan waiting for Mo's OK; do not start P1a before it. These milestones do not
-wait for the sound milestones above.
+phone. Design, risks and Mo's answers are in `docs/PODCASTS-PLAN.md`. Mo
+approved the plan on 2026-11-16. These milestones do not wait for the sound
+milestones above. Mo's way of working here: Opus 5.5 plans and checks, Sonnet
+writes the code.
 
 - [ ] **P1a. Podcasts section: subscribe and browse**
   - A menu button at the top left of the Books screen opens a side menu with
@@ -257,8 +258,9 @@ wait for the sound milestones above.
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token
     budget, 2 minutes of overlap), the on-device detector (Foundation Models,
-    numbered lines in, line ranges out), the clean-up rules and the
-    `<sha256>.ads.<detector>.json` file, as in `docs/PODCASTS-PLAN.md`.
+    numbered lines in, line ranges out, each marked an ad or the hosts' own
+    plug), the clean-up rules and the `<sha256>.ads.<detector>.json` file, as in
+    `docs/PODCASTS-PLAN.md`.
   - A Mac `.command` finds the ads in a transcribed episode and prints them
     (needs Apple Intelligence on the Mac).
   - Test first: Linux tests with a fake detector: pieces fit the budget and
@@ -283,10 +285,12 @@ wait for the sound milestones above.
   - The Swift player skips each saved ad when playback reaches it (not when the
     listener seeks into it), also with the screen locked. The app shows "Skipped
     ad (1:05)" with Undo for 6 seconds; Undo goes back to the ad's start, plays
-    it, and records the skip as wrong. Ads show on the seek bar. A switch per
-    show and one in Settings turn skipping off.
+    it, and records the skip as wrong. Ads show on the seek bar. Two switches,
+    "Skip ads" and "Skip the hosts' own plugs" (both on by default), in Settings
+    and per show.
   - Test first: Swift tests for the skip rules (reaching an ad, seeking into
-    one, Undo, speed changes, an ad at the very end); a JS test for the note.
+    one, Undo, speed changes, an ad at the very end, a plug with its switch
+    off); a JS test for the note.
   - Done when: check.sh passes, the iOS build passes in CI, and on 3 episodes Mo
     picks most ads (4 in 5) are skipped and at most one skip cuts the show.
   - Try it: play a downloaded episode with ads found and wait for the first ad.
