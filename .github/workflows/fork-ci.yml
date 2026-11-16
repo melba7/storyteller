@@ -57,7 +57,7 @@ jobs:
         run: |
           native=true
           if [ "$EVENT" = "pull_request" ]; then
-            pattern='^(applications/mobile/|libraries/LofiScoreKit/|package\.json$|yarn\.lock$|\.yarnrc\.yml$|\.yarn/patches/|\.github/workflows/fork-ci\.yml$)'
+            pattern='^(applications/mobile/|libraries/LofiScoreKit/|libraries/PodcastKit/|package\.json$|yarn\.lock$|\.yarnrc\.yml$|\.yarn/patches/|\.github/workflows/fork-ci\.yml$)'
             if ! git diff --name-only "origin/$BASE_REF...HEAD" | grep -qE "$pattern"; then
               native=false
             fi
@@ -97,7 +97,9 @@ jobs:
         run: |
           yarn oxfmt --check FORK.md .github/workflows tools/fork \
             applications/mobile/fork.config.ts applications/mobile/app.config.ts \
-            applications/mobile/lofi applications/mobile/modules/lofi-score
+            applications/mobile/lofi applications/mobile/modules/lofi-score \
+            applications/mobile/modules/podcasts applications/mobile/podcasts \
+            "applications/mobile/app/(root)/podcasts" libraries/PodcastKit
 
   ios-build:
     name: iOS simulator build
@@ -126,6 +128,10 @@ jobs:
       - name: LofiScoreKit tests
         if: hashFiles('libraries/LofiScoreKit/Package.swift') != ''
         working-directory: libraries/LofiScoreKit
+        run: swift test
+      - name: PodcastKit tests
+        if: hashFiles('libraries/PodcastKit/Package.swift') != ''
+        working-directory: libraries/PodcastKit
         run: swift test
       # Same steps as upstream's EAS iOS build (applications/mobile/.eas).
       - name: Install the mobile app's dependencies

@@ -38,19 +38,23 @@ export const forkIdentity: ForkIdentity = {
 }
 
 /**
- * The Swift package in libraries/LofiScoreKit, built from source by CocoaPods
- * for the fork's atmosphere module (modules/lofi-score). Each target has a
- * podspec next to Package.swift. The path is relative to the generated `ios`
- * folder. (The shelved music's pods live in shelved/lofi-music.)
+ * The Swift packages in libraries/LofiScoreKit and libraries/PodcastKit, built
+ * from source by CocoaPods for the fork's modules (modules/lofi-score and
+ * modules/podcasts). Each target has a podspec next to its Package.swift. The
+ * paths are relative to the generated `ios` folder. (The shelved music's pods
+ * live in shelved/lofi-music.)
  */
 const lofiScorePods = [
-  "LofiScoreCore",
-  "LofiText",
-  "LofiMood",
-  "LofiAudioCore",
-  "LofiAtmosphere",
-  "LofiScoreHost",
-].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" }))
+  ...[
+    "LofiScoreCore",
+    "LofiText",
+    "LofiMood",
+    "LofiAudioCore",
+    "LofiAtmosphere",
+    "LofiScoreHost",
+  ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" })),
+  { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
+]
 
 type PluginEntry = NonNullable<ExpoConfig["plugins"]>[number]
 
@@ -59,7 +63,7 @@ interface BuildPropertiesOptions {
 }
 
 /**
- * Adds the LofiScoreKit pods to expo-build-properties' `ios.extraPods`, next
+ * Adds the LofiScoreKit and PodcastKit pods to expo-build-properties' `ios.extraPods`, next
  * to upstream's own extra pods.
  */
 export function withLofiScorePods(plugins: PluginEntry[]): PluginEntry[] {

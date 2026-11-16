@@ -6,13 +6,17 @@
     ".github/workflows/",
     "CLAUDE.md",
     "FORK.md",
+    "applications/mobile/app/(root)/podcasts/",
     "applications/mobile/fork.config.ts",
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
+    "applications/mobile/modules/podcasts/",
     "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
+    "applications/mobile/podcasts/",
     "applications/web/src/app/api/v2/books/[bookId]/lofi-score/",
     "docs/",
     "libraries/LofiScoreKit/",
+    "libraries/PodcastKit/",
     "shelved/",
     "tools/fork/",
     "tools/lofi-library/"
@@ -27,6 +31,11 @@
       "file": "applications/mobile/app.config.ts",
       "markers": 3,
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
+    },
+    {
+      "file": "applications/mobile/app/(root)/index.tsx",
+      "markers": 2,
+      "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts."
     },
     {
       "file": "applications/mobile/app/(root)/settings.tsx",

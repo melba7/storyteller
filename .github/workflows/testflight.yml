@@ -21,6 +21,7 @@ on:
     paths:
       - "applications/mobile/**"
       - "libraries/LofiScoreKit/**"
+      - "libraries/PodcastKit/**"
       - "package.json"
       - "yarn.lock"
       - ".github/workflows/testflight.yml"

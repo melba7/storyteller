@@ -160,7 +160,9 @@ approved the plan on 2026-11-16. These milestones do not wait for the sound
 milestones above. Mo's way of working here: Opus 5.5 plans and checks, Sonnet
 writes the code.
 
-- [ ] **P1a. Podcasts section: subscribe and browse**
+- [ ] **P1a. Podcasts section: subscribe and browse** Status: built and passing
+      `check.sh`; waiting for the iOS build in CI and Mo's first run on
+      TestFlight.
   - A menu button at the top left of the Books screen opens a side menu with
     Books and Podcasts. Podcasts lists the shows; "Add" searches Apple's free
     podcast directory or takes an RSS link; a show's page lists its episodes,
