@@ -109,6 +109,21 @@ also starts the iOS build and TestFlight.
 Each episode row shows where it is: Downloading, Transcribing 40%, Finding ads,
 "3 ads found", or why not ("Apple Intelligence is off").
 
+### Following Apple Podcasts (Mo's choice, 2026-11-16)
+
+iOS does not let other apps see Apple Podcasts' library, and Apple Podcasts has
+no export. Two ways in, both one way (nothing is written back to Apple
+Podcasts):
+
+- **Share links** (P2d): a link copied from Apple Podcasts goes into Add;
+  Apple's free lookup turns its id into the feed.
+- **The Mac** (P2e): with library sync on, Apple Podcasts on the Mac has the
+  same shows. An hourly job reads a copy of its library file and writes the
+  followed shows and finished episodes to `Podcasts/apple-podcasts.json` in the
+  iCloud folder the phone already links for the sounds. The phone adds new shows
+  and marks finished episodes as played. It only adds: an unfollowed show stays,
+  and a show unsubscribed in Storyteller is not added again.
+
 ## Finding ads
 
 ### The interface
@@ -205,22 +220,25 @@ in `FORK.md`. The Pocket Casts name, icons and look are not used.
 | Battery and heat while transcribing                                                        | One episode at a time, preferring the charger; P3a measures the time per hour of audio on the phone.                                                                                                                               |
 | TestFlight stops working                                                                   | No entitlements; the new Swift folder is added to the workflow's paths; Fork CI builds the app on every PR.                                                                                                                        |
 | Upstream updates conflict                                                                  | New folders are fork-owned; only two touch points; `check-fork.mjs` enforces it.                                                                                                                                                   |
+| Apple changes its private library file, or macOS stops the Mac job reading it              | The job reads a copy, checks the columns it needs and says plainly what changed; share links keep working meanwhile. macOS asks Mo once to allow the read.                                                                         |
 | Private feed links hold a password                                                         | Stored only on the phone, never logged.                                                                                                                                                                                            |
 
 ## How each milestone is checked
 
-| Milestone             | In the cloud (`check.sh`)                       | Fork CI (macOS)            | Mo's Mac                                                                 | Only on Mo's phone                              |
-| --------------------- | ----------------------------------------------- | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
-| P1a Subscribe         | Feed parser (Swift, Linux), library logic (JS)  | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
-| P1b Play              | Player rules (Swift), player state (JS)         | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
-| P2a Downloads         | Download bookkeeping, file identity             | iOS build                  |                                                                          | Download with the app closed, play offline      |
-| P2b Up Next           | Queue rules                                     | iOS build                  |                                                                          | Next episode starts with the screen locked      |
-| P2c New episodes      | Refresh and clean-up rules                      | iOS build                  |                                                                          | New episodes appear and download by themselves  |
-| P3a Transcribe        | Transcript format and storage                   | Builds the Apple-only code | `.command` transcribes an episode                                        | Speed, battery, the first model download        |
-| P3b In the background | Resume rules                                    | iOS build                  |                                                                          | Transcribed after the app was closed            |
-| P4a Ad finder         | Chunker, clean-up, saving, with a fake detector | Builds the Apple-only code | `.command` finds ads in an episode (needs Apple Intelligence on the Mac) |                                                 |
-| P4b Ads on the phone  | Status rules                                    | iOS build                  |                                                                          | Ads found on the iPhone's model, time taken     |
-| P4c Skipping          | Skip rules (seek into an ad, Undo, speed)       | iOS build                  |                                                                          | Skip, note and Undo while listening, locked too |
+| Milestone             | In the cloud (`check.sh`)                              | Fork CI (macOS)            | Mo's Mac                                                                 | Only on Mo's phone                              |
+| --------------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
+| P1a Subscribe         | Feed parser (Swift, Linux), library logic (JS)         | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
+| P1b Play              | Player rules (Swift), player state (JS)                | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
+| P2a Downloads         | Download bookkeeping, file identity                    | iOS build                  |                                                                          | Download with the app closed, play offline      |
+| P2b Up Next           | Queue rules                                            | iOS build                  |                                                                          | Next episode starts with the screen locked      |
+| P2c New episodes      | Refresh and clean-up rules                             | iOS build                  |                                                                          | New episodes appear and download by themselves  |
+| P2d Share links       | Reading Apple links and the lookup                     | iOS build                  |                                                                          | A link from Apple Podcasts adds the show        |
+| P2e Mac sync          | Library file reader (Python), what the phone adds (JS) | iOS build                  | Job writes the file from the real library                                | A followed show appears within the hour         |
+| P3a Transcribe        | Transcript format and storage                          | Builds the Apple-only code | `.command` transcribes an episode                                        | Speed, battery, the first model download        |
+| P3b In the background | Resume rules                                           | iOS build                  |                                                                          | Transcribed after the app was closed            |
+| P4a Ad finder         | Chunker, clean-up, saving, with a fake detector        | Builds the Apple-only code | `.command` finds ads in an episode (needs Apple Intelligence on the Mac) |                                                 |
+| P4b Ads on the phone  | Status rules                                           | iOS build                  |                                                                          | Ads found on the iPhone's model, time taken     |
+| P4c Skipping          | Skip rules (seek into an ad, Undo, speed)              | iOS build                  |                                                                          | Skip, note and Undo while listening, locked too |
 
 The Mac commands are double-clickable `.command` files, because the Mac's auto
 mode refuses `swift run`.
@@ -258,5 +276,6 @@ support can follow), and Apple Intelligence is on on the phone.
   behind the same session API.
 - A Mac command that compares two detectors on the same transcripts.
 - Import subscriptions from another app (OPML), a sleep timer, chapters,
-  CarPlay.
+  CarPlay. Sending what you play in Storyteller back to Apple Podcasts is not
+  possible (no API).
 - Open on Podcasts when that was the last section used.

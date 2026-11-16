@@ -237,6 +237,45 @@ writes the code.
     `LofiBackgroundImport.swift`), `fork.config.ts` (task id, background fetch),
     `podcasts/` (settings).
 
+- [ ] **P2d. Apple Podcasts share links** (Mo's choice, 2026-11-16)
+  - Add also takes a link copied from Apple Podcasts
+    (`https://podcasts.apple.com/.../id<number>`, with or without an episode
+    `?i=`). The app asks Apple's free lookup
+    (`https://itunes.apple.com/lookup?id=<number>&entity=podcast`) for the feed
+    and subscribes to it.
+  - Test first: JS tests reading the id from show and episode links in different
+    countries, rejecting other links, and reading the lookup's answer.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
+    link shared from Apple Podcasts adds that show.
+  - Files: `modules/podcasts/directory.ts` (+ test), `podcasts/AddPodcast.tsx`.
+
+- [ ] **P2e. Follow Apple Podcasts from the Mac** (Mo's choice, 2026-11-16)
+  - One way only, from Apple Podcasts to Storyteller. An hourly launchd job on
+    the Mac copies Apple Podcasts' library file
+    (`~/Library/Group Containers/243LU875E5.groups.com.apple.podcasts/Documents/MTLibrary.sqlite`),
+    reads the followed shows (feed links) and the finished episodes (guids) from
+    the copy, and writes `Podcasts/apple-podcasts.json` into `LofiMusic` and its
+    iCloud copy. It never writes to Apple's files.
+  - The phone reads that file through the sounds folder link it already has (no
+    new setup), when the app opens and in P2c's background refresh. It
+    subscribes to shows it has not seen in the file before and marks finished
+    episodes as played, so they are not downloaded. A show unfollowed in Apple
+    Podcasts stays; a show unsubscribed in Storyteller is not added again.
+  - Mo installs the job once with a double-clickable `.command` (the Mac's auto
+    mode refuses scripts) and allows the macOS prompt to read Apple Podcasts'
+    data.
+  - Test first: Python tests on a small library file built in the test (shows,
+    finished episodes, a missing column says what changed in Apple's format); JS
+    tests for what the phone adds and marks (seen shows, unsubscribed shows,
+    unknown guids).
+  - Done when: check.sh passes, the iOS build passes in CI, the Mac job writes
+    the file from Mo's real library, and a show followed in Apple Podcasts
+    appears in Storyteller within the hour.
+  - Files: new `libraries/PodcastKit/Tools/mac/` (export script, launchd
+    installer, `.command` files, README), `modules/podcasts` (reading the file,
+    with tests), `LofiScoreHost` or `modules/lofi-score` (handing over the
+    linked folder), `tools/fork/check.sh` (the Python tests).
+
 - [ ] **P3a. Transcribe downloaded episodes**
   - After a download, `SpeechTranscriber` (with time ranges) writes the episode
     out in the feed's language, while the app is open or playing. It asks iOS

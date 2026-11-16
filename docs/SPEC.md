@@ -69,6 +69,10 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
 - The user can play an episode with speed, skip buttons and the lock screen, and
   a book and a podcast never play at the same time. Check: switching between
   them on the phone plays only one.
+- The user can add a show from an Apple Podcasts share link, and the shows they
+  follow in Apple Podcasts appear in Storyteller by themselves (one way, through
+  the Mac), with episodes finished there marked as played. Check: a show
+  followed in Apple Podcasts appears within the hour.
 - The user can download episodes (also with the app closed) and keep an Up Next
   list that carries on with the screen locked. Check: a downloaded episode plays
   in airplane mode, and the next one starts by itself.
