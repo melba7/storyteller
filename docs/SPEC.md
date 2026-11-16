@@ -66,6 +66,11 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
 - The user can open Podcasts from a side menu on the Books screen, add a show by
   searching Apple's podcast directory or pasting an RSS link, and see its
   episodes. Check: a show added both ways lists its episodes.
+- The user can explore Apple's top podcasts, overall and by category, get
+  suggestions from the categories of the shows they follow, look at a show
+  before following it, and search episodes in their own shows (offline) and
+  across all podcasts. Check: no suggestion is a show already followed, and an
+  episode is found by a word in its notes.
 - The user can play an episode with speed, skip buttons and the lock screen, and
   a book and a podcast never play at the same time. Check: switching between
   them on the phone plays only one.

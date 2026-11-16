@@ -81,8 +81,9 @@ also starts the iOS build and TestFlight.
 
 ### Data and files
 
-- **Library** (`podcasts.db`, a separate SQLite file): shows, episodes, played
-  and position. The books database and upstream's migrations are not touched.
+- **Library** (`podcasts.db`, a separate SQLite file): shows (with their
+  categories from P1c), episodes, played and position, and a small cache for
+  Apple's charts. The books database and upstream's migrations are not touched.
 - **Downloads**: `Application Support/Podcasts/<episode>/<sha256>.<ext>`. The
   SHA-256 of the downloaded bytes is the file's identity.
 - **Transcript**: `<sha256>.transcript.json` next to the file: lines of words,
@@ -123,6 +124,26 @@ Podcasts):
   iCloud folder the phone already links for the sounds. The phone adds new shows
   and marks finished episodes as played. It only adds: an unfollowed show stays,
   and a show unsubscribed in Storyteller is not added again.
+
+### Explore and search (Mo's ask, 2026-11-16)
+
+Mo chose to build these right after playback, as P1c and P1d. Everything uses
+Apple's free, keyless addresses; nothing is paid.
+
+- **Top charts**: Apple's US top chart, overall and for each of Apple's main
+  categories, fetched when Explore opens and kept for a day. Chart entries carry
+  Apple ids, so one lookup call turns them into feed links.
+- **For you**: Apple has no public "shows like this" list, so suggestions go by
+  category. The categories come from the feeds of the shows you follow (the
+  `itunes:category` tag), so shows added by link count too. The most common
+  categories come first, shows you already follow are left out, and each
+  suggestion names the show of yours it comes from.
+- **Preview**: a show from Explore or search opens a preview read from its feed
+  without saving it, with Follow and Play.
+- **Episode search**: in your shows, on the phone, by words in titles and notes;
+  across all podcasts, through Apple's episode search.
+- The cloud can't reach Apple's chart addresses, so the tests use saved answers,
+  and the first build checks them on the phone.
 
 ## Finding ads
 
@@ -221,6 +242,7 @@ in `FORK.md`. The Pocket Casts name, icons and look are not used.
 | TestFlight stops working                                                                   | No entitlements; the new Swift folder is added to the workflow's paths; Fork CI builds the app on every PR.                                                                                                                        |
 | Upstream updates conflict                                                                  | New folders are fork-owned; only two touch points; `check-fork.mjs` enforces it.                                                                                                                                                   |
 | Apple changes its private library file, or macOS stops the Mac job reading it              | The job reads a copy, checks the columns it needs and says plainly what changed; share links keep working meanwhile. macOS asks Mo once to allow the read.                                                                         |
+| Apple changes or retires its free chart addresses                                          | Explore says plainly that a chart couldn't be loaded; search, links and the library keep working. The addresses live in one file.                                                                                                  |
 | Private feed links hold a password                                                         | Stored only on the phone, never logged.                                                                                                                                                                                            |
 
 ## How each milestone is checked
@@ -229,6 +251,8 @@ in `FORK.md`. The Pocket Casts name, icons and look are not used.
 | --------------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
 | P1a Subscribe         | Feed parser (Swift, Linux), library logic (JS)         | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
 | P1b Play              | Player rules (Swift), player state (JS)                | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
+| P1c Explore           | Feed categories, charts, lookup, For you, cache        | iOS build                  |                                                                          | Charts load, suggestions, follow from a preview |
+| P1d Search episodes   | Search words and order, Apple's episode answer         | iOS build                  |                                                                          | Find by a word in notes, play a found episode   |
 | P2a Downloads         | Download bookkeeping, file identity                    | iOS build                  |                                                                          | Download with the app closed, play offline      |
 | P2b Up Next           | Queue rules                                            | iOS build                  |                                                                          | Next episode starts with the screen locked      |
 | P2c New episodes      | Refresh and clean-up rules                             | iOS build                  |                                                                          | New episodes appear and download by themselves  |
@@ -275,6 +299,9 @@ support can follow), and Apple Intelligence is on on the phone.
   out of git). iOS 27's Foundation Models can also wrap other providers' models
   behind the same session API.
 - A Mac command that compares two detectors on the same transcripts.
+- Search the words spoken inside downloaded episodes (needs P3a's transcripts),
+  suggestions ranked by how alike the shows' descriptions are (on-device model),
+  and charts for other countries.
 - Import subscriptions from another app (OPML), a sleep timer, chapters,
   CarPlay. Sending what you play in Storyteller back to Apple Podcasts is not
   possible (no API).

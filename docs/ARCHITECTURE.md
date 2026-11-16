@@ -103,6 +103,7 @@ in `FORK.md`.
 | 2026-11-16 | Feeds are fetched and read in Swift (Foundation's XML parser), so no JavaScript package is added                                           | `package.json` and `yarn.lock` stay upstream's             |
 | 2026-11-16 | PodcastKit is its own Swift package, not a target of LofiScoreKit                                                                          | Podcasts and sounds change separately; its tests run alone |
 | 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                   | iOS gives other apps no access; Mo's choice                |
+| 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1c)                                      | Apple has no public "similar shows" list; Mo's choice      |
 
 ## Known problems
 
