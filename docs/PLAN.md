@@ -1,6 +1,6 @@
 # Plan
 
-Done: 2 | Last cleanup: none
+Done: 2 | Last cleanup: none | Podcasts: plan waiting for Mo's OK
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -152,6 +152,147 @@ locally too.
   - Try it: install the build from TestFlight and play both books.
   - Files: none beyond what's merged.
 
+## Podcasts
+
+Mo's ask (2026-11-16): a Podcasts section beside Books with ads skipped on the
+phone. Design, risks and open questions are in `docs/PODCASTS-PLAN.md`. Status:
+plan waiting for Mo's OK; do not start P1a before it. These milestones do not
+wait for the sound milestones above.
+
+- [ ] **P1a. Podcasts section: subscribe and browse**
+  - A menu button at the top left of the Books screen opens a side menu with
+    Books and Podcasts. Podcasts lists the shows; "Add" searches Apple's free
+    podcast directory or takes an RSS link; a show's page lists its episodes,
+    newest first, with date, length and notes.
+  - Feeds are read in Swift (`PodcastKit`, Foundation's XML parser) through a
+    new Expo module, and kept in a podcasts-only SQLite file. No new JavaScript
+    packages; the books database is not touched.
+  - Test first: Swift tests reading saved sample feeds (iTunes tags, the three
+    duration formats, missing GUIDs, HTML notes, a broken feed); JS tests for
+    adding a show twice, refreshing without duplicates, and directory results.
+  - Done when: check.sh passes with the new package's tests, the iOS build
+    passes in CI, and on TestFlight Mo adds a show by search and by link and
+    sees its episodes.
+  - Try it: Books, menu (top left), Podcasts, Add, search for a show.
+  - Files: new `libraries/PodcastKit` (package, feed target, tests, podspec),
+    new `modules/podcasts`, new `podcasts/`, new `app/(root)/podcasts/`,
+    `app/(root)/index.tsx` (new touch point), `fork.config.ts`,
+    `tools/fork/touchpoints.json`, `check.sh`, `fork-ci.yml`, `testflight.yml`.
+
+- [ ] **P1b. Play an episode**
+  - A Swift player in `modules/podcasts` streams an episode: play and pause,
+    back 15 s and ahead 30 s, a seek bar, speed (0.8x to 3x), the place kept per
+    episode, a player screen and a mini player on the Podcasts screens.
+  - Lock screen and headphone buttons control the podcast while it is the active
+    player. Starting a podcast pauses the book; starting the book pauses the
+    podcast. The book's lock-screen handlers stand aside while a podcast plays
+    (new markers in `AudiobookPlayerActor.swift`).
+  - Test first: Swift tests for the player's rules (resume place, marking an
+    episode played near its end, who owns the lock screen); JS tests for the
+    player screen's state.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
+    podcast plays from the lock screen, and switching between a book and a
+    podcast never plays both.
+  - Try it: play an episode, lock the phone, use the lock-screen buttons, then
+    start a book.
+  - Files: `modules/podcasts/ios/*`, `podcasts/` player screens,
+    `modules/readium/ios/AudiobookPlayerActor.swift`,
+    `tools/fork/touchpoints.json`.
+
+- [ ] **P2a. Download episodes**
+  - Download and delete buttons per episode. Downloads use a background session,
+    so they finish with the app closed. A downloaded episode plays from the
+    file. Each file's SHA-256 becomes its identity.
+  - Test first: Swift tests for download bookkeeping (resume after a restart,
+    the hash, deleting a file and its side files).
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight an
+    episode downloaded with the app closed plays in airplane mode.
+  - Files: `modules/podcasts/ios` (downloads), `PodcastKit` (file store),
+    `podcasts/` (buttons, storage used).
+
+- [ ] **P2b. Up Next**
+  - Add to Up Next, play next, reorder and remove. The queue lives in Swift, so
+    the next episode starts when one ends, even with the screen locked.
+  - Test first: Swift tests for the queue rules (end of episode, removing the
+    playing one, a missing file); a JS test for the screen's list.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the next episode starts by itself with the phone locked.
+  - Files: `PodcastKit` (queue), `modules/podcasts/ios`, `podcasts/`.
+
+- [ ] **P2c. New episodes by themselves**
+  - Feeds refresh when the app opens and in a background refresh task. Each show
+    can download its newest episode by itself (Mo's answer to question 4), and
+    played downloads are deleted after a day.
+  - Test first: Swift or JS tests for what to download and what to delete.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
+    new episode appears and downloads without opening its show.
+  - Files: `modules/podcasts/ios` (background task, like
+    `LofiBackgroundImport.swift`), `fork.config.ts` (task id, background fetch),
+    `podcasts/` (settings).
+
+- [ ] **P3a. Transcribe downloaded episodes**
+  - After a download, `SpeechTranscriber` (with time ranges) writes the episode
+    out in the feed's language, while the app is open or playing. It asks iOS
+    for the speech model the first time. Saved as `<sha256>.transcript.json`.
+    The episode row shows the progress.
+  - A Mac `.command` transcribes an audio file with the same Swift code, for
+    checks without a new build.
+  - Test first: Linux tests for the transcript format and storage (built from a
+    fake recogniser); the Apple-only wrapper builds in Fork CI.
+  - Done when: check.sh passes, the iOS build passes in CI, the Mac command
+    transcribes an episode, and on TestFlight an hour-long episode is
+    transcribed (the time it takes is written down here).
+  - Files: `PodcastKit` (transcript model, speech target), `modules/podcasts`,
+    `podcasts/` (row status), `PodcastKit/Tools/mac`.
+
+- [ ] **P3b. Transcribe with the app closed**
+  - A background processing task carries on unfinished transcription and resumes
+    where it stopped. Episodes in an unsupported language are marked and
+    skipped.
+  - Test first: Swift tests for the resume rules.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight an
+    episode downloaded before bed is transcribed by morning.
+  - Files: `modules/podcasts/ios`, `fork.config.ts` (task id).
+
+- [ ] **P4a. Find ads** (engine)
+  - The `AdDetector` interface, the chunker (pieces to the detector's token
+    budget, 2 minutes of overlap), the on-device detector (Foundation Models,
+    numbered lines in, line ranges out), the clean-up rules and the
+    `<sha256>.ads.<detector>.json` file, as in `docs/PODCASTS-PLAN.md`.
+  - A Mac `.command` finds the ads in a transcribed episode and prints them
+    (needs Apple Intelligence on the Mac).
+  - Test first: Linux tests with a fake detector: pieces fit the budget and
+    overlap, an ad across a cut is found once, short and long ranges are
+    dropped, edges snap to pauses, results load for the same file only.
+  - Done when: check.sh passes, the Apple-only detector builds in Fork CI, and
+    the Mac command lists the ads in 3 episodes Mo picks.
+  - Files: `PodcastKit` (ads target, on-device target, tests),
+    `PodcastKit/Tools/mac`.
+
+- [ ] **P4b. Find ads on the phone**
+  - After transcription, the app finds the ads while it is open, playing, or in
+    a background task that waits for the charger. The row shows "Finding ads",
+    "3 ads found" or why not (Apple Intelligence off, model downloading). Each
+    episode has an "Ads found" list with a play button per ad.
+  - Test first: tests for the status rules (when to run, which reason to show).
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the phone finds ads in an episode (the time it takes is written down here).
+  - Files: `modules/podcasts/ios`, `podcasts/` (row, ads list, settings).
+
+- [ ] **P4c. Skip ads in the player**
+  - The Swift player skips each saved ad when playback reaches it (not when the
+    listener seeks into it), also with the screen locked. The app shows "Skipped
+    ad (1:05)" with Undo for 6 seconds; Undo goes back to the ad's start, plays
+    it, and records the skip as wrong. Ads show on the seek bar. A switch per
+    show and one in Settings turn skipping off.
+  - Test first: Swift tests for the skip rules (reaching an ad, seeking into
+    one, Undo, speed changes, an ad at the very end); a JS test for the note.
+  - Done when: check.sh passes, the iOS build passes in CI, and on 3 episodes Mo
+    picks most ads (4 in 5) are skipped and at most one skip cuts the show.
+  - Try it: play a downloaded episode with ads found and wait for the first ad.
+  - Files: `PodcastKit` (skip rules), `modules/podcasts/ios` (player),
+    `podcasts/` (note, seek bar, switches).
+
 ## Later
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
@@ -161,3 +302,6 @@ locally too.
 - Give the fork its own app icon before sharing it with anyone.
 - A publish edition and the App Store (see `FORK.md` and the publishing notes).
 - Bring the music back (`shelved/lofi-music/README.md`).
+- Podcasts: Apple's cloud model and Claude Haiku as other ad detectors, a Mac
+  command comparing detectors, OPML import, sleep timer, chapters, CarPlay (see
+  `docs/PODCASTS-PLAN.md`).

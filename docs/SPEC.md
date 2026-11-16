@@ -13,7 +13,8 @@ reader, sync) is taken as given. See `FORK.md`.
 ## Users
 
 - **Mo**, the only user for v1: listens to Storyteller read-aloud books on an
-  iPhone (through TestFlight) and scores books on a Mac.
+  iPhone (through TestFlight) and scores books on a Mac. Mo also wants to listen
+  to podcasts in the same app, with the ads skipped.
 
 ## Features
 
@@ -59,18 +60,42 @@ v1, still to do:
 - The user hears the right place most of the time. Check: the scorer's eval
   score on `Tools/atmosphere/eval/cases.jsonl` is recorded and does not drop.
 
+Podcasts, planned (Mo's ask, 2026-11-16; design in `docs/PODCASTS-PLAN.md`,
+waiting for Mo's OK):
+
+- The user can open Podcasts from a side menu on the Books screen, add a show by
+  searching Apple's podcast directory or pasting an RSS link, and see its
+  episodes. Check: a show added both ways lists its episodes.
+- The user can play an episode with speed, skip buttons and the lock screen, and
+  a book and a podcast never play at the same time. Check: switching between
+  them on the phone plays only one.
+- The user can download episodes (also with the app closed) and keep an Up Next
+  list that carries on with the screen locked. Check: a downloaded episode plays
+  in airplane mode, and the next one starts by itself.
+- The phone transcribes each downloaded episode and finds its ads, with nothing
+  sent off the phone and no paid service. Check: the episode shows "N ads found"
+  and an "Ads found" list.
+- The player skips those ads by itself, shows "Skipped ad" with Undo, and can be
+  turned off per show. Check: on 3 episodes Mo picks, most ads (4 in 5) are
+  skipped and at most one skip cuts the show.
+
 ## Out of scope (v1)
 
-- Changing upstream code beyond the 6 registered touch points.
+- Changing upstream code beyond the registered touch points (6 today; the
+  podcasts plan adds one, on the Books screen).
 - The shelved lofi music (`shelved/lofi-music/`).
 - Publishing to the App Store or sharing builds with others.
 - Android.
+- Paid ad detection (Claude Haiku) and Apple's cloud model in the base podcasts
+  version; ad skipping in streamed episodes.
 - Scoring the whole server library (only chosen books).
 
 ## Assumptions
 
 - The phone gets builds through TestFlight; the iPhone can't use Developer Mode.
 - Scoring uses Claude through Mo's plan on the Mac (Opus).
+- Podcasts are in English, and Apple Intelligence is on on the iPhone 15 Pro
+  (iOS 26 or later).
 - Recordings come from Freesound (personal edition) and Wikimedia Commons
   (publish edition) and are never committed.
 
@@ -79,3 +104,5 @@ v1, still to do:
 - Are the sound levels from PR #27/#28 loud enough on the phone? Mo hasn't
   confirmed this on a build since 11.1.
 - What eval score counts as "good enough" for matching?
+- The five podcast questions in `docs/PODCASTS-PLAN.md` (side menu, start now,
+  finding shows, new episodes, what counts as an ad).
