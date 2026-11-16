@@ -1,6 +1,6 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: plan approved, P1a in progress
+Done: 2 | Last cleanup: none | Podcasts: P1a merged, TestFlight build next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -160,9 +160,9 @@ approved the plan on 2026-11-16. These milestones do not wait for the sound
 milestones above. Mo's way of working here: Opus 5.5 plans and checks, Sonnet
 writes the code.
 
-- [ ] **P1a. Podcasts section: subscribe and browse** Status: built and passing
-      `check.sh`; waiting for the iOS build in CI and Mo's first run on
-      TestFlight.
+- [ ] **P1a. Podcasts section: subscribe and browse** Status: merged into main
+      on 2026-11-16 (PR #37; the iOS build passed on an Intel Mac); waiting for
+      the TestFlight build and Mo's first run.
   - A menu button at the top left of the Books screen opens a side menu with
     Books and Podcasts. Podcasts lists the shows; "Add" searches Apple's free
     podcast directory or takes an RSS link; a show's page lists its episodes,
@@ -205,6 +205,61 @@ writes the code.
   - Files: `modules/podcasts/ios/*`, `podcasts/` player screens,
     `modules/readium/ios/AudiobookPlayerActor.swift`,
     `tools/fork/touchpoints.json`.
+
+- [ ] **P1c. Explore** (Mo's ask, 2026-11-16, after P1b)
+  - An Explore button on the Podcasts screen opens Apple's free US top chart,
+    Apple's main categories (each with its own top chart), and "For you".
+  - "For you" takes the categories of the shows you follow (each feed's
+    `itunes:category`), most common first, and lists the top shows in up to
+    three of them, leaving out shows you already follow. Each one says "Because
+    you follow" and names one of your shows in that category.
+  - Tapping a show opens a preview: picture, notes and episodes read from its
+    feed without saving it, a Follow button, and Play (P1b's player; the place
+    is kept only once you follow). Search results in Add open this preview too,
+    instead of following at once.
+  - The charts are fetched when Explore opens and kept for a day. Chart entries
+    carry Apple ids, not feeds, so one lookup call
+    (`https://itunes.apple.com/lookup?id=<ids>`) gets their feed links.
+  - The feed reader keeps each show's categories. `podcasts.db` goes to version
+    2, upgraded in place: a categories column on shows and a small cache table.
+    Shows followed before get their categories at their next refresh.
+  - The cloud can't reach Apple's chart addresses, so the tests use saved
+    answers and the first build tries them on the phone. Overall:
+    `https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcasts.json`.
+    Per category:
+    `https://itunes.apple.com/us/rss/toppodcasts/limit=50/genre=<id>/json`.
+  - Test first: Swift tests for categories in sample feeds (nested, missing); JS
+    tests reading both chart answers and the lookup, the category list, "For
+    you" (most common categories first, followed shows left out, the "because"
+    show) and the one-day cache.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight Mo
+    opens Explore, browses a category, sees suggestions from the shows already
+    followed, and follows one from its preview.
+  - Try it: Podcasts, Explore.
+  - Files: `PodcastKit` (categories), `modules/podcasts` (`charts.ts`,
+    `categories.ts`, `db.ts` version 2, with tests), `podcasts/` (Explore, show
+    preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (explore and preview
+    routes).
+
+- [ ] **P1d. Search episodes** (Mo's ask, 2026-11-16, after P1c)
+  - Search on the Podcasts screen has two tabs. "Your shows" finds episodes of
+    the shows you follow by words in the title or show notes, on the phone (it
+    works offline), title matches first, then newest. "All podcasts" uses
+    Apple's free episode search
+    (`https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&term=`).
+  - A result from your shows opens the episode. A result from all podcasts opens
+    its show's preview (P1c) at that episode, found by guid or else by its audio
+    link, where it can be played.
+  - Test first: JS tests for the search words (`%` and `_` taken literally,
+    every word required), the order of results, and reading Apple's episode
+    answer (saved).
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight Mo
+    finds an episode of a followed show by a word in its notes, and plays an
+    episode found in all podcasts.
+  - Try it: Podcasts, Search.
+  - Files: `modules/podcasts` (`search.ts`, `directory.ts`, `db.ts`, with
+    tests), `podcasts/` (search screen, `PodcastsHome.tsx`),
+    `app/(root)/podcasts/search.tsx`.
 
 - [ ] **P2a. Download episodes**
   - Download and delete buttons per episode. Downloads use a background session,
@@ -354,3 +409,6 @@ writes the code.
 - Podcasts: Apple's cloud model and Claude Haiku as other ad detectors, a Mac
   command comparing detectors, OPML import, sleep timer, chapters, CarPlay (see
   `docs/PODCASTS-PLAN.md`).
+- Podcasts: search the words spoken inside downloaded episodes (needs P3a's
+  transcripts), suggestions ranked by how alike the shows' descriptions are
+  (on-device model), and charts for other countries.
