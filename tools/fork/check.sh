@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The fork's one check command: fork rules, tool tests, typecheck, lint, format,
-# mobile tests and LofiScoreKit's Swift tests. Prints only failures and a summary.
+# mobile tests and the Swift tests of LofiScoreKit and PodcastKit. Prints only failures and a summary.
 # The iOS simulator build runs only in Fork CI (it needs a Mac): push a branch for it.
 # Usage: tools/fork/check.sh [--no-swift]
 set -u
@@ -22,10 +22,14 @@ step() { # name, command...
   fi
 }
 
-FORK_JS=(applications/mobile/lofi applications/mobile/modules/lofi-score tools/fork)
+FORK_JS=(applications/mobile/lofi applications/mobile/modules/lofi-score
+  applications/mobile/modules/podcasts applications/mobile/podcasts
+  "applications/mobile/app/(root)/podcasts" tools/fork)
 FORMAT=(FORK.md CLAUDE.md docs .github/workflows tools/fork
   applications/mobile/fork.config.ts applications/mobile/app.config.ts
-  applications/mobile/lofi applications/mobile/modules/lofi-score)
+  applications/mobile/lofi applications/mobile/modules/lofi-score
+  applications/mobile/modules/podcasts applications/mobile/podcasts
+  "applications/mobile/app/(root)/podcasts" libraries/PodcastKit)
 
 [ -d node_modules ] || step install yarn install --immutable --mode=skip-build
 step fork-rules node tools/fork/check-fork.mjs
@@ -38,9 +42,12 @@ step mobile-tests yarn test:mobile
 if [ "${1:-}" != "--no-swift" ]; then
   if command -v swift >/dev/null 2>&1; then
     step swift-tests bash -c 'cd libraries/LofiScoreKit && swift test'
+    step podcastkit-tests bash -c 'cd libraries/PodcastKit && swift test'
   elif command -v docker >/dev/null 2>&1; then
     step swift-tests docker run --rm -v "$PWD/libraries/LofiScoreKit":/src \
       -v lofi-build:/src/.build -w /src swift:6.2 swift test
+    step podcastkit-tests docker run --rm -v "$PWD/libraries/PodcastKit":/src \
+      -v podcastkit-build:/src/.build -w /src swift:6.2 swift test
   else
     echo "– swift-tests skipped (no swift or docker)"
   fi

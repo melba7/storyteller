@@ -60,8 +60,8 @@ v1, still to do:
 - The user hears the right place most of the time. Check: the scorer's eval
   score on `Tools/atmosphere/eval/cases.jsonl` is recorded and does not drop.
 
-Podcasts, planned (Mo's ask, 2026-11-16; design in `docs/PODCASTS-PLAN.md`,
-waiting for Mo's OK):
+Podcasts, planned (Mo's ask, approved 2026-11-16; design in
+`docs/PODCASTS-PLAN.md`):
 
 - The user can open Podcasts from a side menu on the Books screen, add a show by
   searching Apple's podcast directory or pasting an RSS link, and see its
@@ -69,6 +69,10 @@ waiting for Mo's OK):
 - The user can play an episode with speed, skip buttons and the lock screen, and
   a book and a podcast never play at the same time. Check: switching between
   them on the phone plays only one.
+- The user can add a show from an Apple Podcasts share link, and the shows they
+  follow in Apple Podcasts appear in Storyteller by themselves (one way, through
+  the Mac), with episodes finished there marked as played. Check: a show
+  followed in Apple Podcasts appears within the hour.
 - The user can download episodes (also with the app closed) and keep an Up Next
   list that carries on with the screen locked. Check: a downloaded episode plays
   in airplane mode, and the next one starts by itself.
@@ -76,7 +80,8 @@ waiting for Mo's OK):
   sent off the phone and no paid service. Check: the episode shows "N ads found"
   and an "Ads found" list.
 - The player skips those ads by itself, shows "Skipped ad" with Undo, and can be
-  turned off per show. Check: on 3 episodes Mo picks, most ads (4 in 5) are
+  turned off per show. The hosts' own plugs (Patreon, merch) are skipped too,
+  under their own switch. Check: on 3 episodes Mo picks, most ads (4 in 5) are
   skipped and at most one skip cuts the show.
 
 ## Out of scope (v1)
@@ -104,5 +109,3 @@ waiting for Mo's OK):
 - Are the sound levels from PR #27/#28 loud enough on the phone? Mo hasn't
   confirmed this on a build since 11.1.
 - What eval score counts as "good enough" for matching?
-- The five podcast questions in `docs/PODCASTS-PLAN.md` (side menu, start now,
-  finding shows, new episodes, what counts as an ad).

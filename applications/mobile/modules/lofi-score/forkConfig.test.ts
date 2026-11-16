@@ -38,10 +38,25 @@ describe("withLofiScorePods", () => {
       "LofiAudioCore",
       "LofiAtmosphere",
       "LofiScoreHost",
+      "PodcastFeed",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
       path: "../../../libraries/LofiScoreKit",
+    })
+  })
+
+  it("adds the podcast feed reader's pod from PodcastKit", () => {
+    const plugins = withLofiScorePods([
+      ["expo-build-properties", { ios: { extraPods: [] } }],
+    ])
+    const [, options] = plugins[0] as [
+      string,
+      { ios: { extraPods: { name: string; path: string }[] } },
+    ]
+    expect(options.ios.extraPods.at(-1)).toEqual({
+      name: "PodcastFeed",
+      path: "../../../libraries/PodcastKit",
     })
   })
 

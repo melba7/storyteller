@@ -61,6 +61,17 @@ Files and folders that belong to the fork, which upstream never touches:
   looks up the clip at the top of the page, so the sounds can follow the pages
   while you read with the narration stopped.
 - `applications/mobile/lofi/`: the React Native UI.
+- `libraries/PodcastKit/`: the Swift package for the Podcasts section. For now
+  it holds the feed reader (`PodcastFeed`), with a podspec so CocoaPods builds
+  it from source for the app.
+- `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
+  a feed and reads it with `PodcastFeed`) and the JavaScript side: the library
+  in its own SQLite file (`podcasts.db`), Apple's directory search and the rules
+  for adding and refreshing shows, with their tests.
+- `applications/mobile/podcasts/` and
+  `applications/mobile/app/(root)/podcasts/`: the Podcasts screens (the side
+  menu, the library, adding a show, a show's episodes, an episode's notes) and
+  their routes.
 - `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`: the server route
   that keeps a book's score (its atmosphere track, and a mood track when the
   shelved music has one) inside the read-aloud EPUB, `GET` for the app and `PUT`
@@ -82,6 +93,9 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   button in the player's toolbar for readaloud books, in the read-along and
   listening screens. It opens a panel with on and off, the sounds' volume, how
   much is going on and the car setting.
+- `applications/mobile/app/(root)/index.tsx` (2 markers): the menu button at the
+  top left of the Books screen. It opens the side menu with Books and Podcasts
+  (`podcasts/SectionMenu.tsx`).
 - `applications/mobile/app/(root)/settings.tsx` (2 markers): the atmosphere's
   section in Settings, which also imports a sounds folder.
 - `applications/mobile/store/store.ts` (1 marker): imports

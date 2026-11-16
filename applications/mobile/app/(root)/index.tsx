@@ -25,6 +25,7 @@ import { type BookWithRelations } from "@/database/books"
 import { type Collection } from "@/database/collections"
 import { useIsFocused } from "@/hooks/useIsFocused"
 import { useListAllServerBooks } from "@/hooks/useListAllServerBooks"
+import { SectionMenuButton } from "@/podcasts/SectionMenu" // LOFI-FORK: the side menu with Books and Podcasts (see FORK.md)
 import { bookImported } from "@/store/actions"
 import { useAppDispatch } from "@/store/appState"
 import {
@@ -121,6 +122,8 @@ export default function Home() {
     <View className="pt-safe flex-1 items-center gap-2 bg-transparent">
       <StatusBar verticalBarBehaviorIOS="disabled" />
       <Group className="pr-safe-or-2 pl-safe-or-4 items-center gap-2">
+        {/* LOFI-FORK: the side menu with Books and Podcasts (see FORK.md) */}
+        <SectionMenuButton current="books" />
         <TouchableOpacity
           accessibilityLabel="Scroll to top"
           accessibilityRole="button"
