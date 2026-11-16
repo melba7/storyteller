@@ -19,6 +19,17 @@ enum PodcastFeedFetcher {
       throw PodcastFetchError(message: "That isn't a web link.")
     }
 
+    // A plain http link is tried over https first, because iOS blocks public http.
+    if scheme == "http", var secure = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+      secure.scheme = "https"
+      if let secureURL = secure.url, let data = try? await load(secureURL) {
+        return data
+      }
+    }
+    return try await load(url)
+  }
+
+  private static func load(_ url: URL) async throws -> Data {
     var request = URLRequest(url: url)
     request.timeoutInterval = 30
     request.setValue("StorytellerLofi/1.0 podcast client", forHTTPHeaderField: "User-Agent")
@@ -26,21 +37,19 @@ enum PodcastFeedFetcher {
       "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
       forHTTPHeaderField: "Accept")
 
-    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+    let data: Data
+    let response: URLResponse
+    do {
+      (data, response) = try await URLSession.shared.data(for: request)
+    } catch let error as URLError where error.code == .appTransportSecurityRequiresSecureConnection {
+      throw PodcastFetchError(message: "This feed only works over plain http, which iOS blocks.")
+    }
     if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
       throw PodcastFetchError(
         message: "The podcast's server answered with status \(http.statusCode).")
     }
-    if response.expectedContentLength > Int64(maxBytes) {
+    if response.expectedContentLength > Int64(maxBytes) || data.count > maxBytes {
       throw PodcastFetchError(message: "This feed is too big to read.")
-    }
-
-    var data = Data()
-    for try await byte in bytes {
-      data.append(byte)
-      if data.count > maxBytes {
-        throw PodcastFetchError(message: "This feed is too big to read.")
-      }
     }
     return data
   }

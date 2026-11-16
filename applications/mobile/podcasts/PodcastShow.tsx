@@ -58,7 +58,7 @@ export function PodcastShow({ id }: { id: string }) {
           style: "destructive",
           onPress: () => {
             unsubscribe(id).then(
-              () => router.replace("/podcasts"),
+              () => router.dismissTo("/podcasts"),
               (cause: unknown) => setProblem(readableError(cause)),
             )
           },

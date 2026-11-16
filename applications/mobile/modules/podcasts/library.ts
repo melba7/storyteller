@@ -1,9 +1,8 @@
 // LOFI-FORK: the podcasts section's library rules (see FORK.md).
 //
-// Pure functions: what a show and an episode are, adding a show twice, merging a
+// Pure functions: what a show and an episode are, merging a
 // refreshed feed into the stored episodes, sorting, and how dates and lengths read.
 // Nothing here touches the database (db.ts does) or the screen.
-import { normalizeFeedUrl } from "./feedUrl"
 
 export type Show = {
   id: string
@@ -36,30 +35,6 @@ export type FetchedEpisode = {
 }
 
 export type StoredEpisode = FetchedEpisode & { id: string; showId: string }
-
-// MARK: Adding a show
-
-/**
- * Adds a show unless the library already has one with the same feed address (compared
- * after normalising it). Then the existing show is returned and the list is unchanged.
- */
-export function addShow(
-  shows: Show[],
-  candidate: Show,
-): { shows: Show[]; show: Show; added: boolean } {
-  const key = comparableUrl(candidate.feedUrl)
-  const existing = shows.find((show) => comparableUrl(show.feedUrl) === key)
-  if (existing) return { shows, show: existing, added: false }
-  return { shows: [...shows, candidate], show: candidate, added: true }
-}
-
-function comparableUrl(url: string): string {
-  try {
-    return normalizeFeedUrl(url)
-  } catch {
-    return url
-  }
-}
 
 // MARK: Refreshing
 

@@ -5,7 +5,6 @@ import {
   type FetchedEpisode,
   type Show,
   type StoredEpisode,
-  addShow,
   episodeFromRow,
   formatDuration,
   formatEpisodeDate,
@@ -56,42 +55,6 @@ function stored(
 ): StoredEpisode {
   return { ...fetched(guid), id: `id-${guid}`, showId: "s1", ...overrides }
 }
-
-describe("addShow", () => {
-  it("adds a new show", () => {
-    const result = addShow([], show())
-    expect(result.added).toBe(true)
-    expect(result.shows).toHaveLength(1)
-    expect(result.show.id).toBe("s1")
-  })
-
-  it("returns the existing show for the same feed address", () => {
-    const existing = show({ id: "old" })
-    const result = addShow([existing], show({ id: "new" }))
-    expect(result.added).toBe(false)
-    expect(result.show).toBe(existing)
-    expect(result.shows).toEqual([existing])
-  })
-
-  it("treats other spellings of the address as the same feed", () => {
-    const existing = show({ feedUrl: "https://example.com/rss" })
-    const result = addShow(
-      [existing],
-      show({ id: "new", feedUrl: "https://Example.com/rss#x" }),
-    )
-    expect(result.added).toBe(false)
-    expect(result.show).toBe(existing)
-  })
-
-  it("keeps different feeds apart", () => {
-    const result = addShow(
-      [show()],
-      show({ id: "s2", feedUrl: "https://example.com/other" }),
-    )
-    expect(result.added).toBe(true)
-    expect(result.shows).toHaveLength(2)
-  })
-})
 
 describe("mergeEpisodes", () => {
   it("inserts everything into an empty library", () => {

@@ -1,15 +1,15 @@
 // LOFI-FORK: the side menu with Books and Podcasts (see FORK.md).
 import { useRouter } from "expo-router"
 import { BookOpen, Menu as MenuIcon, Podcast } from "lucide-react-native"
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import {
-  AccessibilityInfo,
   Animated,
   Modal,
   Pressable,
   View,
   useWindowDimensions,
 } from "react-native"
+import { useReducedMotion } from "react-native-reanimated"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
@@ -25,28 +25,6 @@ const SECTIONS: { id: Section; label: string; icon: typeof BookOpen }[] = [
 
 const SLIDE_MS = 220
 
-function useReduceMotion() {
-  const [reduce, setReduce] = useState(false)
-  useEffect(() => {
-    let current = true
-    AccessibilityInfo.isReduceMotionEnabled().then(
-      (value) => {
-        if (current) setReduce(value)
-      },
-      () => {},
-    )
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduce,
-    )
-    return () => {
-      current = false
-      subscription.remove()
-    }
-  }, [])
-  return reduce
-}
-
 interface Props {
   /** The section this screen belongs to; it is highlighted in the menu. */
   current: Section
@@ -60,7 +38,7 @@ interface Props {
 export function SectionMenuButton({ current }: Props) {
   const router = useRouter()
   const { width } = useWindowDimensions()
-  const reduceMotion = useReduceMotion()
+  const reduceMotion = useReducedMotion()
   const panelWidth = Math.min(300, Math.round(width * 0.8))
 
   const [mounted, setMounted] = useState(false)

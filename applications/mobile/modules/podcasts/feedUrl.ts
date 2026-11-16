@@ -4,7 +4,7 @@ const NOT_A_LINK = "That doesn't look like a web link."
 
 // scheme://[login@]host[:port][/path][?query][#fragment]
 const LINK = /^(https?):\/\/([^/?#\s]+)([/?][^\s#]*)?(#\S*)?$/i
-const HOST = /^[\p{L}\p{N}-]+(\.[\p{L}\p{N}-]+)+(:\d{1,5})?$/u
+const HOST = /^[^\s./:@?#]+(\.[^\s./:@?#]+)+(:\d{1,5})?$/
 
 /**
  * Turns what a listener pasted into one web address per feed: trimmed, with

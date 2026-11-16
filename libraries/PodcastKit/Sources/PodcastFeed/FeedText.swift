@@ -5,11 +5,11 @@ import Foundation
 extension FeedParser {
   // MARK: Notes
 
-  private static let breakingTags = try! NSRegularExpression(
+  nonisolated(unsafe) private static let breakingTags = try! NSRegularExpression(
     pattern: "<br\\s*/?>|</(?:p|li|div|h[1-6]|tr|blockquote)\\s*>", options: [.caseInsensitive])
-  private static let anyTag = try! NSRegularExpression(
+  nonisolated(unsafe) private static let anyTag = try! NSRegularExpression(
     pattern: "<!--.*?-->|</?[A-Za-z][^>]*>", options: [.dotMatchesLineSeparators])
-  private static let entity = try! NSRegularExpression(
+  nonisolated(unsafe) private static let entity = try! NSRegularExpression(
     pattern: "&(#[xX][0-9A-Fa-f]+|#[0-9]+|[A-Za-z][A-Za-z0-9]*);")
 
   private static let namedEntities: [String: String] = [
