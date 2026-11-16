@@ -190,6 +190,10 @@ writes the code.
     player. Starting a podcast pauses the book; starting the book pauses the
     podcast. The book's lock-screen handlers stand aside while a podcast plays
     (new markers in `AudiobookPlayerActor.swift`).
+  - Many episode links are plain http, which iOS blocks by default: set
+    `NSAllowsArbitraryLoadsForMedia` in the Info.plist through `fork.config.ts`
+    (a plist key, not an entitlement). P1a's feed fetch already tries https
+    first.
   - Test first: Swift tests for the player's rules (resume place, marking an
     episode played near its end, who owns the lock screen); JS tests for the
     player screen's state.
