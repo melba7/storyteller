@@ -18,3 +18,7 @@ One line per lesson.
   still exits 0 and writes the score, so the sync job counted the book as done
   with silent chapters; the job now keeps a `.retry` marker and later runs fill
   the gaps.
+- Keeping a squash-merged branch's old tip with `git merge -X ours` re-applied
+  that tip's non-conflicting changes (P1b's mini players came back into P1c's
+  screens). Use `git merge -s ours FETCH_HEAD`, which keeps the tree as it is,
+  and check that `git diff HEAD^1 HEAD` is empty before pushing.

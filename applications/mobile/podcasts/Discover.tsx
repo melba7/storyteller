@@ -16,7 +16,6 @@ import { readableError } from "@/modules/podcasts/nativeError"
 import { showHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
-import { MiniPlayer } from "./MiniPlayer"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 
@@ -174,7 +173,6 @@ export function Discover() {
           {adding === "link" ? <ActivityIndicator /> : <Text>Add</Text>}
         </Button>
       </ScrollView>
-      <MiniPlayer />
     </View>
   )
 }
