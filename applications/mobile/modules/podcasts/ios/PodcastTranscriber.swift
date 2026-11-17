@@ -192,6 +192,12 @@ final class PodcastTranscriber: @unchecked Sendable {
     allowedNow && !makesWayForUrgent(id) && PodcastDownloader.shared.store?.entry(for: id) != nil
   }
 
+  /// A piece of the playing episode is saved: its ads can be looked for now.
+  private func tellAdFinder(_ id: String) {
+    guard lock.withLock({ urgent == id }) else { return }
+    PodcastAdFinder.shared.transcriptGrew(id)
+  }
+
   private func transcribe(_ id: String) async {
     guard let downloads = PodcastDownloader.shared.store, let recogniser,
       let entry = downloads.entry(for: id), case .downloaded(let file, _, _, _) = entry.state,
@@ -205,7 +211,10 @@ final class PodcastTranscriber: @unchecked Sendable {
       let outcome = try await TranscriptRunner.run(
         audio: files.folder.appendingPathComponent(file), sha256: files.sha256, locale: locale,
         recogniser: recogniser, store: files,
-        progress: { [weak self] percent in self?.set(id, .transcribing(percent: percent)) },
+        progress: { [weak self] percent in
+          self?.set(id, .transcribing(percent: percent))
+          self?.tellAdFinder(id)
+        },
         shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
       switch outcome {
       case .finished:

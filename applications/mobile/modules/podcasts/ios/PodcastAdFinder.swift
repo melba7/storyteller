@@ -24,6 +24,9 @@ final class PodcastAdFinder: @unchecked Sendable {
   private var waiting: [String] = []
   /// The episode that is loaded in the player: it goes first, and the one at work makes way.
   private var urgent: String?
+  /// Episodes whose transcript grew since their last partial pass, so the finished pieces of it
+  /// can be checked for ads now.
+  private var partialWanted: Set<String> = []
   private var failures: [String: String] = [:]
   private var retryScheduled = false
   var worker: Task<Void, Never>?
@@ -47,6 +50,7 @@ final class PodcastAdFinder: @unchecked Sendable {
   func removed(_ episodeId: String) {
     let send = lock.withLock { () -> ((String, [String: Any]) -> Void)? in
       waiting.removeAll { $0 == episodeId }
+      partialWanted.remove(episodeId)
       failures[episodeId] = nil
       guard statuses.removeValue(forKey: episodeId) != nil else { return nil }
       return sink
@@ -139,6 +143,23 @@ final class PodcastAdFinder: @unchecked Sendable {
     kick()
   }
 
+  /// The playing episode's transcript has a new piece: its finished pieces are checked for ads
+  /// before the queue goes on.
+  func transcriptGrew(_ id: String) {
+    lock.withLock { _ = partialWanted.insert(id) }
+    kick()
+  }
+
+  /// Takes an episode that wants a partial pass off the list, the urgent one first.
+  private func takePartial() -> String? {
+    lock.withLock {
+      guard let id = (urgent.flatMap { partialWanted.contains($0) ? $0 : nil }) ?? partialWanted.first
+      else { return nil }
+      partialWanted.remove(id)
+      return id
+    }
+  }
+
   /// Takes the next episode off the queue: the urgent one when it waits, otherwise the first.
   private func takeNext() -> String? {
     lock.withLock {
@@ -163,7 +184,7 @@ final class PodcastAdFinder: @unchecked Sendable {
   /// Starts the worker when there is work and it may run; otherwise asks iOS for a turn.
   func kick() {
     let started = lock.withLock { () -> Bool in
-      guard worker == nil, !waiting.isEmpty,
+      guard worker == nil, !waiting.isEmpty || !partialWanted.isEmpty,
         AdsRules.mayRun(appActive: appActive, playing: playing, inBackgroundTask: inBackgroundTask)
       else { return false }
       var priority = TaskPriority.utility
@@ -175,8 +196,14 @@ final class PodcastAdFinder: @unchecked Sendable {
   }
 
   private func drain() async {
-    while allowedNow, let id = takeNext() {
-      await find(id)
+    while allowedNow {
+      if let id = takePartial() {
+        await findPartial(id)
+      } else if let id = takeNext() {
+        await find(id)
+      } else {
+        break
+      }
     }
     lock.withLock { worker = nil }
     kick()
@@ -184,6 +211,27 @@ final class PodcastAdFinder: @unchecked Sendable {
 
   private func mayContinue(_ id: String) -> Bool {
     allowedNow && !makesWayForUrgent(id) && PodcastDownloader.shared.store?.entry(for: id) != nil
+  }
+
+  /// Checks the transcript's finished pieces so far, so the player can skip ads in an episode
+  /// that is still being transcribed. A failure is only logged: the full pass runs when the
+  /// transcript is done and shows its own failure.
+  private func findPartial(_ id: String) async {
+    guard let downloads = PodcastDownloader.shared.store, let detector,
+      let (ads, transcripts) = stores(for: id, in: downloads),
+      !transcripts.hasTranscript, let partial = transcripts.loadPartial()
+    else { return }
+    do {
+      let outcome = try await AdsRunner.runPartial(
+        partial: partial, detector: detector, store: ads,
+        osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+        shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
+      if case .finished = outcome {
+        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+      }
+    } catch {
+      NSLog("Podcasts: ads in the transcript so far could not be checked: \(error)")
+    }
   }
 
   private func find(_ id: String) async {

@@ -62,7 +62,7 @@ final class PodcastAdSkipping {
       case .downloaded(_, let sha, _, _) = entry.state, let folder = try? downloads.folder(for: id)
     {
       store = AdsStore(folder: folder, sha256: sha)
-      skipper.replace(file: store?.load(detector: PodcastAdFinder.detectorName))
+      skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
     }
     // The start is the app's choice, not a seek by the listener, so an ad that begins later is
     // still skipped, and one that holds the start is skipped now.
@@ -78,7 +78,7 @@ final class PodcastAdSkipping {
   func refresh() {
     guard episodeId != nil else { return }
     skipper.apply(settings: settings)
-    skipper.replace(file: store?.load(detector: PodcastAdFinder.detectorName))
+    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
     setMarkers()
   }
 

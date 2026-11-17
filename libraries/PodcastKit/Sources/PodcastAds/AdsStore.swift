@@ -26,10 +26,13 @@ public struct AdsFile: Codable, Sendable, Equatable {
   public var ads: [FoundAd]
   /// The ads whose skip the listener took back.
   public var undone: [UndoneAd]
+  /// For a partial file: the seconds of audio checked so far. Nil in a final file.
+  public var coveredUntil: Double?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
-    ads: [FoundAd], undone: [UndoneAd] = []
+    ads: [FoundAd], undone: [UndoneAd] = [],
+    coveredUntil: Double? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -39,6 +42,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.duration = duration
     self.ads = ads
     self.undone = undone
+    self.coveredUntil = coveredUntil
   }
 
   /// Whether the listener undid the skip of this ad.
@@ -65,7 +69,7 @@ public struct AdsStore: Sendable {
     return folder.appendingPathComponent("\(sha256).ads.\(safe).json")
   }
 
-  private static let encoder: JSONEncoder = {
+  static let encoder: JSONEncoder = {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
     return encoder
@@ -97,10 +101,11 @@ public struct AdsStore: Sendable {
   /// there is no such ad in the file. Undoing twice is recorded once.
   @discardableResult
   public func markUndone(detector: String, adStart start: Double) -> Bool {
-    guard var file = load(detector: detector),
+    let isFinal = load(detector: detector) != nil
+    guard var file = best(detector: detector),
       let ad = file.ads.first(where: { abs($0.start - start) < 0.5 })
     else { return false }
     if !file.isUndone(ad) { file.undone.append(UndoneAd(start: ad.start, end: ad.end)) }
-    return (try? save(file)) != nil
+    return (try? (isFinal ? save(file) : savePartial(file))) != nil
   }
 }
