@@ -12,6 +12,7 @@
     "applications/mobile/modules/lofi-score/",
     "applications/mobile/modules/podcasts/",
     "applications/mobile/modules/readium/ios/LofiNarratorBridge.swift",
+    "applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift",
     "applications/mobile/podcasts/",
     "applications/web/src/app/api/v2/books/[bookId]/lofi-score/",
     "docs/",
@@ -54,8 +55,8 @@
     },
     {
       "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",
-      "markers": 8,
-      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer."
+      "markers": 16,
+      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer. Each of the eight lock-screen handlers also asks LofiRemoteHandoff.swift first, so a playing podcast owns the lock screen and headphone buttons."
     }
   ],
   "allowedChanges": [],

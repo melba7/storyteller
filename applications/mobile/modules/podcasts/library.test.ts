@@ -8,6 +8,7 @@ import {
   episodeFromRow,
   formatDuration,
   formatEpisodeDate,
+  formatEpisodeLength,
   mergeEpisodes,
   showFromRow,
   sortEpisodes,
@@ -25,6 +26,7 @@ function show(overrides: Partial<Show> = {}): Show {
     language: null,
     addedAt: 1,
     refreshedAt: 1,
+    artworkColor: null,
     ...overrides,
   }
 }
@@ -53,7 +55,15 @@ function stored(
   guid: string,
   overrides: Partial<StoredEpisode> = {},
 ): StoredEpisode {
-  return { ...fetched(guid), id: `id-${guid}`, showId: "s1", ...overrides }
+  return {
+    ...fetched(guid),
+    id: `id-${guid}`,
+    showId: "s1",
+    positionSeconds: 0,
+    played: false,
+    lastPlayedAt: null,
+    ...overrides,
+  }
 }
 
 describe("mergeEpisodes", () => {
@@ -228,6 +238,51 @@ describe("rows", () => {
       imageUrl: null,
       season: 1,
       number: null,
+      positionSeconds: 0,
+      played: false,
+      lastPlayedAt: null,
     })
+  })
+
+  it("reads the playing columns of a show and an episode", () => {
+    expect(
+      showFromRow({ id: "s1", artwork_color: "#336699" }).artworkColor,
+    ).toBe("#336699")
+    expect(
+      showFromRow({ id: "s1", artwork_color: null }).artworkColor,
+    ).toBeNull()
+    expect(
+      episodeFromRow({
+        id: "e1",
+        position_seconds: 42.5,
+        played: 1,
+        last_played_at: 9000,
+      }),
+    ).toMatchObject({ positionSeconds: 42.5, played: true, lastPlayedAt: 9000 })
+    expect(
+      episodeFromRow({ id: "e1", position_seconds: -3, played: 0 }),
+    ).toMatchObject({ positionSeconds: 0, played: false, lastPlayedAt: null })
+  })
+})
+
+describe("formatEpisodeLength", () => {
+  const base = { durationSeconds: 3000, positionSeconds: 0, played: false }
+
+  it("shows the full length for an episode not started", () => {
+    expect(formatEpisodeLength(base)).toBe("50 min")
+  })
+
+  it("shows the time left for one in progress", () => {
+    expect(formatEpisodeLength({ ...base, positionSeconds: 600 })).toBe(
+      "40 min left",
+    )
+  })
+
+  it("says played for a played one", () => {
+    expect(formatEpisodeLength({ ...base, played: true })).toBe("Played")
+  })
+
+  it("is empty when the length is unknown", () => {
+    expect(formatEpisodeLength({ ...base, durationSeconds: null })).toBe("")
   })
 })

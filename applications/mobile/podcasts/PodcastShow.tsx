@@ -19,12 +19,14 @@ import { refreshShow, unsubscribe } from "@/modules/podcasts/db"
 import {
   type Show,
   type StoredEpisode,
-  formatDuration,
   formatEpisodeDate,
+  formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 import { Artwork } from "./Artwork"
+import { MiniPlayer } from "./MiniPlayer"
+import { PlayButton } from "./PlayButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisodes, useShow } from "./hooks"
 
@@ -121,9 +123,12 @@ export function PodcastShow({ id }: { id: string }) {
               </Text>
             )
           }
-          renderItem={({ item }) => <EpisodeRow episode={item} />}
+          renderItem={({ item }) => (
+            <EpisodeRow episode={item} show={current} />
+          )}
         />
       )}
+      <MiniPlayer />
     </View>
   )
 }
@@ -165,34 +170,41 @@ function Header({ show, problem }: { show: Show; problem: string | null }) {
   )
 }
 
-function EpisodeRow({ episode }: { episode: StoredEpisode }) {
+function EpisodeRow({ episode, show }: { episode: StoredEpisode; show: Show }) {
   const router = useRouter()
   const details = [
     formatEpisodeDate(episode.publishedAt),
-    formatDuration(episode.durationSeconds),
+    formatEpisodeLength(episode),
   ]
     .filter((part) => part !== "")
     .join(" · ")
   return (
-    <Pressable
-      className="active:bg-secondary border-border gap-1 rounded-md border-b py-3"
-      accessibilityRole="button"
-      accessibilityLabel={
-        details ? `${episode.title}, ${details}` : episode.title
-      }
-      onPress={() =>
-        router.push({
-          pathname: "/podcasts/episode/[id]",
-          params: { id: episode.id },
-        })
-      }
+    <View
+      className={`border-border flex-row items-center gap-3 border-b py-3 ${
+        episode.played ? "opacity-50" : ""
+      }`}
     >
-      <Text className="font-semibold" numberOfLines={3}>
-        {episode.title}
-      </Text>
-      {details ? (
-        <Text className="text-muted-foreground text-sm">{details}</Text>
-      ) : null}
-    </Pressable>
+      <Pressable
+        className="active:bg-secondary flex-1 gap-1 rounded-md"
+        accessibilityRole="button"
+        accessibilityLabel={
+          details ? `${episode.title}, ${details}` : episode.title
+        }
+        onPress={() =>
+          router.push({
+            pathname: "/podcasts/episode/[id]",
+            params: { id: episode.id },
+          })
+        }
+      >
+        <Text className="font-semibold" numberOfLines={3}>
+          {episode.title}
+        </Text>
+        {details ? (
+          <Text className="text-muted-foreground text-sm">{details}</Text>
+        ) : null}
+      </Pressable>
+      <PlayButton episode={episode} show={show} />
+    </View>
   )
 }

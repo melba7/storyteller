@@ -20,6 +20,7 @@ import { type Show } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 import { Artwork } from "./Artwork"
+import { MiniPlayer } from "./MiniPlayer"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { useShows } from "./hooks"
@@ -129,6 +130,7 @@ export function PodcastsHome() {
           )}
         />
       )}
+      <MiniPlayer />
     </View>
   )
 }

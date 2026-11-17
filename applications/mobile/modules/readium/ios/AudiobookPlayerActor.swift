@@ -142,6 +142,7 @@ public actor AudiobookPlayerActor {
         remoteCommandCenter.skipBackwardCommand.preferredIntervals = [15]
 
         remoteCommandCenter.pauseCommand.addTarget { event in
+            if let status = LofiRemoteHandoff.shared.handle(.pause) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.pause()
             }
@@ -149,6 +150,7 @@ public actor AudiobookPlayerActor {
         }
 
         remoteCommandCenter.playCommand.addTarget { event in
+            if let status = LofiRemoteHandoff.shared.handle(.play) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 if await AudiobookPlayerActor.shared.getIsPlaying() { // LOFI-FORK: a narration hold counts as playing
                     await AudiobookPlayerActor.shared.pause()
@@ -161,6 +163,7 @@ public actor AudiobookPlayerActor {
         }
 
         remoteCommandCenter.togglePlayPauseCommand.addTarget { event in
+            if let status = LofiRemoteHandoff.shared.handle(.togglePlayPause) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 if await AudiobookPlayerActor.shared.getIsPlaying() { // LOFI-FORK: a narration hold counts as playing
                     await AudiobookPlayerActor.shared.pause()
@@ -175,6 +178,7 @@ public actor AudiobookPlayerActor {
         // Most headphones only have buttons/gestures for next/prev track, but
         // users almost always want seek forward/back
         remoteCommandCenter.nextTrackCommand.addTarget { event in
+            if let status = LofiRemoteHandoff.shared.handle(.nextTrack) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.seekBy(amount: 30.0, bounded: false)
             }
@@ -182,6 +186,7 @@ public actor AudiobookPlayerActor {
         }
 
         remoteCommandCenter.previousTrackCommand.addTarget { event in
+            if let status = LofiRemoteHandoff.shared.handle(.previousTrack) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.seekBy(amount: -15.0, bounded: false)
             }
@@ -191,6 +196,7 @@ public actor AudiobookPlayerActor {
 
         remoteCommandCenter.skipForwardCommand.addTarget { event in
             guard let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
+            if let status = LofiRemoteHandoff.shared.handle(.skipForward(event.interval)) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.seekBy(amount: event.interval, bounded: false)
             }
@@ -199,6 +205,7 @@ public actor AudiobookPlayerActor {
 
         remoteCommandCenter.skipBackwardCommand.addTarget { event in
             guard let event = event as? MPSkipIntervalCommandEvent else { return .commandFailed }
+            if let status = LofiRemoteHandoff.shared.handle(.skipBackward(event.interval)) { return status } // LOFI-FORK: a playing podcast owns the lock screen
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.seekBy(amount: -event.interval, bounded: false)
             }
@@ -209,6 +216,7 @@ public actor AudiobookPlayerActor {
             guard let event = event as? MPChangePlaybackPositionCommandEvent else {
                 return .commandFailed
             }
+            if let status = LofiRemoteHandoff.shared.handle(.changePosition(event.positionTime)) { return status } // LOFI-FORK: a playing podcast owns the lock screen
 
             Task { @AudiobookPlayerActor in
                 await AudiobookPlayerActor.shared.skip(to: event.positionTime)

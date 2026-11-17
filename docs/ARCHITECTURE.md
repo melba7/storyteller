@@ -33,10 +33,11 @@ in `FORK.md`.
 | `applications/mobile/modules/lofi-score/`                                | Expo module (Swift and JS binding)                                                                                            |
 | `applications/mobile/lofi/`                                              | React UI: toolbar button, panel, settings, reader follow                                                                      |
 | `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`       | Hooks on upstream's audiobook player                                                                                          |
-| `libraries/PodcastKit/`                                                  | Swift package for podcasts: the feed reader (`PodcastFeed`) with its tests and podspec                                        |
-| `applications/mobile/modules/podcasts/`                                  | Expo module that fetches and reads a feed (Swift), plus the library in `podcasts.db`, directory search and library rules (JS) |
-| `applications/mobile/podcasts/`                                          | React UI: the side menu, library, add, show and episode screens                                                               |
-| `applications/mobile/app/(root)/podcasts/`                               | The routes for those screens                                                                                                  |
+| `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`        | Lets a playing podcast own the lock screen; the book's remote handlers ask it first                                           |
+| `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader (`PodcastFeed`), player rules (`PodcastPlayback`), tests, podspecs                    |
+| `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
+| `applications/mobile/podcasts/`                                          | React UI: side menu, library, add, show, episode and player screens, mini player                                              |
+| `applications/mobile/app/(root)/podcasts/`                               | The routes for those screens (the player is a pushed screen)                                                                  |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
@@ -69,13 +70,18 @@ in `FORK.md`.
 - **Sounds folder:** `Atmosphere/<Family>[.<Kind>]/*.m4a`, `sounds.json`
   (including `rejected`), and `OneShots/`.
 - **Podcast library** (`podcasts.db`, its own SQLite file next to the books'
-  database, schema version 1 in `PRAGMA user_version`): `shows` (id, unique feed
+  database, schema version 2 in `PRAGMA user_version`): `shows` (id, unique feed
   address, title, author, description, picture, link, language, when it was
   added and last refreshed) and `episodes` (id, show, the feed's guid, title,
   date, length, plain-text notes, audio address, type and size, picture, season,
   number; one row per guid and show). Dates are milliseconds since 1970. A
   refresh adds new episodes and updates changed ones, and never deletes an
-  episode that left the feed. Removing a show removes its episodes.
+  episode that left the feed. Removing a show removes its episodes. Version 2
+  (P1b, upgraded in place from version 1 with `ALTER TABLE ADD COLUMN`; the
+  steps are in `modules/podcasts/schema.ts`) adds where each episode was left
+  (`position_seconds`), whether it was played (`played`), when it was last
+  played (`last_played_at`) and the show's artwork colour (`artwork_color`,
+  worked out once by the player and used to tint the full-screen player).
 
 ## Decisions log
 
@@ -105,6 +111,7 @@ in `FORK.md`.
 | 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                   | iOS gives other apps no access; Mo's choice                |
 | 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1d)                                      | Apple has no public "similar shows" list; Mo's choice      |
 | 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
+| 2026-11-17 | The podcast player is one Swift `AVPlayer`; a playing podcast owns the lock screen through `LofiRemoteHandoff`                             | The book's handlers stay registered and stand aside        |
 
 ## Known problems
 

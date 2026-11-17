@@ -16,6 +16,8 @@ export type Show = {
   /** Milliseconds since 1970. */
   addedAt: number
   refreshedAt: number
+  /** "#rrggbb": the main colour of the artwork, once the player has worked it out. */
+  artworkColor: string | null
 }
 
 /** An episode as the feed gives it (what the Swift side returns). */
@@ -34,7 +36,15 @@ export type FetchedEpisode = {
   number: number | null
 }
 
-export type StoredEpisode = FetchedEpisode & { id: string; showId: string }
+export type StoredEpisode = FetchedEpisode & {
+  id: string
+  showId: string
+  /** Where the listener left off, in seconds. */
+  positionSeconds: number
+  played: boolean
+  /** Milliseconds since 1970, or null when it was never played. */
+  lastPlayedAt: number | null
+}
 
 // MARK: Refreshing
 
@@ -134,6 +144,25 @@ export function formatDuration(seconds: number | null): string {
   return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`
 }
 
+/**
+ * What an episode row says about its length: "Played", the time left for one in progress
+ * ("12 min left"), or the full length.
+ */
+export function formatEpisodeLength(
+  episode: Pick<
+    StoredEpisode,
+    "durationSeconds" | "positionSeconds" | "played"
+  >,
+): string {
+  if (episode.played) return "Played"
+  const { durationSeconds: duration, positionSeconds: position } = episode
+  if (duration !== null && position > 0 && position < duration) {
+    const left = formatDuration(duration - position)
+    return left === "" ? "" : `${left} left`
+  }
+  return formatDuration(duration)
+}
+
 // MARK: Database rows
 
 type Row = Record<string, unknown>
@@ -162,6 +191,7 @@ export function showFromRow(row: Row): Show {
     language: strOrNull(row["language"]),
     addedAt: numOrNull(row["added_at"]) ?? 0,
     refreshedAt: numOrNull(row["refreshed_at"]) ?? 0,
+    artworkColor: strOrNull(row["artwork_color"]),
   }
 }
 
@@ -180,5 +210,8 @@ export function episodeFromRow(row: Row): StoredEpisode {
     imageUrl: strOrNull(row["image_url"]),
     season: numOrNull(row["season"]),
     number: numOrNull(row["number"]),
+    positionSeconds: Math.max(0, numOrNull(row["position_seconds"]) ?? 0),
+    played: row["played"] === 1 || row["played"] === true,
+    lastPlayedAt: numOrNull(row["last_played_at"]),
   }
 }

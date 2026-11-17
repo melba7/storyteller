@@ -39,6 +39,7 @@ describe("withLofiScorePods", () => {
       "LofiAtmosphere",
       "LofiScoreHost",
       "PodcastFeed",
+      "PodcastPlayback",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
@@ -46,7 +47,7 @@ describe("withLofiScorePods", () => {
     })
   })
 
-  it("adds the podcast feed reader's pod from PodcastKit", () => {
+  it("adds the podcast feed reader's and player rules' pods from PodcastKit", () => {
     const plugins = withLofiScorePods([
       ["expo-build-properties", { ios: { extraPods: [] } }],
     ])
@@ -54,10 +55,10 @@ describe("withLofiScorePods", () => {
       string,
       { ios: { extraPods: { name: string; path: string }[] } },
     ]
-    expect(options.ios.extraPods.at(-1)).toEqual({
-      name: "PodcastFeed",
-      path: "../../../libraries/PodcastKit",
-    })
+    expect(options.ios.extraPods.slice(-2)).toEqual([
+      { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastPlayback", path: "../../../libraries/PodcastKit" },
+    ])
   })
 
   it("leaves other plugins alone", () => {
@@ -91,6 +92,26 @@ describe("soundEdition", () => {
         `${forkIdentity.appId}.soundsImport`,
       ],
       LofiScoreSoundEdition: soundEdition(),
+      NSAppTransportSecurity: { NSAllowsArbitraryLoadsForMedia: true },
+    })
+  })
+
+  it("lets episodes play over plain http and keeps upstream's transport keys", () => {
+    const config = applyForkIdentity({
+      name: "Storyteller",
+      slug: "storyteller",
+      ios: {
+        infoPlist: {
+          NSAppTransportSecurity: {
+            NSAllowsLocalNetworking: true,
+            NSAllowsArbitraryLoadsForMedia: false,
+          },
+        },
+      },
+    })
+    expect(config.ios?.infoPlist?.["NSAppTransportSecurity"]).toEqual({
+      NSAllowsLocalNetworking: true,
+      NSAllowsArbitraryLoadsForMedia: true,
     })
   })
 
