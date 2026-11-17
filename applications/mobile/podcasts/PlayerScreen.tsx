@@ -6,7 +6,7 @@ import { Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { playerGradient } from "@/modules/podcasts/artworkTint"
+import { gradientEnds, playerGradient } from "@/modules/podcasts/artworkTint"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 
 import { ChapterList } from "./ChapterList"
@@ -21,6 +21,9 @@ export function PlayerScreen() {
   const view = usePlayer()
   const [chosen, setChosen] = useState<PlayerPage>("now")
   const { episode, show } = view
+  // The plain top colour shows if a gradient can't be drawn.
+  const color = show?.artworkColor ?? null
+  const [top] = gradientEnds(color)
   const chapters = useChapters(episode?.id ?? "")
   const pages = pagesFor(chapters.length > 0)
   // The chapters page goes away with the chapters (a new episode without any).
@@ -34,7 +37,7 @@ export function PlayerScreen() {
   return (
     <View
       className="pt-safe flex-1"
-      style={{ backgroundImage: playerGradient(show?.artworkColor ?? null) }}
+      style={{ backgroundColor: top, backgroundImage: playerGradient(color) }}
     >
       <View className="px-safe-or-2 flex-row items-center">
         <Pressable

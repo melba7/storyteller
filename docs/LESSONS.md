@@ -35,3 +35,6 @@ One line per lesson.
   "preview" screen in every Podcasts tab group sorted before "discover", so the
   Discover tab opened on an empty preview (Mo saw it on build 23.1). A tab whose
   home is not `index` needs an anchor; `tabStacks.test.ts` checks every tab.
+- Run `yarn oxfmt` from the repository root on the changed paths. Run from
+  another folder it formats the wrong files, and the format check fails (a
+  builder lost a check run to it on 2026-11-17).

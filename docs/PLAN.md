@@ -730,6 +730,17 @@ rebuilt here with nothing copied.
     description shows "Support the show" and "Hosts and guests". An existing
     show shows them after its next refresh.
 
+### Bug check (Mo's ask, 2026-11-17)
+
+Three Opus reviewers traced the data layer, the screens and the Swift side and
+found 31 bugs; all were fixed with tests where the rule could run on Linux, and
+`check.sh` passes. The worst: archiving an imported file deleted the only copy,
+Profile didn't scroll, Up Next could freeze the player, Apple sync undid "Mark
+unplayed", a "Not downloaded" playlist downloaded the library, the outro skip
+used the previous episode's length, http episodes couldn't download, and the
+book resumed instead of the podcast after a call. The Swift module and screen
+fixes wait for Fork CI and TestFlight.
+
 ### A modern podcast app look (Mo's ask, 2026-11-17)
 
 The plan is `docs/PODCASTS-DESIGN.md`: native iOS 26 bars, colour from the
@@ -744,7 +755,7 @@ only. No new npm packages and no new CSS variables.
   - Done when: `check.sh` passes, Fork CI builds, and on TestFlight every screen
     has the native bar, tab titles shrink on scroll, the player swipes down,
     Profile scrolls, and VoiceOver reads every toolbar button.
-- [ ] **D2. The player** (M to L): a gradient from the artwork colour, page
+- [x] **D2. The player** (M to L): a gradient from the artwork colour, page
       pills (Now Playing, Notes, Chapters, Transcript), artwork that shrinks
       when paused, a seek bar that grows under the finger, a five-slot toolbar
       with "…", speed in a sheet, and haptics.
@@ -752,6 +763,9 @@ only. No new npm packages and no new CSS variables.
     sample colours, nothing jumps when speed opens, the artwork shrinks when
     paused (not with Reduce Motion), VoiceOver reads the pages as tabs, and
     nothing clips at the largest text size.
+  - Status: built and passing `check.sh` (a test checks 16 colours): gradient,
+    page pills as tabs, artwork spring, growing seek bar, five-slot toolbar,
+    speed sheet and haptics. The feel and VoiceOver wait for TestFlight.
 - [ ] **D3. Show page, episode rows and the episode card** (L): a wash from the
       artwork behind the show header, rows with two trailing controls and
       readable played rows, and an episode card with one main button and an
