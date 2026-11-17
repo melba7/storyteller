@@ -18,6 +18,8 @@ export type Show = {
   refreshedAt: number
   /** "#rrggbb": the main colour of the artwork, once the player has worked it out. */
   artworkColor: string | null
+  /** Where the listener put the show in "Your order", or null when not placed yet. */
+  ownPosition: number | null
 }
 
 /** An episode as the feed gives it (what the Swift side returns). */
@@ -192,6 +194,7 @@ export function showFromRow(row: Row): Show {
     addedAt: numOrNull(row["added_at"]) ?? 0,
     refreshedAt: numOrNull(row["refreshed_at"]) ?? 0,
     artworkColor: strOrNull(row["artwork_color"]),
+    ownPosition: numOrNull(row["own_position"]),
   }
 }
 

@@ -271,6 +271,9 @@ once reviewed and green.
     dragged order stays after a restart.
   - Files: `podcasts/` (the grid), `modules/podcasts` (`schema.ts`, `db.ts`,
     `library.ts`).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
+    Dragging is on a separate Arrange screen (a handle on each row, plus
+    VoiceOver Move up and Move down), not in the grid itself.
 
 - [ ] **P1d. Discover** (Mo's ask, 2026-11-16, planned as "Explore")
   - The Discover tab shows Apple's free US top chart, Apple's main categories

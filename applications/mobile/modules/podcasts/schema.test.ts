@@ -20,17 +20,27 @@ describe("migrationStatements", () => {
       "ALTER TABLE episodes ADD COLUMN played INTEGER NOT NULL DEFAULT 0",
       "ALTER TABLE episodes ADD COLUMN last_played_at INTEGER",
       "ALTER TABLE shows ADD COLUMN artwork_color TEXT",
-      "PRAGMA user_version = 2",
+      "ALTER TABLE shows ADD COLUMN own_position INTEGER",
+      "PRAGMA user_version = 3",
+    ])
+  })
+
+  it("upgrades a version 2 file with only the own-order column", () => {
+    expect(migrationStatements(2)).toEqual([
+      "ALTER TABLE shows ADD COLUMN own_position INTEGER",
+      "PRAGMA user_version = 3",
     ])
   })
 
   it("does nothing for a current file", () => {
+    expect(SCHEMA_VERSION).toBe(3)
+    expect(migrationStatements(3)).toEqual([])
     expect(migrationStatements(SCHEMA_VERSION)).toEqual([])
     expect(migrationStatements(SCHEMA_VERSION + 1)).toEqual([])
   })
 
   it("gives a new file the same final steps as an upgraded one", () => {
-    expect(migrationStatements(0).slice(-5)).toEqual(migrationStatements(1))
+    expect(migrationStatements(0).slice(-6)).toEqual(migrationStatements(1))
   })
 
   it("treats a broken version number as a new file", () => {

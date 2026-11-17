@@ -103,6 +103,20 @@ export async function listShowActivity(): Promise<ActivityByShow> {
   return activity
 }
 
+/** Keeps "Your order": the shows' places, 0 for the first, saved in one transaction. */
+export async function saveOwnOrder(ids: string[]): Promise<void> {
+  const db = await database()
+  await db.transaction(async (tx) => {
+    for (const [position, id] of ids.entries()) {
+      await tx.execute("UPDATE shows SET own_position = ? WHERE id = ?", [
+        position,
+        id,
+      ])
+    }
+  })
+  notifyLibraryChanged()
+}
+
 export async function getShow(id: string): Promise<Show | null> {
   const found = await rows("SELECT * FROM shows WHERE id = ?", [id])
   return found[0] ? showFromRow(found[0]) : null

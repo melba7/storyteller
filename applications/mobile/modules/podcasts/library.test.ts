@@ -27,6 +27,7 @@ function show(overrides: Partial<Show> = {}): Show {
     addedAt: 1,
     refreshedAt: 1,
     artworkColor: null,
+    ownPosition: null,
     ...overrides,
   }
 }

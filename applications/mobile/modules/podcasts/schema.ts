@@ -5,7 +5,7 @@
 // runs every step; an older file runs only the steps it lacks.
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -47,8 +47,11 @@ const VERSION_2 = [
   "ALTER TABLE shows ADD COLUMN artwork_color TEXT",
 ]
 
+/** Version 3: where the listener put each show in "Your order" (null: not placed yet). */
+const VERSION_3 = ["ALTER TABLE shows ADD COLUMN own_position INTEGER"]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
-const STEPS = [VERSION_1, VERSION_2]
+const STEPS = [VERSION_1, VERSION_2, VERSION_3]
 
 /**
  * The statements that bring a file at `fromVersion` up to SCHEMA_VERSION, ending with the

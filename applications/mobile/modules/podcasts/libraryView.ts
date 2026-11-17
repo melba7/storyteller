@@ -6,13 +6,13 @@
 import { type Show } from "./library"
 
 export type LibraryLayout = "large" | "small" | "list"
-export type LibraryOrder = "name" | "added" | "newest"
+export type LibraryOrder = "name" | "added" | "newest" | "own"
 export type LibraryView = { layout: LibraryLayout; order: LibraryOrder }
 
 export const DEFAULT_VIEW: LibraryView = { layout: "large", order: "name" }
 
 const LAYOUTS: LibraryLayout[] = ["large", "small", "list"]
-const ORDERS: LibraryOrder[] = ["name", "added", "newest"]
+const ORDERS: LibraryOrder[] = ["name", "added", "newest", "own"]
 
 /** What the database knows about a show's episodes, for ordering and for the badge. */
 export type ShowActivity = {
@@ -41,9 +41,20 @@ function byName(a: Show, b: Show): number {
   return left < right ? -1 : left > right ? 1 : 0
 }
 
+/** Placed shows first by position, then the others oldest first (a new show goes last). */
+function byOwn(a: Show, b: Show): number {
+  if (a.ownPosition !== null && b.ownPosition !== null) {
+    return a.ownPosition - b.ownPosition
+  }
+  if (a.ownPosition !== null) return -1
+  if (b.ownPosition !== null) return 1
+  return a.addedAt - b.addedAt
+}
+
 /**
  * A new list in the chosen order. By name ignores case and a leading "The ". By date
  * added and by newest episode put the newest first; shows with no dated episode go last.
+ * "Your order" puts placed shows first, then the rest oldest first.
  * Shows that tie keep their given order, except that newest-episode ties go by name.
  */
 export function sortShows(
@@ -54,6 +65,7 @@ export function sortShows(
   const compare = (a: Show, b: Show): number => {
     if (order === "name") return byName(a, b)
     if (order === "added") return b.addedAt - a.addedAt
+    if (order === "own") return byOwn(a, b)
     const left = activity[a.id]?.newestAt ?? null
     const right = activity[b.id]?.newestAt ?? null
     if (left === right) return byName(a, b)

@@ -70,7 +70,7 @@ in `FORK.md`.
 - **Sounds folder:** `Atmosphere/<Family>[.<Kind>]/*.m4a`, `sounds.json`
   (including `rejected`), and `OneShots/`.
 - **Podcast library** (`podcasts.db`, its own SQLite file next to the books'
-  database, schema version 2 in `PRAGMA user_version`): `shows` (id, unique feed
+  database, schema version 3 in `PRAGMA user_version`): `shows` (id, unique feed
   address, title, author, description, picture, link, language, when it was
   added and last refreshed) and `episodes` (id, show, the feed's guid, title,
   date, length, plain-text notes, audio address, type and size, picture, season,
@@ -82,6 +82,9 @@ in `FORK.md`.
   (`position_seconds`), whether it was played (`played`), when it was last
   played (`last_played_at`) and the show's artwork colour (`artwork_color`,
   worked out once by the player and used to tint the full-screen player).
+  Version 3 (P1c3, same way) adds where the listener put each show in "Your
+  order" (`shows.own_position`, null until placed; placed shows come first, the
+  rest after them, oldest first).
 
 ## Decisions log
 
