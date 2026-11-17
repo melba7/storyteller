@@ -127,6 +127,49 @@ export function planPlayed(
   return [...byShow].map(([showId, guids]) => ({ showId, guids: [...guids] }))
 }
 
+/** The key of one finished episode, for the applied list. */
+function appliedKey(feed: string, guid: string): string {
+  return `${feedKey(feed)}\n${guid}`
+}
+
+/**
+ * The finished episodes to mark played that were not marked before. `applied` holds the pairs
+ * (show feed, guid) done on earlier runs, so an episode the listener marked unplayed since
+ * stays unplayed. Pairs of shows not in the library yet are not applied, so they count when
+ * the show arrives. The new applied list keeps only pairs still in the file, so it stays small.
+ */
+export function planPlayedOnce(
+  file: AppleExport,
+  library: readonly { id: string; feedUrl: string }[],
+  applied: readonly string[],
+): { plays: PlayedInShow[]; applied: string[] } {
+  const done = new Set(applied)
+  const inLibrary = new Set(feedShows(library).map((s) => feedKey(s.feedUrl)))
+  const fresh: AppleFinished[] = []
+  const next = new Set<string>()
+  for (const item of file.finished) {
+    const key = appliedKey(item.feed, item.guid)
+    if (done.has(key)) next.add(key)
+    else if (inLibrary.has(feedKey(item.feed))) {
+      next.add(key)
+      fresh.push(item)
+    }
+  }
+  return {
+    plays: planPlayed({ shows: [], finished: fresh }, library),
+    applied: [...next],
+  }
+}
+
+/** The followed show whose feed is this one, however either address is spelled. */
+export function findShowByFeed<T extends { feedUrl: string }>(
+  shows: readonly T[],
+  feed: string,
+): T | undefined {
+  const key = feedKey(feed)
+  return feedShows(shows).find((show) => feedKey(show.feedUrl) === key)
+}
+
 /** The seen list as kept in AsyncStorage; an unreadable one is empty. */
 export function parseSeen(saved: string | null): string[] {
   if (saved === null) return []

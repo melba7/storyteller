@@ -30,15 +30,22 @@ public struct Chapter: Sendable, Equatable {
 
   /// The key a chapter is known by when the listener's skip choices are saved: its start in
   /// milliseconds. It is stable as long as the chapter's start does not move.
-  public var key: Int { Int((start * 1000).rounded()) }
+  public var key: Int {
+    guard start.isFinite else { return 0 }
+    return Int((min(max(start, 0), ChapterList.maxStart) * 1000).rounded())
+  }
 }
 
 public enum ChapterList {
-  /// Puts chapters in order: drops any that start before 0 or at no time, keeps the first of
+  /// No episode is longer than this many seconds (about 115 days); a chapter that starts later is
+  /// a bad file's, and a start this large must never reach an integer conversion.
+  public static let maxStart = 10_000_000.0
+
+  /// Puts chapters in order: drops any that start before 0, at no time or past `maxStart`, keeps the first of
   /// two that start at the same moment, and gives a chapter with no title the name "Chapter n".
   public static func tidy(_ chapters: [Chapter]) -> [Chapter] {
     var seen = Set<Int>()
-    let sorted = chapters.filter { $0.start.isFinite && $0.start >= 0 }
+    let sorted = chapters.filter { $0.start.isFinite && $0.start >= 0 && $0.start <= maxStart }
       .sorted { $0.start < $1.start }
       .filter { seen.insert($0.key).inserted }
     return sorted.enumerated().map { index, chapter in

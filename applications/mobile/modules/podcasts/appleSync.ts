@@ -14,7 +14,7 @@ import {
   parseAppleExport,
   parseSeen,
   planFollows,
-  planPlayed,
+  planPlayedOnce,
 } from "./applePodcasts"
 import { notifyLibraryChanged } from "./changes"
 import { database, listShows } from "./db"
@@ -23,6 +23,7 @@ import { feedShows } from "./localFiles"
 
 const FILE = "Podcasts/apple-podcasts.json"
 const SEEN_KEY = "podcasts.apple.seen"
+const APPLIED_KEY = "podcasts.apple.played"
 
 async function readFile(): Promise<string | null> {
   try {
@@ -74,10 +75,17 @@ export function syncApplePodcasts(): Promise<void> {
       }
       await AsyncStorage.setItem(SEEN_KEY, JSON.stringify([...keys]))
 
+      // Each finished episode is marked once, so one marked unplayed here stays unplayed.
+      const once = planPlayedOnce(
+        file,
+        await listShows(),
+        parseSeen(await AsyncStorage.getItem(APPLIED_KEY)),
+      )
       let changed = 0
-      for (const { showId, guids } of planPlayed(file, await listShows())) {
+      for (const { showId, guids } of once.plays) {
         changed += await markPlayed(showId, guids)
       }
+      await AsyncStorage.setItem(APPLIED_KEY, JSON.stringify(once.applied))
       if (changed > 0) notifyLibraryChanged()
     } catch (cause) {
       console.warn("Couldn't read the Apple Podcasts follow list", cause)

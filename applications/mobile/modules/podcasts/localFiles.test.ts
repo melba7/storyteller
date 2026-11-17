@@ -10,6 +10,7 @@ import {
   cleanName,
   feedShows,
   importSummary,
+  withoutLocalIds,
   isLocalAudioUrl,
   isLocalEpisodeId,
   localAudioUrl,
@@ -122,5 +123,14 @@ describe("importSummary", () => {
     expect(importSummary(1, 2, [])).toBe(
       "Added 1 file.\n2 files were already added.",
     )
+  })
+})
+
+describe("withoutLocalIds", () => {
+  it("drops the added files, whose download is their only copy", () => {
+    expect(withoutLocalIds(["a-uuid", "file-1", "b-uuid"])).toEqual([
+      "a-uuid",
+      "b-uuid",
+    ])
   })
 })

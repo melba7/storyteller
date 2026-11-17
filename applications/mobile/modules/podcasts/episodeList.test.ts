@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   archivedCount,
   arrangeEpisodes,
+  episodesInView,
   seasonTitle,
   sortForView,
 } from "./episodeList"
@@ -62,6 +63,22 @@ describe("sortForView", () => {
   it("keeps the given order for equal values", () => {
     const same = [episode("x"), episode("y"), episode("z")]
     expect(ids(sortForView(same, "oldest"))).toEqual(["x", "y", "z"])
+  })
+})
+
+describe("episodesInView", () => {
+  it("is the episodes as the list shows them: in order, archived ones hidden", () => {
+    const list = [
+      episode("a", { publishedAt: 1 }),
+      episode("b", { publishedAt: 2, archived: true }),
+      episode("c", { publishedAt: 3 }),
+    ]
+    const items = arrangeEpisodes(list, {
+      sort: "oldest",
+      groupBySeason: true,
+      showArchived: false,
+    })
+    expect(episodesInView(items).map((e) => e.id)).toEqual(["a", "c"])
   })
 })
 

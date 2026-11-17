@@ -174,6 +174,19 @@ in `FORK.md`.
 | 2026-11-17 | Spoken search reads the finished transcript files on each search, off the main thread, with no index; feed-only transcripts are skipped    | No schema change                                           |
 | 2026-11-17 | `podcast:person` (show and episode) and `podcast:funding` (show) are parsed in PodcastKit, at most 20 and 5, links kept only if http(s)    | Safe links from feeds                                      |
 | 2026-11-17 | Schema v14 keeps them as JSON text in `shows.people`, `shows.funding` and `episodes.people`; an episode's own people replace the show's    | Podcasting 2.0 spec rule                                   |
+| 2026-11-17 | A new episode is one newer than the show's newest stored episode; undated ones and a first refresh add nothing new                         | Feeds that change guids don't flood                        |
+| 2026-11-17 | Apple Podcasts finished episodes are marked played once each, remembered in AsyncStorage `podcasts.apple.played`                           | Mark unplayed sticks                                       |
+| 2026-11-17 | Refreshes of one show run one at a time; pull-to-refresh downloads, queues and notifies like the automatic run                             | No duplicate inserts                                       |
+| 2026-11-17 | The cache table drops rows older than 7 days on each write; a "Not downloaded" playlist can't auto-download                                | Bounded storage and downloads                              |
+| 2026-11-17 | An own audio file is never deleted by archive or a download delete; only "Delete file" removes it                                          | It is the only copy                                        |
+| 2026-11-17 | The player remembers Up Next items by id and follows one the library lacks; `nativeId` keeps a followed preview's Swift id                 | Up Next never freezes the player                           |
+| 2026-11-17 | Marks go through `playerInstance.markPlayed`, so the loaded episode keeps them through the next save; unplayed seeks to 0                  | Marks were undone                                          |
+| 2026-11-17 | The player's gradient is built in TypeScript (`artworkTint.ts`): saturation lifted, top darkened to 4.6:1 for white text                   | Swift colour code unchanged                                |
+| 2026-11-17 | The player has pages (Now Playing, Notes, Chapters, Transcript) as tabs and a five-slot toolbar with "…"; speed is a sheet                 | Fewer controls, nothing jumps                              |
+| 2026-11-17 | The outro start comes only from the loaded item's own length; an app-chosen start is not a listener seek                                   | Episodes ended early                                       |
+| 2026-11-17 | Ads that start within 0.5 s of the one before are skipped as one stretch; failed ad scans are retried when the app opens                   | An ad then a plug, rate limits                             |
+| 2026-11-17 | Episode, chapter and artwork links on plain http are fetched over https; a finished download refuses to return after a delete              | iOS blocks http outside media                              |
+| 2026-11-17 | While a podcast owns the lock screen the book doesn't resume after a call (`LofiRemoteHandoff.podcastIsActive`)                            | The book took over                                         |
 
 ## Known problems
 

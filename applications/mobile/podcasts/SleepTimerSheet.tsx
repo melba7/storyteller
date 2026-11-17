@@ -19,7 +19,7 @@ import {
 import { useChapters } from "./useChapters"
 import { sleepTimer, useNow, useSleepTimer } from "./useSleepTimer"
 
-/** The moon button: opens the sleep timer choices and shows the time left on itself. */
+/** The moon slot in the player's toolbar: opens the sleep timer choices and shows the time left in its place. */
 export function SleepTimerButton() {
   const state = useSleepTimer()
   const view = usePlayer()
@@ -38,20 +38,21 @@ export function SleepTimerButton() {
   return (
     <>
       <Pressable
-        className={`flex-row items-center gap-2 rounded-full px-5 py-2 ${
-          state.kind === "none" ? "bg-white/15" : "bg-white"
-        } active:opacity-80`}
+        className="h-11 min-w-11 items-center justify-center rounded-full px-2 active:bg-white/15"
         accessibilityRole="button"
         accessibilityLabel={sleepButtonLabel(left, state)}
         onPress={() => setOpen(true)}
       >
-        <Icon
-          as={Moon}
-          size={18}
-          className={state.kind === "none" ? "text-white" : "text-black"}
-        />
-        {text === "" ? null : (
-          <Text className="font-semibold text-black">{text}</Text>
+        {text === "" ? (
+          <Icon as={Moon} size={22} className="text-white" />
+        ) : (
+          <Text
+            className="text-sm font-semibold text-white"
+            style={{ fontVariant: ["tabular-nums"] }}
+            numberOfLines={1}
+          >
+            {text}
+          </Text>
         )}
       </Pressable>
       <Modal

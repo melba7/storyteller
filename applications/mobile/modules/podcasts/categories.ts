@@ -44,19 +44,23 @@ export function chartCategoryFor(name: string): ChartCategory | null {
  * first followed show (in the order given) that has it.
  */
 export function pickForYou(followed: FollowedShow[], limit = 3): ForYouPick[] {
-  const counts = new Map<string, { count: number; because: string }>()
+  // Counted by the chart category, so "comedy" and "Comedy" are one.
+  const counts = new Map<
+    string,
+    { category: ChartCategory; count: number; because: string }
+  >()
   for (const show of feedShows(followed)) {
+    const seen = new Set<string>()
     for (const name of topLevelNames(show.categories)) {
-      const found = counts.get(name)
+      const category = chartCategoryFor(name)
+      if (!category || seen.has(category.id)) continue
+      seen.add(category.id)
+      const found = counts.get(category.id)
       if (found) found.count += 1
-      else counts.set(name, { count: 1, because: show.title })
+      else counts.set(category.id, { category, count: 1, because: show.title })
     }
   }
-  const picks: (ForYouPick & { count: number })[] = []
-  for (const [name, { count, because }] of counts) {
-    const category = chartCategoryFor(name)
-    if (category) picks.push({ category, because, count })
-  }
+  const picks: (ForYouPick & { count: number })[] = [...counts.values()]
   picks.sort(
     (a, b) =>
       b.count - a.count || a.category.name.localeCompare(b.category.name),

@@ -270,4 +270,38 @@ describe("playlistDownloads", () => {
     )
     expect(picked.map((e) => e.id)).toEqual(["a", "b", "c"])
   })
+
+  it("does not auto-download a playlist of episodes that are not downloaded", () => {
+    const picked = playlistDownloads(
+      [
+        {
+          id: "p1",
+          autoDownload: true,
+          rules: { downloaded: "notDownloaded" },
+        },
+        { id: "p2", autoDownload: true, rules: { downloaded: "any" } },
+      ],
+      new Map([
+        ["p1", many],
+        ["p2", [episode("x")]],
+      ]),
+      new Set(),
+    )
+    expect(picked.map((e) => e.id)).toEqual(["x"])
+  })
+
+  it("leaves out played episodes when asked to", () => {
+    const list = [
+      { ...episode("a"), played: true },
+      { ...episode("b"), played: false },
+    ]
+    const playlists = [{ id: "p1", autoDownload: true }]
+    const matches = new Map([["p1", list]])
+    expect(
+      playlistDownloads(playlists, matches, new Set(), true).map((e) => e.id),
+    ).toEqual(["b"])
+    expect(
+      playlistDownloads(playlists, matches, new Set()).map((e) => e.id),
+    ).toEqual(["a", "b"])
+  })
 })

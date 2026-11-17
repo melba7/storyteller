@@ -61,15 +61,29 @@ export type NewEpisode = {
   audioType: string
 }
 
-/** The episodes a refresh inserted, with the ids they were saved under. */
+/**
+ * The episodes a refresh inserted that count as new, with the ids they were saved under. An
+ * episode is new only when it came out after the newest episode stored before the refresh, so
+ * old episodes a feed gains (changed guids, a longer feed) are not. A show with nothing stored
+ * yet has nothing new, and an undated episode is never new. `stored` is the show's episodes
+ * before the refresh.
+ */
 export function newEpisodes(
   showId: string,
   inserted: readonly FetchedEpisode[],
   ids: readonly string[],
+  stored: readonly { publishedAt: number | null }[],
 ): NewEpisode[] {
+  if (stored.length === 0) return []
+  const newest = Math.max(
+    -Infinity,
+    ...stored.map((episode) => episode.publishedAt ?? -Infinity),
+  )
   return inserted.flatMap((episode, index) => {
     const id = ids[index]
-    return id === undefined
+    return id === undefined ||
+      episode.publishedAt === null ||
+      episode.publishedAt <= newest
       ? []
       : [
           {
@@ -108,6 +122,17 @@ export function episodesToDownload(
     }
   }
   return [...newest.values()]
+}
+
+/**
+ * The new episodes of shows whose own "Notify about new episodes" switch is on (`notify`, show
+ * id to value; a show not in it counts as off).
+ */
+export function episodesToNotify(
+  added: readonly NewEpisode[],
+  notify: ReadonlyMap<string, boolean>,
+): NewEpisode[] {
+  return added.filter((episode) => notify.get(episode.showId) === true)
 }
 
 /**

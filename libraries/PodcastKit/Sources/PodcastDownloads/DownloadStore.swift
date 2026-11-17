@@ -126,11 +126,12 @@ public final class DownloadStore: @unchecked Sendable {
 
   /// Puts a staged, hashed file in place as `<root>/<episodeId>/<sha256>.<ext>` and marks the
   /// episode downloaded. An older download of the same episode is removed first, with its side
-  /// files (a new file is a new identity).
+  /// files (a new file is a new identity). With `requireEntry` (a finished download) nothing is
+  /// filed when the episode was removed meanwhile: the staged file is deleted and it throws.
   @discardableResult
   public func install(
     episodeId: String, staged: URL, sha256: String, fileExtension: String, bytes: Int64,
-    date: Date = Date()
+    date: Date = Date(), requireEntry: Bool = false
   ) throws -> DownloadEntry {
     let folder = try folder(for: episodeId)
     guard DownloadFile.isSha256(sha256) else { throw DownloadError.badHash(sha256) }
@@ -140,6 +141,10 @@ public final class DownloadStore: @unchecked Sendable {
     let name = DownloadFile.name(sha256: sha256, fileExtension: fileExtension)
     return try lock.withLock {
       let fm = FileManager.default
+      if requireEntry, !index.entries.contains(where: { $0.episodeId == episodeId }) {
+        try? fm.removeItem(at: staged)
+        throw DownloadError.noEntry(episodeId)
+      }
       try? fm.removeItem(at: folder)
       try fm.createDirectory(at: folder, withIntermediateDirectories: true)
       try fm.moveItem(at: staged, to: folder.appendingPathComponent(name))

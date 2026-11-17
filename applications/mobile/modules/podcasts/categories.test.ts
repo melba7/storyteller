@@ -84,6 +84,18 @@ describe("pickForYou", () => {
     expect(picks.map((p) => p.category.name)).toEqual(["Comedy", "Business"])
   })
 
+  it("merges names that are the same chart category", () => {
+    const picks = pickForYou([
+      followed("A", ["comedy"]),
+      followed("B", ["Comedy"]),
+      followed("C", ["News"]),
+    ])
+    expect(picks.map((p) => [p.category.name, p.because])).toEqual([
+      ["Comedy", "A"],
+      ["News", "C"],
+    ])
+  })
+
   it("skips categories Apple has no chart for, and gives nothing without categories", () => {
     const picks = pickForYou([
       followed("A", ["Gardening"]),

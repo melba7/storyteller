@@ -123,7 +123,7 @@ enum ArtworkLoader {
 
   static func data(_ url: URL) async -> Data? {
     guard url.scheme == "http" || url.scheme == "https" else { return nil }
-    var request = URLRequest(url: url)
+    var request = URLRequest(url: url.upgradedToHTTPS)
     request.timeoutInterval = 20
     guard let (data, response) = try? await URLSession.shared.data(for: request) else { return nil }
     if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { return nil }

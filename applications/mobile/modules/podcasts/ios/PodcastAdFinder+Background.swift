@@ -38,6 +38,7 @@ extension PodcastAdFinder {
     center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: nil) {
       [weak self] _ in
       self?.lock.withLock { self?.appActive = true }
+      self?.forgetFailures()
       self?.scan()
     }
     center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: nil) {

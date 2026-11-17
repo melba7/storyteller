@@ -149,4 +149,11 @@ describe("playlistProblem", () => {
       playlistProblem("Mine", { ...ok, longerThan: 30, shorterThan: 30 }),
     ).toMatch(/longer and shorter/)
   })
+
+  it("refuses auto-download for episodes that are not downloaded", () => {
+    const rules = { ...ok, downloaded: "notDownloaded" as const }
+    expect(playlistProblem("Mine", rules, true)).toMatch(/download/i)
+    expect(playlistProblem("Mine", rules, false)).toBeNull()
+    expect(playlistProblem("Mine", rules)).toBeNull()
+  })
 })

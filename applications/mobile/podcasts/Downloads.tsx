@@ -19,6 +19,7 @@ import {
   type StoredEpisode,
   formatEpisodeDate,
 } from "@/modules/podcasts/library"
+import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { episodeHref } from "@/modules/podcasts/routes"
 import { withTranscript } from "@/modules/podcasts/transcripts"
 
@@ -147,27 +148,29 @@ function DownloadRow({
         </View>
       </Pressable>
       {episode ? <DownloadButton episode={episode} /> : null}
-      <Menu
-        actions={[
-          {
-            id: "delete",
-            title:
-              info.state === "downloaded"
-                ? "Delete download"
-                : "Remove download",
-            attributes: { destructive: true },
-            onPress: () => confirmDelete(removable),
-          },
-        ]}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel={`More for ${title}`}
+      {isLocalEpisodeId(info.episodeId) ? null : (
+        <Menu
+          actions={[
+            {
+              id: "delete",
+              title:
+                info.state === "downloaded"
+                  ? "Delete download"
+                  : "Remove download",
+              attributes: { destructive: true },
+              onPress: () => confirmDelete(removable),
+            },
+          ]}
         >
-          <Icon as={Ellipsis} size={22} className="text-muted-foreground" />
-        </Button>
-      </Menu>
+          <Button
+            variant="ghost"
+            size="icon"
+            accessibilityLabel={`More for ${title}`}
+          >
+            <Icon as={Ellipsis} size={22} className="text-muted-foreground" />
+          </Button>
+        </Menu>
+      )}
     </View>
   )
 }

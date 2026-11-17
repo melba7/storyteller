@@ -21,6 +21,11 @@ export function isLocalEpisodeId(id: string): boolean {
   return id.startsWith("file-")
 }
 
+/** The ids that are not added files: an added file's download is its only copy. */
+export function withoutLocalIds(ids: readonly string[]): string[] {
+  return ids.filter((id) => !isLocalEpisodeId(id))
+}
+
 export function isLocalFeedUrl(feedUrl: string): boolean {
   return feedUrl === LOCAL_FEED_URL
 }

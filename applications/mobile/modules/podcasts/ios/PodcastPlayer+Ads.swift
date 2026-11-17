@@ -64,8 +64,11 @@ final class PodcastAdSkipping {
       store = AdsStore(folder: folder, sha256: sha)
       skipper.replace(file: store?.load(detector: PodcastAdFinder.detectorName))
     }
-    skipper.seeked(to: position)
+    // The start is the app's choice, not a seek by the listener, so an ad that begins later is
+    // still skipped, and one that holds the start is skipped now.
+    let skip = skipper.started(at: position, duration: owner.currentDuration, now: now)
     setMarkers()
+    if let skip { jump(skip, from: position) }
   }
 
   /// The playhead was moved by the listener, a lock screen button or Undo.
@@ -110,7 +113,7 @@ final class PodcastAdSkipping {
 
   /// Playback crossed an ad's start: jump to its end, unless the listener got there by a seek.
   private func reachedMarker() {
-    guard let episodeId, owner.wantsToPlay else { return }
+    guard episodeId != nil, owner.wantsToPlay else { return }
     let rate = Double(owner.player.rate)
     var duration: Double?
     if let seconds = owner.player.currentItem?.duration.seconds, seconds.isFinite, seconds > 0 {
@@ -120,7 +123,13 @@ final class PodcastAdSkipping {
       let skip = skipper.reached(
         position: owner.position, rate: rate > 0 ? rate : 1, duration: duration, now: now)
     else { return }
-    owner.noteSaved(.ads, audioSeconds: skip.target - owner.position)
+    jump(skip)
+  }
+
+  /// Seeks to the end of the skipped ad (and the ones that follow it at once) and tells the app.
+  private func jump(_ skip: AdSkip, from place: Double? = nil) {
+    guard let episodeId else { return }
+    owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
     owner.player.seek(
       to: CMTime(seconds: skip.target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero)
@@ -128,8 +137,8 @@ final class PodcastAdSkipping {
     owner.sink?(
       "onAdSkipped",
       [
-        "episodeId": episodeId, "start": skip.ad.start, "end": skip.ad.end,
-        "length": skip.ad.end - skip.ad.start,
+        "episodeId": episodeId, "start": skip.ad.start, "end": skip.end,
+        "length": skip.end - skip.ad.start,
       ])
   }
 }

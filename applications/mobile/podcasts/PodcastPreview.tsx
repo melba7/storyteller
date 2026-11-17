@@ -4,10 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { useIsFocused } from "@/hooks/useIsFocused"
 import { fetchFeed, subscribe } from "@/modules/podcasts/dbFeeds"
 import { normalizeFeedUrl } from "@/modules/podcasts/feedUrl"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { adoptFollowedPreview } from "@/modules/podcasts/playerInstance"
 import {
   type EpisodeTarget,
   type Preview,
@@ -50,6 +52,17 @@ export function PodcastPreview({
   const [following, setFollowing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const left = useRef(false)
+  // Following only moves on to the show's page while this page is still the one on screen.
+  const isFocused = useIsFocused()
+  const focused = useRef(isFocused)
+  focused.current = isFocused
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   const list = useRef<FlatList<StoredEpisode>>(null)
   const scrolled = useRef(false)
   const { guid, audioUrl } = episode
@@ -98,11 +111,12 @@ export function PodcastPreview({
 
   // Replaces this page with the show's own, once, when the show is in the library.
   useEffect(() => {
-    if (followed && !left.current) {
+    if (followed && isFocused && !left.current) {
       left.current = true
+      adoptFollowedPreview(followed.id).catch(() => {})
       router.replace(showHref(segments, followed.id))
     }
-  }, [followed, router, segments])
+  }, [followed, isFocused, router, segments])
 
   async function follow() {
     if (following) return
@@ -110,7 +124,9 @@ export function PodcastPreview({
     setProblem(null)
     try {
       const show = await subscribe(feedUrl)
-      if (!left.current) {
+      // A preview episode that is playing now has a library twin: keep its place there.
+      await adoptFollowedPreview(show.id).catch(() => {})
+      if (!left.current && mounted.current && focused.current) {
         left.current = true
         router.replace(showHref(segments, show.id))
       }

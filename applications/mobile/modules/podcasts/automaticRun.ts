@@ -55,12 +55,14 @@ async function startNew(added: Added, settings: AutomaticSettings) {
  * Downloads the first few episodes of each playlist that asks for it, on Wi-Fi only. What
  * is already on the phone, on its way or failed is left alone.
  */
-async function downloadForPlaylists(now: number) {
+async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
   const playlists = (await listPlaylists()).filter(
     (p) => p.kind === "smart" && p.autoDownload,
   )
   if (playlists.length === 0) return
   const infos = await listDownloads()
+  // With "delete played downloads" on, a played episode would be fetched and deleted again.
+  const skipPlayed = settings.deletePlayed
   const known = new Set(infos.map((info) => info.episodeId))
   const onPhone = new Set(
     infos.filter((info) => info.state === "downloaded").map((i) => i.episodeId),
@@ -77,7 +79,12 @@ async function downloadForPlaylists(now: number) {
     )
   }
   const languages = new Map((await listShows()).map((s) => [s.id, s.language]))
-  for (const episode of playlistDownloads(playlists, matches, known)) {
+  for (const episode of playlistDownloads(
+    playlists,
+    matches,
+    known,
+    skipPlayed,
+  )) {
     try {
       await startDownload(
         episode.id,
@@ -114,6 +121,25 @@ async function queueNew(added: Added) {
     } catch (cause) {
       console.warn("Couldn't add a new episode to Up Next", cause)
     }
+  }
+}
+
+/**
+ * What happens for episodes a refresh just added: the newest downloads by itself where the
+ * show says so, they go in Up Next where it says so, and the listener is told. The automatic
+ * run and a pull-to-refresh both end here. A failure is logged, not thrown.
+ */
+export async function followUpNew(
+  added: Added,
+  settings?: AutomaticSettings,
+): Promise<void> {
+  if (added.length === 0) return
+  try {
+    await startNew(added, settings ?? (await loadSettings()))
+    await queueNew(added)
+    await notifyAboutNewEpisodes(added)
+  } catch (cause) {
+    console.warn("Couldn't act on the new episodes", cause)
   }
 }
 
@@ -184,12 +210,10 @@ export function runAutomatic(): Promise<void> {
       await syncShowSettings().catch((cause) =>
         console.warn("Couldn't save the show settings for the player", cause),
       )
-      await startNew(added, settings)
-      await queueNew(added)
-      await downloadForPlaylists(now).catch((cause) =>
+      await followUpNew(added, settings)
+      await downloadForPlaylists(now, settings).catch((cause) =>
         console.warn("Couldn't download for the playlists", cause),
       )
-      await notifyAboutNewEpisodes(added)
       await deletePlayed(now, settings)
       await archiveByRules(now)
       await saveLastRun(now)

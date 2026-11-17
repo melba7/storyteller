@@ -4,7 +4,7 @@ import { Ellipsis } from "lucide-react-native"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu } from "@/components/ui/menu"
-import { setPlayed, setStarred } from "@/modules/podcasts/dbEpisodes"
+import { setStarred } from "@/modules/podcasts/dbEpisodes"
 import {
   archiveEpisodes,
   unarchiveEpisodes,
@@ -12,6 +12,7 @@ import {
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
+import { markPlayed } from "@/modules/podcasts/playerInstance"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { isQueued } from "@/modules/podcasts/upNext"
 
@@ -60,7 +61,7 @@ export function playedAction(episode: StoredEpisode) {
     id: "played",
     title: episode.played ? "Mark unplayed" : "Mark played",
     onPress: () => {
-      setPlayed([episode.id], !episode.played).catch((cause: unknown) =>
+      markPlayed([episode.id], !episode.played).catch((cause: unknown) =>
         console.warn("Couldn't change the episode's played mark", cause),
       )
     },

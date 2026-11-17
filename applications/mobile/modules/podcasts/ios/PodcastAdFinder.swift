@@ -195,8 +195,12 @@ final class PodcastAdFinder: @unchecked Sendable {
     }
   }
 
+  /// Forgets why earlier tries failed, so the next scan tries those episodes again. Called when
+  /// the app comes to the front: a busy or rate-limited model works again by then.
+  func forgetFailures() { lock.withLock { failures.removeAll() } }
+
   /// Shows why this episode's ads could not be found. It is not tried again until the app
-  /// is opened anew, so a run that always fails does not loop.
+  /// comes to the front again, so a run that always fails does not loop.
   private func fail(_ id: String, _ reason: String) {
     lock.withLock { failures[id] = reason }
     set(id, .notPossible(reason: reason))

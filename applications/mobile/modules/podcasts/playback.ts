@@ -11,6 +11,8 @@ import type {
   PlaybackLoadOptions,
   PlaybackState,
   PodcastsEvents,
+  UpNextChange,
+  UpNextItem,
 } from "./index"
 import type { Show, StoredEpisode } from "./library"
 import {
@@ -20,6 +22,7 @@ import {
   isPlayed,
   resumeStart,
 } from "./playbackRules"
+import { isPreviewId } from "./preview"
 
 // MARK: Controller
 
@@ -83,6 +86,37 @@ export interface PlaybackDeps {
   report?(cause: unknown): void
 }
 
+/** How many Up Next items the controller remembers, for episodes the library lacks. */
+const KNOWN_QUEUE_ITEMS = 200
+
+/** An episode built from its Up Next item, for one the library has no row for. */
+export function episodeFromQueueItem(item: UpNextItem): StoredEpisode {
+  return {
+    id: item.id,
+    showId: item.showId ?? "",
+    guid: item.id,
+    title: item.title,
+    publishedAt: 0,
+    durationSeconds: item.duration ?? null,
+    notes: "",
+    audioUrl: item.url,
+    audioType: item.type,
+    audioBytes: null,
+    imageUrl: item.artworkUrl ?? null,
+    season: null,
+    number: null,
+    transcriptUrl: null,
+    transcriptType: null,
+    people: [],
+    chaptersUrl: item.chaptersUrl ?? null,
+    positionSeconds: item.position,
+    played: false,
+    lastPlayedAt: null,
+    archived: false,
+    starredAt: null,
+  }
+}
+
 export function createPlayback(deps: PlaybackDeps) {
   let view = EMPTY_VIEW
   let timer: unknown = null
@@ -90,6 +124,12 @@ export function createPlayback(deps: PlaybackDeps) {
   const listeners = new Set<() => void>()
   /** The loaded episode is inside the "mark played" window and was saved as played. */
   let markedEarly = false
+  /** The listener marked the loaded episode played, so the next save keeps it played. */
+  let markedPlayed = false
+  /** The id the native player knows the loaded episode by (a followed preview keeps its old one). */
+  let nativeId: string | null = null
+  /** Every Up Next item seen lately: Swift drops one from its queue before it announces it. */
+  const knownItems = new Map<string, UpNextItem>()
 
   function set(next: Partial<PlayerView>) {
     view = { ...view, ...next }
@@ -100,12 +140,9 @@ export function createPlayback(deps: PlaybackDeps) {
   function persist(position: number, reachedEnd = false) {
     const episode = view.episode
     if (!episode) return
-    const played = isPlayed(
-      position,
-      view.duration,
-      reachedEnd,
-      deps.playedWithin?.() ?? 0,
-    )
+    const played =
+      markedPlayed ||
+      isPlayed(position, view.duration, reachedEnd, deps.playedWithin?.() ?? 0)
     deps.savePlayback(episode.id, position, played).catch((cause: unknown) => {
       deps.report?.(cause)
     })
@@ -122,7 +159,7 @@ export function createPlayback(deps: PlaybackDeps) {
 
   function onState(state: PlaybackState) {
     const episode = view.episode
-    if (!episode || state.episodeId !== episode.id) return
+    if (!episode || state.episodeId !== (nativeId ?? episode.id)) return
     const wasPlaying = view.isPlaying
     set({
       loaded: true,
@@ -150,7 +187,8 @@ export function createPlayback(deps: PlaybackDeps) {
   }
 
   function onEnded(event: PlaybackEnded) {
-    if (event.episodeId !== view.episode?.id) return
+    if (!view.episode || event.episodeId !== (nativeId ?? view.episode.id))
+      return
     set({ position: event.position, isPlaying: false, isBuffering: false })
     persist(event.position, true)
     syncTimer()
@@ -159,12 +197,17 @@ export function createPlayback(deps: PlaybackDeps) {
   /** Swift started the next queued episode (the one before ended): follow along. */
   async function onAdvanced(event: PlaybackAdvanced) {
     try {
-      const episode = await deps.getEpisode(event.episodeId)
+      const item = knownItems.get(event.episodeId)
+      const episode =
+        (await deps.getEpisode(event.episodeId)) ??
+        (item ? episodeFromQueueItem(item) : null)
       if (!episode) return
       const show = await deps.getShow(episode.showId)
       // One that was still playing (the next button on the headphones) keeps its place.
       if (view.episode && view.isPlaying) persist(view.position)
       markedEarly = false
+      markedPlayed = false
+      nativeId = episode.id
       set({
         episode,
         show,
@@ -185,8 +228,21 @@ export function createPlayback(deps: PlaybackDeps) {
     }
   }
 
+  function onQueue(change: UpNextChange) {
+    for (const item of change.items) {
+      knownItems.delete(item.id)
+      knownItems.set(item.id, item)
+    }
+    while (knownItems.size > KNOWN_QUEUE_ITEMS) {
+      const oldest = knownItems.keys().next().value
+      if (oldest === undefined) break
+      knownItems.delete(oldest)
+    }
+  }
+
   function onError(event: PlaybackError) {
-    if (event.episodeId !== view.episode?.id) return
+    if (!view.episode || event.episodeId !== (nativeId ?? view.episode.id))
+      return
     set({ error: event.message, isPlaying: false, isBuffering: false })
     syncTimer()
   }
@@ -197,6 +253,7 @@ export function createPlayback(deps: PlaybackDeps) {
     deps.native.addListener("onPlaybackState", onState)
     deps.native.addListener("onPlaybackEnded", onEnded)
     deps.native.addListener("onPlaybackError", onError)
+    deps.native.addListener("onUpNextChange", onQueue)
     deps.native.addListener("onPlaybackAdvanced", (event) => {
       void onAdvanced(event)
     })
@@ -262,6 +319,8 @@ export function createPlayback(deps: PlaybackDeps) {
     }
     if (view.episode && view.loaded) persist(view.position)
     markedEarly = false
+    markedPlayed = false
+    nativeId = episode.id
     set({
       episode,
       show,
@@ -321,17 +380,28 @@ export function createPlayback(deps: PlaybackDeps) {
     else await run(() => native().play())
   }
 
+  /** Before the first Play: remembers the place and starts there when the episode loads. */
+  function moveUnloaded(target: number) {
+    const episode = view.episode
+    if (!episode) return
+    set({
+      position: target,
+      episode: { ...episode, positionSeconds: target, played: false },
+    })
+    persist(target)
+  }
+
   async function seekTo(seconds: number) {
-    if (!view.loaded) return
     const target = clampPosition(seconds, view.duration)
+    if (!view.loaded) return moveUnloaded(target)
     set({ position: target })
     await run(() => native().seekTo(target))
     persist(target)
   }
 
   async function skip(seconds: number) {
-    if (!view.loaded) return
     const target = clampPosition(view.position + seconds, view.duration)
+    if (!view.loaded) return moveUnloaded(target)
     set({ position: target })
     await run(() => native().skipBy(seconds))
     persist(target)
@@ -346,8 +416,59 @@ export function createPlayback(deps: PlaybackDeps) {
     })
   }
 
+  /**
+   * The listener marked episodes played or unplayed. The loaded one keeps the mark through the
+   * player's next save; unplayed also puts it back at the start.
+   */
+  async function episodesMarked(ids: readonly string[], played: boolean) {
+    const episode = view.episode
+    if (!episode || !ids.includes(episode.id)) return
+    markedPlayed = played
+    markedEarly = false
+    set({ episode: { ...episode, played } })
+    if (!played) await seekTo(0)
+  }
+
+  /** A followed show's episodes are in the library: a playing preview episode becomes its twin. */
+  function adoptLibrary(episodes: readonly StoredEpisode[], show: Show | null) {
+    const current = view.episode
+    if (!current || !isPreviewId(current.id)) return
+    const twin = episodes.find((e) => e.guid === current.guid)
+    if (!twin) return
+    markedPlayed = false
+    set({
+      episode: { ...twin, positionSeconds: view.position },
+      show: show ?? view.show,
+    })
+    persist(view.position)
+  }
+
+  /** After a library change (a rename): the loaded episode's title and picture are read again. */
+  async function refreshEpisode() {
+    const current = view.episode
+    if (!current || isPreviewId(current.id)) return
+    try {
+      const fresh = await deps.getEpisode(current.id)
+      if (!fresh || view.episode?.id !== current.id) return
+      if (fresh.title === current.title && fresh.imageUrl === current.imageUrl)
+        return
+      set({
+        episode: {
+          ...view.episode,
+          title: fresh.title,
+          imageUrl: fresh.imageUrl,
+        },
+      })
+    } catch (cause) {
+      deps.report?.(cause)
+    }
+  }
+
   return {
     getView: () => view,
+    episodesMarked,
+    adoptLibrary,
+    refreshEpisode,
     subscribe(listener: () => void) {
       listeners.add(listener)
       return () => {

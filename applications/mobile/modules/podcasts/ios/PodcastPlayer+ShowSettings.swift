@@ -52,7 +52,9 @@ extension PodcastPlayer {
     showState.outroHandled = false
     showState.showSpeedActive = settings.speed != nil
     speed = ShowRules.speed(show: settings.speed, player: showState.listenerSpeed)
-    refreshOutro()
+    // The player still holds the last episode here, so its length would be the wrong one. The
+    // outro is worked out once the new item has loaded (endAtOutroIfReached).
+    showState.outroStart = nil
   }
 
   /// The listener changed the speed in the player. That is their speed from now on, unless
@@ -61,10 +63,15 @@ extension PodcastPlayer {
     if !showState.showSpeedActive { showState.listenerSpeed = speed }
   }
 
-  /// Works out where the outro begins, once the length is known.
+  /// Works out where the outro begins, once the loaded item's own length is known. The feed's
+  /// length is only a guess and is not used for it.
   private func refreshOutro() {
+    var loaded: Double?
+    if let seconds = player.currentItem?.duration.seconds, seconds.isFinite, seconds > 0 {
+      loaded = seconds
+    }
     showState.outroStart = ShowRules.outroStart(
-      duration: currentDuration, outro: showState.settings.outroSeconds,
+      duration: loaded, outro: showState.settings.outroSeconds,
       intro: showState.settings.introSeconds)
   }
 

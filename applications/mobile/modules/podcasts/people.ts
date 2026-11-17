@@ -63,7 +63,7 @@ export function fundingFromJson(value: unknown): PodcastFunding[] {
   for (const entry of parseList(value)) {
     if (!isRecord(entry)) continue
     const url = webUrl(entry["url"])
-    if (url === null) continue
+    if (url === null || links.some((link) => link.url === url)) continue
     links.push({ url, label: text(entry["label"], "") })
     if (links.length === MAX_FUNDING) break
   }

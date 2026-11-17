@@ -19,6 +19,7 @@ import {
 } from "@/modules/podcasts/downloadsNative"
 import { type DownloadInfo, Podcasts } from "@/modules/podcasts/index"
 import { type StoredEpisode } from "@/modules/podcasts/library"
+import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 // What the screens know about downloads: read once from Swift, then kept fresh by its
@@ -139,6 +140,8 @@ export function pressDownload(
 }
 
 export function confirmDelete(episode: Pick<StoredEpisode, "id" | "title">) {
+  // An added file's download is its only copy; "Delete file" in its menu is the way.
+  if (isLocalEpisodeId(episode.id)) return
   Alert.alert(
     "Delete this download?",
     `${episode.title} is removed from your phone. You can download it again later.`,

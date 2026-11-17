@@ -9,6 +9,7 @@ import { withAds } from "@/modules/podcasts/ads"
 import { downloadLook } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type StoredEpisode } from "@/modules/podcasts/library"
+import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { withTranscript } from "@/modules/podcasts/transcripts"
 
 import { ProgressRing } from "./PlayButton"
@@ -40,7 +41,8 @@ export function DownloadButton({
   const transcript = useTranscript(episode.id)
   const ads = useAdsInfo(episode.id)
   const primary = useCSSVariable("--color-primary") as string
-  if (Podcasts === null) return null
+  // An added file's download is its only copy: no button, so it can't be deleted from here.
+  if (Podcasts === null || isLocalEpisodeId(episode.id)) return null
   const look = downloadLook(info, episode.title)
   // The transcript only matters once the audio is on the phone.
   const downloaded = info?.state === "downloaded"

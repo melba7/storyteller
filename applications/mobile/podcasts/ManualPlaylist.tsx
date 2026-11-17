@@ -57,9 +57,19 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   const savedIds = list.map((entry) => entry.episode.id)
   const ids = order ?? savedIds
 
+  // A drag still waiting to be saved is saved when the screen goes, not lost.
+  const pending = useRef<string[] | null>(null)
+  const playlistId = useRef(playlist.id)
+  playlistId.current = playlist.id
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current)
+      if (pending.current) {
+        saveItemOrder(playlistId.current, pending.current).catch(
+          (cause: unknown) =>
+            console.warn("Couldn't save the playlist's order", cause),
+        )
+      }
     },
     [],
   )
@@ -67,9 +77,11 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   function reorder(next: string[]) {
     if (!moveBetween(ids, next)) return
     setOrder(next)
+    pending.current = next
     if (timer.current) clearTimeout(timer.current)
     // Saved once the finger rests, not at every row it passes.
     timer.current = setTimeout(() => {
+      pending.current = null
       saveItemOrder(playlist.id, next).then(
         () => setOrder(null),
         (cause: unknown) => {

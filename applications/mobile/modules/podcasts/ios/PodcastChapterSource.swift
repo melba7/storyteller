@@ -21,10 +21,10 @@ enum PodcastChapterSource {
   /// The feed's JSON chapters. Nothing when the address is bad, the server fails or the
   /// answer is not a chapters file.
   static func fromFeed(_ address: String) async -> [Chapter] {
-    guard let url = URL(string: address), let scheme = url.scheme?.lowercased(),
-      scheme == "http" || scheme == "https", url.host != nil
+    guard let given = URL(string: address), let scheme = given.scheme?.lowercased(),
+      scheme == "http" || scheme == "https", given.host != nil
     else { return [] }
-    var request = URLRequest(url: url)
+    var request = URLRequest(url: given.upgradedToHTTPS)
     request.timeoutInterval = 20
     request.setValue("StorytellerLofi/1.0 podcast client", forHTTPHeaderField: "User-Agent")
     guard let (data, response) = try? await URLSession.shared.data(for: request),

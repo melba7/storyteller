@@ -5,6 +5,7 @@ import { type Show, type StoredEpisode } from "./library"
 import {
   playAllPlan,
   parseSnapshot,
+  runPlayAll,
   resolveItems,
   snapshotOf,
 } from "./manualPlaylist"
@@ -309,5 +310,22 @@ describe("hand-filled playlists in the database", () => {
       "manual",
     )
     expect(order(db)).toEqual(["a"])
+  })
+})
+
+describe("runPlayAll", () => {
+  it("plays the first episode before it queues the rest", async () => {
+    const calls: string[] = []
+    await runPlayAll(playAllPlan(["a", "b", "c"]), {
+      play: (id) => {
+        calls.push(`play ${id}`)
+        return Promise.resolve()
+      },
+      queue: (id, place) => {
+        calls.push(`queue ${id} ${place}`)
+        return Promise.resolve()
+      },
+    })
+    expect(calls).toEqual(["play a", "queue c next", "queue b next"])
   })
 })

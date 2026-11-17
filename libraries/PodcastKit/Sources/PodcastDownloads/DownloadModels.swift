@@ -119,12 +119,15 @@ public enum DownloadError: Error, Equatable, LocalizedError {
   case unsafeEpisodeId(String)
   case badHash(String)
   case badExtension(String)
+  /// The episode was removed while its file was being filed.
+  case noEntry(String)
 
   public var errorDescription: String? {
     switch self {
     case .unsafeEpisodeId(let id): return "\"\(id)\" is not a usable episode id."
     case .badHash(let hash): return "\"\(hash)\" is not a SHA-256 hash."
     case .badExtension(let ext): return "\"\(ext)\" is not a usable file extension."
+    case .noEntry(let id): return "The download of \"\(id)\" was removed."
     }
   }
 }

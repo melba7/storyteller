@@ -173,6 +173,36 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(store.storageUsed(), 8)
   }
 
+  func testAFinishedDownloadThatWasDeletedMeanwhileIsNotBroughtBack() throws {
+    let store = try DownloadStore(root: root)
+    try store.put(entry("a", .downloading(bytes: 1, expected: 2)))
+    let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try Data([1, 2]).write(to: temp)
+    let staged = try store.stage(temp, episodeId: "a")
+    // The listener removes it after the file finished but before it is filed.
+    try store.delete(episodeId: "a")
+    XCTAssertThrowsError(
+      try store.install(
+        episodeId: "a", staged: staged, sha256: sha, fileExtension: "mp3", bytes: 2,
+        requireEntry: true)
+    ) { XCTAssertEqual($0 as? DownloadError, .noEntry("a")) }
+    XCTAssertNil(store.entry(for: "a"))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: try store.folder(for: "a").path))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: staged.path))
+  }
+
+  func testInstallWithAnEntryStillWorksWhenOneIsRequired() throws {
+    let store = try DownloadStore(root: root)
+    try store.put(entry("a", .downloading(bytes: 1, expected: 2)))
+    let temp = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try Data([1, 2]).write(to: temp)
+    let staged = try store.stage(temp, episodeId: "a")
+    let done = try store.install(
+      episodeId: "a", staged: staged, sha256: sha, fileExtension: "mp3", bytes: 2, requireEntry: true)
+    XCTAssertEqual(done.url, "https://cdn.example.com/a.mp3")
+    XCTAssertNotNil(store.localFile(for: "a"))
+  }
+
   // MARK: Deleting
 
   func testDeleteRemovesTheWholeFolderAndTheEntry() throws {

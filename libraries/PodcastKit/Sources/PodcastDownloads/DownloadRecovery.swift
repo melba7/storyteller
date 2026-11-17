@@ -58,6 +58,10 @@ public enum DownloadRecovery {
       if status == 404 || status == 410 { return .fail("The episode is no longer there (\(status))") }
       return .fail("The server answered \(status)")
     }
+    // -1022: App Transport Security refused a plain http address.
+    if failure.urlErrorCode == -1022 {
+      return .fail("The episode's link is plain http, which iOS blocks")
+    }
     if let code = failure.urlErrorCode, transient.contains(code) {
       guard failure.attempts < maxRetries else { return .fail("No connection, tap to try again") }
       return failure.hasResumeData ? .resume : .restart

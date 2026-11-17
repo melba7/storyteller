@@ -1,56 +1,33 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { useRouter } from "expo-router"
-import {
-  ChevronDown,
-  Pause,
-  Play,
-  RotateCcw,
-  RotateCw,
-} from "lucide-react-native"
+import { ChevronDown } from "lucide-react-native"
 import { useState } from "react"
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  View,
-  useWindowDimensions,
-} from "react-native"
+import { Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { adMarks, adRows } from "@/modules/podcasts/ads"
-import { chapterArtwork } from "@/modules/podcasts/chapters"
-import { speedLabel } from "@/modules/podcasts/playbackRules"
-import { skipLabel } from "@/modules/podcasts/playbackSettings"
-import { player, usePlayer } from "@/modules/podcasts/playerInstance"
-import { playerBackground } from "@/modules/podcasts/playerLook"
+import { gradientEnds, playerGradient } from "@/modules/podcasts/artworkTint"
+import { usePlayer } from "@/modules/podcasts/playerInstance"
 
-import { Artwork } from "./Artwork"
-import { ChapterBar } from "./ChapterBar"
 import { ChapterList } from "./ChapterList"
-import { PlayerButtons } from "./PlayerButtons"
-import { SeekBar } from "./SeekBar"
-import { SkippedAdNote } from "./SkippedAdNote"
-import { SpeedPanel } from "./SpeedPanel"
+import { PlayerNowPlaying } from "./PlayerNowPlaying"
+import { NotesPage, PagePills, type PlayerPage, pagesFor } from "./PlayerPages"
 import { TranscriptView } from "./TranscriptView"
-import { useAdsFile } from "./useAds"
 import { useChapters } from "./useChapters"
-import { usePlaybackSettings } from "./usePlaybackSettings"
 
-/** The full-screen player, laid out like Pocket Casts': artwork, seek bar, controls, notes. */
+/** The full-screen player: a gradient from the artwork, page pills, and the page chosen. */
 export function PlayerScreen() {
   const router = useRouter()
   const view = usePlayer()
-  const { skipBack, skipForward } = usePlaybackSettings()
-  const { width } = useWindowDimensions()
-  const [showSpeed, setShowSpeed] = useState(false)
-  const [showTranscript, setShowTranscript] = useState(false)
-  const [showChapters, setShowChapters] = useState(false)
+  const [chosen, setChosen] = useState<PlayerPage>("now")
   const { episode, show } = view
+  // The plain top colour shows if a gradient can't be drawn.
+  const color = show?.artworkColor ?? null
+  const [top] = gradientEnds(color)
   const chapters = useChapters(episode?.id ?? "")
-  const adsFile = useAdsFile(episode?.id ?? "")
-  const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
-  const artwork = Math.min(width - 64, 340)
+  const pages = pagesFor(chapters.length > 0)
+  // The chapters page goes away with the chapters (a new episode without any).
+  const page = pages.includes(chosen) ? chosen : "now"
 
   function close() {
     if (router.canGoBack()) router.back()
@@ -60,7 +37,7 @@ export function PlayerScreen() {
   return (
     <View
       className="pt-safe flex-1"
-      style={{ backgroundColor: playerBackground(show?.artworkColor ?? null) }}
+      style={{ backgroundColor: top, backgroundImage: playerGradient(color) }}
     >
       <View className="px-safe-or-2 flex-row items-center">
         <Pressable
@@ -72,40 +49,7 @@ export function PlayerScreen() {
           <Icon as={ChevronDown} size={28} className="text-white" />
         </Pressable>
         {episode ? (
-          <View className="ml-auto flex-row gap-2">
-            {chapters.length > 0 ? (
-              <Pressable
-                className="rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
-                accessibilityRole="button"
-                accessibilityLabel={
-                  showChapters ? "Back to the player" : "Open the chapters"
-                }
-                onPress={() => {
-                  setShowTranscript(false)
-                  setShowChapters((value) => !value)
-                }}
-              >
-                <Text className="font-semibold text-white">
-                  {showChapters ? "Player" : "Chapters"}
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              className="rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
-              accessibilityRole="button"
-              accessibilityLabel={
-                showTranscript ? "Back to the player" : "Open the transcript"
-              }
-              onPress={() => {
-                setShowChapters(false)
-                setShowTranscript((value) => !value)
-              }}
-            >
-              <Text className="font-semibold text-white">
-                {showTranscript ? "Player" : "Transcript"}
-              </Text>
-            </Pressable>
-          </View>
+          <PagePills pages={pages} page={page} onChange={setChosen} />
         ) : null}
       </View>
 
@@ -113,154 +57,19 @@ export function PlayerScreen() {
         <Text className="px-8 py-12 text-center text-white/70">
           Nothing is playing. Pick an episode to start.
         </Text>
-      ) : showChapters && chapters.length > 0 ? (
+      ) : page === "chapters" ? (
         <ChapterList episodeId={episode.id} chapters={chapters} />
-      ) : showTranscript ? (
+      ) : page === "transcript" ? (
         <TranscriptView key={episode.id} episode={episode} />
+      ) : page === "notes" ? (
+        <NotesPage notes={episode.notes} />
       ) : (
-        <ScrollView
-          contentContainerClassName="px-safe-or-6 pb-safe items-center gap-5 pb-8"
-          showsVerticalScrollIndicator={false}
-        >
-          <Artwork
-            uri={
-              chapterArtwork(chapters, view.position) ??
-              episode.imageUrl ??
-              show?.imageUrl ??
-              null
-            }
-            size={artwork}
-            className="rounded-2xl"
-          />
-          <View className="w-full gap-1">
-            <Text
-              className="text-center text-xl font-semibold text-white"
-              numberOfLines={2}
-            >
-              {episode.title}
-            </Text>
-            {show ? (
-              <Text
-                className="text-center text-base text-white/70"
-                numberOfLines={1}
-              >
-                {show.title}
-              </Text>
-            ) : null}
-          </View>
-
-          {view.error ? (
-            <Text
-              className="text-center text-sm text-red-300"
-              accessibilityRole="alert"
-            >
-              {view.error}
-            </Text>
-          ) : null}
-
-          <SeekBar
-            position={view.position}
-            duration={view.duration}
-            onSeek={(seconds) => void player.seekTo(seconds)}
-            marks={marks}
-          />
-          <ChapterBar
-            chapters={chapters}
-            position={view.position}
-            onOpen={() => setShowChapters(true)}
-          />
-          <SkippedAdNote />
-
-          <View className="w-full flex-row items-center justify-center gap-8">
-            <SkipButton
-              label={skipLabel("back", skipBack)}
-              seconds={skipBack}
-              icon={RotateCcw}
-              onPress={() => void player.skip(-skipBack)}
-            />
-            <Pressable
-              className="size-20 items-center justify-center rounded-full bg-white active:opacity-80"
-              accessibilityRole="button"
-              accessibilityLabel={view.isPlaying ? "Pause" : "Play"}
-              onPress={() => void player.togglePlayPause()}
-            >
-              {view.isBuffering ? (
-                <ActivityIndicator
-                  color="#000000"
-                  accessibilityLabel="Buffering"
-                />
-              ) : (
-                <Icon
-                  as={view.isPlaying ? Pause : Play}
-                  size={34}
-                  className="text-black"
-                  fill="#000000"
-                />
-              )}
-            </Pressable>
-            <SkipButton
-              label={skipLabel("ahead", skipForward)}
-              seconds={skipForward}
-              icon={RotateCw}
-              onPress={() => void player.skip(skipForward)}
-            />
-          </View>
-
-          <Pressable
-            className="rounded-full bg-white/15 px-5 py-2 active:bg-white/25"
-            accessibilityRole="button"
-            accessibilityLabel={`Playback speed ${speedLabel(view.rate)}`}
-            onPress={() => setShowSpeed((value) => !value)}
-          >
-            <Text className="font-semibold text-white">
-              {speedLabel(view.rate)}
-            </Text>
-          </Pressable>
-          {showSpeed ? (
-            <View className="w-full">
-              <SpeedPanel
-                rate={view.rate}
-                onChange={(rate) => void player.setRate(rate)}
-              />
-            </View>
-          ) : null}
-
-          <PlayerButtons />
-
-          <View className="w-full gap-2 pt-4">
-            <Text className="text-lg font-semibold text-white">Show notes</Text>
-            <Text selectable className="text-base leading-6 text-white/85">
-              {episode.notes === ""
-                ? "No notes for this episode."
-                : episode.notes}
-            </Text>
-          </View>
-        </ScrollView>
+        <PlayerNowPlaying
+          view={view}
+          chapters={chapters}
+          onOpenChapters={() => setChosen("chapters")}
+        />
       )}
     </View>
-  )
-}
-
-function SkipButton({
-  label,
-  seconds,
-  icon,
-  onPress,
-}: {
-  label: string
-  seconds: number
-  icon: typeof RotateCcw
-  onPress: () => void
-}) {
-  return (
-    <Pressable
-      className="size-14 items-center justify-center active:opacity-60"
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onPress={onPress}
-    >
-      <Icon as={icon} size={44} className="text-white" strokeWidth={1.5} />
-      <Text className="absolute text-xs font-bold text-white">{seconds}</Text>
-    </Pressable>
   )
 }

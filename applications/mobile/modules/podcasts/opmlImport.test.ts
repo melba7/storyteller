@@ -30,6 +30,20 @@ describe("importFeeds", () => {
     expect(summary).toMatchObject({ added: 1, alreadyFollowed: 1 })
   })
 
+  it("leaves a show followed under another spelling alone", async () => {
+    const follow = vi.fn(() => Promise.resolve())
+    const summary = await importFeeds(
+      [
+        { title: "A", feedUrl: "http://www.example.com/feed/" },
+        { title: "B", feedUrl: "https://example.com/feed" },
+      ],
+      ["https://example.com/feed"],
+      follow,
+    )
+    expect(follow).not.toHaveBeenCalled()
+    expect(summary).toMatchObject({ added: 0, alreadyFollowed: 2 })
+  })
+
   it("follows a show listed twice once", async () => {
     const follow = vi.fn(() => Promise.resolve())
     const summary = await importFeeds([feed("a"), feed("a")], [], follow)

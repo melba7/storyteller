@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, View } from "react-native"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { setPlayed, setStarred } from "@/modules/podcasts/dbEpisodes"
+import { setStarred } from "@/modules/podcasts/dbEpisodes"
 import {
   archiveEpisodes,
   unarchiveEpisodes,
@@ -15,6 +15,7 @@ import {
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { peopleForEpisode } from "@/modules/podcasts/people"
+import { markPlayed } from "@/modules/podcasts/playerInstance"
 import { episodeShare } from "@/modules/podcasts/share"
 
 import { AdsFound } from "./AdsFound"
@@ -141,7 +142,7 @@ export function PodcastEpisode({ id }: { id: string }) {
           variant="ghost"
           accessibilityLabel={`${current.played ? "Mark unplayed" : "Mark played"} ${current.title}`}
           onPress={() => {
-            setPlayed([current.id], !current.played).catch((cause: unknown) =>
+            markPlayed([current.id], !current.played).catch((cause: unknown) =>
               console.warn("Couldn't change the episode's played mark", cause),
             )
           }}

@@ -10,12 +10,14 @@ import {
 } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { followUpNew } from "@/modules/podcasts/automaticRun"
 import { unsubscribe } from "@/modules/podcasts/db"
 import { refreshShow } from "@/modules/podcasts/dbFeeds"
 import {
   type EpisodeListItem,
   archivedCount,
   arrangeEpisodes,
+  episodesInView,
 } from "@/modules/podcasts/episodeList"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
@@ -37,6 +39,11 @@ export function PodcastShow({ id }: { id: string }) {
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const selection = useSelection()
+  const items = useMemo(
+    () =>
+      show.data ? arrangeEpisodes(episodes.data ?? [], show.data.settings) : [],
+    [episodes.data, show.data],
+  )
   const shows = useMemo(
     () => new Map(show.data ? [[show.data.id, show.data]] : []),
     [show.data],
@@ -46,7 +53,7 @@ export function PodcastShow({ id }: { id: string }) {
     setRefreshing(true)
     setProblem(null)
     try {
-      await refreshShow(id)
+      await followUpNew(await refreshShow(id))
     } catch (cause) {
       setProblem(readableError(cause))
     } finally {
@@ -109,12 +116,12 @@ export function PodcastShow({ id }: { id: string }) {
           {selection.on ? (
             <SelectionBar
               selection={selection}
-              episodes={episodes.data ?? []}
+              episodes={episodesInView(items)}
               shows={shows}
             />
           ) : null}
           <FlatList<EpisodeListItem>
-            data={arrangeEpisodes(episodes.data ?? [], current.settings)}
+            data={items}
             keyExtractor={(item) => item.key}
             contentContainerClassName="px-safe-or-4"
             contentInsetAdjustmentBehavior="automatic"

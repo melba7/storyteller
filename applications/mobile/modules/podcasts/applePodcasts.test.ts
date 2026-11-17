@@ -4,10 +4,12 @@ import { describe, expect, it } from "vitest"
 import {
   type AppleExport,
   feedKey,
+  findShowByFeed,
   parseAppleExport,
   parseSeen,
   planFollows,
   planPlayed,
+  planPlayedOnce,
 } from "./applePodcasts"
 
 const file = (
@@ -194,5 +196,55 @@ describe("parseSeen", () => {
     expect(parseSeen("{}")).toEqual([])
     expect(parseSeen("nope")).toEqual([])
     expect(parseSeen(null)).toEqual([])
+  })
+})
+
+describe("planPlayedOnce", () => {
+  const library = [{ id: "s1", feedUrl: "https://example.com/feed" }]
+  const file = {
+    shows: [],
+    finished: [
+      { feed: "http://www.example.com/feed/", guid: "g1" },
+      { feed: "https://example.com/feed", guid: "g2" },
+      { feed: "https://other.example.com/feed", guid: "g3" },
+    ],
+  }
+
+  it("marks each finished episode once, then leaves it alone", () => {
+    const first = planPlayedOnce(file, library, [])
+    expect(first.plays).toEqual([{ showId: "s1", guids: ["g1", "g2"] }])
+    const second = planPlayedOnce(file, library, first.applied)
+    expect(second.plays).toEqual([])
+    expect(second.applied.sort()).toEqual(first.applied.sort())
+  })
+
+  it("keeps a pair for a show not in the library for when it arrives", () => {
+    const first = planPlayedOnce(file, library, [])
+    expect(first.applied).toHaveLength(2)
+    const later = planPlayedOnce(
+      file,
+      [...library, { id: "s2", feedUrl: "https://other.example.com/feed" }],
+      first.applied,
+    )
+    expect(later.plays).toEqual([{ showId: "s2", guids: ["g3"] }])
+  })
+
+  it("forgets pairs that are no longer in the file", () => {
+    const first = planPlayedOnce(file, library, [])
+    const smaller = { shows: [], finished: [file.finished[1] as never] }
+    expect(
+      planPlayedOnce(smaller, library, first.applied).applied,
+    ).toHaveLength(1)
+  })
+})
+
+describe("findShowByFeed", () => {
+  const shows = [
+    { id: "a", feedUrl: "https://example.com/feed" },
+    { id: "own", feedUrl: "local:files" },
+  ]
+  it("finds a show whatever the spelling of its address", () => {
+    expect(findShowByFeed(shows, "http://www.EXAMPLE.com/feed/")?.id).toBe("a")
+    expect(findShowByFeed(shows, "https://example.com/other")).toBeUndefined()
   })
 })

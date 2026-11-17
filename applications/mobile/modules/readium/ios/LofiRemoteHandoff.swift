@@ -38,6 +38,14 @@ public final class LofiRemoteHandoff: @unchecked Sendable {
         lock.unlock()
     }
 
+    /// Whether a podcast owns the lock screen now. The book then does not resume by itself after
+    /// a call or Siri, because the podcast player does that for its own episode.
+    public var podcastIsActive: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return podcastHandler != nil
+    }
+
     /// The book gets the lock screen back.
     public func clearPodcastHandler() {
         lock.lock()
