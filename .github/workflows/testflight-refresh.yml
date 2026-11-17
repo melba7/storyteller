@@ -18,7 +18,8 @@ on:
   workflow_dispatch:
     inputs:
       force:
-        description: Start a new TestFlight build now, however new the last one is
+        description:
+          Start a new TestFlight build now, however new the last one is
         type: boolean
         default: false
 
