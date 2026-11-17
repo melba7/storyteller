@@ -14,6 +14,7 @@ import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
+import { QueueButtons } from "./QueueButtons"
 import { useEpisode, useShow } from "./hooks"
 
 /** The episode card, shown as a sheet: artwork, details, a big play button and the notes. */
@@ -94,6 +95,7 @@ export function PodcastEpisode({ id }: { id: string }) {
         )}
         <Text>{label}</Text>
       </Button>
+      <QueueButtons episode={current} show={show.data ?? null} />
       <DownloadButton episode={current} size={44} showStatus />
       <View className="w-full pt-2">
         {current.notes === "" ? (

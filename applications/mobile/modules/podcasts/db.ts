@@ -23,6 +23,7 @@ import {
 import { type ActivityByShow } from "./libraryView"
 import { migrationStatements } from "./schema"
 import { type EpisodeHit, hitFromRow, localSearchQuery } from "./search"
+import { removeManyFromUpNext } from "./upNextNative"
 
 let opened: Promise<DB> | null = null
 
@@ -182,14 +183,17 @@ export async function saveArtworkColor(
 }
 
 /**
- * Removes the show and its episodes from the library, and the episodes' downloads. The
+ * Removes the show and its episodes from the library, and the episodes' downloads and
+ * places in Up Next. The
  * downloads go first: if one can't be removed the show stays, so no file is left behind
  * that nothing points to.
  */
 export async function unsubscribe(id: string): Promise<void> {
   const db = await database()
   const found = await rows("SELECT id FROM episodes WHERE show_id = ?", [id])
-  await deleteDownloads(found.map((row) => String(row["id"])))
+  const ids = found.map((row) => String(row["id"]))
+  await deleteDownloads(ids)
+  await removeManyFromUpNext(ids)
   await db.transaction(async (tx) => {
     await tx.execute("DELETE FROM episodes WHERE show_id = ?", [id])
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])

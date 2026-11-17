@@ -11,9 +11,12 @@ import {
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { episodeHref } from "@/modules/podcasts/routes"
+import { queuedLabel } from "@/modules/podcasts/upNext"
 
 import { DownloadButton } from "./DownloadButton"
+import { EpisodeMenu } from "./EpisodeMenu"
 import { PlayButton } from "./PlayButton"
+import { useUpNext } from "./useUpNext"
 
 /**
  * One episode on a show's page: date, title, length or time left, and a download button and a play button whose
@@ -37,6 +40,7 @@ export function EpisodeRow({
   const state = rowState(episode)
   const date = formatEpisodeDate(episode.publishedAt)
   const length = formatEpisodeLength(episode)
+  const queued = queuedLabel(useUpNext(), episode.id)
   return (
     <View
       className={`border-border flex-row items-center gap-3 border-b py-3 ${highlighted ? "bg-secondary rounded-md px-2" : ""}`}
@@ -45,7 +49,7 @@ export function EpisodeRow({
       <Pressable
         className="active:bg-secondary flex-1 gap-1 rounded-md"
         accessibilityRole="button"
-        accessibilityLabel={[episode.title, date, length]
+        accessibilityLabel={[episode.title, date, length, queued]
           .filter((part) => part !== "")
           .join(", ")}
         disabled={!openable}
@@ -57,10 +61,17 @@ export function EpisodeRow({
         <Text className="font-semibold" numberOfLines={2}>
           {episode.title}
         </Text>
-        {length ? (
-          <Text className="text-muted-foreground text-sm">{length}</Text>
+        {length || queued ? (
+          <Text className="text-muted-foreground text-sm">
+            {length}
+            {length && queued ? " · " : ""}
+            {queued ? (
+              <Text className="text-primary text-sm">Up Next</Text>
+            ) : null}
+          </Text>
         ) : null}
       </Pressable>
+      <EpisodeMenu episode={episode} show={show} />
       <DownloadButton episode={episode} />
       <PlayButton episode={episode} show={show} ring={ringFraction(episode)} />
     </View>

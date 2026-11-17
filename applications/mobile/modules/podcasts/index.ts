@@ -58,6 +58,8 @@ export type PlaybackLoadOptions = {
   duration?: number | null
   played: boolean
   autoplay: boolean
+  /** The feed's audio type, kept for Up Next. */
+  audioType: string
 }
 
 /** The episode played to its end. */
@@ -96,7 +98,30 @@ export type DownloadInfo = {
 /** A download changed, or (state "none") was removed. */
 export type DownloadChange = DownloadInfo | { episodeId: string; state: "none" }
 
+/** An episode in Up Next, with what the player needs to start it without JavaScript. */
+export type UpNextItem = {
+  id: string
+  url: string
+  /** The feed's audio type. */
+  type: string
+  title: string
+  showTitle: string
+  artworkUrl?: string | null
+  /** Seconds, when known. */
+  duration?: number | null
+  /** Where the listener left off, in seconds. */
+  position: number
+}
+
+/** The queue changed. `items` is the whole queue, in play order. */
+export type UpNextChange = { items: UpNextItem[] }
+
+/** The player started the next queued episode by itself. */
+export type PlaybackAdvanced = { episodeId: string }
+
 export type PodcastsEvents = {
+  onUpNextChange: (change: UpNextChange) => void
+  onPlaybackAdvanced: (event: PlaybackAdvanced) => void
   onDownloadChange: (change: DownloadChange) => void
   onPlaybackState: (state: PlaybackState) => void
   onPlaybackEnded: (event: PlaybackEnded) => void
@@ -124,6 +149,13 @@ type PodcastsNativeModule = {
   getPlaybackState(): Promise<PlaybackState>
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
+
+  listUpNext(): Promise<UpNextItem[]>
+  /** Puts an episode at the top ("next") or the bottom ("last"). One already queued moves. */
+  addToUpNext(item: UpNextItem, place: "next" | "last"): Promise<void>
+  moveInUpNext(from: number, to: number): Promise<void>
+  removeFromUpNext(id: string): Promise<void>
+  clearUpNext(): Promise<void>
 
   /** Starts downloading an episode. It carries on with the app closed. */
   download(episodeId: string, url: string, type: string): Promise<void>

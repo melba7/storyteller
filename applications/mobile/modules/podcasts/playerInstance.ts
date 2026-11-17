@@ -5,6 +5,7 @@
 import { useEffect, useSyncExternalStore } from "react"
 
 import {
+  getEpisode,
   getShow,
   lastPlayedEpisode,
   saveArtworkColor,
@@ -19,6 +20,7 @@ export const player = createPlayback({
   saveArtworkColor,
   lastPlayedEpisode,
   getShow,
+  getEpisode,
   setInterval: (callback, ms) => setInterval(callback, ms),
   clearInterval: (handle) =>
     clearInterval(handle as ReturnType<typeof setInterval>),

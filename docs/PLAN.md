@@ -366,6 +366,11 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
     the next episode starts by itself with the phone locked.
   - Files: `PodcastKit` (queue), `modules/podcasts/ios`, `podcasts/`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    queue is saved by Swift in `Application Support/Podcasts/up-next.json`; when
+    an episode ends Swift starts the next one itself and JS follows along
+    (`onPlaybackAdvanced`). Not tried on a phone yet: the next episode with the
+    screen locked, swipe actions and drag to reorder.
 
 - [ ] **P2c. New episodes by themselves**
   - Feeds refresh when the app opens and in a background refresh task. Each show

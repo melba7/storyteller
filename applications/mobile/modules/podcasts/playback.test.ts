@@ -73,6 +73,7 @@ function setup(last: StoredEpisode | null = null) {
     saveArtworkColor: vi.fn(() => Promise.resolve()),
     lastPlayedEpisode: vi.fn(() => Promise.resolve(last)),
     getShow: vi.fn(() => Promise.resolve<Show | null>(show)),
+    getEpisode: vi.fn(() => Promise.resolve<StoredEpisode | null>(null)),
     setInterval: vi.fn((callback: () => void, ms: number) => {
       ticks.push({ callback, ms })
       return ticks.length
@@ -97,6 +98,51 @@ function setup(last: StoredEpisode | null = null) {
   return { playback, native, deps, handlers, ticks, state }
 }
 
+describe("an episode that Swift starts from Up Next", () => {
+  it("becomes the loaded episode, with its show", async () => {
+    const next = episode({
+      id: "e2",
+      title: "Episode two",
+      positionSeconds: 90,
+    })
+    const { playback, deps, handlers } = setup()
+    deps.getEpisode.mockResolvedValue(next)
+    await playback.playEpisode(episode(), show)
+    handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
+    await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
+    const view = playback.getView()
+    expect(view.show?.id).toBe("s1")
+    expect(view.loaded).toBe(true)
+    expect(view.position).toBe(90)
+    expect(view.isBuffering).toBe(true)
+  })
+
+  it("then follows that episode's state", async () => {
+    const { playback, deps, handlers } = setup()
+    deps.getEpisode.mockResolvedValue(episode({ id: "e2" }))
+    await playback.playEpisode(episode(), show)
+    handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
+    await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
+    handlers.onPlaybackState?.({
+      episodeId: "e2",
+      position: 5,
+      duration: 600,
+      isPlaying: true,
+      isBuffering: false,
+      rate: 1,
+    })
+    expect(playback.getView()).toMatchObject({ isPlaying: true, position: 5 })
+  })
+
+  it("is ignored when the library does not have the episode", async () => {
+    const { playback, deps, handlers } = setup()
+    await playback.playEpisode(episode(), show)
+    handlers.onPlaybackAdvanced?.({ episodeId: "gone" })
+    await vi.waitFor(() => expect(deps.getEpisode).toHaveBeenCalledWith("gone"))
+    expect(playback.getView().episode?.id).toBe("e1")
+  })
+})
+
 describe("playEpisode", () => {
   it("loads the episode at its saved place and plays it", async () => {
     const { playback, native } = setup()
@@ -111,6 +157,7 @@ describe("playEpisode", () => {
       duration: 600,
       played: false,
       autoplay: true,
+      audioType: "audio/mpeg",
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)

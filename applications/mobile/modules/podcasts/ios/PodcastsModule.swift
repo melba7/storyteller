@@ -21,13 +21,27 @@ struct PlaybackLoadOptions: Record {
   @Field var duration: Double?
   @Field var played: Bool = false
   @Field var autoplay: Bool = true
+  @Field var audioType: String = ""
+}
+
+/// An episode to put in Up Next.
+struct UpNextItemOptions: Record {
+  @Field var id: String = ""
+  @Field var url: String = ""
+  @Field var type: String = ""
+  @Field var title: String = ""
+  @Field var showTitle: String = ""
+  @Field var artworkUrl: String?
+  @Field var duration: Double?
+  @Field var position: Double = 0
 }
 
 public final class PodcastsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("Podcasts")
 
-    Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange")
+    Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
+      "onUpNextChange", "onPlaybackAdvanced")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -65,7 +79,8 @@ public final class PodcastsModule: Module {
       let episode = PodcastPlayer.Episode(
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
-        duration: options.duration, played: options.played, autoplay: options.autoplay)
+        duration: options.duration, played: options.played, autoplay: options.autoplay,
+        type: options.audioType)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -94,6 +109,32 @@ public final class PodcastsModule: Module {
 
     AsyncFunction("getPlaybackState") { () async -> [String: Any] in
       await MainActor.run { PodcastPlayer.shared.state() }
+    }
+
+    // MARK: Up Next
+
+    AsyncFunction("listUpNext") { () async -> [[String: Any]] in
+      await MainActor.run { PodcastPlayer.shared.upNextObjects() }
+    }
+    // Puts an episode at the top ("next") or the bottom ("last"). One already queued moves.
+    AsyncFunction("addToUpNext") { (item: UpNextItemOptions, place: String) async throws in
+      guard let place = QueuePlace(rawValue: place), !item.id.isEmpty else {
+        throw PodcastFetchError(message: "This episode can't be added to Up Next.")
+      }
+      let queued = QueueItem(
+        id: item.id, url: item.url, type: item.type, title: item.title,
+        showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
+        position: item.position)
+      await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
+    }
+    AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
+      await MainActor.run { PodcastPlayer.shared.moveInUpNext(from: from, to: to) }
+    }
+    AsyncFunction("removeFromUpNext") { (id: String) async in
+      await MainActor.run { PodcastPlayer.shared.removeFromUpNext(id) }
+    }
+    AsyncFunction("clearUpNext") { () async in
+      await MainActor.run { PodcastPlayer.shared.clearUpNext() }
     }
 
     // MARK: Downloading

@@ -1,16 +1,18 @@
 // LOFI-FORK: the podcasts section's routes (see FORK.md).
 //
 // A show's page and an episode's page exist in the tabs (Podcasts and Discover; Profile has
-// the episode's card for its Downloads), each in the tab's own stack. Opening one must stay
+// the episode's card for its Downloads, Up Next the same for its queue), each in the tab's own stack. Opening one must stay
 // in the tab you are in, so the link names that tab's group.
 
-/** The tab's group when the screen is in Discover or Profile, else the Podcasts tab's. */
+/** The tab's group when the screen is in Discover, Up Next or Profile, else the Podcasts tab's. */
 export function tabBase(segments: readonly string[]): string {
   const tab = segments.includes("(discover)")
     ? "(discover)"
-    : segments.includes("(profile)")
-      ? "(profile)"
-      : "(library)"
+    : segments.includes("(upnext)")
+      ? "(upnext)"
+      : segments.includes("(profile)")
+        ? "(profile)"
+        : "(library)"
   return `/podcasts/(tabs)/${tab}`
 }
 
