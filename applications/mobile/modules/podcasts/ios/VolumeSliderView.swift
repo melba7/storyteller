@@ -43,6 +43,12 @@ final class VolumeSliderView: ExpoView {
       height: height)
   }
 
+  /// Touches up to half a thumb past either end still reach the slider, so at zero or full
+  /// volume all of the thumb can be grabbed (the drawing stays cut off at the edges).
+  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+    bounds.insetBy(dx: -Self.thumbWidth / 2, dy: 0).contains(point)
+  }
+
   /// True on a light sheet (a dark slider), false on a dark one (a light slider).
   func setLight(_ light: Bool) {
     slider.overrideUserInterfaceStyle = light ? .light : .dark
