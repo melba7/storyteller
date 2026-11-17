@@ -455,15 +455,15 @@ once reviewed and green.
     the transcript follows a playing episode and a tap on a line plays from
     there.
   - Files: `PodcastKit` (the feed's `podcast:transcript` tag),
-    `modules/podcasts` (transcript readers, with tests), `podcasts/` (the
-    transcript in the player).
+    `modules/podcasts` (transcript readers, with tests, adapted from
+    Transcriptator, MIT), `podcasts/` (the transcript in the player).
 
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token
     budget, 2 minutes of overlap), the on-device detector (Foundation Models,
     numbered lines in, line ranges out, each marked an ad or the hosts' own
-    plug), the clean-up rules and the `<sha256>.ads.<detector>.json` file, as in
-    `docs/PODCASTS-PLAN.md`.
+    plug, with how sure it is), the clean-up rules (adapted from MinusPod, MIT)
+    and the `<sha256>.ads.<detector>.json` file, as in `docs/PODCASTS-PLAN.md`.
   - A Mac `.command` finds the ads in a transcribed episode and prints them
     (needs Apple Intelligence on the Mac).
   - Test first: Linux tests with a fake detector: pieces fit the budget and
@@ -531,8 +531,8 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       the end.
 - [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
       from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
-      read in Swift), a chapter list in the player, previous and next chapter,
-      chapter artwork, and skipping a chapter.
+      read with OutcastID3, MIT, copied in), a chapter list in the player,
+      previous and next chapter, chapter artwork, and skipping a chapter.
 - [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
       title you can edit, from the player and as a headphone action; listed per
       episode and in Profile; tap to play from there.
