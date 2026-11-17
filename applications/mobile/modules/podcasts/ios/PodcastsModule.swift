@@ -41,13 +41,15 @@ public final class PodcastsModule: Module {
     Name("Podcasts")
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
-      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange")
+      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onAdsChange")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
       PodcastDownloader.shared.start()
       PodcastTranscriber.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
       PodcastTranscriber.shared.start()
+      PodcastAdFinder.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
+      PodcastAdFinder.shared.start()
       Task { @MainActor [weak self] in
         PodcastPlayer.shared.sink = { name, body in self?.sendEvent(name, body) }
       }
@@ -178,6 +180,14 @@ public final class PodcastsModule: Module {
     AsyncFunction("listTranscripts") { () -> [[String: Any]] in PodcastTranscriber.shared.all() }
     AsyncFunction("getTranscript") { (episodeId: String) -> String? in
       PodcastTranscriber.shared.transcriptJSON(episodeId)
+    }
+
+    // MARK: Ads
+
+    // Where every transcribed episode's ad finding is, and one episode's saved ads as JSON.
+    AsyncFunction("listAds") { () -> [[String: Any]] in PodcastAdFinder.shared.all() }
+    AsyncFunction("getAds") { (episodeId: String) -> String? in
+      PodcastAdFinder.shared.adsJSON(episodeId)
     }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.

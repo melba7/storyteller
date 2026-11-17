@@ -85,6 +85,14 @@ public struct AdsStore: Sendable {
     return file
   }
 
+  /// The detector's result as saved, for the app to read, or nil as for `load`.
+  public func json(detector: String) -> String? {
+    guard load(detector: detector) != nil,
+      let data = try? Data(contentsOf: url(detector: detector))
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
   /// Records that the listener undid the skip of the ad starting at `start`. False when
   /// there is no such ad in the file. Undoing twice is recorded once.
   @discardableResult

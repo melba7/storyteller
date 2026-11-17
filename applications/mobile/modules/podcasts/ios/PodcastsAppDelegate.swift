@@ -16,6 +16,8 @@ public final class PodcastsAppDelegateSubscriber: ExpoAppDelegateSubscriber {
     // A background task has to be registered before the launch is over.
     PodcastTranscriber.registerBackgroundTask()
     PodcastTranscriber.shared.start()
+    PodcastAdFinder.registerBackgroundTask()
+    PodcastAdFinder.shared.start()
     return true
   }
 

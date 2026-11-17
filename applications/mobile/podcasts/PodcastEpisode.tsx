@@ -10,6 +10,7 @@ import {
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 
+import { AdsFound } from "./AdsFound"
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { LinkedNotes } from "./LinkedNotes"
@@ -97,6 +98,7 @@ export function PodcastEpisode({ id }: { id: string }) {
       </Button>
       <QueueButtons episode={current} show={show.data ?? null} />
       <DownloadButton episode={current} size={44} showStatus />
+      <AdsFound episode={current} show={show.data ?? null} />
       <View className="w-full pt-2">
         {current.notes === "" ? (
           <Text className="text-muted-foreground">

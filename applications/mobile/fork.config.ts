@@ -145,6 +145,7 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
         ...tasks,
         `${appId}.soundsImport`,
         `${appId}.podcastTranscribe`,
+        `${appId}.podcastAds`,
       ],
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: {

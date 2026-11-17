@@ -101,6 +101,7 @@ describe("soundEdition", () => {
       BGTaskSchedulerPermittedIdentifiers: [
         `${forkIdentity.appId}.soundsImport`,
         `${forkIdentity.appId}.podcastTranscribe`,
+        `${forkIdentity.appId}.podcastAds`,
       ],
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: { NSAllowsArbitraryLoadsForMedia: true },
@@ -147,6 +148,7 @@ describe("soundEdition", () => {
       "upstream.task",
       `${forkIdentity.appId}.soundsImport`,
       `${forkIdentity.appId}.podcastTranscribe`,
+      `${forkIdentity.appId}.podcastAds`,
     ])
   })
 

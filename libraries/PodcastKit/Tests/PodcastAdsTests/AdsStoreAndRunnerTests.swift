@@ -45,6 +45,14 @@ final class AdsStoreTests: XCTestCase {
     XCTAssertNil(other.load(detector: "fake"))
   }
 
+  func testTheJsonIsGivenOnlyForAFileThatLoads() throws {
+    let store = AdsStore(folder: folder, sha256: sha)
+    XCTAssertNil(store.json(detector: "fake"))
+    try store.save(file())
+    let text = try XCTUnwrap(store.json(detector: "fake"))
+    XCTAssertEqual(try JSONDecoder().decode(AdsFile.self, from: Data(text.utf8)), file())
+  }
+
   func testAFileThatCannotBeReadCountsAsNone() throws {
     let store = AdsStore(folder: folder, sha256: sha)
     try Data("not json".utf8).write(to: store.url(detector: "fake"))
