@@ -1,16 +1,17 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
+import { Link } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import {
   type DirectoryShow,
   searchDirectory,
 } from "@/modules/podcasts/directory"
 import { followLink } from "@/modules/podcasts/followLink"
+import { isFollowLink } from "@/modules/podcasts/followLinkText"
 import { Podcasts } from "@/modules/podcasts/index"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { episodeHref, previewHref, showHref } from "@/modules/podcasts/routes"
@@ -29,14 +30,14 @@ export function Discover() {
   const [results, setResults] = useState<DirectoryShow[]>([])
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
-  const [link, setLink] = useState("")
-  // Whether the pasted link is being followed now.
+  // Set while the link typed into the search bar is being followed.
   const [adding, setAdding] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
   const latestSearch = useRef(0)
 
   useEffect(() => {
-    const trimmed = term.trim()
+    // A link is followed, not searched for.
+    const trimmed = isFollowLink(term) ? "" : term.trim()
     const search = ++latestSearch.current
     if (trimmed === "") {
       setResults([])
@@ -82,6 +83,8 @@ export function Discover() {
   }
 
   const canAdd = Podcasts !== null && adding === null
+  const typed = term.trim() !== ""
+  const isLink = isFollowLink(term)
 
   return (
     <View className="bg-background flex-1">
@@ -93,6 +96,13 @@ export function Discover() {
             <SectionMenuButton current="podcasts" />
           </Stack.Toolbar.View>
         }
+      />
+      <Stack.SearchBar
+        placeholder="Search podcasts or paste a link"
+        autoCapitalize="none"
+        hideWhenScrolling={false}
+        onChangeText={(event) => setTerm(event.nativeEvent.text)}
+        onCancelButtonPress={() => setTerm("")}
       />
       <ScrollView
         contentContainerClassName="px-safe-or-4 gap-3"
@@ -112,21 +122,30 @@ export function Discover() {
           </Text>
         ) : null}
 
-        <Input
-          accessibilityLabel="Search podcasts"
-          placeholder="Search for a podcast"
-          value={term}
-          onChangeText={setTerm}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
+        {isLink ? (
+          <Pressable
+            className="bg-secondary min-h-14 flex-row items-center gap-3 rounded-2xl px-4 py-3 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel="Follow this link"
+            accessibilityState={{ disabled: !canAdd }}
+            disabled={!canAdd}
+            onPress={() => add(term, "link")}
+          >
+            <Icon as={Link} size={22} className="text-primary" />
+            <View className="flex-1">
+              <Text className="font-semibold">Follow this link</Text>
+              <Text className="text-muted-foreground text-sm" numberOfLines={1}>
+                {term.trim()}
+              </Text>
+            </View>
+            {adding === "link" ? <ActivityIndicator /> : null}
+          </Pressable>
+        ) : null}
         {searching ? (
           <ActivityIndicator accessibilityLabel="Searching" />
         ) : searchError ? (
           <Text className="text-destructive text-sm">{searchError}</Text>
-        ) : term.trim() !== "" && results.length === 0 ? (
+        ) : typed && !isLink && results.length === 0 ? (
           <Text className="text-muted-foreground text-sm">
             No podcasts found.
           </Text>
@@ -134,12 +153,12 @@ export function Discover() {
         {results.map((show) => (
           <Pressable
             key={show.id}
-            className="active:bg-secondary flex-row items-center gap-3 rounded-md py-1"
+            className="active:bg-secondary flex-row items-center gap-3 rounded-xl py-1"
             accessibilityRole="button"
             accessibilityLabel={`Preview ${show.title}`}
             onPress={() => router.push(previewHref(segments, show.feedUrl))}
           >
-            <Artwork uri={show.imageUrl} size={56} />
+            <Artwork uri={show.imageUrl} size={64} />
             <View className="flex-1">
               <Text className="font-semibold" numberOfLines={2}>
                 {show.title}
@@ -156,29 +175,7 @@ export function Discover() {
           </Pressable>
         ))}
 
-        <Text className="mt-4 font-semibold">Paste a link</Text>
-        <Input
-          accessibilityLabel="RSS or Apple Podcasts link"
-          placeholder="RSS or Apple Podcasts link"
-          value={link}
-          onChangeText={setLink}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          returnKeyType="go"
-          onSubmitEditing={() => {
-            if (canAdd && link.trim() !== "") void add(link, "link")
-          }}
-        />
-        <Button
-          accessibilityLabel="Add this link"
-          disabled={!canAdd || link.trim() === ""}
-          onPress={() => add(link, "link")}
-        >
-          {adding === "link" ? <ActivityIndicator /> : <Text>Add</Text>}
-        </Button>
-
-        {term.trim() === "" ? (
+        {!typed ? (
           <View className="mt-4 pb-6">
             <DiscoverBrowse />
           </View>

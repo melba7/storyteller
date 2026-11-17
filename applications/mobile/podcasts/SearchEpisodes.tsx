@@ -4,7 +4,6 @@ import { useState } from "react"
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
-import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
 import { searchEpisodes } from "@/modules/podcasts/db"
 import {
@@ -42,19 +41,20 @@ function Segments({
 }) {
   return (
     <View
-      className="bg-secondary flex-row rounded-lg p-1"
+      className="bg-secondary flex-row rounded-full p-1"
       accessibilityRole="tablist"
     >
       {SCOPES.map(({ id, label }) => (
         <Pressable
           key={id}
-          className={`flex-1 items-center rounded-md py-2 ${scope === id ? "bg-background" : ""}`}
+          className={`min-h-10 flex-1 items-center justify-center rounded-full px-2 ${scope === id ? "bg-background" : ""}`}
           accessibilityRole="tab"
           accessibilityState={{ selected: scope === id }}
           onPress={() => onChange(id)}
         >
           <Text
             className={scope === id ? "font-semibold" : "text-muted-foreground"}
+            numberOfLines={1}
           >
             {label}
           </Text>
@@ -157,7 +157,15 @@ export function SearchEpisodes() {
   return (
     <View className="bg-background flex-1">
       <ScreenBar title="Search" />
-      {/* The search box sits above the results, not in a scroll view, so the header is solid. */}
+      <Stack.SearchBar
+        placeholder="Search for an episode"
+        autoCapitalize="none"
+        autoFocus
+        hideWhenScrolling={false}
+        onChangeText={(event) => setTerm(event.nativeEvent.text)}
+        onCancelButtonPress={() => setTerm("")}
+      />
+      {/* The scope control sits above the results, not in a scroll view, so the header is solid. */}
       <Stack.Screen
         options={{
           headerTransparent: false,
@@ -165,17 +173,6 @@ export function SearchEpisodes() {
         }}
       />
       <View className="px-safe-or-4 gap-3 pb-2">
-        <Input
-          accessibilityLabel="Search episodes"
-          placeholder="Search for an episode"
-          value={term}
-          onChangeText={setTerm}
-          autoFocus
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
         <Segments scope={scope} onChange={setScope} />
       </View>
       {state.searching ? (

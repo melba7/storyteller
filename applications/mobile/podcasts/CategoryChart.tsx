@@ -51,10 +51,13 @@ export function CategoryChart({ id }: { id: string }) {
               accessibilityLabel={`${item.title}, number ${index + 1}`}
               onPress={() => open(item.feedUrl)}
             >
-              <Text className="text-muted-foreground w-7 text-right">
+              <Text
+                className="text-muted-foreground min-w-10 text-right text-2xl font-bold"
+                style={{ fontVariant: ["tabular-nums"] }}
+              >
                 {index + 1}
               </Text>
-              <Artwork uri={item.imageUrl} size={56} />
+              <Artwork uri={item.imageUrl} size={64} />
               <View className="flex-1">
                 <Text className="font-semibold" numberOfLines={2}>
                   {item.title}

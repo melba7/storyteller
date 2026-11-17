@@ -6,6 +6,7 @@ import { type Show } from "@/modules/podcasts/library"
 import { badgeLabel } from "@/modules/podcasts/libraryView"
 
 import { Artwork } from "./Artwork"
+import { PressableScale } from "./PressableScale"
 
 /** The grids' gutter around the cells and the gap between them, in points. */
 export const GRID_GUTTER = 16
@@ -28,7 +29,7 @@ function Badge({ count, className }: { count: number; className?: string }) {
   if (text === "") return null
   return (
     <View
-      className={`bg-primary h-5 min-w-5 items-center justify-center rounded-full px-1.5 ${className ?? ""}`}
+      className={`bg-primary border-background min-h-5 min-w-5 items-center justify-center rounded-full border-2 px-1.5 ${className ?? ""}`}
     >
       <Text className="text-primary-foreground text-xs font-semibold">
         {text}
@@ -51,16 +52,15 @@ export function ShowCell({
   onPress,
 }: Props & { size: number }) {
   return (
-    <Pressable
-      className="active:opacity-70"
+    <PressableScale
       style={{ width: size, marginBottom: GRID_GAP }}
       accessibilityRole="button"
       accessibilityLabel={label(show, count)}
       onPress={onPress}
     >
       <Artwork uri={show.imageUrl} size={size} />
-      <Badge count={count} className="absolute top-1 right-1" />
-    </Pressable>
+      <Badge count={count} className="absolute -top-1.5 -right-1.5" />
+    </PressableScale>
   )
 }
 

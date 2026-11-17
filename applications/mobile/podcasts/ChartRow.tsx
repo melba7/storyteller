@@ -1,14 +1,15 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { Pressable, ScrollView, View } from "react-native"
+import { ScrollView, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { type ChartShow } from "@/modules/podcasts/charts"
 import { previewHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
+import { PressableScale } from "./PressableScale"
 
-const TILE = 112
+export const TILE = 140
 
 /** Opens a chart show's preview in the tab you are in. */
 export function useOpenPreview() {
@@ -21,14 +22,13 @@ export function useOpenPreview() {
 export function ShowTile({ show, note }: { show: ChartShow; note?: string }) {
   const open = useOpenPreview()
   return (
-    <Pressable
-      className="active:opacity-70"
+    <PressableScale
       style={{ width: TILE }}
       accessibilityRole="button"
       accessibilityLabel={`${show.title}${show.author ? `, ${show.author}` : ""}`}
       onPress={() => open(show.feedUrl)}
     >
-      <Artwork uri={show.imageUrl} size={TILE} className="rounded-xl" />
+      <Artwork uri={show.imageUrl} size={TILE} />
       <Text className="mt-1 text-sm font-semibold" numberOfLines={2}>
         {show.title}
       </Text>
@@ -37,7 +37,7 @@ export function ShowTile({ show, note }: { show: ChartShow; note?: string }) {
           {note}
         </Text>
       ) : null}
-    </Pressable>
+    </PressableScale>
   )
 }
 
@@ -53,9 +53,11 @@ export function ChartRow({
 }) {
   return (
     <View className="gap-2">
-      <Text className="font-semibold">{title}</Text>
+      <Text className="text-xl font-bold" accessibilityRole="header">
+        {title}
+      </Text>
       {note ? (
-        <Text className="text-muted-foreground -mt-1 text-xs">{note}</Text>
+        <Text className="text-muted-foreground -mt-1 text-sm">{note}</Text>
       ) : null}
       <ScrollView
         horizontal

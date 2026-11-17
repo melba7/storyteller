@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
+import { Podcast } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -25,6 +26,7 @@ import {
 import { readableError } from "@/modules/podcasts/nativeError"
 import { showHref } from "@/modules/podcasts/routes"
 
+import { EmptyState } from "./EmptyState"
 import {
   GRID_GAP,
   GRID_GUTTER,
@@ -218,15 +220,25 @@ export function PodcastsHome() {
           }
           ListHeaderComponent={
             refreshProblem ? (
-              <Text className="text-destructive py-2 text-sm">
-                {refreshProblem}
-              </Text>
+              <View className="bg-destructive/10 mb-3 rounded-xl p-3">
+                <Text
+                  className="text-destructive text-sm"
+                  accessibilityRole="alert"
+                >
+                  {refreshProblem}
+                </Text>
+              </View>
             ) : undefined
           }
           ListEmptyComponent={
-            <Message
+            <EmptyState
+              icon={Podcast}
               title="No podcasts yet"
-              body="Tap the plus button to search for a show or paste its RSS link."
+              body="Search for a show, or paste its RSS or Apple Podcasts link."
+              action={{
+                label: "Find a podcast",
+                onPress: () => router.navigate("/podcasts/discover"),
+              }}
             />
           }
           renderItem={renderShow}
