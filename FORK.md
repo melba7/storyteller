@@ -155,8 +155,11 @@ Mo chose on 2026-11-17 to give every Books screen the Apple Podcasts look
 merging in those files. The restyled upstream files carry no markers; they are
 listed in `allowedChanges` in `touchpoints.json`. The edits change how things
 are drawn (class names, wrappers, layout), not what they do, and shared pieces
-live in `applications/mobile/apple-look/`. When a sync conflicts in one of these
-files, take upstream's change to the logic and keep the fork's styling.
+live in `applications/mobile/apple-look/`. The look adds one dependency,
+`expo-glass-effect` (already installed by expo-router), for the Liquid Glass of
+the mini player and the reader's bar, so `package.json` and `yarn.lock` are
+listed too. When a sync conflicts in one of these files, take upstream's change
+to the logic and keep the fork's styling.
 
 `node tools/fork/check-fork.mjs` enforces all of this. It fails when a marker
 disappears, when an unregistered file carries a marker, when the fork commits an

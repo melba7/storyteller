@@ -12,9 +12,14 @@ import {
 
 interface Props {
   mode: "text" | "audio"
+  /** Colour class for the icon. */
+  iconClassName?: string
 }
 
-export function NavigationItem({ mode }: Props) {
+export function NavigationItem({
+  mode,
+  iconClassName = "text-foreground",
+}: Props) {
   const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
   const format = useAppSelector(getCurrentlyPlayingFormat) ?? "readaloud"
 
@@ -23,6 +28,7 @@ export function NavigationItem({ mode }: Props) {
       accessibilityLabel="Open navigation menu"
       variant="ghost"
       size="icon"
+      className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
       disabled={!bookUuid}
       onPress={() => {
         if (!bookUuid) return
@@ -35,7 +41,7 @@ export function NavigationItem({ mode }: Props) {
         })
       }}
     >
-      <Icon as={TableOfContentsIcon} size={24} />
+      <Icon as={TableOfContentsIcon} size={24} className={iconClassName} />
     </Button>
   )
 }

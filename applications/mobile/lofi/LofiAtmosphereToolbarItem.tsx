@@ -24,6 +24,8 @@ import { useLofiAtmosphere } from "./useLofiAtmosphere"
 type Props = {
   /** The toolbar's screen: the reader ("text") or the listening screen. */
   mode: "audio" | "text"
+  /** Colour class for the icon. */
+  iconClassName?: string
 }
 
 /**
@@ -31,7 +33,10 @@ type Props = {
  * how much is going on, and the car setting. Shown for readaloud books, where
  * there is text to follow.
  */
-export function LofiAtmosphereToolbarItem({ mode }: Props) {
+export function LofiAtmosphereToolbarItem({
+  mode,
+  iconClassName = "text-foreground",
+}: Props) {
   const [open, setOpen] = useState(false)
   const atmosphere = useLofiAtmosphere(open ? 1500 : 15000)
   const insets = useSafeAreaInsets()
@@ -78,7 +83,7 @@ export function LofiAtmosphereToolbarItem({ mode }: Props) {
         }
         variant="ghost"
         size="icon"
-        className="h-10 w-12 sm:h-9 sm:w-11"
+        className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
         onPress={() => {
           setOpen(true)
         }}
@@ -86,7 +91,7 @@ export function LofiAtmosphereToolbarItem({ mode }: Props) {
         <Icon
           as={AudioLines}
           size={24}
-          className={cn(!enabled && "opacity-40")}
+          className={cn(iconClassName, !enabled && "opacity-40")}
         />
       </Button>
       <Modal

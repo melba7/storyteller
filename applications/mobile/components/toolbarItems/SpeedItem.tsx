@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Slider } from "@/components/ui/slider"
 import { Text } from "@/components/ui/text"
+import { cn } from "@/lib/utils"
 import { useAppSelector } from "@/store/appState"
 import {
   useGetBookPreferencesQuery,
@@ -155,7 +156,12 @@ export function SpeedMenuContent({
   )
 }
 
-export function SpeedItem() {
+type Props = {
+  /** Colour class for the icon and the speed label. */
+  iconClassName?: string
+}
+
+export function SpeedItem({ iconClassName = "text-foreground" }: Props) {
   const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
   const currentSpeed = useAppSelector(getPlaybackRate)
 
@@ -166,7 +172,7 @@ export function SpeedItem() {
       accessibilityLabel={`Playback speed, ${currentSpeed}x`}
       variant="ghost"
       size="icon"
-      className="h-10 w-12 sm:h-9 sm:w-11"
+      className="h-11 min-w-11 rounded-full px-2 sm:h-11 sm:min-w-11"
       onPress={() => {
         router.push({
           pathname: "/speed-menu",
@@ -175,15 +181,15 @@ export function SpeedItem() {
       }}
     >
       {currentSpeed === 1 ? (
-        <Icon as={Gauge} size={24} />
+        <Icon as={Gauge} size={24} className={iconClassName} />
       ) : (
         <Text
           numberOfLines={1}
           minimumFontScale={1}
           maxFontSizeMultiplier={1}
-          className="px-2 text-xs font-bold"
+          className={cn("text-[15px] font-semibold", iconClassName)}
         >
-          {currentSpeed}x
+          {currentSpeed}×
         </Text>
       )}
     </Button>

@@ -5,7 +5,10 @@ import {
   progressViewStyle,
   tint,
 } from "@expo/ui/swift-ui/modifiers"
+import { useState } from "react"
 import { Platform, View } from "react-native"
+import { Gesture, GestureDetector } from "react-native-gesture-handler"
+import { scheduleOnRN } from "react-native-worklets"
 import { useCSSVariable } from "uniwind"
 
 import { cn } from "@/lib/utils"
@@ -22,6 +25,11 @@ type Props = {
   onProgressChange?: ((newProgress: number) => void) | undefined
   onPanStart?: (() => void) | undefined
   onPanStop?: (() => void) | undefined
+  /** Draws Apple's slim rounded bar (the players) instead of the platform's. */
+  slim?: boolean
+  /** Classes for the slim bar's track and its filled part. */
+  trackClassName?: string | undefined
+  fillClassName?: string | undefined
 }
 
 function clamp(value: number, min: number, max: number) {
@@ -88,6 +96,91 @@ function ReadOnlyProgressBar({
   )
 }
 
+function SlimProgressBar({
+  accessibilityLabel,
+  className,
+  start,
+  step,
+  stop,
+  progress,
+  trackClassName,
+  fillClassName,
+  onProgressChange,
+  onPanStart,
+  onPanStop,
+}: Required<Pick<Props, "progress" | "start" | "stop" | "step">> &
+  Omit<Props, "progress" | "start" | "stop" | "step" | "slim">) {
+  const [width, setWidth] = useState(0)
+  const hasUsableRange = stop > start
+  const boundedProgress = hasUsableRange ? clamp(progress, start, stop) : start
+  const fraction = hasUsableRange
+    ? (boundedProgress - start) / (stop - start)
+    : 0
+
+  const seekToX = (x: number) => {
+    if (!onProgressChange || !hasUsableRange || width <= 0) return
+    const raw = start + clamp(x / width, 0, 1) * (stop - start)
+    const aligned = step > 0 ? Math.round((raw - start) / step) * step + start : raw
+    onProgressChange(clamp(aligned, start, stop))
+  }
+  const jump = Math.max(step, (stop - start) / 20)
+
+  // The touch starts the seek at once, so a tap on the bar jumps there.
+  const gesture = Gesture.Pan()
+    .enabled(!!onProgressChange)
+    .minDistance(0)
+    .onBegin((event) => {
+      "worklet"
+      if (onPanStart) scheduleOnRN(onPanStart)
+      scheduleOnRN(seekToX, event.x)
+    })
+    .onUpdate((event) => {
+      "worklet"
+      scheduleOnRN(seekToX, event.x)
+    })
+    .onFinalize(() => {
+      "worklet"
+      if (onPanStop) scheduleOnRN(onPanStop)
+    })
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <View
+        accessibilityLabel={accessibilityLabel}
+        accessibilityRole={onProgressChange ? "adjustable" : "progressbar"}
+        accessibilityValue={
+          hasUsableRange
+            ? { min: start, max: stop, now: boundedProgress }
+            : undefined
+        }
+        accessibilityActions={
+          onProgressChange
+            ? [{ name: "increment" }, { name: "decrement" }]
+            : undefined
+        }
+        onAccessibilityAction={(event) => {
+          if (!onProgressChange) return
+          const delta = event.nativeEvent.actionName === "increment" ? jump : -jump
+          onProgressChange(clamp(boundedProgress + delta, start, stop))
+        }}
+        className={cn("justify-center", className)}
+        onLayout={(event) => {
+          setWidth(event.nativeEvent.layout.width)
+        }}
+      >
+        <View
+          className={cn("bg-foreground/15 h-1.5 overflow-hidden rounded-full", trackClassName)}
+        >
+          <View
+            className={cn("bg-foreground/60 h-full rounded-full", fillClassName)}
+            style={{ width: `${fraction * 100}%` }}
+          />
+        </View>
+      </View>
+    </GestureDetector>
+  )
+}
+
 export function ProgressBar({
   accessibilityLabel,
   className,
@@ -98,7 +191,28 @@ export function ProgressBar({
   onProgressChange,
   onPanStart,
   onPanStop,
+  slim,
+  trackClassName,
+  fillClassName,
 }: Props) {
+  if (slim) {
+    return (
+      <SlimProgressBar
+        accessibilityLabel={accessibilityLabel}
+        className={className}
+        start={start}
+        step={step}
+        stop={stop}
+        progress={progress}
+        trackClassName={trackClassName}
+        fillClassName={fillClassName}
+        onProgressChange={onProgressChange}
+        onPanStart={onPanStart}
+        onPanStop={onPanStop}
+      />
+    )
+  }
+
   if (onProgressChange) {
     return (
       <View {...(className && { className })}>

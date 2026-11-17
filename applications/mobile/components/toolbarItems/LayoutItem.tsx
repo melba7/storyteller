@@ -12,7 +12,12 @@ import {
 } from "@/store/localApi"
 import { getCurrentlyPlayingBookUuid } from "@/store/selectors/bookshelfSelectors"
 
-export function LayoutItem() {
+type Props = {
+  /** Colour class for the icon. */
+  iconClassName?: string
+}
+
+export function LayoutItem({ iconClassName = "text-foreground" }: Props) {
   const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
   const { data: bookPreferences } = useGetBookPreferencesQuery(
     bookUuid ? { uuid: bookUuid } : skipToken,
@@ -37,6 +42,7 @@ export function LayoutItem() {
       accessibilityState={{ selected: isScrollLayout }}
       variant="ghost"
       size="icon"
+      className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
       disabled={!bookUuid || !preferences}
       onPress={() => {
         if (!bookUuid || !preferences) return
@@ -49,7 +55,11 @@ export function LayoutItem() {
         updateBookPreference({ bookUuid, name: "layout", value })
       }}
     >
-      <Icon as={isScrollLayout ? ScrollText : Columns2} size={24} />
+      <Icon
+        as={isScrollLayout ? ScrollText : Columns2}
+        size={24}
+        className={iconClassName}
+      />
     </Button>
   )
 }

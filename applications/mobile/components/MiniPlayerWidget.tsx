@@ -2,7 +2,6 @@ import { skipToken } from "@reduxjs/toolkit/query"
 import { Link } from "expo-router"
 import { useEffect, useMemo, useState } from "react"
 import {
-  Platform,
   TouchableOpacity,
   View,
   type ViewStyle,
@@ -17,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 
+import { GlassCapsule } from "@/apple-look/GlassCapsule"
 import { playerPositionSeeked } from "@/store/actions"
 import { useAppDispatch, useAppSelector } from "@/store/appState"
 import { useGetBookQuery } from "@/store/localApi"
@@ -47,7 +47,6 @@ export function MiniPlayerWidget() {
 
   const dispatch = useAppDispatch()
   const [eagerProgress, setEagerProgress] = useState(progress)
-  const [progressBarHeight, setProgressBarHeight] = useState(0)
 
   const formattedEagerProgress = useMemo(() => {
     return formatTime(eagerProgress, rate)
@@ -110,83 +109,68 @@ export function MiniPlayerWidget() {
 
   return (
     <Animated.View
-      className="mb-safe-offset-2 right-safe-or-3 left-safe-or-3 absolute bottom-0 z-90 rounded-lg"
+      className="mb-safe-offset-2 right-safe-or-3 left-safe-or-3 absolute bottom-0 z-90"
       style={widgetAnimatedStyle}
     >
-      <View
-        className={
-          "bg-background shadow-foreground/50 ios:rounded-t-none rounded-lg shadow-sm"
-        }
-      >
-        {book && (
-          <View>
-            <View
-              onLayout={(event) => {
-                const { height } = event.nativeEvent.layout
-                setProgressBarHeight((currentHeight) =>
-                  currentHeight === height ? currentHeight : height,
-                )
-              }}
-              style={{
-                transform: [
-                  {
-                    translateY: Platform.select({
-                      ios: -progressBarHeight / 2 + 3,
-                      default: -progressBarHeight / 3 + 3,
-                    }),
-                  },
-                ],
-                marginBottom: Platform.select({
-                  ios: -progressBarHeight / 2 + 2,
-                  default: undefined,
-                }),
-              }}
-            >
-              <ProgressBar
-                accessibilityLabel="Mini player progress"
-                start={startPosition}
-                stop={endPosition}
-                progress={eagerProgress}
-                onProgressChange={(value) => {
-                  setEagerProgress(value)
-                  dispatch(playerPositionSeeked({ progress: value }))
+      {book && (
+        <GlassCapsule className="h-14">
+          <GestureDetector gesture={panGesture}>
+            <View className="h-14 flex-row items-center gap-2 pr-2">
+              <Link
+                href={{
+                  pathname: "/listen/[uuid]",
+                  params: { uuid: bookUuid, format },
                 }}
-              />
-            </View>
-
-            <GestureDetector gesture={panGesture}>
-              <View className="mb-2 flex-row items-center justify-between gap-6 pr-8">
-                <Link
-                  href={{
-                    pathname: "/listen/[uuid]",
-                    params: { uuid: bookUuid, format },
-                  }}
-                  asChild
+                asChild
+              >
+                <TouchableOpacity
+                  accessibilityLabel={`Open audio player for ${book.title}`}
+                  accessibilityRole="button"
+                  className="flex-1 flex-row items-center gap-3 pl-2"
                 >
-                  <TouchableOpacity
-                    accessibilityLabel={`Open audio player for ${book.title}`}
-                    accessibilityRole="button"
-                    className="shrink flex-row items-center justify-between gap-6 px-6"
+                  <View
+                    className="border-foreground/10 h-10 w-10 overflow-hidden border"
+                    style={{ borderRadius: 6 }}
                   >
-                    <View className="h-10 w-10">
-                      <AudiobookCover book={book} style={{ borderRadius: 4 }} />
-                    </View>
-                    <View>
-                      <Text numberOfLines={1} className="text-sm">
-                        {book.title}
-                      </Text>
-                      <Text numberOfLines={1} className="text-sm">
-                        {formattedProgress}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                </Link>
-                <PlayPause />
-              </View>
-            </GestureDetector>
+                    <AudiobookCover book={book} />
+                  </View>
+                  <View className="flex-1">
+                    <Text
+                      numberOfLines={1}
+                      className="text-[15px] font-semibold"
+                    >
+                      {book.title}
+                    </Text>
+                    <Text
+                      numberOfLines={1}
+                      className="text-muted-foreground text-[13px]"
+                    >
+                      {formattedProgress}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Link>
+              <PlayPause />
+            </View>
+          </GestureDetector>
+          <View className="absolute right-6 bottom-0 left-6">
+            <ProgressBar
+              slim
+              className="h-2"
+              trackClassName="bg-foreground/10 h-[3px]"
+              fillClassName="bg-foreground/50"
+              accessibilityLabel="Mini player progress"
+              start={startPosition}
+              stop={endPosition}
+              progress={eagerProgress}
+              onProgressChange={(value) => {
+                setEagerProgress(value)
+                dispatch(playerPositionSeeked({ progress: value }))
+              }}
+            />
           </View>
-        )}
-      </View>
+        </GlassCapsule>
+      )}
     </Animated.View>
   )
 }
