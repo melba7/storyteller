@@ -28,6 +28,7 @@ extension PodcastPlayer {
     switch timer.kind {
     case .countdown: return ["kind": "countdown", "endsAt": timer.endsAt * 1000]
     case .endOfEpisode: return ["kind": "endOfEpisode"]
+    case .endOfChapter: return ["kind": "endOfChapter", "chapterEnd": timer.endsAt]
     }
   }
 
@@ -44,6 +45,15 @@ extension PodcastPlayer {
 
   func sleepUntilEndOfEpisode() { setSleep(.endOfEpisode) }
 
+  /// Stops where the chapter playing now ends. False when the episode has no chapter here.
+  @discardableResult
+  func sleepUntilEndOfChapter() -> Bool {
+    guard let end = currentChapterEnd(), let timer = SleepTimer.endOfChapter(endingAt: end)
+    else { return false }
+    setSleep(timer)
+    return true
+  }
+
   /// Adds 5 minutes while a countdown runs.
   func extendSleep() {
     guard let timer = SleepState.shared.timer, timer.kind == .countdown else { return }
@@ -59,7 +69,12 @@ extension PodcastPlayer {
 
   /// Called with every tick of the clock: turns the volume down in the last 10 seconds.
   func sleepTick() {
-    guard let timer = SleepState.shared.timer, timer.kind == .countdown else { return }
+    guard let timer = SleepState.shared.timer else { return }
+    if timer.kind == .endOfChapter {
+      chapterSleepTick(timer)
+      return
+    }
+    guard timer.kind == .countdown else { return }
     if timer.isFinished(at: Self.clock) {
       sleepRanOut()
     } else {
@@ -73,6 +88,20 @@ extension PodcastPlayer {
     guard SleepState.shared.timer?.stopsBeforeNextEpisode == true else { return false }
     cancelSleep()
     return true
+  }
+
+  /// The end-of-chapter timer, checked with every tick: pause at the chapter's end, and let the
+  /// timer go when the listener has moved well past it.
+  private func chapterSleepTick(_ timer: SleepTimer) {
+    guard wantsToPlay else { return }
+    switch timer.chapterStatus(at: position) {
+    case .waiting: break
+    case .reached:
+      SleepState.shared.timer = nil
+      pause()
+      sink?("onSleepTimerChange", sleepObject())
+    case .passed: cancelSleep()
+    }
   }
 
   private func setSleep(_ timer: SleepTimer) {

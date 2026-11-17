@@ -68,8 +68,10 @@ Files and folders that belong to the fork, which upstream never touches:
 - `libraries/PodcastKit/`: the Swift package for the Podcasts section. It holds
   the feed reader (`PodcastFeed`) and the player's rules (`PodcastPlayback`),
   the transcripts and the ad finder (`PodcastAds`, with the Apple-only
-  `PodcastAdsOnDevice`), each with a podspec so CocoaPods builds it from source
-  for the app.
+  `PodcastAdsOnDevice`) and the chapters (`PodcastChapters`: the feed's JSON
+  chapters, an ID3 reader written from the ID3v2.3 and v2.4 specs, and the rules
+  for the current, previous and next chapter and for skipping), each with a
+  podspec so CocoaPods builds it from source for the app.
 - `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
   a feed, reads it with `PodcastFeed` and plays episodes) and the JavaScript
   side: the library in its own SQLite file (`podcasts.db`), Apple's directory

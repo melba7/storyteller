@@ -289,6 +289,7 @@ export function createPlayback(deps: PlaybackDeps) {
         played: episode.played,
         autoplay: true,
         audioType: episode.audioType,
+        chaptersUrl: episode.chaptersUrl,
       }),
     )
     if (show) tintFor(show).catch(() => {})

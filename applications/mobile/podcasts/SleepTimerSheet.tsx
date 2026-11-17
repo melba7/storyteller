@@ -16,12 +16,14 @@ import {
   sleepSecondsLeft,
 } from "@/modules/podcasts/sleepTimer"
 
+import { useChapters } from "./useChapters"
 import { sleepTimer, useNow, useSleepTimer } from "./useSleepTimer"
 
 /** The moon button: opens the sleep timer choices and shows the time left on itself. */
 export function SleepTimerButton() {
   const state = useSleepTimer()
   const view = usePlayer()
+  const chapters = useChapters(view.episode?.id ?? "")
   const [open, setOpen] = useState(false)
   const now = useNow(state.kind === "countdown")
   const left = sleepSecondsLeft(
@@ -61,6 +63,7 @@ export function SleepTimerButton() {
         <SleepSheet
           running={state.kind !== "none"}
           counting={state.kind === "countdown"}
+          hasChapters={chapters.length > 0}
           onClose={() => setOpen(false)}
         />
       </Modal>
@@ -71,10 +74,12 @@ export function SleepTimerButton() {
 function SleepSheet({
   running,
   counting,
+  hasChapters,
   onClose,
 }: {
   running: boolean
   counting: boolean
+  hasChapters: boolean
   onClose: () => void
 }) {
   const [typed, setTyped] = useState("")
@@ -102,6 +107,12 @@ function SleepSheet({
             onPress={() => choose(() => sleepTimer.startMinutes(minutes))}
           />
         ))}
+        {hasChapters ? (
+          <Choice
+            label="End of chapter"
+            onPress={() => choose(sleepTimer.endOfChapter)}
+          />
+        ) : null}
         <Choice
           label="End of episode"
           onPress={() => choose(sleepTimer.endOfEpisode)}

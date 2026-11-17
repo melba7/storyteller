@@ -30,6 +30,7 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    chaptersUrl: null,
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,
@@ -165,6 +166,7 @@ describe("playEpisode", () => {
       played: false,
       autoplay: true,
       audioType: "audio/mpeg",
+      chaptersUrl: null,
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)

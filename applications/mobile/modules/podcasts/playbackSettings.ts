@@ -4,7 +4,7 @@
 // settings live in Swift (PodcastPlayback's PlaybackSettings, kept in UserDefaults) because the
 // player uses them with the screen locked; playbackSettingsStore.ts talks to it.
 
-export type HeadphoneNext = "skip" | "nextEpisode"
+export type HeadphoneNext = "skip" | "nextEpisode" | "nextChapter"
 
 export type PlaybackSettings = {
   /** Seconds the back button jumps. */
@@ -18,6 +18,12 @@ export type PlaybackSettings = {
   /** Go back 3 seconds after a 5-minute pause and 10 after an hour. */
   rewindAfterPause: boolean
 }
+
+export const HEADPHONE_NEXT_CHOICES = [
+  "skip",
+  "nextEpisode",
+  "nextChapter",
+] as const satisfies readonly HeadphoneNext[]
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 45, 60] as const
 export const MARK_PLAYED_CHOICES = [0, 10, 30, 60] as const
@@ -52,7 +58,9 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       defaults.skipForward,
     ),
     headphoneNext:
-      record["headphoneNext"] === "nextEpisode" ? "nextEpisode" : "skip",
+      HEADPHONE_NEXT_CHOICES.find(
+        (choice) => choice === record["headphoneNext"],
+      ) ?? defaults.headphoneNext,
     markPlayedWhenLeft: oneOf(
       record["markPlayedWhenLeft"],
       MARK_PLAYED_CHOICES,
@@ -60,6 +68,12 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
     ),
     rewindAfterPause: record["rewindAfterPause"] === true,
   }
+}
+
+/** The words for each choice of the headphones' next button. */
+export function headphoneNextLabel(choice: HeadphoneNext): string {
+  if (choice === "nextEpisode") return "Next in Up Next"
+  return choice === "nextChapter" ? "Next chapter" : "Skip ahead"
 }
 
 /** "5 s", "1 min". */

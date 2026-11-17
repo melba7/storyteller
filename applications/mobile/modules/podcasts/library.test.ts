@@ -55,6 +55,7 @@ function fetched(
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    chaptersUrl: null,
     ...overrides,
   }
 }
@@ -249,6 +250,7 @@ describe("rows", () => {
       number: null,
       transcriptUrl: null,
       transcriptType: null,
+      chaptersUrl: null,
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
@@ -365,6 +367,19 @@ describe("an episode's transcript", () => {
     expect(update[0]?.episode.transcriptUrl).toBe("https://x.test/g.vtt")
   })
 
+  it("keeps the chapters address of the feed", () => {
+    expect(fetchedEpisode(feedEpisode).chaptersUrl).toBeNull()
+    expect(
+      fetchedEpisode({ ...feedEpisode, chaptersUrl: "https://x.test/c.json" })
+        .chaptersUrl,
+    ).toBe("https://x.test/c.json")
+    const { update } = mergeEpisodes(
+      [stored("g")],
+      [fetched("g", { chaptersUrl: "https://x.test/c.json" })],
+    )
+    expect(update).toHaveLength(1)
+  })
+
   it("is read from the database row", () => {
     const row = {
       id: "e",
@@ -378,6 +393,11 @@ describe("an episode's transcript", () => {
       transcript_type: "text/vtt",
     }
     expect(episodeFromRow(row).transcriptUrl).toBe("https://x.test/g.vtt")
+    expect(episodeFromRow(row).chaptersUrl).toBeNull()
+    expect(
+      episodeFromRow({ ...row, chapters_url: "https://x.test/c.json" })
+        .chaptersUrl,
+    ).toBe("https://x.test/c.json")
     expect(
       episodeFromRow({ ...row, transcript_url: null }).transcriptType,
     ).toBe("text/vtt")

@@ -65,6 +65,17 @@ final class PlaybackSettingsTests: XCTestCase {
     XCTAssertEqual(settings.nextAction(queueHasNext: false), .skip(seconds: 30))
   }
 
+  func testNextCanGoToTheNextChapter() {
+    var settings = PlaybackSettings(values: ["headphoneNext": "nextChapter"])
+    XCTAssertEqual(settings.headphoneNext, .nextChapter)
+    XCTAssertEqual(settings.nextAction(queueHasNext: true, chapterAhead: true), .nextChapter)
+    // In the last chapter, or with none, it skips ahead.
+    settings.skipForward = 30
+    XCTAssertEqual(settings.nextAction(queueHasNext: true, chapterAhead: false), .skip(seconds: 30))
+    XCTAssertEqual(settings.nextAction(queueHasNext: true), .skip(seconds: 30))
+    XCTAssertEqual(settings.values["headphoneNext"] as? String, "nextChapter")
+  }
+
   func testPreviousIsTheSkipBackAmount() {
     var settings = PlaybackSettings()
     settings.skipBack = 5

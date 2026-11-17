@@ -81,6 +81,26 @@ final class SleepTimerTests: XCTestCase {
     XCTAssertFalse(countdown.stopsBeforeNextEpisode)
   }
 
+  func testEndOfChapterWaitsForTheChapterEndThenStops() throws {
+    let timer = try XCTUnwrap(SleepTimer.endOfChapter(endingAt: 600))
+    XCTAssertEqual(timer.kind, .endOfChapter)
+    XCTAssertNil(timer.remaining(at: 100))
+    XCTAssertEqual(timer.volume(at: 1e9), 1)
+    XCTAssertEqual(timer.chapterStatus(at: 300), .waiting)
+    XCTAssertEqual(timer.chapterStatus(at: 599.4), .waiting)
+    XCTAssertEqual(timer.chapterStatus(at: 599.6), .reached)
+    XCTAssertEqual(timer.chapterStatus(at: 601), .reached)
+    // The listener moved on well past the end: the timer no longer means anything.
+    XCTAssertEqual(timer.chapterStatus(at: 700), .passed)
+    XCTAssertTrue(timer.stopsBeforeNextEpisode)
+  }
+
+  func testOnlyAChapterTimerHasAChapterStatus() throws {
+    XCTAssertEqual(SleepTimer.endOfEpisode.chapterStatus(at: 5), .waiting)
+    XCTAssertNil(SleepTimer.endOfChapter(endingAt: .nan))
+    XCTAssertNil(SleepTimer.endOfChapter(endingAt: -1))
+  }
+
   func testOwnTimeIsWholeMinutesFromOneToTwelveHours() {
     XCTAssertEqual(SleepTimer.customMinutes("20"), 20)
     XCTAssertEqual(SleepTimer.customMinutes(" 90 "), 90)

@@ -21,6 +21,13 @@ describe("readSleepState", () => {
     })
     expect(readSleepState({ kind: "none" })).toEqual({ kind: "none" })
   })
+  it("reads the end of the chapter", () => {
+    expect(readSleepState({ kind: "endOfChapter", chapterEnd: 600 })).toEqual({
+      kind: "endOfChapter",
+      chapterEnd: 600,
+    })
+    expect(readSleepState({ kind: "endOfChapter" })).toEqual({ kind: "none" })
+  })
   it("takes anything else as no timer", () => {
     expect(readSleepState(null)).toEqual({ kind: "none" })
     expect(readSleepState("soon")).toEqual({ kind: "none" })
@@ -55,6 +62,12 @@ describe("sleepSecondsLeft", () => {
     expect(sleepSecondsLeft(state, 0, 600, 1800, 2)).toBe(600)
     expect(sleepSecondsLeft(state, 0, 2000, 1800, 1)).toBe(0)
   })
+  it("for the end of the chapter, is what is left of the chapter", () => {
+    const state = { kind: "endOfChapter", chapterEnd: 600 } as const
+    expect(sleepSecondsLeft(state, 0, 400, null, 2)).toBe(100)
+    expect(sleepSecondsLeft(state, 0, 700, null, 1)).toBe(0)
+    expect(sleepSecondsLeft(state, 0, 400, null, 0)).toBeNull()
+  })
   it("has no answer for an unknown length or no timer", () => {
     expect(
       sleepSecondsLeft({ kind: "endOfEpisode" }, 0, 10, null, 1),
@@ -73,6 +86,13 @@ describe("the moon button's words", () => {
     expect(sleepButtonText(null, { kind: "endOfEpisode" })).toBe("End")
     expect(sleepButtonLabel(null, { kind: "endOfEpisode" })).toBe(
       "Sleep timer, at the end of the episode",
+    )
+  })
+  it("counts down to the end of the chapter", () => {
+    const state = { kind: "endOfChapter", chapterEnd: 600 } as const
+    expect(sleepButtonText(95, state)).toBe("1:35")
+    expect(sleepButtonLabel(95, state)).toBe(
+      "Sleep timer, at the end of the chapter, 1:35 left",
     )
   })
   it("is empty and off with no timer", () => {

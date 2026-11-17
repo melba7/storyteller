@@ -8,6 +8,8 @@ public struct SleepTimer: Equatable, Sendable {
   public enum Kind: Equatable, Sendable {
     case countdown
     case endOfEpisode
+    /// Stops where the chapter playing now ends (`endsAt` is that place in the episode).
+    case endOfChapter
   }
 
   /// The choices the player offers, in minutes.
@@ -20,7 +22,8 @@ public struct SleepTimer: Equatable, Sendable {
   public static let extraSeconds = 300.0
 
   public let kind: Kind
-  /// When a countdown ends. Zero for the end-of-episode timer, which has no clock.
+  /// When a countdown ends, in clock seconds. For the end-of-chapter timer it is instead the
+  /// place in the episode (seconds) where the chapter ends. Zero for the end-of-episode timer.
   public let endsAt: Double
 
   private init(kind: Kind, endsAt: Double) {
@@ -38,6 +41,35 @@ public struct SleepTimer: Equatable, Sendable {
 
   /// Stops at the end of the episode that is playing.
   public static let endOfEpisode = SleepTimer(kind: .endOfEpisode, endsAt: 0)
+
+  /// Stops at `end`, the second of the episode where the chapter that is playing ends. Nil
+  /// for a place that is not a time.
+  public static func endOfChapter(endingAt end: Double) -> SleepTimer? {
+    guard end.isFinite, end > 0 else { return nil }
+    return SleepTimer(kind: .endOfChapter, endsAt: end)
+  }
+
+  public enum ChapterStatus: Equatable, Sendable {
+    /// Not at the end yet (or this is not a chapter timer).
+    case waiting
+    /// At the end of the chapter: pause now.
+    case reached
+    /// The listener went well past the end; the timer is out of date.
+    case passed
+  }
+
+  /// How close to the end of the chapter the player pauses. The player checks about twice a
+  /// second, so it stops a little early rather than late into the next chapter.
+  public static let chapterEndSlack = 0.5
+  /// Further than this past the end means the listener moved on, not that the chapter ended.
+  public static let chapterPassedBy = 3.0
+
+  /// Where playback is compared with the end of the chapter, for an end-of-chapter timer.
+  public func chapterStatus(at position: Double) -> ChapterStatus {
+    guard kind == .endOfChapter, position.isFinite else { return .waiting }
+    if position > endsAt + Self.chapterPassedBy { return .passed }
+    return position >= endsAt - Self.chapterEndSlack ? .reached : .waiting
+  }
 
   /// Seconds left on a countdown, never below zero. Nil for the end-of-episode timer.
   public func remaining(at now: Double) -> Double? {
@@ -67,7 +99,7 @@ public struct SleepTimer: Equatable, Sendable {
 
   /// When the episode ends and the queue has more: a timer set for the end of the episode
   /// means stop here rather than go on to the next one.
-  public var stopsBeforeNextEpisode: Bool { kind == .endOfEpisode }
+  public var stopsBeforeNextEpisode: Bool { kind == .endOfEpisode || kind == .endOfChapter }
 
   /// A listener's own time, from what was typed: whole minutes from 1 to 720. Nil when it is
   /// not a number in that range.

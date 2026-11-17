@@ -66,6 +66,7 @@ function run(action: Promise<void> | undefined) {
 export const sleepTimer = {
   startMinutes: (minutes: number) => run(Podcasts?.startSleepTimer(minutes)),
   endOfEpisode: () => run(Podcasts?.sleepUntilEndOfEpisode()),
+  endOfChapter: () => run(Podcasts?.sleepUntilEndOfChapter()),
   addFiveMinutes: () => run(Podcasts?.extendSleepTimer()),
   cancel: () => run(Podcasts?.cancelSleepTimer()),
 }

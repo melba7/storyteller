@@ -21,8 +21,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 7", () => {
-    expect(SCHEMA_VERSION).toBe(7)
+  it("is at version 8", () => {
+    expect(SCHEMA_VERSION).toBe(8)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -98,6 +98,12 @@ describe("migrationStatements", () => {
       "ALTER TABLE shows ADD COLUMN episode_sort TEXT NOT NULL DEFAULT 'newest'",
     )
     expect(statements).toHaveLength(7)
+  })
+
+  it("version 8 adds the feed's chapters address to episodes", () => {
+    expect(stepFrom(7)).toEqual([
+      "ALTER TABLE episodes ADD COLUMN chapters_url TEXT",
+    ])
   })
 
   it("has a column for every setting the screen saves", () => {

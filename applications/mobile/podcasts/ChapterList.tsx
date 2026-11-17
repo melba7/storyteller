@@ -1,0 +1,81 @@
+// LOFI-FORK: the podcasts section's player screen (see FORK.md).
+import { ScrollView, Switch, Pressable, View } from "react-native"
+
+import { Text } from "@/components/ui/text"
+import { currentChapterIndex } from "@/modules/podcasts/chapters"
+import type { PodcastChapter } from "@/modules/podcasts/index"
+import { formatTime } from "@/modules/podcasts/playbackRules"
+import { player, usePlayer } from "@/modules/podcasts/playerInstance"
+
+import { Artwork } from "./Artwork"
+import { chapterActions } from "./useChapters"
+
+/**
+ * The chapters of the episode under the player's top bar: the one playing is highlighted, a
+ * tap plays from the start of a chapter, and each has a switch to skip it. A skipped chapter
+ * is jumped over as ads are, but one you tap or seek into plays.
+ */
+export function ChapterList({
+  episodeId,
+  chapters,
+}: {
+  episodeId: string
+  chapters: readonly PodcastChapter[]
+}) {
+  const view = usePlayer()
+  const playing = currentChapterIndex(chapters, view.position)
+
+  function play(chapter: PodcastChapter) {
+    void player.seekTo(chapter.start)
+    if (!view.isPlaying) void player.togglePlayPause()
+  }
+
+  return (
+    <ScrollView contentContainerClassName="px-safe-or-4 pb-safe gap-1 pb-8">
+      {chapters.map((chapter, index) => (
+        <View
+          key={chapter.start}
+          className={`flex-row items-center gap-3 rounded-xl px-2 py-2 ${
+            index === playing ? "bg-white/20" : ""
+          }`}
+        >
+          <Pressable
+            className="min-h-12 flex-1 flex-row items-center gap-3 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={`Play chapter ${chapter.title} from ${formatTime(chapter.start)}`}
+            accessibilityState={{ selected: index === playing }}
+            onPress={() => play(chapter)}
+          >
+            {chapter.imageUrl ? (
+              <Artwork
+                uri={chapter.imageUrl}
+                size={44}
+                className="rounded-lg"
+              />
+            ) : null}
+            <View className="flex-1">
+              <Text
+                className={`text-base text-white ${
+                  index === playing ? "font-bold" : "font-medium"
+                } ${chapter.skipped ? "opacity-50" : ""}`}
+                numberOfLines={2}
+              >
+                {chapter.title}
+              </Text>
+              <Text className="text-sm text-white/70">
+                {formatTime(chapter.start)}
+              </Text>
+            </View>
+          </Pressable>
+          <Switch
+            value={chapter.skipped}
+            accessibilityLabel={`Skip the chapter ${chapter.title}`}
+            onValueChange={(skipped) =>
+              chapterActions.setSkipped(episodeId, chapter.start, skipped)
+            }
+          />
+        </View>
+      ))}
+    </ScrollView>
+  )
+}

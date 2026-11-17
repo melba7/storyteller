@@ -34,6 +34,8 @@ export type PodcastFeedEpisode = {
   number?: number | null
   /** Every `podcast:transcript` tag of the episode. */
   transcripts?: { url: string; type: string; language?: string; rel?: string }[]
+  /** The `podcast:chapters` JSON file's address. */
+  chaptersUrl?: string | null
 }
 
 /** What the player is doing, sent about twice a second while playing and on every change. */
@@ -66,6 +68,8 @@ export type PlaybackLoadOptions = {
   autoplay: boolean
   /** The feed's audio type, kept for Up Next. */
   audioType: string
+  /** The feed's JSON chapters file, for the chapters of an episode that is not downloaded. */
+  chaptersUrl?: string | null
 }
 
 /** The episode played to its end. */
@@ -165,6 +169,8 @@ export type UpNextItem = {
   duration?: number | null
   /** Where the listener left off, in seconds. */
   position: number
+  /** The feed's JSON chapters file; missing in a queue saved before chapters. */
+  chaptersUrl?: string | null
 }
 
 /** The queue changed. `items` is the whole queue, in play order. */
@@ -173,13 +179,33 @@ export type UpNextChange = { items: UpNextItem[] }
 /** The player started the next queued episode by itself. */
 export type PlaybackAdvanced = { episodeId: string }
 
+/** One chapter of the loaded episode, as Swift sends it. */
+export type PodcastChapter = {
+  /** Seconds. */
+  start: number
+  /** Seconds, when the source says where it ends. */
+  end?: number
+  title: string
+  /** A web address, or a file address for a picture read from an MP3. */
+  imageUrl: string | null
+  url: string | null
+  /** The listener switched this chapter off: the player jumps over it. */
+  skipped: boolean
+}
+
+/** The chapters of the loaded episode (none until they are read). */
+export type ChaptersInfo = { episodeId: string; chapters: PodcastChapter[] }
+
 /** The sleep timer: off, a countdown that ends at `endsAt` (milliseconds), or the episode's end. */
 export type SleepTimerState =
   | { kind: "none" }
   | { kind: "countdown"; endsAt: number }
   | { kind: "endOfEpisode" }
+  /** `chapterEnd` is the second of the episode where the chapter ends. */
+  | { kind: "endOfChapter"; chapterEnd: number }
 
 export type PodcastsEvents = {
+  onChaptersChange: (info: ChaptersInfo) => void
   onSleepTimerChange: (state: SleepTimerState) => void
   onUpNextChange: (change: UpNextChange) => void
   onPlaybackAdvanced: (event: PlaybackAdvanced) => void
@@ -233,10 +259,25 @@ type PodcastsNativeModule = {
   /** Counts down this many minutes (1 to 720), then fades out and pauses. */
   startSleepTimer(minutes: number): Promise<void>
   sleepUntilEndOfEpisode(): Promise<void>
+  /** Stops where the chapter playing now ends. Rejects when the episode has no chapters. */
+  sleepUntilEndOfChapter(): Promise<void>
   /** Adds 5 minutes to a running countdown. */
   extendSleepTimer(): Promise<void>
   cancelSleepTimer(): Promise<void>
   getSleepTimer(): Promise<SleepTimerState>
+
+  /** The chapters of the loaded episode. */
+  getChapters(): Promise<ChaptersInfo>
+  /** Goes to the start of this chapter (after 3 seconds into it) or of the one before. */
+  previousChapter(): Promise<void>
+  /** Goes to the start of the next chapter. */
+  nextChapter(): Promise<void>
+  /** Switches a chapter's skipping on or off (`start` is the chapter's start in seconds). */
+  setChapterSkipped(
+    episodeId: string,
+    start: number,
+    skipped: boolean,
+  ): Promise<void>
 
   listUpNext(): Promise<UpNextItem[]>
   /** Puts an episode at the top ("next") or the bottom ("last"). One already queued moves. */
