@@ -40,6 +40,8 @@ final class PodcastPlayer {
   var currentEnded = false
   /// Skips the saved ads of a downloaded episode (see PodcastPlayer+Ads.swift).
   lazy var adSkipping = PodcastAdSkipping(self)
+  /// Voice boost and silence trimming (see PodcastPlayer+Sound.swift).
+  lazy var sound = PodcastSound(self)
   private var ticks = 0
 
   private init() {
@@ -114,6 +116,7 @@ final class PodcastPlayer {
         toleranceAfter: .zero)
     }
     adSkipping.begin(episode.id, startingAt: start)
+    sound.begin(episode.id, startingAt: start)
     publish()
     if episode.autoplay { play() }
   }
@@ -146,6 +149,7 @@ final class PodcastPlayer {
   func seek(to seconds: Double) {
     let target = Skip.clamp(seconds, duration: currentDuration)
     adSkipping.seeked(to: target)
+    sound.seeked(to: target)
     player.seek(
       to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero

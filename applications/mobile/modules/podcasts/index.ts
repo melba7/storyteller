@@ -277,6 +277,11 @@ type PodcastsNativeModule = {
    * recorded as wrong. False when it is too late.
    */
   undoAdSkip(): Promise<boolean>
+  /**
+   * What silence trimming has saved so far, in seconds of audio, kept in Swift so a stats
+   * screen can read it.
+   */
+  getTrimSavings(): Promise<number>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>

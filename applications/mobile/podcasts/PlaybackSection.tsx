@@ -9,6 +9,14 @@ import {
   markPlayedLabel,
   secondsLabel,
 } from "@/modules/podcasts/playbackSettings"
+import {
+  BOOST_BODY,
+  BOOST_CHOICES,
+  TRIM_BODY,
+  TRIM_CHOICES,
+  boostLabel,
+  trimLabel,
+} from "@/modules/podcasts/sound"
 
 import {
   updatePlaybackSettings,
@@ -53,6 +61,22 @@ export function PlaybackSection() {
         onChoose={(markPlayedWhenLeft) =>
           updatePlaybackSettings({ markPlayedWhenLeft })
         }
+      />
+      <Choices
+        title="Volume boost"
+        body={BOOST_BODY}
+        choices={BOOST_CHOICES}
+        selected={settings.voiceBoost}
+        label={boostLabel}
+        onChoose={(voiceBoost) => updatePlaybackSettings({ voiceBoost })}
+      />
+      <Choices
+        title="Trim silence"
+        body={TRIM_BODY}
+        choices={TRIM_CHOICES}
+        selected={settings.trimSilence}
+        label={trimLabel}
+        onChoose={(trimSilence) => updatePlaybackSettings({ trimSilence })}
       />
       <View className="border-border flex-row items-center gap-3 border-b py-3">
         <View className="flex-1">

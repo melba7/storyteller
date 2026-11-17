@@ -14,20 +14,27 @@ public struct ShowPlaybackSettings: Sendable, Equatable, Codable {
   /// Nil follows the global switch.
   public var skipAds: Bool?
   public var skipPlugs: Bool?
+  /// The show's own voice boost and silence trimming, as the strength's name, or nil to follow
+  /// the listener's.
+  public var voiceBoost: BoostStrength?
+  public var trimSilence: TrimStrength?
 
   public init(
     introSeconds: Double = 0, outroSeconds: Double = 0, speed: Double? = nil,
-    skipAds: Bool? = nil, skipPlugs: Bool? = nil
+    skipAds: Bool? = nil, skipPlugs: Bool? = nil, voiceBoost: BoostStrength? = nil,
+    trimSilence: TrimStrength? = nil
   ) {
     self.introSeconds = introSeconds
     self.outroSeconds = outroSeconds
     self.speed = speed
     self.skipAds = skipAds
     self.skipPlugs = skipPlugs
+    self.voiceBoost = voiceBoost
+    self.trimSilence = trimSilence
   }
 
   private enum Keys: String, CodingKey {
-    case introSeconds, outroSeconds, speed, skipAds, skipPlugs
+    case introSeconds, outroSeconds, speed, skipAds, skipPlugs, voiceBoost, trimSilence
   }
 
   /// A missing key is the default, so a file from an older or newer app still reads.
@@ -38,6 +45,20 @@ public struct ShowPlaybackSettings: Sendable, Equatable, Codable {
     speed = try c.decodeIfPresent(Double.self, forKey: .speed)
     skipAds = try c.decodeIfPresent(Bool.self, forKey: .skipAds)
     skipPlugs = try c.decodeIfPresent(Bool.self, forKey: .skipPlugs)
+    // A name that is not a strength follows the listener's setting.
+    voiceBoost = try c.decodeIfPresent(String.self, forKey: .voiceBoost).flatMap(BoostStrength.init(rawValue:))
+    trimSilence = try c.decodeIfPresent(String.self, forKey: .trimSilence).flatMap(TrimStrength.init(rawValue:))
+  }
+
+  public func encode(to encoder: Encoder) throws {
+    var c = encoder.container(keyedBy: Keys.self)
+    try c.encode(introSeconds, forKey: .introSeconds)
+    try c.encode(outroSeconds, forKey: .outroSeconds)
+    try c.encodeIfPresent(speed, forKey: .speed)
+    try c.encodeIfPresent(skipAds, forKey: .skipAds)
+    try c.encodeIfPresent(skipPlugs, forKey: .skipPlugs)
+    try c.encodeIfPresent(voiceBoost?.rawValue, forKey: .voiceBoost)
+    try c.encodeIfPresent(trimSilence?.rawValue, forKey: .trimSilence)
   }
 }
 

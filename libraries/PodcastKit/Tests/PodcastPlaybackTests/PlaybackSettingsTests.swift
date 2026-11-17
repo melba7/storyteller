@@ -112,4 +112,16 @@ final class PlayedEarlyTests: XCTestCase {
   func testASmallerWindowNeverShrinksTheFiveSeconds() {
     XCTAssertTrue(PlayedRule.isPlayed(position: 596, duration: 600, reachedEnd: false, within: 2))
   }
+
+  func testSoundSettingsAreOffByDefaultAndRoundTrip() {
+    XCTAssertEqual(PlaybackSettings().voiceBoost, .off)
+    XCTAssertEqual(PlaybackSettings().trimSilence, .off)
+    var settings = PlaybackSettings()
+    settings.voiceBoost = .high
+    settings.trimSilence = .medium
+    XCTAssertEqual(PlaybackSettings(values: settings.values), settings)
+    let odd = PlaybackSettings(values: ["voiceBoost": "max", "trimSilence": 4])
+    XCTAssertEqual(odd.voiceBoost, .off)
+    XCTAssertEqual(odd.trimSilence, .off)
+  }
 }

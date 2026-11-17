@@ -25,6 +25,16 @@ import {
   stepSkip,
   upNextLabel,
 } from "@/modules/podcasts/showSettings"
+import {
+  BOOST_BODY,
+  BOOST_CHOICES,
+  type BoostStrength,
+  TRIM_BODY,
+  TRIM_CHOICES,
+  type TrimStrength,
+  boostLabel,
+  trimLabel,
+} from "@/modules/podcasts/sound"
 
 import { ScreenBar } from "./ScreenBar"
 import { useShow } from "./hooks"
@@ -77,6 +87,12 @@ function SwitchRow(props: {
     </Row>
   )
 }
+
+const BOOST_OPTIONS: readonly (BoostStrength | null)[] = [
+  null,
+  ...BOOST_CHOICES,
+]
+const TRIM_OPTIONS: readonly (TrimStrength | null)[] = [null, ...TRIM_CHOICES]
 
 /** A row whose value is picked from a menu. */
 function ChoiceRow<T extends string | number | boolean | null>({
@@ -210,6 +226,24 @@ export function ShowSettingsScreen({ id }: { id: string }) {
           options={SPEED_CHOICES}
           label={(v) => (v === null ? "Follow the player" : speedLabel(v))}
           onChange={(speed) => change({ speed })}
+        />
+        <ChoiceRow
+          title="Volume boost"
+          body={BOOST_BODY}
+          value={settings.voiceBoost}
+          options={BOOST_OPTIONS}
+          label={(v) =>
+            v === null ? "Follow the main setting" : boostLabel(v)
+          }
+          onChange={(voiceBoost) => change({ voiceBoost })}
+        />
+        <ChoiceRow
+          title="Trim silence"
+          body={TRIM_BODY}
+          value={settings.trimSilence}
+          options={TRIM_OPTIONS}
+          label={(v) => (v === null ? "Follow the main setting" : trimLabel(v))}
+          onChange={(trimSilence) => change({ trimSilence })}
         />
         <Heading>New episodes</Heading>
         <SwitchRow

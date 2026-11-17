@@ -28,6 +28,9 @@ public struct PlaybackSettings: Equatable, Sendable {
   public var headphoneNext = HeadphoneNext.skip
   public var markPlayedWhenLeft = 0
   public var rewindAfterPause = false
+  /// Voice boost and silence trimming for everything; a show can choose its own.
+  public var voiceBoost = BoostStrength.off
+  public var trimSilence = TrimStrength.off
 
   /// The defaults are what the player used before there were settings.
   public init() {}
@@ -47,6 +50,8 @@ public struct PlaybackSettings: Equatable, Sendable {
       markPlayedWhenLeft = left
     }
     if let rewind = values["rewindAfterPause"] as? Bool { rewindAfterPause = rewind }
+    voiceBoost = BoostStrength(stored: values["voiceBoost"])
+    trimSilence = TrimStrength(stored: values["trimSilence"])
   }
 
   /// A whole number from storage (Int) or from JavaScript, which hands every number over as a
@@ -63,6 +68,7 @@ public struct PlaybackSettings: Equatable, Sendable {
     [
       "skipBack": skipBack, "skipForward": skipForward, "headphoneNext": headphoneNext.rawValue,
       "markPlayedWhenLeft": markPlayedWhenLeft, "rewindAfterPause": rewindAfterPause,
+      "voiceBoost": voiceBoost.rawValue, "trimSilence": trimSilence.rawValue,
     ]
   }
 

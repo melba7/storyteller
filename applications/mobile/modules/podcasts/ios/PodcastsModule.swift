@@ -243,11 +243,16 @@ public final class PodcastsModule: Module {
 
     // Saves the settings of every show the player must know with the screen locked (speed,
     // intro, outro, skip switches) as one JSON object keyed by show id.
-    AsyncFunction("writeShowSettings") { (json: String) throws in
+    AsyncFunction("writeShowSettings") { (json: String) async throws in
       guard ShowSettingsStore.write(json: json) else {
         throw PodcastFetchError(message: "The show settings could not be saved.")
       }
+      // The loaded show's sound choices may have changed.
+      await MainActor.run { PodcastPlayer.shared.applyShowSound() }
     }
+
+    // Seconds of audio that silence trimming has cut so far (for a stats screen).
+    AsyncFunction("getTrimSavings") { () -> Double in TrimSavingsStore.seconds }
 
     // MARK: Transcripts
 

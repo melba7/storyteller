@@ -28,6 +28,8 @@ describe("defaults", () => {
       notify: true,
       skipAds: null,
       skipPlugs: null,
+      voiceBoost: null,
+      trimSilence: null,
       archiveAfterPlayed: "never",
       archiveAfterDays: null,
       keepNewest: null,
@@ -74,6 +76,8 @@ describe("reading a row", () => {
         episode_sort: "longest",
         group_by_season: 1,
         show_archived: 1,
+        voice_boost: "high",
+        trim_silence: "off",
       }),
     ).toEqual({
       skipIntro: 35,
@@ -90,6 +94,8 @@ describe("reading a row", () => {
       sort: "longest",
       groupBySeason: true,
       showArchived: true,
+      voiceBoost: "high",
+      trimSilence: "off",
     })
   })
 
@@ -144,10 +150,15 @@ describe("settingsMirror", () => {
           },
         },
         { id: "b", settings: { ...DEFAULT_SHOW_SETTINGS, skipPlugs: false } },
+        { id: "c", settings: { ...DEFAULT_SHOW_SETTINGS, trimSilence: "off" } },
+        { id: "d", settings: { ...DEFAULT_SHOW_SETTINGS, voiceBoost: "low" } },
       ]),
     ).toEqual({
       a: { introSeconds: 30, outroSeconds: 10, speed: 1.4, skipAds: true },
       b: { introSeconds: 0, outroSeconds: 0, skipPlugs: false },
+      // Off is the show's own choice, so it is kept.
+      c: { introSeconds: 0, outroSeconds: 0, trimSilence: "off" },
+      d: { introSeconds: 0, outroSeconds: 0, voiceBoost: "low" },
     })
   })
 })
