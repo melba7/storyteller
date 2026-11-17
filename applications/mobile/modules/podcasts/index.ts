@@ -1,6 +1,7 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 import { requireOptionalNativeModule } from "expo-modules-core"
 
+import type { ImportedAudio } from "./localFiles"
 import type { PlaybackSettings } from "./playbackSettings"
 
 /** A podcast feed as the Swift side reads it. A value the feed lacks is missing or null. */
@@ -298,6 +299,11 @@ type PodcastsNativeModule = {
     automatic: boolean,
     language: string | null,
   ): Promise<void>
+  /**
+   * Copies an audio file from the Files app in and installs it like a finished download. The
+   * answer has the episode's id (from the file's content), title, length, size and extension.
+   */
+  importAudioFile(uri: string, fileName: string | null): Promise<ImportedAudio>
   /** Stops a download that is not finished and forgets it. */
   cancelDownload(episodeId: string): Promise<void>
   /** Removes a download: the audio, its side files and its entry. */

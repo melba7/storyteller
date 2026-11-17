@@ -4,6 +4,8 @@
 // hand-written XML reader, since the app has no XML library) and writes one. Pure text in and
 // out, so it is tested without the app. Following the shows is in opmlImport.ts.
 
+import { feedShows } from "./localFiles"
+
 export type OpmlFeed = {
   /** The outline's `title`, or its `text`, or "". */
   title: string
@@ -204,7 +206,7 @@ export function writeOpml(
   shows: readonly { title: string; feedUrl: string; link?: string | null }[],
   now: Date,
 ): string {
-  const lines = shows.map((show) => {
+  const lines = feedShows(shows).map((show) => {
     const title = escape(show.title)
     const web = show.link ? ` htmlUrl="${escape(show.link)}"` : ""
     return `    <outline type="rss" text="${title}" title="${title}" xmlUrl="${escape(show.feedUrl)}"${web}/>`

@@ -9,6 +9,7 @@ import * as Sharing from "expo-sharing"
 
 import { listShows } from "./db"
 import { subscribe } from "./dbFeeds"
+import { feedShows } from "./localFiles"
 import { OpmlError, parseOpml, writeOpml } from "./opml"
 import { type ImportSummary, importFeeds } from "./opmlImport"
 
@@ -45,7 +46,7 @@ export async function importOpmlFile(
 
 /** Writes every followed show to an OPML file and opens the share sheet. Returns the count. */
 export async function exportOpmlFile(): Promise<number> {
-  const shows = await listShows()
+  const shows = feedShows(await listShows())
   if (shows.length === 0) return 0
   if (!(await Sharing.isAvailableAsync())) {
     throw new Error("Sharing isn't available on this device.")

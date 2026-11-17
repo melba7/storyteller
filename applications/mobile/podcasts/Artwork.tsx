@@ -1,10 +1,11 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Image } from "expo-image"
-import { Podcast } from "lucide-react-native"
+import { FileAudio, Podcast } from "lucide-react-native"
 import { View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
+import { LOCAL_ARTWORK } from "@/modules/podcasts/localFiles"
 
 interface Props {
   uri: string | null
@@ -22,7 +23,10 @@ export function Artwork({ uri, size, className }: Props) {
       )}
       style={{ width: size, height: size }}
     >
-      {uri ? (
+      {uri === LOCAL_ARTWORK ? (
+        // The "Your files" show has no picture to load: this tile is drawn here.
+        <Icon as={FileAudio} size={size / 2.5} className="text-primary" />
+      ) : uri ? (
         <Image
           source={{ uri }}
           style={{ width: size, height: size }}

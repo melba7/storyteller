@@ -16,6 +16,7 @@ import {
   mergeEpisodes,
   showFromRow,
 } from "./library"
+import { feedShows, isLocalFeedUrl } from "./localFiles"
 import { readableError } from "./nativeError"
 
 // MARK: Reading a feed
@@ -136,7 +137,8 @@ export async function subscribe(link: string): Promise<Show> {
  */
 export async function refreshShow(id: string): Promise<NewEpisode[]> {
   const show = await getShow(id)
-  if (!show) return []
+  // "Your files" has no feed to read.
+  if (!show || isLocalFeedUrl(show.feedUrl)) return []
   const feed = await fetchFeed(show.feedUrl)
   const { insert, update } = mergeEpisodes(
     await listEpisodes(id),
@@ -183,7 +185,7 @@ export async function refreshAllShows(): Promise<{
 }> {
   const failed: string[] = []
   const added: NewEpisode[] = []
-  for (const show of await listShows()) {
+  for (const show of feedShows(await listShows())) {
     try {
       added.push(...(await refreshShow(show.id)))
     } catch {

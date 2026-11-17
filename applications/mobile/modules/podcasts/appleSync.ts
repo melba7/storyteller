@@ -19,6 +19,7 @@ import {
 import { notifyLibraryChanged } from "./changes"
 import { database, listShows } from "./db"
 import { subscribe } from "./dbFeeds"
+import { feedShows } from "./localFiles"
 
 const FILE = "Podcasts/apple-podcasts.json"
 const SEEN_KEY = "podcasts.apple.seen"
@@ -60,7 +61,7 @@ export function syncApplePodcasts(): Promise<void> {
       const plan = planFollows(
         file,
         seen,
-        (await listShows()).map((show) => show.feedUrl),
+        feedShows(await listShows()).map((show) => show.feedUrl),
       )
       const keys = new Set(plan.seen)
       for (const show of plan.subscribe) {

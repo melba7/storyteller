@@ -37,6 +37,7 @@ import {
 } from "./LibraryShows"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
+import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
 import { useLibraryView } from "./useLibraryView"
 
@@ -85,6 +86,11 @@ function menuActions(
             ? arrange()
             : change({ order: order.id }),
       })),
+    },
+    {
+      id: "add-files",
+      title: "Add audio files",
+      onPress: () => void addAudioFiles(),
     },
     {
       id: "arrange",

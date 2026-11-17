@@ -10,8 +10,10 @@ import {
 } from "@/modules/podcasts/dbSettings"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
+import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { isQueued } from "@/modules/podcasts/upNext"
 
+import { localFileActions } from "./localFileActions"
 import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
 /**
@@ -69,6 +71,7 @@ export function EpisodeMenu({
             ]
           : []),
         archiveAction(episode),
+        ...(isLocalEpisodeId(episode.id) ? localFileActions(episode) : []),
       ]}
     >
       <Button
