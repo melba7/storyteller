@@ -116,13 +116,10 @@ describe("leftWords", () => {
 describe("miniSubtitle", () => {
   const now = new Date(2026, 10, 17).getTime()
   const published = new Date(2026, 10, 12).getTime()
-  it("says the time left once the episode is under way", () => {
-    expect(miniSubtitle(600, 1500, published, now)).toBe("15m left")
+  it("says the episode's date", () => {
+    expect(miniSubtitle(published, now)).toBe("November 12")
   })
-  it("says the date for one not started", () => {
-    expect(miniSubtitle(0, 1500, published, now)).toBe("November 12")
-  })
-  it("is empty with neither", () => {
-    expect(miniSubtitle(0, null, null, now)).toBe("")
+  it("is empty without a date", () => {
+    expect(miniSubtitle(null, now)).toBe("")
   })
 })

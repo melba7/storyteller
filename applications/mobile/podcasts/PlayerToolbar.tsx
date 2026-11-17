@@ -10,8 +10,8 @@ import { pick } from "./haptics"
 import { useSheet } from "./playerSheetContext"
 
 /**
- * The player's bottom row: transcript at the left (lit while it shows), AirPlay in the middle
- * and the queue at the right. Each panel button toggles its panel in place of the artwork.
+ * The player's bottom row: transcript, AirPlay and the queue spread evenly (at about a sixth, a half and five sixths
+ * of the width), the transcript and queue lit while their panel shows. Each panel button toggles its panel in place of the artwork.
  */
 export function PlayerToolbar({
   panel,
@@ -21,7 +21,7 @@ export function PlayerToolbar({
   onPanel: (panel: PlayerPanel) => void
 }) {
   return (
-    <View className="w-full flex-row items-center justify-between px-8">
+    <View className="w-full flex-row items-center justify-around">
       <PanelButton
         icon={MessageSquareQuote}
         label="Transcript"

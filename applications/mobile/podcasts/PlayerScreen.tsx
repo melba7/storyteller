@@ -1,10 +1,12 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { useRouter } from "expo-router"
+import { StatusBar } from "expo-status-bar"
 import { useMemo, useState } from "react"
-import { Pressable, View, useWindowDimensions } from "react-native"
+import { Pressable, ScrollView, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { chapterArtwork } from "@/modules/podcasts/chapters"
+import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
 import { sheetColors } from "@/modules/podcasts/playerSheet"
@@ -27,6 +29,8 @@ import { useChapters } from "./useChapters"
 
 /** The space kept free left and right of the artwork and the controls. */
 const SIDE = 32
+/** Under this height (large text), the artwork area is too small for a picture, so it is left out. */
+const MIN_ART_AREA = 140
 
 /**
  * The player sheet: the artwork's colour as the whole background with a grabber at the top.
@@ -35,7 +39,8 @@ const SIDE = 32
  */
 export function PlayerScreen() {
   const router = useRouter()
-  const segments = useSegments()
+  // The player is a modal, so its own segments name no tab: use the tab you were in.
+  const segments = lastTabSegments()
   const view = usePlayer()
   const { width } = useWindowDimensions()
   // A screen that opened the player may have asked for a page (the menu's "View Transcript").
@@ -51,7 +56,10 @@ export function PlayerScreen() {
   const chapters = useChapters(episode?.id ?? "")
   // The chapters panel goes away with the chapters (a new episode without any).
   const panel = chosen === "chapters" && chapters.length === 0 ? "art" : chosen
-  const size = Math.max(120, Math.min(width - SIDE * 2, areaHeight - 8))
+  // Until the area is measured the artwork is as wide as it can be, so it doesn't jump.
+  const wide = width - SIDE * 2
+  const size = areaHeight > 0 ? Math.min(wide, areaHeight - 8) : wide
+  const showArt = areaHeight === 0 || areaHeight >= MIN_ART_AREA
 
   function close() {
     if (router.canGoBack()) router.back()
@@ -68,6 +76,7 @@ export function PlayerScreen() {
   // no safe-area padding. The plain top colour shows if a gradient can't be drawn.
   return (
     <SheetProvider value={colors}>
+      <StatusBar style={colors.ink === "#ffffff" ? "light" : "dark"} />
       <View
         className="pb-safe-offset-2 flex-1"
         style={{
@@ -105,16 +114,18 @@ export function PlayerScreen() {
             >
               {panel === "art" ? (
                 <View className="flex-1 items-center justify-center">
-                  <PlayerArtwork
-                    uri={
-                      chapterArtwork(chapters, view.position) ??
-                      episode.imageUrl ??
-                      show?.imageUrl ??
-                      null
-                    }
-                    size={size}
-                    playing={view.isPlaying}
-                  />
+                  {showArt ? (
+                    <PlayerArtwork
+                      uri={
+                        chapterArtwork(chapters, view.position) ??
+                        episode.imageUrl ??
+                        show?.imageUrl ??
+                        null
+                      }
+                      size={size}
+                      playing={view.isPlaying}
+                    />
+                  ) : null}
                 </View>
               ) : panel === "transcript" ? (
                 <TranscriptView key={episode.id} episode={episode} />
@@ -141,15 +152,22 @@ export function PlayerScreen() {
                 />
               )}
             </View>
-            <PlayerNowPlaying
-              view={view}
-              chapters={chapters}
-              onPanel={setChosen}
-              onShow={goToShow}
-            />
-            <View className="pt-1">
-              <PlayerToolbar panel={panel} onPanel={setChosen} />
-            </View>
+            {/* Everything under the artwork scrolls when large text makes it taller than the room left. */}
+            <ScrollView
+              style={{ flexGrow: 0, flexShrink: 1 }}
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+            >
+              <PlayerNowPlaying
+                view={view}
+                chapters={chapters}
+                onPanel={setChosen}
+                onShow={goToShow}
+              />
+              <View className="pt-1">
+                <PlayerToolbar panel={panel} onPanel={setChosen} />
+              </View>
+            </ScrollView>
           </>
         )}
       </View>

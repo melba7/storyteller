@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { Trash2 } from "lucide-react-native"
 import { useMemo } from "react"
-import { Pressable, View } from "react-native"
+import { Alert, Pressable, View } from "react-native"
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable"
@@ -9,8 +9,11 @@ import Swipeable, {
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { getEpisode, getShow } from "@/modules/podcasts/db"
 import { type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
+import { readableError } from "@/modules/podcasts/nativeError"
+import { player } from "@/modules/podcasts/playerInstance"
 import { moveBetween } from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
@@ -77,9 +80,10 @@ export function PlayerQueue() {
           }
         </Text>
       ) : (
-        // The list draws itself with the section's theme colours, so it sits on the sheet as a card.
-        <View className="flex-1 overflow-hidden rounded-2xl">
+        // The rows are drawn on the sheet itself, in the sheet's colours, like the transcript.
+        <View className="flex-1">
           <DragList
+            onSheet={{ line: sheet.rest, grip: sheet.muted }}
             ids={ids}
             rowHeight={ROW_HEIGHT}
             onChange={reorder}
@@ -105,7 +109,20 @@ export function PlayerQueue() {
   )
 }
 
+/** Plays a queued episode now; Swift takes it out of the queue as it starts. */
+async function playQueued(item: UpNextItem) {
+  try {
+    const episode = await getEpisode(item.id)
+    if (!episode) throw new Error("This episode is no longer in your library.")
+    const show = episode.showId ? await getShow(episode.showId) : null
+    await player.playEpisode(episode, show)
+  } catch (cause) {
+    Alert.alert("Couldn't play the episode", readableError(cause))
+  }
+}
+
 function QueueRow({ item }: { item: UpNextItem }) {
+  const sheet = useSheet()
   function remove(methods: SwipeableMethods) {
     pick()
     methods.close()
@@ -126,23 +143,39 @@ function QueueRow({ item }: { item: UpNextItem }) {
         </Button>
       )}
     >
-      <View className="bg-background h-full flex-row items-center gap-3 pl-2">
+      <Pressable
+        className="h-full flex-row items-center gap-3 active:opacity-60"
+        accessibilityRole="button"
+        accessibilityLabel={`Play ${item.title} now`}
+        onPress={() => {
+          pick()
+          void playQueued(item)
+        }}
+      >
         <Artwork
           uri={item.artworkUrl ?? null}
           size={ART}
           className="rounded-lg"
         />
         <View className="flex-1">
-          <Text className="font-semibold" numberOfLines={2}>
+          <Text
+            className="font-semibold"
+            style={{ color: sheet.ink }}
+            numberOfLines={2}
+          >
             {item.title}
           </Text>
           {line === "" ? null : (
-            <Text className="text-muted-foreground text-sm" numberOfLines={1}>
+            <Text
+              className="text-sm"
+              style={{ color: sheet.muted }}
+              numberOfLines={1}
+            >
               {line}
             </Text>
           )}
         </View>
-      </View>
+      </Pressable>
     </Swipeable>
   )
 }

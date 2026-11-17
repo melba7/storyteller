@@ -1,11 +1,12 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { useRouter } from "expo-router"
 import { Ellipsis } from "lucide-react-native"
 import { View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { type MenuAction, Menu } from "@/components/ui/menu"
 import { setStarred } from "@/modules/podcasts/dbEpisodes"
+import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import { formatTime } from "@/modules/podcasts/playbackRules"
 import {
   markPlayed,
@@ -41,7 +42,8 @@ export function PlayerMenu({
 }) {
   const sheet = useSheet()
   const router = useRouter()
-  const segments = useSegments()
+  // The player is a modal, so its own segments name no tab: use the tab you were in.
+  const segments = lastTabSegments()
   const view = usePlayer()
   const { episode, show } = view
   const id = episode?.id ?? ""
@@ -52,7 +54,7 @@ export function PlayerMenu({
   const saved = (stored?.starredAt ?? null) !== null
   const played = stored?.played ?? false
 
-  // Leave the player, then open the page in the tab the player was opened from.
+  // Leave the player, then open the page in the tab you were in before the player (see lastTab).
   function leaveTo(href: Parameters<typeof router.push>[0]) {
     if (router.canGoBack()) router.back()
     router.push(href)

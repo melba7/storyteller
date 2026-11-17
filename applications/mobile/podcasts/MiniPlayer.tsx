@@ -35,10 +35,11 @@ export function useHasMiniPlayer(): boolean {
 }
 
 /**
- * What sits in the tab bar's accessory: small rounded artwork, the title in bold with the date
- * (or the time left, once the episode is under way) under it, a play button and skip forward.
- * Tap it to open the full-screen player. The full row has the second line and skip forward;
- * the compact one (shown when the tab bar is minimized) leaves them out.
+ * What sits in the tab bar's accessory: small rounded artwork, the title in bold with the
+ * episode's date under it in the plain text colour, a play button and skip forward. Tap it to
+ * open the full-screen player. The compact row (shown when the tab bar is minimized) keeps the
+ * two lines at a smaller size and leaves skip forward out. A long title ends in "..." because
+ * the accessory is glass, so there is no known colour for a fade to end in.
  *
  * The player still slides up as a modal. Link.AppleZoom zooms only from a Link's own trigger
  * into a pushed screen of the same navigator, and the accessory is drawn by the native tab bar
@@ -56,7 +57,7 @@ export function MiniPlayerContent() {
 
   return (
     <View className="flex-1 justify-center">
-      <View className="flex-row items-center gap-3 px-4">
+      <View className="flex-row items-center gap-3 px-[9px]">
         <Pressable
           className="flex-1 flex-row items-center gap-3"
           accessibilityRole="button"
@@ -69,7 +70,7 @@ export function MiniPlayerContent() {
         >
           <Artwork
             uri={episode.imageUrl ?? show?.imageUrl ?? null}
-            size={compact ? 32 : 40}
+            size={compact ? 30 : 40}
             className="rounded-lg border-0"
           />
           <View className="flex-1">
@@ -79,18 +80,10 @@ export function MiniPlayerContent() {
             >
               {episode.title}
             </Text>
-            {compact ? null : (
-              <Text className="text-muted-foreground text-sm" numberOfLines={1}>
-                {view.error ??
-                  (note
-                    ? skipNoteText(note)
-                    : miniSubtitle(
-                        view.position,
-                        view.duration,
-                        episode.publishedAt,
-                      ))}
-              </Text>
-            )}
+            <Text className={compact ? "text-xs" : "text-sm"} numberOfLines={1}>
+              {view.error ??
+                (note ? skipNoteText(note) : miniSubtitle(episode.publishedAt))}
+            </Text>
           </View>
         </Pressable>
         {note ? (

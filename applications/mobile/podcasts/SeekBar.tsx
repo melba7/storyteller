@@ -37,7 +37,7 @@ interface Props {
   center?: ReactNode
 }
 
-const TRACK_REST = 10
+const TRACK_REST = 7
 const TRACK_TOUCHED = 16
 const GROW_MS = 150
 
@@ -151,7 +151,10 @@ export function SeekBar({
                     ? "absolute h-full bg-amber-300"
                     : "absolute h-full bg-amber-300/40"
                 }
+                // An outline in the sheet's ink keeps the mark visible on a yellow or light sheet.
                 style={{
+                  borderWidth: 1,
+                  borderColor: sheet.ink,
                   left: `${mark.left * 100}%`,
                   width: `${Math.max(mark.width * 100, 0.6)}%`,
                 }}
@@ -162,14 +165,14 @@ export function SeekBar({
       </GestureDetector>
       <View className="flex-row items-center justify-between gap-3">
         <Text
-          className="text-sm"
+          className="text-sm font-semibold"
           style={{ fontVariant: ["tabular-nums"], color: sheet.muted }}
         >
           {formatTime(shown)}
         </Text>
         {center ?? <View className="flex-1" />}
         <Text
-          className="text-sm"
+          className="text-sm font-semibold"
           style={{ fontVariant: ["tabular-nums"], color: sheet.muted }}
         >
           {timeLeft(shown, duration).replace("-", "\u2212")}

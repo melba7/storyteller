@@ -32,6 +32,12 @@ interface ListProps {
   footer?: ReactNode
   /** Called when a row is let go after it was moved to a new place. */
   onDrop?: () => void
+  /**
+   * Draws the list on its surroundings (transparent, no card colour) with these colours for
+   * the row separators and the grip, as the player's queue does on the sheet. Without it the
+   * list uses the theme's colours.
+   */
+  onSheet?: { line: string; grip: string } | undefined
 }
 
 /**
@@ -50,6 +56,7 @@ export function DragList({
   header,
   footer,
   onDrop,
+  onSheet,
 }: ListProps) {
   // The row being dragged, where it started, and how far the finger has moved.
   const [dragging, setDragging] = useState<string | null>(null)
@@ -93,9 +100,9 @@ export function DragList({
 
   return (
     <ScrollView
-      className="bg-background flex-1"
+      className={onSheet ? "flex-1" : "bg-background flex-1"}
       scrollEnabled={dragging === null}
-      contentContainerClassName="px-safe-or-4"
+      contentContainerClassName={onSheet ? "" : "px-safe-or-4"}
       contentInsetAdjustmentBehavior="automatic"
     >
       {header}
@@ -114,6 +121,7 @@ export function DragList({
           onEnd={end}
           onStep={(by) => step(id, by)}
           onAction={(name) => onAction?.(id, name)}
+          onSheet={onSheet}
         >
           {renderContent(id, index)}
         </DragRow>
@@ -138,6 +146,7 @@ interface RowProps {
   onEnd: () => void
   onStep: (by: number) => void
   onAction: (name: string) => void
+  onSheet?: { line: string; grip: string } | undefined
 }
 
 function DragRow({
@@ -153,6 +162,7 @@ function DragRow({
   onEnd,
   onStep,
   onAction,
+  onSheet,
 }: RowProps) {
   const pan = Gesture.Pan()
     .onBegin(() => {
@@ -177,10 +187,14 @@ function DragRow({
 
   return (
     <Animated.View
-      className={`border-border bg-background flex-row items-center gap-3 border-b ${
-        dragging ? "shadow-lg" : ""
-      }`}
-      style={[{ height }, style]}
+      className={`flex-row items-center gap-3 border-b ${
+        onSheet ? "" : "border-border bg-background"
+      } ${dragging ? "shadow-lg" : ""}`}
+      style={[
+        { height },
+        onSheet ? { borderBottomColor: onSheet.line } : null,
+        style,
+      ]}
       accessible
       accessibilityLabel={label}
       accessibilityActions={[
@@ -202,7 +216,15 @@ function DragRow({
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
         >
-          <Icon as={GripVertical} size={22} className="text-muted-foreground" />
+          {onSheet ? (
+            <Icon as={GripVertical} size={22} color={onSheet.grip} />
+          ) : (
+            <Icon
+              as={GripVertical}
+              size={22}
+              className="text-muted-foreground"
+            />
+          )}
         </View>
       </GestureDetector>
     </Animated.View>

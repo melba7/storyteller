@@ -94,7 +94,8 @@ export function PlayerNowPlaying({
 
       {view.error ? (
         <Text
-          className="text-center text-sm text-red-400"
+          className="text-center text-sm font-semibold"
+          style={{ color: sheet.ink }}
           accessibilityRole="alert"
         >
           {view.error}

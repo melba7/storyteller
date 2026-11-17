@@ -132,16 +132,10 @@ export function leftWords(position: number, duration: number | null): string {
   return rest === 0 ? `${hours}h left` : `${hours}h ${rest}m left`
 }
 
-/**
- * The mini player's second line: the time left for an episode under way, else its date, else
- * nothing.
- */
+/** The mini player's second line: the episode's date, as in Apple Podcasts, else nothing. */
 export function miniSubtitle(
-  position: number,
-  duration: number | null,
   publishedAt: number | null,
   now: number = Date.now(),
 ): string {
-  const left = position > 1 ? leftWords(position, duration) : ""
-  return left !== "" ? left : dateWords(publishedAt, now)
+  return dateWords(publishedAt, now)
 }
