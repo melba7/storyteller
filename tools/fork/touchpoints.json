@@ -34,9 +34,19 @@
       "purpose": "Passes upstream's config through withForkIdentity from fork.config.ts, so the fork has its own name and bundle ID and installs beside the official app."
     },
     {
+      "file": "applications/mobile/global.css",
+      "markers": 1,
+      "purpose": "One @import of podcasts/themes.css, which declares the Podcasts section's extra themes (Extra Dark, Midnight, Paper, Forest) as Uniwind variants."
+    },
+    {
       "file": "applications/mobile/app/(root)/index.tsx",
       "markers": 2,
       "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts."
+    },
+    {
+      "file": "applications/mobile/metro.config.js",
+      "markers": 1,
+      "purpose": "Lists the Podcasts section's extra theme names in extraThemes of withUniwindConfig, so Uniwind builds the colours declared in podcasts/themes.css."
     },
     {
       "file": "applications/mobile/app/(root)/settings.tsx",

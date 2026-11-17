@@ -101,6 +101,13 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   button in the player's toolbar for readaloud books, in the read-along and
   listening screens. It opens a panel with on and off, the sounds' volume, how
   much is going on and the car setting.
+- `applications/mobile/global.css` (1 marker): one `@import` of
+  `podcasts/themes.css`, which declares the Podcasts section's extra themes
+  (Extra Dark, Midnight, Paper, Forest) as Uniwind variants.
+- `applications/mobile/metro.config.js` (1 marker): lists those four theme names
+  in `extraThemes`, so Uniwind builds their colours. The section wraps itself in
+  one `ScopedTheme` (`app/(root)/podcasts/_layout.tsx`) with the listener's
+  choice.
 - `applications/mobile/app/(root)/index.tsx` (2 markers): the menu button at the
   top left of the Books screen. It opens the side menu with Books and Podcasts
   (`podcasts/SectionMenu.tsx`).

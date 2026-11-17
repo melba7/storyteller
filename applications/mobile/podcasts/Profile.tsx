@@ -28,6 +28,7 @@ import { Podcasts } from "@/modules/podcasts/index"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
 import { AddAudioFilesRow } from "./AddAudioFilesRow"
+import { AppearanceSection } from "./AppearanceSection"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
@@ -198,6 +199,7 @@ export function Profile() {
           />
           <NotifyRow />
           <PlaybackSection />
+          <AppearanceSection />
           <AddAudioFilesRow />
           <OpmlSection />
           <AdSkipSwitches />
