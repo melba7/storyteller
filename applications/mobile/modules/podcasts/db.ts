@@ -29,40 +29,7 @@ import {
   sortEpisodes,
 } from "./library"
 import { readableError } from "./nativeError"
-
-const SCHEMA_VERSION = 1
-
-const SCHEMA = [
-  `CREATE TABLE shows (
-    id TEXT PRIMARY KEY NOT NULL,
-    feed_url TEXT NOT NULL UNIQUE,
-    title TEXT NOT NULL,
-    author TEXT,
-    description TEXT NOT NULL DEFAULT '',
-    image_url TEXT,
-    link TEXT,
-    language TEXT,
-    added_at INTEGER NOT NULL,
-    refreshed_at INTEGER NOT NULL
-  )`,
-  `CREATE TABLE episodes (
-    id TEXT PRIMARY KEY NOT NULL,
-    show_id TEXT NOT NULL REFERENCES shows(id) ON DELETE CASCADE,
-    guid TEXT NOT NULL,
-    title TEXT NOT NULL,
-    published_at INTEGER,
-    duration_seconds REAL,
-    notes TEXT NOT NULL DEFAULT '',
-    audio_url TEXT NOT NULL,
-    audio_type TEXT NOT NULL,
-    audio_bytes INTEGER,
-    image_url TEXT,
-    season INTEGER,
-    number INTEGER,
-    UNIQUE (show_id, guid)
-  )`,
-  "CREATE INDEX episodes_show_published ON episodes (show_id, published_at)",
-]
+import { migrationStatements } from "./schema"
 
 let opened: Promise<DB> | null = null
 
@@ -79,10 +46,10 @@ function database(): Promise<DB> {
     await db.execute("PRAGMA foreign_keys = ON")
     const result = await db.execute("PRAGMA user_version")
     const version = Number(result.rows[0]?.["user_version"] ?? 0)
-    if (version < 1) {
+    const statements = migrationStatements(version)
+    if (statements.length > 0) {
       await db.transaction(async (tx) => {
-        for (const statement of SCHEMA) await tx.execute(statement)
-        await tx.execute(`PRAGMA user_version = ${SCHEMA_VERSION}`)
+        for (const statement of statements) await tx.execute(statement)
       })
     }
     return db
@@ -120,6 +87,43 @@ export async function listEpisodes(showId: string): Promise<StoredEpisode[]> {
 export async function getEpisode(id: string): Promise<StoredEpisode | null> {
   const found = await rows("SELECT * FROM episodes WHERE id = ?", [id])
   return found[0] ? episodeFromRow(found[0]) : null
+}
+
+// MARK: Playing
+
+/** Keeps where the listener is in an episode, and whether it counts as played. */
+export async function savePlayback(
+  episodeId: string,
+  position: number,
+  played: boolean,
+): Promise<void> {
+  const db = await database()
+  await db.execute(
+    "UPDATE episodes SET position_seconds = ?, played = ?, last_played_at = ? WHERE id = ?",
+    [Math.max(0, position), played ? 1 : 0, Date.now(), episodeId],
+  )
+  notifyLibraryChanged()
+}
+
+/** The episode played most recently, for the mini player after the app restarts. */
+export async function lastPlayedEpisode(): Promise<StoredEpisode | null> {
+  const found = await rows(
+    "SELECT * FROM episodes WHERE last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT 1",
+  )
+  return found[0] ? episodeFromRow(found[0]) : null
+}
+
+/** Keeps the main colour of a show's artwork, worked out once by the player. */
+export async function saveArtworkColor(
+  showId: string,
+  color: string,
+): Promise<void> {
+  const db = await database()
+  await db.execute("UPDATE shows SET artwork_color = ? WHERE id = ?", [
+    color,
+    showId,
+  ])
+  notifyLibraryChanged()
 }
 
 // MARK: Reading a feed

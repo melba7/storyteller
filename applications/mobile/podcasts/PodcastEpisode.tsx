@@ -1,9 +1,14 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
+import { Pause, Play } from "lucide-react-native"
 import { ActivityIndicator, ScrollView, View } from "react-native"
 
+import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { formatDuration, formatEpisodeDate } from "@/modules/podcasts/library"
 
+import { MiniPlayer } from "./MiniPlayer"
+import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisode, useShow } from "./hooks"
 
@@ -11,6 +16,7 @@ export function PodcastEpisode({ id }: { id: string }) {
   const episode = useEpisode(id)
   const show = useShow(episode.data?.showId ?? "")
   const current = episode.data
+  const status = useEpisodeStatus(id)
 
   const details = current
     ? [
@@ -39,6 +45,24 @@ export function PodcastEpisode({ id }: { id: string }) {
           {details ? (
             <Text className="text-muted-foreground text-sm">{details}</Text>
           ) : null}
+          <Button
+            className="self-start"
+            accessibilityLabel={status === "playing" ? "Pause" : "Play"}
+            onPress={() => pressEpisode(current, show.data ?? null, status)}
+          >
+            <Icon
+              as={status === "playing" ? Pause : Play}
+              size={18}
+              className="text-primary-foreground"
+            />
+            <Text>
+              {status === "playing"
+                ? "Pause"
+                : current.positionSeconds > 0 && !current.played
+                  ? "Resume"
+                  : "Play"}
+            </Text>
+          </Button>
           <Text selectable className="text-base leading-6">
             {current.notes === ""
               ? "No notes for this episode."
@@ -46,6 +70,7 @@ export function PodcastEpisode({ id }: { id: string }) {
           </Text>
         </ScrollView>
       )}
+      <MiniPlayer />
     </View>
   )
 }

@@ -21,25 +21,26 @@ in `FORK.md`.
 
 ## Folder map (fork-owned)
 
-| Path                                                                     | What                                                                                                                          |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `libraries/LofiScoreKit/Sources/LofiAtmosphere`                          | Scene model, catalogue, Claude scorer, track builder, director and player                                                     |
-| `libraries/LofiScoreKit/Sources/LofiScoreHost`                           | App host: settings, finding a book's track, importing the sounds folder, following the narrator                               |
-| `libraries/LofiScoreKit/Sources/LofiAudioCore`                           | Clock, gains, loudness, WAV and other audio basics                                                                            |
-| `libraries/LofiScoreKit/Sources/LofiText`                                | Reads EPUB sentences without looking ahead                                                                                    |
-| `libraries/LofiScoreKit/Sources/lofi-atmosphere`                         | CLI: track, show, score, synth, library, catalog, eval                                                                        |
-| `libraries/LofiScoreKit/Sources/LofiMood`, `LofiEvalCLI`, `LofiTrainCLI` | Mood detection the shelved music used (still built)                                                                           |
-| `libraries/LofiScoreKit/Tools/`                                          | Mac scripts, the fetch script, the eval set, data tools                                                                       |
-| `applications/mobile/modules/lofi-score/`                                | Expo module (Swift and JS binding)                                                                                            |
-| `applications/mobile/lofi/`                                              | React UI: toolbar button, panel, settings, reader follow                                                                      |
-| `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`       | Hooks on upstream's audiobook player                                                                                          |
-| `libraries/PodcastKit/`                                                  | Swift package for podcasts: the feed reader (`PodcastFeed`) with its tests and podspec                                        |
-| `applications/mobile/modules/podcasts/`                                  | Expo module that fetches and reads a feed (Swift), plus the library in `podcasts.db`, directory search and library rules (JS) |
-| `applications/mobile/podcasts/`                                          | React UI: the side menu, library, add, show and episode screens                                                               |
-| `applications/mobile/app/(root)/podcasts/`                               | The routes for those screens                                                                                                  |
-| `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
-| `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
-| `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
+| Path                                                                     | What                                                                                                                                   |
+| ------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `libraries/LofiScoreKit/Sources/LofiAtmosphere`                          | Scene model, catalogue, Claude scorer, track builder, director and player                                                              |
+| `libraries/LofiScoreKit/Sources/LofiScoreHost`                           | App host: settings, finding a book's track, importing the sounds folder, following the narrator                                        |
+| `libraries/LofiScoreKit/Sources/LofiAudioCore`                           | Clock, gains, loudness, WAV and other audio basics                                                                                     |
+| `libraries/LofiScoreKit/Sources/LofiText`                                | Reads EPUB sentences without looking ahead                                                                                             |
+| `libraries/LofiScoreKit/Sources/lofi-atmosphere`                         | CLI: track, show, score, synth, library, catalog, eval                                                                                 |
+| `libraries/LofiScoreKit/Sources/LofiMood`, `LofiEvalCLI`, `LofiTrainCLI` | Mood detection the shelved music used (still built)                                                                                    |
+| `libraries/LofiScoreKit/Tools/`                                          | Mac scripts, the fetch script, the eval set, data tools                                                                                |
+| `applications/mobile/modules/lofi-score/`                                | Expo module (Swift and JS binding)                                                                                                     |
+| `applications/mobile/lofi/`                                              | React UI: toolbar button, panel, settings, reader follow                                                                               |
+| `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`       | Hooks on upstream's audiobook player                                                                                                   |
+| `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`        | Lets a playing podcast own the lock screen: the book's remote handlers ask it first                                                    |
+| `libraries/PodcastKit/`                                                  | Swift package for podcasts: the feed reader (`PodcastFeed`) and the player's rules (`PodcastPlayback`), with tests and podspecs        |
+| `applications/mobile/modules/podcasts/`                                  | Expo module that fetches a feed and plays episodes (Swift), plus the library in `podcasts.db`, directory search and library rules (JS) |
+| `applications/mobile/podcasts/`                                          | React UI: the side menu, library, add, show, episode and player screens, mini player                                                   |
+| `applications/mobile/app/(root)/podcasts/`                               | The routes for those screens (the player is a pushed screen)                                                                           |
+| `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                           |
+| `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                                  |
+| `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                           |
 
 ## Data flow
 
@@ -69,42 +70,48 @@ in `FORK.md`.
 - **Sounds folder:** `Atmosphere/<Family>[.<Kind>]/*.m4a`, `sounds.json`
   (including `rejected`), and `OneShots/`.
 - **Podcast library** (`podcasts.db`, its own SQLite file next to the books'
-  database, schema version 1 in `PRAGMA user_version`): `shows` (id, unique feed
+  database, schema version 2 in `PRAGMA user_version`): `shows` (id, unique feed
   address, title, author, description, picture, link, language, when it was
   added and last refreshed) and `episodes` (id, show, the feed's guid, title,
   date, length, plain-text notes, audio address, type and size, picture, season,
   number; one row per guid and show). Dates are milliseconds since 1970. A
   refresh adds new episodes and updates changed ones, and never deletes an
-  episode that left the feed. Removing a show removes its episodes.
+  episode that left the feed. Removing a show removes its episodes. Version 2
+  (P1b, upgraded in place from version 1 with `ALTER TABLE ADD COLUMN`; the
+  steps are in `modules/podcasts/schema.ts`) adds where each episode was left
+  (`position_seconds`), whether it was played (`played`), when it was last
+  played (`last_played_at`) and the show's artwork colour (`artwork_color`,
+  worked out once by the player and used to tint the full-screen player).
 
 ## Decisions log
 
-| Date       | Decision                                                                                                                                   | Why                                                        |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
-| 2026-11-09 | Fork code lives in new folders; upstream edits only at marked touch points                                                                 | Upstream syncs stay clean                                  |
-| 2026-11-09 | No audio in git; personal (CC BY-NC) and publish (Commons) sound editions                                                                  | The repo is public; licences differ                        |
-| 2026-11-10 | Music shelved; ambience is the app's focus                                                                                                 | Mo's direction                                             |
-| 2026-11-10 | Scoring with Claude Opus through the plan, spoiler-safe windows                                                                            | Accuracy; no look-ahead                                    |
-| 2026-11-11 | Bed at -10 dB under the voice, quiet loops boosted up to maxGain 6                                                                         | Mo couldn't hear the sounds                                |
-| 2026-11-11 | Fetch gates on title, loudness range and loudness; poor loops listed as rejected                                                           | Drips and room noise slipped in                            |
-| 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library                                                                    | Cost; Mo's choice                                          |
-| 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                                                                             | Mo's choice                                                |
-| 2026-11-14 | `tools/fork/check.sh` is the one check command                                                                                             | One command for every check                                |
-| 2026-11-14 | Sound check in the app replaces hunting for spots by hand; spots end before the sentence playing now                                       | Mo's ask; no spoilers                                      |
-| 2026-11-14 | Sound check stops are steady scenes (8+ sentences, one main sound and level); results carry what played                                    | Fable review: answers must be traceable to a level         |
-| 2026-11-14 | Level fixes from the check are global; per-book narrator loudness is proposed as 2d                                                        | One quiet narrator should not move every book              |
-| 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped                                      | Second review: a near jump is a rewind otherwise           |
-| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                                                               | A limit left 161 scenes silent                             |
-| 2026-11-15 | The sounds import asks iCloud for every file up front and finishes in a BGProcessingTask (`<bundle id>.soundsImport`)                      | Mo's ask: the import took too long with the app open       |
-| 2026-11-15 | Level fixes stay global; each book's narrator loudness is measured at scoring and used in place of -16 LUFS (2d)                           | Mo's choice on the review card                             |
-| 2026-11-15 | The sound check may use the book's opening (first chapter with sounds, or about 5 minutes, whichever is longer) before the user gets there | Mo's ask: check the levels before hearing most of the book |
-| 2026-11-16 | The section switch is a side menu opened from the Books screen's top bar, not bottom tabs                                                  | Tabs would reshape upstream's screens; Mo's choice         |
-| 2026-11-16 | Podcasts keep their library in their own SQLite file (`podcasts.db`), not in Storyteller's database or Redux store                         | Upstream's migrations and store stay untouched             |
-| 2026-11-16 | Feeds are fetched and read in Swift (Foundation's XML parser), so no JavaScript package is added                                           | `package.json` and `yarn.lock` stay upstream's             |
-| 2026-11-16 | PodcastKit is its own Swift package, not a target of LofiScoreKit                                                                          | Podcasts and sounds change separately; its tests run alone |
-| 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                   | iOS gives other apps no access; Mo's choice                |
-| 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1d)                                      | Apple has no public "similar shows" list; Mo's choice      |
-| 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
+| Date       | Decision                                                                                                                                                                                | Why                                                                         |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| 2026-11-09 | Fork code lives in new folders; upstream edits only at marked touch points                                                                                                              | Upstream syncs stay clean                                                   |
+| 2026-11-09 | No audio in git; personal (CC BY-NC) and publish (Commons) sound editions                                                                                                               | The repo is public; licences differ                                         |
+| 2026-11-10 | Music shelved; ambience is the app's focus                                                                                                                                              | Mo's direction                                                              |
+| 2026-11-10 | Scoring with Claude Opus through the plan, spoiler-safe windows                                                                                                                         | Accuracy; no look-ahead                                                     |
+| 2026-11-11 | Bed at -10 dB under the voice, quiet loops boosted up to maxGain 6                                                                                                                      | Mo couldn't hear the sounds                                                 |
+| 2026-11-11 | Fetch gates on title, loudness range and loudness; poor loops listed as rejected                                                                                                        | Drips and room noise slipped in                                             |
+| 2026-11-12 | Score only books Mo names (`Books/wanted.txt`), never the whole library                                                                                                                 | Cost; Mo's choice                                                           |
+| 2026-11-14 | Long runs go to GitHub CI from a pushed branch                                                                                                                                          | Mo's choice                                                                 |
+| 2026-11-14 | `tools/fork/check.sh` is the one check command                                                                                                                                          | One command for every check                                                 |
+| 2026-11-14 | Sound check in the app replaces hunting for spots by hand; spots end before the sentence playing now                                                                                    | Mo's ask; no spoilers                                                       |
+| 2026-11-14 | Sound check stops are steady scenes (8+ sentences, one main sound and level); results carry what played                                                                                 | Fable review: answers must be traceable to a level                          |
+| 2026-11-14 | Level fixes from the check are global; per-book narrator loudness is proposed as 2d                                                                                                     | One quiet narrator should not move every book                               |
+| 2026-11-14 | The sound check tells the follower of each jump; its stops follow what the director plays, not dipped                                                                                   | Second review: a near jump is a rewind otherwise                            |
+| 2026-11-14 | Scenes failed on the plan's usage limit are retried by later runs (`.retry`)                                                                                                            | A limit left 161 scenes silent                                              |
+| 2026-11-15 | The sounds import asks iCloud for every file up front and finishes in a BGProcessingTask (`<bundle id>.soundsImport`)                                                                   | Mo's ask: the import took too long with the app open                        |
+| 2026-11-15 | Level fixes stay global; each book's narrator loudness is measured at scoring and used in place of -16 LUFS (2d)                                                                        | Mo's choice on the review card                                              |
+| 2026-11-15 | The sound check may use the book's opening (first chapter with sounds, or about 5 minutes, whichever is longer) before the user gets there                                              | Mo's ask: check the levels before hearing most of the book                  |
+| 2026-11-16 | The section switch is a side menu opened from the Books screen's top bar, not bottom tabs                                                                                               | Tabs would reshape upstream's screens; Mo's choice                          |
+| 2026-11-16 | Podcasts keep their library in their own SQLite file (`podcasts.db`), not in Storyteller's database or Redux store                                                                      | Upstream's migrations and store stay untouched                              |
+| 2026-11-16 | Feeds are fetched and read in Swift (Foundation's XML parser), so no JavaScript package is added                                                                                        | `package.json` and `yarn.lock` stay upstream's                              |
+| 2026-11-16 | PodcastKit is its own Swift package, not a target of LofiScoreKit                                                                                                                       | Podcasts and sounds change separately; its tests run alone                  |
+| 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                                                                | iOS gives other apps no access; Mo's choice                                 |
+| 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1d)                                                                                   | Apple has no public "similar shows" list; Mo's choice                       |
+| 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                                                                    | Mo's ask                                                                    |
+| 2026-11-17 | The podcast player is one Swift `AVPlayer` in the Podcasts module; its rules live in PodcastKit's `PodcastPlayback`; a playing podcast owns the lock screen through `LofiRemoteHandoff` | Rules test on Linux; the book's handlers register once and just stand aside |
 
 ## Known problems
 

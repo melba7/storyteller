@@ -15,6 +15,7 @@ import { Podcasts } from "@/modules/podcasts/index"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 import { Artwork } from "./Artwork"
+import { MiniPlayer } from "./MiniPlayer"
 import { ScreenBar } from "./ScreenBar"
 
 const SEARCH_DELAY_MS = 400
@@ -168,6 +169,7 @@ export function AddPodcast() {
           {adding === "link" ? <ActivityIndicator /> : <Text>Add</Text>}
         </Button>
       </ScrollView>
+      <MiniPlayer />
     </View>
   )
 }

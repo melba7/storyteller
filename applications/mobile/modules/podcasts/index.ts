@@ -30,9 +30,79 @@ export type PodcastFeedEpisode = {
   number?: number | null
 }
 
+/** What the player is doing, sent about twice a second while playing and on every change. */
+export type PlaybackState = {
+  /** Missing until an episode has been loaded. */
+  episodeId?: string | null
+  /** Seconds. */
+  position: number
+  /** Seconds, once known. */
+  duration?: number | null
+  isPlaying: boolean
+  /** The listener wants to play but the stream is still loading. */
+  isBuffering: boolean
+  /** 0.5 to 3.0 in tenths. */
+  rate: number
+}
+
+export type PlaybackLoadOptions = {
+  episodeId: string
+  url: string
+  title: string
+  showTitle: string
+  artworkUrl?: string | null
+  /** Where the listener left off. The player starts over for a played or nearly-over episode. */
+  savedPosition: number
+  duration?: number | null
+  played: boolean
+  autoplay: boolean
+}
+
+/** The episode played to its end. */
+export type PlaybackEnded = {
+  episodeId: string
+  position: number
+  duration: number
+  played: true
+}
+
+export type PlaybackError = {
+  episodeId: string
+  /** Plain words for the listener. */
+  message: string
+}
+
+export type PodcastsEvents = {
+  onPlaybackState: (state: PlaybackState) => void
+  onPlaybackEnded: (event: PlaybackEnded) => void
+  onPlaybackError: (event: PlaybackError) => void
+}
+
 type PodcastsNativeModule = {
   /** Downloads and reads the feed. Rejects with a message the listener can read. */
   fetchFeed(url: string): Promise<PodcastFeedData>
+
+  /** Loads an episode and, with `autoplay`, starts it. */
+  load(options: PlaybackLoadOptions): Promise<void>
+  play(): Promise<void>
+  pause(): Promise<void>
+  togglePlayPause(): Promise<void>
+  seekTo(seconds: number): Promise<void>
+  /** Jumps by this many seconds (negative for back), staying inside the episode. */
+  skipBy(seconds: number): Promise<void>
+  /** Ahead 45 seconds. */
+  skipForward(): Promise<void>
+  /** Back 10 seconds. */
+  skipBack(): Promise<void>
+  /** Sets the speed, rounded to 0.1 within 0.5 to 3.0, and returns the speed in use. */
+  setRate(rate: number): Promise<number>
+  getPlaybackState(): Promise<PlaybackState>
+  /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
+  artworkColor(url: string): Promise<string | null>
+  addListener<E extends keyof PodcastsEvents>(
+    event: E,
+    listener: PodcastsEvents[E],
+  ): { remove(): void }
 }
 
 /** The native module. Null on Android and the web, where the section is not available. */

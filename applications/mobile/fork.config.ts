@@ -53,7 +53,10 @@ const lofiScorePods = [
     "LofiAtmosphere",
     "LofiScoreHost",
   ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" })),
-  { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
+  ...["PodcastFeed", "PodcastPlayback"].map((name) => ({
+    name,
+    path: "../../../libraries/PodcastKit",
+  })),
 ]
 
 type PluginEntry = NonNullable<ExpoConfig["plugins"]>[number]
@@ -117,6 +120,11 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const modes = (plist["UIBackgroundModes"] as string[] | undefined) ?? []
   const tasks =
     (plist["BGTaskSchedulerPermittedIdentifiers"] as string[] | undefined) ?? []
+  // Many podcast hosts serve episodes over plain http, which iOS blocks unless the app
+  // allows it for media. This is a plist key, not an entitlement.
+  const transport =
+    (plist["NSAppTransportSecurity"] as Record<string, unknown> | undefined) ??
+    {}
   const ios: NonNullable<ExpoConfig["ios"]> = {
     ...config.ios,
     bundleIdentifier: appId,
@@ -127,6 +135,10 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
         : [...modes, "processing"],
       BGTaskSchedulerPermittedIdentifiers: [...tasks, `${appId}.soundsImport`],
       LofiScoreSoundEdition: soundEdition(),
+      NSAppTransportSecurity: {
+        ...transport,
+        NSAllowsArbitraryLoadsForMedia: true,
+      },
     },
   }
   // Set by .github/workflows/testflight.yml: every TestFlight upload needs its

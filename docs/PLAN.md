@@ -214,6 +214,8 @@ once reviewed and green.
   - Files: `modules/podcasts/ios/*`, `podcasts/` player screens,
     `modules/readium/ios/AudiobookPlayerActor.swift`,
     `tools/fork/touchpoints.json`.
+  - Status: built and passing check.sh; waiting for the iOS build in CI and Mo's
+    first run on TestFlight.
 
 - [ ] **P1c. The Pocket Casts layout** (Mo's ask, 2026-11-17)
   - The Podcasts section gets a bottom tab bar like Pocket Casts': Podcasts,
@@ -258,8 +260,9 @@ once reviewed and green.
     carry Apple ids, not feeds, so one lookup call
     (`https://itunes.apple.com/lookup?id=<ids>`) gets their feed links.
   - The feed reader keeps each show's categories. `podcasts.db` goes to version
-    2, upgraded in place: a categories column on shows and a small cache table.
-    Shows followed before get their categories at their next refresh.
+    3 (P1b took version 2), upgraded in place: a categories column on shows and
+    a small cache table. Shows followed before get their categories at their
+    next refresh.
   - The cloud can't reach Apple's chart addresses, so the tests use saved
     answers and the first build tries them on the phone. Overall:
     `https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcasts.json`.

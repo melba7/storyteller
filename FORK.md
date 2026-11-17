@@ -53,6 +53,10 @@ Files and folders that belong to the fork, which upstream never touches:
   lets CocoaPods build it from source for the app.
 - `applications/mobile/modules/lofi-score/`: its Expo module (iOS only), with
   the JavaScript binding and its tests.
+- `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`: the
+  lock-screen handoff to the podcast player (see the touch point below). It is a
+  new file in upstream's Readium module, because `AudiobookPlayerActor.pause()`
+  is internal to it.
 - `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`: hooks on
   upstream's audiobook player. It is a new file inside upstream's Readium
   module, because the player's observers and `Track` are internal to it. It adds
@@ -61,13 +65,13 @@ Files and folders that belong to the fork, which upstream never touches:
   looks up the clip at the top of the page, so the sounds can follow the pages
   while you read with the narration stopped.
 - `applications/mobile/lofi/`: the React Native UI.
-- `libraries/PodcastKit/`: the Swift package for the Podcasts section. For now
-  it holds the feed reader (`PodcastFeed`), with a podspec so CocoaPods builds
-  it from source for the app.
+- `libraries/PodcastKit/`: the Swift package for the Podcasts section. It holds
+  the feed reader (`PodcastFeed`) and the player's rules (`PodcastPlayback`),
+  each with a podspec so CocoaPods builds it from source for the app.
 - `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
-  a feed and reads it with `PodcastFeed`) and the JavaScript side: the library
-  in its own SQLite file (`podcasts.db`), Apple's directory search and the rules
-  for adding and refreshing shows, with their tests.
+  a feed, reads it with `PodcastFeed` and plays episodes) and the JavaScript
+  side: the library in its own SQLite file (`podcasts.db`), Apple's directory
+  search and the rules for adding and refreshing shows, with their tests.
 - `applications/mobile/podcasts/` and
   `applications/mobile/app/(root)/podcasts/`: the Podcasts screens (the side
   menu, the library, adding a show, a show's episodes, an episode's notes) and
@@ -103,7 +107,7 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   the clip at the top of each page you turn to, the same way the app keeps the
   audio in step with the page, and hands it to the atmosphere, which plays the
   scene from there and never from further down the page.
-- `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift` (8
+- `applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift` (16
   markers): the narration hold. When the atmosphere swells at a big scene
   change, the bridge stops the narrator at the end of the sentence for under a
   second (0.8 s by default, switchable in Settings) and then carries on. These
@@ -111,7 +115,12 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   toggle commands count a hold as playing, the play state observer ignores it,
   pause and the sleep timer end it and report the pause, and play ends it early
   without the automatic rewind. The real code, and an access extension at the
-  end of the file for the player's private state, live in the bridge.
+  end of the file for the player's private state, live in the bridge. Eight more
+  lines, one at the top of each lock-screen handler, ask
+  `LofiRemoteHandoff.swift` first: while a podcast is the active player, the
+  command goes to the podcast player and the book does nothing. The handoff and
+  a small extension that lets the podcast player pause the book live in that
+  fork-owned file.
 
 The Expo module needs no touch point: it starts with the app and follows the
 narrator through `LofiNarratorBridge.swift`.
