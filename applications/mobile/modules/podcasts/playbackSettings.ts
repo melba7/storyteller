@@ -4,6 +4,13 @@
 // settings live in Swift (PodcastPlayback's PlaybackSettings, kept in UserDefaults) because the
 // player uses them with the screen locked; playbackSettingsStore.ts talks to it.
 
+import {
+  type BoostStrength,
+  type TrimStrength,
+  parseBoost,
+  parseTrim,
+} from "./sound"
+
 export type HeadphoneNext = "skip" | "nextEpisode"
 
 export type PlaybackSettings = {
@@ -17,6 +24,10 @@ export type PlaybackSettings = {
   markPlayedWhenLeft: number
   /** Go back 3 seconds after a 5-minute pause and 10 after an hour. */
   rewindAfterPause: boolean
+  /** Make voices louder, for everything (a show can choose its own). */
+  voiceBoost: BoostStrength
+  /** Cut the quiet gaps, for everything (a show can choose its own). */
+  trimSilence: TrimStrength
 }
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 45, 60] as const
@@ -29,6 +40,8 @@ export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   headphoneNext: "skip",
   markPlayedWhenLeft: 0,
   rewindAfterPause: false,
+  voiceBoost: "off",
+  trimSilence: "off",
 }
 
 function oneOf<T extends number>(
@@ -59,6 +72,8 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       defaults.markPlayedWhenLeft,
     ),
     rewindAfterPause: record["rewindAfterPause"] === true,
+    voiceBoost: parseBoost(record["voiceBoost"]),
+    trimSilence: parseTrim(record["trimSilence"]),
   }
 }
 

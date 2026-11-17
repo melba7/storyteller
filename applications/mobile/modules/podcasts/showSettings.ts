@@ -4,6 +4,12 @@
 // 7), what each one may hold, and the small mirror the Swift player reads with the screen
 // locked. Nothing here touches the database (dbSettings.ts does) or the native module.
 import { clampSpeed } from "./playbackRules"
+import {
+  type BoostStrength,
+  type TrimStrength,
+  parseShowBoost,
+  parseShowTrim,
+} from "./sound"
 
 export type AutoUpNext = "off" | "top" | "bottom"
 export type AfterPlayed = "never" | "now" | "day" | "week"
@@ -35,6 +41,9 @@ export type ShowSettings = {
   sort: EpisodeSort
   groupBySeason: boolean
   showArchived: boolean
+  /** The show's own voice boost and silence trimming: null follows the main setting. */
+  voiceBoost: BoostStrength | null
+  trimSilence: TrimStrength | null
 }
 
 export const DEFAULT_SHOW_SETTINGS: ShowSettings = {
@@ -52,6 +61,8 @@ export const DEFAULT_SHOW_SETTINGS: ShowSettings = {
   sort: "newest",
   groupBySeason: false,
   showArchived: false,
+  voiceBoost: null,
+  trimSilence: null,
 }
 
 export const SKIP_STEP = 5
@@ -136,6 +147,8 @@ export function showSettingsFromRow(
     ),
     groupBySeason: flag(row["group_by_season"], d.groupBySeason),
     showArchived: flag(row["show_archived"], d.showArchived),
+    voiceBoost: parseShowBoost(row["voice_boost"]),
+    trimSilence: parseShowTrim(row["trim_silence"]),
   }
 }
 
@@ -159,6 +172,8 @@ export function showSettingsToValues(
     settings.sort,
     bit(settings.groupBySeason),
     bit(settings.showArchived),
+    settings.voiceBoost,
+    settings.trimSilence,
   ]
 }
 
@@ -177,6 +192,8 @@ export const SETTING_COLUMNS = [
   "episode_sort",
   "group_by_season",
   "show_archived",
+  "voice_boost",
+  "trim_silence",
 ] as const
 
 /** What the Swift player reads with the screen locked (PodcastPlayback's ShowPlaybackSettings). */
@@ -186,6 +203,8 @@ export type MirroredSettings = {
   speed?: number
   skipAds?: boolean
   skipPlugs?: boolean
+  voiceBoost?: BoostStrength
+  trimSilence?: TrimStrength
 }
 
 /**
@@ -204,12 +223,16 @@ export function settingsMirror(
     if (settings.speed !== null) entry.speed = clampSpeed(settings.speed)
     if (settings.skipAds !== null) entry.skipAds = settings.skipAds
     if (settings.skipPlugs !== null) entry.skipPlugs = settings.skipPlugs
+    if (settings.voiceBoost !== null) entry.voiceBoost = settings.voiceBoost
+    if (settings.trimSilence !== null) entry.trimSilence = settings.trimSilence
     const plain =
       entry.introSeconds === 0 &&
       entry.outroSeconds === 0 &&
       entry.speed === undefined &&
       entry.skipAds === undefined &&
-      entry.skipPlugs === undefined
+      entry.skipPlugs === undefined &&
+      entry.voiceBoost === undefined &&
+      entry.trimSilence === undefined
     if (!plain) mirror[id] = entry
   }
   return mirror

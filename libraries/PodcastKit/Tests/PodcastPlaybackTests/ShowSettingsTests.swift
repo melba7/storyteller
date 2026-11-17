@@ -116,4 +116,19 @@ final class ShowSettingsTests: XCTestCase {
     let data = try JSONEncoder().encode(queue)
     XCTAssertEqual(try JSONDecoder().decode(UpNextQueue.self, from: data).items.first?.showId, "s1")
   }
+
+  func testAShowsSoundChoicesAreReadAndKept() throws {
+    let read = try XCTUnwrap(
+      ShowSettingsFile.decode(#"{"a":{"voiceBoost":"medium","trimSilence":"off"},"b":{"voiceBoost":"huge"},"c":{}}"#))
+    XCTAssertEqual(read["a"]?.voiceBoost, .medium)
+    // "off" is a choice of its own, not the same as following the listener.
+    XCTAssertEqual(read["a"]?.trimSilence, TrimStrength.off)
+    XCTAssertNil(read["b"]?.voiceBoost)
+    XCTAssertNil(read["c"]?.trimSilence)
+    let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).json")
+    defer { try? FileManager.default.removeItem(at: file) }
+    let saved = ["a": ShowPlaybackSettings(voiceBoost: .low, trimSilence: .strong)]
+    try ShowSettingsFile.save(saved, to: file)
+    XCTAssertEqual(ShowSettingsFile.load(from: file), saved)
+  }
 }

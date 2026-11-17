@@ -68,5 +68,6 @@ extension PodcastPlayer {
   /// The listener changed the settings: the lock screen's skip buttons follow.
   func settingsChanged() {
     lockScreen.refreshSkipIntervals()
+    sound.refresh()
   }
 }

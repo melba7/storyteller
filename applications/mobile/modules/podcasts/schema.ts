@@ -5,7 +5,7 @@
 // runs every step; an older file runs only the steps it lacks.
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -102,6 +102,16 @@ const VERSION_7 = [
   "ALTER TABLE shows ADD COLUMN show_archived INTEGER NOT NULL DEFAULT 0",
 ]
 
+/**
+ * Version 8: each show's own voice boost and silence trimming. Null follows the main setting
+ * in Profile; otherwise the strength's name (off, low, medium, high / off, mild, medium,
+ * strong).
+ */
+const VERSION_8 = [
+  "ALTER TABLE shows ADD COLUMN voice_boost TEXT",
+  "ALTER TABLE shows ADD COLUMN trim_silence TEXT",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -111,6 +121,7 @@ const STEPS = [
   VERSION_5,
   VERSION_6,
   VERSION_7,
+  VERSION_8,
 ]
 
 /**

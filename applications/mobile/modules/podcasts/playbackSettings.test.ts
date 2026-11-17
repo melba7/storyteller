@@ -24,6 +24,8 @@ describe("parsePlaybackSettings", () => {
       headphoneNext: "nextEpisode",
       markPlayedWhenLeft: 60,
       rewindAfterPause: true,
+      voiceBoost: "high",
+      trimSilence: "mild",
     }
     expect(parsePlaybackSettings(saved)).toEqual(saved)
   })
@@ -35,6 +37,8 @@ describe("parsePlaybackSettings", () => {
         headphoneNext: "teleport",
         markPlayedWhenLeft: 25,
         rewindAfterPause: "yes",
+        voiceBoost: "max",
+        trimSilence: 2,
       }),
     ).toEqual(DEFAULT_PLAYBACK_SETTINGS)
   })
