@@ -49,17 +49,19 @@ export function ScreenBar({
   const rightItems = toolbarItems(right)
   return (
     <>
-      {titleHidden ? (
-        <Stack.Screen options={{ title, headerTitle: () => null }} />
-      ) : (
-        <Stack.Title
-          large={large}
-          style={{ fontFamily: "YoungSerif", color: foreground }}
-          largeStyle={{ fontFamily: "YoungSerif", color: foreground }}
-        >
-          {title}
-        </Stack.Title>
-      )}
+      {/* A hidden title is drawn in no colour rather than swapped for a custom header title:
+          options set through Stack.Screen stay after it unmounts, so the title could never
+          come back. VoiceOver still reads it. */}
+      <Stack.Title
+        large={large}
+        style={{
+          fontFamily: "YoungSerif",
+          color: titleHidden ? "transparent" : foreground,
+        }}
+        largeStyle={{ fontFamily: "YoungSerif", color: foreground }}
+      >
+        {title}
+      </Stack.Title>
       {leftItems.length > 0 ? (
         <Stack.Toolbar placement="left">{leftItems}</Stack.Toolbar>
       ) : null}

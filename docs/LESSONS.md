@@ -38,3 +38,8 @@ One line per lesson.
 - Run `yarn oxfmt` from the repository root on the changed paths. Run from
   another folder it formats the wrong files, and the format check fails (a
   builder lost a check run to it on 2026-11-17).
+- In expo-router 58, options set with `<Stack.Screen options>` inside a page
+  stay after that element unmounts (they go through `navigation.setOptions`),
+  while `Stack.Title` and `Stack.Toolbar` are removed with it. Anything that
+  changes while a screen is open (a title that appears on scroll) must use the
+  composition components only.
