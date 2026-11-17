@@ -435,6 +435,23 @@ once reviewed and green.
     episode downloaded before bed is transcribed by morning.
   - Files: `modules/podcasts/ios`, `fork.config.ts` (task id).
 
+- [ ] **P3c. Moving transcript** (Mo's ask, 2026-11-17; replaces the old P5p)
+  - Like the books' read-along: the player shows the episode's transcript. It
+    scrolls with the audio, highlights the line playing now, and plays from a
+    line when you tap it. You can search in it.
+  - The feed's own transcript (`podcast:transcript`, as WebVTT, SRT or JSON) is
+    used when there is one, so it also works while streaming. Otherwise the
+    on-device transcript from P3a is used. Without either, the player says why.
+  - Test first: tests reading WebVTT, SRT and JSON transcripts (times, speakers,
+    a broken file), choosing the source, and finding the line playing at a given
+    time.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the transcript follows a playing episode and a tap on a line plays from
+    there.
+  - Files: `PodcastKit` (the feed's `podcast:transcript` tag),
+    `modules/podcasts` (transcript readers, with tests), `podcasts/` (the
+    transcript in the player).
+
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token
     budget, 2 minutes of overlap), the on-device detector (Foundation Models,
@@ -536,10 +553,6 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
       play them like episodes, and put them in Up Next. They are transcribed and
       ad-checked like downloads.
-- [ ] **P5p. Transcript in the player** (M, after P3a): the episode's transcript
-      beside the player, the words playing now highlighted, tap a line to jump
-      there, and search in it. A feed's own transcript (`podcast:transcript`) is
-      shown when there is one.
 
 ## Later
 

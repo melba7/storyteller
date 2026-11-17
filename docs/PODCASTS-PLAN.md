@@ -3,7 +3,7 @@
 Status: approved by Mo on 2026-11-16 with the suggested answers below, except
 that the hosts' own plugs are skipped too, under a separate switch (question 5).
 On 2026-11-17 Mo asked for Pocket Casts' look and features as well (see
-"Matching Pocket Casts"). The milestones are P1a to P5p in `docs/PLAN.md`.
+"Matching Pocket Casts"). The milestones are P1a to P5o in `docs/PLAN.md`.
 
 ## Goal
 
@@ -186,7 +186,7 @@ support pages (November 2026).
 | Downloads, storage, Wi-Fi only                                                     | P2a                                                | M         |
 | Up Next (tab, swipe actions, reorder, clear)                                       | P2b                                                | M         |
 | New episodes and auto-download                                                     | P2c                                                | M         |
-| Transcripts                                                                        | P3a (made on the phone), P5p (shown in the player) | M         |
+| Transcripts                                                                        | P3a (made on the phone), P3c (shown in the player) | M         |
 | Per-show settings: skip intro and outro, speed, auto-download, auto-add to Up Next | P5a                                                | S         |
 | Archive, auto archive, episode limit, sort, group by season                        | P5b                                                | S         |
 | Star, mark played, listening history, multi-select                                 | P5c                                                | M         |
@@ -356,10 +356,11 @@ logo, icons, artwork and theme names are not used.
 | P2e Mac sync                  | Library file reader (Python), what the phone adds (JS) | iOS build                  | Job writes the file from the real library                                | A followed show appears within the hour         |
 | P3a Transcribe                | Transcript format and storage                          | Builds the Apple-only code | `.command` transcribes an episode                                        | Speed, battery, the first model download        |
 | P3b In the background         | Resume rules                                           | iOS build                  |                                                                          | Transcribed after the app was closed            |
+| P3c Moving transcript         | Transcript readers, the line playing at a time         | iOS build                  |                                                                          | Follows the audio, tap a line to play there     |
 | P4a Ad finder                 | Chunker, clean-up, saving, with a fake detector        | Builds the Apple-only code | `.command` finds ads in an episode (needs Apple Intelligence on the Mac) |                                                 |
 | P4b Ads on the phone          | Status rules                                           | iOS build                  |                                                                          | Ads found on the iPhone's model, time taken     |
 | P4c Skipping                  | Skip rules (seek into an ad, Undo, speed)              | iOS build                  |                                                                          | Skip, note and Undo while listening, locked too |
-| P5a-P5p Pocket Casts features | Each step's rules                                      | iOS build                  |                                                                          | The feature named in the step                   |
+| P5a-P5o Pocket Casts features | Each step's rules                                      | iOS build                  |                                                                          | The feature named in the step                   |
 
 The Mac commands are double-clickable `.command` files, because the Mac's auto
 mode refuses `swift run`.
