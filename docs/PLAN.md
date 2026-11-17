@@ -1,7 +1,7 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1 to P6b merged (TestFlight 24.1); the
-bug check fixes and the design (D1 to D5) are built, in review
+Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
+(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix is in review
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -447,6 +447,10 @@ once reviewed and green.
     real test: if Apple's format differs, the script says which name is missing.
     The phone reads the file on every app open and in the background refresh;
     the first read subscribes to everything followed but downloads nothing.
+    First real run on Mo's Mac (2026-11-17): 64 followed shows, but 0 finished
+    episodes, because `ZHASBEENPLAYED` is empty in today's library. Finished
+    episodes now come from `ZPLAYSTATE` with a sign of listening. The phone did
+    not add the shows within a few minutes; that is being looked into.
 
 - [ ] **P3a. Transcribe downloaded episodes**
   - After a download, `SpeechTranscriber` (with time ranges) writes the episode

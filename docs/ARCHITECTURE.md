@@ -198,6 +198,7 @@ in `FORK.md`.
 | 2026-11-17 | Hero cards put white text on blurred artwork under 60% black                                                                               | 4.5:1 even on white artwork                                |
 | 2026-11-17 | Profile groups are `SettingsGroup` cards; rows split by `border-foreground/10`, controls in cards use `bg-foreground/10`                   | Dark's border equals its card colour                       |
 | 2026-11-17 | `rulePills` is the one source of a smart playlist's rule words; `DragList` gets `onDrop` for the drop haptic                               | No second copy of the words                                |
+| 2026-11-17 | Apple Podcasts finished episodes come from the play state (0) with a sign of listening; `ZHASBEENPLAYED` is empty in today's library       | Following a show marks its old episodes played             |
 
 ## Known problems
 

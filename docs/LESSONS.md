@@ -43,3 +43,6 @@ One line per lesson.
   while `Stack.Title` and `Stack.Toolbar` are removed with it. Anything that
   changes while a screen is open (a title that appears on scroll) must use the
   composition components only.
+- Column names found by other people's tools are not proof of what a column
+  holds: Apple's library has `ZHASBEENPLAYED` but leaves it empty. Check a value
+  against the real data (or say it is unchecked) before relying on it.
