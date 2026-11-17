@@ -158,7 +158,7 @@ export default function BookDetailsScreen() {
               height={352}
               width={232}
             />
-            <Text className="font-youngserif mt-4 mb-1 text-2xl" variant="h1">
+            <Text className="mt-4 mb-1 text-[28px] font-bold" variant="h1">
               {book.title}
             </Text>
             {book.subtitle && (

@@ -52,9 +52,7 @@ export function BookGrid({ title, books, header, refreshable = true }: Props) {
           {/* Header options rather than views, so that iOS is free to host the
               bar — and the back action in particular — in the iPhone Duo rail. */}
           <RouterStack.Header style={{ shadowColor: "transparent" }} />
-          <RouterStack.Title style={{ fontFamily: "YoungSerif" }}>
-            {title}
-          </RouterStack.Title>
+          <RouterStack.Title>{title}</RouterStack.Title>
           <ScreenBackButton />
         </>
       )}
@@ -65,7 +63,7 @@ export function BookGrid({ title, books, header, refreshable = true }: Props) {
           <View className="px-safe-or-2 w-full flex-row items-center justify-start gap-2 self-start">
             <BackButton />
 
-            <Text className="font-youngserif my-2" variant="h3">
+            <Text className="my-2" variant="h3">
               {title}
             </Text>
 

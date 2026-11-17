@@ -1,12 +1,11 @@
 import { type HrefObject, useRouter } from "expo-router"
-import { TouchableOpacity, View } from "react-native"
 import { FlatList } from "react-native-gesture-handler"
 
+import { SectionHeader } from "@/apple-look/SectionHeader"
 import { type BookWithRelations } from "@/database/books"
 
 import { BookThumbnail } from "./BookThumbnail"
 import { Stack } from "./ui/Stack"
-import { Text } from "./ui/text"
 
 interface Props {
   label: string
@@ -20,30 +19,22 @@ export function Shelf({ label, href, books }: Props) {
   if (!books.length) return null
 
   return (
-    <Stack>
-      <View className="flex-row items-baseline justify-between pr-3">
-        <Text variant="h3" className="font-youngserif">
-          {label}
-        </Text>
-
-        {href && (
-          <TouchableOpacity
-            accessibilityLabel={`View all ${label} books`}
-            accessibilityRole="button"
-            onPress={() => router.push(href)}
-            className="flex-row items-center"
-          >
-            <Text className="text-primary text-sm">
-              View all ({books.length})
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
+    <Stack className="gap-2">
+      <SectionHeader
+        title={label}
+        className="px-5"
+        {...(href
+          ? {
+              accessibilityLabel: `View all ${label} books`,
+              onPress: () => router.push(href),
+            }
+          : {})}
+      />
 
       <FlatList
         horizontal
         data={books.slice(0, 25)}
-        contentContainerClassName="gap-4"
+        contentContainerClassName="gap-3 px-5"
         renderItem={({ item: book }) => <BookThumbnail book={book} />}
       />
     </Stack>

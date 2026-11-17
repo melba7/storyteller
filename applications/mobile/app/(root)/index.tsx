@@ -13,6 +13,7 @@ import {
   View,
 } from "react-native"
 
+import { BooksHomeBar } from "@/apple-look/BooksHomeBar"
 import { MiniPlayerWidget } from "@/components/MiniPlayerWidget"
 import { Shelf } from "@/components/Shelf"
 import { Group } from "@/components/ui/Group"
@@ -25,6 +26,7 @@ import { type BookWithRelations } from "@/database/books"
 import { type Collection } from "@/database/collections"
 import { useIsFocused } from "@/hooks/useIsFocused"
 import { useListAllServerBooks } from "@/hooks/useListAllServerBooks"
+import { usesSystemHeader } from "@/lib/nativeChrome"
 import { SectionMenuButton } from "@/podcasts/SectionMenu" // LOFI-FORK: the side menu with Books and Podcasts (see FORK.md)
 import { bookImported } from "@/store/actions"
 import { useAppDispatch } from "@/store/appState"
@@ -118,6 +120,108 @@ export default function Home() {
 
   const scrollViewRef = useRef<ScrollViewInstance>(null)
 
+  async function importBook() {
+    const uri = await pickBookFile()
+    if (uri) dispatch(bookImported({ url: uri, from: "home" }))
+  }
+
+  function openSettings() {
+    router.push("/settings")
+  }
+
+  const shelves = (
+    <ScrollView
+      className="pl-safe pr-safe w-full"
+      contentContainerClassName="gap-7"
+      contentInsetAdjustmentBehavior="automatic"
+      ref={scrollViewRef}
+      refreshControl={
+        <RefreshControl
+          refreshing={isLoading}
+          onRefresh={() => {
+            refetch()
+          }}
+        />
+      }
+    >
+      <Shelf
+        label="On this device"
+        books={onDevice}
+        href={{ pathname: "/shelf/[type]", params: { type: "on-device" } }}
+      />
+      <Shelf
+        label="Currently reading"
+        books={currentlyReading}
+        href={{
+          pathname: "/shelf/[type]",
+          params: { type: "currently-reading" },
+        }}
+      />
+      <Shelf
+        label="Next up"
+        books={nextUp}
+        href={{ pathname: "/shelf/[type]", params: { type: "next-up" } }}
+      />
+      <Shelf
+        label="Start reading"
+        books={startReading}
+        href={{
+          pathname: "/shelf/[type]",
+          params: { type: "start-reading" },
+        }}
+      />
+      <Shelf
+        label="Recently added"
+        books={recentlyAdded}
+        href={{
+          pathname: "/shelf/[type]",
+          params: { type: "recently-added" },
+        }}
+      />
+      {collections.map((collection) => (
+        <Shelf
+          key={collection.uuid}
+          label={collection.name}
+          books={booksByCollection[collection.uuid] ?? []}
+          href={{
+            pathname: "/collection/[uuid]",
+            params: {
+              uuid: collection.uuid,
+            },
+          }}
+        />
+      ))}
+      {books.length === 0 && (
+        <View className="bg-secondary mx-5 gap-4 rounded-2xl p-4">
+          <Text>You don’t have any books available, yet!</Text>
+          <Text>
+            You can{" "}
+            <Link href="/server">
+              <Text className="text-link">
+                connect to a Storyteller instance
+              </Text>
+            </Link>{" "}
+            to download some.
+          </Text>
+        </View>
+      )}
+      {/* Spacer for the miniplayer */}
+      <View className="h-40 w-full" />
+    </ScrollView>
+  )
+
+  if (usesSystemHeader) {
+    // The list comes first so that iOS can shrink the large title as it scrolls.
+    return (
+      <>
+        {shelves}
+        <StatusBar verticalBarBehaviorIOS="disabled" />
+        <BooksHomeBar onImportBook={importBook} onOpenSettings={openSettings} />
+        <MiniPlayerWidget />
+      </>
+    )
+  }
+
   return (
     <View className="pt-safe flex-1 items-center gap-2 bg-transparent">
       <StatusBar verticalBarBehaviorIOS="disabled" />
@@ -153,15 +257,12 @@ export default function Home() {
             {
               id: "import-book",
               title: "Import book",
-              onPress: async () => {
-                const uri = await pickBookFile()
-                if (uri) dispatch(bookImported({ url: uri, from: "home" }))
-              },
+              onPress: importBook,
             },
             {
               id: "settings",
               title: "Settings",
-              onPress: () => router.push("/settings"),
+              onPress: openSettings,
             },
           ]}
         >
@@ -174,83 +275,7 @@ export default function Home() {
           </Button>
         </Menu>
       </Group>
-      <ScrollView
-        className="pl-safe-or-6 pr-safe w-full"
-        contentContainerClassName="gap-4"
-        ref={scrollViewRef}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={() => {
-              refetch()
-            }}
-          />
-        }
-      >
-        <Shelf
-          label="On this device"
-          books={onDevice}
-          href={{ pathname: "/shelf/[type]", params: { type: "on-device" } }}
-        />
-        <Shelf
-          label="Currently reading"
-          books={currentlyReading}
-          href={{
-            pathname: "/shelf/[type]",
-            params: { type: "currently-reading" },
-          }}
-        />
-        <Shelf
-          label="Next up"
-          books={nextUp}
-          href={{ pathname: "/shelf/[type]", params: { type: "next-up" } }}
-        />
-        <Shelf
-          label="Start reading"
-          books={startReading}
-          href={{
-            pathname: "/shelf/[type]",
-            params: { type: "start-reading" },
-          }}
-        />
-        <Shelf
-          label="Recently added"
-          books={recentlyAdded}
-          href={{
-            pathname: "/shelf/[type]",
-            params: { type: "recently-added" },
-          }}
-        />
-        {collections.map((collection) => (
-          <Shelf
-            key={collection.uuid}
-            label={collection.name}
-            books={booksByCollection[collection.uuid] ?? []}
-            href={{
-              pathname: "/collection/[uuid]",
-              params: {
-                uuid: collection.uuid,
-              },
-            }}
-          />
-        ))}
-        {books.length === 0 && (
-          <View className="bg-border mr-5 gap-4 rounded p-4">
-            <Text>You don’t have any books available, yet!</Text>
-            <Text>
-              You can{" "}
-              <Link href="/server">
-                <Text className="text-link">
-                  connect to a Storyteller instance
-                </Text>
-              </Link>{" "}
-              to download some.
-            </Text>
-          </View>
-        )}
-        {/* Spacer for the miniplayer */}
-        <View className="h-40 w-full" />
-      </ScrollView>
+      {shelves}
       <MiniPlayerWidget />
     </View>
   )

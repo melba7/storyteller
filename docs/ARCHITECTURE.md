@@ -38,6 +38,7 @@ in `FORK.md`.
 | `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
 | `applications/mobile/podcasts/`                                          | React UI: side menu, library grid, discover, show, episode and player screens, mini player                                    |
 | `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover, Up Next, Profile), a stack per tab, the player pushed                              |
+| `applications/mobile/apple-look/`                                        | Shared pieces of the Apple Podcasts look on the Books side: large-title bar, section heading, grouped lists, glass capsule    |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |

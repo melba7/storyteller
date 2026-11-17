@@ -153,6 +153,30 @@ locally too.
   - Try it: install the build from TestFlight and play both books.
   - Files: none beyond what's merged.
 
+## The Apple look for Books
+
+Mo's ask (2026-11-17): give everything outside Podcasts the Apple Podcasts look,
+with no feature changes. Mo chose "Every Books screen". The plan, the colours
+and the screen-by-screen table are in `docs/BOOKS-APPLE-DESIGN.md`. One pull
+request with all of it, merged before PR #48, then one TestFlight build carries
+both.
+
+- [ ] **B1. Colours and font.** Apple's colours in `global.css` (done), headings
+      in the system font.
+- [ ] **B2. Shared pieces and Home.**
+- [ ] **B3. Book page.**
+- [ ] **B4. Grids and search.**
+- [ ] **B5. Settings and sheets.**
+- [ ] **B6. Players.**
+- [ ] **B7. Reader chrome.**
+- [ ] **B8. Look check.** Every screen against the table and Mo's screenshots,
+      the iOS build in CI, then Mo's look on TestFlight.
+  - Done when: `tools/fork/check.sh` passes, every restyled upstream file is in
+    `allowedChanges`, the iOS build passes, and a review of the diff finds no
+    handler, menu item, label or screen removed.
+  - Try it: install the TestFlight build and open Books, a book, Settings, the
+    player and the reader in light and dark.
+
 ## Podcasts
 
 Mo's ask (2026-11-16): a Podcasts section beside Books with ads skipped on the

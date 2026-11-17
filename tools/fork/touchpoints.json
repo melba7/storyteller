@@ -42,7 +42,7 @@
     {
       "file": "applications/mobile/app/(root)/index.tsx",
       "markers": 2,
-      "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts."
+      "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts. The screen is also restyled with the Apple look (docs/BOOKS-APPLE-DESIGN.md): on iOS its list comes first and apple-look/BooksHomeBar.tsx draws the native bar with the side menu, Search and the home menu."
     },
     {
       "file": "applications/mobile/metro.config.js",
@@ -70,6 +70,16 @@
       "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer. Each of the eight lock-screen handlers also asks LofiRemoteHandoff.swift first, so a playing podcast owns the lock screen and headphone buttons. The book does not resume after a call or Siri while a podcast owns the lock screen (the podcast player resumes its own episode)."
     }
   ],
-  "allowedChanges": [],
+  "allowedChanges": [
+    "applications/mobile/app/(root)/_layout.tsx",
+    "applications/mobile/app/(root)/book/[uuid].tsx",
+    "applications/mobile/components/BookGrid.tsx",
+    "applications/mobile/components/BookThumbnail.tsx",
+    "applications/mobile/components/Shelf.tsx",
+    "applications/mobile/components/ui/button.tsx",
+    "applications/mobile/components/ui/input.tsx",
+    "applications/mobile/components/ui/switch.tsx",
+    "applications/mobile/components/ui/text.tsx"
+  ],
   "allowedAudio": []
 }
