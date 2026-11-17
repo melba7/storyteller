@@ -2,7 +2,8 @@
 
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix and R1 to R8
-from Mo's first try are in review in one pull request (R6 waits on Mo)
+from Mo's first try are in review in one pull request; the Apple Podcasts
+redesign (A1 to A6) and a second bug check go into the same pull request
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -912,8 +913,45 @@ that, so a fresh download is usually past its ads before they are known.
     download keeps the feed's http address (optional `plainURL`, older indexes
     read fine) to try once if https cannot connect. Marketplace's 403 is not
     looked at yet.
-- [ ] **R6. A more modern look** (M to L): waits for Mo to name the app to
-      follow and the screens that look dated.
+- [x] **R6. A more modern look**: Mo named Apple Podcasts; it became the
+      redesign below (A1 to A6).
+
+### The Apple Podcasts look (Mo's ask, 2026-11-17)
+
+Mo: "Redesign the whole thing to look like apple podcast app with all the
+features we have. Same animations, look and everything." Plan, structure and
+look in `docs/PODCASTS-APPLE-DESIGN.md`, from Mo's screenshots (kept in the
+project files, not the repository). One pull request with R1 to R8, one
+TestFlight build.
+
+- [ ] **B2. Second bug check of the whole Podcasts section** (Mo's ask): Opus
+      reads the Swift side and the data and logic side; Sonnet fixes what holds
+      up; the screens are checked after the redesign (A6).
+  - Done when: every finding is fixed or noted with a reason, `check.sh` passes
+    and the iOS build passes in CI.
+- [ ] **A1. Tabs and rooms** (L): Home, New, Library and Search (the system
+      search tab); the account button and Profile as a sheet; the Library list
+      and Recently Updated; Shows as its own screen; the Up Next page with the
+      queue; nothing lost from the old Profile, Playlists and Up Next tabs.
+  - Done when: `check.sh` passes, route tests cover every tab's home screen and
+    the shared detail routes, and the iOS build passes in CI.
+- [ ] **A2. Home** (L): the Up Next cards (in progress, then the newest unplayed
+      episode per show), the shared episode "…" menu, Your Top Shows, You Might
+      Like, Saved and Latest Episodes.
+  - Done when: the shelf's SQL and order are tested and `check.sh` passes.
+- [ ] **A3. Rows, show page and episode page** (L) in Apple's look, with the
+      purple accent and the system font.
+  - Done when: `check.sh` passes; the look is checked on TestFlight.
+- [ ] **A4. Player and mini player** (L): the screenshot's layout, the queue and
+      transcript in place of the artwork, the "…" menu, the zoom from the mini
+      player where it works.
+  - Done when: `check.sh` passes and nothing the old player did is lost.
+- [ ] **A5. Search and New** (M): category tiles, scopes, featured cards and
+      ranked Top Shows.
+  - Done when: `check.sh` passes.
+- [ ] **A6. Look and motion check** (M): every screen against the screenshots in
+      each theme, animations with Reduce Motion, VoiceOver and large text.
+  - Done when: the Opus check's findings are fixed and `check.sh` passes.
 
 ## Later
 
