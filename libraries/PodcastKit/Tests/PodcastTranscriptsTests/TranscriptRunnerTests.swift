@@ -31,7 +31,7 @@ private final class FakeRecogniser: PieceRecogniser, @unchecked Sendable {
 
 final class TranscriptRunnerTests: XCTestCase {
   private var folder: URL!
-  private let hash = String(repeating: "ab", count: 32)
+  private let sha = String(repeating: "ab", count: 32)
   private let audio = URL(fileURLWithPath: "/nowhere/audio.mp3")
 
   override func setUpWithError() throws {
@@ -44,14 +44,14 @@ final class TranscriptRunnerTests: XCTestCase {
     try? FileManager.default.removeItem(at: folder)
   }
 
-  private var store: TranscriptStore { TranscriptStore(folder: folder, sha256: hash) }
+  private var store: TranscriptStore { TranscriptStore(folder: folder, sha256: sha) }
 
   private func run(
     _ recogniser: FakeRecogniser, stopAfter pieces: Int? = nil
   ) async throws -> RunOutcome {
     let allowed = Allowance(pieces)
     return try await TranscriptRunner.run(
-      audio: audio, sha256: hash, locale: "en-US", recogniser: recogniser, store: store,
+      audio: audio, sha256: sha, locale: "en-US", recogniser: recogniser, store: store,
       shouldContinue: { allowed.take() })
   }
 
@@ -63,7 +63,7 @@ final class TranscriptRunnerTests: XCTestCase {
     XCTAssertEqual(transcript.words.first?.text, "w0")
     XCTAssertEqual(transcript.words.last?.text, "w699")
     XCTAssertEqual(transcript.identity.locale, "en-US")
-    XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(hash).transcript.json").path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: folder.appendingPathComponent("\(sha).transcript.json").path))
     XCTAssertFalse(FileManager.default.fileExists(atPath: store.partialURL.path))
     XCTAssertEqual(store.status(), .done)
     XCTAssertEqual(store.loadTranscript(), transcript)
@@ -87,8 +87,8 @@ final class TranscriptRunnerTests: XCTestCase {
     let other = folder.appendingPathComponent("other")
     try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
     let whole = try await TranscriptRunner.run(
-      audio: audio, sha256: hash, locale: "en-US", recogniser: FakeRecogniser(),
-      store: TranscriptStore(folder: other, sha256: hash))
+      audio: audio, sha256: sha, locale: "en-US", recogniser: FakeRecogniser(),
+      store: TranscriptStore(folder: other, sha256: sha))
     guard case .finished(let straight) = whole else { return XCTFail("not finished") }
     XCTAssertEqual(resumed.words, straight.words)
     XCTAssertEqual(resumed.lines, straight.lines)
@@ -106,7 +106,7 @@ final class TranscriptRunnerTests: XCTestCase {
   func testProgressIsReported() async throws {
     let seen = Collected()
     _ = try await TranscriptRunner.run(
-      audio: audio, sha256: hash, locale: "en-US", recogniser: FakeRecogniser(), store: store,
+      audio: audio, sha256: sha, locale: "en-US", recogniser: FakeRecogniser(), store: store,
       progress: { seen.add($0) })
     XCTAssertEqual(seen.values, [0, 42, 85, 100])
   }
@@ -139,7 +139,7 @@ final class TranscriptRunnerTests: XCTestCase {
   func testATranscriptSurvivesAJSONRoundTrip() throws {
     let transcript = Transcript(
       identity: TranscriptIdentity(
-        locale: "de-DE", recogniser: "R", recogniserVersion: "3", osVersion: "26.1", sha256: hash),
+        locale: "de-DE", recogniser: "R", recogniserVersion: "3", osVersion: "26.1", sha256: sha),
       duration: 12.5,
       lines: [TranscriptLine(start: 0.5, end: 2, text: "Guten Tag.")],
       words: [

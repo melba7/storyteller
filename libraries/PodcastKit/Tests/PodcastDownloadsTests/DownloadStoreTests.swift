@@ -4,7 +4,7 @@ import XCTest
 
 final class DownloadStoreTests: XCTestCase {
   private var root: URL!
-  private let hash = String(repeating: "ab", count: 32)
+  private let sha = String(repeating: "ab", count: 32)
 
   override func setUpWithError() throws {
     root = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -28,7 +28,7 @@ final class DownloadStoreTests: XCTestCase {
     try Data(repeating: 1, count: bytes).write(to: temp)
     let staged = try store.stage(temp, episodeId: id)
     return try store.install(
-      episodeId: id, staged: staged, sha256: hash, fileExtension: "mp3", bytes: Int64(bytes),
+      episodeId: id, staged: staged, sha256: sha, fileExtension: "mp3", bytes: Int64(bytes),
       date: Date(timeIntervalSince1970: 1_700_000_100))
   }
 
@@ -47,7 +47,7 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(
       reopened.entry(for: "d")?.state,
       .downloaded(
-        file: "\(hash).mp3", sha256: hash, bytes: 5, date: Date(timeIntervalSince1970: 1_700_000_100)))
+        file: "\(sha).mp3", sha256: sha, bytes: 5, date: Date(timeIntervalSince1970: 1_700_000_100)))
     XCTAssertEqual(reopened.entry(for: "b")?.state, .downloading(bytes: 10, expected: 100))
   }
 
@@ -126,7 +126,7 @@ final class DownloadStoreTests: XCTestCase {
     let store = try DownloadStore(root: root)
     let id = UUID().uuidString
     try finish(store, id)
-    let expected = root.appendingPathComponent(id).appendingPathComponent("\(hash).mp3")
+    let expected = root.appendingPathComponent(id).appendingPathComponent("\(sha).mp3")
     XCTAssertTrue(FileManager.default.fileExists(atPath: expected.path))
     XCTAssertEqual(store.localFile(for: id)?.path, expected.path)
     // Nothing is left waiting in .incoming.
@@ -159,17 +159,17 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertThrowsError(
       try store.install(episodeId: "a", staged: temp, sha256: "../x", fileExtension: "mp3", bytes: 1))
     XCTAssertThrowsError(
-      try store.install(episodeId: "a", staged: temp, sha256: hash, fileExtension: "../x", bytes: 1))
+      try store.install(episodeId: "a", staged: temp, sha256: sha, fileExtension: "../x", bytes: 1))
   }
 
   func testANewDownloadReplacesTheOldFileAndItsSideFiles() throws {
     let store = try DownloadStore(root: root)
     try finish(store, "a")
     let folder = try store.folder(for: "a")
-    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(hash).transcript.json"))
+    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(sha).transcript.json"))
     try finish(store, "a", bytes: 8)
     XCTAssertEqual(
-      try FileManager.default.contentsOfDirectory(atPath: folder.path), ["\(hash).mp3"])
+      try FileManager.default.contentsOfDirectory(atPath: folder.path), ["\(sha).mp3"])
     XCTAssertEqual(store.storageUsed(), 8)
   }
 
@@ -180,8 +180,8 @@ final class DownloadStoreTests: XCTestCase {
     try finish(store, "a")
     try finish(store, "b")
     let folder = try store.folder(for: "a")
-    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(hash).transcript.json"))
-    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(hash).ads.test.json"))
+    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(sha).transcript.json"))
+    try Data("{}".utf8).write(to: folder.appendingPathComponent("\(sha).ads.test.json"))
 
     XCTAssertTrue(try store.delete(episodeId: "a"))
     XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
