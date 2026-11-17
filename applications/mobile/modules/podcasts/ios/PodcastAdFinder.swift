@@ -180,6 +180,8 @@ final class PodcastAdFinder: @unchecked Sendable {
       switch outcome {
       case .finished(let file):
         set(id, file.ads.isEmpty ? .noneFound : .found(count: file.ads.count))
+        // An episode that is playing now starts skipping the new ads.
+        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
       case .stopped:
         pause(id)
       }

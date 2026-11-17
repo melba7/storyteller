@@ -3,7 +3,7 @@
 // What a row says about an episode's ad finding, how a change from Swift updates what the
 // screens know, and the list of ads on the episode card. The finding itself is Swift
 // (PodcastAds); this file does not need the native module.
-import type { AdsChange, AdsInfo } from "./index"
+import type { AdSkipped, AdUndone, AdsChange, AdsInfo } from "./index"
 
 /** What the screens know about ad finding, by episode id. */
 export type AdsMap = Readonly<Record<string, AdsInfo>>
@@ -140,6 +140,7 @@ export type AdRow = {
   key: string
   /** Where to play from, in seconds. */
   start: number
+  end: number
   /** The ad's start in the episode, "12:03". */
   time: string
   /** How long it is, "1:05". */
@@ -172,6 +173,7 @@ export function adRows(file: AdsFile): AdRow[] {
       return {
         key: String(ad.start),
         start: ad.start,
+        end: ad.end,
         time,
         length,
         kind,
@@ -188,4 +190,73 @@ export function adRows(file: AdsFile): AdRow[] {
           .join(", "),
       }
     })
+}
+
+// MARK: The note after a skip
+
+/** How long the "Skipped ad" note stays, with its Undo button. */
+export const SKIP_NOTE_MS = 6000
+
+/** The note on the screen: the skip that just happened. */
+export type SkipNote = {
+  episodeId: string
+  /** Where the skipped ad started, in seconds. */
+  start: number
+  /** How long it was, in seconds. */
+  length: number
+  /** When the note appeared, in milliseconds. */
+  shownAt: number
+}
+
+export function skipNote(event: AdSkipped, now: number): SkipNote {
+  return {
+    episodeId: event.episodeId,
+    start: event.start,
+    length: event.length,
+    shownAt: now,
+  }
+}
+
+/** "Skipped ad (1:05)". */
+export function skipNoteText(note: SkipNote): string {
+  return `Skipped ad (${formatClock(note.length)})`
+}
+
+/** Whether the note is still to be shown at `now`. */
+export function skipNoteShown(note: SkipNote | null, now: number): boolean {
+  return note !== null && now - note.shownAt < SKIP_NOTE_MS
+}
+
+/** The note after an undo: gone when it was that skip's. */
+export function noteAfterUndo(
+  note: SkipNote | null,
+  event: AdUndone,
+): SkipNote | null {
+  if (note?.episodeId === event.episodeId && note.start === event.start)
+    return null
+  return note
+}
+
+// MARK: Marks on the seek bar
+
+/** Where an ad sits on the seek bar, as shares (0 to 1) of its length. */
+export type AdMark = { left: number; width: number; skipped: boolean }
+
+/** The marks for the listed ads. Nothing while the length is not known. */
+export function adMarks(
+  rows: readonly Pick<AdRow, "start" | "end" | "skipped">[],
+  duration: number | null,
+): AdMark[] {
+  if (duration === null || !(duration > 0)) return []
+  return rows.flatMap((row) => {
+    if (!(row.end > row.start) || row.start >= duration) return []
+    const left = Math.max(0, row.start / duration)
+    return [
+      {
+        left,
+        width: Math.min(1 - left, (row.end - row.start) / duration),
+        skipped: row.skipped,
+      },
+    ]
+  })
 }

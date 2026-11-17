@@ -2,7 +2,7 @@
 //
 // Thin wrappers over the native module's ad functions. Not imported by any test, because the
 // native module is not there; the rules are in ads.ts.
-import { type AdsInfo, Podcasts } from "./index"
+import { type AdSkipSettings, type AdsInfo, Podcasts } from "./index"
 
 export async function listAds(): Promise<AdsInfo[]> {
   return (await Podcasts?.listAds()) ?? []
@@ -11,4 +11,24 @@ export async function listAds(): Promise<AdsInfo[]> {
 /** An episode's saved ads as JSON text, or null. */
 export async function getAds(episodeId: string): Promise<string | null> {
   return (await Podcasts?.getAds(episodeId)) ?? null
+}
+
+export async function getAdSkipSettings(): Promise<AdSkipSettings> {
+  return (
+    (await Podcasts?.getAdSkipSettings()) ?? {
+      skipAds: true,
+      skipOwnPlugs: true,
+    }
+  )
+}
+
+export async function setAdSkipSettings(
+  settings: AdSkipSettings,
+): Promise<void> {
+  await Podcasts?.setAdSkipSettings(settings.skipAds, settings.skipOwnPlugs)
+}
+
+/** Undoes the skip that was just made. False when it is too late (or there is nothing). */
+export async function undoAdSkip(): Promise<boolean> {
+  return (await Podcasts?.undoAdSkip()) ?? false
 }

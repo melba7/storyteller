@@ -6,6 +6,7 @@
 
 import ExpoModulesCore
 import Foundation
+import PodcastAds
 import PodcastDownloads
 import PodcastFeed
 import PodcastPlayback
@@ -41,7 +42,7 @@ public final class PodcastsModule: Module {
     Name("Podcasts")
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
-      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onAdsChange")
+      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onAdsChange", "onAdSkipped", "onAdUndone")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -188,6 +189,21 @@ public final class PodcastsModule: Module {
     AsyncFunction("listAds") { () -> [[String: Any]] in PodcastAdFinder.shared.all() }
     AsyncFunction("getAds") { (episodeId: String) -> String? in
       PodcastAdFinder.shared.adsJSON(episodeId)
+    }
+
+    // The two switches for skipping ads and the hosts' own plugs (both on until turned off).
+    AsyncFunction("getAdSkipSettings") { () -> [String: Bool] in
+      let settings = AdSkipDefaults.settings
+      return ["skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs]
+    }
+    AsyncFunction("setAdSkipSettings") { (skipAds: Bool, skipOwnPlugs: Bool) async in
+      AdSkipDefaults.settings = AdSkipSettings(skipAds: skipAds, skipOwnPlugs: skipOwnPlugs)
+      await MainActor.run { PodcastPlayer.shared.adSkipping.refresh() }
+    }
+    // Takes back the skip that was just made: back to the ad's start, playing, and the skip is
+    // recorded as wrong. False when it is too late.
+    AsyncFunction("undoAdSkip") { () async -> Bool in
+      await MainActor.run { PodcastPlayer.shared.adSkipping.undo() }
     }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.

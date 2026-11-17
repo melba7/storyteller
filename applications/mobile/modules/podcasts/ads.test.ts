@@ -2,12 +2,18 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  SKIP_NOTE_MS,
+  adMarks,
   adRows,
   adsMapFromList,
   adsStatus,
   applyAdsChange,
   formatClock,
+  noteAfterUndo,
   parseAdsFile,
+  skipNote,
+  skipNoteShown,
+  skipNoteText,
   withAds,
 } from "./ads"
 import type { AdsInfo } from "./index"
@@ -149,5 +155,61 @@ describe("adRows", () => {
     expect(rows.map((row) => row.skipped)).toEqual([true, false, false])
     expect(rows.map((row) => row.undone)).toEqual([false, false, true])
     expect(rows[1]?.label).toContain("not sure")
+  })
+})
+
+describe("the note after a skip", () => {
+  const event = { episodeId: "e1", start: 723, end: 788, length: 65 }
+
+  it("says how long the skipped ad was", () => {
+    expect(skipNoteText(skipNote(event, 1000))).toBe("Skipped ad (1:05)")
+    expect(skipNoteText(skipNote({ ...event, length: 3725 }, 0))).toBe(
+      "Skipped ad (1:02:05)",
+    )
+  })
+
+  it("stays for six seconds", () => {
+    const note = skipNote(event, 10_000)
+    expect(SKIP_NOTE_MS).toBe(6000)
+    expect(skipNoteShown(note, 10_000)).toBe(true)
+    expect(skipNoteShown(note, 15_999)).toBe(true)
+    expect(skipNoteShown(note, 16_000)).toBe(false)
+    expect(skipNoteShown(null, 16_000)).toBe(false)
+  })
+
+  it("goes when that skip is undone and stays for another one", () => {
+    const note = skipNote(event, 0)
+    expect(noteAfterUndo(note, { episodeId: "e1", start: 723 })).toBeNull()
+    expect(noteAfterUndo(note, { episodeId: "e1", start: 5 })).toBe(note)
+    expect(noteAfterUndo(note, { episodeId: "e2", start: 723 })).toBe(note)
+    expect(noteAfterUndo(null, { episodeId: "e1", start: 723 })).toBeNull()
+  })
+})
+
+describe("adMarks", () => {
+  const rows = [
+    { start: 100, end: 160, skipped: true },
+    { start: 500, end: 560, skipped: false },
+  ]
+
+  it("places each ad as shares of the episode", () => {
+    const marks = adMarks(rows, 1000)
+    expect(marks[0]).toEqual({ left: 0.1, width: 0.06, skipped: true })
+    expect(marks[1]?.left).toBe(0.5)
+    expect(marks[1]?.skipped).toBe(false)
+  })
+
+  it("draws nothing while the length is unknown", () => {
+    expect(adMarks(rows, null)).toEqual([])
+    expect(adMarks(rows, 0)).toEqual([])
+  })
+
+  it("keeps a mark inside the bar", () => {
+    const [mark] = adMarks([{ start: 950, end: 1100, skipped: true }], 1000)
+    expect(mark?.left).toBe(0.95)
+    expect(mark?.width).toBeCloseTo(0.05)
+    expect(adMarks([{ start: 1200, end: 1300, skipped: true }], 1000)).toEqual(
+      [],
+    )
   })
 })
