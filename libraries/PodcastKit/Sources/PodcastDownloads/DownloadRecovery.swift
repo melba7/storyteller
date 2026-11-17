@@ -13,6 +13,9 @@ public struct DownloadFailure: Sendable, Equatable {
   /// `URLError.backgroundTaskCancelledReason` was `.userForceQuitApplication`: the listener
   /// swiped the app away and iOS stopped the transfer.
   public var forceQuit: Bool
+  /// iOS stopped the transfer itself (`URLError.backgroundTaskCancelledReason` had any value:
+  /// a swipe-away, Background App Refresh turned off, or too few resources).
+  public var stoppedByIOS: Bool
   /// The phone had no room for the file.
   public var diskFull: Bool
   /// How many times this download has already been retried after a dropped connection.
@@ -20,12 +23,14 @@ public struct DownloadFailure: Sendable, Equatable {
 
   public init(
     urlErrorCode: Int? = nil, httpStatus: Int? = nil, hasResumeData: Bool = false,
-    forceQuit: Bool = false, diskFull: Bool = false, attempts: Int = 0
+    forceQuit: Bool = false, stoppedByIOS: Bool = false, diskFull: Bool = false,
+    attempts: Int = 0
   ) {
     self.urlErrorCode = urlErrorCode
     self.httpStatus = httpStatus
     self.hasResumeData = hasResumeData
     self.forceQuit = forceQuit
+    self.stoppedByIOS = stoppedByIOS || forceQuit
     self.diskFull = diskFull
     self.attempts = attempts
   }
@@ -52,10 +57,10 @@ public enum DownloadRecovery {
   /// download and must change nothing. A play-through entry is fed by the player, never by the
   /// background session, so any report is from an older task (the automatic download the player
   /// cancelled to take over). A cancel the app asked for (-999, and not iOS stopping the
-  /// transfer after a swipe-away) is a download the app already removed or replaced.
+  /// transfer for any reason) is a download the app already removed or replaced.
   public static func ignoresCompletion(_ failure: DownloadFailure, playThrough: Bool) -> Bool {
     if playThrough { return true }
-    return failure.urlErrorCode == -999 && !failure.forceQuit
+    return failure.urlErrorCode == -999 && !failure.stoppedByIOS
   }
 
   /// Whether a URLError code is a connection that dropped or is not there for now.

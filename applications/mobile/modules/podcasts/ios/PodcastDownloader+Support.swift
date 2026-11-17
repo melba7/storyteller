@@ -27,6 +27,7 @@ extension DownloadFailure {
       httpStatus: (response as? HTTPURLResponse)?.statusCode,
       hasResumeData: urlError?.downloadTaskResumeData != nil,
       forceQuit: urlError?.backgroundTaskCancelledReason == .userForceQuitApplication,
+      stoppedByIOS: urlError?.backgroundTaskCancelledReason != nil,
       diskFull: Self.isDiskFull(error),
       attempts: attempts)
   }

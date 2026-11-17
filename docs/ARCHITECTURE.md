@@ -222,6 +222,8 @@ in `FORK.md`.
 | 2026-11-17 | Play-through falls back to the plain address before its first byte or without a length; an unfinished entry is dropped at launch           | Playback first; no stale "Stopped" rows                    |
 | 2026-11-17 | The Apple follow list is read with a file coordinator on its own queue, again after 20, 30 and 60 s, with its status in Profile            | An iCloud placeholder reads as nothing                     |
 | 2026-11-17 | Ads found in a transcript so far count as found for the player, the ads list and the status line until the full pass is done               | Skipping starts while transcribing                         |
+| 2026-11-17 | Play-through waits for a missing network (up to 20 waits of 30 s, not counted as resume tries); old task reports are ignored               | A tunnel must not end the episode                          |
+| 2026-11-17 | The background session ignores a cancel the app asked for (-999 with no iOS reason); iOS's own cancels are still handled                   | A replaced download read as failed                         |
 
 ## Known problems
 

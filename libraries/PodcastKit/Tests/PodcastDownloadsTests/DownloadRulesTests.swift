@@ -268,6 +268,13 @@ final class DownloadCompletionIgnoredTests: XCTestCase {
       DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -999), playThrough: false))
   }
 
+  func testACancelByIOSForAnotherReasonIsStillReported() {
+    // Background App Refresh turned off, or iOS short of resources: not the app's own cancel.
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(
+        DownloadFailure(urlErrorCode: -999, stoppedByIOS: true), playThrough: false))
+  }
+
   func testASwipeAwayAndRealFailuresAreStillReported() {
     XCTAssertFalse(
       DownloadRecovery.ignoresCompletion(
