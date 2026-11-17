@@ -537,6 +537,11 @@ once reviewed and green.
     the Mac command lists the ads in 3 episodes Mo picks.
   - Files: `PodcastKit` (ads target, on-device target, tests),
     `PodcastKit/Tools/mac`.
+  - Status: built; the Linux tests pass. The Foundation Models detector is
+    compiled for the first time in Fork CI. Still open: the Mac command on 3
+    episodes Mo picks. MinusPod's rules (12 s of speech, 5 minutes, carrying the
+    end on) and part of MinusPod's and Podly's wording are credited in
+    `FORK.md`.
 
 - [ ] **P4b. Find ads on the phone**
   - After transcription, the app finds the ads while it is open, playing, or in
@@ -547,6 +552,10 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
     the phone finds ads in an episode (the time it takes is written down here).
   - Files: `modules/podcasts/ios`, `podcasts/` (row, ads list, settings).
+  - Status: built and passing `check.sh`. Still open: the iOS build in CI and
+    the time it takes on the phone. Finding ads waits for the charger in the
+    background (`<bundle id>.podcastAds`); a failed run is not retried until the
+    app opens again.
 
 - [ ] **P4c. Skip ads in the player**
   - The Swift player skips each saved ad when playback reaches it (not when the
@@ -563,6 +572,9 @@ once reviewed and green.
   - Try it: play a downloaded episode with ads found and wait for the first ad.
   - Files: `PodcastKit` (skip rules), `modules/podcasts/ios` (player),
     `podcasts/` (note, seek bar, switches).
+  - Status: built and passing `check.sh`. Still open: the iOS build in CI and
+    the TestFlight check on 3 episodes. Only "sure" ads are skipped; a show's
+    own switches (P5a) win over the ones in Profile.
 
 ### Pocket Casts features (Mo's ask, 2026-11-17)
 
@@ -598,6 +610,8 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5f. Sleep timer** (S): 5 to 60 minutes or your own time, end of
       episode, end of chapter once P5g is in, add 5 minutes, and a fade-out at
       the end.
+  - Status: built and passing `check.sh` (Swift timer, 10 s fade-out, moon
+    button in the player). "End of chapter" waits for P5g.
 - [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
       from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
       read with OutcastID3, MIT, copied in), a chapter list in the player,
@@ -609,6 +623,8 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       headphones' next and previous buttons do (skip, next chapter or bookmark),
       mark an episode played when N seconds are left, and going back a few
       seconds after a long pause.
+  - Status: built and passing `check.sh`: a Playback section in Profile, kept in
+    Swift. "Next chapter or bookmark" waits for P5g and P5h.
 - [ ] **P5j. Volume boost and trim silence** (L): a second Swift player
       (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
       silent gaps, in three strengths, per show or for everything. Streamed
@@ -622,9 +638,14 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5m. Share and OPML** (S): share a show, an episode or the place playing
       now (the feed's own links); import and export your shows as an OPML file
       (with the document picker and share sheet the app already has).
+  - Status: built and passing `check.sh`. An episode is shared by its audio
+    address (the feed's episode web link is not stored).
 - [ ] **P5n. AirPlay and notifications** (S): the AirPlay button in the player,
       and a notification when a followed show has a new episode (per show, from
       P2c's background refresh).
+  - Status: built and passing `check.sh`: the AirPlay button and one local
+    notification per show per refresh, with one switch in Profile (off by
+    default). Per-show switches are not built.
 - [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
       play them like episodes, and put them in Up Next. They are transcribed and
       ad-checked like downloads.

@@ -43,6 +43,8 @@ describe("withLofiScorePods", () => {
       "PodcastDownloads",
       "PodcastTranscripts",
       "PodcastSpeech",
+      "PodcastAds",
+      "PodcastAdsOnDevice",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
@@ -50,7 +52,7 @@ describe("withLofiScorePods", () => {
     })
   })
 
-  it("adds the podcast feed reader's, player rules', downloads', transcripts' and speech pods from PodcastKit", () => {
+  it("adds the podcast feed reader's, player rules', downloads', transcripts', speech and ads pods from PodcastKit", () => {
     const plugins = withLofiScorePods([
       ["expo-build-properties", { ios: { extraPods: [] } }],
     ])
@@ -58,12 +60,14 @@ describe("withLofiScorePods", () => {
       string,
       { ios: { extraPods: { name: string; path: string }[] } },
     ]
-    expect(options.ios.extraPods.slice(-5)).toEqual([
+    expect(options.ios.extraPods.slice(-7)).toEqual([
       { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
       { name: "PodcastPlayback", path: "../../../libraries/PodcastKit" },
       { name: "PodcastDownloads", path: "../../../libraries/PodcastKit" },
       { name: "PodcastTranscripts", path: "../../../libraries/PodcastKit" },
       { name: "PodcastSpeech", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastAds", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastAdsOnDevice", path: "../../../libraries/PodcastKit" },
     ])
   })
 
@@ -97,6 +101,7 @@ describe("soundEdition", () => {
       BGTaskSchedulerPermittedIdentifiers: [
         `${forkIdentity.appId}.soundsImport`,
         `${forkIdentity.appId}.podcastTranscribe`,
+        `${forkIdentity.appId}.podcastAds`,
       ],
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: { NSAllowsArbitraryLoadsForMedia: true },
@@ -143,6 +148,7 @@ describe("soundEdition", () => {
       "upstream.task",
       `${forkIdentity.appId}.soundsImport`,
       `${forkIdentity.appId}.podcastTranscribe`,
+      `${forkIdentity.appId}.podcastAds`,
     ])
   })
 

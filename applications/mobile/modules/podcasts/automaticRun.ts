@@ -20,6 +20,7 @@ import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
 import { refreshAllShows } from "./dbFeeds"
 import { archiveEpisodes, syncShowSettings } from "./dbSettings"
 import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
+import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 import { listUpNext, queueEpisode } from "./upNextNative"
 
@@ -136,6 +137,7 @@ export function runAutomatic(): Promise<void> {
       )
       await startNew(added, settings)
       await queueNew(added)
+      await notifyAboutNewEpisodes(added)
       await deletePlayed(now, settings)
       await archiveByRules(now)
       await saveLastRun(now)

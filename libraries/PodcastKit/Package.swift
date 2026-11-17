@@ -4,9 +4,10 @@
 // screens. That is the feed reader (PodcastFeed), which turns an RSS feed into a
 // show and its episodes, the player's rules (PodcastPlayback), and the downloads' files
 // and bookkeeping (PodcastDownloads), and the transcripts of downloaded episodes
-// (PodcastTranscripts). Pure Swift and Foundation, so it builds and tests on Linux too. The
-// exceptions are PodcastSpeech and podcast-transcribe, which use Apple's Speech framework
-// and are empty on Linux.
+// (PodcastTranscripts) and finding the ads in them (PodcastAds). Pure Swift and Foundation, so
+// it builds and tests on Linux too. The exceptions are PodcastSpeech and podcast-transcribe,
+// which use Apple's Speech framework, and PodcastAdsOnDevice and podcast-ads, which use
+// Apple's Foundation Models framework; all four are empty on Linux.
 
 import PackageDescription
 
@@ -23,7 +24,10 @@ let package = Package(
         .library(name: "PodcastDownloads", targets: ["PodcastDownloads"]),
         .library(name: "PodcastTranscripts", targets: ["PodcastTranscripts"]),
         .library(name: "PodcastSpeech", targets: ["PodcastSpeech"]),
+        .library(name: "PodcastAds", targets: ["PodcastAds"]),
+        .library(name: "PodcastAdsOnDevice", targets: ["PodcastAdsOnDevice"]),
         .executable(name: "podcast-transcribe", targets: ["podcast-transcribe"]),
+        .executable(name: "podcast-ads", targets: ["podcast-ads"]),
     ],
     targets: [
         // RSS 2.0 with the iTunes tags: the show, its episodes, durations, dates and notes.
@@ -52,6 +56,25 @@ let package = Package(
         // `swift run podcast-transcribe <audio file>`: prints a file's transcript with times.
         .executableTarget(
             name: "podcast-transcribe", dependencies: ["PodcastSpeech", "PodcastTranscripts", "PodcastDownloads"],
+            swiftSettings: [.swiftLanguageMode(.v5)]),
+            // Ads: the detector interface, the chunker, the clean-up rules and the `.ads.` files.
+        // Foundation only (and the transcript's values), so it tests on Linux with a fake
+        // detector.
+        .target(name: "PodcastAds", dependencies: ["PodcastTranscripts"]),
+        .testTarget(name: "PodcastAdsTests", dependencies: ["PodcastAds"]),
+        // The detector made of Apple's on-device model (Foundation Models, iOS 26 and macOS 26).
+        // Empty where there is no such framework. Swift 5 mode for the same reason as
+        // PodcastSpeech: it cannot be compiled here.
+        .target(
+            name: "PodcastAdsOnDevice", dependencies: ["PodcastAds"],
+            swiftSettings: [.swiftLanguageMode(.v5)]),
+        // `swift run podcast-ads <transcript or audio file>`: prints the ads in an episode.
+        .executableTarget(
+            name: "podcast-ads",
+            dependencies: [
+                "PodcastAds", "PodcastAdsOnDevice", "PodcastSpeech", "PodcastTranscripts",
+                "PodcastDownloads",
+            ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

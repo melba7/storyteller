@@ -13,12 +13,15 @@ import {
   formatEpisodeDate,
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
+import { episodeShare } from "@/modules/podcasts/share"
 
+import { AdsFound } from "./AdsFound"
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { QueueButtons } from "./QueueButtons"
+import { ShareButton } from "./ShareButton"
 import { useEpisode, useShow } from "./hooks"
 
 /** The episode card, shown as a sheet: artwork, details, a big play button and the notes. */
@@ -115,6 +118,11 @@ export function PodcastEpisode({ id }: { id: string }) {
       >
         <Text>{current.archived ? "Unarchive" : "Archive"}</Text>
       </Button>
+      <ShareButton
+        label={`Share ${current.title}`}
+        build={() => episodeShare(current, show.data ?? null)}
+      />
+      <AdsFound episode={current} show={show.data ?? null} />
       <View className="w-full pt-2">
         {current.notes === "" ? (
           <Text className="text-muted-foreground">

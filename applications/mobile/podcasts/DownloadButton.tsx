@@ -5,12 +5,14 @@ import { useCSSVariable } from "uniwind"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { withAds } from "@/modules/podcasts/ads"
 import { downloadLook } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { withTranscript } from "@/modules/podcasts/transcripts"
 
 import { ProgressRing } from "./PlayButton"
+import { useAdsInfo } from "./useAds"
 import { pressDownload, useDownload } from "./useDownloads"
 import { useTranscript } from "./useTranscripts"
 
@@ -36,13 +38,15 @@ export function DownloadButton({
 }: Props) {
   const info = useDownload(episode.id)
   const transcript = useTranscript(episode.id)
+  const ads = useAdsInfo(episode.id)
   const primary = useCSSVariable("--color-primary") as string
   if (Podcasts === null) return null
   const look = downloadLook(info, episode.title)
   // The transcript only matters once the audio is on the phone.
-  const status = withTranscript(
-    look.status,
-    info?.state === "downloaded" ? transcript : undefined,
+  const downloaded = info?.state === "downloaded"
+  const status = withAds(
+    withTranscript(look.status, downloaded ? transcript : undefined),
+    downloaded && transcript?.state === "done" ? ads : undefined,
   )
   const inner = Math.round(size / 2)
   return (

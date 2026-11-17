@@ -84,6 +84,7 @@ function setup(last: StoredEpisode | null = null) {
       return ticks.length
     }),
     clearInterval: vi.fn(),
+    playedWithin: vi.fn(() => 0),
   } satisfies PlaybackDeps
   const playback = createPlayback(deps)
   const state = (
@@ -214,6 +215,114 @@ describe("playEpisode", () => {
     const playback = createPlayback({ ...deps, native: null })
     await playback.playEpisode(episode(), show)
     expect(playback.getView().error).toBe("Podcasts need the iOS app.")
+  })
+})
+
+describe("marking played when seconds are left", () => {
+  it("saves as played when the window is entered, once", async () => {
+    const { playback, deps, state } = setup()
+    deps.playedWithin.mockReturnValue(30)
+    await playback.playEpisode(episode(), show)
+    state(500, true)
+    expect(deps.savePlayback).not.toHaveBeenCalled()
+    state(570, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 570, true)
+    state(572, true)
+    expect(deps.savePlayback).toHaveBeenCalledTimes(1)
+  })
+
+  it("saves again after a seek back out and in", async () => {
+    const { playback, deps, state } = setup()
+    deps.playedWithin.mockReturnValue(30)
+    await playback.playEpisode(episode(), show)
+    state(580, true)
+    state(100, true)
+    state(575, true)
+    expect(deps.savePlayback).toHaveBeenCalledTimes(2)
+  })
+
+  it("does nothing when the setting is off", async () => {
+    const { playback, deps, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(590, true)
+    expect(deps.savePlayback).not.toHaveBeenCalled()
+  })
+
+  it("counts a pause inside the window as played", async () => {
+    const { playback, deps, state } = setup()
+    deps.playedWithin.mockReturnValue(60)
+    await playback.playEpisode(episode(), show)
+    state(530, true)
+    deps.savePlayback.mockClear()
+    state(545, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 545, true)
+  })
+})
+
+describe("the next button starting another episode", () => {
+  it("saves the place of the one that was playing", async () => {
+    const { playback, deps, handlers, state } = setup()
+    deps.getEpisode.mockResolvedValue(episode({ id: "e2" }))
+    await playback.playEpisode(episode(), show)
+    state(120, true)
+    deps.savePlayback.mockClear()
+    handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
+    await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
+    expect(deps.savePlayback).toHaveBeenCalledWith("e1", 120, false)
+  })
+
+  it("does not save again for one that already ended", async () => {
+    const { playback, deps, handlers } = setup()
+    deps.getEpisode.mockResolvedValue(episode({ id: "e2" }))
+    await playback.playEpisode(episode(), show)
+    handlers.onPlaybackEnded?.({
+      episodeId: "e1",
+      position: 600,
+      duration: 600,
+      played: true,
+    })
+    deps.savePlayback.mockClear()
+    handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
+    await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
+    expect(deps.savePlayback).not.toHaveBeenCalled()
+  })
+})
+
+describe("playFrom", () => {
+  it("loads a new episode at the given second, even if it was played", async () => {
+    const { playback, native } = setup()
+    await playback.playFrom(
+      episode({ positionSeconds: 30, played: true }),
+      show,
+      95,
+    )
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({
+        savedPosition: 95,
+        played: false,
+        autoplay: true,
+      }),
+    )
+    expect(playback.getView().position).toBe(95)
+  })
+
+  it("seeks the loaded episode and plays it", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(10, false)
+    await playback.playFrom(episode(), show, 95)
+    expect(native.load).toHaveBeenCalledTimes(1)
+    expect(native.seekTo).toHaveBeenCalledWith(95)
+    expect(native.play).toHaveBeenCalledTimes(1)
+  })
+
+  it("only seeks when the episode is already playing", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(10, true)
+    await playback.playFrom(episode(), show, 95)
+    expect(native.seekTo).toHaveBeenCalledWith(95)
+    expect(native.play).not.toHaveBeenCalled()
   })
 })
 

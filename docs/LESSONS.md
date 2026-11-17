@@ -26,3 +26,7 @@ One line per lesson.
   on macOS `XCTestCase` is an `NSObject`, so Fork CI failed to compile it. Don't
   give test classes properties that `NSObject` already has (`hash`,
   `description`, `name`).
+- Expo hands every JavaScript number to Swift as a `Double`, also whole ones, so
+  `values["x"] as? Int` on a `[String: Any]` from JavaScript is always nil and
+  the playback settings fell back to their defaults. Read numbers from
+  JavaScript as `Double` (or through a helper that takes both).

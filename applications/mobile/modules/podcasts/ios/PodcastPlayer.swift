@@ -38,6 +38,8 @@ final class PodcastPlayer {
   var current: QueueItem?
   /// The loaded episode played to its end.
   var currentEnded = false
+  /// Skips the saved ads of a downloaded episode (see PodcastPlayer+Ads.swift).
+  lazy var adSkipping = PodcastAdSkipping(self)
   private var ticks = 0
 
   private init() {
@@ -111,6 +113,7 @@ final class PodcastPlayer {
         to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
         toleranceAfter: .zero)
     }
+    adSkipping.begin(episode.id, startingAt: start)
     publish()
     if episode.autoplay { play() }
   }
@@ -123,6 +126,7 @@ final class PodcastPlayer {
     try? AVAudioSession.sharedInstance().setActive(true)
     // A finished episode starts over.
     if let duration = currentDuration, position >= duration - 0.5 { seek(to: 0) }
+    rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
     player.play()
     takeTheLockScreen()
@@ -141,6 +145,7 @@ final class PodcastPlayer {
 
   func seek(to seconds: Double) {
     let target = Skip.clamp(seconds, duration: currentDuration)
+    adSkipping.seeked(to: target)
     player.seek(
       to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero
@@ -248,12 +253,14 @@ final class PodcastPlayer {
   private func tick() {
     ticks += 1
     endAtOutroIfReached()
+    sleepTick()
     // The lock screen card keeps its own clock, so it is rewritten only now and then.
     publish(refreshCard: ticks % 10 == 0)
   }
 
   private func playStateChanged() {
     if player.timeControlStatus == .playing { takeTheLockScreen() }
+    if player.timeControlStatus == .paused { notePaused() }
     // Transcribing may run while a podcast plays, which keeps the app alive.
     PodcastTranscriber.shared.playbackChanged(isPlaying: player.timeControlStatus == .playing)
     publish()
@@ -284,8 +291,9 @@ final class PodcastPlayer {
     sink?(
       "onPlaybackEnded",
       ["episodeId": episodeId ?? "", "position": duration, "duration": duration, "played": true])
-    // The next queued episode starts here in Swift, so it also starts with the screen locked.
-    if startNextInQueue() { return }
+    // The next queued episode starts here in Swift, so it also starts with the screen locked,
+    // unless the sleep timer was set for the end of this one.
+    if !sleepStopsQueue(), startNextInQueue() { return }
     publish(positionOverride: duration)
   }
 

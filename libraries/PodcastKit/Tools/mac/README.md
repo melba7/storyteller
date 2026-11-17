@@ -37,6 +37,7 @@ the app is not added again.
 
 - `Sync Apple Podcasts now.command` runs one sync in a window.
 - `Transcribe an episode.command`: see the next section.
+- `Find ads in an episode.command`: see the section after it.
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -73,6 +74,24 @@ the Mac's; to use another one, run
 `libraries/PodcastKit`. A run that is stopped carries on where it was (progress
 is kept in the temporary folder). On a Mac without macOS 26 the tool only says
 so.
+
+## Find ads in an episode
+
+`Find ads in an episode.command` asks for a transcript (a
+`<hash>.transcript.json`) or an audio file, finds the ads with the same Swift
+code the app uses (Apple's on-device model through PodcastKit's `podcast-ads`),
+and saves the list next to the file as `<file name>.ads.txt`. An audio file is
+transcribed first, as above. Each line is one ad: its start and end, its length,
+its kind (an ad, or the hosts' own plug), how sure the model is, the advertiser
+and its first words. The app skips only the sure ones. Use it to check what the
+detector finds in an episode without a new build of the app.
+
+It needs macOS 26 with Apple Intelligence turned on (System Settings, Apple
+Intelligence & Siri) and Xcode 26. The first run builds the tool (about a
+minute). Each piece of about ten minutes takes the model a few seconds, so an
+hour-long episode takes a minute or so. If Apple Intelligence is off, or its
+model is still downloading, the tool says so and stops. On a Mac without macOS
+26 it only says so.
 
 ## Tests
 

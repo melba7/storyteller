@@ -52,9 +52,16 @@ final class PodcastLockScreen {
       Task { @MainActor in self?.onCommand?(command) }
       return .success
     }
+    refreshSkipIntervals()
+  }
+
+  /// The skip buttons use the amounts from the listener's playback settings.
+  func refreshSkipIntervals() {
+    guard owner.current == .podcast else { return }
+    let settings = PlaybackSettingsStore.current
     let commands = MPRemoteCommandCenter.shared()
-    commands.skipForwardCommand.preferredIntervals = [NSNumber(value: Skip.ahead)]
-    commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: Skip.back)]
+    commands.skipForwardCommand.preferredIntervals = [NSNumber(value: settings.skipForward)]
+    commands.skipBackwardCommand.preferredIntervals = [NSNumber(value: settings.skipBack)]
   }
 
   /// The book started playing: it gets the card, the buttons and its intervals back.
