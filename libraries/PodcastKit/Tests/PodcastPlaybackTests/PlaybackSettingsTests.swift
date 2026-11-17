@@ -76,6 +76,20 @@ final class PlaybackSettingsTests: XCTestCase {
     XCTAssertEqual(settings.values["headphoneNext"] as? String, "nextChapter")
   }
 
+  func testNextMakesABookmarkWhenAskedWhateverIsQueued() {
+    var settings = PlaybackSettings()
+    settings.headphoneNext = .bookmark
+    XCTAssertEqual(settings.nextAction(queueHasNext: true), .bookmark)
+    XCTAssertEqual(settings.nextAction(queueHasNext: false), .bookmark)
+  }
+
+  func testTheBookmarkChoiceIsStoredAndReadBack() {
+    var settings = PlaybackSettings()
+    settings.headphoneNext = .bookmark
+    XCTAssertEqual(settings.values["headphoneNext"] as? String, "bookmark")
+    XCTAssertEqual(PlaybackSettings(values: settings.values).headphoneNext, .bookmark)
+  }
+
   func testPreviousIsTheSkipBackAmount() {
     var settings = PlaybackSettings()
     settings.skipBack = 5

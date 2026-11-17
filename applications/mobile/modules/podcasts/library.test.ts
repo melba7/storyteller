@@ -72,6 +72,7 @@ function stored(
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
     ...overrides,
   }
 }
@@ -255,6 +256,7 @@ describe("rows", () => {
       played: false,
       lastPlayedAt: null,
       archived: false,
+      starredAt: null,
     })
   })
 

@@ -39,6 +39,7 @@ export function previewFromFeed(
       played: false,
       lastPlayedAt: null,
       archived: false,
+      starredAt: null,
     })
   }
   return {

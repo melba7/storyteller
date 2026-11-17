@@ -149,6 +149,7 @@ describe("queueItem", () => {
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
   } as StoredEpisode
   const show = {
     id: "s1",

@@ -24,7 +24,10 @@ export type Query<T> = {
  * Reads from the library and reads again whenever the library changes (a show added,
  * refreshed or removed) or `key` changes.
  */
-function useLibraryQuery<T>(load: () => Promise<T>, key: string): Query<T> {
+export function useLibraryQuery<T>(
+  load: () => Promise<T>,
+  key: string,
+): Query<T> {
   const version = useSyncExternalStore(onLibraryChanged, libraryVersion)
   const [state, setState] = useState<Query<T>>({
     data: undefined,

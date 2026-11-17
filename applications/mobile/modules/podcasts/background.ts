@@ -28,7 +28,18 @@ TaskManager.defineTask(TASK, async () => {
   }
 })
 
+/** Saves the bookmarks the headphones made while JavaScript wasn't running. */
+async function importBookmarks() {
+  try {
+    const { importPendingBookmarks } = await import("./dbBookmarks")
+    await importPendingBookmarks()
+  } catch (cause) {
+    console.warn("Couldn't import the headphone bookmarks", cause)
+  }
+}
+
 async function refreshInForeground() {
+  await importBookmarks()
   try {
     const { runIfDue } = await import("./automaticRun")
     await runIfDue()
@@ -42,6 +53,11 @@ if (Podcasts !== null) {
     minimumInterval: MINIMUM_INTERVAL,
   }).catch((cause: unknown) => {
     console.warn("Couldn't register the podcasts background task", cause)
+  })
+
+  // A bookmark made with the headphones while the app is open is saved at once.
+  Podcasts.addListener("onBookmarksPending", () => {
+    void importBookmarks()
   })
 
   const later = () => setTimeout(refreshInForeground, FOREGROUND_DELAY_MS)

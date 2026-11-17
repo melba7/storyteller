@@ -9,6 +9,8 @@ public enum HeadphoneNext: String, Equatable, Sendable {
   case nextEpisode
   /// Go to the start of the next chapter (skips ahead in the last chapter or with none).
   case nextChapter
+  /// Add a bookmark at the place playing now.
+  case bookmark
 }
 
 /// What the player does about a press of the headphones' or lock screen's next button.
@@ -16,6 +18,7 @@ public enum HeadphoneAction: Equatable, Sendable {
   case skip(seconds: Double)
   case nextEpisode
   case nextChapter
+  case bookmark
 }
 
 /// The listener's playback settings. Stored natively because the player uses them with the
@@ -75,9 +78,10 @@ public struct PlaybackSettings: Equatable, Sendable {
     ]
   }
 
-  /// What the next button does now. Next episode needs one in Up Next and next chapter needs a
-  /// chapter ahead; otherwise it skips.
+  /// What the next button does now. A bookmark is made whatever the queue holds; next
+  /// episode needs one in Up Next and next chapter a chapter ahead; otherwise it skips.
   public func nextAction(queueHasNext: Bool, chapterAhead: Bool = false) -> HeadphoneAction {
+    if headphoneNext == .bookmark { return .bookmark }
     if headphoneNext == .nextChapter && chapterAhead { return .nextChapter }
     if headphoneNext == .nextEpisode && queueHasNext { return .nextEpisode }
     return .skip(seconds: Double(skipForward))

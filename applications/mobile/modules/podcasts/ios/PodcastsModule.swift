@@ -47,7 +47,7 @@ public final class PodcastsModule: Module {
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
       "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange",
-      "onAdsChange", "onAdSkipped", "onAdUndone", "onChaptersChange")
+      "onAdsChange", "onAdSkipped", "onAdUndone", "onChaptersChange", "onBookmarksPending")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -185,6 +185,17 @@ public final class PodcastsModule: Module {
       let kept = PlaybackSettingsStore.save(values)
       await MainActor.run { PodcastPlayer.shared.settingsChanged() }
       return kept.values
+    }
+
+    // MARK: Bookmarks
+
+    // The bookmarks the headphones made while the app wasn't running, as a JSON list (see
+    // PendingBookmarks). The app saves them, then asks to remove the ones it saved.
+    AsyncFunction("readPendingBookmarks") { () async -> String in
+      await MainActor.run { PodcastPlayer.readPendingBookmarks() }
+    }
+    AsyncFunction("removePendingBookmarks") { (ids: [String]) async throws in
+      try await MainActor.run { try PodcastPlayer.removePendingBookmarks(ids: ids) }
     }
 
     // MARK: Sleep timer

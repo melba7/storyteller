@@ -1,10 +1,11 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Pause, Play } from "lucide-react-native"
+import { Pause, Play, Star } from "lucide-react-native"
 import { ActivityIndicator, ScrollView, View } from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { setPlayed, setStarred } from "@/modules/podcasts/dbEpisodes"
 import {
   archiveEpisodes,
   unarchiveEpisodes,
@@ -18,10 +19,12 @@ import { episodeShare } from "@/modules/podcasts/share"
 import { AdsFound } from "./AdsFound"
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
+import { EpisodeBookmarks } from "./EpisodeBookmarks"
 import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { QueueButtons } from "./QueueButtons"
 import { ShareButton } from "./ShareButton"
+import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { useEpisode, useShow } from "./hooks"
 
 /** The episode card, shown as a sheet: artwork, details, a big play button and the notes. */
@@ -104,6 +107,46 @@ export function PodcastEpisode({ id }: { id: string }) {
       </Button>
       <QueueButtons episode={current} show={show.data ?? null} />
       <DownloadButton episode={current} size={44} showStatus />
+      <View className="flex-row flex-wrap items-center justify-center gap-2">
+        <Button
+          variant="ghost"
+          accessibilityLabel={`${current.starredAt === null ? "Star" : "Unstar"} ${current.title}`}
+          onPress={() => {
+            setStarred([current.id], current.starredAt === null).catch(
+              (cause: unknown) =>
+                console.warn("Couldn't change the episode's star", cause),
+            )
+          }}
+        >
+          <Icon
+            as={Star}
+            size={18}
+            className="text-primary"
+            fill={current.starredAt === null ? "none" : "currentColor"}
+          />
+          <Text>{current.starredAt === null ? "Star" : "Starred"}</Text>
+        </Button>
+        <Button
+          variant="ghost"
+          accessibilityLabel={`Add ${current.title} to a playlist`}
+          onPress={() =>
+            void chooseAndAddToPlaylist(current, show.data ?? null)
+          }
+        >
+          <Text>Add to playlist</Text>
+        </Button>
+        <Button
+          variant="ghost"
+          accessibilityLabel={`${current.played ? "Mark unplayed" : "Mark played"} ${current.title}`}
+          onPress={() => {
+            setPlayed([current.id], !current.played).catch((cause: unknown) =>
+              console.warn("Couldn't change the episode's played mark", cause),
+            )
+          }}
+        >
+          <Text>{current.played ? "Mark unplayed" : "Mark played"}</Text>
+        </Button>
+      </View>
       <Button
         variant="ghost"
         accessibilityLabel={`${current.archived ? "Unarchive" : "Archive"} ${current.title}`}
@@ -123,6 +166,7 @@ export function PodcastEpisode({ id }: { id: string }) {
         build={() => episodeShare(current, show.data ?? null)}
       />
       <AdsFound episode={current} show={show.data ?? null} />
+      <EpisodeBookmarks episode={current} show={show.data ?? null} />
       <View className="w-full pt-2">
         {current.notes === "" ? (
           <Text className="text-muted-foreground">

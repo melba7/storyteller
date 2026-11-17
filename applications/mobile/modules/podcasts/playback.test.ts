@@ -35,6 +35,7 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
     ...overrides,
   }
 }

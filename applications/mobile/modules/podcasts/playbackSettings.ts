@@ -11,7 +11,7 @@ import {
   parseTrim,
 } from "./sound"
 
-export type HeadphoneNext = "skip" | "nextEpisode" | "nextChapter"
+export type HeadphoneNext = "skip" | "nextEpisode" | "nextChapter" | "bookmark"
 
 export type PlaybackSettings = {
   /** Seconds the back button jumps. */
@@ -34,6 +34,7 @@ export const HEADPHONE_NEXT_CHOICES = [
   "skip",
   "nextEpisode",
   "nextChapter",
+  "bookmark",
 ] as const satisfies readonly HeadphoneNext[]
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 45, 60] as const
@@ -58,6 +59,28 @@ function oneOf<T extends number>(
   return choices.find((choice) => choice === value) ?? fallback
 }
 
+function oneOfText<T extends string>(
+  value: unknown,
+  choices: readonly T[],
+  fallback: T,
+): T {
+  return choices.find((choice) => choice === value) ?? fallback
+}
+
+/** What each headphone choice is called in Profile. */
+export function headphoneNextLabel(choice: HeadphoneNext): string {
+  switch (choice) {
+    case "skip":
+      return "Skip ahead"
+    case "nextEpisode":
+      return "Next in Up Next"
+    case "nextChapter":
+      return "Next chapter"
+    case "bookmark":
+      return "Add a bookmark"
+  }
+}
+
 /** Stored values; anything missing or not one of the choices keeps its default. */
 export function parsePlaybackSettings(value: unknown): PlaybackSettings {
   const defaults = DEFAULT_PLAYBACK_SETTINGS
@@ -70,10 +93,11 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       SKIP_CHOICES,
       defaults.skipForward,
     ),
-    headphoneNext:
-      HEADPHONE_NEXT_CHOICES.find(
-        (choice) => choice === record["headphoneNext"],
-      ) ?? defaults.headphoneNext,
+    headphoneNext: oneOfText(
+      record["headphoneNext"],
+      HEADPHONE_NEXT_CHOICES,
+      defaults.headphoneNext,
+    ),
     markPlayedWhenLeft: oneOf(
       record["markPlayedWhenLeft"],
       MARK_PLAYED_CHOICES,
@@ -83,12 +107,6 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
     voiceBoost: parseBoost(record["voiceBoost"]),
     trimSilence: parseTrim(record["trimSilence"]),
   }
-}
-
-/** The words for each choice of the headphones' next button. */
-export function headphoneNextLabel(choice: HeadphoneNext): string {
-  if (choice === "nextEpisode") return "Next in Up Next"
-  return choice === "nextChapter" ? "Next chapter" : "Skip ahead"
 }
 
 /** "5 s", "1 min". */

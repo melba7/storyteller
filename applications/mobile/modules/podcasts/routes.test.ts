@@ -29,6 +29,15 @@ describe("tabBase", () => {
     )
   })
 
+  it("stays in the Playlists tab", () => {
+    expect(
+      tabBase(["(root)", "podcasts", "(tabs)", "(playlists)", "playlist"]),
+    ).toBe("/podcasts/(tabs)/(playlists)")
+    expect(
+      showHref(["(tabs)", "(playlists)", "show", "[id]"], "s1").pathname,
+    ).toBe("/podcasts/(tabs)/(playlists)/show/[id]")
+  })
+
   it("uses the Podcasts tab otherwise", () => {
     expect(tabBase(["(root)", "podcasts", "(tabs)", "(library)"])).toBe(
       "/podcasts/(tabs)/(library)",

@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { ArrowUpDown, Settings } from "lucide-react-native"
+import { ArrowUpDown, ListChecks, Settings } from "lucide-react-native"
 import { View } from "react-native"
 
 import { Button } from "@/components/ui/button"
@@ -19,15 +19,18 @@ const SORTS: { id: EpisodeSort; title: string }[] = [
 ]
 
 /**
- * The show page's two buttons: how the episodes are ordered and grouped (kept per show), and
- * the show's settings.
+ * The show page's buttons: how the episodes are ordered and grouped (kept per show), picking
+ * several episodes, and the show's settings.
  */
 export function ShowBarButtons({
   show,
   archivedCount,
+  onSelect,
 }: {
   show: Show
   archivedCount: number
+  /** Starts picking several episodes. */
+  onSelect: () => void
 }) {
   const router = useRouter()
   const segments = useSegments()
@@ -73,6 +76,14 @@ export function ShowBarButtons({
           <Icon as={ArrowUpDown} size={20} className="text-primary" />
         </Button>
       </Menu>
+      <Button
+        variant="ghost"
+        size="icon"
+        accessibilityLabel="Select episodes"
+        onPress={onSelect}
+      >
+        <Icon as={ListChecks} size={20} className="text-primary" />
+      </Button>
       <Button
         variant="ghost"
         size="icon"

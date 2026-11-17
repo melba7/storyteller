@@ -215,6 +215,8 @@ export type PodcastsEvents = {
   onAdsChange: (change: AdsChange) => void
   onAdSkipped: (event: AdSkipped) => void
   onAdUndone: (event: AdUndone) => void
+  /** The headphones made a bookmark: `readPendingBookmarks` has it. */
+  onBookmarksPending: () => void
   onPlaybackState: (state: PlaybackState) => void
   onPlaybackEnded: (event: PlaybackEnded) => void
   onPlaybackError: (event: PlaybackError) => void
@@ -244,6 +246,13 @@ type PodcastsNativeModule = {
 
   /** Saves every show's playback settings (JSON, show id to settings) for the player. */
   writeShowSettings(json: string): Promise<void>
+  /**
+   * The bookmarks the headphones made (`Podcasts/pending-bookmarks.json`) as a JSON list;
+   * "[]" when there are none. They stay in the file until `removePendingBookmarks`.
+   */
+  readPendingBookmarks(): Promise<string>
+  /** Takes the bookmarks with these ids out of the file, once they are saved. */
+  removePendingBookmarks(ids: string[]): Promise<void>
 
   /** "granted", "denied" or "undetermined" (not asked yet). */
   notificationPermission(): Promise<"granted" | "denied" | "undetermined">
