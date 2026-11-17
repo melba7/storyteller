@@ -1,8 +1,9 @@
+import { syncApplePodcasts } from "./appleSync"
 // LOFI-FORK: the podcasts section's automatic downloads and clean-up (see FORK.md).
 //
-// What the app does by itself when it comes to the front and in the background task: read
-// every feed, download each show's newest new episode (always on Wi-Fi) and delete played
-// downloads after a day. The rules are in automatic.ts. Not imported by any test, because the
+// What the app does by itself when it comes to the front and in the background task: follow
+// what the Mac wrote from Apple Podcasts (appleSync.ts), read every feed, download each show's
+// newest new episode (always on Wi-Fi) and delete played downloads after a day. The rules are in automatic.ts. Not imported by any test, because the
 // database and the native module are not there.
 import {
   type AutomaticSettings,
@@ -62,6 +63,8 @@ export function runAutomatic(): Promise<void> {
     try {
       const now = Date.now()
       const settings = await loadSettings()
+      // First, so a show followed on the Mac is in the library when the feeds are read.
+      await syncApplePodcasts()
       const { added } = await refreshAllShows()
       await startNew(added, settings)
       await deletePlayed(now, settings)
@@ -73,8 +76,14 @@ export function runAutomatic(): Promise<void> {
   return running
 }
 
-/** The same, when the last run was 30 or more minutes ago. */
+/**
+ * The same, when the last run was 30 or more minutes ago. Otherwise only the Apple Podcasts
+ * follow list is read, which is cheap, so a show followed on the Mac shows up on every open.
+ */
 export async function runIfDue(): Promise<void> {
-  if (!refreshDue(await loadLastRun(), Date.now())) return
+  if (!refreshDue(await loadLastRun(), Date.now())) {
+    await syncApplePodcasts()
+    return
+  }
   await runAutomatic()
 }

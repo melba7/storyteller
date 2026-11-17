@@ -127,6 +127,7 @@ in `FORK.md`.
 | 2026-11-17 | Playing from a list puts the episode that was playing back at the top of Up Next, unless it had finished                                   | Pocket Casts' rule (Mo's ask); nothing is lost             |
 | 2026-11-17 | Background refresh runs in JS through `expo-background-task` (defined from `store/store.ts`); no new Swift task                            | Reuses the refresh code; iOS picks when it runs            |
 | 2026-11-17 | Automatic downloads are the newest new episode per show and always wait for Wi-Fi, whatever the switch says                                | No surprise data use; a deleted episode is not new again   |
+| 2026-11-17 | The Mac writes the Apple Podcasts follow list to a JSON file in the linked sounds folder; the phone reads it                               | One way; a seen list stops an unsubscribed show returning  |
 
 ## Known problems
 

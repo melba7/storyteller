@@ -437,6 +437,15 @@ once reviewed and green.
     installer, `.command` files, README), `modules/podcasts` (reading the file,
     with tests), `LofiScoreHost` or `modules/lofi-score` (handing over the
     linked folder), `tools/fork/check.sh` (the Python tests).
+  - Status: built and passing `check.sh`; the Mac job has not run on a real Mac
+    and the iOS build has not run yet. Mo's one-time Mac step: double-click
+    `Install Apple Podcasts sync.command` in `libraries/PodcastKit/Tools/mac/`
+    and allow the macOS prompt (or add `/bin/bash` to Full Disk Access; the
+    README says where). The names of Apple's tables and columns come from other
+    tools that read the same file, not from Mo's Mac, so the first run is the
+    real test: if Apple's format differs, the script says which name is missing.
+    The phone reads the file on every app open and in the background refresh;
+    the first read subscribes to everything followed but downloads nothing.
 
 - [ ] **P3a. Transcribe downloaded episodes**
   - After a download, `SpeechTranscriber` (with time ranges) writes the episode

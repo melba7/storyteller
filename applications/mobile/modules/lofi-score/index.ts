@@ -234,6 +234,12 @@ type LofiScoreNativeModule = {
    * score or the book is not on the device.
    */
   installBookScore(bookUuid: string, score: string): Promise<LofiStatus>
+  /**
+   * The text of one small file below the linked sounds folder, such as
+   * `Podcasts/apple-podcasts.json`. Null when no folder is linked or the file
+   * is missing, not downloaded from iCloud yet, or not text.
+   */
+  readLinkedFolderFile(path: string): Promise<string | null>
   /** Deletes the imported sounds and forgets the linked folder. */
   removeImportedSounds(): Promise<LofiStatus>
   setAtmosphereEnabled(enabled: boolean): Promise<LofiStatus>
