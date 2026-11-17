@@ -11,6 +11,7 @@ import {
 } from "@op-engineering/op-sqlite"
 import { Platform } from "react-native"
 
+import { rememberUnsubscribed } from "./appleMemory"
 import { notifyLibraryChanged } from "./changes"
 import { deleteDownloads } from "./downloadsNative"
 import { RECORD_LISTEN_SQL } from "./episodeSql"
@@ -196,6 +197,7 @@ export async function saveArtworkColor(
  */
 export async function unsubscribe(id: string): Promise<void> {
   const db = await database()
+  const show = await getShow(id)
   const found = await rows("SELECT id FROM episodes WHERE show_id = ?", [id])
   const ids = found.map((row) => String(row["id"]))
   await deleteDownloads(ids)
@@ -204,5 +206,7 @@ export async function unsubscribe(id: string): Promise<void> {
     await tx.execute("DELETE FROM episodes WHERE show_id = ?", [id])
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])
   })
+  // The Apple Podcasts list never adds a show the listener dropped.
+  if (show) await rememberUnsubscribed(show.feedUrl)
   notifyLibraryChanged()
 }

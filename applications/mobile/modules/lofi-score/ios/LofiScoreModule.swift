@@ -179,6 +179,24 @@ public final class LofiScoreModule: Module {
       return String(data: data, encoding: .utf8)
     }
 
+    // The same file, with why there is nothing when there is nothing: "found" (with `text`),
+    // "notLinked", "folderGone", "missing", "notDownloaded" (iCloud was asked for it) or
+    // "unreadable" (with `message`).
+    AsyncFunction("readLinkedFolderFileStatus") { (path: String) async -> [String: Any] in
+      switch await LofiScoreRuntime.shared.host.fetchLinkedFile(path) {
+      case .found(let data):
+        guard let text = String(data: data, encoding: .utf8) else {
+          return ["status": "unreadable", "message": "The file is not text."]
+        }
+        return ["status": "found", "text": text]
+      case .notLinked: return ["status": "notLinked"]
+      case .folderGone: return ["status": "folderGone"]
+      case .missing: return ["status": "missing"]
+      case .notDownloaded: return ["status": "notDownloaded"]
+      case .unreadable(let message): return ["status": "unreadable", "message": message]
+      }
+    }
+
     AsyncFunction("removeImportedSounds") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.removeImportedSounds()

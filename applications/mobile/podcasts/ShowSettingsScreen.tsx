@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Minus, Plus } from "lucide-react-native"
-import { type ReactNode } from "react"
-import { ActivityIndicator, ScrollView, View } from "react-native"
+import { type ReactNode, useEffect, useRef } from "react"
+import { ActivityIndicator, Alert, ScrollView, View } from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
@@ -9,6 +9,7 @@ import { Menu } from "@/components/ui/menu"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import { saveShowSettings } from "@/modules/podcasts/dbSettings"
+import { readableError } from "@/modules/podcasts/nativeError"
 import { speedLabel } from "@/modules/podcasts/playbackRules"
 import {
   type AfterPlayed,
@@ -177,6 +178,18 @@ const SPEED_CHOICES: readonly (number | null)[] = [null, ...SPEEDS]
 export function ShowSettingsScreen({ id }: { id: string }) {
   const show = useShow(id)
   const current = show.data
+  // The settings as last asked for, until the library has read them back: a second change
+  // before that builds on the first instead of undoing it.
+  const pending = useRef<ShowSettings | null>(null)
+  useEffect(() => {
+    if (
+      pending.current !== null &&
+      current &&
+      JSON.stringify(pending.current) === JSON.stringify(current.settings)
+    ) {
+      pending.current = null
+    }
+  }, [current])
   if (show.loading) {
     return (
       <>
@@ -201,9 +214,13 @@ export function ShowSettingsScreen({ id }: { id: string }) {
   }
   const settings = current.settings
   const change = (patch: Partial<ShowSettings>) => {
-    saveShowSettings(id, { ...settings, ...patch }).catch((cause: unknown) =>
-      console.warn("Couldn't save the show's settings", cause),
-    )
+    const next = { ...(pending.current ?? settings), ...patch }
+    pending.current = next
+    saveShowSettings(id, next).catch((cause: unknown) => {
+      pending.current = null
+      console.warn("Couldn't save the show's settings", cause)
+      Alert.alert("Couldn't save the setting", readableError(cause))
+    })
   }
   return (
     <>

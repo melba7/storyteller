@@ -88,7 +88,10 @@ export interface PlaybackDeps {
    * own download as the bytes arrive (so ads can be skipped in it)? It is asked before the
    * episode loads; a play pressed meanwhile wins. An answer that fails means "no".
    */
-  playThroughDownload?(episode: StoredEpisode): Promise<boolean> | boolean
+  playThroughDownload?(
+    episode: StoredEpisode,
+    show: Show | null,
+  ): Promise<boolean> | boolean
   /** Reports a failure that has no screen to show it (saving the place). */
   report?(cause: unknown): void
 }
@@ -336,7 +339,8 @@ export function createPlayback(deps: PlaybackDeps) {
     const turn = ++playTurn
     let throughDownload = false
     try {
-      throughDownload = (await deps.playThroughDownload?.(episode)) ?? false
+      throughDownload =
+        (await deps.playThroughDownload?.(episode, show)) ?? false
     } catch (cause) {
       deps.report?.(cause)
     }

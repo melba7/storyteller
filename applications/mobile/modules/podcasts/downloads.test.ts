@@ -10,6 +10,7 @@ import {
   formatStorage,
   mapFromList,
   shouldDownloadOnPlay,
+  skipAdsFor,
   sortDownloads,
   storageOf,
 } from "./downloads"
@@ -245,6 +246,34 @@ describe("shouldDownloadOnPlay", () => {
       ).toBe(false)
     }
   })
+  it("plays through its own download when the automatic one has not started", () => {
+    const waiting = { episodeId: "e1", automatic: true }
+    expect(
+      shouldDownloadOnPlay(stream, info({ ...waiting, state: "queued" }), true),
+    ).toBe(true)
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ ...waiting, state: "downloading", bytes: 0 }),
+        true,
+      ),
+    ).toBe(true)
+    // Once bytes have arrived, or when the listener asked for it, it is left alone.
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ ...waiting, state: "downloading", bytes: 5 }),
+        true,
+      ),
+    ).toBe(false)
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ episodeId: "e1", automatic: false, state: "queued" }),
+        true,
+      ),
+    ).toBe(false)
+  })
   it("does nothing when Skip ads is off", () => {
     expect(shouldDownloadOnPlay(stream, undefined, false)).toBe(false)
   })
@@ -253,5 +282,14 @@ describe("shouldDownloadOnPlay", () => {
     expect(shouldDownloadOnPlay({ id: "preview:s:1" }, undefined, true)).toBe(
       false,
     )
+  })
+})
+
+describe("skipAdsFor", () => {
+  it("takes the show's own choice when it has one, else the main switch", () => {
+    expect(skipAdsFor(true, false)).toBe(true)
+    expect(skipAdsFor(false, true)).toBe(false)
+    expect(skipAdsFor(null, true)).toBe(true)
+    expect(skipAdsFor(undefined, false)).toBe(false)
   })
 })

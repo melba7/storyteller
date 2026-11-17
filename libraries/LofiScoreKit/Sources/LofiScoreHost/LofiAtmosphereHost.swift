@@ -88,6 +88,8 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
     private var settings: AtmosphereSettings { environment.settings }
     private let queue = DispatchQueue(label: "LofiScore.host")
     private let work = DispatchQueue(label: "LofiScore.host.work", qos: .userInitiated)
+    /// Reads of small linked files, apart from `work` (a sounds sync can wait on iCloud for long).
+    private let reads = DispatchQueue(label: "LofiScore.host.read", qos: .userInitiated, attributes: .concurrent)
 
     // State on `queue`.
     private var started = false
@@ -373,13 +375,20 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
     /// One small file from the linked folder (``LinkedFolderFile``), or nil when no folder is
     /// linked, the folder or file is gone, or the file is not downloaded yet.
     public func readLinkedFile(_ path: String) async -> Data? {
+        if case .found(let data) = await fetchLinkedFile(path) { return data }
+        return nil
+    }
+
+    /// What reading one small file from the linked folder found. It runs on its own queue, so a
+    /// sounds sync that is waiting for iCloud does not hold it up.
+    public func fetchLinkedFile(_ path: String) async -> LinkedFolderFile.Outcome {
         let bookmark = await onQueue { [self] in settings.linkedFolderBookmark }
-        guard let bookmark else { return nil }
+        guard let bookmark else { return .notLinked }
         let resolve = environment.resolveBookmark
         return await withCheckedContinuation { continuation in
-            work.async {
-                guard let folder = try? resolve(bookmark) else { return continuation.resume(returning: nil) }
-                continuation.resume(returning: LinkedFolderFile.read(path, in: folder))
+            reads.async {
+                guard let folder = try? resolve(bookmark) else { return continuation.resume(returning: .folderGone) }
+                continuation.resume(returning: LinkedFolderFile.fetch(path, in: folder))
             }
         }
     }

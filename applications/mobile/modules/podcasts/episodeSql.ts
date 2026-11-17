@@ -24,6 +24,14 @@ export const SET_PLAYED_SQL =
 export const RECORD_LISTEN_SQL =
   "UPDATE episodes SET position_seconds = ?, played = ?, last_played_at = ?, history_at = ? WHERE id = ?"
 
+/**
+ * An episode finished in Apple Podcasts. Params: the time of the sync, show id, the feed's
+ * guid. It starts the clean-up clock (`last_played_at`) if none is running, so "delete
+ * played" and "archive after a day or week" apply, and leaves the history alone.
+ */
+export const MARK_PLAYED_FROM_APPLE_SQL =
+  "UPDATE episodes SET played = 1, last_played_at = COALESCE(last_played_at, ?) WHERE show_id = ? AND guid = ? AND played = 0"
+
 /** Episodes listened to, the most recent first. */
 export const HISTORY_SQL =
   "SELECT * FROM episodes WHERE history_at IS NOT NULL ORDER BY history_at DESC"

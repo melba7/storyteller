@@ -174,10 +174,19 @@ export function downloadsSummary(map: DownloadMap): string {
   return `${count} ${noun}, ${formatStorage(storageOf(map))}`
 }
 
+/** Whether ads are skipped for a show: its own choice where it has one, else the main switch. */
+export function skipAdsFor(
+  show: boolean | null | undefined,
+  main: boolean,
+): boolean {
+  return show ?? main
+}
+
 /**
  * Whether playing this episode should start its download: "Skip ads" is on, the episode is a
  * feed episode (not an added file or a preview) and it is not downloaded, queued or on its way.
- * A failed download is tried again.
+ * A failed download is tried again, and so is a new episode's automatic one that has not
+ * received a byte (it waits for Wi-Fi; the player cancels it and plays through its own).
  */
 export function shouldDownloadOnPlay(
   episode: { id: string },
@@ -186,5 +195,10 @@ export function shouldDownloadOnPlay(
 ): boolean {
   if (!skipAds) return false
   if (isLocalEpisodeId(episode.id) || isPreviewId(episode.id)) return false
-  return download === undefined || download.state === "failed"
+  if (download === undefined || download.state === "failed") return true
+  if (download.automatic !== true) return false
+  return (
+    download.state === "queued" ||
+    (download.state === "downloading" && (download.bytes ?? 0) === 0)
+  )
 }

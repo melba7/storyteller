@@ -228,7 +228,7 @@ describe("playEpisode", () => {
     const { playback, deps, state } = setup()
     await playback.playEpisode(episode(), show)
     expect(deps.playThroughDownload).toHaveBeenCalledTimes(1)
-    expect(deps.playThroughDownload).toHaveBeenCalledWith(episode())
+    expect(deps.playThroughDownload).toHaveBeenCalledWith(episode(), show)
     state(5, false)
     await playback.playEpisode(episode(), show)
     expect(deps.playThroughDownload).toHaveBeenCalledTimes(1)

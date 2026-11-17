@@ -170,7 +170,11 @@ describe("queueItem", () => {
       duration: 1000,
       position: 300,
       chaptersUrl: null,
+      language: null,
     })
+  })
+  it("carries the show's language, so the next episode is transcribed in it", () => {
+    expect(queueItem(episode, { ...show, language: "de" }).language).toBe("de")
   })
   it("carries the chapters address", () => {
     const chaptered = { ...episode, chaptersUrl: "https://x.test/c.json" }

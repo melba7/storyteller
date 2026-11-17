@@ -22,6 +22,7 @@ export function queueItem(
     type: episode.audioType,
     chaptersUrl: episode.chaptersUrl,
     title: episode.title,
+    language: show?.language ?? null,
     showTitle: show?.title ?? "",
     artworkUrl: episode.imageUrl ?? show?.imageUrl ?? null,
     duration: episode.durationSeconds,

@@ -4,11 +4,13 @@
 // charts. These use db.ts's open file. Not imported by any test, because op-sqlite is native.
 import { randomUUID } from "expo-crypto"
 
-import { findShowByFeed } from "./applePodcasts"
+import { settleArrived, loadList, PENDING_KEY } from "./appleMemory"
+import { feedKey, findShowByFeed, pendingGuids } from "./applePodcasts"
 import { type NewEpisode, newEpisodes } from "./automatic"
 import { CACHE_KEEP_MS, PRUNE_CACHE_SQL } from "./cacheSql"
 import { notifyLibraryChanged } from "./changes"
 import { database, getShow, listEpisodes, listShows, rows } from "./db"
+import { MARK_PLAYED_FROM_APPLE_SQL } from "./episodeSql"
 import { normalizeFeedUrl } from "./feedUrl"
 import { Podcasts, type PodcastFeedData } from "./index"
 import {
@@ -42,6 +44,12 @@ export async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
 
 /** A pull-to-refresh and the automatic run never read one show at the same time. */
 const oneRefreshAtATime = serialByKey()
+
+/**
+ * Two follows of one feed (the Apple Podcasts list, an OPML import, a pasted link) never run
+ * at the same time, whatever the spelling of the address: the second finds the show.
+ */
+const oneFollowAtATime = serialByKey()
 
 function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
   return [
@@ -98,13 +106,20 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
 }
 
 /** Subscribes to the feed at this link (a pasted one or one from the directory). */
-export async function subscribe(link: string): Promise<Show> {
+export function subscribe(link: string): Promise<Show> {
   const feedUrl = normalizeFeedUrl(link)
+  return oneFollowAtATime(feedKey(feedUrl), () => follow(feedUrl))
+}
+
+async function follow(feedUrl: string): Promise<Show> {
   // The same feed under another spelling (http, www, a closing slash) is the same show.
   const existing = findShowByFeed(await listShows(), feedUrl)
   if (existing) return existing
 
   const feed = await fetchFeed(feedUrl)
+  // Looked at again: another follow of a feed that moved may have saved it meanwhile.
+  const savedMeanwhile = findShowByFeed(await listShows(), feedUrl)
+  if (savedMeanwhile) return savedMeanwhile
   const now = Date.now()
   const id = randomUUID()
   const { insert } = mergeEpisodes([], feed.episodes.map(fetchedEpisode))
@@ -160,6 +175,13 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     feed.episodes.map(fetchedEpisode),
   )
   const ids = insert.map(() => randomUUID())
+  // Episodes Apple Podcasts says were finished before they reached this phone arrive played,
+  // so they do not count as new.
+  const finished = pendingGuids(
+    await loadList(PENDING_KEY).catch(() => []),
+    show.feedUrl,
+  )
+  const arrived = insert.map((episode) => finished.has(episode.guid))
   const db = await database()
   await db.transaction(async (tx) => {
     await tx.execute(
@@ -183,29 +205,59 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     for (const [at, episode] of insert.entries()) {
       const [sql, params] = insertEpisode(ids[at] as string, id, episode)
       await tx.execute(sql, [...params])
+      if (arrived[at]) {
+        await tx.execute(MARK_PLAYED_FROM_APPLE_SQL, [
+          Date.now(),
+          id,
+          episode.guid,
+        ])
+      }
     }
     for (const { id: episodeId, episode } of update) {
       const [sql, params] = updateEpisode(episodeId, episode)
       await tx.execute(sql, [...params])
     }
   })
+  await settleArrived(
+    show.feedUrl,
+    insert.filter((_, at) => arrived[at]).map((episode) => episode.guid),
+  )
   notifyLibraryChanged()
-  return newEpisodes(id, insert, ids, stored)
+  return newEpisodes(
+    id,
+    insert.filter((_, at) => !arrived[at]),
+    ids.filter((_, at) => !arrived[at]),
+    stored,
+  )
 }
 
 /**
  * Refreshes every show, one after the other. A show that fails does not stop the rest.
- * `added` is every episode the refresh added.
+ * `added` is every episode the refresh added. `onAdded` is called with each show's new
+ * episodes as soon as that show is read, so a run that is cut short loses none of them. The
+ * Apple Podcasts list is read first, but for no more than 30 seconds (a pull-to-refresh
+ * reads it too); the automatic run reads it itself and passes `appleSync: false`.
  */
-export async function refreshAllShows(): Promise<{
+export async function refreshAllShows(
+  options: {
+    appleSync?: boolean
+    onAdded?: (added: NewEpisode[]) => Promise<void>
+  } = {},
+): Promise<{
   failed: string[]
   added: NewEpisode[]
 }> {
   const failed: string[] = []
   const added: NewEpisode[] = []
+  if (options.appleSync !== false) {
+    const { syncApplePodcastsBriefly } = await import("./appleSync")
+    await syncApplePodcastsBriefly()
+  }
   for (const show of feedShows(await listShows())) {
     try {
-      added.push(...(await refreshShow(show.id)))
+      const batch = await refreshShow(show.id)
+      added.push(...batch)
+      if (batch.length > 0) await options.onAdded?.(batch)
     } catch {
       failed.push(show.title)
     }

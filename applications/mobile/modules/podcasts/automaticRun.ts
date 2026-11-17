@@ -1,4 +1,4 @@
-import { syncApplePodcasts } from "./appleSync"
+import { syncApplePodcastsBriefly } from "./appleSync"
 import { archivesByItself, episodesToArchive } from "./archive"
 // LOFI-FORK: the podcasts section's automatic downloads and clean-up (see FORK.md).
 //
@@ -14,9 +14,16 @@ import {
   downloadsToDelete,
   episodesForUpNext,
   episodesToDownload,
+  mergeFollowUps,
   refreshDue,
 } from "./automatic"
-import { loadLastRun, loadSettings, saveLastRun } from "./automaticSettings"
+import {
+  loadFollowUps,
+  loadLastRun,
+  loadSettings,
+  saveFollowUps,
+  saveLastRun,
+} from "./automaticSettings"
 import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
 import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
@@ -204,13 +211,24 @@ export function runAutomatic(): Promise<void> {
       await importPendingBookmarks().catch((cause) =>
         console.warn("Couldn't import the headphone bookmarks", cause),
       )
-      // First, so a show followed on the Mac is in the library when the feeds are read.
-      await syncApplePodcasts()
-      const { added } = await refreshAllShows()
+      // First, so a show followed on the Mac is in the library when the feeds are read, but
+      // the feeds do not wait more than 30 seconds for it.
+      await syncApplePodcastsBriefly()
+      // The new episodes are kept as each show is read, so a run that is cut short (the
+      // background task's time ran out) still follows them up next time.
+      let todo = await loadFollowUps()
+      await refreshAllShows({
+        appleSync: false,
+        onAdded: async (batch) => {
+          todo = mergeFollowUps(todo, batch)
+          await saveFollowUps(todo)
+        },
+      })
       await syncShowSettings().catch((cause) =>
         console.warn("Couldn't save the show settings for the player", cause),
       )
-      await followUpNew(added, settings)
+      await followUpNew(todo, settings)
+      await saveFollowUps([])
       await downloadForPlaylists(now, settings).catch((cause) =>
         console.warn("Couldn't download for the playlists", cause),
       )
@@ -230,7 +248,7 @@ export function runAutomatic(): Promise<void> {
  */
 export async function runIfDue(): Promise<void> {
   if (!refreshDue(await loadLastRun(), Date.now())) {
-    await syncApplePodcasts()
+    await syncApplePodcastsBriefly()
     // In full at startup, so the player has every show's settings even on a quiet open.
     await syncShowSettings().catch((cause) =>
       console.warn("Couldn't save the show settings for the player", cause),

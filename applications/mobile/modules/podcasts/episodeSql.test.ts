@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   CLEAR_HISTORY_SQL,
   HISTORY_SQL,
+  MARK_PLAYED_FROM_APPLE_SQL,
   SET_PLAYED_SQL,
   SET_STARRED_SQL,
   STAR_ORDER_SQL,
@@ -118,5 +119,35 @@ describe("the listening history", () => {
       { id: "a", history_at: 700 },
       { id: "b", history_at: null },
     ])
+  })
+})
+
+describe("marking played from Apple Podcasts", () => {
+  it("stamps the clean-up time once and leaves the history alone", () => {
+    const db = setup()
+    db.prepare("UPDATE episodes SET last_played_at = 50 WHERE id = 'b'").run()
+    for (const id of ["a", "b"]) {
+      db.prepare(MARK_PLAYED_FROM_APPLE_SQL).run(900, "show-1", id)
+    }
+    expect(
+      db
+        .prepare(
+          "SELECT id, played, last_played_at, history_at FROM episodes WHERE id IN ('a', 'b', 'c') ORDER BY id",
+        )
+        .all(),
+    ).toEqual([
+      { id: "a", played: 1, last_played_at: 900, history_at: null },
+      { id: "b", played: 1, last_played_at: 50, history_at: null },
+      { id: "c", played: 0, last_played_at: null, history_at: null },
+    ])
+  })
+
+  it("matches by the show and the feed's guid, and only an unplayed episode", () => {
+    const db = openTestDatabase()
+    addShow(db)
+    addEpisode(db, { id: "a", guid: "g1", played: 1 })
+    expect(
+      db.prepare(MARK_PLAYED_FROM_APPLE_SQL).run(900, "show-1", "g1").changes,
+    ).toBe(0)
   })
 })

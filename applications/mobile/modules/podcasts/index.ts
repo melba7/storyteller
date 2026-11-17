@@ -128,6 +128,8 @@ export type DownloadInfo = {
   date?: number
   /** Plain words for a failed download. */
   reason?: string
+  /** Asked for by the app by itself (a new episode), not by the listener. */
+  automatic?: boolean
   /** Milliseconds since 1970. */
   updatedAt: number
 }
@@ -207,6 +209,8 @@ export type UpNextItem = {
   position: number
   /** The feed's JSON chapters file; missing in a queue saved before chapters. */
   chaptersUrl?: string | null
+  /** The show's language, for the transcript; missing in a queue saved before this. */
+  language?: string | null
 }
 
 /** The queue changed. `items` is the whole queue, in play order. */

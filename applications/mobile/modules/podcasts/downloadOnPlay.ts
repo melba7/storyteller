@@ -7,16 +7,21 @@
 // one, so it shows in the Downloads list. Not imported by any test, because the native module
 // is not there; the rule it uses is shouldDownloadOnPlay.
 import { getAdSkipSettings } from "./adsNative"
-import { shouldDownloadOnPlay } from "./downloads"
+import { shouldDownloadOnPlay, skipAdsFor } from "./downloads"
 import { listDownloads } from "./downloadsNative"
-import type { StoredEpisode } from "./library"
+import type { Show, StoredEpisode } from "./library"
 
-/** True when the episode should play through its own download. Any failure means "no". */
+/**
+ * True when the episode should play through its own download: Skip ads is on for its show
+ * (the show's own choice, else the main switch). Any failure means "no".
+ */
 export async function playThroughDownload(
   episode: StoredEpisode,
+  show: Show | null,
 ): Promise<boolean> {
   try {
-    const { skipAds } = await getAdSkipSettings()
+    const main = await getAdSkipSettings()
+    const skipAds = skipAdsFor(show?.settings.skipAds, main.skipAds)
     if (!skipAds) return false
     const download = (await listDownloads()).find(
       (info) => info.episodeId === episode.id,
