@@ -209,8 +209,19 @@ in `FORK.md`.
 | 2026-11-17 | Podcasts screens return their list first with no wrapping View; bar, status bar and overlays come after it                                 | iOS tracks the first scroll view only                      |
 | 2026-11-17 | The selection bar is drawn over the list under the header, with a 48 pt spacer at the top of the list                                      | The list has to stay first                                 |
 | 2026-11-17 | Bottom-pinned controls use `pb-safe-offset-3`, never `pb-safe` with another bottom padding                                                 | A later `pb-N` overrides the inset                         |
-| 2026-11-17 | App Transport Security allows any load; https is tried first and a download falls back once to the feed's http address                     | Some feeds serve only http                                 |
+| 2026-11-17 | App Transport Security sets only `NSAllowsArbitraryLoads`; https is tried first, a download falls back once to the feed's http address     | Apple ignores it next to the media/web/local keys          |
 | 2026-11-17 | The downloads list is a shared route (`downloadsHref`); the Library has a Downloaded row and Profile keeps its row                         | Mo could not find Downloads                                |
+| 2026-11-17 | Podcasts has Apple Podcasts' tabs (Home, New, Library, Search) over one shared route group; Profile is the modal stack `/podcasts/account` | Mo asked for Apple's look and structure                    |
+| 2026-11-17 | Home's Up Next: in progress by last played, then the newest unplayed of each show, at most 20; Top Shows rank by recent plays              | The stats keep no listening time per show                  |
+| 2026-11-17 | One cadence rule (`cadence.ts`, the median gap of the six newest dates) for Home's "Updated …" and the show page                           | Both pages said different things                           |
+| 2026-11-17 | The episode menu is a pure layout (`episodeMenuModel`) drawn on iOS by an `@expo/ui` SwiftUI Menu with Save and Share on top               | The community menu can't draw that top row                 |
+| 2026-11-17 | The episode page is a plain push in the tab stack; View Transcript shows only for the episode loaded in the player                         | A sheet hid the pages pushed from it                       |
+| 2026-11-17 | The player sheet takes the artwork's colour (`playerSheet.ts`) with white or black ink; it remembers the last tab for its links            | Light artwork needs black text; a modal names no tab       |
+| 2026-11-17 | The volume slider is a second Expo module (`PodcastsVolumeModule`); show tiles zoom into the show page, the mini player doesn't            | One native view per module; the accessory is off-stack     |
+| 2026-11-17 | Play-through resumes a dropped connection with Range + If-Range on the redirected address, taking only a 206 at the bytes on disk          | Never join two versions of a file                          |
+| 2026-11-17 | Play-through falls back to the plain address before its first byte or without a length; an unfinished entry is dropped at launch           | Playback first; no stale "Stopped" rows                    |
+| 2026-11-17 | The Apple follow list is read with a file coordinator on its own queue, again after 20, 30 and 60 s, with its status in Profile            | An iCloud placeholder reads as nothing                     |
+| 2026-11-17 | Ads found in a transcript so far count as found for the player, the ads list and the status line until the full pass is done               | Skipping starts while transcribing                         |
 
 ## Known problems
 

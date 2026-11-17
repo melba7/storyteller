@@ -2,8 +2,9 @@
 
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix and R1 to R8
-from Mo's first try are in review in one pull request; the Apple Podcasts
-redesign (A1 to A6) and a second bug check go into the same pull request
+from Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug
+check (B2) are built in one pull request; waiting on the iOS build in CI and
+Fable 5.2's final check
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -929,6 +930,10 @@ TestFlight build.
       up; the screens are checked after the redesign (A6).
   - Done when: every finding is fixed or noted with a reason, `check.sh` passes
     and the iOS build passes in CI.
+  - Status: S1 to S8 and D1 to D16 fixed 2026-11-17 (ATS, resuming and falling
+    back play-through, the downloader knowing about it, Up Next language, the
+    Apple follow list read with retries and a status row in Profile, pending
+    Apple-played episodes, serial subscribe); Fable 5.2 reviews the fixes.
 - [ ] **A1. Tabs and rooms** (L): Home, New, Library and Search (the system
       search tab); the account button and Profile as a sheet; the Library list
       and Recently Updated; Shows as its own screen; the Up Next page with the
@@ -961,9 +966,15 @@ TestFlight build.
 - [ ] **A5. Search and New** (M): category tiles, scopes, featured cards and
       ranked Top Shows.
   - Done when: `check.sh` passes.
+  - Status: built 2026-11-17 (paging featured cards, ranked Top Shows, For You
+    shelves, gradient category tiles, scope chips, a shared `SectionHeader`).
 - [ ] **A6. Look and motion check** (M): every screen against the screenshots in
       each theme, animations with Reduce Motion, VoiceOver and large text.
   - Done when: the Opus check's findings are fixed and `check.sh` passes.
+  - Status: the check found 27 items (L1 to L27, 2026-11-17); all fixed but the
+    mini player's title fade (the glass has no colour to fade into) and the
+    episode artwork's zoom (no tile opens an episode). The final check of the
+    whole pull request is Fable 5.2's (Mo, 2026-11-17).
 
 ## Later
 

@@ -55,3 +55,9 @@ One line per lesson.
 - Keep a round of Mo's fixes in one pull request and one TestFlight build. I
   planned the streaming ad skip for "after this round is on TestFlight", and Mo
   asked why it was split: add the bigger fix to the same pull request instead.
+- Apple's App Transport Security keys cancel each other:
+  `NSAllowsArbitraryLoads` is ignored when `NSAllowsArbitraryLoadsForMedia`,
+  `...InWebContent` or `NSAllowsLocalNetworking` is set. Check the final plist,
+  not one key.
+- Run `yarn oxfmt` on directories before `check.sh`: on single files it can sort
+  imports differently from the check.

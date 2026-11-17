@@ -95,9 +95,10 @@ with a card's "…" menu open, 05 a show's episode list scrolled, 06 a show page
 - **Type**: SF Pro (the system font) everywhere in Podcasts, bold for titles, as
   Apple does. The brand serif leaves the Podcasts section.
 - **Colour**: Apple's purple accent (`#9B42F5` light, `#B57BFF` dark, close to
-  the screenshots) as the primary of the default Podcasts look, which follows
-  iOS light and dark with the system backgrounds. The other themes keep working
-  with their own primary.
+  the screenshots) and the system backgrounds come from the app's own light and
+  dark theme, which the Books restyle gives Apple's colours for the whole app.
+  The Podcasts screens use theme tokens only, so the other Podcasts themes keep
+  working with their own primary.
 - **Episode rows** (05, 06): a grey line "Oct 6 · 5h ago" style date (with the
   season or "Played" when it applies), the title in bold (up to 4 lines), one or
   two grey lines of description, the episode's artwork at the right (about 96
