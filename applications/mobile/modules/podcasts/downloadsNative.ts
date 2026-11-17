@@ -17,8 +17,9 @@ export async function startDownload(
   episodeId: string,
   url: string,
   type: string,
+  automatic = false,
 ): Promise<void> {
-  await Podcasts?.download(episodeId, url, type)
+  await Podcasts?.download(episodeId, url, type, automatic)
 }
 
 export async function cancelDownload(episodeId: string): Promise<void> {

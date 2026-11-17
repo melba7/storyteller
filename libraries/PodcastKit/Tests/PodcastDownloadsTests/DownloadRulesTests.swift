@@ -181,3 +181,15 @@ final class DownloadRecoveryTests: XCTestCase {
       DownloadRecovery.decide(DownloadFailure()), .fail("The download failed, tap to try again"))
   }
 }
+
+final class NetworkPolicyTests: XCTestCase {
+  func testAutomaticDownloadsAlwaysWaitForWifi() {
+    XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: true, setting: false))
+    XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: true, setting: true))
+  }
+
+  func testTheListenersDownloadsFollowTheSwitch() {
+    XCTAssertFalse(NetworkPolicy.wifiOnly(automatic: false, setting: false))
+    XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: false, setting: true))
+  }
+}

@@ -4,6 +4,7 @@
 // charts. These use db.ts's open file. Not imported by any test, because op-sqlite is native.
 import { randomUUID } from "expo-crypto"
 
+import { type NewEpisode, newEpisodes } from "./automatic"
 import { notifyLibraryChanged } from "./changes"
 import { database, getShow, listEpisodes, listShows, rows } from "./db"
 import { normalizeFeedUrl } from "./feedUrl"
@@ -35,13 +36,13 @@ export async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
 
 // MARK: Writing
 
-function insertEpisode(showId: string, episode: FetchedEpisode) {
+function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
   return [
     `INSERT INTO episodes (id, show_id, guid, title, published_at, duration_seconds, notes,
        audio_url, audio_type, audio_bytes, image_url, season, number)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      randomUUID(),
+      id,
       showId,
       episode.guid,
       episode.title,
@@ -111,7 +112,7 @@ export async function subscribe(link: string): Promise<Show> {
       ],
     )
     for (const episode of insert) {
-      const [sql, params] = insertEpisode(id, episode)
+      const [sql, params] = insertEpisode(randomUUID(), id, episode)
       await tx.execute(sql, [...params])
     }
   })
@@ -121,15 +122,19 @@ export async function subscribe(link: string): Promise<Show> {
   return show
 }
 
-/** Reads the show's feed again: adds new episodes, updates changed ones, deletes none. */
-export async function refreshShow(id: string): Promise<void> {
+/**
+ * Reads the show's feed again: adds new episodes, updates changed ones, deletes none. Returns
+ * the episodes it added, for downloading the newest one by itself.
+ */
+export async function refreshShow(id: string): Promise<NewEpisode[]> {
   const show = await getShow(id)
-  if (!show) return
+  if (!show) return []
   const feed = await fetchFeed(show.feedUrl)
   const { insert, update } = mergeEpisodes(
     await listEpisodes(id),
     feed.episodes.map(fetchedEpisode),
   )
+  const ids = insert.map(() => randomUUID())
   const db = await database()
   await db.transaction(async (tx) => {
     await tx.execute(
@@ -147,8 +152,8 @@ export async function refreshShow(id: string): Promise<void> {
         id,
       ],
     )
-    for (const episode of insert) {
-      const [sql, params] = insertEpisode(id, episode)
+    for (const [at, episode] of insert.entries()) {
+      const [sql, params] = insertEpisode(ids[at] as string, id, episode)
       await tx.execute(sql, [...params])
     }
     for (const { id: episodeId, episode } of update) {
@@ -157,19 +162,27 @@ export async function refreshShow(id: string): Promise<void> {
     }
   })
   notifyLibraryChanged()
+  return newEpisodes(id, insert, ids)
 }
 
-/** Refreshes every show, one after the other. A show that fails does not stop the rest. */
-export async function refreshAllShows(): Promise<{ failed: string[] }> {
+/**
+ * Refreshes every show, one after the other. A show that fails does not stop the rest.
+ * `added` is every episode the refresh added.
+ */
+export async function refreshAllShows(): Promise<{
+  failed: string[]
+  added: NewEpisode[]
+}> {
   const failed: string[] = []
+  const added: NewEpisode[] = []
   for (const show of await listShows()) {
     try {
-      await refreshShow(show.id)
+      added.push(...(await refreshShow(show.id)))
     } catch {
       failed.push(show.title)
     }
   }
-  return { failed }
+  return { failed, added }
 }
 
 // MARK: Kept answers

@@ -382,6 +382,16 @@ once reviewed and green.
   - Files: `modules/podcasts/ios` (background task, like
     `LofiBackgroundImport.swift`), `fork.config.ts` (task id, background fetch),
     `podcasts/` (settings).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. It
+    ran as JavaScript, not Swift: `modules/podcasts/background.ts` defines an
+    `expo-background-task` task (imported from `store/store.ts`, a second marker
+    there) and refreshes when the app comes to the front, at most every 30
+    minutes. New episodes download by themselves (newest per show, on Wi-Fi
+    only, whatever the Wi-Fi switch says); played downloads go a day after they
+    were played, never the one loaded in the player. Both are switches in
+    Profile, on by default. iOS decides when the background task runs (often
+    overnight), so "a new episode appears without opening the app" can only be
+    checked over a night.
 
 - [ ] **P2d. Apple Podcasts share links** (Mo's choice, 2026-11-16)
   - Add also takes a link copied from Apple Podcasts

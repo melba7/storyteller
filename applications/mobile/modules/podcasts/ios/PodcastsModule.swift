@@ -140,10 +140,12 @@ public final class PodcastsModule: Module {
     // MARK: Downloading
 
     // Starts downloading an episode; carries on with the app closed. `type` is the feed's
-    // audio type, used to name the file.
-    AsyncFunction("download") { (episodeId: String, url: String, type: String) throws in
+    // audio type, used to name the file. `automatic` marks a new episode the app fetches by
+    // itself: those always wait for Wi-Fi.
+    AsyncFunction("download") { (episodeId: String, url: String, type: String, automatic: Bool) throws in
       do {
-        try PodcastDownloader.shared.download(episodeId: episodeId, url: url, type: type)
+        try PodcastDownloader.shared.download(
+          episodeId: episodeId, url: url, type: type, automatic: automatic)
       } catch {
         throw PodcastFetchError(message: error.localizedDescription)
       }

@@ -146,7 +146,8 @@ public final class DownloadStore: @unchecked Sendable {
       let previous = index.entries.first { $0.episodeId == episodeId }
       let entry = DownloadEntry(
         episodeId: episodeId, url: previous?.url ?? "", fileExtension: fileExtension,
-        state: .downloaded(file: name, sha256: sha256, bytes: bytes, date: date), updatedAt: date)
+        state: .downloaded(file: name, sha256: sha256, bytes: bytes, date: date), updatedAt: date,
+        automatic: previous?.automatic ?? false)
       replace(entry)
       try save()
       return entry

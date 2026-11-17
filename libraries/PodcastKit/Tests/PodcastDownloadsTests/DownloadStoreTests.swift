@@ -51,6 +51,33 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(reopened.entry(for: "b")?.state, .downloading(bytes: 10, expected: 100))
   }
 
+  func testTheAutomaticFlagSurvivesARestartAndAnOldIndexMeansFalse() throws {
+    let store = try DownloadStore(root: root)
+    var auto = entry("a", .queued)
+    auto.automatic = true
+    try store.put(auto)
+    try store.put(entry("b", .queued))
+    let reopened = try DownloadStore(root: root)
+    XCTAssertEqual(reopened.entry(for: "a")?.automatic, true)
+    XCTAssertEqual(reopened.entry(for: "b")?.automatic, false)
+
+    // An index from before the flag existed.
+    let old = """
+      {"version":1,"entries":[{"episodeId":"c","url":"https://x.example/c.mp3",\
+      "fileExtension":"mp3","state":{"kind":"queued"},"updatedAt":"2026-11-17T10:00:00Z"}]}
+      """
+    try Data(old.utf8).write(to: root.appendingPathComponent("index.json"))
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "c")?.automatic, false)
+  }
+
+  func testFinishingKeepsTheAutomaticFlag() throws {
+    let store = try DownloadStore(root: root)
+    var auto = entry("a", .queued)
+    auto.automatic = true
+    try store.put(auto)
+    XCTAssertTrue(try finish(store, "a").automatic)
+  }
+
   func testAnIndexThatCannotBeReadIsSetAsideAndTheStoreStartsEmpty() throws {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     try Data("not json".utf8).write(to: root.appendingPathComponent("index.json"))

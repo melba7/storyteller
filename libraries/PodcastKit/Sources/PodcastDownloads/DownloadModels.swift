@@ -76,16 +76,36 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   public var fileExtension: String
   public var state: DownloadState
   public var updatedAt: Date
+  /// Started by the app by itself (a new episode), not by the listener. These wait for Wi-Fi
+  /// whatever the "Download only on Wi-Fi" switch says.
+  public var automatic: Bool
 
   public init(
     episodeId: String, url: String, fileExtension: String, state: DownloadState,
-    updatedAt: Date = Date()
+    updatedAt: Date = Date(), automatic: Bool = false
   ) {
     self.episodeId = episodeId
     self.url = url
     self.fileExtension = fileExtension
     self.state = state
     self.updatedAt = updatedAt
+    self.automatic = automatic
+  }
+
+  private enum Keys: String, CodingKey {
+    case episodeId, url, fileExtension, state, updatedAt, automatic
+  }
+
+  /// An index written before automatic downloads has no `automatic`: it means false.
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: Keys.self)
+    self.init(
+      episodeId: try c.decode(String.self, forKey: .episodeId),
+      url: try c.decode(String.self, forKey: .url),
+      fileExtension: try c.decode(String.self, forKey: .fileExtension),
+      state: try c.decode(DownloadState.self, forKey: .state),
+      updatedAt: try c.decode(Date.self, forKey: .updatedAt),
+      automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false)
   }
 }
 

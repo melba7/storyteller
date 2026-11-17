@@ -52,6 +52,12 @@ public enum DownloadFile {
   }
 }
 
+public enum NetworkPolicy {
+  /// Whether a download may only use Wi-Fi. The app's own downloads of new episodes always
+  /// wait for Wi-Fi; the listener's follow the "Download only on Wi-Fi" switch.
+  public static func wifiOnly(automatic: Bool, setting: Bool) -> Bool { automatic || setting }
+}
+
 /// What to do with an index entry when the app starts again.
 public enum RelaunchAction: Sendable, Equatable {
   case keep

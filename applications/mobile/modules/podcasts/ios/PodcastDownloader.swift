@@ -107,7 +107,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
 
   // MARK: Asking
 
-  func download(episodeId: String, url: String, type: String) throws {
+  func download(episodeId: String, url: String, type: String, automatic: Bool) throws {
     guard let store else { throw PodcastFetchError(message: "Downloads are not available.") }
     _ = try store.folder(for: episodeId)
     guard let address = URL(string: url), let scheme = address.scheme?.lowercased(),
@@ -121,7 +121,8 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     lock.withLock { retries[episodeId] = nil }
     let entry = DownloadEntry(
       episodeId: episodeId, url: address.absoluteString,
-      fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued)
+      fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued,
+      automatic: automatic)
     try store.put(entry)
     emit(entry)
     begin(entry)
@@ -153,7 +154,9 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
       return fail(entry.episodeId, "This episode has no downloadable link.")
     }
     var request = URLRequest(url: address)
-    let wifiOnly = DownloadSettings.wifiOnly
+    // New episodes the app fetches by itself always wait for Wi-Fi.
+    let wifiOnly = NetworkPolicy.wifiOnly(
+      automatic: entry.automatic, setting: DownloadSettings.wifiOnly)
     request.allowsCellularAccess = !wifiOnly
     request.allowsExpensiveNetworkAccess = !wifiOnly
     launch(session.downloadTask(with: request), for: entry.episodeId)

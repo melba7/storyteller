@@ -157,8 +157,16 @@ type PodcastsNativeModule = {
   removeFromUpNext(id: string): Promise<void>
   clearUpNext(): Promise<void>
 
-  /** Starts downloading an episode. It carries on with the app closed. */
-  download(episodeId: string, url: string, type: string): Promise<void>
+  /**
+   * Starts downloading an episode. It carries on with the app closed. `automatic` is for new
+   * episodes the app fetches by itself: they always wait for Wi-Fi.
+   */
+  download(
+    episodeId: string,
+    url: string,
+    type: string,
+    automatic: boolean,
+  ): Promise<void>
   /** Stops a download that is not finished and forgets it. */
   cancelDownload(episodeId: string): Promise<void>
   /** Removes a download: the audio, its side files and its entry. */

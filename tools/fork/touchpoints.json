@@ -50,8 +50,8 @@
     },
     {
       "file": "applications/mobile/store/store.ts",
-      "markers": 1,
-      "purpose": "Imports lofi/readerFollow.ts for its listeners, so the sounds follow the pages while the listener reads a readaloud book on screen with the narration stopped."
+      "markers": 2,
+      "purpose": "Imports lofi/readerFollow.ts for its listeners, so the sounds follow the pages while the listener reads a readaloud book on screen with the narration stopped. Also imports modules/podcasts/background.ts, which defines the podcasts background task while the app starts (iOS may start the app in the background just to run it)."
     },
     {
       "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",

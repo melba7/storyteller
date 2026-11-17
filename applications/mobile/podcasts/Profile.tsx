@@ -8,6 +8,14 @@ import { Pressable, View } from "react-native"
 import { Icon } from "@/components/ui/icon"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
+import {
+  type AutomaticSettings,
+  DEFAULT_SETTINGS,
+} from "@/modules/podcasts/automatic"
+import {
+  loadSettings,
+  saveSettings,
+} from "@/modules/podcasts/automaticSettings"
 import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
@@ -21,6 +29,7 @@ export function Profile() {
   const router = useRouter()
   const map = useDownloadMap()
   const [wifiOnly, setWifi] = useState<boolean | null>(null)
+  const [automatic, setAutomatic] = useState<AutomaticSettings | null>(null)
 
   useEffect(() => {
     let live = true
@@ -36,6 +45,23 @@ export function Profile() {
       live = false
     }
   }, [])
+
+  useEffect(() => {
+    let live = true
+    loadSettings().then((value) => {
+      if (live) setAutomatic(value)
+    })
+    return () => {
+      live = false
+    }
+  }, [])
+
+  function changeAutomatic(patch: Partial<AutomaticSettings>) {
+    const before = automatic ?? DEFAULT_SETTINGS
+    const next = { ...before, ...patch }
+    setAutomatic(next)
+    saveSettings(next).catch(() => setAutomatic(before))
+  }
 
   function change(on: boolean) {
     const before = wifiOnly
@@ -90,7 +116,47 @@ export function Profile() {
               />
             )}
           </View>
+          <SettingRow
+            title="Download new episodes"
+            body="New episodes of the shows you follow download by themselves, on Wi-Fi only."
+            checked={automatic?.downloadNew ?? null}
+            onChange={(on) => changeAutomatic({ downloadNew: on })}
+          />
+          <SettingRow
+            title="Delete played downloads after a day"
+            body="A download is removed a day after you played it."
+            checked={automatic?.deletePlayed ?? null}
+            onChange={(on) => changeAutomatic({ deletePlayed: on })}
+          />
         </View>
+      )}
+    </View>
+  )
+}
+
+function SettingRow({
+  title,
+  body,
+  checked,
+  onChange,
+}: {
+  title: string
+  body: string
+  checked: boolean | null
+  onChange: (on: boolean) => void
+}) {
+  return (
+    <View className="border-border flex-row items-center gap-3 border-b py-3">
+      <View className="flex-1">
+        <Text className="font-semibold">{title}</Text>
+        <Text className="text-muted-foreground text-sm">{body}</Text>
+      </View>
+      {checked === null ? null : (
+        <Switch
+          accessibilityLabel={title}
+          checked={checked}
+          onCheckedChange={onChange}
+        />
       )}
     </View>
   )
