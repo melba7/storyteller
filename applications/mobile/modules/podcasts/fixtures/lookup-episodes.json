@@ -1,0 +1,38 @@
+{
+  "resultCount": 4,
+  "results": [
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 1535809341,
+      "collectionName": "Space Talk",
+      "feedUrl": "https://feeds.example.com/space-talk"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "trackId": 1000700001,
+      "trackName": "The Moon Base Episode",
+      "collectionName": "Space Talk",
+      "collectionId": 1535809341,
+      "releaseDate": "2023-01-02T10:30:00Z",
+      "episodeGuid": "abc-123",
+      "episodeUrl": "https://cdn.example.com/moon.mp3?src=apple",
+      "feedUrl": "https://feeds.example.com/space-talk"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "trackId": 1000700002,
+      "trackName": "Only an address",
+      "collectionName": "Space Talk",
+      "episodeUrl": "https://cdn.example.com/only.mp3",
+      "feedUrl": "https://feeds.example.com/space-talk"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "trackId": 1000700003,
+      "trackName": "Nothing to match on",
+      "collectionName": "Space Talk",
+      "feedUrl": "https://feeds.example.com/space-talk"
+    }
+  ]
+}

@@ -404,6 +404,12 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
     link shared from Apple Podcasts adds that show.
   - Files: `modules/podcasts/directory.ts` (+ test), `podcasts/AddPodcast.tsx`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    link field in Discover takes an Apple Podcasts link or an RSS link ("Paste a
+    link"). A link with `?i=` opens that episode's card over the show when the
+    feed has it (matched through Apple's episode lookup), else the show. No
+    "paste from clipboard" button: `expo-clipboard` is not an app dependency,
+    and the brief said to skip it then.
 
 - [ ] **P2e. Follow Apple Podcasts from the Mac** (Mo's choice, 2026-11-16)
   - One way only, from Apple Podcasts to Storyteller. An hourly launchd job on

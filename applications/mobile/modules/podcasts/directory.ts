@@ -162,3 +162,117 @@ export async function searchDirectoryEpisodes(
     ),
   )
 }
+
+// MARK: Apple Podcasts share links
+
+/** What a link copied from Apple Podcasts points at. */
+export type AppleLink = {
+  /** Apple's id for the show (the digits after `id`). */
+  showId: string
+  /** Apple's id for the episode, when the link has `?i=`. */
+  episodeId: string | null
+}
+
+const APPLE_LINK =
+  /^https?:\/\/(?:podcasts|itunes)\.apple\.com(\/[^?#\s]*)?(?:\?([^#\s]*))?(?:#\S*)?$/i
+
+/**
+ * Reads a link shared from Apple Podcasts (`podcasts.apple.com/<country>/podcast/<slug>/id<number>`,
+ * or the older `itunes.apple.com` form), with or without `?i=<episode>` and other query
+ * parameters. Returns null for any other link, and for one with no id.
+ */
+export function parseAppleLink(input: string): AppleLink | null {
+  const match = APPLE_LINK.exec(input.trim())
+  if (!match) return null
+  const showId = (match[1] ?? "")
+    .split("/")
+    .map((part) => /^id(\d+)$/i.exec(part)?.[1])
+    .find((id) => id !== undefined)
+  if (!showId) return null
+  let episodeId: string | null = null
+  for (const pair of (match[2] ?? "").split("&")) {
+    const [key, value = ""] = pair.split("=")
+    if (key === "i" && /^\d+$/.test(value)) episodeId = value
+  }
+  return { showId, episodeId }
+}
+
+const LOOKUP_URL = "https://itunes.apple.com/lookup?id="
+
+/** Reads the feed address from Apple's lookup answer for one show. */
+export function parseLookupFeed(json: unknown, showId: string): string {
+  const results =
+    typeof json === "object" && json !== null
+      ? (json as { results?: unknown }).results
+      : undefined
+  if (!Array.isArray(results) || results.length === 0) {
+    throw new Error("Apple's directory has no show for this link.")
+  }
+  const shows = parseDirectoryResults(json)
+  const feed = (shows.find((show) => show.id === showId) ?? shows[0])?.feedUrl
+  if (!feed) throw new Error("Apple doesn't list a feed for this show.")
+  return feed
+}
+
+/** Asks Apple's free lookup for the feed address of a show. Throws a message to read. */
+export async function lookupFeedUrl(
+  showId: string,
+  fetchFn: FetchFn = fetch,
+): Promise<string> {
+  const json = await directoryJson(
+    `${LOOKUP_URL}${encodeURIComponent(showId)}&entity=podcast`,
+    fetchFn,
+  )
+  return parseLookupFeed(json, showId)
+}
+
+/** How to find an Apple episode in the show's own feed. */
+export type AppleEpisodeMatch = { guid: string | null; audioUrl: string | null }
+
+/** The feed's id and audio address for the episode Apple calls `episodeId`, if listed. */
+export function findAppleEpisode(
+  json: unknown,
+  episodeId: string,
+): AppleEpisodeMatch | null {
+  const found = parseEpisodeResults(json).find(
+    (episode) => episode.id === episodeId,
+  )
+  if (!found || (found.guid === null && found.audioUrl === null)) return null
+  return { guid: found.guid, audioUrl: found.audioUrl }
+}
+
+/**
+ * Asks Apple's lookup for a show's latest 200 episodes and finds the one a share link named.
+ * Null when Apple does not list it or cannot be reached: the caller opens the show instead.
+ */
+export async function lookupAppleEpisode(
+  showId: string,
+  episodeId: string,
+  fetchFn: FetchFn = fetch,
+): Promise<AppleEpisodeMatch | null> {
+  try {
+    const json = await directoryJson(
+      `${LOOKUP_URL}${encodeURIComponent(showId)}&entity=podcastEpisode&limit=200`,
+      fetchFn,
+    )
+    return findAppleEpisode(json, episodeId)
+  } catch {
+    return null
+  }
+}
+
+/** The id of the stored episode that is the one Apple named, or null when the feed lacks it. */
+export function pickEpisode(
+  episodes: readonly { id: string; guid: string; audioUrl: string }[],
+  match: AppleEpisodeMatch,
+): string | null {
+  const byGuid = match.guid
+    ? episodes.find((episode) => episode.guid === match.guid)
+    : undefined
+  const found =
+    byGuid ??
+    (match.audioUrl
+      ? episodes.find((episode) => episode.audioUrl === match.audioUrl)
+      : undefined)
+  return found?.id ?? null
+}
