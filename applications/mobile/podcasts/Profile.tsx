@@ -21,6 +21,7 @@ import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
 
 import { NotifyRow } from "./NotifyRow"
+import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
@@ -132,6 +133,7 @@ export function Profile() {
           />
           <NotifyRow />
           <PlaybackSection />
+          <OpmlSection />
         </View>
       )}
     </View>
