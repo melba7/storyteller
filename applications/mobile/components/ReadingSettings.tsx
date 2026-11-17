@@ -3,15 +3,15 @@ import deepmerge from "deepmerge"
 import { dequal } from "dequal"
 import { Link } from "expo-router"
 import { useMemo } from "react"
-import { Pressable, StyleSheet, View } from "react-native"
+import { View } from "react-native"
 
+import { GroupedRow, GroupedSection } from "@/apple-look/GroupedList"
 import { Switch } from "@/components/ui/switch"
 import {
   type ReadaloudDecoratorStyle,
   defaultPreferences,
 } from "@/database/preferencesTypes"
 import { formatNumber } from "@/formatting"
-import { cn } from "@/lib/utils"
 import {
   useGetBookPreferencesQuery,
   useGetGlobalPreferencesQuery,
@@ -24,13 +24,9 @@ import { type UUID } from "@/uuid"
 import { ColorPickerDialog } from "./ColorPickerDialog"
 import { LoadingView } from "./LoadingView"
 import { ButtonGroup, ButtonGroupButton } from "./ui/ButtonGroup"
-import { Button } from "./ui/button"
 import { Select, SelectItem, SelectTrigger, SelectValue } from "./ui/select"
 import { Slider } from "./ui/slider"
 import { Text } from "./ui/text"
-import { colors } from "./ui/tokens/colors"
-import { fontSizes } from "./ui/tokens/fontSizes"
-import { spacing } from "./ui/tokens/spacing"
 
 type Props = {
   bookUuid?: UUID
@@ -83,324 +79,298 @@ export function ReadingSettings({ bookUuid }: Props) {
     preferences.readaloudDecoratorStyle ??
     defaultPreferences.readaloudDecoratorStyle
 
+  // Writes a layout or typography change to the book when there is one, else to the defaults.
+  const update = <Name extends "layout" | "typography">(
+    name: Name,
+    value: (typeof preferences)[Name],
+  ) => {
+    if (bookUuid) {
+      updateBookPreference({ bookUuid, name, value })
+    } else {
+      updateGlobalPreference({ name, value })
+    }
+  }
+
   return (
-    <View className="mt-8">
-      <Text variant="h2">Appearance</Text>
-      <View className="my-3 w-full flex-row items-center justify-between">
-        <Text maxFontSizeMultiplier={1} className="text-lg">
-          Dark mode
-        </Text>
-        <ButtonGroup
-          value={preferences.darkMode}
-          onChange={(value: boolean | "auto") => {
-            updateGlobalPreference({ name: "darkMode", value })
-          }}
-        >
-          <ButtonGroupButton accessibilityLabel="Use light mode" value={false}>
-            <Text maxFontSizeMultiplier={1}>Light</Text>
-          </ButtonGroupButton>
-          <ButtonGroupButton
-            accessibilityLabel="Use device dark mode setting"
-            value="auto"
-          >
-            <Text maxFontSizeMultiplier={1}>Device</Text>
-          </ButtonGroupButton>
-          <ButtonGroupButton accessibilityLabel="Use dark mode" value={true}>
-            <Text maxFontSizeMultiplier={1}>Dark</Text>
-          </ButtonGroupButton>
-        </ButtonGroup>
-      </View>
-      <View className="my-3 w-full flex-row items-center justify-between">
-        <Text className="text-lg">Light theme</Text>
-        <Select
-          value={{
-            value: preferences.lightTheme,
-            label: preferences.lightTheme,
-          }}
-          onValueChange={(option) => {
-            if (!option) return
-            updateGlobalPreference({ name: "lightTheme", value: option.value })
-          }}
-        >
-          <SelectTrigger
-            accessibilityLabel={`Light theme, ${preferences.lightTheme}`}
-          >
-            <SelectValue placeholder="" />
-          </SelectTrigger>
-          {preferences.colorThemes
-            .filter(({ isDark }) => !isDark)
-            .map(({ name }) => (
-              <SelectItem key={name} label={name} value={name} />
-            ))}
-        </Select>
-      </View>
-      <View className="my-3 w-full flex-row items-center justify-between">
-        <Text className="text-lg">Dark theme</Text>
-        <Select
-          value={{
-            value: preferences.darkTheme,
-            label: preferences.darkTheme,
-          }}
-          onValueChange={(option) => {
-            if (!option) return
-            updateGlobalPreference({ name: "darkTheme", value: option.value })
-          }}
-        >
-          <SelectTrigger
-            accessibilityLabel={`Dark theme, ${preferences.darkTheme}`}
-          >
-            <SelectValue placeholder="" />
-          </SelectTrigger>
-          {preferences.colorThemes
-            .filter(({ isDark }) => isDark)
-            .map(({ name }) => (
-              <SelectItem key={name} label={name} value={name} />
-            ))}
-        </Select>
-      </View>
-      <Link href="/custom-theme" asChild>
-        <Button
-          accessibilityLabel="Manage custom themes"
-          size="flex"
-          variant="ghost"
-        >
-          <Text className="text-primary group-active:text-primary/80">
-            Manage custom themes
-          </Text>
-        </Button>
-      </Link>
-      <View className="my-3 w-full gap-3">
-        <View className="w-full flex-row flex-wrap items-center justify-between gap-3">
-          <Text maxFontSizeMultiplier={1.5} className="text-lg">
-            Readaloud decoration
-          </Text>
-          <ButtonGroup
-            value={readaloudDecoratorStyle}
-            onChange={(value: ReadaloudDecoratorStyle) => {
-              if (bookUuid) {
-                updateBookPreference({
-                  bookUuid,
-                  name: "readaloudDecoratorStyle",
-                  value,
-                })
-              } else {
+    <View>
+      <GroupedSection title="Appearance">
+        <GroupedRow
+          title="Dark mode"
+          trailing={
+            <ButtonGroup
+              value={preferences.darkMode}
+              onChange={(value: boolean | "auto") => {
+                updateGlobalPreference({ name: "darkMode", value })
+              }}
+            >
+              <ButtonGroupButton
+                accessibilityLabel="Use light mode"
+                value={false}
+              >
+                <Text maxFontSizeMultiplier={1}>Light</Text>
+              </ButtonGroupButton>
+              <ButtonGroupButton
+                accessibilityLabel="Use device dark mode setting"
+                value="auto"
+              >
+                <Text maxFontSizeMultiplier={1}>Device</Text>
+              </ButtonGroupButton>
+              <ButtonGroupButton
+                accessibilityLabel="Use dark mode"
+                value={true}
+              >
+                <Text maxFontSizeMultiplier={1}>Dark</Text>
+              </ButtonGroupButton>
+            </ButtonGroup>
+          }
+        />
+        <GroupedRow
+          title="Light theme"
+          trailing={
+            <Select
+              value={{
+                value: preferences.lightTheme,
+                label: preferences.lightTheme,
+              }}
+              onValueChange={(option) => {
+                if (!option) return
                 updateGlobalPreference({
-                  name: "readaloudDecoratorStyle",
-                  value,
+                  name: "lightTheme",
+                  value: option.value,
                 })
-              }
-            }}
-          >
-            <ButtonGroupButton
-              accessibilityLabel="Use highlight readaloud decoration"
-              size="sm"
-              value="highlight"
+              }}
             >
-              <Text maxFontSizeMultiplier={1.5}>Highlight</Text>
-            </ButtonGroupButton>
-            <ButtonGroupButton
-              accessibilityLabel="Use underline readaloud decoration"
-              size="sm"
-              value="underline"
+              <SelectTrigger
+                accessibilityLabel={`Light theme, ${preferences.lightTheme}`}
+              >
+                <SelectValue placeholder="" />
+              </SelectTrigger>
+              {preferences.colorThemes
+                .filter(({ isDark }) => !isDark)
+                .map(({ name }) => (
+                  <SelectItem key={name} label={name} value={name} />
+                ))}
+            </Select>
+          }
+        />
+        <GroupedRow
+          title="Dark theme"
+          trailing={
+            <Select
+              value={{
+                value: preferences.darkTheme,
+                label: preferences.darkTheme,
+              }}
+              onValueChange={(option) => {
+                if (!option) return
+                updateGlobalPreference({
+                  name: "darkTheme",
+                  value: option.value,
+                })
+              }}
             >
-              <Text maxFontSizeMultiplier={1.5}>Underline</Text>
-            </ButtonGroupButton>
-          </ButtonGroup>
-        </View>
-        {readaloudDecoratorStyle === "highlight" && (
-          <View className="w-full flex-row items-center justify-between gap-4">
-            <Text maxFontSizeMultiplier={1.5} className="text-lg">
-              Highlight color
-            </Text>
-            <ColorPickerDialog
-              key={preferences.readaloudColor}
-              initialValue={preferences.readaloudColor}
-              onSave={(value) => {
+              <SelectTrigger
+                accessibilityLabel={`Dark theme, ${preferences.darkTheme}`}
+              >
+                <SelectValue placeholder="" />
+              </SelectTrigger>
+              {preferences.colorThemes
+                .filter(({ isDark }) => isDark)
+                .map(({ name }) => (
+                  <SelectItem key={name} label={name} value={name} />
+                ))}
+            </Select>
+          }
+        />
+        <Link key="themes" href="/custom-theme" asChild>
+          <GroupedRow
+            accessibilityLabel="Manage custom themes"
+            title="Manage custom themes"
+            onPress={() => {}}
+          />
+        </Link>
+        <GroupedRow
+          title="Readaloud decoration"
+          trailing={
+            <ButtonGroup
+              value={readaloudDecoratorStyle}
+              onChange={(value: ReadaloudDecoratorStyle) => {
                 if (bookUuid) {
                   updateBookPreference({
                     bookUuid,
-                    name: "readaloudColor",
+                    name: "readaloudDecoratorStyle",
                     value,
                   })
                 } else {
-                  updateGlobalPreference({ name: "readaloudColor", value })
+                  updateGlobalPreference({
+                    name: "readaloudDecoratorStyle",
+                    value,
+                  })
                 }
               }}
-            />
-          </View>
-        )}
-      </View>
-      <View className="my-3 w-full flex-row items-center gap-10">
-        <Text className="text-lg">Floating toolbars</Text>
-        <Switch
-          checked={preferences.floatingToolbar}
-          onCheckedChange={(value) =>
-            updateGlobalPreference({
-              name: "floatingToolbar",
-              value,
-            })
+            >
+              <ButtonGroupButton
+                accessibilityLabel="Use highlight readaloud decoration"
+                size="sm"
+                value="highlight"
+              >
+                <Text maxFontSizeMultiplier={1.5}>Highlight</Text>
+              </ButtonGroupButton>
+              <ButtonGroupButton
+                accessibilityLabel="Use underline readaloud decoration"
+                size="sm"
+                value="underline"
+              >
+                <Text maxFontSizeMultiplier={1.5}>Underline</Text>
+              </ButtonGroupButton>
+            </ButtonGroup>
           }
         />
-      </View>
-      <Text variant="h2" className="mt-4">
-        Margins
-      </Text>
-      <View className="my-3 w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1} className="text-lg">
-            Left margin
-          </Text>
-          <Text maxFontSizeMultiplier={1} className="shrink-0 text-sm">
-            {preferences.layout.marginLeft ?? 0}px
-          </Text>
-        </View>
-        <Slider
-          accessibilityLabel="Left margin"
-          className="w-full"
-          start={0}
-          stop={50}
-          step={1}
-          value={preferences.layout.marginLeft ?? 0}
-          onValueChange={(value) => {
-            const update = {
-              ...preferences.layout,
-              marginLeft: Math.round(value),
+        {readaloudDecoratorStyle === "highlight" ? (
+          <GroupedRow
+            title="Highlight color"
+            trailing={
+              <ColorPickerDialog
+                key={preferences.readaloudColor}
+                initialValue={preferences.readaloudColor}
+                onSave={(value) => {
+                  if (bookUuid) {
+                    updateBookPreference({
+                      bookUuid,
+                      name: "readaloudColor",
+                      value,
+                    })
+                  } else {
+                    updateGlobalPreference({ name: "readaloudColor", value })
+                  }
+                }}
+              />
             }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "layout",
-                value: update,
-              })
-            } else {
-              updateGlobalPreference({ name: "layout", value: update })
-            }
-          }}
+          />
+        ) : null}
+        <GroupedRow
+          title="Floating toolbars"
+          trailing={
+            <Switch
+              checked={preferences.floatingToolbar}
+              onCheckedChange={(value) =>
+                updateGlobalPreference({
+                  name: "floatingToolbar",
+                  value,
+                })
+              }
+            />
+          }
         />
-      </View>
-      <View className="my-3 w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1} className="text-lg">
-            Right margin
-          </Text>
-          <Text maxFontSizeMultiplier={1} className="shrink-0 text-sm">
-            {preferences.layout.marginRight ?? 0}px
-          </Text>
-        </View>
-        <Slider
-          accessibilityLabel="Right margin"
-          className="w-full"
-          start={0}
-          stop={50}
-          step={1}
-          value={preferences.layout.marginRight ?? 0}
-          onValueChange={(value) => {
-            const update = {
-              ...preferences.layout,
-              marginRight: Math.round(value),
-            }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "layout",
-                value: update,
-              })
-            } else {
-              updateGlobalPreference({ name: "layout", value: update })
-            }
-          }}
-        />
-      </View>
-
-      <View>
-        <Text variant="h2">Layout</Text>
-        <View style={styles.field}>
-          <Text maxFontSizeMultiplier={1} className="text-lg">
-            Reader layout
-          </Text>
-          <ButtonGroup
-            value={preferences.layout.scroll ? "scroll" : "page"}
-            onChange={(layout: "page" | "scroll") => {
-              const update = {
+      </GroupedSection>
+      <GroupedSection title="Margins">
+        <GroupedRow
+          title="Left margin"
+          value={`${preferences.layout.marginLeft ?? 0}px`}
+          className="pb-2"
+        >
+          <Slider
+            accessibilityLabel="Left margin"
+            className="w-full"
+            start={0}
+            stop={50}
+            step={1}
+            value={preferences.layout.marginLeft ?? 0}
+            onValueChange={(value) => {
+              update("layout", {
                 ...preferences.layout,
-                scroll: layout === "scroll",
-              }
-              if (bookUuid) {
-                updateBookPreference({
-                  bookUuid,
-                  name: "layout",
-                  value: update,
-                })
-              } else {
-                updateGlobalPreference({ name: "layout", value: update })
-              }
+                marginLeft: Math.round(value),
+              })
             }}
-          >
-            <ButtonGroupButton
-              accessibilityLabel="Use page layout"
-              value="page"
-            >
-              <Text maxFontSizeMultiplier={1}>Page</Text>
-            </ButtonGroupButton>
-            <ButtonGroupButton
-              accessibilityLabel="Use scroll layout"
-              value="scroll"
-            >
-              <Text maxFontSizeMultiplier={1}>Scroll</Text>
-            </ButtonGroupButton>
-          </ButtonGroup>
-        </View>
-      </View>
-      <View>
-        <Text variant="h2">Typography{!bookUuid && " defaults"}</Text>
-        {bookUuid ? (
-          <View style={styles.typographyControls}>
-            <Button
-              accessibilityLabel="Set typography as defaults"
-              disabled={dirty}
-              variant="ghost"
-              size="sm"
-              onPress={() => {
-                setBookPreferencesAsDefaults({ bookUuid })
-              }}
-            >
-              <Text
-                maxFontSizeMultiplier={1.5}
-                className={dirty ? "opacity-50" : "text-primary"}
-              >
-                Set as defaults
-              </Text>
-            </Button>
-            <Button
-              accessibilityLabel="Reset typography to defaults"
-              variant="ghost"
-              size="sm"
-              disabled={typographyPreferencesAreDefaults}
-              onPress={() => {
-                updateBookPreference({
-                  bookUuid,
-                  name: "typography",
-                  value: {},
+          />
+        </GroupedRow>
+        <GroupedRow
+          title="Right margin"
+          value={`${preferences.layout.marginRight ?? 0}px`}
+          className="pb-2"
+        >
+          <Slider
+            accessibilityLabel="Right margin"
+            className="w-full"
+            start={0}
+            stop={50}
+            step={1}
+            value={preferences.layout.marginRight ?? 0}
+            onValueChange={(value) => {
+              update("layout", {
+                ...preferences.layout,
+                marginRight: Math.round(value),
+              })
+            }}
+          />
+        </GroupedRow>
+      </GroupedSection>
+      <GroupedSection title="Layout">
+        <GroupedRow
+          title="Reader layout"
+          trailing={
+            <ButtonGroup
+              value={preferences.layout.scroll ? "scroll" : "page"}
+              onChange={(layout: "page" | "scroll") => {
+                update("layout", {
+                  ...preferences.layout,
+                  scroll: layout === "scroll",
                 })
               }}
             >
-              <Text
-                maxFontSizeMultiplier={1.5}
-                className={
-                  typographyPreferencesAreDefaults
-                    ? "opacity-50"
-                    : "text-primary"
-                }
+              <ButtonGroupButton
+                accessibilityLabel="Use page layout"
+                value="page"
               >
-                Reset to defaults
-              </Text>
-            </Button>
-          </View>
+                <Text maxFontSizeMultiplier={1}>Page</Text>
+              </ButtonGroupButton>
+              <ButtonGroupButton
+                accessibilityLabel="Use scroll layout"
+                value="scroll"
+              >
+                <Text maxFontSizeMultiplier={1}>Scroll</Text>
+              </ButtonGroupButton>
+            </ButtonGroup>
+          }
+        />
+      </GroupedSection>
+      <GroupedSection title={`Typography${!bookUuid ? " defaults" : ""}`}>
+        {bookUuid ? (
+          <GroupedRow
+            key="set-defaults"
+            accessibilityLabel="Set typography as defaults"
+            title="Set as defaults"
+            tinted
+            hideChevron
+            disabled={dirty}
+            onPress={() => {
+              setBookPreferencesAsDefaults({ bookUuid })
+            }}
+          />
+        ) : null}
+        {bookUuid ? (
+          <GroupedRow
+            key="reset-book"
+            accessibilityLabel="Reset typography to defaults"
+            title="Reset to defaults"
+            tinted
+            hideChevron
+            disabled={typographyPreferencesAreDefaults}
+            onPress={() => {
+              updateBookPreference({
+                bookUuid,
+                name: "typography",
+                value: {},
+              })
+            }}
+          />
         ) : (
-          <Pressable
+          <GroupedRow
+            key="reset-global"
             accessibilityLabel="Reset typography settings"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: typographyPreferencesAreDefaults }}
+            title="Reset"
+            tinted
+            hideChevron
             disabled={typographyPreferencesAreDefaults}
             onPress={() => {
               updateGlobalPreference({
@@ -408,222 +378,121 @@ export function ReadingSettings({ bookUuid }: Props) {
                 value: defaultPreferences.typography,
               })
             }}
-          >
-            <Text
-              className={cn(
-                "my-2 self-end",
-                typographyPreferencesAreDefaults
-                  ? "opacity-50"
-                  : "text-primary",
-              )}
-            >
-              Reset
-            </Text>
-          </Pressable>
+          />
         )}
-      </View>
-
-      <View className="my-3 w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1} className="text-lg">
-            Font scaling
-          </Text>
-          <Text className="shrink-0 text-sm" maxFontSizeMultiplier={1}>
-            {formatNumber(preferences.typography.scale, 2)}x
-          </Text>
-        </View>
-        <Slider
-          accessibilityLabel="Font scaling"
-          className="w-full"
-          start={0.7}
-          stop={2}
-          step={0.05}
-          value={preferences.typography.scale}
-          onValueChange={(value) => {
-            const update = {
-              ...preferences.typography,
-              // Rounding to hundredths to account for floating point errors
-              scale: Math.round(value * 100) / 100,
-            }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "typography",
-                value: update,
-              })
-            } else {
-              updateGlobalPreference({ name: "typography", value: update })
-            }
-          }}
-        />
-      </View>
-      <View className="my-3 w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1} className="text-lg">
-            Line height
-          </Text>
-          <Text maxFontSizeMultiplier={1} className="shrink-0 text-sm">
-            {formatNumber(preferences.typography.lineHeight, 2)}x
-          </Text>
-        </View>
-        <Slider
-          accessibilityLabel="Line height"
-          className="w-full"
-          start={1.0}
-          stop={2.0}
-          step={0.05}
-          value={preferences.typography.lineHeight}
-          onValueChange={(value) => {
-            const update = {
-              ...preferences.typography,
-              // Rounding to hundredths to account for floating point errors
-              lineHeight: Math.round(value * 100) / 100,
-            }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "typography",
-                value: update,
-              })
-            } else {
-              updateGlobalPreference({ name: "typography", value: update })
-            }
-          }}
-        />
-      </View>
-      <View style={styles.field}>
-        <Text maxFontSizeMultiplier={1} className="text-lg">
-          Text alignment
-        </Text>
-        <ButtonGroup
-          value={preferences.typography.alignment}
-          onChange={(value: "justify" | "left") => {
-            const update = {
-              ...preferences.typography,
-              alignment: value,
-            }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "typography",
-                value: update,
-              })
-            } else {
-              updateGlobalPreference({ name: "typography", value: update })
-            }
-          }}
+        <GroupedRow
+          title="Font scaling"
+          value={`${formatNumber(preferences.typography.scale, 2)}x`}
+          className="pb-2"
         >
-          <ButtonGroupButton
-            accessibilityLabel="Justify text alignment"
-            value="justify"
-          >
-            <Text maxFontSizeMultiplier={1}>Justify</Text>
-          </ButtonGroupButton>
-          <ButtonGroupButton
-            accessibilityLabel="Use left text alignment"
-            value="left"
-          >
-            <Text maxFontSizeMultiplier={1}>Left</Text>
-          </ButtonGroupButton>
-        </ButtonGroup>
-      </View>
-      <View style={styles.field}>
-        <Text maxFontSizeMultiplier={1.25} className="text-lg">
-          Font family
-        </Text>
-        <Select
-          value={{
-            value: preferences.typography.fontFamily,
-            label: preferences.typography.fontFamily,
-          }}
-          onValueChange={(option) => {
-            if (!option) return
-            const update = {
-              ...preferences.typography,
-              fontFamily: option.value,
-            }
-            if (bookUuid) {
-              updateBookPreference({
-                bookUuid,
-                name: "typography",
-                value: update,
+          <Slider
+            accessibilityLabel="Font scaling"
+            className="w-full"
+            start={0.7}
+            stop={2}
+            step={0.05}
+            value={preferences.typography.scale}
+            onValueChange={(value) => {
+              update("typography", {
+                ...preferences.typography,
+                // Rounding to hundredths to account for floating point errors
+                scale: Math.round(value * 100) / 100,
               })
-            } else {
-              updateGlobalPreference({ name: "typography", value: update })
-            }
-          }}
+            }}
+          />
+        </GroupedRow>
+        <GroupedRow
+          title="Line height"
+          value={`${formatNumber(preferences.typography.lineHeight, 2)}x`}
+          className="pb-2"
         >
-          <SelectTrigger
-            accessibilityLabel={`Font family, ${preferences.typography.fontFamily}`}
-          >
-            <SelectValue
-              placeholder=""
-              style={{
-                fontFamily: getFontPreviewFamily(
-                  preferences.typography.fontFamily,
-                ),
+          <Slider
+            accessibilityLabel="Line height"
+            className="w-full"
+            start={1.0}
+            stop={2.0}
+            step={0.05}
+            value={preferences.typography.lineHeight}
+            onValueChange={(value) => {
+              update("typography", {
+                ...preferences.typography,
+                // Rounding to hundredths to account for floating point errors
+                lineHeight: Math.round(value * 100) / 100,
+              })
+            }}
+          />
+        </GroupedRow>
+        <GroupedRow
+          title="Text alignment"
+          trailing={
+            <ButtonGroup
+              value={preferences.typography.alignment}
+              onChange={(value: "justify" | "left") => {
+                update("typography", {
+                  ...preferences.typography,
+                  alignment: value,
+                })
               }}
-            />
-          </SelectTrigger>
-          <SelectItem label="Literata" value="Literata" />
-          <SelectItem label="OpenDyslexic" value="OpenDyslexic" />
-          {preferences.customFonts.map(({ name }) => (
-            <SelectItem key={name} label={name} value={name} />
-          ))}
-        </Select>
-      </View>
-      <Link href="custom-fonts" asChild>
-        <Button
-          accessibilityLabel="Manage custom fonts"
-          size="flex"
-          variant="ghost"
-        >
-          <Text className="text-primary group-active:text-primary/80">
-            Manage custom fonts
-          </Text>
-        </Button>
-      </Link>
+            >
+              <ButtonGroupButton
+                accessibilityLabel="Justify text alignment"
+                value="justify"
+              >
+                <Text maxFontSizeMultiplier={1}>Justify</Text>
+              </ButtonGroupButton>
+              <ButtonGroupButton
+                accessibilityLabel="Use left text alignment"
+                value="left"
+              >
+                <Text maxFontSizeMultiplier={1}>Left</Text>
+              </ButtonGroupButton>
+            </ButtonGroup>
+          }
+        />
+        <GroupedRow
+          title="Font family"
+          trailing={
+            <Select
+              value={{
+                value: preferences.typography.fontFamily,
+                label: preferences.typography.fontFamily,
+              }}
+              onValueChange={(option) => {
+                if (!option) return
+                update("typography", {
+                  ...preferences.typography,
+                  fontFamily: option.value,
+                })
+              }}
+            >
+              <SelectTrigger
+                accessibilityLabel={`Font family, ${preferences.typography.fontFamily}`}
+              >
+                <SelectValue
+                  placeholder=""
+                  style={{
+                    fontFamily: getFontPreviewFamily(
+                      preferences.typography.fontFamily,
+                    ),
+                  }}
+                />
+              </SelectTrigger>
+              <SelectItem label="Literata" value="Literata" />
+              <SelectItem label="OpenDyslexic" value="OpenDyslexic" />
+              {preferences.customFonts.map(({ name }) => (
+                <SelectItem key={name} label={name} value={name} />
+              ))}
+            </Select>
+          }
+        />
+        <Link key="fonts" href="custom-fonts" asChild>
+          <GroupedRow
+            accessibilityLabel="Manage custom fonts"
+            title="Manage custom fonts"
+            onPress={() => {}}
+          />
+        </Link>
+      </GroupedSection>
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  subsubheading: {
-    ...fontSizes.xl,
-    fontWeight: "600",
-    marginVertical: spacing["1.5"],
-  },
-  subheading: {
-    ...fontSizes["2xl"],
-    fontWeight: "bold",
-    marginVertical: spacing["1.5"],
-  },
-  explanation: {
-    ...fontSizes.xs,
-  },
-  field: {
-    width: "100%",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginVertical: spacing["1.5"],
-  },
-  label: {
-    ...fontSizes.lg,
-    flexGrow: 0,
-  },
-  typographyHeaderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    flexWrap: "wrap",
-  },
-  bookTypographyHeaderContainer: {},
-  typographyControls: { flexDirection: "row", justifyContent: "space-between" },
-  pressable: {
-    color: colors.primary9,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-})

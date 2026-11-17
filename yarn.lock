@@ -16017,6 +16017,7 @@ __metadata:
     expo-document-picker: "npm:~58.0.4"
     expo-file-system: "npm:~58.0.11"
     expo-font: "npm:~58.0.10"
+    expo-glass-effect: "npm:~58.0.5"
     expo-haptics: "npm:~58.0.7"
     expo-hinge: "npm:~58.0.2"
     expo-image: "npm:~58.0.17"
@@ -25447,7 +25448,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"expo-glass-effect@npm:^58.0.5":
+"expo-glass-effect@npm:^58.0.5, expo-glass-effect@npm:~58.0.5":
   version: 58.0.5
   resolution: "expo-glass-effect@npm:58.0.5"
   peerDependencies:

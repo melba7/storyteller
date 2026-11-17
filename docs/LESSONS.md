@@ -43,3 +43,9 @@ One line per lesson.
   while `Stack.Title` and `Stack.Toolbar` are removed with it. Anything that
   changes while a screen is open (a title that appears on scroll) must use the
   composition components only.
+- In `global.css`, an `@import` after other rules is an error ("@import rules
+  must precede all rules"), so a theme that must override upstream values goes
+  in a marked block appended at the end of the file (2026-11-17).
+- With `withUniwind` missing, a third-party native view such as `GlassView`
+  silently ignores `className`. Wrap it once (`withUniwind(GlassView)`) before
+  styling it with classes (2026-11-17).

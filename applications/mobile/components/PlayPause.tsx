@@ -1,7 +1,8 @@
 import { Pause, Play } from "lucide-react-native"
 import { ActivityIndicator } from "react-native"
+import { useCSSVariable } from "uniwind"
 
-import { useColorTheme } from "@/hooks/useColorTheme"
+import { cn } from "@/lib/utils"
 import { Storyteller } from "@/modules/readium"
 import { useAppSelector } from "@/store/appState"
 import {
@@ -16,16 +17,25 @@ type Props = {
   size?: number | undefined
   automaticRewind?: boolean
   buttonSize?: ButtonProps["size"]
+  /** Colour class for the icon, for example "text-white" over the player's wash. */
+  iconClassName?: string
 }
 
 export function PlayPause({
   size = 24,
   automaticRewind = true,
   buttonSize = "icon",
+  iconClassName = "text-foreground",
 }: Props) {
   const isPlaying = useAppSelector(getIsPlaying)
   const isLoading = useAppSelector(getIsAudioLoading)
-  const { foreground } = useColorTheme()
+  const spinnerColor = useCSSVariable(
+    iconClassName === "text-white"
+      ? "--color-primary-foreground"
+      : "--color-foreground",
+  ) as string
+  // A big icon needs a bigger touch target than the button's standard one.
+  const buttonStyle = size > 40 ? { height: size, width: size } : undefined
 
   if (isLoading) {
     return (
@@ -33,6 +43,7 @@ export function PlayPause({
         accessibilityLabel="Loading audio"
         accessibilityRole="progressbar"
         size={size}
+        color={spinnerColor}
       />
     )
   }
@@ -42,25 +53,32 @@ export function PlayPause({
       accessibilityLabel="Pause"
       variant="ghost"
       size={buttonSize}
+      style={buttonStyle}
       onPress={() => {
         Storyteller.pause()
       }}
     >
-      <Icon as={Pause} fill={foreground} size={size} />
+      <Icon
+        as={Pause}
+        fill="currentColor"
+        className={iconClassName}
+        size={size}
+      />
     </Button>
   ) : (
     <Button
       accessibilityLabel="Play"
       variant="ghost"
       size={buttonSize}
+      style={buttonStyle}
       onPress={() => {
         Storyteller.play(automaticRewind)
       }}
     >
       <Icon
         as={Play}
-        fill={foreground}
-        className="bg-transparent"
+        fill="currentColor"
+        className={cn("bg-transparent", iconClassName)}
         size={size}
       />
     </Button>

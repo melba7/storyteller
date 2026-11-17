@@ -91,7 +91,7 @@ function AccordionTrigger({
   return (
     <TextClassContext.Provider
       value={cn(
-        "text-left text-sm font-medium",
+        "text-left text-[17px]",
         Platform.select({ web: "group-hover:underline" }),
       )}
     >
@@ -99,7 +99,7 @@ function AccordionTrigger({
         <AccordionPrimitive.Trigger {...props} asChild>
           <Trigger
             className={cn(
-              "flex-row items-start justify-between gap-4 rounded-md py-4 disabled:opacity-50",
+              "min-h-11 flex-row items-center justify-between gap-4 py-3 active:opacity-70 disabled:opacity-50",
               Platform.select({
                 web: "focus-visible:border-ring focus-visible:ring-ring/50 flex flex-1 transition-all outline-none hover:underline focus-visible:ring-[3px] disabled:pointer-events-none [&[data-state=open]>svg]:rotate-180",
               }),
@@ -134,7 +134,7 @@ function AccordionContent({
   React.RefAttributes<AccordionPrimitive.ContentRef>) {
   const { isExpanded } = AccordionPrimitive.useItemContext()
   return (
-    <TextClassContext.Provider value="text-sm">
+    <TextClassContext.Provider value="text-[15px]">
       <AccordionPrimitive.Content
         className={cn(
           "overflow-hidden",

@@ -132,7 +132,7 @@ export function Bookmarks({
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="px-2 pt-2"
+      contentContainerClassName="pt-1"
       contentContainerStyle={{ paddingBottom }}
     >
       {sortedBookmarks.map((bookmark, index) => (
@@ -140,7 +140,7 @@ export function Bookmarks({
           key={bookmark.uuid}
           renderRightActions={() => (
             <Button
-              className="align-center h-full w-20 justify-center bg-red-500 sm:h-full sm:w-20"
+              className="align-center h-full w-20 justify-center rounded-none sm:h-full sm:w-20"
               variant="destructive"
               onPress={() => {
                 deleteBookmarks({
@@ -153,7 +153,7 @@ export function Bookmarks({
             </Button>
           )}
         >
-          <View className="bg-background py-0.5">
+          <View className="bg-background">
             <Button
               onPress={() => {
                 dispatch(
@@ -167,28 +167,29 @@ export function Bookmarks({
                 onClose?.()
               }}
               variant="ghost"
-              className="active:bg-secondary h-auto flex-col items-start rounded-md border border-transparent px-3 py-3 sm:h-auto"
+              className="active:bg-secondary min-h-11 h-auto flex-col items-start rounded-none px-4 py-3 sm:h-auto"
             >
               {format === "audiobook" ? (
                 <>
-                  <Text className="text-sm font-bold">
+                  <Text className="text-[17px] font-normal">
                     {audiobookBookmarkDetails[index]?.title}
                   </Text>
-                  <Text className="mt-2 text-xs">
+                  <Text className="text-muted-foreground mt-0.5 text-[15px]">
                     Timestamp {audiobookBookmarkTimestamps[index]}
                   </Text>
                 </>
               ) : (
                 <>
-                  <Text className="text-sm font-bold">
+                  <Text className="text-[17px] font-normal">
                     {bookmarkTitles[index]}
                   </Text>
-                  <Text className="mt-2 text-xs">
+                  <Text className="text-muted-foreground mt-0.5 text-[15px]">
                     Page {bookmarkPages[index]}
                   </Text>
                 </>
               )}
             </Button>
+            <View className="bg-border ml-4 h-px" />
           </View>
         </Swipeable>
       ))}

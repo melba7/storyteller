@@ -95,7 +95,7 @@ export default function NavigationMenuLayout() {
             },
             tabBarLabelStyle: {
               fontSize: 12,
-              fontWeight: "700",
+              fontWeight: "600",
               lineHeight: 14,
             },
           }}

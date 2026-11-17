@@ -7,6 +7,7 @@ import { Icon } from "@/components/ui/icon"
 import { Menu, type MenuAction } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
 import { useIsNotBackground } from "@/hooks/useIsNotBackground"
+import { cn } from "@/lib/utils"
 import { useAppDispatch, useAppSelector } from "@/store/appState"
 import { getSleepTimer } from "@/store/selectors/sleepTimerSelectors"
 import { sleepTimerSlice } from "@/store/slices/sleepTimerSlice"
@@ -25,7 +26,12 @@ function formatSleepTimer(sleepTimer: Date) {
 
 const MAX_FONT_SCALE = 1.75
 
-export function SleepTimerItem() {
+type Props = {
+  /** Colour class for the icon and the countdown. */
+  iconClassName?: string
+}
+
+export function SleepTimerItem({ iconClassName = "text-foreground" }: Props) {
   const dispatch = useAppDispatch()
   const sleepTimer = useAppSelector(getSleepTimer)
   const isNotBackground = useIsNotBackground()
@@ -110,14 +116,19 @@ export function SleepTimerItem() {
         }
         variant="ghost"
         size="icon"
-        className="h-10 w-12 sm:h-9 sm:w-11"
+        className="h-10 w-12 rounded-full px-0 sm:h-10 sm:w-12"
       >
         {formattedSleepTimer ? (
-          <Text minimumFontScale={1} maxFontSizeMultiplier={MAX_FONT_SCALE}>
+          <Text
+            numberOfLines={1}
+            minimumFontScale={1}
+            maxFontSizeMultiplier={MAX_FONT_SCALE}
+            className={cn("text-[13px] font-semibold", iconClassName)}
+          >
             {formattedSleepTimer}
           </Text>
         ) : (
-          <Icon as={ClockFading} size={24} />
+          <Icon as={ClockFading} size={24} className={iconClassName} />
         )}
       </Button>
     </Menu>

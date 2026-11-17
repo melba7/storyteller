@@ -25,6 +25,8 @@ import { Text } from "./ui/text"
 
 const DEFAULT_THUMBNAIL_WIDTH = 116
 const THUMBNAIL_HEIGHT_RATIO = 176 / 116
+// Covers wider than this (the book page) get 12-point corners, thumbnails 8.
+const BIG_COVER_WIDTH = 160
 
 interface Props {
   book: BookWithRelations
@@ -37,8 +39,8 @@ export function BookThumbnail({
 }: Props) {
   const router = useRouter()
   const height = Math.round(width * THUMBNAIL_HEIGHT_RATIO)
-  const titleFontSize = Math.max(11, Math.min(16, Math.round(width * 0.11)))
-  const authorFontSize = Math.max(10, Math.min(14, Math.round(width * 0.1)))
+  const titleFontSize = Math.max(12, Math.min(15, Math.round(width * 0.13)))
+  const authorFontSize = Math.max(11, Math.min(13, Math.round(width * 0.112)))
 
   const downloadedFormats = useDownloadedFormats(book)
   const availableFormats = useAvailableFormats(book)
@@ -174,19 +176,19 @@ export function BookThumbnail({
   const renderMetadata = (maxWidth: number) => (
     <>
       <Text
+        className="mt-1 font-semibold"
+        numberOfLines={2}
+        style={{ maxWidth, fontSize: titleFontSize }}
+      >
+        {book.title}
+      </Text>
+
+      <Text
         className="text-muted-foreground"
         numberOfLines={1}
         style={{ maxWidth, fontSize: authorFontSize }}
       >
         {book.authors[0]?.name}
-      </Text>
-
-      <Text
-        className="leading-none font-semibold"
-        numberOfLines={2}
-        style={{ maxWidth, fontSize: titleFontSize }}
-      >
-        {book.title}
       </Text>
     </>
   )
@@ -425,7 +427,8 @@ function EbookCoverImage({
   return (
     <Stack
       className={cn(
-        "bg-secondary items-center justify-center overflow-hidden rounded-lg",
+        "bg-secondary border-foreground/10 items-center justify-center overflow-hidden border-[0.5px]",
+        width > BIG_COVER_WIDTH ? "rounded-xl" : "rounded-lg",
         className,
       )}
       style={{ height, width, ...style }}
@@ -451,7 +454,8 @@ function AudiobookCoverImage({
   return (
     <Stack
       className={cn(
-        "bg-secondary items-center justify-center overflow-hidden rounded-lg",
+        "bg-secondary border-foreground/10 items-center justify-center overflow-hidden border-[0.5px]",
+        width > BIG_COVER_WIDTH ? "rounded-xl" : "rounded-lg",
         className,
       )}
       style={{ height, width, ...style }}

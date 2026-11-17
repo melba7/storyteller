@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { View } from "react-native"
 import { FlatList } from "react-native-gesture-handler"
 
+import { groupedScreenClass } from "@/apple-look/GroupedList"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
@@ -44,7 +45,7 @@ export default function LogModal() {
   }, [])
 
   return (
-    <View className="android:pt-safe h-full">
+    <View className={`android:pt-safe h-full ${groupedScreenClass}`}>
       <View className="w-full flex-row items-center justify-between px-4 pt-3">
         <Button
           accessibilityLabel="Close logs"
@@ -84,9 +85,12 @@ export default function LogModal() {
         </Button>
       </View>
       <FlatList
-        className="grow px-4"
+        className="bg-card mx-4 mb-4 grow rounded-2xl"
+        contentContainerClassName="p-4"
         data={logText}
-        renderItem={(item) => <Text>{item.item}</Text>}
+        renderItem={(item) => (
+          <Text className="text-[13px]">{item.item}</Text>
+        )}
       />
     </View>
   )

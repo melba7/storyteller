@@ -9,6 +9,7 @@ import { useState } from "react"
 import { Alert, View } from "react-native"
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller"
 
+import { GroupedRow, GroupedSection, groupedScreenClass } from "@/apple-look/GroupedList"
 import { signInWithDeviceCode } from "@/auth/deviceCodeLogin"
 import { LoginButton } from "@/components/LoginButton"
 import { ScreenBackButton } from "@/components/ScreenBackButton"
@@ -90,8 +91,9 @@ export default function ServerPage() {
 
   return (
     <KeyboardAwareScrollView
+      className={groupedScreenClass}
       contentContainerClassName={cn(
-        "items-stretch px-safe-or-8",
+        "items-stretch px-safe-or-4",
         !usesSystemHeader && "pt-safe",
       )}
       contentInsetAdjustmentBehavior={usesSystemHeader ? "automatic" : "never"}
@@ -99,18 +101,24 @@ export default function ServerPage() {
       {/* Contributes header options, it does not render a view. */}
       <ScreenBackButton fallback="/settings" />
       <View className="gap-4 pb-4">
-        <Text className="mx-2">Server url</Text>
-        <Input
-          accessibilityLabel="Server URL"
-          maxFontSizeMultiplier={2}
-          autoCapitalize="none"
-          keyboardType="url"
-          autoCorrect={false}
-          returnKeyType="done"
-          textContentType="URL"
-          value={url}
-          onChangeText={setUrl}
-        />
+        <GroupedSection
+          title="Server url"
+          footer="Enter the full URL for your Storyteller server instance, including the scheme (http:// or https://). This may look like a local IP address and port, such as http://192.168.1.12:8001, or a domain name, such as https://yourdomain.com."
+        >
+          <GroupedRow className="py-2">
+            <Input
+              accessibilityLabel="Server URL"
+              maxFontSizeMultiplier={2}
+              autoCapitalize="none"
+              keyboardType="url"
+              autoCorrect={false}
+              returnKeyType="done"
+              textContentType="URL"
+              value={url}
+              onChangeText={setUrl}
+            />
+          </GroupedRow>
+        </GroupedSection>
         <LoginButton serverUrl={url} />
         <Button
           accessibilityLabel="Add server with QR code"
@@ -123,11 +131,11 @@ export default function ServerPage() {
         </Button>
         {isScannerOpen && (
           <View className="gap-3">
-            <Text className="text-sm">
+            <Text className="text-muted-foreground text-[13px]">
               Scan the QR code from the Storyteller&rsquo;s
               http?s://your-server-url/device/start page.
             </Text>
-            <View className="h-80 w-full overflow-hidden rounded-xl border">
+            <View className="h-80 w-full overflow-hidden rounded-2xl">
               <CameraView
                 style={{ flex: 1 }}
                 facing="back"
@@ -157,16 +165,6 @@ export default function ServerPage() {
             </Button>
           </View>
         )}
-      </View>
-      <View className="bg-secondary gap-4 rounded p-4">
-        <Text>
-          Enter the full URL for your Storyteller server instance, including the
-          scheme (http:// or https://).
-        </Text>
-        <Text>This may look like a local IP address and port, such as:</Text>
-        <Text>http://192.168.1.12:8001</Text>
-        <Text>Or a domain name, such as:</Text>
-        <Text>https://yourdomain.com</Text>
       </View>
     </KeyboardAwareScrollView>
   )

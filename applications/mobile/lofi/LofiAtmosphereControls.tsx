@@ -2,6 +2,7 @@
 // Settings (see FORK.md).
 import { View } from "react-native"
 
+import { GroupedRow, GroupedSection } from "@/apple-look/GroupedList"
 import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
@@ -16,14 +17,18 @@ import { type LofiAtmosphere } from "./useLofiAtmosphere"
 
 type Props = {
   atmosphere: LofiAtmosphere
+  /** A muted heading above the card. */
+  title?: string
+  /** Muted explanatory text under the card. */
+  footer?: string
 }
 
 /** On and off, the sounds' volume under the voice, how much is going on, and the car. */
-export function LofiAtmosphereControls({ atmosphere }: Props) {
+export function LofiAtmosphereControls({ atmosphere, title, footer }: Props) {
   const { status } = atmosphere
   if (!status) {
     return (
-      <Text variant="muted" className="py-4">
+      <Text variant="muted" className="py-4 text-[15px]">
         Loading…
       </Text>
     )
@@ -37,29 +42,24 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
     Math.round(intensity * 20) === Math.round(sounds.defaultIntensity * 20)
 
   return (
-    <View className="w-full gap-5">
-      <View className="w-full flex-row items-center justify-between gap-4">
-        <View className="shrink gap-1">
-          <Text maxFontSizeMultiplier={1.5} className="text-lg">
-            Atmosphere sounds
-          </Text>
-          <Text variant="muted">{describeAtmosphere(status)}</Text>
-        </View>
-        <Switch
-          accessibilityLabel="Atmosphere sounds"
-          checked={sounds.enabled}
-          disabled={!sounds.available}
-          onCheckedChange={(enabled) => void atmosphere.setEnabled(enabled)}
-        />
-      </View>
-
-      <View className="w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1.5}>Sounds volume</Text>
-          <Text maxFontSizeMultiplier={1.5} className="shrink-0 text-sm">
-            {levelLabel(level)}
-          </Text>
-        </View>
+    <GroupedSection title={title} footer={footer}>
+      <GroupedRow
+        title="Atmosphere sounds"
+        subtitle={describeAtmosphere(status)}
+        trailing={
+          <Switch
+            accessibilityLabel="Atmosphere sounds"
+            checked={sounds.enabled}
+            disabled={!sounds.available}
+            onCheckedChange={(enabled) => void atmosphere.setEnabled(enabled)}
+          />
+        }
+      />
+      <GroupedRow
+        title="Sounds volume"
+        value={levelLabel(level)}
+        className="pb-2"
+      >
         <Slider
           accessibilityLabel="Sounds volume under the voice"
           disabled={!sounds.enabled}
@@ -71,7 +71,7 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
           onValueChange={(value) => void atmosphere.setLevel(Math.round(value))}
         />
         <View className="w-full flex-row items-center justify-between">
-          <Text variant="muted">Quieter</Text>
+          <Text className="text-muted-foreground text-[13px]">Quieter</Text>
           {!isDefaultLevel && (
             <Button
               accessibilityLabel="Reset the sounds volume"
@@ -82,17 +82,14 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
               <Text>Reset</Text>
             </Button>
           )}
-          <Text variant="muted">Louder</Text>
+          <Text className="text-muted-foreground text-[13px]">Louder</Text>
         </View>
-      </View>
-
-      <View className="w-full gap-2">
-        <View className="w-full flex-row items-center justify-between gap-4">
-          <Text maxFontSizeMultiplier={1.5}>How much is going on</Text>
-          <Text maxFontSizeMultiplier={1.5} className="shrink-0 text-sm">
-            {intensityLabel(intensity)}
-          </Text>
-        </View>
+      </GroupedRow>
+      <GroupedRow
+        title="How much is going on"
+        value={intensityLabel(intensity)}
+        className="pb-2"
+      >
         <Slider
           accessibilityLabel="How much is going on in the atmosphere"
           disabled={!sounds.enabled}
@@ -106,7 +103,9 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
           }
         />
         <View className="w-full flex-row items-center justify-between">
-          <Text variant="muted">Just the main sound</Text>
+          <Text className="text-muted-foreground text-[13px]">
+            Just the main sound
+          </Text>
           {!isDefaultIntensity && (
             <Button
               accessibilityLabel="Reset how much is going on in the atmosphere"
@@ -117,21 +116,22 @@ export function LofiAtmosphereControls({ atmosphere }: Props) {
               <Text>Reset</Text>
             </Button>
           )}
-          <Text variant="muted">The whole scene</Text>
+          <Text className="text-muted-foreground text-[13px]">
+            The whole scene
+          </Text>
         </View>
-      </View>
-
-      <View className="w-full flex-row items-center justify-between gap-4">
-        <View className="shrink gap-1">
-          <Text maxFontSizeMultiplier={1.5}>Off in the car</Text>
-          <Text variant="muted">No sounds through CarPlay</Text>
-        </View>
-        <Switch
-          accessibilityLabel="Atmosphere sounds off in the car"
-          checked={status.mutedInCar}
-          onCheckedChange={(muted) => void atmosphere.setMutedInCar(muted)}
-        />
-      </View>
-    </View>
+      </GroupedRow>
+      <GroupedRow
+        title="Off in the car"
+        subtitle="No sounds through CarPlay"
+        trailing={
+          <Switch
+            accessibilityLabel="Atmosphere sounds off in the car"
+            checked={status.mutedInCar}
+            onCheckedChange={(muted) => void atmosphere.setMutedInCar(muted)}
+          />
+        }
+      />
+    </GroupedSection>
   )
 }

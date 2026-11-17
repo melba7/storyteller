@@ -16,7 +16,7 @@ function Input({
   return (
     <TextInput
       className={cn(
-        "border-input bg-background text-foreground dark:bg-input/30 flex min-h-10 w-full min-w-0 flex-row items-center rounded-md border px-3 py-1 text-base leading-5 shadow-xs shadow-black/5 sm:min-h-9",
+        "bg-secondary dark:bg-input text-foreground flex min-h-10 w-full min-w-0 flex-row items-center rounded-xl px-3 py-1 text-[17px] leading-5",
         props.editable === false &&
           cn(
             "opacity-50",
@@ -26,11 +26,11 @@ function Input({
           ),
         Platform.select({
           web: cn(
-            "selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground transition-[color,box-shadow] outline-none md:text-sm",
+            "selection:bg-primary selection:text-primary-foreground placeholder:text-muted-foreground transition-[color,box-shadow] outline-none",
             "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
             "aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
           ),
-          native: "placeholder:text-muted-foreground/50",
+          native: "placeholder:text-muted-foreground",
         }),
         className,
       )}

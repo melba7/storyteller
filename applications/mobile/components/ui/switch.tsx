@@ -20,6 +20,9 @@ type AndroidSwitchProps = ComponentProps<typeof BaseComposeSwitch> & {
   checkedBorderColor?: ColorValue | undefined
   checkedThumbColor?: ColorValue | undefined
   checkedTrackColor?: ColorValue | undefined
+  uncheckedBorderColor?: ColorValue | undefined
+  uncheckedThumbColor?: ColorValue | undefined
+  uncheckedTrackColor?: ColorValue | undefined
 }
 
 type Props = {
@@ -66,6 +69,9 @@ function BaseAndroidSwitch({
   checkedBorderColor,
   checkedThumbColor,
   checkedTrackColor,
+  uncheckedBorderColor,
+  uncheckedThumbColor,
+  uncheckedTrackColor,
   colors,
   ...props
 }: AndroidSwitchProps) {
@@ -74,6 +80,9 @@ function BaseAndroidSwitch({
     ...(checkedBorderColor ? { checkedBorderColor } : {}),
     ...(checkedThumbColor ? { checkedThumbColor } : {}),
     ...(checkedTrackColor ? { checkedTrackColor } : {}),
+    ...(uncheckedBorderColor ? { uncheckedBorderColor } : {}),
+    ...(uncheckedThumbColor ? { uncheckedThumbColor } : {}),
+    ...(uncheckedTrackColor ? { uncheckedTrackColor } : {}),
   }
 
   return (
@@ -95,6 +104,18 @@ const AndroidSwitch = withUniwind(BaseAndroidSwitch, {
   },
   checkedTrackColor: {
     fromClassName: "checkedTrackColorClassName",
+    styleProperty: "backgroundColor",
+  },
+  uncheckedBorderColor: {
+    fromClassName: "uncheckedBorderColorClassName",
+    styleProperty: "borderColor",
+  },
+  uncheckedThumbColor: {
+    fromClassName: "uncheckedThumbColorClassName",
+    styleProperty: "color",
+  },
+  uncheckedTrackColor: {
+    fromClassName: "uncheckedTrackColorClassName",
     styleProperty: "backgroundColor",
   },
 })
@@ -130,6 +151,9 @@ export function Switch({
             checkedBorderColorClassName="border-primary"
             checkedThumbColorClassName="text-primary-foreground"
             checkedTrackColorClassName="bg-primary"
+            uncheckedBorderColorClassName="border-input"
+            uncheckedThumbColorClassName="text-primary-foreground"
+            uncheckedTrackColorClassName="bg-input"
             modifiers={androidSwitchModifiers}
           />
         ) : (

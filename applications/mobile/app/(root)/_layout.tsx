@@ -1,6 +1,7 @@
 import { Stack } from "expo-router"
 import { Platform } from "react-native"
 import { useReducedMotion } from "react-native-reanimated"
+import { useCSSVariable } from "uniwind"
 
 import { BackButton } from "@/components/BackButton"
 import { usesSystemHeader } from "@/lib/nativeChrome"
@@ -25,15 +26,24 @@ function javaScriptBackButton(fallback = "/") {
 export default function ModalLayout() {
   const modalPresentation = Platform.OS === "android" ? "formSheet" : "modal"
   const reduceMotion = useReducedMotion()
+  const primary = useCSSVariable("--color-primary") as string
 
   return (
     <Stack
       screenOptions={{
         headerShown: false,
+        headerTintColor: primary,
         ...(reduceMotion ? { animation: "none" } : {}),
       }}
     >
-      <Stack.Screen name="index" />
+      <Stack.Screen
+        name="index"
+        options={{
+          headerShown: usesSystemHeader,
+          headerTransparent: true,
+          headerShadowVisible: false,
+        }}
+      />
       <Stack.Screen
         name="settings"
         options={{

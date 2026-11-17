@@ -52,9 +52,14 @@ function triggerBookmarkPressHaptic() {
 
 interface Props {
   activeBookmarks: Bookmark[]
+  /** Colour class for the icon. */
+  iconClassName?: string
 }
 
-export function BookmarkItem({ activeBookmarks }: Props) {
+export function BookmarkItem({
+  activeBookmarks,
+  iconClassName = "text-foreground",
+}: Props) {
   const bookUuid = useAppSelector(getCurrentlyPlayingBookUuid)
   const format = useAppSelector(getCurrentlyPlayingFormat)
   const { data: book } = useGetBookQuery(
@@ -94,7 +99,7 @@ export function BookmarkItem({ activeBookmarks }: Props) {
     <Animated.View style={buttonAnimatedStyle}>
       <Button
         accessibilityLabel={showActive ? "Remove bookmark" : "Add bookmark"}
-        className="items-center rounded"
+        className="h-10 w-10 items-center rounded-full sm:h-10 sm:w-10"
         size="icon"
         variant="ghost"
         onPress={() => {
@@ -126,9 +131,9 @@ export function BookmarkItem({ activeBookmarks }: Props) {
       >
         <Animated.View style={iconAnimatedStyle}>
           {showActive ? (
-            <Icon as={BookmarkCheck} size={24} />
+            <Icon as={BookmarkCheck} size={24} className={iconClassName} />
           ) : (
-            <Icon as={BookmarkIcon} size={24} />
+            <Icon as={BookmarkIcon} size={24} className={iconClassName} />
           )}
         </Animated.View>
       </Button>

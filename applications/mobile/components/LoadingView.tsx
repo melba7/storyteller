@@ -1,9 +1,11 @@
 import { ActivityIndicator, View } from "react-native"
+import { useCSSVariable } from "uniwind"
 
 import { useColorTheme } from "@/hooks/useColorTheme"
 
 export function LoadingView() {
-  const { background, foreground } = useColorTheme()
+  const { background } = useColorTheme()
+  const primary = useCSSVariable("--color-primary") as string
 
   return (
     <View
@@ -38,7 +40,7 @@ export function LoadingView() {
         ]}
       >
         <ActivityIndicator
-          color={foreground}
+          color={primary}
           size={"small"}
           style={{ flex: 1 }}
         />

@@ -36,7 +36,7 @@ export function ColorPickerDialog({ initialValue, onSave }: Props) {
     <Dialog className="self-end">
       <DialogTrigger asChild>
         <Button
-          className="h-8 w-8 rounded-full border border-white"
+          className="border-foreground/10 h-8 w-8 rounded-full border"
           variant="ghost"
           style={{ backgroundColor: value }}
           size="icon"

@@ -123,11 +123,11 @@ export function Highlights({
   return (
     <ScrollView
       className="flex-1"
-      contentContainerClassName="px-2 pt-2"
+      contentContainerClassName="pt-1"
       contentContainerStyle={{ paddingBottom }}
     >
       {highlights.map((highlight, index) => (
-        <View key={highlight.uuid} className="py-0.5">
+        <View key={highlight.uuid}>
           <Button
             onPress={async () => {
               dispatch(
@@ -141,15 +141,19 @@ export function Highlights({
               onClose?.()
             }}
             variant="ghost"
-            className="active:bg-secondary h-auto flex-col items-start rounded-md border border-transparent px-3 py-3 sm:h-auto"
+            className="active:bg-secondary min-h-11 h-auto flex-col items-start rounded-none px-4 py-3 sm:h-auto"
           >
-            <Text className="text-sm font-bold">{highlightTitles[index]}</Text>
+            <Text className="text-[17px] font-normal">
+              {highlightTitles[index]}
+            </Text>
             {highlight.locator.locations?.position && (
-              <Text className="my-2 text-xs">Page {highlightPages[index]}</Text>
+              <Text className="text-muted-foreground my-1 text-[15px]">
+                Page {highlightPages[index]}
+              </Text>
             )}
             {highlight.locator.text?.highlight && (
               <Text
-                className="text-justify text-sm underline decoration-solid"
+                className="text-justify text-[15px] underline decoration-solid"
                 style={{
                   fontFamily: preferences?.typography?.fontFamily,
                   textAlign: "left",
@@ -165,6 +169,7 @@ export function Highlights({
               </Text>
             )}
           </Button>
+          <View className="bg-border ml-4 h-px" />
         </View>
       ))}
     </ScrollView>
