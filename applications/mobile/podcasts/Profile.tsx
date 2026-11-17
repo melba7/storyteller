@@ -21,6 +21,7 @@ import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
+import { AppearanceSection } from "./AppearanceSection"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
@@ -153,6 +154,7 @@ export function Profile() {
           />
           <NotifyRow />
           <PlaybackSection />
+          <AppearanceSection />
           <OpmlSection />
           <AdSkipSwitches />
         </View>

@@ -1,0 +1,98 @@
+/* LOFI-FORK: the Podcasts section's extra themes (see FORK.md). Pulled in by global.css and
+   listed in metro.config.js. Uniwind needs every theme to declare the same variables as light
+   and dark in global.css; modules/podcasts/theme.test.ts checks that. */
+@layer theme {
+  :root {
+    /* Extra Dark: true black backgrounds, for OLED screens. */
+    @variant pod-black {
+      --color-background: #000000;
+      --color-foreground: #fafafa;
+      --color-card: #000000;
+      --color-card-foreground: #fafafa;
+      --color-popover: #0a0a0a;
+      --color-popover-foreground: #fafafa;
+      --color-primary: #ef7f3e;
+      --color-primary-foreground: #000000;
+      --color-secondary: #1a1a1a;
+      --color-secondary-foreground: #fafafa;
+      --color-muted: #1a1a1a;
+      --color-muted-foreground: #a3a3a3;
+      --color-accent: #1a1a1a;
+      --color-accent-foreground: #fafafa;
+      --color-link: #73c1fc;
+      --color-destructive: #e14e4e;
+      --color-border: #262626;
+      --color-input: #262626;
+      --color-ring: #737373;
+    }
+
+    /* Midnight: a deep blue night. */
+    @variant pod-midnight {
+      --color-background: #0b1426;
+      --color-foreground: #e6ecf7;
+      --color-card: #101c33;
+      --color-card-foreground: #e6ecf7;
+      --color-popover: #101c33;
+      --color-popover-foreground: #e6ecf7;
+      --color-primary: #7aa7ff;
+      --color-primary-foreground: #0b1426;
+      --color-secondary: #172544;
+      --color-secondary-foreground: #e6ecf7;
+      --color-muted: #172544;
+      --color-muted-foreground: #9aa9c7;
+      --color-accent: #172544;
+      --color-accent-foreground: #e6ecf7;
+      --color-link: #8fc0ff;
+      --color-destructive: #f06a6a;
+      --color-border: #223357;
+      --color-input: #223357;
+      --color-ring: #4d6aa8;
+    }
+
+    /* Paper: warm sepia, light. */
+    @variant pod-paper {
+      --color-background: #f4ecd8;
+      --color-foreground: #3b2f22;
+      --color-card: #faf4e4;
+      --color-card-foreground: #3b2f22;
+      --color-popover: #faf4e4;
+      --color-popover-foreground: #3b2f22;
+      --color-primary: #9a4a1a;
+      --color-primary-foreground: #fbf5e6;
+      --color-secondary: #e9dfc6;
+      --color-secondary-foreground: #3b2f22;
+      --color-muted: #e9dfc6;
+      --color-muted-foreground: #6f604d;
+      --color-accent: #e9dfc6;
+      --color-accent-foreground: #3b2f22;
+      --color-link: #1f5f8b;
+      --color-destructive: #b83232;
+      --color-border: #d8cbab;
+      --color-input: #d8cbab;
+      --color-ring: #a8987a;
+    }
+
+    /* Forest: dark green. */
+    @variant pod-forest {
+      --color-background: #0d1a14;
+      --color-foreground: #e4efe6;
+      --color-card: #12231b;
+      --color-card-foreground: #e4efe6;
+      --color-popover: #12231b;
+      --color-popover-foreground: #e4efe6;
+      --color-primary: #6fcf8f;
+      --color-primary-foreground: #0d1a14;
+      --color-secondary: #1b3226;
+      --color-secondary-foreground: #e4efe6;
+      --color-muted: #1b3226;
+      --color-muted-foreground: #9bb5a5;
+      --color-accent: #1b3226;
+      --color-accent-foreground: #e4efe6;
+      --color-link: #7fd0e0;
+      --color-destructive: #e86a5f;
+      --color-border: #25402f;
+      --color-input: #25402f;
+      --color-ring: #4f7a62;
+    }
+  }
+}

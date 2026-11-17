@@ -8,4 +8,6 @@ const config = process.env.EXPO_PUBLIC_ENABLE_SENTRY
 
 module.exports = withUniwindConfig(config, {
   cssEntryFile: "./global.css",
+  // LOFI-FORK: the Podcasts section's extra themes, declared in podcasts/themes.css (see FORK.md).
+  extraThemes: ["pod-black", "pod-midnight", "pod-paper", "pod-forest"],
 })
