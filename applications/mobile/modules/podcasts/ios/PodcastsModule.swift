@@ -178,6 +178,7 @@ public final class PodcastsModule: Module {
     // The system's AirPlay button, for the player (see AirPlayRouteView).
     View(AirPlayRouteView.self) {
       Prop("label") { (view: AirPlayRouteView, label: String) in view.setLabel(label) }
+      Prop("light") { (view: AirPlayRouteView, light: Bool) in view.setLight(light) }
     }
 
     // MARK: Playback settings

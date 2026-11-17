@@ -10,7 +10,6 @@ import { skipNoteText } from "@/modules/podcasts/ads"
 import {
   miniPlayerLabel,
   showsMiniPlayer,
-  timeLeft,
 } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import {
@@ -19,7 +18,7 @@ import {
   usePlayerValue,
   useRestoreLastEpisode,
 } from "@/modules/podcasts/playerInstance"
-import { progressFraction } from "@/modules/podcasts/playerLook"
+import { miniSubtitle } from "@/modules/podcasts/playerSheet"
 
 import { Artwork } from "./Artwork"
 import { tap } from "./haptics"
@@ -36,9 +35,15 @@ export function useHasMiniPlayer(): boolean {
 }
 
 /**
- * What sits in the tab bar's accessory: the artwork, the title and a play button. Tap it to
- * open the full-screen player. The full row also says the time left; the compact one (shown
- * when the tab bar is minimized) leaves it out.
+ * What sits in the tab bar's accessory: small rounded artwork, the title in bold with the date
+ * (or the time left, once the episode is under way) under it, a play button and skip forward.
+ * Tap it to open the full-screen player. The full row has the second line and skip forward;
+ * the compact one (shown when the tab bar is minimized) leaves them out.
+ *
+ * The player still slides up as a modal. Link.AppleZoom zooms only from a Link's own trigger
+ * into a pushed screen of the same navigator, and the accessory is drawn by the native tab bar
+ * outside the stack, so there is no trigger to zoom from (and it can't be tried without a
+ * device).
  */
 export function MiniPlayerContent() {
   const router = useRouter()
@@ -65,11 +70,11 @@ export function MiniPlayerContent() {
           <Artwork
             uri={episode.imageUrl ?? show?.imageUrl ?? null}
             size={compact ? 32 : 40}
-            className="rounded-lg"
+            className="rounded-lg border-0"
           />
           <View className="flex-1">
             <Text
-              className={compact ? "text-sm font-semibold" : "font-semibold"}
+              className={compact ? "text-sm font-bold" : "font-bold"}
               numberOfLines={1}
             >
               {episode.title}
@@ -79,7 +84,11 @@ export function MiniPlayerContent() {
                 {view.error ??
                   (note
                     ? skipNoteText(note)
-                    : timeLeft(view.position, view.duration))}
+                    : miniSubtitle(
+                        view.position,
+                        view.duration,
+                        episode.publishedAt,
+                      ))}
               </Text>
             )}
           </View>
@@ -130,16 +139,6 @@ export function MiniPlayerContent() {
           </Pressable>
         )}
       </View>
-      {compact ? null : (
-        <View className="bg-foreground/10 absolute right-4 bottom-0 left-4 h-0.5 rounded-full">
-          <View
-            className="bg-primary h-0.5 rounded-full"
-            style={{
-              width: `${progressFraction(view.position, view.duration) * 100}%`,
-            }}
-          />
-        </View>
-      )}
     </View>
   )
 }

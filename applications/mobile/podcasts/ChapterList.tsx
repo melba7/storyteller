@@ -9,6 +9,7 @@ import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 
 import { Artwork } from "./Artwork"
 import { pick } from "./haptics"
+import { useSheet } from "./playerSheetContext"
 import { chapterActions } from "./useChapters"
 
 /**
@@ -25,6 +26,7 @@ export function ChapterList({
 }) {
   const view = usePlayer()
   const playing = currentChapterIndex(chapters, view.position)
+  const sheet = useSheet()
 
   function play(chapter: PodcastChapter) {
     pick()
@@ -33,13 +35,14 @@ export function ChapterList({
   }
 
   return (
-    <ScrollView contentContainerClassName="px-safe-or-4 pb-safe-offset-3 gap-1">
+    <ScrollView contentContainerClassName="px-1 pb-3 gap-1">
       {chapters.map((chapter, index) => (
         <View
           key={chapter.start}
-          className={`flex-row items-center gap-3 rounded-xl px-2 py-2 ${
-            index === playing ? "bg-white/20" : ""
-          }`}
+          className="flex-row items-center gap-3 rounded-xl px-2 py-2"
+          style={
+            index === playing ? { backgroundColor: sheet.rest } : undefined
+          }
         >
           <Pressable
             className="min-h-12 flex-1 flex-row items-center gap-3 active:opacity-70"
@@ -57,14 +60,15 @@ export function ChapterList({
             ) : null}
             <View className="flex-1">
               <Text
-                className={`text-base text-white ${
+                className={`text-base ${
                   index === playing ? "font-bold" : "font-medium"
                 } ${chapter.skipped ? "opacity-50" : ""}`}
+                style={{ color: sheet.ink }}
                 numberOfLines={2}
               >
                 {chapter.title}
               </Text>
-              <Text className="text-sm text-white/70">
+              <Text className="text-sm" style={{ color: sheet.muted }}>
                 {formatTime(chapter.start)}
               </Text>
             </View>

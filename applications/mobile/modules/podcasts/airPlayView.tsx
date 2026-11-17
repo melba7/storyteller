@@ -12,6 +12,8 @@ import { Podcasts } from "./index"
 type AirPlayViewProps = {
   /** What VoiceOver says for the button. */
   label: string
+  /** True on a light sheet, so the button is dark (white when left out). */
+  light?: boolean
   style?: StyleProp<ViewStyle>
 }
 

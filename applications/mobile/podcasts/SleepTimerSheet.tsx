@@ -16,11 +16,13 @@ import {
   sleepSecondsLeft,
 } from "@/modules/podcasts/sleepTimer"
 
+import { useSheet } from "./playerSheetContext"
 import { useChapters } from "./useChapters"
 import { sleepTimer, useNow, useSleepTimer } from "./useSleepTimer"
 
-/** The moon slot in the player's toolbar: opens the sleep timer choices and shows the time left in its place. */
+/** The moon in the player's transport row: opens the sleep timer choices and shows the time left in its place. */
 export function SleepTimerButton() {
+  const sheet = useSheet()
   const state = useSleepTimer()
   const view = usePlayer()
   const chapters = useChapters(view.episode?.id ?? "")
@@ -38,17 +40,17 @@ export function SleepTimerButton() {
   return (
     <>
       <Pressable
-        className="h-11 min-w-11 items-center justify-center rounded-full px-2 active:bg-white/15"
+        className="h-11 min-w-11 items-center justify-center rounded-full px-2 active:opacity-60"
         accessibilityRole="button"
         accessibilityLabel={sleepButtonLabel(left, state)}
         onPress={() => setOpen(true)}
       >
         {text === "" ? (
-          <Icon as={Moon} size={22} className="text-white" />
+          <Icon as={Moon} size={24} color={sheet.tint} />
         ) : (
           <Text
-            className="text-sm font-semibold text-white"
-            style={{ fontVariant: ["tabular-nums"] }}
+            className="text-sm font-semibold"
+            style={{ fontVariant: ["tabular-nums"], color: sheet.tint }}
             numberOfLines={1}
           >
             {text}

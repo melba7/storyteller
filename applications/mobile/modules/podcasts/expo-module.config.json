@@ -1,7 +1,7 @@
 {
   "platforms": ["ios"],
   "ios": {
-    "modules": ["PodcastsModule"],
+    "modules": ["PodcastsModule", "PodcastsVolumeModule"],
     "appDelegateSubscribers": ["PodcastsAppDelegateSubscriber"]
   }
 }
