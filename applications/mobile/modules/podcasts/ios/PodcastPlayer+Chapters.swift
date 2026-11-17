@@ -159,6 +159,7 @@ extension PodcastPlayer {
         position: position, in: state.chapters, duration: currentDuration)
     else { return }
     state.jumping = true
+    noteSaved(.chapters, audioSeconds: target - position)
     player.seek(
       to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero

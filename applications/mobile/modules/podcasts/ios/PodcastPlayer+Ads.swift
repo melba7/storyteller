@@ -83,6 +83,7 @@ final class PodcastAdSkipping {
   func undo() -> Bool {
     guard let ad = skipper.undo(now: now), let episodeId else { return false }
     store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: ad.start)
+    StatsStore.shared.undoAdSkip()
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -119,6 +120,7 @@ final class PodcastAdSkipping {
       let skip = skipper.reached(
         position: owner.position, rate: rate > 0 ? rate : 1, duration: duration, now: now)
     else { return }
+    owner.noteSaved(.ads, audioSeconds: skip.target - owner.position)
     owner.player.seek(
       to: CMTime(seconds: skip.target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero)
