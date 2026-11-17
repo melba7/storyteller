@@ -22,7 +22,7 @@ import {
   SKIP_AHEAD_SECONDS,
   SKIP_BACK_SECONDS,
   speedLabel,
-} from "@/modules/podcasts/playback"
+} from "@/modules/podcasts/playbackRules"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 import { playerBackground } from "@/modules/podcasts/playerLook"
 

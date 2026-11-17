@@ -6,7 +6,11 @@ import { useSharedValue } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 
 import { Text } from "@/components/ui/text"
-import { formatTime, timeLeft } from "@/modules/podcasts/playback"
+import {
+  clampPosition,
+  formatTime,
+  timeLeft,
+} from "@/modules/podcasts/playbackRules"
 import {
   barFraction,
   positionAt,
@@ -82,12 +86,14 @@ export function SeekBar({ position, duration, onSeek }: Props) {
           accessibilityRole="adjustable"
           accessibilityLabel="Seek bar"
           accessibilityValue={{
-            text: `${formatTime(shown)}, ${timeLeft(shown, duration)} left`,
+            text: known
+              ? `${formatTime(shown)} played, ${formatTime(duration - shown)} left`
+              : `${formatTime(shown)} played, unknown length`,
           }}
           accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
           onAccessibilityAction={(event) => {
             const step = event.nativeEvent.actionName === "increment" ? 15 : -15
-            onSeek(Math.max(0, position + step))
+            onSeek(clampPosition(position + step, duration))
           }}
           onLayout={(event) => {
             width.set(event.nativeEvent.layout.width)

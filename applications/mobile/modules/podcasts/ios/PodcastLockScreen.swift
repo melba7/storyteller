@@ -36,7 +36,7 @@ final class PodcastLockScreen {
     guard let artworkUrl, let url = URL(string: artworkUrl) else { return }
     artworkTask = Task { [weak self] in
       guard let image = await ArtworkLoader.image(url), !Task.isCancelled else { return }
-      let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+      let artwork = Self.makeArtwork(image)
       self?.artwork = artwork
       if let self, self.owner.current == .podcast { self.refreshArtwork() }
     }
@@ -64,10 +64,16 @@ final class PodcastLockScreen {
     let commands = MPRemoteCommandCenter.shared()
     commands.skipForwardCommand.preferredIntervals = Self.bookForward
     commands.skipBackwardCommand.preferredIntervals = Self.bookBack
-    if let saved = savedBookInfo {
+    // Put the book's card back only while the card is still ours. If the book has already
+    // written its own, leave it.
+    let current = MPNowPlayingInfoCenter.default().nowPlayingInfo
+    let stillOurs =
+      current?[MPMediaItemPropertyTitle] as? String == title
+      && current?[MPMediaItemPropertyArtist] as? String == showTitle
+    if let saved = savedBookInfo, stillOurs {
       MPNowPlayingInfoCenter.default().nowPlayingInfo = saved
-      savedBookInfo = nil
     }
+    savedBookInfo = nil
   }
 
   /// Writes the card while the podcast owns it: elapsed time and rate follow play, pause,
@@ -87,6 +93,12 @@ final class PodcastLockScreen {
     }
     if let artwork { info[MPMediaItemPropertyArtwork] = artwork }
     MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+  }
+
+  /// Built outside the main actor: iOS calls the request handler on another thread, and a
+  /// main-actor handler would crash there.
+  nonisolated private static func makeArtwork(_ image: UIImage) -> MPMediaItemArtwork {
+    MPMediaItemArtwork(boundsSize: image.size) { _ in image }
   }
 
   private func refreshArtwork() {

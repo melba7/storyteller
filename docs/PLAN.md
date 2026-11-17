@@ -509,6 +509,9 @@ out, with the reasons, are in "Matching Pocket Casts" in
 ## Later
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
+- Podcasts: `savePlayback` notifies the library on every 15 s save, so open
+  lists re-read the database while playing. Notify only when what a row shows
+  (minutes left or played) changes.
 - Split the big Swift files (`AmbienceSynth`, `AmbiencePlayer`,
   `LofiAtmosphereHost`).
 - Stop building the mood code while the music is shelved.

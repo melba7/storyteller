@@ -4,7 +4,7 @@ import { Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { speedLabel, stepSpeed } from "@/modules/podcasts/playback"
+import { speedLabel, stepSpeed } from "@/modules/podcasts/playbackRules"
 
 const PRESETS = [1, 1.2, 1.5, 2]
 

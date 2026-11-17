@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { showsMiniPlayer, timeLeft } from "@/modules/podcasts/playback"
+import { showsMiniPlayer, timeLeft } from "@/modules/podcasts/playbackRules"
 import {
   player,
   usePlayer,

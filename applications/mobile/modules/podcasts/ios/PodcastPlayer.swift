@@ -18,18 +18,18 @@ final class PodcastPlayer {
   /// Where events go: the module's `sendEvent`.
   var sink: (@MainActor (String, [String: Any]) -> Void)?
 
-  private let player = AVPlayer()
-  private let lockScreen = PodcastLockScreen()
+  let player = AVPlayer()
+  let lockScreen = PodcastLockScreen()
   private var episodeId: String?
   private var knownDuration: Double?
   private var speed = Speed.normal
   /// What the listener asked for: playing, even while the stream is still buffering.
-  private var wantsToPlay = false
+  var wantsToPlay = false
   private var timeObserver: Any?
   private var playerObservation: NSKeyValueObservation?
   private var itemObservation: NSKeyValueObservation?
   private var itemObservers: [NSObjectProtocol] = []
-  private var watchingBook = false
+  var watchingBook = false
   private var ticks = 0
 
   private init() {
@@ -164,7 +164,7 @@ final class PodcastPlayer {
     return object
   }
 
-  private func publish(positionOverride: Double? = nil, refreshCard: Bool = true) {
+  func publish(positionOverride: Double? = nil, refreshCard: Bool = true) {
     let place = positionOverride ?? position
     sink?("onPlaybackState", stateObject(position: place))
     guard refreshCard else { return }
@@ -270,54 +270,6 @@ final class PodcastPlayer {
         else { return }
         self.play()
       }
-    }
-  }
-
-  // MARK: The book and the lock screen
-
-  /// A podcast is playing: the book stops and the podcast owns the lock screen.
-  private func takeTheLockScreen() {
-    guard lockScreen.owner.current != .podcast else { return }
-    Task {
-      let book = AudiobookPlayerActor.shared
-      if await book.lofiIsPlaying() { await book.lofiPauseForPodcast() }
-      // After the book has paused, so its own card updates can't overwrite ours.
-      lockScreen.podcastStartedPlaying()
-      publish()
-    }
-  }
-
-  /// Registers once with the book's player: when the book plays, the podcast stops.
-  private func watchTheBook() {
-    guard !watchingBook else { return }
-    watchingBook = true
-    Task {
-      await AudiobookPlayerActor.shared.lofiObserve(
-        track: { _ in },
-        playing: { isPlaying, _ in
-          guard isPlaying else { return }
-          Task { @MainActor in PodcastPlayer.shared.bookStartedPlaying() }
-        },
-        clip: { _ in }
-      )
-    }
-  }
-
-  private func bookStartedPlaying() {
-    if wantsToPlay || player.timeControlStatus != .paused { pause() }
-    lockScreen.bookStartedPlaying()
-  }
-
-  private func handle(_ command: LofiRemoteCommand) {
-    switch command {
-    case .play: play()
-    case .pause: pause()
-    case .togglePlayPause: togglePlayPause()
-    case .nextTrack: skip(by: Skip.ahead)
-    case .previousTrack: skip(by: -Skip.back)
-    case .skipForward(let seconds): skip(by: seconds)
-    case .skipBackward(let seconds): skip(by: -seconds)
-    case .changePosition(let seconds): seek(to: seconds)
     }
   }
 }
