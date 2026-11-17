@@ -57,15 +57,19 @@ export function resumeStart(
   return saved
 }
 
-/** Played to its end, or stopped within 5 seconds of the end. */
+/**
+ * Played to its end, or stopped within 5 seconds of the end. `within` is the listener's
+ * "mark played when this many seconds are left" (0 is off); it never shrinks the 5 seconds.
+ */
 export function isPlayed(
   position: number,
   duration: number | null,
   reachedEnd: boolean,
+  within = 0,
 ): boolean {
   if (reachedEnd) return true
   if (duration === null || !(duration > 0)) return false
-  return duration - position <= PLAYED_WITHIN_SECONDS
+  return duration - position <= Math.max(within, PLAYED_WITHIN_SECONDS)
 }
 
 /** The mini player shows when an episode is loaded or one was played before. */

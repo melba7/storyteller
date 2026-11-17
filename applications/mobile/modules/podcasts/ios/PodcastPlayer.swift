@@ -117,6 +117,7 @@ final class PodcastPlayer {
     try? AVAudioSession.sharedInstance().setActive(true)
     // A finished episode starts over.
     if let duration = currentDuration, position >= duration - 0.5 { seek(to: 0) }
+    rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
     player.play()
     takeTheLockScreen()
@@ -247,6 +248,7 @@ final class PodcastPlayer {
 
   private func playStateChanged() {
     if player.timeControlStatus == .playing { takeTheLockScreen() }
+    if player.timeControlStatus == .paused { notePaused() }
     // Transcribing may run while a podcast plays, which keeps the app alive.
     PodcastTranscriber.shared.playbackChanged(isPlaying: player.timeControlStatus == .playing)
     publish()

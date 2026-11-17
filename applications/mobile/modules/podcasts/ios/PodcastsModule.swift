@@ -98,10 +98,12 @@ public final class PodcastsModule: Module {
       await MainActor.run { PodcastPlayer.shared.skip(by: seconds) }
     }
     AsyncFunction("skipForward") { () async in
-      await MainActor.run { PodcastPlayer.shared.skip(by: Skip.ahead) }
+      let amount = Double(PlaybackSettingsStore.current.skipForward)
+      await MainActor.run { PodcastPlayer.shared.skip(by: amount) }
     }
     AsyncFunction("skipBack") { () async in
-      await MainActor.run { PodcastPlayer.shared.skip(by: -Skip.back) }
+      let amount = PlaybackSettingsStore.current.previousSeconds
+      await MainActor.run { PodcastPlayer.shared.skip(by: -amount) }
     }
 
     // Sets the speed, rounded to 0.1 within 0.5 to 3.0, and returns the speed in use.
@@ -137,6 +139,18 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("clearUpNext") { () async in
       await MainActor.run { PodcastPlayer.shared.clearUpNext() }
+    }
+
+    // MARK: Playback settings
+
+    // The listener's playback settings (see PlaybackSettings). Saving returns what was kept.
+    AsyncFunction("getPlaybackSettings") { () -> [String: Any] in
+      PlaybackSettingsStore.current.values
+    }
+    AsyncFunction("setPlaybackSettings") { (values: [String: Any]) async -> [String: Any] in
+      let kept = PlaybackSettingsStore.save(values)
+      await MainActor.run { PodcastPlayer.shared.settingsChanged() }
+      return kept.values
     }
 
     // MARK: Sleep timer

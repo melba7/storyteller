@@ -1,6 +1,8 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 import { requireOptionalNativeModule } from "expo-modules-core"
 
+import type { PlaybackSettings } from "./playbackSettings"
+
 /** A podcast feed as the Swift side reads it. A value the feed lacks is missing or null. */
 export type PodcastFeedData = {
   title: string
@@ -172,6 +174,11 @@ type PodcastsNativeModule = {
   getPlaybackState(): Promise<PlaybackState>
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
+
+  /** The listener's playback settings, as Swift keeps them (see playbackSettings.ts). */
+  getPlaybackSettings(): Promise<PlaybackSettings>
+  /** Saves the settings; a value that is not a choice keeps its default. Returns what was kept. */
+  setPlaybackSettings(settings: PlaybackSettings): Promise<PlaybackSettings>
 
   /** Counts down this many minutes (1 to 720), then fades out and pauses. */
   startSleepTimer(minutes: number): Promise<void>

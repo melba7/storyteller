@@ -18,11 +18,8 @@ import {
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import {
-  SKIP_AHEAD_SECONDS,
-  SKIP_BACK_SECONDS,
-  speedLabel,
-} from "@/modules/podcasts/playbackRules"
+import { speedLabel } from "@/modules/podcasts/playbackRules"
+import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 import { playerBackground } from "@/modules/podcasts/playerLook"
 
@@ -30,11 +27,13 @@ import { Artwork } from "./Artwork"
 import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
 import { SpeedPanel } from "./SpeedPanel"
+import { usePlaybackSettings } from "./usePlaybackSettings"
 
 /** The full-screen player, laid out like Pocket Casts': artwork, seek bar, controls, notes. */
 export function PlayerScreen() {
   const router = useRouter()
   const view = usePlayer()
+  const { skipBack, skipForward } = usePlaybackSettings()
   const { width } = useWindowDimensions()
   const [showSpeed, setShowSpeed] = useState(false)
   const { episode, show } = view
@@ -109,10 +108,10 @@ export function PlayerScreen() {
 
           <View className="w-full flex-row items-center justify-center gap-8">
             <SkipButton
-              label={`Back ${SKIP_BACK_SECONDS} seconds`}
-              seconds={SKIP_BACK_SECONDS}
+              label={skipLabel("back", skipBack)}
+              seconds={skipBack}
               icon={RotateCcw}
-              onPress={() => void player.skip(-SKIP_BACK_SECONDS)}
+              onPress={() => void player.skip(-skipBack)}
             />
             <Pressable
               className="size-20 items-center justify-center rounded-full bg-white active:opacity-80"
@@ -135,10 +134,10 @@ export function PlayerScreen() {
               )}
             </Pressable>
             <SkipButton
-              label={`Ahead ${SKIP_AHEAD_SECONDS} seconds`}
-              seconds={SKIP_AHEAD_SECONDS}
+              label={skipLabel("ahead", skipForward)}
+              seconds={skipForward}
               icon={RotateCw}
-              onPress={() => void player.skip(SKIP_AHEAD_SECONDS)}
+              onPress={() => void player.skip(skipForward)}
             />
           </View>
 

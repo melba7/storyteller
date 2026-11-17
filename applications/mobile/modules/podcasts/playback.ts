@@ -77,6 +77,8 @@ export interface PlaybackDeps {
   getEpisode(id: string): Promise<StoredEpisode | null>
   setInterval(callback: () => void, ms: number): unknown
   clearInterval(handle: unknown): void
+  /** The listener's "mark played when this many seconds are left" (0 or missing: off). */
+  playedWithin?(): number
   /** Reports a failure that has no screen to show it (saving the place). */
   report?(cause: unknown): void
 }
@@ -86,6 +88,8 @@ export function createPlayback(deps: PlaybackDeps) {
   let timer: unknown = null
   let listening = false
   const listeners = new Set<() => void>()
+  /** The loaded episode is inside the "mark played" window and was saved as played. */
+  let markedEarly = false
 
   function set(next: Partial<PlayerView>) {
     view = { ...view, ...next }
@@ -96,7 +100,12 @@ export function createPlayback(deps: PlaybackDeps) {
   function persist(position: number, reachedEnd = false) {
     const episode = view.episode
     if (!episode) return
-    const played = isPlayed(position, view.duration, reachedEnd)
+    const played = isPlayed(
+      position,
+      view.duration,
+      reachedEnd,
+      deps.playedWithin?.() ?? 0,
+    )
     deps.savePlayback(episode.id, position, played).catch((cause: unknown) => {
       deps.report?.(cause)
     })
@@ -127,7 +136,17 @@ export function createPlayback(deps: PlaybackDeps) {
     if (wasPlaying && !state.isPlaying && !state.isBuffering) {
       persist(state.position)
     }
+    markEarly(state.position)
     syncTimer()
+  }
+
+  /** Saves the episode as played the moment it enters the listener's "N seconds left" window. */
+  function markEarly(position: number) {
+    const within = deps.playedWithin?.() ?? 0
+    const inside =
+      within > 0 && isPlayed(position, view.duration, false, within)
+    if (inside && !markedEarly) persist(position)
+    markedEarly = inside
   }
 
   function onEnded(event: PlaybackEnded) {
@@ -143,6 +162,9 @@ export function createPlayback(deps: PlaybackDeps) {
       const episode = await deps.getEpisode(event.episodeId)
       if (!episode) return
       const show = await deps.getShow(episode.showId)
+      // One that was still playing (the next button on the headphones) keeps its place.
+      if (view.episode && view.isPlaying) persist(view.position)
+      markedEarly = false
       set({
         episode,
         show,
@@ -239,6 +261,7 @@ export function createPlayback(deps: PlaybackDeps) {
       return
     }
     if (view.episode && view.loaded) persist(view.position)
+    markedEarly = false
     set({
       episode,
       show,
