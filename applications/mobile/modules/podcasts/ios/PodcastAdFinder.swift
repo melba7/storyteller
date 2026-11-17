@@ -169,9 +169,13 @@ final class PodcastAdFinder: @unchecked Sendable {
     }
   }
 
-  /// Whether another episode is urgent and waiting, so the one at work should stop.
+  /// Whether another episode is urgent and waiting, or its transcript grew and wants a partial
+  /// pass, so the one at work should stop (its answers so far are kept).
   private func makesWayForUrgent(_ id: String) -> Bool {
-    lock.withLock { QueueOrder.shouldStop(working: id, waiting: waiting, urgent: urgent) }
+    lock.withLock {
+      QueueOrder.shouldStop(working: id, waiting: waiting, urgent: urgent)
+        || (urgent != id && urgent.map { partialWanted.contains($0) } == true)
+    }
   }
 
   var allowedNow: Bool {
