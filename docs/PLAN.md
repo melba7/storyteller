@@ -816,11 +816,14 @@ at a time in download order, the one playing does not go first, nothing shows
 until the whole episode is done, and ads are looked for only after that, so a
 fresh download is usually past its ads before they are known.
 
-- [ ] **R1. Downloaded episodes in the Library** (S): a "Downloaded" row at the
+- [x] **R1. Downloaded episodes in the Library** (S): a "Downloaded" row at the
       top of the Library (with how many) opens the downloads list inside the
       Library tab; Profile keeps its row.
   - Done when: `check.sh` passes and the row opens the list without switching
     tabs.
+  - Status: built. The downloads list is a shared route (`downloadsHref`), so it
+    opens in the tab you are in; the Library's "Downloaded" row sits above the
+    shows and Profile uses the same link. The look waits for TestFlight.
 - [ ] **R2. The playing episode first** (M): the transcriber and the ad finder
       put the playing episode at the front of their queues and pause another
       episode at its next piece; playing an episode that is not downloaded
@@ -833,7 +836,24 @@ fresh download is usually past its ads before they are known.
   - Done when: `check.sh` passes and the iOS build passes in CI.
 - [ ] **R4. Ads found as the transcript grows** (L): waits for Mo's answer on
       Apple Intelligence (the finder needs it).
-- [ ] **R5. The top bar over text** (S to M): waits for Mo's screenshots.
+- [ ] **R5. The top bar over text, and controls off the edge** (M): Mo's
+      screenshots (Profile scrolled, the player's transcript) show the large
+      title staying large over the content, the page pills running off the
+      right edge, and the transcript's buttons under the home indicator. Every
+      screen's list or scroll view becomes the screen's first child (no wrapping
+      View, the bar and status bar after it), so iOS tracks it: the large title
+      shrinks and the bar blurs what passes under it. The player's pills fit the
+      width, and every control pinned to the bottom sits above the home
+      indicator. Then a pass over every Podcasts screen for the same faults.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    the Profile title shrinks on scroll and nothing is clipped in the player.
+- [ ] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows
+      failed with "only works over plain http". The app allows plain http (like
+      other podcast apps), keeps trying https first, and a download whose https
+      address fails falls back to the feed's http address. Marketplace's 403 is
+      looked at separately.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    the Bloomberg feeds subscribe.
 - [ ] **R6. A more modern look** (M to L): waits for Mo to name the app to
       follow and the screens that look dated.
 
