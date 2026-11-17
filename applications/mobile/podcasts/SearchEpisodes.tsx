@@ -9,6 +9,7 @@ import {
   searchDirectoryEpisodes,
 } from "@/modules/podcasts/directory"
 import {
+  type StoredEpisode,
   formatDuration,
   formatEpisodeDate,
   formatEpisodeLength,
@@ -23,12 +24,12 @@ import { useDebouncedSearch } from "./useDebouncedSearch"
 export type Scope = "mine" | "all" | "spoken"
 
 const SCOPES: { id: Scope; label: string }[] = [
-  { id: "mine", label: "Your shows" },
   { id: "all", label: "All podcasts" },
+  { id: "mine", label: "Your shows" },
   { id: "spoken", label: "Spoken" },
 ]
 
-/** The scope control under the search bar: Your shows, All podcasts, Spoken. */
+/** The scopes under the search bar as capsule chips: All podcasts, Your shows, Spoken. */
 export function ScopeControl({
   scope,
   onChange,
@@ -37,26 +38,30 @@ export function ScopeControl({
   onChange: (scope: Scope) => void
 }) {
   return (
-    <View
-      className="bg-secondary flex-row rounded-full p-1"
-      accessibilityRole="tablist"
-    >
-      {SCOPES.map(({ id, label }) => (
-        <Pressable
-          key={id}
-          className={`min-h-10 flex-1 items-center justify-center rounded-full px-2 ${scope === id ? "bg-background" : ""}`}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: scope === id }}
-          onPress={() => onChange(id)}
-        >
-          <Text
-            className={scope === id ? "font-semibold" : "text-muted-foreground"}
-            numberOfLines={1}
+    <View className="flex-row flex-wrap gap-2" accessibilityRole="tablist">
+      {SCOPES.map(({ id, label }) => {
+        const selected = scope === id
+        return (
+          <Pressable
+            key={id}
+            className={`min-h-9 items-center justify-center rounded-full px-4 ${selected ? "bg-primary" : "bg-secondary"}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(id)}
           >
-            {label}
-          </Text>
-        </Pressable>
-      ))}
+            <Text
+              className={
+                selected
+                  ? "text-primary-foreground font-semibold"
+                  : "font-semibold"
+              }
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        )
+      })}
     </View>
   )
 }
@@ -80,9 +85,9 @@ export function ResultRow({
       accessibilityLabel={`${title}, ${line}`}
       onPress={onPress}
     >
-      <Artwork uri={imageUrl} size={56} />
+      <Artwork uri={imageUrl} size={60} />
       <View className="flex-1">
-        <Text className="font-semibold" numberOfLines={2}>
+        <Text className="text-base font-bold" numberOfLines={2}>
           {title}
         </Text>
         <Text className="text-muted-foreground text-sm" numberOfLines={2}>
@@ -98,6 +103,8 @@ const join = (parts: string[]) =>
 
 export type EpisodeRowData = {
   key: string
+  /** The library episode behind a "Your shows" hit, which is drawn as a full episode row. */
+  episode?: StoredEpisode
   title: string
   line: string
   imageUrl: string | null
@@ -130,6 +137,7 @@ export function useEpisodeSearch(scope: Scope, term: string) {
     scope === "mine"
       ? mine.results.map(({ episode, showTitle, showImageUrl }) => ({
           key: episode.id,
+          episode,
           title: episode.title,
           line: join([
             showTitle,

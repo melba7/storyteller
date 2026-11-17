@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { ScrollView, View } from "react-native"
+import { ScrollView } from "react-native"
 
 import { DiscoverBrowse } from "./DiscoverBrowse"
 import { ScreenBar } from "./ScreenBar"
@@ -18,12 +18,10 @@ export function Discover() {
     <>
       <ScrollView
         className="bg-background flex-1"
-        contentContainerClassName="px-safe-or-4 gap-3"
+        contentContainerStyle={{ paddingBottom: 24 }}
         contentInsetAdjustmentBehavior="automatic"
       >
-        <View className="mt-4 pb-6">
-          <DiscoverBrowse />
-        </View>
+        <DiscoverBrowse />
       </ScrollView>
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar

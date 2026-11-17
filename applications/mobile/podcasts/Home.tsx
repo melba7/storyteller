@@ -1,10 +1,9 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { ChevronRight, Podcast } from "lucide-react-native"
-import { Pressable, RefreshControl, ScrollView, View } from "react-native"
+import { Podcast } from "lucide-react-native"
+import { RefreshControl, ScrollView, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { topShowCaption, updateCadence } from "@/modules/podcasts/homeLook"
 import {
@@ -18,6 +17,7 @@ import {
 import { useOpenPreview } from "./ChartRow"
 import { EmptyState } from "./EmptyState"
 import { ScreenBar } from "./ScreenBar"
+import { SectionHeader } from "./SectionHeader"
 import { SectionMenuButton } from "./SectionMenu"
 import { ShowShelf } from "./ShowShelf"
 import { UpNextShelf } from "./UpNextShelf"
@@ -30,27 +30,6 @@ import {
 } from "./useHome"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import { useRefreshShows } from "./useRefreshShows"
-
-/** A section's bold title with a grey chevron; tapping it opens the section's page. */
-export function SectionHeader({
-  title,
-  onPress,
-}: {
-  title: string
-  onPress: () => void
-}) {
-  return (
-    <Pressable
-      className="flex-row items-center gap-1 px-4 pt-7 pb-3"
-      accessibilityRole="header"
-      accessibilityLabel={title}
-      onPress={onPress}
-    >
-      <Text className="text-[28px] leading-8 font-bold">{title}</Text>
-      <Icon as={ChevronRight} size={24} className="text-muted-foreground" />
-    </Pressable>
-  )
-}
 
 /**
  * The Home tab: "Up Next >" (a shelf of cards: episodes in progress, then the newest unplayed

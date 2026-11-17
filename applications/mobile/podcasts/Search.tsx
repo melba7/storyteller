@@ -10,6 +10,7 @@ import { isFollowLink } from "@/modules/podcasts/followLinkText"
 import { type SpokenResult } from "@/modules/podcasts/spokenSearch"
 
 import { CategoryTiles } from "./DiscoverBrowse"
+import { EpisodeRow } from "./EpisodeRow"
 import { ScreenBar } from "./ScreenBar"
 import {
   type EpisodeRowData,
@@ -19,11 +20,14 @@ import {
   useEpisodeSearch,
 } from "./SearchEpisodes"
 import { FollowLinkRow, ShowResult, useShowSearch } from "./SearchShows"
+import { SectionHeader } from "./SectionHeader"
 import { SectionMenuButton } from "./SectionMenu"
 import { SpokenGroup, SpokenNotes } from "./SpokenResults"
+import { useShows } from "./hooks"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 
 type Item =
+  | { kind: "header"; key: string; title: string }
   | { kind: "show"; key: string; show: DirectoryShow }
   | { kind: "episode"; key: string; row: EpisodeRowData }
   | { kind: "spoken"; key: string; group: SpokenResult }
@@ -45,20 +49,31 @@ export function Search() {
   const shows = useShowSearch(searched, scope === "all")
   const episodes = useEpisodeSearch(scope, searched)
   const state = episodes.state
+  const showById = new Map((useShows().data ?? []).map((s) => [s.id, s]))
 
+  const headed = (key: string, title: string, rest: Item[]): Item[] =>
+    rest.length > 0 ? [{ kind: "header", key, title }, ...rest] : []
   const items: Item[] = [
-    ...(scope === "all"
-      ? shows.results.map((show) => ({
-          kind: "show" as const,
-          key: `show:${show.id}`,
-          show,
-        }))
-      : []),
-    ...episodes.rows.map((row) => ({
-      kind: "episode" as const,
-      key: `episode:${row.key}`,
-      row,
-    })),
+    ...headed(
+      "header:shows",
+      "Shows",
+      scope === "all"
+        ? shows.results.map((show) => ({
+            kind: "show" as const,
+            key: `show:${show.id}`,
+            show,
+          }))
+        : [],
+    ),
+    ...headed(
+      "header:episodes",
+      "Episodes",
+      episodes.rows.map((row) => ({
+        kind: "episode" as const,
+        key: `episode:${row.key}`,
+        row,
+      })),
+    ),
     ...(scope === "spoken"
       ? episodes.spoken.map((group) => ({
           kind: "spoken" as const,
@@ -77,12 +92,12 @@ export function Search() {
         data={typed ? items : []}
         keyExtractor={(item) => item.key}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerClassName="px-safe-or-4 gap-3 pb-6"
+        contentContainerClassName="pb-6"
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         ListHeaderComponent={
           typed ? (
-            <View className="gap-3 pt-2">
+            <View className="px-safe-or-4 gap-3 pt-2 pb-1">
               <ScopeControl scope={scope} onChange={setScope} />
               {link ? <FollowLinkRow term={term} /> : null}
               {searching ? (
@@ -99,7 +114,7 @@ export function Search() {
               ) : null}
             </View>
           ) : (
-            <View className="pt-4">
+            <View className="px-safe-or-4 pt-4">
               <CategoryTiles />
             </View>
           )
@@ -111,20 +126,35 @@ export function Search() {
             </Text>
           ) : undefined
         }
-        renderItem={({ item }) =>
-          item.kind === "show" ? (
-            <ShowResult show={item.show} />
-          ) : item.kind === "episode" ? (
-            <ResultRow
-              title={item.row.title}
-              line={item.row.line}
-              imageUrl={item.row.imageUrl}
-              onPress={item.row.open}
-            />
-          ) : (
-            <SpokenGroup item={item.group} />
+        renderItem={({ item }) => {
+          if (item.kind === "header") {
+            return <SectionHeader title={item.title} />
+          }
+          const libraryShow =
+            item.kind === "episode" && item.row.episode
+              ? showById.get(item.row.episode.showId)
+              : undefined
+          return (
+            <View className="px-safe-or-4 py-1.5">
+              {item.kind === "show" ? (
+                <ShowResult show={item.show} />
+              ) : item.kind === "episode" ? (
+                item.row.episode && libraryShow ? (
+                  <EpisodeRow episode={item.row.episode} show={libraryShow} />
+                ) : (
+                  <ResultRow
+                    title={item.row.title}
+                    line={item.row.line}
+                    imageUrl={item.row.imageUrl}
+                    onPress={item.row.open}
+                  />
+                )
+              ) : (
+                <SpokenGroup item={item.group} />
+              )}
+            </View>
           )
-        }
+        }}
       />
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar

@@ -2,16 +2,23 @@
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { CHART_CATEGORIES, type ChartShow } from "@/modules/podcasts/charts"
+import {
+  CHART_CATEGORIES,
+  type ChartShow,
+  TOP_CHART,
+} from "@/modules/podcasts/charts"
 
 import { Artwork } from "./Artwork"
 import { useOpenPreview } from "./ChartRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useChart } from "./discoverHooks"
 
-/** A category's top podcasts as a list, pushed from Discover. */
+/** A category's top podcasts, or the overall chart ("Top Shows"), as a list pushed from New. */
 export function CategoryChart({ id }: { id: string }) {
-  const category = CHART_CATEGORIES.find((c) => c.id === id)
+  const category =
+    id === TOP_CHART
+      ? { id, name: "Top Shows" }
+      : CHART_CATEGORIES.find((c) => c.id === id)
   const chart = useChart(id)
   const open = useOpenPreview()
   return (
@@ -57,9 +64,9 @@ export function CategoryChart({ id }: { id: string }) {
               >
                 {index + 1}
               </Text>
-              <Artwork uri={item.imageUrl} size={64} />
+              <Artwork uri={item.imageUrl} size={60} />
               <View className="flex-1">
-                <Text className="font-semibold" numberOfLines={2}>
+                <Text className="text-base font-bold" numberOfLines={2}>
                   {item.title}
                 </Text>
                 {item.author ? (

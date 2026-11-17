@@ -38,9 +38,9 @@ export function ShowResult({ show }: { show: DirectoryShow }) {
       accessibilityLabel={`Preview ${show.title}`}
       onPress={() => router.push(previewHref(segments, show.feedUrl))}
     >
-      <Artwork uri={show.imageUrl} size={64} />
+      <Artwork uri={show.imageUrl} size={60} />
       <View className="flex-1">
-        <Text className="font-semibold" numberOfLines={2}>
+        <Text className="text-base font-bold" numberOfLines={2}>
           {show.title}
         </Text>
         {show.author ? (
