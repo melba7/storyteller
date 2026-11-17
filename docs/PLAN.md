@@ -1,6 +1,6 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1a merged, TestFlight build next
+Done: 2 | Last cleanup: none | Podcasts: P1a, P1b merged; TestFlight 20.1 next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -164,8 +164,8 @@ features (Mo's ask; reference only, see "Matching Pocket Casts" in
 once reviewed and green.
 
 - [ ] **P1a. Podcasts section: subscribe and browse** Status: merged into main
-      on 2026-11-16 (PR #37; the iOS build passed on an Intel Mac); waiting for
-      the TestFlight build and Mo's first run.
+      on 2026-11-16 (PR #37; the iOS build passed on an Intel Mac); in
+      TestFlight build 20.1, waiting for Mo's first run.
   - A menu button at the top left of the Books screen opens a side menu with
     Books and Podcasts. Podcasts lists the shows; "Add" searches Apple's free
     podcast directory or takes an RSS link; a show's page lists its episodes,
@@ -214,36 +214,62 @@ once reviewed and green.
   - Files: `modules/podcasts/ios/*`, `podcasts/` player screens,
     `modules/readium/ios/AudiobookPlayerActor.swift`,
     `tools/fork/touchpoints.json`.
-  - Status: built and passing check.sh; waiting for the iOS build in CI and Mo's
-    first run on TestFlight.
+  - Status: merged into main on 2026-11-17 (PR #40); in TestFlight build 20.1,
+    waiting for Mo's first run.
 
-- [ ] **P1c. The Pocket Casts layout** (Mo's ask, 2026-11-17)
-  - The Podcasts section gets a bottom tab bar like Pocket Casts': Podcasts,
-    Discover and Profile to start. Up Next joins with P2b and Playlists with
-    P5d, so no tab is ever empty. The mini player sits just above the tabs. Try
-    expo-router's native iOS tabs first (the iOS 26 glass bar, no new package);
-    if they can't sit inside the section, draw the bar in React.
+- [ ] **P1c. Tabs and the library grid** (Mo's ask, 2026-11-17; the Pocket Casts
+      layout, part 1 of 3)
+  - The Podcasts section gets a bottom tab bar like Pocket Casts': Podcasts and
+    Discover to start. Each tab joins with the feature that fills it, so no tab
+    is ever empty: Profile with P2a (Downloads), Up Next with P2b, Playlists
+    with P5d. Use expo-router's native iOS tabs (`expo-router/native-tabs`, the
+    iOS 26 glass bar, no new package), each tab with its own stack so a show's
+    page keeps the bar. The mini player sits in the tab bar's accessory slot
+    (`NativeTabs.BottomAccessory`), as in Pocket Casts.
   - Podcasts tab: a grid of artwork (large grid, small grid or list) with a
-    badge for unplayed episodes, sorted by name, date added, newest episode or
-    your own order (drag), with the add button and the side menu button on top.
+    badge for unplayed episodes, sorted by name, date added or newest episode.
+    The layout and the order are picked from a menu in the top bar and kept on
+    the phone. The side menu button stays at the top left; the add button opens
+    Discover.
+  - Discover tab: the directory search and RSS link from today's Add screen,
+    which it replaces. P1d adds the charts below the search.
+  - The badge counts the unplayed episodes released since you followed the show,
+    plus the newest episode if it is unplayed (so a show you just followed shows
+    1), shown as "99+" past 99.
+  - Own icons (SF Symbols for the tabs, lucide in the screens) and colours:
+    nothing is copied from Pocket Casts.
+  - Test first: JS tests for the three orders, the badge count and the saved
+    layout choice.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the two tabs, the three layouts, the orders, the badges and the mini player
+    above the tabs work.
+  - Try it: Podcasts, the menu at the top right, then Discover.
+  - Files: `app/(root)/podcasts/` (the tab and stack layouts and routes),
+    `podcasts/` (grid, Discover, mini player), `modules/podcasts/library.ts` and
+    `db.ts` (orders and counts, with tests).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
+
+- [ ] **P1c2. A show's page and the episode card** (part 2 of 3)
   - A show's page: a large header (artwork, title, author, Follow or Following,
     a description that expands), then episode rows with date, title, length or
     time left, a play button with a progress ring, and played episodes dimmed.
-    An episode opens as a card (artwork, title, date, length, play, notes with
-    working links).
-  - Profile tab: settings for the Podcasts section and, later, stats, downloads,
-    history and bookmarks.
-  - Own icons (lucide, already in the app) and colours: nothing is copied from
-    Pocket Casts.
-  - Test first: JS tests for the grid's sorting, the badge counts and the row
-    states (unplayed, in progress, played); screenshots of each screen checked
-    by Opus against the reference.
-  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
-    the three tabs, the grid, a show's page and the episode card work.
-  - Try it: Podcasts, then each tab.
-  - Files: `podcasts/` (tab layout, grid, show page, episode card, Profile),
-    `app/(root)/podcasts/` (the tab routes), `modules/podcasts/library.ts`
-    (sorting and counts, with tests).
+  - An episode opens as a card (a sheet): artwork, title, date, length, play,
+    and notes with working links.
+  - Test first: JS tests for the row states (unplayed, in progress, played) and
+    the ring's fraction.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
+    show's page and the episode card look and work as described.
+  - Files: `podcasts/` (show page, episode card, progress ring),
+    `app/(root)/podcasts/` (the card's route).
+
+- [ ] **P1c3. Your own order** (part 3 of 3)
+  - A fourth order for the Podcasts tab: your own, set by dragging artwork in
+    the grid or rows in the list, kept in `podcasts.db` (version 3).
+  - Test first: JS tests for moving a show and for new shows going last.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
+    dragged order stays after a restart.
+  - Files: `podcasts/` (the grid), `modules/podcasts` (`schema.ts`, `db.ts`,
+    `library.ts`).
 
 - [ ] **P1d. Discover** (Mo's ask, 2026-11-16, planned as "Explore")
   - The Discover tab shows Apple's free US top chart, Apple's main categories
@@ -260,9 +286,9 @@ once reviewed and green.
     carry Apple ids, not feeds, so one lookup call
     (`https://itunes.apple.com/lookup?id=<ids>`) gets their feed links.
   - The feed reader keeps each show's categories. `podcasts.db` goes to version
-    3 (P1b took version 2), upgraded in place: a categories column on shows and
-    a small cache table. Shows followed before get their categories at their
-    next refresh.
+    4 (P1b and P1c3 took 2 and 3), upgraded in place: a categories column on
+    shows and a small cache table. Shows followed before get their categories at
+    their next refresh.
   - The cloud can't reach Apple's chart addresses, so the tests use saved
     answers and the first build tries them on the phone. Overall:
     `https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcasts.json`.
@@ -277,7 +303,7 @@ once reviewed and green.
     followed, and follows one from its preview.
   - Try it: Podcasts, Discover.
   - Files: `PodcastKit` (categories), `modules/podcasts` (`charts.ts`,
-    `categories.ts`, `db.ts` version 2, with tests), `podcasts/` (Discover, show
+    `categories.ts`, `db.ts` version 4, with tests), `podcasts/` (Discover, show
     preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (discover and preview
     routes).
 

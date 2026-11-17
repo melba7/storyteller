@@ -157,11 +157,12 @@ support pages (November 2026).
 
 ### The look
 
-- A bottom tab bar inside the Podcasts section: Podcasts, Discover and Profile,
-  then Up Next (P2b) and Playlists (P5d). The mini player sits above the tabs.
-  expo-router's native tabs (in the app already) give iOS 26's glass tab bar; if
-  they can't sit inside the section, the bar is drawn in React. The side menu
-  button stays, to get back to Books.
+- A bottom tab bar inside the Podcasts section: Podcasts and Discover, then
+  Profile (P2a), Up Next (P2b) and Playlists (P5d), each when it has something
+  in it. The mini player sits above the tabs. expo-router's native tabs (in the
+  app already) give iOS 26's glass tab bar; if they can't sit inside the
+  section, the bar is drawn in React. The side menu button stays, to get back to
+  Books.
 - Podcasts: a grid of artwork with a badge for unplayed episodes (large grid,
   small grid or list), sortable, with drag to reorder.
 - A show's page: a large header, then episode rows with a play button that shows
@@ -181,7 +182,7 @@ support pages (November 2026).
 | Discover: charts, categories, suggestions                                          | P1d (Apple's charts)                               | M         |
 | Search shows and episodes                                                          | P1a, P1e                                           | S         |
 | Player: speed 0.5x-3x, skip 10/45 s, lock screen, mini player                      | P1b                                                | M         |
-| The Pocket Casts layout (tabs, grid, show page, episode card)                      | P1c                                                | M         |
+| The Pocket Casts layout (tabs, grid, show page, episode card)                      | P1c, P1c2, P1c3                                    | M         |
 | Downloads, storage, Wi-Fi only                                                     | P2a                                                | M         |
 | Up Next (tab, swipe actions, reorder, clear)                                       | P2b                                                | M         |
 | New episodes and auto-download                                                     | P2c                                                | M         |
@@ -345,7 +346,7 @@ logo, icons, artwork and theme names are not used.
 | ----------------------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
 | P1a Subscribe                 | Feed parser (Swift, Linux), library logic (JS)         | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
 | P1b Play                      | Player rules (Swift), player state (JS)                | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
-| P1c Layout                    | Grid sorting, badges, row states                       | iOS build                  |                                                                          | Tabs, grid, show page, episode card             |
+| P1c to P1c3 Layout            | Grid sorting, badges, row states                       | iOS build                  |                                                                          | Tabs, grid, show page, episode card             |
 | P1d Discover                  | Feed categories, charts, lookup, For you, cache        | iOS build                  |                                                                          | Charts load, suggestions, follow from a preview |
 | P1e Search episodes           | Search words and order, Apple's episode answer         | iOS build                  |                                                                          | Find by a word in notes, play a found episode   |
 | P2a Downloads                 | Download bookkeeping, file identity                    | iOS build                  |                                                                          | Download with the app closed, play offline      |

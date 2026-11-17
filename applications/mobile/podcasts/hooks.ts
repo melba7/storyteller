@@ -6,9 +6,11 @@ import {
   getEpisode,
   getShow,
   listEpisodes,
+  listShowActivity,
   listShows,
 } from "@/modules/podcasts/db"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
+import { type ActivityByShow } from "@/modules/podcasts/libraryView"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 export type Query<T> = {
@@ -57,6 +59,11 @@ function useLibraryQuery<T>(load: () => Promise<T>, key: string): Query<T> {
 
 export function useShows(): Query<Show[]> {
   return useLibraryQuery(listShows, "shows")
+}
+
+/** Each show's newest episode and unplayed count, for the library's order and badges. */
+export function useShowActivity(): Query<ActivityByShow> {
+  return useLibraryQuery(listShowActivity, "show-activity")
 }
 
 /** The show, or null when the library has no show with this id. */

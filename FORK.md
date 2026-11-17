@@ -74,8 +74,8 @@ Files and folders that belong to the fork, which upstream never touches:
   search and the rules for adding and refreshing shows, with their tests.
 - `applications/mobile/podcasts/` and
   `applications/mobile/app/(root)/podcasts/`: the Podcasts screens (the side
-  menu, the library, adding a show, a show's episodes, an episode's notes) and
-  their routes.
+  menu, the library grid, Discover, a show's episodes, an episode's notes, the
+  mini player in the tab bar) and their routes.
 - `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`: the server route
   that keeps a book's score (its atmosphere track, and a mood track when the
   shelved music has one) inside the read-aloud EPUB, `GET` for the app and `PUT`

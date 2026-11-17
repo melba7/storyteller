@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { useRouter, useSegments } from "expo-router"
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 
@@ -13,15 +13,17 @@ import {
 } from "@/modules/podcasts/directory"
 import { Podcasts } from "@/modules/podcasts/index"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { showHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
-import { MiniPlayer } from "./MiniPlayer"
 import { ScreenBar } from "./ScreenBar"
+import { SectionMenuButton } from "./SectionMenu"
 
 const SEARCH_DELAY_MS = 400
 
-export function AddPodcast() {
+export function Discover() {
   const router = useRouter()
+  const segments = useSegments()
   const [term, setTerm] = useState("")
   const [results, setResults] = useState<DirectoryShow[]>([])
   const [searching, setSearching] = useState(false)
@@ -67,11 +69,9 @@ export function AddPodcast() {
     setAddError(null)
     try {
       const show = await subscribe(feed)
-      // Replace this screen, so Back from the show returns to the library.
-      router.replace({
-        pathname: "/podcasts/show/[id]",
-        params: { id: show.id },
-      })
+      // Back from the show returns here, to Discover.
+      router.push(showHref(segments, show.id))
+      setAdding(null)
     } catch (cause) {
       setAddError(readableError(cause))
       setAdding(null)
@@ -82,9 +82,13 @@ export function AddPodcast() {
 
   return (
     <View className="pt-safe bg-background flex-1">
-      <ScreenBar title="Add a podcast" />
+      <ScreenBar
+        title="Discover"
+        left={<SectionMenuButton current="podcasts" />}
+      />
       <ScrollView
-        contentContainerClassName="px-safe-or-4 pb-safe gap-3"
+        contentContainerClassName="px-safe-or-4 gap-3"
+        contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
@@ -169,7 +173,6 @@ export function AddPodcast() {
           {adding === "link" ? <ActivityIndicator /> : <Text>Add</Text>}
         </Button>
       </ScrollView>
-      <MiniPlayer />
     </View>
   )
 }
