@@ -25,6 +25,10 @@ struct PlaybackLoadOptions: Record {
   @Field var audioType: String = ""
   @Field var showId: String?
   @Field var chaptersUrl: String?
+  /// Play from the episode's own download as it arrives (Skip ads is on and it is not downloaded).
+  @Field var playThroughDownload: Bool = false
+  /// The feed's language, for the transcript of the download that plays.
+  @Field var language: String?
 }
 
 /// An episode to put in Up Next.
@@ -90,7 +94,8 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl)
+        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
+        playThroughDownload: options.playThroughDownload, language: options.language)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 

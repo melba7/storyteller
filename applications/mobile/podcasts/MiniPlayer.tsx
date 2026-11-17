@@ -7,7 +7,6 @@ import { ActivityIndicator, Pressable, View } from "react-native"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { skipNoteText } from "@/modules/podcasts/ads"
-import { usePlayWait } from "@/modules/podcasts/playWaitStore"
 import {
   miniPlayerLabel,
   showsMiniPlayer,
@@ -23,7 +22,6 @@ import {
 import { progressFraction } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
-import { DownloadWaitCard } from "./DownloadWaitCard"
 import { tap } from "./haptics"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 import { pressUndo, useSkipNote } from "./useSkipNote"
@@ -47,10 +45,8 @@ export function MiniPlayerContent() {
   const view = usePlayer()
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
   const note = useSkipNote()
-  const wait = usePlayWait()
   const { skipForward } = usePlaybackSettings()
   const { episode, show } = view
-  if (wait) return <DownloadWaitCard wait={wait} />
   if (!episode) return null
 
   return (

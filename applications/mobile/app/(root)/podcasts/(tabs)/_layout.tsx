@@ -2,7 +2,6 @@
 import { NativeTabs } from "expo-router/native-tabs"
 import { useCSSVariable } from "uniwind"
 
-import { usePlayWait } from "@/modules/podcasts/playWaitStore"
 import { upNextBadge } from "@/modules/podcasts/upNext"
 import { MiniPlayerContent, useHasMiniPlayer } from "@/podcasts/MiniPlayer"
 import { useUpNext } from "@/podcasts/useUpNext"
@@ -14,10 +13,7 @@ import { useUpNext } from "@/podcasts/useUpNext"
  * and on iOS 26 the system draws the bar's glass itself, so only the tint can follow the theme.
  */
 export default function PodcastTabsLayout() {
-  // The bar also carries the card for an episode that is downloading before it plays.
-  const hasPlayer = useHasMiniPlayer()
-  const waiting = usePlayWait() !== null
-  const hasMiniPlayer = hasPlayer || waiting
+  const hasMiniPlayer = useHasMiniPlayer()
   const badge = upNextBadge(useUpNext())
   const tint = useCSSVariable("--color-primary") as string
   const quiet = useCSSVariable("--color-muted-foreground") as string

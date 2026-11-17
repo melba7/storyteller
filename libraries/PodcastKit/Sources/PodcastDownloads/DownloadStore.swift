@@ -124,6 +124,19 @@ public final class DownloadStore: @unchecked Sendable {
     return staged
   }
 
+  /// A new empty file in `.incoming`, for a download that is written there as it arrives. It is
+  /// on the same volume as the episode's folder, so `install` can still file it with a rename.
+  public func newStagingFile(episodeId: String) throws -> URL {
+    _ = try folder(for: episodeId)
+    let fm = FileManager.default
+    try fm.createDirectory(at: incomingURL, withIntermediateDirectories: true)
+    let staged = incomingURL.appendingPathComponent("\(episodeId)-\(UUID().uuidString)")
+    guard fm.createFile(atPath: staged.path, contents: nil) else {
+      throw CocoaError(.fileWriteUnknown)
+    }
+    return staged
+  }
+
   /// Puts a staged, hashed file in place as `<root>/<episodeId>/<sha256>.<ext>` and marks the
   /// episode downloaded. An older download of the same episode is removed first, with its side
   /// files (a new file is a new identity). With `requireEntry` (a finished download) nothing is

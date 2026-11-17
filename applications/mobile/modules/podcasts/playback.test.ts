@@ -90,7 +90,7 @@ function setup(last: StoredEpisode | null = null) {
     }),
     clearInterval: vi.fn(),
     playedWithin: vi.fn(() => 0),
-    beforePlay: vi.fn(),
+    playThroughDownload: vi.fn((): Promise<boolean> | boolean => false),
   } satisfies PlaybackDeps
   const playback = createPlayback(deps)
   const state = (
@@ -216,51 +216,68 @@ describe("playEpisode", () => {
       autoplay: true,
       audioType: "audio/mpeg",
       chaptersUrl: null,
+      playThroughDownload: false,
+      language: null,
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)
     expect(playback.getView().isBuffering).toBe(true)
   })
 
-  it("tells beforePlay about an episode that starts, not about a resume", async () => {
+  it("asks about an episode that starts, not about a resume", async () => {
     const { playback, deps, state } = setup()
     await playback.playEpisode(episode(), show)
-    expect(deps.beforePlay).toHaveBeenCalledTimes(1)
-    expect(deps.beforePlay).toHaveBeenCalledWith(
-      episode(),
-      expect.any(Function),
-    )
+    expect(deps.playThroughDownload).toHaveBeenCalledTimes(1)
+    expect(deps.playThroughDownload).toHaveBeenCalledWith(episode())
     state(5, false)
     await playback.playEpisode(episode(), show)
-    expect(deps.beforePlay).toHaveBeenCalledTimes(1)
+    expect(deps.playThroughDownload).toHaveBeenCalledTimes(1)
   })
 
-  it("loads only after beforePlay is done, and a newer play wins over one that waits", async () => {
+  it("loads at once, with the answer and the show's language", async () => {
     const { playback, native, deps } = setup()
-    let release: () => void = () => {}
-    deps.beforePlay.mockImplementationOnce(
-      () => new Promise<void>((done) => (release = done)),
+    deps.playThroughDownload.mockResolvedValueOnce(true)
+    await playback.playEpisode(episode(), { ...show, language: "en" })
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ playThroughDownload: true, language: "en" }),
+    )
+  })
+
+  it("does not play through the download when nothing says to", async () => {
+    const { playback, native } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ playThroughDownload: false }),
+    )
+  })
+
+  it("loads only after the answer, and a newer play wins over one that is deciding", async () => {
+    const { playback, native, deps } = setup()
+    let answer: (through: boolean) => void = () => {}
+    deps.playThroughDownload.mockImplementationOnce(
+      () => new Promise<boolean>((done) => (answer = done)),
     )
     const first = playback.playEpisode(episode({ id: "e1" }), show)
     await Promise.resolve()
     expect(native.load).not.toHaveBeenCalled()
     await playback.playEpisode(episode({ id: "e2" }), show)
     expect(native.load).toHaveBeenCalledTimes(1)
-    release()
+    answer(true)
     await first
     expect(native.load).toHaveBeenCalledTimes(1)
     expect(native.load).toHaveBeenCalledWith(
       expect.objectContaining({ episodeId: "e2" }),
     )
-    const abandoned = deps.beforePlay.mock.calls[0]?.[1]
-    expect(abandoned?.()).toBe(true)
   })
 
-  it("loads anyway when beforePlay fails", async () => {
+  it("loads anyway, as a plain stream, when the question fails", async () => {
     const { playback, native, deps } = setup()
-    deps.beforePlay.mockRejectedValueOnce(new Error("no"))
+    deps.playThroughDownload.mockRejectedValueOnce(new Error("no"))
     await playback.playEpisode(episode(), show)
     expect(native.load).toHaveBeenCalledTimes(1)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ playThroughDownload: false }),
+    )
   })
 
   it("shows the start of a played episode as zero", async () => {

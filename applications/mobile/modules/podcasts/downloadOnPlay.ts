@@ -1,70 +1,29 @@
 // LOFI-FORK: the podcasts section's downloads (see FORK.md).
 //
-// Playing an episode that is not downloaded, with "Skip ads" on, downloads it first and plays
-// the file, because ads are found only in the exact file that plays. The player waits for the
-// download (playback.ts awaits this); the wait ends when the file is there, the download fails
-// or waits for Wi-Fi, a minute passes or the listener taps "Stream now" (the rules are
-// waitDecision in playWait.ts), and then the episode plays. A download started here is a
-// manual one, so the Wi-Fi-only setting applies as to a tap on the download button. Not
-// imported by any test, because the native module is not there.
+// Playing an episode that is not downloaded, with "Skip ads" on, plays it from its own
+// download as the bytes arrive, because ads are found only in the exact file that plays. The
+// player does not wait: this only says whether to ask the native player for that (the rules
+// that need the network, such as Wi-Fi only, are native). The download it makes is a manual
+// one, so it shows in the Downloads list. Not imported by any test, because the native module
+// is not there; the rule it uses is shouldDownloadOnPlay.
 import { getAdSkipSettings } from "./adsNative"
-import { getShow } from "./db"
 import { shouldDownloadOnPlay } from "./downloads"
-import { getWifiOnly, listDownloads, startDownload } from "./downloadsNative"
+import { listDownloads } from "./downloadsNative"
 import type { StoredEpisode } from "./library"
-import { waitDecision } from "./playWait"
-import { beginWait, endWait, streamAsked } from "./playWaitStore"
 
-const POLL_MS = 1000
-let waits = 0
-
-const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms))
-
-/**
- * Resolves when the episode may load: at once when nothing is to be downloaded, otherwise
- * when the wait ends. Any failure means "play now" (streaming), so playing never breaks.
- * `abandoned` says a newer play took over, which ends the wait quietly.
- */
-export async function downloadOnPlay(
+/** True when the episode should play through its own download. Any failure means "no". */
+export async function playThroughDownload(
   episode: StoredEpisode,
-  abandoned: () => boolean,
-): Promise<void> {
-  const id = ++waits
+): Promise<boolean> {
   try {
     const { skipAds } = await getAdSkipSettings()
-    if (!skipAds) return
-    const first = (await listDownloads()).find(
+    if (!skipAds) return false
+    const download = (await listDownloads()).find(
       (info) => info.episodeId === episode.id,
     )
-    if (!shouldDownloadOnPlay(episode, first, skipAds)) return
-    const show = await getShow(episode.showId)
-    const wifiOnly = await getWifiOnly()
-    const began = Date.now()
-    beginWait({ id, episodeId: episode.id, title: episode.title })
-    await startDownload(
-      episode.id,
-      episode.audioUrl,
-      episode.audioType,
-      false,
-      show?.language ?? null,
-    )
-    for (;;) {
-      if (abandoned()) return
-      const download = (await listDownloads()).find(
-        (info) => info.episodeId === episode.id,
-      )
-      const decision = waitDecision({
-        download,
-        elapsedMs: Date.now() - began,
-        wifiOnly,
-        streamAsked: streamAsked(id),
-      })
-      if (decision !== "wait") return
-      await sleep(POLL_MS)
-    }
+    return shouldDownloadOnPlay(episode, download, skipAds)
   } catch (cause) {
-    console.warn("Couldn't download the playing episode first", cause)
-  } finally {
-    endWait(id)
+    console.warn("Couldn't tell whether to play through the download", cause)
+    return false
   }
 }

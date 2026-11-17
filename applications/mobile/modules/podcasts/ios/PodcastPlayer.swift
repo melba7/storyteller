@@ -43,10 +43,14 @@ final class PodcastPlayer {
   /// Voice boost and silence trimming (see PodcastPlayer+Sound.swift).
   lazy var sound = PodcastSound(self)
   private var ticks = 0
+  /// Feeds the loaded item from its own download, while there is one (PodcastPlayer+Stream.swift).
+  var streamDownload: PodcastStreamDownload?
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
     observeSession()
+    // Starts watching the network, so "on Wi-Fi now" is known by the first play.
+    _ = PodcastNetwork.shared
   }
 
   // MARK: Loading
@@ -67,6 +71,10 @@ final class PodcastPlayer {
     var showId: String?
     /// The feed's JSON chapters file (PodcastPlayer+Chapters.swift).
     var chaptersUrl: String?
+    /// The app asks to play through the episode's own download (PodcastPlayer+Stream.swift).
+    var playThroughDownload = false
+    /// The feed's language, for the transcript of an episode that starts downloading here.
+    var language: String?
   }
 
   /// The listener chose this episode. The one playing goes back to the top of Up Next.
@@ -100,8 +108,9 @@ final class PodcastPlayer {
       emitError(episode.id, "The audio session couldn't start: \(error.localizedDescription)")
     }
 
-    // A downloaded episode plays from its file; any other streams from its address.
-    let item = AVPlayerItem(url: PodcastDownloader.shared.localFile(for: episode.id) ?? episode.url)
+    // A downloaded episode plays from its file; any other streams from its address, or from
+    // its own download as it arrives.
+    let item = makeItem(for: episode)
     // Keeps voices natural at any speed.
     item.audioTimePitchAlgorithm = .timeDomain
     player.defaultRate = Float(speed.value)

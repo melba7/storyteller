@@ -40,13 +40,18 @@ public enum DownloadFile {
     "mp3", "m4a", "m4b", "mp4", "aac", "ogg", "opus", "wav", "flac", "aif", "aiff", "webm", "caf",
   ]
 
+  /// The extension for a MIME type this app knows, ignoring case and any parameters.
+  public static func knownExtension(forType type: String?) -> String? {
+    guard let kind = (type ?? "").split(separator: ";").first.map({
+      $0.trimmingCharacters(in: .whitespaces).lowercased()
+    }) else { return nil }
+    return byType[kind]
+  }
+
   /// The file extension for an episode: from the enclosure's type, else from the address's
   /// path, else "mp3" (by far the most common).
   public static func fileExtension(type: String?, url: URL?) -> String {
-    let kind = (type ?? "").split(separator: ";").first.map {
-      $0.trimmingCharacters(in: .whitespaces).lowercased()
-    }
-    if let kind, let ext = byType[kind] { return ext }
+    if let ext = knownExtension(forType: type) { return ext }
     if let ext = url?.pathExtension.lowercased(), known.contains(ext) { return ext }
     return "mp3"
   }

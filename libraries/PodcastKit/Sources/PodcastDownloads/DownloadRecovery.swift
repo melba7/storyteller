@@ -85,4 +85,13 @@ public enum DownloadRecovery {
     }
     return .fail("The download failed, tap to try again")
   }
+
+  /// The words for a download that stopped and will not be carried on, for a download that has
+  /// no resume or restart (one played while it arrives). A dropped connection reads as one.
+  public static func reason(for failure: DownloadFailure) -> String {
+    switch decide(failure) {
+    case .fail(let reason): return reason
+    case .resume, .restart: return "No connection, tap to try again"
+    }
+  }
 }

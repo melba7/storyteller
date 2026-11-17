@@ -213,18 +213,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     }
     do {
       let staged = try store.stage(location, episodeId: id)
-      let hash: String
-      let bytes: Int64
-      do {
-        hash = try FileHash.sha256(of: staged)
-        bytes = (try FileManager.default.attributesOfItem(atPath: staged.path)[.size] as? Int64) ?? 0
-      } catch {
-        try? FileManager.default.removeItem(at: staged)
-        throw error
-      }
-      let done = try store.install(
-        episodeId: id, staged: staged, sha256: hash, fileExtension: entry.fileExtension, bytes: bytes,
-        requireEntry: true)
+      let done = try store.installStaged(staged, episodeId: id, fileExtension: entry.fileExtension)
       finished(id, taskIdentifier: downloadTask.taskIdentifier)
       emit(done)
       PodcastTranscriber.shared.downloaded(id)
