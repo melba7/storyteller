@@ -4,8 +4,10 @@
 // db.ts, which needs the native SQLite module, so the steps can be tested. A new install
 // runs every step; an older file runs only the steps it lacks.
 
+import { starterStatements } from "./playlists"
+
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 8
+export const SCHEMA_VERSION = 9
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -114,6 +116,23 @@ const VERSION_8 = [
   "CREATE INDEX episodes_history ON episodes (history_at)",
 ]
 
+/**
+ * Version 9: smart playlists, with the three every library starts with (New Releases, In
+ * Progress and Starred). They are made here, once, so deleting one keeps it deleted.
+ */
+const VERSION_9 = [
+  `CREATE TABLE playlists (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    rules TEXT NOT NULL,
+    sort TEXT NOT NULL DEFAULT 'newest',
+    auto_download INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`,
+  ...starterStatements(),
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -124,6 +143,7 @@ const STEPS = [
   VERSION_6,
   VERSION_7,
   VERSION_8,
+  VERSION_9,
 ]
 
 /**

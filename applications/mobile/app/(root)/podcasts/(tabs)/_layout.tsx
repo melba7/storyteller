@@ -18,6 +18,10 @@ export default function PodcastTabsLayout() {
         <NativeTabs.Trigger.Label>Podcasts</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="square.grid.2x2" />
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(playlists)">
+        <NativeTabs.Trigger.Label>Playlists</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="music.note.list" />
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(discover)">
         <NativeTabs.Trigger.Label>Discover</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon sf="magnifyingglass" />

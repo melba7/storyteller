@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import { SCHEMA_VERSION, migrationStatements } from "./schema"
 import { SETTING_COLUMNS } from "./showSettings"
+import { openTestDatabase } from "./testDatabase"
 
 /** The statements of the step that takes a file from `version` to the next one. */
 function stepFrom(version: number): string[] {
@@ -21,8 +22,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 8", () => {
-    expect(SCHEMA_VERSION).toBe(8)
+  it("is at version 9", () => {
+    expect(SCHEMA_VERSION).toBe(9)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -111,6 +112,22 @@ describe("migrationStatements", () => {
     expect(
       statements.some((s) => s.startsWith("UPDATE episodes SET history_at")),
     ).toBe(true)
+  })
+
+  it("version 9 adds the playlists table and the three starter playlists", () => {
+    const statements = stepFrom(8)
+    expect(statements[0]).toContain("CREATE TABLE playlists")
+    expect(statements).toHaveLength(4)
+    const db = openTestDatabase()
+    expect(
+      db
+        .prepare("SELECT id, title, position FROM playlists ORDER BY position")
+        .all(),
+    ).toEqual([
+      { id: "starter-new-releases", title: "New Releases", position: 0 },
+      { id: "starter-in-progress", title: "In Progress", position: 1 },
+      { id: "starter-starred", title: "Starred", position: 2 },
+    ])
   })
 
   it("has a column for every setting the screen saves", () => {
