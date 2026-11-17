@@ -21,7 +21,9 @@ export function SectionHeader({
     return (
       <View
         className="flex-row items-center gap-1 px-4 pt-7 pb-3"
+        accessible
         accessibilityRole="header"
+        accessibilityLabel={title}
       >
         {label}
       </View>

@@ -46,13 +46,16 @@ export function PlayerScreen() {
   // The player is a modal, so its own segments name no tab: use the tab you were in.
   const segments = lastTabSegments()
   const view = usePlayer()
-  const { width } = useWindowDimensions()
+  const windowSize = useWindowDimensions()
   // A screen that opened the player may have asked for a page (the menu's "View Transcript").
   const [chosen, setChosen] = useState<PlayerPanel>(
     () => takePlayerPageRequest() ?? "art",
   )
   const [areaHeight, setAreaHeight] = useState(0)
-  const [sheetHeight, setSheetHeight] = useState(0)
+  const [sheet, setSheet] = useState({ width: 0, height: 0 })
+  const sheetHeight = sheet.height
+  // The sheet's own width: on iPad the modal sheet is narrower than the window.
+  const width = sheet.width > 0 ? sheet.width : windowSize.width
   const { episode, show } = view
   const colors = useMemo(
     () => sheetColors(show?.artworkColor ?? null),
@@ -98,7 +101,10 @@ export function PlayerScreen() {
       <StatusBar style={colors.ink === "#ffffff" ? "light" : "dark"} />
       <View
         className="pb-safe-offset-2 flex-1"
-        onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}
+        onLayout={(event) => {
+          const { width: w, height: h } = event.nativeEvent.layout
+          setSheet({ width: w, height: h })
+        }}
         style={{
           backgroundColor: colors.top,
           backgroundImage: `linear-gradient(180deg, ${colors.top}, ${colors.bottom})`,

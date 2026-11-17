@@ -1000,8 +1000,14 @@ TestFlight build.
     episode artwork's zoom (no tile opens an episode). Fable 5.2's final check
     of the whole pull request (Mo, 2026-11-17) found no serious issue and seven
     smaller ones, all fixed, plus the player's full-width artwork, SF Symbol
-    buttons and a thick volume bar. Left for a device: pulling down on a show
-    page opened by the zoom may close it instead of refreshing.
+    buttons and a thick volume bar. A last Fable check of those fixes and of
+    main's Books look merged in found six small issues, all fixed: the mini
+    player's symbols in the theme's colour, the player artwork as wide as the
+    iPad sheet, a fingertip-wide clear thumb on the volume bar, the "Episodes"
+    heading for VoiceOver, the Light and Dark swatches in the new colours, and
+    the swipe actions' padding and colours under the new buttons. Left for a
+    device: pulling down on a show page opened by the zoom may close it instead
+    of refreshing, and dragging the volume bar.
 
 ## Later
 
@@ -1015,6 +1021,8 @@ TestFlight build.
   yet."
 - Podcasts: the trimmer reads the ads only when an episode loads, so ads found
   while it plays are not avoided until the next load.
+- Podcasts: since the Books look, Appearance's Dark and Extra Dark are both
+  black and differ only in their accent colour.
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
 - Podcasts: `savePlayback` notifies the library on every 15 s save, so open

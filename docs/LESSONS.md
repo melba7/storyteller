@@ -67,3 +67,9 @@ One line per lesson.
 - With `withUniwind` missing, a third-party native view such as `GlassView`
   silently ignores `className`. Wrap it once (`withUniwind(GlassView)`) before
   styling it with classes (2026-11-17).
+- An `@expo/ui` SF Symbol with no `color` is drawn in iOS's own label colour,
+  not the theme's text colour, so it is wrong under a fixed Appearance. Pass the
+  theme's colour (`useCSSVariable`) every time (2026-11-17).
+- A restyle of a shared component reaches every screen that uses it: the Books
+  look's wider `Button` padding wrapped the Podcasts swipe actions' labels.
+  After merging such a change, check the other section's uses (2026-11-17).

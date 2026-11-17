@@ -227,6 +227,7 @@ in `FORK.md`.
 | 2026-11-17 | The background session ignores a cancel the app asked for (-999 with no iOS reason); iOS's own cancels are still handled                   | A replaced download read as failed                         |
 | 2026-11-17 | The player's artwork is full width under the grabber, fading into the sheet; its buttons are SF Symbols (`SFIcon`, `@expo/ui` Image)       | As in Apple's player (Mo's screenshot 08)                  |
 | 2026-11-17 | A play-through with no byte yet that waits for the network gives up, so the plain address plays and shows its error                        | No silent spinner with Skip ads on                         |
+| 2026-11-17 | The volume bar's clear thumb is 28 pt wide and the slider reaches 14 pt past both edges, cut off, with clear space in its images           | Easy to grab; the fill still runs from edge to edge        |
 | 2026-11-17 | Apple's colours are the app's own light and dark themes, in one marked block appended to `global.css`                                      | Uniwind allows `@import` only first                        |
 | 2026-11-17 | Books screens use native large titles: on iOS the list is the screen's first child and the bar is `Stack.Title`/`Stack.Toolbar`            | Large titles shrink on scroll                              |
 | 2026-11-17 | Shared Books pieces (bars, headings, grouped lists, glass capsule) live in `apple-look/`; restyled upstream files are allowed changes      | Upstream syncs merge by hand there                         |

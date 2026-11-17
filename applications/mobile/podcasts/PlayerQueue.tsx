@@ -141,7 +141,7 @@ function QueueRow({ item }: { item: UpNextItem }) {
       renderRightActions={(_progress, _translation, methods) => (
         <Button
           variant="destructive"
-          className="h-full w-20 flex-col gap-1 rounded-none"
+          className="h-full w-20 flex-col gap-1 rounded-none px-1"
           accessibilityLabel={`Remove ${item.title} from Up Next`}
           onPress={() => remove(methods)}
         >

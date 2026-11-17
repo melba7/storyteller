@@ -245,7 +245,7 @@ function EntryRow({
       ) => (
         <Button
           variant="destructive"
-          className="h-full w-20 rounded-none"
+          className="h-full w-20 rounded-none px-1"
           accessibilityLabel={`Remove ${episode.title} from the playlist`}
           onPress={() => {
             methods.close()

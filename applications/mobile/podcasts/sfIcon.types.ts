@@ -6,7 +6,10 @@ export type SFIconProps = {
   /** The SF Symbol drawn on iOS. */
   name: SFSymbol
   size: number
-  /** A "#rrggbb" colour; the surroundings' text colour when left out. */
+  /**
+   * A "#rrggbb" colour. Left out, iOS draws the symbol in its own label colour, not the
+   * section's text colour, so pass the theme's colour wherever the Appearance can differ.
+   */
   color?: string | undefined
   /** What is drawn where SF Symbols don't exist (Android, the web). */
   fallback: LucideIcon

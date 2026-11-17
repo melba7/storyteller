@@ -137,6 +137,25 @@ describe("the style files", () => {
     }
   })
 
+  it("draws each swatch in its theme's own background and accent", () => {
+    /** A variable's value in the last `@variant <id> { ... }`, the one that wins. */
+    function value(source: string, id: string, name: string) {
+      const start = source.lastIndexOf(`@variant ${id} {`)
+      expect(start).toBeGreaterThan(-1)
+      const block = source.slice(start, source.indexOf("}", start))
+      return new RegExp(`${name}:\\s*(#[0-9a-f]{6})`).exec(block)?.[1]
+    }
+    for (const theme of THEMES) {
+      const source = EXTRA_THEME_IDS.includes(theme.id) ? css : global
+      expect(value(source, theme.id, "--color-background")).toBe(
+        theme.swatch.background,
+      )
+      expect(value(source, theme.id, "--color-primary")).toBe(
+        theme.swatch.accent,
+      )
+    }
+  })
+
   it("is pulled in by global.css and listed in the metro config", () => {
     expect(global).toMatch(/@import "\.\/podcasts\/themes\.css";/)
     for (const id of EXTRA_THEME_IDS) expect(metro).toContain(`"${id}"`)

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router"
 import { NativeTabs } from "expo-router/native-tabs"
 import { Pause, Play, RotateCw } from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
+import { useCSSVariable } from "uniwind"
 
 import { Text } from "@/components/ui/text"
 import { skipNoteText } from "@/modules/podcasts/ads"
@@ -53,6 +54,9 @@ export function MiniPlayerContent() {
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
   const note = useSkipNote()
   const { skipForward } = usePlaybackSettings()
+  // The symbols take the title's colour; left out, iOS would draw them in its own label colour,
+  // which is the wrong one under a fixed dark or light Appearance.
+  const ink = useCSSVariable("--color-foreground") as string
   const { episode, show } = view
   if (!episode) return null
 
@@ -112,6 +116,7 @@ export function MiniPlayerContent() {
             <SFIcon
               name={view.isPlaying ? "pause.fill" : "play.fill"}
               size={compact ? 22 : 26}
+              color={ink}
               fallback={view.isPlaying ? Pause : Play}
               filled
             />
@@ -130,6 +135,7 @@ export function MiniPlayerContent() {
             <SFIcon
               name={skipSymbol("ahead", skipForward)}
               size={28}
+              color={ink}
               fallback={RotateCw}
               badge={skipForward}
             />

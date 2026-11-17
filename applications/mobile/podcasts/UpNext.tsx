@@ -224,10 +224,12 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
 
   return (
     <Swipeable
+      // The swipe actions are 80 points wide, so they keep a small padding of their own (the
+      // shared Button's is too wide for "Play next") and a solid background behind the row.
       renderLeftActions={(_progress, _translation, methods) => (
         <View className="flex-row">
           <Button
-            className="h-full w-20 flex-col gap-1 rounded-none"
+            className="h-full w-20 flex-col gap-1 rounded-none px-1"
             accessibilityLabel={`Play ${item.title} next`}
             onPress={() => playNext(methods)}
           >
@@ -240,7 +242,7 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
           </Button>
           <Button
             variant="secondary"
-            className="h-full w-20 flex-col gap-1 rounded-none"
+            className="bg-secondary h-full w-20 flex-col gap-1 rounded-none px-1"
             accessibilityLabel={`Play ${item.title} last`}
             onPress={() => playLast(methods)}
           >
@@ -249,14 +251,14 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
               size={20}
               className="text-secondary-foreground"
             />
-            <Text className="text-xs">Play last</Text>
+            <Text className="text-secondary-foreground text-xs">Play last</Text>
           </Button>
         </View>
       )}
       renderRightActions={(_progress, _translation, methods) => (
         <Button
           variant="destructive"
-          className="h-full w-20 flex-col gap-1 rounded-none"
+          className="h-full w-20 flex-col gap-1 rounded-none px-1"
           accessibilityLabel={`Remove ${item.title} from Up Next`}
           onPress={() => remove(methods)}
         >
