@@ -23,7 +23,7 @@ import {
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { episodeHref } from "@/modules/podcasts/routes"
+import { episodeHref, tabBase } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
 import { PlayButton } from "./PlayButton"
@@ -32,6 +32,7 @@ import { useEpisodes, useShow } from "./hooks"
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
+  const segments = useSegments()
   const show = useShow(id)
   const episodes = useEpisodes(id)
   const [refreshing, setRefreshing] = useState(false)
@@ -60,7 +61,11 @@ export function PodcastShow({ id }: { id: string }) {
           style: "destructive",
           onPress: () => {
             unsubscribe(id).then(
-              () => router.dismissTo("/podcasts"),
+              () => {
+                // Back within this tab's stack, not into the other tab.
+                if (router.canGoBack()) router.back()
+                else router.navigate(tabBase(segments))
+              },
               (cause: unknown) => setProblem(readableError(cause)),
             )
           },
