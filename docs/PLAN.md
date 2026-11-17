@@ -711,6 +711,10 @@ rebuilt here with nothing copied.
     not searched.
   - Done when: a phrase said in a downloaded episode is found, and the tap plays
     from that line.
+  - Status: built and passing `check.sh`, no schema change: "Spoken" in the
+    episode search, results grouped by episode (newest first) with the time and
+    the lines around the words, whole words only. Each search reads every
+    transcript file; no index is kept.
 - [ ] **P6b. Hosts, guests and support links** (S): the feed's own
       `podcast:person` (show and episode) and `podcast:funding` (show) tags,
       shown in the episode's description: "Support the show" links and the hosts

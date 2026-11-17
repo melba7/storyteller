@@ -183,7 +183,6 @@ export function SearchEpisodes() {
       {scope === "spoken" ? (
         <SpokenResults
           results={spoken.results}
-          active
           typed={typed}
           waiting={spoken.searching || spoken.error !== null}
         />

@@ -170,6 +170,8 @@ in `FORK.md`.
 | 2026-11-17 | Podcasts themes are Uniwind extra themes in `podcasts/themes.css`, with one `@import` in `global.css` and `extraThemes` in Metro           | Two small touch points                                     |
 | 2026-11-17 | The Podcasts section sits in one `ScopedTheme`; "Like the app" passes the app's own light or dark name                                     | Sheets and mini player follow                              |
 | 2026-11-17 | The Discover tab's stack is anchored on `discover` (`unstable_settings.anchor`); a test checks every tab's first screen                    | Shared screens sort first                                  |
+| 2026-11-17 | Spoken search matches in PodcastKit `TranscriptSearch`: normalised words, the phrase first, else all words in one line; 3 hits an episode  | Tested on Linux                                            |
+| 2026-11-17 | Spoken search reads the finished transcript files on each search, off the main thread, with no index; feed-only transcripts are skipped    | No schema change                                           |
 
 ## Known problems
 

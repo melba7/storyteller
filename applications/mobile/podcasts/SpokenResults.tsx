@@ -12,10 +12,9 @@ import { listTranscripts } from "@/modules/podcasts/transcriptsNative"
 import { Artwork } from "./Artwork"
 
 /** True once at least one episode on the phone has a finished transcript (null: not known yet). */
-function useAnyTranscribed(active: boolean): boolean | null {
+function useAnyTranscribed(): boolean | null {
   const [any, setAny] = useState<boolean | null>(null)
   useEffect(() => {
-    if (!active) return
     let cancelled = false
     listTranscripts().then(
       (infos) => {
@@ -28,7 +27,7 @@ function useAnyTranscribed(active: boolean): boolean | null {
     return () => {
       cancelled = true
     }
-  }, [active])
+  }, [])
   return any
 }
 
@@ -43,17 +42,15 @@ function playFrom({ episode, show }: SpokenResult, seconds: number) {
 /** The spoken-word results: each episode, then the lines where the words were said. */
 export function SpokenResults({
   results,
-  active,
   typed,
   waiting,
 }: {
   results: SpokenResult[]
-  active: boolean
   typed: boolean
   /** A search is running or has failed, so the screen says that instead. */
   waiting: boolean
 }) {
-  const anyTranscribed = useAnyTranscribed(active)
+  const anyTranscribed = useAnyTranscribed()
   return (
     <>
       {anyTranscribed === false ? (
