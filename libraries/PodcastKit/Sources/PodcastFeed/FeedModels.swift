@@ -30,6 +30,23 @@ public struct PodcastFeed: Sendable, Equatable {
   }
 }
 
+/// A `podcast:transcript` tag (Podcasting 2.0): where an episode's transcript can be read.
+public struct FeedTranscript: Sendable, Equatable {
+  public var url: URL
+  /// The MIME type as the feed wrote it, lower case ("application/json", "text/vtt").
+  public var type: String
+  public var language: String?
+  /// "captions" and the like; nil when the feed has none.
+  public var rel: String?
+
+  public init(url: URL, type: String, language: String? = nil, rel: String? = nil) {
+    self.url = url
+    self.type = type
+    self.language = language
+    self.rel = rel
+  }
+}
+
 /// One episode that has audio to play.
 public struct FeedEpisode: Sendable, Equatable {
   /// The feed's own id for the episode. Falls back to the audio address when the feed has none.
@@ -45,11 +62,14 @@ public struct FeedEpisode: Sendable, Equatable {
   public var imageURL: URL?
   public var season: Int?
   public var number: Int?
+  /// Every `podcast:transcript` tag, in feed order.
+  public var transcripts: [FeedTranscript]
 
   public init(
     guid: String, title: String, published: Date? = nil, durationSeconds: Double? = nil,
     notes: String = "", audioURL: URL, audioType: String, audioBytes: Int64? = nil,
-    imageURL: URL? = nil, season: Int? = nil, number: Int? = nil
+    imageURL: URL? = nil, season: Int? = nil, number: Int? = nil,
+    transcripts: [FeedTranscript] = []
   ) {
     self.guid = guid
     self.title = title
@@ -62,6 +82,7 @@ public struct FeedEpisode: Sendable, Equatable {
     self.imageURL = imageURL
     self.season = season
     self.number = number
+    self.transcripts = transcripts
   }
 }
 

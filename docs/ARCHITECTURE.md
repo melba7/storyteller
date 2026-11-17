@@ -132,6 +132,9 @@ in `FORK.md`.
 | 2026-11-17 | Transcribing goes in pieces of 5 minutes; a partial file is saved after each, and a restart begins 2 s before it                           | Overlap words are dropped, so none is doubled              |
 | 2026-11-17 | The Speech code (SpeechAnalyzer, iOS 26) is one small target behind `canImport(Speech)`; the rest is tested on Linux                       | Only Fork CI compiles it; tests use a fake recogniser      |
 | 2026-11-17 | Transcribing runs while the app is open or a podcast plays, and in a background task `<bundle id>.podcastTranscribe`                       | iOS picks the time; the task resumes from the partial file |
+| 2026-11-17 | `podcasts.db` is at schema version 5: each episode keeps one feed transcript (`transcript_url`, `transcript_type`), chosen by type         | JSON, then WebVTT, SRT, HTML; plain text skipped           |
+| 2026-11-17 | Transcript readers are written for the fork; only Transcriptator's time reading is adapted (MIT, in `FORK.md`)                             | Its HTML reader needs a package this app lacks             |
+| 2026-11-17 | The transcript shown is the feed's when it has one, else the phone's own, else the reason; the feed's file is cached for a week            | Works while streaming; a bad file falls back               |
 
 ## Known problems
 

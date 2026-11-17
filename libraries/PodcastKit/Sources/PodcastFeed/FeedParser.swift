@@ -24,6 +24,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     var guid = "", title = "", pubDate = "", duration = "", season = "", number = ""
     var description = "", summary = "", content = "", image = ""
     var audio: (url: URL, type: String, bytes: Int64?)?
+    var transcripts: [FeedTranscript] = []
   }
 
   private var path: [String] = []
@@ -81,6 +82,8 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       item?.image = clean(attributes["href"] ?? "")
     case "rss/channel/item/enclosure":
       readEnclosure(attributes)
+    case "rss/channel/item/podcast:transcript":
+      readTranscript(attributes)
     default:
       break
     }
@@ -140,6 +143,19 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     item?.audio = (url, type.isEmpty ? FeedParser.guessedType(url) : type, bytes)
   }
 
+  /// Keeps every transcript tag that has a web address.
+  private func readTranscript(_ attributes: [String: String]) {
+    guard let url = URL(string: clean(attributes["url"] ?? "")),
+      url.scheme?.lowercased().hasPrefix("http") == true
+    else { return }
+    let language = clean(attributes["language"] ?? "")
+    let rel = clean(attributes["rel"] ?? "")
+    item?.transcripts.append(
+      FeedTranscript(
+        url: url, type: clean(attributes["type"] ?? "").lowercased(),
+        language: language.isEmpty ? nil : language, rel: rel.isEmpty ? nil : rel))
+  }
+
   private func finishItem() {
     defer { item = nil }
     guard let item, let audio = item.audio else { return }
@@ -157,6 +173,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
         audioBytes: audio.bytes,
         imageURL: URL(string: item.image).flatMap { item.image.isEmpty ? nil : $0 },
         season: Int(item.season),
-        number: Int(item.number)))
+        number: Int(item.number),
+        transcripts: item.transcripts))
   }
 }

@@ -27,6 +27,8 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     imageUrl: null,
     season: null,
     number: null,
+    transcriptUrl: null,
+    transcriptType: null,
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,

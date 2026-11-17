@@ -35,6 +35,12 @@ enum PodcastFeedJSON {
     if let imageURL = episode.imageURL { object["imageUrl"] = imageURL.absoluteString }
     if let season = episode.season { object["season"] = season }
     if let number = episode.number { object["number"] = number }
+    object["transcripts"] = episode.transcripts.map { transcript -> [String: Any] in
+      var entry: [String: Any] = ["url": transcript.url.absoluteString, "type": transcript.type]
+      if let language = transcript.language { entry["language"] = language }
+      if let rel = transcript.rel { entry["rel"] = rel }
+      return entry
+    }
     return object
   }
 }

@@ -95,6 +95,8 @@ describe("newEpisodes", () => {
     imageUrl: null,
     season: null,
     number: null,
+    transcriptUrl: null,
+    transcriptType: null,
   })
 
   it("pairs each inserted episode with the id it was saved under", () => {

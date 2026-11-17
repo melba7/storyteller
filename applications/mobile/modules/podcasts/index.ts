@@ -30,6 +30,8 @@ export type PodcastFeedEpisode = {
   imageUrl?: string | null
   season?: number | null
   number?: number | null
+  /** Every `podcast:transcript` tag of the episode. */
+  transcripts?: { url: string; type: string; language?: string; rel?: string }[]
 }
 
 /** What the player is doing, sent about twice a second while playing and on every change. */
