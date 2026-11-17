@@ -10,7 +10,7 @@ import { usePodcastsTheme } from "@/podcasts/usePodcastsTheme"
 type ThemeName = ComponentProps<typeof ScopedTheme>["theme"]
 
 /**
- * The tabs, and the player as a sheet that slides up over them and swipes down. Everything in
+ * The tabs, the account sheet (Profile) and the player as sheets that slides up over them and swipes down. Everything in
  * the section, the sheets and the mini player too, takes its colours from the listener's chosen
  * theme (Profile > Appearance) because the whole section sits inside one ScopedTheme.
  */
@@ -35,6 +35,7 @@ function ThemedStack() {
     >
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="player" options={{ presentation: "modal" }} />
+      <Stack.Screen name="account" options={{ presentation: "modal" }} />
     </Stack>
   )
 }

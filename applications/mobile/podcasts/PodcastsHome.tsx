@@ -1,8 +1,8 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Download, Podcast } from "lucide-react-native"
-import { useMemo, useState } from "react"
+import { Podcast } from "lucide-react-native"
+import { useMemo } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -12,9 +12,6 @@ import {
 } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { followUpNew } from "@/modules/podcasts/automaticRun"
-import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
-import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
 import {
@@ -24,8 +21,7 @@ import {
   badgeCount,
   sortShows,
 } from "@/modules/podcasts/libraryView"
-import { readableError } from "@/modules/podcasts/nativeError"
-import { downloadsHref, showHref } from "@/modules/podcasts/routes"
+import { SEARCH_HREF, arrangeHref, showHref } from "@/modules/podcasts/routes"
 
 import { EmptyState } from "./EmptyState"
 import {
@@ -36,13 +32,11 @@ import {
   cellSize,
 } from "./LibraryShows"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SectionMenuButton } from "./SectionMenu"
-import { LinkRow } from "./SettingsGroup"
 import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
-import { useDownloadMap } from "./useDownloads"
 import { useLibraryView } from "./useLibraryView"
 import { useStatusBarStyle } from "./usePodcastsTheme"
+import { useRefreshShows } from "./useRefreshShows"
 
 const LAYOUTS: { id: LibraryLayout; title: string; columns: number }[] = [
   { id: "large", title: "Large grid", columns: 3 },
@@ -113,11 +107,9 @@ export function PodcastsHome() {
   const segments = useSegments()
   const { width } = useWindowDimensions()
   const shows = useShows()
-  const downloads = useDownloadMap()
   const activity = useShowActivity()
   const { view, change } = useLibraryView()
-  const [refreshing, setRefreshing] = useState(false)
-  const [refreshProblem, setRefreshProblem] = useState<string | null>(null)
+  const { refreshing, problem: refreshProblem, refresh } = useRefreshShows()
 
   // If the activity query fails, no badges show and the newest-episode order falls back to name.
   const found = activity.data
@@ -126,25 +118,8 @@ export function PodcastsHome() {
     [shows.data, view, found],
   )
 
-  async function refresh() {
-    setRefreshing(true)
-    setRefreshProblem(null)
-    try {
-      const { failed, added } = await refreshAllShows()
-      await followUpNew(added)
-      if (failed.length > 0) {
-        setRefreshProblem(`Couldn't refresh ${failed.join(", ")}.`)
-      }
-    } catch (cause) {
-      setRefreshProblem(readableError(cause))
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
-  const summary = downloadsSummary(downloads)
   const arranged = (shows.data ?? []).some((s) => s.ownPosition !== null)
-  const openArrange = () => router.push("/podcasts/arrange")
+  const openArrange = () => router.push(arrangeHref(segments))
   const columns = LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3
   const size = cellSize(width, columns)
   const isList = view?.layout === "list"
@@ -205,15 +180,6 @@ export function PodcastsHome() {
                   </Text>
                 </View>
               ) : null}
-              <View className="bg-secondary mb-3 overflow-hidden rounded-3xl px-4">
-                <LinkRow
-                  icon={Download}
-                  title="Downloaded"
-                  body={summary}
-                  label={`Downloaded, ${summary}`}
-                  onPress={() => router.push(downloadsHref(segments))}
-                />
-              </View>
             </>
           }
           ListEmptyComponent={
@@ -223,7 +189,7 @@ export function PodcastsHome() {
               body="Search for a show, or paste its RSS or Apple Podcasts link."
               action={{
                 label: "Find a podcast",
-                onPress: () => router.navigate("/podcasts/discover"),
+                onPress: () => router.navigate(SEARCH_HREF),
               }}
             />
           }
@@ -233,23 +199,13 @@ export function PodcastsHome() {
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
         large
-        title="Podcasts"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
+        title="Shows"
         right={
           <>
             <Stack.Toolbar.Button
-              icon="magnifyingglass"
-              accessibilityLabel="Search episodes"
-              onPress={() => router.push("/podcasts/search")}
-            />
-            <Stack.Toolbar.Button
               icon="plus"
               accessibilityLabel="Find a podcast to add"
-              onPress={() => router.navigate("/podcasts/discover")}
+              onPress={() => router.navigate(SEARCH_HREF)}
             />
             <Stack.Toolbar.Menu
               icon="ellipsis"

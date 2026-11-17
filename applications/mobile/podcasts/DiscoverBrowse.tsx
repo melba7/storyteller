@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { useRouter, useSegments } from "expo-router"
 import {
   Baby,
   BookOpen,
@@ -58,14 +58,10 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
   "1309": Clapperboard,
 }
 
-/** What Discover shows under the search: the hero cards, "For you", the top chart and the categories. */
+/** What New shows: the hero cards, "For you", the top chart and the categories. */
 export function DiscoverBrowse() {
-  const router = useRouter()
   const forYou = useForYou()
   const top = useChart(TOP_CHART)
-  const { width } = useWindowDimensions()
-  // Two columns inside the screen's 16 pt gutters, with 12 pt between them.
-  const tile = Math.max(1, Math.floor((width - 32 - 12) / 2))
   return (
     <View className="gap-6">
       {top.loading ? (
@@ -89,32 +85,44 @@ export function DiscoverBrowse() {
         <ChartRow title="Top podcasts" shows={top.data.slice(HERO_COUNT)} />
       ) : null}
 
-      <View className="gap-3">
-        <Text className="text-xl font-bold" accessibilityRole="header">
-          Categories
-        </Text>
-        <View className="flex-row flex-wrap gap-3">
-          {CHART_CATEGORIES.map((category) => (
-            <PressableScale
-              key={category.id}
-              style={{ width: tile }}
-              accessibilityRole="button"
-              accessibilityLabel={`${category.name}, top podcasts`}
-              onPress={() => router.push(categoryHref(category.id))}
-            >
-              <View className="bg-secondary min-h-20 flex-row items-center gap-3 rounded-2xl p-3">
-                <Icon
-                  as={CATEGORY_ICONS[category.id] ?? Podcast}
-                  size={24}
-                  className="text-primary"
-                />
-                <Text className="flex-1 font-semibold" numberOfLines={2}>
-                  {category.name}
-                </Text>
-              </View>
-            </PressableScale>
-          ))}
-        </View>
+      <CategoryTiles />
+    </View>
+  )
+}
+
+/** The categories as a two-column grid of tiles; each opens the category's chart. */
+export function CategoryTiles() {
+  const router = useRouter()
+  const segments = useSegments()
+  const { width } = useWindowDimensions()
+  // Two columns inside the screen's 16 pt gutters, with 12 pt between them.
+  const tile = Math.max(1, Math.floor((width - 32 - 12) / 2))
+  return (
+    <View className="gap-3">
+      <Text className="text-xl font-bold" accessibilityRole="header">
+        Categories
+      </Text>
+      <View className="flex-row flex-wrap gap-3">
+        {CHART_CATEGORIES.map((category) => (
+          <PressableScale
+            key={category.id}
+            style={{ width: tile }}
+            accessibilityRole="button"
+            accessibilityLabel={`${category.name}, top podcasts`}
+            onPress={() => router.push(categoryHref(category.id, segments))}
+          >
+            <View className="bg-secondary min-h-20 flex-row items-center gap-3 rounded-2xl p-3">
+              <Icon
+                as={CATEGORY_ICONS[category.id] ?? Podcast}
+                size={24}
+                className="text-primary"
+              />
+              <Text className="flex-1 font-semibold" numberOfLines={2}>
+                {category.name}
+              </Text>
+            </View>
+          </PressableScale>
+        ))}
       </View>
     </View>
   )

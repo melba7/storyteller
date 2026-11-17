@@ -1,7 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack, useRouter, useSegments } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Bookmark, Download, History } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { ScrollView } from "react-native"
 
@@ -14,10 +13,8 @@ import {
   loadSettings,
   saveSettings,
 } from "@/modules/podcasts/automaticSettings"
-import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
-import { downloadsHref } from "@/modules/podcasts/routes"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
 import { AddAudioFilesRow } from "./AddAudioFilesRow"
@@ -26,18 +23,17 @@ import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SectionMenuButton } from "./SectionMenu"
-import { LinkRow, SettingsGroup, SwitchRow } from "./SettingsGroup"
+import { SettingsGroup, SwitchRow } from "./SettingsGroup"
 import { StatsCard } from "./StatsCard"
-import { useDownloadMap } from "./useDownloads"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 
-/** The Profile tab: your stats, then the settings in titled cards. */
+/**
+ * Profile, the account sheet: your stats, then the settings in titled cards. Downloads,
+ * History and Bookmarks are Library's rows now.
+ */
 export function Profile() {
   const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
-  const segments = useSegments()
-  const map = useDownloadMap()
   const [wifiOnly, setWifi] = useState<boolean | null>(null)
   const [automatic, setAutomatic] = useState<AutomaticSettings | null>(null)
 
@@ -79,8 +75,6 @@ export function Profile() {
     setWifiOnly(on).catch(() => setWifi(before))
   }
 
-  const summary = downloadsSummary(map)
-
   return (
     <>
       {Podcasts === null ? (
@@ -96,31 +90,6 @@ export function Profile() {
           contentInsetAdjustmentBehavior="automatic"
         >
           <StatsCard />
-          <SettingsGroup title="Library">
-            <LinkRow
-              icon={Download}
-              title="Downloads"
-              body={summary}
-              label={`Downloads, ${summary}`}
-              onPress={() => router.push(downloadsHref(segments))}
-            />
-            <LinkRow
-              icon={History}
-              title="Listening history"
-              body="What you listened to, by day."
-              label="Listening history"
-              onPress={() => router.push("/podcasts/(tabs)/(profile)/history")}
-            />
-            <LinkRow
-              icon={Bookmark}
-              title="Bookmarks"
-              body="Places you marked, in every episode."
-              label="Bookmarks"
-              onPress={() =>
-                router.push("/podcasts/(tabs)/(profile)/bookmarks")
-              }
-            />
-          </SettingsGroup>
           <SettingsGroup title="Downloads">
             <SwitchRow
               title="Download only on Wi-Fi"
@@ -159,10 +128,13 @@ export function Profile() {
       <ScreenBar
         large
         title="Profile"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
+        right={
+          <Stack.Toolbar.Button
+            accessibilityLabel="Done"
+            onPress={() => router.dismiss()}
+          >
+            Done
+          </Stack.Toolbar.Button>
         }
       />
     </>

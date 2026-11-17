@@ -6,6 +6,7 @@ import { Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { ACCOUNT_STATS_HREF } from "@/modules/podcasts/routes"
 import {
   type Stats,
   formatDuration,
@@ -37,7 +38,7 @@ export function StatsCard() {
       className="bg-secondary active:bg-foreground/10 flex-row items-center gap-3 rounded-3xl p-4"
       accessibilityRole="button"
       accessibilityLabel={`Stats. Listened ${listened}. Saved ${saved}.`}
-      onPress={() => router.push("/podcasts/(tabs)/(profile)/stats")}
+      onPress={() => router.push(ACCOUNT_STATS_HREF)}
     >
       <Figure value={listened} label="Listened" />
       <Figure value={saved} label="Saved" />

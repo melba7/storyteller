@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { randomUUID } from "expo-crypto"
-import { Stack, useRouter } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
@@ -27,6 +27,7 @@ import {
   parseMinutes,
   playlistProblem,
 } from "@/modules/podcasts/playlists"
+import { tabBase } from "@/modules/podcasts/routes"
 
 import {
   ChoiceRow,
@@ -52,6 +53,7 @@ function toggled<T>(list: readonly T[], item: T): T[] {
  */
 export function PlaylistEditor({ id }: { id: string }) {
   const router = useRouter()
+  const segments = useSegments()
   const creating = id === "new"
   const existing = usePlaylist(creating ? "" : id)
   const shows = useShows()
@@ -138,7 +140,7 @@ export function PlaylistEditor({ id }: { id: string }) {
           onPress: () => {
             deletePlaylist(draft?.id ?? "").then(
               // Back past the playlist's own page, which is gone now.
-              () => router.dismissTo("/podcasts/(tabs)/(playlists)"),
+              () => router.dismissTo(tabBase(segments)),
               (cause: unknown) => setProblem(readableError(cause)),
             )
           },

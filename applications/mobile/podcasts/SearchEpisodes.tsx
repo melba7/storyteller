@@ -1,8 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack, useRouter, useSegments } from "expo-router"
-import { useState } from "react"
-import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
-import { useCSSVariable } from "uniwind"
+import { useRouter, useSegments } from "expo-router"
+import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { searchEpisodes } from "@/modules/podcasts/db"
@@ -20,11 +18,9 @@ import { type EpisodeHit } from "@/modules/podcasts/search"
 import { searchSpoken } from "@/modules/podcasts/spokenSearch"
 
 import { Artwork } from "./Artwork"
-import { ScreenBar } from "./ScreenBar"
-import { SpokenResults } from "./SpokenResults"
 import { useDebouncedSearch } from "./useDebouncedSearch"
 
-type Scope = "mine" | "all" | "spoken"
+export type Scope = "mine" | "all" | "spoken"
 
 const SCOPES: { id: Scope; label: string }[] = [
   { id: "mine", label: "Your shows" },
@@ -32,7 +28,8 @@ const SCOPES: { id: Scope; label: string }[] = [
   { id: "spoken", label: "Spoken" },
 ]
 
-function Segments({
+/** The scope control under the search bar: Your shows, All podcasts, Spoken. */
+export function ScopeControl({
   scope,
   onChange,
 }: {
@@ -64,7 +61,8 @@ function Segments({
   )
 }
 
-function ResultRow({
+/** One episode result: its picture, title and a grey line. */
+export function ResultRow({
   title,
   line,
   imageUrl,
@@ -98,13 +96,21 @@ function ResultRow({
 const join = (parts: string[]) =>
   parts.filter((part) => part !== "").join(" · ")
 
-/** Search for episodes: in the followed shows (on the phone) or in all of Apple's podcasts. */
-export function SearchEpisodes() {
-  const background = useCSSVariable("--color-background") as string
+export type EpisodeRowData = {
+  key: string
+  title: string
+  line: string
+  imageUrl: string | null
+  open: () => void
+}
+
+/**
+ * Episode search for the words typed: in the followed shows (on the phone), in all of Apple's
+ * podcasts, or in the words spoken inside downloaded episodes. Only the chosen scope searches.
+ */
+export function useEpisodeSearch(scope: Scope, term: string) {
   const router = useRouter()
   const segments = useSegments()
-  const [scope, setScope] = useState<Scope>("mine")
-  const [term, setTerm] = useState("")
   const mine = useDebouncedSearch<EpisodeHit>(
     scope === "mine" ? term : "",
     searchEpisodes,
@@ -120,10 +126,7 @@ export function SearchEpisodes() {
     searchSpoken,
     400,
   )
-  const state = scope === "mine" ? mine : scope === "all" ? all : spoken
-  const typed = term.trim() !== ""
-
-  const rows =
+  const rows: EpisodeRowData[] =
     scope === "mine"
       ? mine.results.map(({ episode, showTitle, showImageUrl }) => ({
           key: episode.id,
@@ -136,79 +139,25 @@ export function SearchEpisodes() {
           imageUrl: episode.imageUrl ?? showImageUrl,
           open: () => router.push(episodeHref(segments, episode.id)),
         }))
-      : all.results.map((found) => ({
-          key: found.id,
-          title: found.title,
-          line: join([
-            found.showTitle,
-            formatEpisodeDate(found.publishedAt),
-            formatDuration(found.durationSeconds),
-          ]),
-          imageUrl: found.imageUrl,
-          open: () =>
-            router.push(
-              previewHref(segments, found.feedUrl, {
-                guid: found.guid,
-                audioUrl: found.audioUrl,
-              }),
-            ),
-        }))
-
-  return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Search" />
-      <Stack.SearchBar
-        placeholder="Search for an episode"
-        autoCapitalize="none"
-        autoFocus
-        hideWhenScrolling={false}
-        onChangeText={(event) => setTerm(event.nativeEvent.text)}
-        onCancelButtonPress={() => setTerm("")}
-      />
-      {/* The scope control sits above the results, not in a scroll view, so the header is solid. */}
-      <Stack.Screen
-        options={{
-          headerTransparent: false,
-          headerStyle: { backgroundColor: background },
-        }}
-      />
-      <View className="px-safe-or-4 gap-3 pb-2">
-        <Segments scope={scope} onChange={setScope} />
-      </View>
-      {state.searching ? (
-        <ActivityIndicator className="mt-4" accessibilityLabel="Searching" />
-      ) : state.error ? (
-        <Text className="text-destructive px-8 py-6 text-center text-sm">
-          {state.error}
-        </Text>
-      ) : scope !== "spoken" && typed && rows.length === 0 ? (
-        <Text className="text-muted-foreground px-8 py-6 text-center text-sm">
-          No episodes found.
-        </Text>
-      ) : null}
-      {scope === "spoken" ? (
-        <SpokenResults
-          results={spoken.results}
-          typed={typed}
-          waiting={spoken.searching || spoken.error !== null}
-        />
-      ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => row.key}
-          contentContainerClassName="px-safe-or-4 gap-3 pb-6"
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          renderItem={({ item }) => (
-            <ResultRow
-              title={item.title}
-              line={item.line}
-              imageUrl={item.imageUrl}
-              onPress={item.open}
-            />
-          )}
-        />
-      )}
-    </View>
-  )
+      : scope === "all"
+        ? all.results.map((found) => ({
+            key: found.id,
+            title: found.title,
+            line: join([
+              found.showTitle,
+              formatEpisodeDate(found.publishedAt),
+              formatDuration(found.durationSeconds),
+            ]),
+            imageUrl: found.imageUrl,
+            open: () =>
+              router.push(
+                previewHref(segments, found.feedUrl, {
+                  guid: found.guid,
+                  audioUrl: found.audioUrl,
+                }),
+              ),
+          }))
+        : []
+  const state = scope === "mine" ? mine : scope === "all" ? all : spoken
+  return { rows, spoken: spoken.results, state }
 }

@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screen (see FORK.md).
-import { SearchEpisodes } from "@/podcasts/SearchEpisodes"
+import { Search } from "@/podcasts/Search"
 
 export default function SearchScreen() {
-  return <SearchEpisodes />
+  return <Search />
 }

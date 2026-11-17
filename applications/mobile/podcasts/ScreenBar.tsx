@@ -1,8 +1,10 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { Children, Fragment, type ReactNode, isValidElement } from "react"
 import { ScrollView } from "react-native"
 import { useCSSVariable } from "uniwind"
+
+import { ACCOUNT_HREF } from "@/modules/podcasts/routes"
 
 interface Props {
   title: string
@@ -15,6 +17,11 @@ interface Props {
   right?: ReactNode
   /** A large title that shrinks on scroll (the tab roots); otherwise a small inline one. */
   large?: boolean
+  /**
+   * The round account button at the top right (a tab root's): it opens Profile as a sheet.
+   * It sits after any `right` items.
+   */
+  account?: boolean
   /** Keeps the title for VoiceOver and the back button but draws none. */
   titleHidden?: boolean
 }
@@ -33,7 +40,7 @@ function toolbarItems(node: ReactNode): ReactNode[] {
 
 /**
  * The top bar of a podcasts screen: the stack's native header. The title is drawn by iOS in
- * the brand serif; `left` and `right` fill the header's toolbar. A large title shrinks only
+ * the system font, bold; `left` and `right` fill the header's toolbar. A large title shrinks only
  * when the screen's first child is a scroll view with `contentInsetAdjustmentBehavior`
  * "automatic".
  */
@@ -42,11 +49,25 @@ export function ScreenBar({
   left,
   right,
   large = false,
+  account = false,
   titleHidden = false,
 }: Props) {
+  const router = useRouter()
   const foreground = useCSSVariable("--color-foreground") as string
   const leftItems = toolbarItems(left)
-  const rightItems = toolbarItems(right)
+  const rightItems = [
+    ...toolbarItems(right),
+    ...(account
+      ? [
+          <Stack.Toolbar.Button
+            key="account"
+            icon="person.crop.circle"
+            accessibilityLabel="Account and settings"
+            onPress={() => router.push(ACCOUNT_HREF)}
+          />,
+        ]
+      : []),
+  ]
   return (
     <>
       {/* A hidden title is drawn in no colour rather than swapped for a custom header title:
@@ -55,10 +76,10 @@ export function ScreenBar({
       <Stack.Title
         large={large}
         style={{
-          fontFamily: "YoungSerif",
+          fontWeight: "700",
           color: titleHidden ? "transparent" : foreground,
         }}
-        largeStyle={{ fontFamily: "YoungSerif", color: foreground }}
+        largeStyle={{ fontWeight: "700", color: foreground }}
       >
         {title}
       </Stack.Title>

@@ -18,7 +18,7 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { Podcasts, type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
-import { episodeHref } from "@/modules/podcasts/routes"
+import { SEARCH_HREF, episodeHref } from "@/modules/podcasts/routes"
 import {
   moveBetween,
   progressFraction,
@@ -30,7 +30,6 @@ import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
 import { EmptyState } from "./EmptyState"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SectionMenuButton } from "./SectionMenu"
 import { pick } from "./haptics"
 import { useEpisodesByIds } from "./hooks"
 import { useStatusBarStyle } from "./usePodcastsTheme"
@@ -52,7 +51,7 @@ const ACTIONS: RowAction[] = [
 ]
 
 /**
- * The Up Next tab: the episodes that play after the current one, in order. Drag a row by its
+ * The Up Next page (Home's "Up Next >" and Library's Up Next row): the episodes that play after the current one, in order. Drag a row by its
  * handle (or use VoiceOver's Move up and Move down) to reorder; swipe right for Play next
  * and Play last, left for Remove. Tapping a row opens the episode.
  */
@@ -103,7 +102,7 @@ export function UpNext() {
             body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
             action={{
               label: "Find an episode",
-              onPress: () => router.navigate("/podcasts"),
+              onPress: () => router.navigate(SEARCH_HREF),
             }}
           />
         </BelowBar>
@@ -139,11 +138,6 @@ export function UpNext() {
       <ScreenBar
         large
         title="Up Next"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
         right={
           <Stack.Toolbar.Button
             hidden={queue.length === 0}

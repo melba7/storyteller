@@ -1,11 +1,12 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack, useRouter } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useMemo } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { rulePills } from "@/modules/podcasts/playlistRules"
+import { playlistEditHref } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
@@ -17,6 +18,7 @@ import { useSelection } from "./useSelection"
 /** One smart playlist: what its rules ask for, and the episodes they take, in its order. */
 export function PlaylistScreen({ id }: { id: string }) {
   const router = useRouter()
+  const segments = useSegments()
   const playlist = usePlaylist(id)
   const episodes = useSmartEpisodes(playlist.data)
   const shows = useShows()
@@ -101,11 +103,7 @@ export function PlaylistScreen({ id }: { id: string }) {
               accessibilityLabel="Edit the playlist"
               onPress={() =>
                 current
-                  ? router.push({
-                      pathname:
-                        "/podcasts/(tabs)/(playlists)/playlist-edit/[id]",
-                      params: { id: current.id },
-                    })
+                  ? router.push(playlistEditHref(segments, current.id))
                   : undefined
               }
             />

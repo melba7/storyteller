@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screen (see FORK.md).
-import { PodcastsHome } from "@/podcasts/PodcastsHome"
+import { Library } from "@/podcasts/Library"
 
-export default function PodcastsScreen() {
-  return <PodcastsHome />
+export default function LibraryScreen() {
+  return <Library />
 }

@@ -24,7 +24,7 @@ import {
   episodeCount,
 } from "@/modules/podcasts/playlistLook"
 import { type Playlist } from "@/modules/podcasts/playlists"
-import { previewHref, episodeHref } from "@/modules/podcasts/routes"
+import { episodeHref, previewHref, tabBase } from "@/modules/podcasts/routes"
 import { moveBetween } from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
@@ -47,6 +47,7 @@ function tell(title: string, cause: unknown) {
  */
 export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   const router = useRouter()
+  const segments = useSegments()
   const entries = useEntries(playlist.id)
   const list = entries.data ?? []
   // The order shown while it is dragged, until the saved order catches up.
@@ -118,7 +119,7 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
           style: "destructive",
           onPress: () => {
             deletePlaylist(playlist.id).then(
-              () => router.dismissTo("/podcasts/(tabs)/(playlists)"),
+              () => router.dismissTo(tabBase(segments)),
               (cause: unknown) => tell("Couldn't delete the playlist", cause),
             )
           },
