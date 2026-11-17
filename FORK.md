@@ -67,7 +67,9 @@ Files and folders that belong to the fork, which upstream never touches:
 - `applications/mobile/lofi/`: the React Native UI.
 - `libraries/PodcastKit/`: the Swift package for the Podcasts section. It holds
   the feed reader (`PodcastFeed`) and the player's rules (`PodcastPlayback`),
-  each with a podspec so CocoaPods builds it from source for the app.
+  the transcripts and the ad finder (`PodcastAds`, with the Apple-only
+  `PodcastAdsOnDevice`), each with a podspec so CocoaPods builds it from source
+  for the app.
 - `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
   a feed, reads it with `PodcastFeed` and plays episodes) and the JavaScript
   side: the library in its own SQLite file (`podcasts.db`), Apple's directory
@@ -135,6 +137,48 @@ disappears, when an unregistered file carries a marker, when the fork commits an
 audio file, and when the fork changes an upstream file that isn't a registered
 touch point. Add `--list` to see every file the fork changes compared with the
 upstream release it is based on.
+
+## Third-party code
+
+The fork adds no packages from other projects. Code copied or adapted into the
+fork keeps its notice here and at the top of the file. Ideas and wording adapted
+from other MIT projects are credited the same way:
+
+- **MinusPod** (https://github.com/ttlequals0/MinusPod, MIT): the rules in
+  `libraries/PodcastKit/Sources/PodcastAds` (join ads with less than 12 seconds
+  of speech between them, at most 5 minutes in all, and carry an ad's end on
+  while the next lines still read as the ad) and part of the wording of the
+  on-device detector's instructions.
+- **Podly** (https://github.com/jdrbc/podly_pure_podcasts, MIT): part of the
+  wording of the detector's instructions (not to take the hosts' own plugs for
+  ads, and to prefer saying nothing when in doubt).
+- `applications/mobile/modules/podcasts/transcriptFormats/timestamp.ts` is
+  adapted from [Transcriptator](https://github.com/stevencrader/transcriptator)
+  (the time reading in its `timestamp.ts`). The rest of the transcript readers
+  are written for the fork, because Transcriptator's HTML reader needs
+  `node-html-parser` and its speaker and joining options are not wanted.
+
+  > MIT License
+  >
+  > Copyright (c) 2023 Steven Crader
+  >
+  > Permission is hereby granted, free of charge, to any person obtaining a copy
+  > of this software and associated documentation files (the "Software"), to
+  > deal in the Software without restriction, including without limitation the
+  > rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+  > sell copies of the Software, and to permit persons to whom the Software is
+  > furnished to do so, subject to the following conditions:
+  >
+  > The above copyright notice and this permission notice shall be included in
+  > all copies or substantial portions of the Software.
+  >
+  > THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  > IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  > FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  > AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+  > FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+  > IN THE SOFTWARE.
 
 ## Fork identity
 

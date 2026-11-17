@@ -7,6 +7,7 @@ import {
   type StoredEpisode,
   categoriesFromJson,
   episodeFromRow,
+  fetchedEpisode,
   formatDuration,
   formatEpisodeDate,
   formatEpisodeLength,
@@ -14,6 +15,7 @@ import {
   showFromRow,
   sortEpisodes,
 } from "./library"
+import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 function show(overrides: Partial<Show> = {}): Show {
   return {
@@ -30,6 +32,7 @@ function show(overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
 }
@@ -50,6 +53,8 @@ function fetched(
     imageUrl: null,
     season: null,
     number: null,
+    transcriptUrl: null,
+    transcriptType: null,
     ...overrides,
   }
 }
@@ -65,6 +70,7 @@ function stored(
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,
+    archived: false,
     ...overrides,
   }
 }
@@ -241,9 +247,12 @@ describe("rows", () => {
       imageUrl: null,
       season: 1,
       number: null,
+      transcriptUrl: null,
+      transcriptType: null,
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
+      archived: false,
     })
   })
 
@@ -311,5 +320,69 @@ describe("categories", () => {
         .categories,
     ).toEqual(["News"])
     expect(showFromRow({ id: "s", feed_url: "u" }).categories).toEqual([])
+  })
+})
+
+describe("an episode's transcript", () => {
+  const feedEpisode = {
+    guid: "g",
+    title: "T",
+    notes: "",
+    audioUrl: "https://cdn.example.com/g.mp3",
+    audioType: "audio/mpeg",
+  }
+
+  it("keeps the best transcript of the feed's tags", () => {
+    const episode = fetchedEpisode({
+      ...feedEpisode,
+      transcripts: [
+        { url: "https://x.test/g.txt", type: "text/plain" },
+        { url: "https://x.test/g.srt", type: "application/x-subrip" },
+        { url: "https://x.test/g.json", type: "application/json" },
+      ],
+    })
+    expect(episode.transcriptUrl).toBe("https://x.test/g.json")
+    expect(episode.transcriptType).toBe("application/json")
+  })
+
+  it("is null when the feed has none", () => {
+    const episode = fetchedEpisode(feedEpisode)
+    expect(episode.transcriptUrl).toBeNull()
+    expect(episode.transcriptType).toBeNull()
+  })
+
+  it("is filled in for a stored episode at the next refresh", () => {
+    const { update } = mergeEpisodes(
+      [stored("g")],
+      [
+        fetched("g", {
+          transcriptUrl: "https://x.test/g.vtt",
+          transcriptType: "text/vtt",
+        }),
+      ],
+    )
+    expect(update).toHaveLength(1)
+    expect(update[0]?.episode.transcriptUrl).toBe("https://x.test/g.vtt")
+  })
+
+  it("is read from the database row", () => {
+    const row = {
+      id: "e",
+      show_id: "s",
+      guid: "g",
+      title: "T",
+      notes: "",
+      audio_url: "https://cdn.example.com/g.mp3",
+      audio_type: "audio/mpeg",
+      transcript_url: "https://x.test/g.vtt",
+      transcript_type: "text/vtt",
+    }
+    expect(episodeFromRow(row).transcriptUrl).toBe("https://x.test/g.vtt")
+    expect(
+      episodeFromRow({ ...row, transcript_url: null }).transcriptType,
+    ).toBe("text/vtt")
+    expect(
+      episodeFromRow({ ...row, transcript_url: null }).transcriptUrl,
+    ).toBeNull()
   })
 })

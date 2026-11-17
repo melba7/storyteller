@@ -9,6 +9,7 @@ import {
   fetchedEpisode,
   sortEpisodes,
 } from "./library"
+import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 const PREVIEW_PREFIX = "preview:"
 
@@ -37,6 +38,7 @@ export function previewFromFeed(
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
+      archived: false,
     })
   }
   return {
@@ -54,6 +56,7 @@ export function previewFromFeed(
       artworkColor: null,
       ownPosition: null,
       categories: feed.categories ?? [],
+      settings: DEFAULT_SHOW_SETTINGS,
     },
     episodes: sortEpisodes(episodes),
   }

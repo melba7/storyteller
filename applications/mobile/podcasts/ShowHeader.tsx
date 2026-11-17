@@ -8,8 +8,10 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { needsMore } from "@/modules/podcasts/episodeLook"
 import { type Show } from "@/modules/podcasts/library"
+import { showShare } from "@/modules/podcasts/share"
 
 import { Artwork } from "./Artwork"
+import { ShareButton } from "./ShareButton"
 
 interface Props {
   show: Show
@@ -64,6 +66,10 @@ export function ShowHeader({
           <Text>Following</Text>
         </Button>
       )}
+      <ShareButton
+        label={`Share ${show.title}`}
+        build={() => showShare(show)}
+      />
       {show.description ? (
         <View className="w-full gap-1">
           <Text className="text-sm" numberOfLines={expanded ? undefined : 3}>

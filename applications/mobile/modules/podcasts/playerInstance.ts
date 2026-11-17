@@ -13,6 +13,7 @@ import {
 } from "./db"
 import { Podcasts } from "./index"
 import { type PlayerView, createPlayback } from "./playback"
+import { getPlaybackSettings } from "./playbackSettingsStore"
 
 export const player = createPlayback({
   native: Podcasts,
@@ -24,6 +25,7 @@ export const player = createPlayback({
   setInterval: (callback, ms) => setInterval(callback, ms),
   clearInterval: (handle) =>
     clearInterval(handle as ReturnType<typeof setInterval>),
+  playedWithin: () => getPlaybackSettings().markPlayedWhenLeft,
   report: (cause) => console.warn("Couldn't save the place", cause),
 })
 

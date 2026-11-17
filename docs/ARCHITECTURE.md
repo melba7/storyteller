@@ -88,7 +88,9 @@ in `FORK.md`.
   category names (`shows.categories`, a JSON list: each top-level name, then
   "Top › Sub" ones; shows followed before get them at their next refresh) and a
   `cache` table (key, value, saved at) that keeps Apple's chart answers for a
-  day.
+  day. Version 6 (P5a) adds the show settings on `shows` (skip intro and outro,
+  speed, download, Up Next, notify, ads, plugs) and version 7 (P5b) adds
+  `episodes.archived` and the archive and view columns.
 
 ## Decisions log
 
@@ -132,6 +134,22 @@ in `FORK.md`.
 | 2026-11-17 | Transcribing goes in pieces of 5 minutes; a partial file is saved after each, and a restart begins 2 s before it                           | Overlap words are dropped, so none is doubled              |
 | 2026-11-17 | The Speech code (SpeechAnalyzer, iOS 26) is one small target behind `canImport(Speech)`; the rest is tested on Linux                       | Only Fork CI compiles it; tests use a fake recogniser      |
 | 2026-11-17 | Transcribing runs while the app is open or a podcast plays, and in a background task `<bundle id>.podcastTranscribe`                       | iOS picks the time; the task resumes from the partial file |
+| 2026-11-17 | `podcasts.db` is at schema version 5: each episode keeps one feed transcript (`transcript_url`, `transcript_type`), chosen by type         | JSON, then WebVTT, SRT, HTML; plain text skipped           |
+| 2026-11-17 | Transcript readers are written for the fork; only Transcriptator's time reading is adapted (MIT, in `FORK.md`)                             | Its HTML reader needs a package this app lacks             |
+| 2026-11-17 | The transcript shown is the feed's when it has one, else the phone's own, else the reason; the feed's file is cached for a week            | Works while streaming; a bad file falls back               |
+| 2026-11-17 | `podcasts.db` is at schema version 7: per-show settings are columns on `shows` (v6), archive and the show page's view are columns (v7)     | The view is kept per show in the DB, not AsyncStorage      |
+| 2026-11-17 | The Swift player reads `Podcasts/show-settings.json`, written by JS in full at startup and on every change; `showId` rides on queue items  | Intro, outro and speed work with the screen locked         |
+| 2026-11-17 | A show's own speed is temporary: the player's chosen speed comes back for a show with none; the outro ends the episode so Up Next goes on  | Listener's speed is not overwritten                        |
+| 2026-11-17 | Archiving deletes the download and sets `episodes.archived`; rules run in `runAutomatic` and skip the loaded episode and Up Next           | Pure rules in `archive.ts`; search and badges skip it      |
+| 2026-11-17 | Ads are found by a swappable `AdDetector`; the on-device one is Foundation Models (`apple-on-device`, version 1) on 4,096-token pieces     | No paid API; a new version re-checks an episode            |
+| 2026-11-17 | Ads are `sure`, `unsure` or `guess`: only sure ones are skipped, unsure ones are listed, guesses are dropped (MinusPod's levels, MIT)      | A wrong skip costs more than a missed ad                   |
+| 2026-11-17 | Finding ads runs in its own background task `<bundle id>.podcastAds`, only on the charger; the transcribing task is untouched              | The model is heavy and rate limited in the background      |
+| 2026-11-17 | The player skips ads with boundary time observers in Swift; a seek into an ad never skips it, an undone ad is recorded and kept            | Works locked; Undo is never undone again                   |
+| 2026-11-17 | "Skip ads" and "Skip the hosts' own plugs" are in `UserDefaults`; a show's own choice (P5a columns, in the mirror) wins over them          | The player reads them with no JavaScript                   |
+| 2026-11-17 | The sleep timer is a wall-clock deadline in Swift with an alarm task; the last 10 s fade the volume; "end of episode" stops Up Next        | Works locked; the clock runs while paused                  |
+| 2026-11-17 | Playback settings (skips, headphones' next, played early, rewind) are a `UserDefaults` dictionary in Swift; JS only shows and saves them   | The lock screen uses them with no JavaScript               |
+| 2026-11-17 | New-episode notifications are local (`UNUserNotificationCenter`), one per show per refresh, from `runAutomatic`; switch in AsyncStorage    | No push service or `expo-notifications` needed             |
+| 2026-11-17 | OPML is read and written by a small hand-written reader in `opml.ts`; files go through the document picker and share sheet                 | No new package                                             |
 
 ## Known problems
 

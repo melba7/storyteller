@@ -5,7 +5,7 @@
 // runs every step; an older file runs only the steps it lacks.
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 7
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -63,8 +63,55 @@ const VERSION_4 = [
   )`,
 ]
 
+/**
+ * Version 5: the feed's transcript for each episode (its address and type, chosen from the
+ * `podcast:transcript` tags). Filled at the next refresh for episodes saved before.
+ */
+const VERSION_5 = [
+  "ALTER TABLE episodes ADD COLUMN transcript_url TEXT",
+  "ALTER TABLE episodes ADD COLUMN transcript_type TEXT",
+]
+
+/**
+ * Version 6: each show's own settings. Skip lengths are seconds, `speed` is null to follow the
+ * player's speed, `skip_ads` and `skip_plugs` are null to follow the global switch, and
+ * `auto_up_next` is off, top or bottom.
+ */
+const VERSION_6 = [
+  "ALTER TABLE shows ADD COLUMN skip_intro INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE shows ADD COLUMN skip_outro INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE shows ADD COLUMN speed REAL",
+  "ALTER TABLE shows ADD COLUMN auto_download INTEGER NOT NULL DEFAULT 1",
+  "ALTER TABLE shows ADD COLUMN auto_up_next TEXT NOT NULL DEFAULT 'off'",
+  "ALTER TABLE shows ADD COLUMN notify INTEGER NOT NULL DEFAULT 1",
+  "ALTER TABLE shows ADD COLUMN skip_ads INTEGER",
+  "ALTER TABLE shows ADD COLUMN skip_plugs INTEGER",
+]
+
+/**
+ * Version 7: archived episodes, each show's auto-archive rules and its page's view (sort,
+ * grouping by season, whether archived episodes show).
+ */
+const VERSION_7 = [
+  "ALTER TABLE episodes ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE shows ADD COLUMN archive_after_played TEXT NOT NULL DEFAULT 'never'",
+  "ALTER TABLE shows ADD COLUMN archive_after_days INTEGER",
+  "ALTER TABLE shows ADD COLUMN keep_newest INTEGER",
+  "ALTER TABLE shows ADD COLUMN episode_sort TEXT NOT NULL DEFAULT 'newest'",
+  "ALTER TABLE shows ADD COLUMN group_by_season INTEGER NOT NULL DEFAULT 0",
+  "ALTER TABLE shows ADD COLUMN show_archived INTEGER NOT NULL DEFAULT 0",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
-const STEPS = [VERSION_1, VERSION_2, VERSION_3, VERSION_4]
+const STEPS = [
+  VERSION_1,
+  VERSION_2,
+  VERSION_3,
+  VERSION_4,
+  VERSION_5,
+  VERSION_6,
+  VERSION_7,
+]
 
 /**
  * The statements that bring a file at `fromVersion` up to SCHEMA_VERSION, ending with the

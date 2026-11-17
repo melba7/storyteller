@@ -10,6 +10,7 @@ import {
   serializeLibraryView,
   sortShows,
 } from "./libraryView"
+import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 function show(id: string, overrides: Partial<Show> = {}): Show {
   return {
@@ -26,6 +27,7 @@ function show(id: string, overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
 }

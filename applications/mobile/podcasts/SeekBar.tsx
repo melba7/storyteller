@@ -6,6 +6,7 @@ import { useSharedValue } from "react-native-reanimated"
 import { scheduleOnRN } from "react-native-worklets"
 
 import { Text } from "@/components/ui/text"
+import { type AdMark } from "@/modules/podcasts/ads"
 import {
   clampPosition,
   formatTime,
@@ -22,6 +23,8 @@ interface Props {
   duration: number | null
   /** Called once, where the listener lets go or taps. */
   onSeek: (seconds: number) => void
+  /** Where the ads are, as shares of the bar. */
+  marks?: readonly AdMark[]
 }
 
 const THUMB = 14
@@ -31,7 +34,7 @@ const THUMB = 14
  * it. While a finger is down the bar shows the finger's place; the player only moves when it
  * lifts.
  */
-export function SeekBar({ position, duration, onSeek }: Props) {
+export function SeekBar({ position, duration, onSeek, marks = [] }: Props) {
   const width = useSharedValue(1)
   const [trackWidth, setTrackWidth] = useState(0)
   // The place under the finger, from 0 to 1, or null when nobody is touching the bar.
@@ -105,6 +108,20 @@ export function SeekBar({ position, duration, onSeek }: Props) {
               className="h-1 rounded-full bg-white"
               style={{ width: `${fraction * 100}%` }}
             />
+            {marks.map((mark) => (
+              <View
+                key={mark.left}
+                className={
+                  mark.skipped
+                    ? "absolute h-1 bg-amber-300"
+                    : "absolute h-1 bg-amber-300/40"
+                }
+                style={{
+                  left: `${mark.left * 100}%`,
+                  width: `${Math.max(mark.width * 100, 0.6)}%`,
+                }}
+              />
+            ))}
           </View>
           <View
             className="absolute rounded-full bg-white"

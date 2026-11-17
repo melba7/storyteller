@@ -47,9 +47,9 @@ if [ "${1:-}" != "--no-swift" ]; then
     step podcastkit-tests bash -c 'cd libraries/PodcastKit && swift test'
   elif command -v docker >/dev/null 2>&1; then
     step swift-tests docker run --rm -v "$PWD/libraries/LofiScoreKit":/src \
-      -v lofi-build:/src/.build -w /src swift:6.2 swift test
+      -v "${CHECK_VOLUME_PREFIX:-}lofi-build":/src/.build -w /src swift:6.2 swift test
     step podcastkit-tests docker run --rm -v "$PWD/libraries/PodcastKit":/src \
-      -v podcastkit-build:/src/.build -w /src swift:6.2 swift test
+      -v "${CHECK_VOLUME_PREFIX:-}podcastkit-build":/src/.build -w /src swift:6.2 swift test
   else
     echo "– swift-tests skipped (no swift or docker)"
   fi

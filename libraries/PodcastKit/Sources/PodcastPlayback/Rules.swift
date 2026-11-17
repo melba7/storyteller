@@ -43,10 +43,14 @@ public enum PlayedRule {
   /// Stopping this close to the end counts as played.
   public static let nearEnd = 5.0
 
-  public static func isPlayed(position: Double, duration: Double?, reachedEnd: Bool) -> Bool {
+  /// `within` is how many seconds from the end count as played: the listener's setting (see
+  /// PlaybackSettings.markPlayedWhenLeft), never less than `nearEnd`.
+  public static func isPlayed(
+    position: Double, duration: Double?, reachedEnd: Bool, within: Double = nearEnd
+  ) -> Bool {
     if reachedEnd { return true }
     guard let duration, duration.isFinite, duration > 0, position.isFinite else { return false }
-    return duration - position <= nearEnd
+    return duration - position <= max(within, nearEnd)
   }
 }
 

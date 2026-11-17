@@ -18,25 +18,32 @@ import {
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import {
-  SKIP_AHEAD_SECONDS,
-  SKIP_BACK_SECONDS,
-  speedLabel,
-} from "@/modules/podcasts/playbackRules"
+import { adMarks, adRows } from "@/modules/podcasts/ads"
+import { speedLabel } from "@/modules/podcasts/playbackRules"
+import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 import { playerBackground } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
+import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
+import { SkippedAdNote } from "./SkippedAdNote"
 import { SpeedPanel } from "./SpeedPanel"
+import { TranscriptView } from "./TranscriptView"
+import { useAdsFile } from "./useAds"
+import { usePlaybackSettings } from "./usePlaybackSettings"
 
 /** The full-screen player, laid out like Pocket Casts': artwork, seek bar, controls, notes. */
 export function PlayerScreen() {
   const router = useRouter()
   const view = usePlayer()
+  const { skipBack, skipForward } = usePlaybackSettings()
   const { width } = useWindowDimensions()
   const [showSpeed, setShowSpeed] = useState(false)
+  const [showTranscript, setShowTranscript] = useState(false)
   const { episode, show } = view
+  const adsFile = useAdsFile(episode?.id ?? "")
+  const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
   const artwork = Math.min(width - 64, 340)
 
   function close() {
@@ -58,12 +65,28 @@ export function PlayerScreen() {
         >
           <Icon as={ChevronDown} size={28} className="text-white" />
         </Pressable>
+        {episode ? (
+          <Pressable
+            className="ml-auto rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
+            accessibilityRole="button"
+            accessibilityLabel={
+              showTranscript ? "Back to the player" : "Open the transcript"
+            }
+            onPress={() => setShowTranscript((value) => !value)}
+          >
+            <Text className="font-semibold text-white">
+              {showTranscript ? "Player" : "Transcript"}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {!episode ? (
         <Text className="px-8 py-12 text-center text-white/70">
           Nothing is playing. Pick an episode to start.
         </Text>
+      ) : showTranscript ? (
+        <TranscriptView key={episode.id} episode={episode} />
       ) : (
         <ScrollView
           contentContainerClassName="px-safe-or-6 pb-safe items-center gap-5 pb-8"
@@ -104,14 +127,16 @@ export function PlayerScreen() {
             position={view.position}
             duration={view.duration}
             onSeek={(seconds) => void player.seekTo(seconds)}
+            marks={marks}
           />
+          <SkippedAdNote />
 
           <View className="w-full flex-row items-center justify-center gap-8">
             <SkipButton
-              label={`Back ${SKIP_BACK_SECONDS} seconds`}
-              seconds={SKIP_BACK_SECONDS}
+              label={skipLabel("back", skipBack)}
+              seconds={skipBack}
               icon={RotateCcw}
-              onPress={() => void player.skip(-SKIP_BACK_SECONDS)}
+              onPress={() => void player.skip(-skipBack)}
             />
             <Pressable
               className="size-20 items-center justify-center rounded-full bg-white active:opacity-80"
@@ -134,10 +159,10 @@ export function PlayerScreen() {
               )}
             </Pressable>
             <SkipButton
-              label={`Ahead ${SKIP_AHEAD_SECONDS} seconds`}
-              seconds={SKIP_AHEAD_SECONDS}
+              label={skipLabel("ahead", skipForward)}
+              seconds={skipForward}
               icon={RotateCw}
-              onPress={() => void player.skip(SKIP_AHEAD_SECONDS)}
+              onPress={() => void player.skip(skipForward)}
             />
           </View>
 
@@ -159,6 +184,8 @@ export function PlayerScreen() {
               />
             </View>
           ) : null}
+
+          <PlayerButtons />
 
           <View className="w-full gap-2 pt-4">
             <Text className="text-lg font-semibold text-white">Show notes</Text>

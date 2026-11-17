@@ -12,12 +12,17 @@ import {
 import { Text } from "@/components/ui/text"
 import { unsubscribe } from "@/modules/podcasts/db"
 import { refreshShow } from "@/modules/podcasts/dbFeeds"
-import { type StoredEpisode } from "@/modules/podcasts/library"
+import {
+  type EpisodeListItem,
+  archivedCount,
+  arrangeEpisodes,
+} from "@/modules/podcasts/episodeList"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { tabBase } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { ScreenBar } from "./ScreenBar"
+import { ShowBarButtons } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
 
@@ -68,7 +73,17 @@ export function PodcastShow({ id }: { id: string }) {
   const current = show.data
   return (
     <View className="pt-safe bg-background flex-1">
-      <ScreenBar title={current?.title ?? "Podcast"} />
+      <ScreenBar
+        title={current?.title ?? "Podcast"}
+        right={
+          current ? (
+            <ShowBarButtons
+              show={current}
+              archivedCount={archivedCount(episodes.data ?? [])}
+            />
+          ) : undefined
+        }
+      />
       {show.loading ? (
         <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
       ) : !current ? (
@@ -76,9 +91,9 @@ export function PodcastShow({ id }: { id: string }) {
           {show.error ?? "This show isn't in your library."}
         </Text>
       ) : (
-        <FlatList<StoredEpisode>
-          data={episodes.data ?? []}
-          keyExtractor={(episode) => episode.id}
+        <FlatList<EpisodeListItem>
+          data={arrangeEpisodes(episodes.data ?? [], current.settings)}
+          keyExtractor={(item) => item.key}
           contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
           refreshControl={
@@ -98,9 +113,15 @@ export function PodcastShow({ id }: { id: string }) {
               </Text>
             )
           }
-          renderItem={({ item }) => (
-            <EpisodeRow episode={item} show={current} />
-          )}
+          renderItem={({ item }) =>
+            item.kind === "header" ? (
+              <Text variant="h4" className="pt-4 pb-1">
+                {item.title}
+              </Text>
+            ) : (
+              <EpisodeRow episode={item.episode} show={current} />
+            )
+          }
         />
       )}
     </View>

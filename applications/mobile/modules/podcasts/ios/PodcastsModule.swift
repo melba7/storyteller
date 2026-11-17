@@ -6,6 +6,7 @@
 
 import ExpoModulesCore
 import Foundation
+import PodcastAds
 import PodcastDownloads
 import PodcastFeed
 import PodcastPlayback
@@ -22,6 +23,7 @@ struct PlaybackLoadOptions: Record {
   @Field var played: Bool = false
   @Field var autoplay: Bool = true
   @Field var audioType: String = ""
+  @Field var showId: String?
 }
 
 /// An episode to put in Up Next.
@@ -34,6 +36,7 @@ struct UpNextItemOptions: Record {
   @Field var artworkUrl: String?
   @Field var duration: Double?
   @Field var position: Double = 0
+  @Field var showId: String?
 }
 
 public final class PodcastsModule: Module {
@@ -41,13 +44,16 @@ public final class PodcastsModule: Module {
     Name("Podcasts")
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
-      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange")
+      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange",
+      "onAdsChange", "onAdSkipped", "onAdUndone")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
       PodcastDownloader.shared.start()
       PodcastTranscriber.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
       PodcastTranscriber.shared.start()
+      PodcastAdFinder.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
+      PodcastAdFinder.shared.start()
       Task { @MainActor [weak self] in
         PodcastPlayer.shared.sink = { name, body in self?.sendEvent(name, body) }
       }
@@ -82,7 +88,7 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType)
+        type: options.audioType, showId: options.showId)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -98,10 +104,12 @@ public final class PodcastsModule: Module {
       await MainActor.run { PodcastPlayer.shared.skip(by: seconds) }
     }
     AsyncFunction("skipForward") { () async in
-      await MainActor.run { PodcastPlayer.shared.skip(by: Skip.ahead) }
+      let amount = Double(PlaybackSettingsStore.current.skipForward)
+      await MainActor.run { PodcastPlayer.shared.skip(by: amount) }
     }
     AsyncFunction("skipBack") { () async in
-      await MainActor.run { PodcastPlayer.shared.skip(by: -Skip.back) }
+      let amount = PlaybackSettingsStore.current.previousSeconds
+      await MainActor.run { PodcastPlayer.shared.skip(by: -amount) }
     }
 
     // Sets the speed, rounded to 0.1 within 0.5 to 3.0, and returns the speed in use.
@@ -126,7 +134,7 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position)
+        position: item.position, showId: item.showId)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -137,6 +145,65 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("clearUpNext") { () async in
       await MainActor.run { PodcastPlayer.shared.clearUpNext() }
+    }
+
+    // MARK: Notifications
+
+    // "granted", "denied" or "undetermined".
+    AsyncFunction("notificationPermission") { () async -> String in
+      await PodcastNotifier.shared.permission()
+    }
+    // Asks the listener (iOS shows its question the first time); returns whether it is allowed.
+    AsyncFunction("requestNotificationPermission") { () async -> Bool in
+      await PodcastNotifier.shared.requestPermission()
+    }
+    // Posts a notification now. Nothing happens without permission.
+    AsyncFunction("postNotification") { (id: String, title: String, body: String) async throws in
+      do {
+        try await PodcastNotifier.shared.post(id: id, title: title, body: body)
+      } catch {
+        throw PodcastFetchError(message: error.localizedDescription)
+      }
+    }
+
+    // MARK: AirPlay
+
+    // The system's AirPlay button, for the player (see AirPlayRouteView).
+    View(AirPlayRouteView.self) {
+      Prop("label") { (view: AirPlayRouteView, label: String) in view.setLabel(label) }
+    }
+
+    // MARK: Playback settings
+
+    // The listener's playback settings (see PlaybackSettings). Saving returns what was kept.
+    AsyncFunction("getPlaybackSettings") { () -> [String: Any] in
+      PlaybackSettingsStore.current.values
+    }
+    AsyncFunction("setPlaybackSettings") { (values: [String: Any]) async -> [String: Any] in
+      let kept = PlaybackSettingsStore.save(values)
+      await MainActor.run { PodcastPlayer.shared.settingsChanged() }
+      return kept.values
+    }
+
+    // MARK: Sleep timer
+
+    // A countdown in minutes (1 to 720), or until the end of the episode. Both replace any
+    // timer. The state is "none", "countdown" (with `endsAt`, milliseconds) or "endOfEpisode".
+    AsyncFunction("startSleepTimer") { (minutes: Double) async throws in
+      let started = await MainActor.run { PodcastPlayer.shared.startSleep(minutes: minutes) }
+      if !started { throw PodcastFetchError(message: "That is not a time the timer can use.") }
+    }
+    AsyncFunction("sleepUntilEndOfEpisode") { () async in
+      await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfEpisode() }
+    }
+    AsyncFunction("extendSleepTimer") { () async in
+      await MainActor.run { PodcastPlayer.shared.extendSleep() }
+    }
+    AsyncFunction("cancelSleepTimer") { () async in
+      await MainActor.run { PodcastPlayer.shared.cancelSleep() }
+    }
+    AsyncFunction("getSleepTimer") { () async -> [String: Any] in
+      await MainActor.run { PodcastPlayer.shared.sleepObject() }
     }
 
     // MARK: Downloading
@@ -172,12 +239,45 @@ public final class PodcastsModule: Module {
     AsyncFunction("setWifiOnly") { (on: Bool) in DownloadSettings.wifiOnly = on }
     AsyncFunction("getWifiOnly") { () -> Bool in DownloadSettings.wifiOnly }
 
+    // MARK: Show settings
+
+    // Saves the settings of every show the player must know with the screen locked (speed,
+    // intro, outro, skip switches) as one JSON object keyed by show id.
+    AsyncFunction("writeShowSettings") { (json: String) throws in
+      guard ShowSettingsStore.write(json: json) else {
+        throw PodcastFetchError(message: "The show settings could not be saved.")
+      }
+    }
+
     // MARK: Transcripts
 
     // Every downloaded episode's transcript state, and one finished transcript as JSON.
     AsyncFunction("listTranscripts") { () -> [[String: Any]] in PodcastTranscriber.shared.all() }
     AsyncFunction("getTranscript") { (episodeId: String) -> String? in
       PodcastTranscriber.shared.transcriptJSON(episodeId)
+    }
+
+    // MARK: Ads
+
+    // Where every transcribed episode's ad finding is, and one episode's saved ads as JSON.
+    AsyncFunction("listAds") { () -> [[String: Any]] in PodcastAdFinder.shared.all() }
+    AsyncFunction("getAds") { (episodeId: String) -> String? in
+      PodcastAdFinder.shared.adsJSON(episodeId)
+    }
+
+    // The two switches for skipping ads and the hosts' own plugs (both on until turned off).
+    AsyncFunction("getAdSkipSettings") { () -> [String: Bool] in
+      let settings = AdSkipDefaults.settings
+      return ["skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs]
+    }
+    AsyncFunction("setAdSkipSettings") { (skipAds: Bool, skipOwnPlugs: Bool) async in
+      AdSkipDefaults.settings = AdSkipSettings(skipAds: skipAds, skipOwnPlugs: skipOwnPlugs)
+      await MainActor.run { PodcastPlayer.shared.adSkipping.refresh() }
+    }
+    // Takes back the skip that was just made: back to the ad's start, playing, and the skip is
+    // recorded as wrong. False when it is too late.
+    AsyncFunction("undoAdSkip") { () async -> Bool in
+      await MainActor.run { PodcastPlayer.shared.adSkipping.undo() }
     }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.

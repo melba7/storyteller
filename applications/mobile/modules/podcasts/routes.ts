@@ -25,6 +25,14 @@ export function showHref(segments: readonly string[], id: string): PodcastHref {
   return { pathname: `${tabBase(segments)}/show/[id]`, params: { id } }
 }
 
+/** A show's own settings, in the tab you are in. */
+export function settingsHref(
+  segments: readonly string[],
+  id: string,
+): PodcastHref {
+  return { pathname: `${tabBase(segments)}/show-settings/[id]`, params: { id } }
+}
+
 export function episodeHref(
   segments: readonly string[],
   id: string,

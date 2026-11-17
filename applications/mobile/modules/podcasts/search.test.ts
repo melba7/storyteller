@@ -124,6 +124,24 @@ describe.skipIf(!Database)("running the query", () => {
     expect(search("_")).toEqual(["e6"])
   })
 
+  it("leaves archived episodes out", () => {
+    const db = new Database!(":memory:")
+    for (const statement of migrationStatements(0)) db.exec(statement)
+    db.exec(
+      `INSERT INTO shows (id, feed_url, title, added_at, refreshed_at)
+       VALUES ('s1', 'u', 'Show', 0, 0);
+       INSERT INTO episodes (id, show_id, guid, title, notes, audio_url, audio_type, archived)
+       VALUES ('e1', 's1', 'g1', 'Hello there', '', 'https://x/a.mp3', 'audio/mpeg', 0),
+              ('e2', 's1', 'g2', 'Hello again', '', 'https://x/b.mp3', 'audio/mpeg', 1)`,
+    )
+    const query = localSearchQuery("hello")!
+    const found = db
+      .prepare(query.sql)
+      .all(...query.params)
+      .map((row) => hitFromRow(row).episode.id)
+    expect(found).toEqual(["e1"])
+  })
+
   it("ignores case and keeps to the limit", () => {
     const search = library()
     expect(search("MOON", 2)).toHaveLength(2)
