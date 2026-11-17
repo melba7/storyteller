@@ -6,6 +6,7 @@ import { Pressable, View, useWindowDimensions } from "react-native"
 import { Text } from "@/components/ui/text"
 import { chapterArtwork } from "@/modules/podcasts/chapters"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
+import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
 import { sheetColors } from "@/modules/podcasts/playerSheet"
 import { showHref } from "@/modules/podcasts/routes"
 
@@ -37,7 +38,10 @@ export function PlayerScreen() {
   const segments = useSegments()
   const view = usePlayer()
   const { width } = useWindowDimensions()
-  const [chosen, setChosen] = useState<PlayerPanel>("art")
+  // A screen that opened the player may have asked for a page (the menu's "View Transcript").
+  const [chosen, setChosen] = useState<PlayerPanel>(
+    () => takePlayerPageRequest() ?? "art",
+  )
   const [areaHeight, setAreaHeight] = useState(0)
   const { episode, show } = view
   const colors = useMemo(
