@@ -210,8 +210,9 @@ from other MIT projects are credited the same way:
 
 `applications/mobile/fork.config.ts` gives the app:
 
-- the name "Storyteller Lofi", or "Storyteller Lofi (dev)" for development
-  builds;
+- the name "Storyteller+" on the home screen (Mo's choice, 2026-11-17), or
+  "Storyteller+ (dev)" for development builds. The name in TestFlight and the
+  App Store is the App Store Connect record's own name, changed there;
 - its own bundle ID, with `.dev` appended for development builds;
 - no EAS account or project, because upstream's belong to upstream.
 

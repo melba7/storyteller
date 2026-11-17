@@ -32,7 +32,9 @@ interface ForkIdentity {
 }
 
 export const forkIdentity: ForkIdentity = {
-  name: "Storyteller Lofi",
+  // Mo's choice (2026-11-17). Expo also names the generated Xcode project after it, without
+  // the "+" ("Storyteller"); CI finds the workspace by pattern, so that is fine.
+  name: "Storyteller+",
   slug: "storyteller-lofi",
   appId: "io.github.melba7.storytellerlofi",
 }
