@@ -63,6 +63,10 @@ export function PodcastPreview({
     let current = true
     setPreview(null)
     setError(null)
+    if (!feedUrl) {
+      setError("No show was chosen. Go back and pick one.")
+      return
+    }
     fetchFeed(feedUrl).then(
       (feed) => {
         if (current) setPreview(previewFromFeed(feedUrl, feed))
