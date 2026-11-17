@@ -8,6 +8,7 @@ import { formatTime } from "@/modules/podcasts/playbackRules"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 
 import { Artwork } from "./Artwork"
+import { pick } from "./haptics"
 import { chapterActions } from "./useChapters"
 
 /**
@@ -26,6 +27,7 @@ export function ChapterList({
   const playing = currentChapterIndex(chapters, view.position)
 
   function play(chapter: PodcastChapter) {
+    pick()
     void player.seekTo(chapter.start)
     if (!view.isPlaying) void player.togglePlayPause()
   }

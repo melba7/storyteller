@@ -7,6 +7,7 @@ import { Text } from "@/components/ui/text"
 import { currentChapterIndex } from "@/modules/podcasts/chapters"
 import type { PodcastChapter } from "@/modules/podcasts/index"
 
+import { pick } from "./haptics"
 import { chapterActions } from "./useChapters"
 
 /** Under the seek bar: the chapter playing, with buttons for the previous and next chapter. */
@@ -28,7 +29,10 @@ export function ChapterBar({
         className="size-11 items-center justify-center active:opacity-60"
         accessibilityRole="button"
         accessibilityLabel="Previous chapter"
-        onPress={chapterActions.previous}
+        onPress={() => {
+          pick()
+          chapterActions.previous()
+        }}
       >
         <Icon as={SkipBack} size={24} className="text-white" />
       </Pressable>
@@ -49,7 +53,10 @@ export function ChapterBar({
         className="size-11 items-center justify-center active:opacity-60"
         accessibilityRole="button"
         accessibilityLabel="Next chapter"
-        onPress={chapterActions.next}
+        onPress={() => {
+          pick()
+          chapterActions.next()
+        }}
       >
         <Icon as={SkipForward} size={24} className="text-white" />
       </Pressable>
