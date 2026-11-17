@@ -1,4 +1,4 @@
-# Apple Podcasts sync (Mac)
+# Podcast tools (Mac)
 
 Tells the Storyteller Lofi app which podcasts you follow in Apple Podcasts and
 which episodes you finished there. One way: Apple Podcasts' files are only read,
@@ -36,6 +36,7 @@ the app is not added again.
 ## Other things to double-click
 
 - `Sync Apple Podcasts now.command` runs one sync in a window.
+- `Transcribe an episode.command`: see the next section.
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -56,6 +57,22 @@ is at the end.
   up on this Mac.
 
 Exit codes: 0 worked, 2 could not read or write, 3 Apple's format changed.
+
+## Transcribe an episode
+
+`Transcribe an episode.command` asks for an audio file in a dialog, transcribes
+it with the same Swift code the app uses (Apple's SpeechAnalyzer through
+PodcastKit's `podcast-transcribe`), and saves the lines with their times next to
+the file as `<file name>.transcript.txt`. Use it to check transcripts without a
+new build of the app.
+
+It needs macOS 26 and Xcode 26. The first run builds the tool (about a minute),
+and the first run for a language downloads Apple's speech model. The language is
+the Mac's; to use another one, run
+`swift run -c release podcast-transcribe --locale de-DE <file>` in
+`libraries/PodcastKit`. A run that is stopped carries on where it was (progress
+is kept in the temporary folder). On a Mac without macOS 26 the tool only says
+so.
 
 ## Tests
 

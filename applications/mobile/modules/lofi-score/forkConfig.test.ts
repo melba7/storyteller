@@ -41,6 +41,8 @@ describe("withLofiScorePods", () => {
       "PodcastFeed",
       "PodcastPlayback",
       "PodcastDownloads",
+      "PodcastTranscripts",
+      "PodcastSpeech",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
@@ -48,7 +50,7 @@ describe("withLofiScorePods", () => {
     })
   })
 
-  it("adds the podcast feed reader's, player rules' and downloads' pods from PodcastKit", () => {
+  it("adds the podcast feed reader's, player rules', downloads', transcripts' and speech pods from PodcastKit", () => {
     const plugins = withLofiScorePods([
       ["expo-build-properties", { ios: { extraPods: [] } }],
     ])
@@ -56,10 +58,12 @@ describe("withLofiScorePods", () => {
       string,
       { ios: { extraPods: { name: string; path: string }[] } },
     ]
-    expect(options.ios.extraPods.slice(-3)).toEqual([
+    expect(options.ios.extraPods.slice(-5)).toEqual([
       { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
       { name: "PodcastPlayback", path: "../../../libraries/PodcastKit" },
       { name: "PodcastDownloads", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastTranscripts", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastSpeech", path: "../../../libraries/PodcastKit" },
     ])
   })
 
@@ -92,6 +96,7 @@ describe("soundEdition", () => {
       UIBackgroundModes: ["audio", "processing"],
       BGTaskSchedulerPermittedIdentifiers: [
         `${forkIdentity.appId}.soundsImport`,
+        `${forkIdentity.appId}.podcastTranscribe`,
       ],
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: { NSAllowsArbitraryLoadsForMedia: true },
@@ -134,7 +139,11 @@ describe("soundEdition", () => {
     ])
     expect(
       config.ios?.infoPlist?.["BGTaskSchedulerPermittedIdentifiers"],
-    ).toEqual(["upstream.task", `${forkIdentity.appId}.soundsImport`])
+    ).toEqual([
+      "upstream.task",
+      `${forkIdentity.appId}.soundsImport`,
+      `${forkIdentity.appId}.podcastTranscribe`,
+    ])
   })
 
   describe("in a TestFlight build", () => {

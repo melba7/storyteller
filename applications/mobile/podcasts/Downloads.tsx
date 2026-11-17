@@ -19,12 +19,14 @@ import {
   formatEpisodeDate,
 } from "@/modules/podcasts/library"
 import { episodeHref } from "@/modules/podcasts/routes"
+import { withTranscript } from "@/modules/podcasts/transcripts"
 
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisodesByIds, useShows } from "./hooks"
 import { confirmDelete, useDownloadMap, useStorageUsed } from "./useDownloads"
+import { useTranscript } from "./useTranscripts"
 
 /**
  * The Downloads screen: the storage used at the top, then the downloaded and still-moving
@@ -105,10 +107,14 @@ function DownloadRow({
   // A download whose episode left the library still shows, so it can be deleted.
   const title = episode?.title ?? "An episode no longer in your library"
   const look = downloadLook(info, title)
+  const transcript = useTranscript(info.episodeId)
   const details = [
     showTitle,
     episode ? formatEpisodeDate(episode.publishedAt) : "",
-    look.status,
+    withTranscript(
+      look.status,
+      info.state === "downloaded" ? transcript : undefined,
+    ),
   ]
     .filter((part) => part !== "")
     .join(" · ")

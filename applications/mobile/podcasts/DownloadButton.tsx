@@ -8,12 +8,17 @@ import { Text } from "@/components/ui/text"
 import { downloadLook } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type StoredEpisode } from "@/modules/podcasts/library"
+import { withTranscript } from "@/modules/podcasts/transcripts"
 
 import { ProgressRing } from "./PlayButton"
 import { pressDownload, useDownload } from "./useDownloads"
+import { useTranscript } from "./useTranscripts"
 
 interface Props {
-  episode: Pick<StoredEpisode, "id" | "title" | "audioUrl" | "audioType">
+  episode: Pick<
+    StoredEpisode,
+    "id" | "showId" | "title" | "audioUrl" | "audioType"
+  >
   size?: number
   /** Also writes what the download is doing beside the button (the episode card). */
   showStatus?: boolean
@@ -30,14 +35,20 @@ export function DownloadButton({
   showStatus = false,
 }: Props) {
   const info = useDownload(episode.id)
+  const transcript = useTranscript(episode.id)
   const primary = useCSSVariable("--color-primary") as string
   if (Podcasts === null) return null
   const look = downloadLook(info, episode.title)
+  // The transcript only matters once the audio is on the phone.
+  const status = withTranscript(
+    look.status,
+    info?.state === "downloaded" ? transcript : undefined,
+  )
   const inner = Math.round(size / 2)
   return (
     <View className="flex-row items-center gap-2">
-      {showStatus && look.status ? (
-        <Text className="text-muted-foreground text-sm">{look.status}</Text>
+      {showStatus && status ? (
+        <Text className="text-muted-foreground text-sm">{status}</Text>
       ) : null}
       <Pressable
         className="items-center justify-center rounded-full active:opacity-60"

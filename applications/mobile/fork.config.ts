@@ -53,7 +53,13 @@ const lofiScorePods = [
     "LofiAtmosphere",
     "LofiScoreHost",
   ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" })),
-  ...["PodcastFeed", "PodcastPlayback", "PodcastDownloads"].map((name) => ({
+  ...[
+    "PodcastFeed",
+    "PodcastPlayback",
+    "PodcastDownloads",
+    "PodcastTranscripts",
+    "PodcastSpeech",
+  ].map((name) => ({
     name,
     path: "../../../libraries/PodcastKit",
   })),
@@ -133,7 +139,11 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
       UIBackgroundModes: modes.includes("processing")
         ? modes
         : [...modes, "processing"],
-      BGTaskSchedulerPermittedIdentifiers: [...tasks, `${appId}.soundsImport`],
+      BGTaskSchedulerPermittedIdentifiers: [
+        ...tasks,
+        `${appId}.soundsImport`,
+        `${appId}.podcastTranscribe`,
+      ],
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: {
         ...transport,

@@ -41,11 +41,13 @@ public final class PodcastsModule: Module {
     Name("Podcasts")
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
-      "onUpNextChange", "onPlaybackAdvanced")
+      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
       PodcastDownloader.shared.start()
+      PodcastTranscriber.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
+      PodcastTranscriber.shared.start()
       Task { @MainActor [weak self] in
         PodcastPlayer.shared.sink = { name, body in self?.sendEvent(name, body) }
       }
@@ -141,8 +143,10 @@ public final class PodcastsModule: Module {
 
     // Starts downloading an episode; carries on with the app closed. `type` is the feed's
     // audio type, used to name the file. `automatic` marks a new episode the app fetches by
-    // itself: those always wait for Wi-Fi.
-    AsyncFunction("download") { (episodeId: String, url: String, type: String, automatic: Bool) throws in
+    // itself: those always wait for Wi-Fi. `language` is the feed's, for the transcript.
+    AsyncFunction("download") {
+      (episodeId: String, url: String, type: String, automatic: Bool, language: String?) throws in
+      PodcastTranscriber.shared.noteLanguage(language, for: episodeId)
       do {
         try PodcastDownloader.shared.download(
           episodeId: episodeId, url: url, type: type, automatic: automatic)
@@ -167,6 +171,14 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("setWifiOnly") { (on: Bool) in DownloadSettings.wifiOnly = on }
     AsyncFunction("getWifiOnly") { () -> Bool in DownloadSettings.wifiOnly }
+
+    // MARK: Transcripts
+
+    // Every downloaded episode's transcript state, and one finished transcript as JSON.
+    AsyncFunction("listTranscripts") { () -> [[String: Any]] in PodcastTranscriber.shared.all() }
+    AsyncFunction("getTranscript") { (episodeId: String) -> String? in
+      PodcastTranscriber.shared.transcriptJSON(episodeId)
+    }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.
     AsyncFunction("artworkColor") { (address: String) async -> String? in

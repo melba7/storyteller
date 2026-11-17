@@ -12,7 +12,7 @@ import {
   refreshDue,
 } from "./automatic"
 import { loadLastRun, loadSettings, saveLastRun } from "./automaticSettings"
-import { listEpisodesByIds } from "./db"
+import { getShow, listEpisodesByIds } from "./db"
 import { refreshAllShows } from "./dbFeeds"
 import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
 import { player } from "./playerInstance"
@@ -25,7 +25,14 @@ async function startNew(
 ) {
   for (const episode of episodesToDownload(added, settings)) {
     try {
-      await startDownload(episode.id, episode.audioUrl, episode.audioType, true)
+      const show = await getShow(episode.showId)
+      await startDownload(
+        episode.id,
+        episode.audioUrl,
+        episode.audioType,
+        true,
+        show?.language ?? null,
+      )
     } catch (cause) {
       console.warn("Couldn't start an automatic download", cause)
     }

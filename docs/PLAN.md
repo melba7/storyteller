@@ -461,6 +461,15 @@ once reviewed and green.
     transcribed (the time it takes is written down here).
   - Files: `PodcastKit` (transcript model, speech target), `modules/podcasts`,
     `podcasts/` (row status), `PodcastKit/Tools/mac`.
+  - Status: built and passing `check.sh`; the Apple-only part has never been
+    compiled (Fork CI's macOS and iOS builds are its first compile) and nothing
+    has run on a Mac or iPhone. Transcribing runs in pieces of 5 minutes, one
+    episode at a time, while the app is open or a podcast plays; it needs iOS 26
+    (older iOS says "Needs iOS 26"). Rows say "Transcribing 40%", "Transcript
+    ready" or the reason. `Transcribe an episode.command` in
+    `libraries/PodcastKit/Tools/mac` does one file on a Mac. How long an
+    hour-long episode takes on the phone is not measured: that needs TestFlight,
+    and the number goes here once Mo has it.
 
 - [ ] **P3b. Transcribe with the app closed**
   - A background processing task carries on unfinished transcription and resumes
@@ -470,6 +479,15 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight an
     episode downloaded before bed is transcribed by morning.
   - Files: `modules/podcasts/ios`, `fork.config.ts` (task id).
+  - Status: built with P3a, passing `check.sh` and not yet run on a phone. The
+    resume rules are tested on Linux with a fake recogniser (a stop after any
+    piece, a restart 2 s before the saved time, a broken partial file starting
+    over). The app asks iOS for the background task
+    `<bundle id>.podcastTranscribe` when it goes to the background with work
+    left; iOS decides when it runs (often overnight, on the charger), so
+    "transcribed by morning" is for Mo to check on TestFlight. When iOS ends a
+    turn, the piece in progress is finished and saved first, so a very slow
+    piece can still be cut off by iOS; only that piece is lost.
 
 - [ ] **P3c. Moving transcript** (Mo's ask, 2026-11-17; replaces the old P5p)
   - Like the books' read-along: the player shows the episode's transcript. It

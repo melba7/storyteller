@@ -1,6 +1,6 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
-// The downloads' part of the app's launch. iOS may start the app in the background only to
+// The downloads' and transcripts' part of the app's launch. iOS may start the app in the background only to
 // deliver downloads that finished while it was closed; there is no JavaScript then, so the
 // download session is made here, while the app launches, and iOS's completion handler is kept
 // until the session has handled its events.
@@ -13,6 +13,9 @@ public final class PodcastsAppDelegateSubscriber: ExpoAppDelegateSubscriber {
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
     PodcastDownloader.shared.start()
+    // A background task has to be registered before the launch is over.
+    PodcastTranscriber.registerBackgroundTask()
+    PodcastTranscriber.shared.start()
     return true
   }
 

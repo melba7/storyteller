@@ -2,6 +2,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react"
 import { Alert } from "react-native"
 
+import { getShow } from "@/modules/podcasts/db"
 import {
   type DownloadAction,
   type DownloadMap,
@@ -104,14 +105,28 @@ function tell(title: string, cause: unknown) {
 /** What a tap on a download button does. Deleting asks first. */
 export function pressDownload(
   action: DownloadAction,
-  episode: Pick<StoredEpisode, "id" | "title" | "audioUrl" | "audioType">,
+  episode: Pick<
+    StoredEpisode,
+    "id" | "showId" | "title" | "audioUrl" | "audioType"
+  >,
 ) {
   switch (action) {
     case "download":
     case "retry":
-      startDownload(episode.id, episode.audioUrl, episode.audioType).catch(
-        (cause: unknown) => tell("Couldn't download", cause),
-      )
+      // The show's language picks the transcript's language; without one, the phone's.
+      getShow(episode.showId)
+        .then(
+          (show) =>
+            startDownload(
+              episode.id,
+              episode.audioUrl,
+              episode.audioType,
+              false,
+              show?.language ?? null,
+            ),
+          () => startDownload(episode.id, episode.audioUrl, episode.audioType),
+        )
+        .catch((cause: unknown) => tell("Couldn't download", cause))
       return
     case "cancel":
       cancelDownload(episode.id).catch((cause: unknown) =>

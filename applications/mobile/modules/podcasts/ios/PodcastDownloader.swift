@@ -144,6 +144,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
       for task in tasks where task.taskDescription == episodeId { task.cancel() }
     }
     emitRemoved(episodeId)
+    PodcastTranscriber.shared.removed(episodeId)
   }
 
   func localFile(for episodeId: String) -> URL? { store?.localFile(for: episodeId) }
@@ -221,6 +222,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
         episodeId: id, staged: staged, sha256: hash, fileExtension: entry.fileExtension, bytes: bytes)
       finished(id, taskIdentifier: downloadTask.taskIdentifier)
       emit(done)
+      PodcastTranscriber.shared.downloaded(id)
     } catch {
       let full = DownloadFailure.isDiskFull(error)
       recover(id, DownloadFailure(diskFull: full, attempts: DownloadRecovery.maxRetries))

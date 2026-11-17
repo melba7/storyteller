@@ -246,6 +246,8 @@ final class PodcastPlayer {
 
   private func playStateChanged() {
     if player.timeControlStatus == .playing { takeTheLockScreen() }
+    // Transcribing may run while a podcast plays, which keeps the app alive.
+    PodcastTranscriber.shared.playbackChanged(isPlaying: player.timeControlStatus == .playing)
     publish()
   }
 
