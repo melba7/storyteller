@@ -122,28 +122,25 @@ describe("updateCadence", () => {
   const every = (days: number, count = 6) =>
     Array.from({ length: count }, (_, i) => now - i * days * DAY)
   it("names daily, weekly, biweekly and monthly shows", () => {
-    expect(updateCadence(every(1))).toBe("Updated Daily")
-    expect(updateCadence(every(7))).toBe("Updated Weekly")
-    expect(updateCadence(every(14))).toBe("Updated Biweekly")
-    expect(updateCadence(every(30))).toBe("Updated Monthly")
+    expect(updateCadence(every(1), now)).toBe("Updated Daily")
+    expect(updateCadence(every(7), now)).toBe("Updated Weekly")
+    expect(updateCadence(every(14), now)).toBe("Updated Biweekly")
+    expect(updateCadence(every(30), now)).toBe("Updated Monthly")
   })
   it("uses the median, so one long break does not matter", () => {
     expect(
-      updateCadence([
+      updateCadence(
+        [now, now - 7 * DAY, now - 14 * DAY, now - 21 * DAY, now - 100 * DAY],
         now,
-        now - 7 * DAY,
-        now - 14 * DAY,
-        now - 21 * DAY,
-        now - 100 * DAY,
-      ]),
+      ),
     ).toBe("Updated Weekly")
   })
   it("says nothing with too few dates or an odd rhythm", () => {
-    expect(updateCadence(every(7, 2))).toBe("")
-    expect(updateCadence(every(120))).toBe("")
+    expect(updateCadence(every(7, 2), now)).toBe("")
+    expect(updateCadence(every(120), now)).toBe("")
   })
   it("does not depend on the order of the dates", () => {
-    expect(updateCadence(every(7).reverse())).toBe("Updated Weekly")
+    expect(updateCadence(every(7).reverse(), now)).toBe("Updated Weekly")
   })
 })
 

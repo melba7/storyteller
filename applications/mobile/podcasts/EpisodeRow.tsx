@@ -74,6 +74,7 @@ export function EpisodeRow({
   highlighted = false,
   selection,
   artwork = true,
+  here,
 }: {
   episode: StoredEpisode
   show: Show
@@ -85,6 +86,8 @@ export function EpisodeRow({
   selection?: Selection
   /** Shows the episode's picture (or its show's) at the right; on by default. */
   artwork?: boolean
+  /** The page the list is on (a show's), so the "..." menu leaves out going to it. */
+  here?: { show?: boolean }
 }) {
   const router = useRouter()
   const segments = useSegments()
@@ -194,7 +197,11 @@ export function EpisodeRow({
             <PlayCapsule episode={episode} show={show} />
             <MetaGlyph meta={meta} />
             <View className="flex-1" />
-            <EpisodeMenu episode={episode} show={show} />
+            <EpisodeMenu
+              episode={episode}
+              show={show}
+              {...(here ? { here } : {})}
+            />
           </View>
         )}
       </View>

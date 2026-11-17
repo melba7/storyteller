@@ -39,6 +39,10 @@ export type MenuFacts = {
   queued: boolean
   /** A preview episode isn't in the library: no Save, played mark, archive, or pages. */
   preview: boolean
+  /** The player has this episode loaded, so it has a transcript to open. Default false. */
+  transcript?: boolean
+  /** The page the menu is on: its own "Go to" entry is left out. */
+  here?: { episode?: boolean; show?: boolean }
   /** The download entry's title and whether it is destructive; null when there is none. */
   download: { title: string; destructive: boolean; icon: string } | null
   /** Extra entries for an added file, in their own group after Archive. */
@@ -94,13 +98,27 @@ export function menuLayout(facts: MenuFacts): MenuLayout {
     ...(facts.preview
       ? []
       : [
-          { id: "episode", title: "Go to Episode", icon: "info.circle" },
-          {
-            id: "show",
-            title: "Go to Show",
-            icon: "dot.radiowaves.up.forward",
-          },
-          { id: "transcript", title: "View Transcript", icon: "quote.bubble" },
+          ...(facts.here?.episode
+            ? []
+            : [{ id: "episode", title: "Go to Episode", icon: "info.circle" }]),
+          ...(facts.here?.show
+            ? []
+            : [
+                {
+                  id: "show",
+                  title: "Go to Show",
+                  icon: "dot.radiowaves.up.forward",
+                },
+              ]),
+          ...(facts.transcript
+            ? [
+                {
+                  id: "transcript",
+                  title: "View Transcript",
+                  icon: "quote.bubble",
+                },
+              ]
+            : []),
         ]),
     { id: "playlist", title: "Add to Playlist", icon: "text.badge.plus" },
   ]

@@ -10,6 +10,8 @@ import { capsuleLook } from "@/modules/podcasts/episodeRowLook"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { player, usePlayerValue } from "@/modules/podcasts/playerInstance"
 
+import { PressableScale } from "./PressableScale"
+
 /** What an episode's play button shows. */
 type Status = "idle" | "playing" | "buffering"
 
@@ -173,10 +175,20 @@ export function PlayCapsule({
   const status = useEpisodeStatus(episode.id)
   const look = capsuleLook(episode)
   const primary = useCSSVariable("--color-primary") as string
+  const secondary = useCSSVariable("--color-secondary") as string
   const playing = status === "playing"
   return (
-    <Pressable
-      className="bg-secondary h-8 flex-row items-center gap-1.5 rounded-full px-3 active:opacity-70"
+    <PressableScale
+      style={{
+        minHeight: 32,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        backgroundColor: secondary,
+      }}
       hitSlop={6}
       accessibilityRole="button"
       accessibilityLabel={[
@@ -210,6 +222,6 @@ export function PlayCapsule({
       {look.label ? (
         <Text className="text-primary text-[15px] font-bold">{look.label}</Text>
       ) : null}
-    </Pressable>
+    </PressableScale>
   )
 }

@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
+import { StatusBar } from "expo-status-bar"
 import { useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
@@ -31,7 +32,7 @@ import { type EpisodeSort } from "@/modules/podcasts/showSettings"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SelectionBar, SelectionSpacer } from "./SelectionBar"
+import { SelectionBar } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
@@ -156,7 +157,6 @@ export function PodcastShow({ id }: { id: string }) {
           }
           ListHeaderComponent={
             <>
-              {selection.on ? <SelectionSpacer /> : null}
               <ShowHeader
                 show={current}
                 problem={problem}
@@ -178,7 +178,12 @@ export function PodcastShow({ id }: { id: string }) {
             </>
           }
           ListEmptyComponent={
-            episodes.loading ? undefined : (
+            episodes.loading ? (
+              <ActivityIndicator
+                className="mt-8"
+                accessibilityLabel="Loading episodes"
+              />
+            ) : (
               <Text className="text-muted-foreground px-safe-or-4 py-6 text-center text-sm">
                 {episodes.error ??
                   (filter === "all"
@@ -198,6 +203,7 @@ export function PodcastShow({ id }: { id: string }) {
                   episode={item.episode}
                   show={current}
                   selection={selection}
+                  here={{ show: true }}
                 />
               </View>
             )
@@ -205,6 +211,10 @@ export function PodcastShow({ id }: { id: string }) {
           extraData={selection.selected}
         />
       )}
+      {/* White clock and battery while the coloured header is under the bar. */}
+      {current && !titleInBar ? (
+        <StatusBar style="light" verticalBarBehaviorIOS="disabled" />
+      ) : null}
       <ScreenBar
         title={current ? current.title : "Podcast"}
         titleHidden={Boolean(current) && !titleInBar}

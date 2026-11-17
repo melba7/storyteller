@@ -3,6 +3,7 @@
 // Pure functions for Apple's look: the grey date line of an episode row, the short length in
 // its capsule, plain text from HTML notes, how often a show publishes, the line under a show's
 // description, and the show page's filter.
+import { cadenceWord } from "./cadence"
 import { type StoredEpisode } from "./library"
 
 const MONTHS = [
@@ -57,7 +58,7 @@ export function seasonEpisode(
     .join(" ")
 }
 
-/** The parts of a row's grey line: date, season and episode, "Played". */
+/** The parts of a row's grey line: date, season and episode. ("Played" is the capsule's.) */
 export function dateLineParts(
   episode: Pick<StoredEpisode, "publishedAt" | "season" | "number" | "played">,
   now: number,
@@ -65,7 +66,6 @@ export function dateLineParts(
   return [
     dateWords(episode.publishedAt, now),
     seasonEpisode(episode.season, episode.number),
-    episode.played ? "Played" : "",
   ].filter((part) => part !== "")
 }
 
@@ -147,32 +147,12 @@ export function stripHtml(html: string): string {
     .trim()
 }
 
-/**
- * How often a show publishes, from its episode dates: "Daily", "Every few days", "Weekly",
- * "Biweekly" or "Monthly", by the middle gap between its newest episodes. Empty with fewer than
- * three dates, a show that has gone quiet (nothing for six months) or an uneven one.
- */
+/** How often a show publishes ("Weekly"), from its episode dates; see `cadenceWord`. */
 export function updateFrequency(
   dates: readonly (number | null)[],
   now: number,
 ): string {
-  const sorted = dates
-    .filter((date): date is number => date !== null && Number.isFinite(date))
-    .sort((a, b) => b - a)
-  if (sorted.length < 3) return ""
-  if (now - (sorted[0] ?? 0) > 180 * DAY) return ""
-  const gaps: number[] = []
-  for (let i = 0; i < Math.min(sorted.length - 1, 10); i++) {
-    gaps.push(((sorted[i] ?? 0) - (sorted[i + 1] ?? 0)) / DAY)
-  }
-  gaps.sort((a, b) => a - b)
-  const middle = gaps[Math.floor(gaps.length / 2)] ?? 0
-  if (middle <= 1.5) return "Daily"
-  if (middle <= 4) return "Every few days"
-  if (middle <= 9) return "Weekly"
-  if (middle <= 18) return "Biweekly"
-  if (middle <= 45) return "Monthly"
-  return ""
+  return cadenceWord(dates, now)
 }
 
 /** The tinted line under a show's description: first category, how often, author. */

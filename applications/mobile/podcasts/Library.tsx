@@ -16,6 +16,7 @@ import { useMemo } from "react"
 import { Alert, FlatList, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { downloadedCount } from "@/modules/podcasts/downloads"
 import { episodeCount } from "@/modules/podcasts/playlistLook"
 import { type Playlist } from "@/modules/podcasts/playlists"
 import {
@@ -134,7 +135,7 @@ export function Library() {
       <LibraryRow
         icon={CircleArrowDown}
         title="Downloaded"
-        count={Object.keys(downloads).length || null}
+        count={downloadedCount(downloads) || null}
         onPress={() => router.push(downloadsHref(segments))}
       />
       <LibraryRow
@@ -197,7 +198,7 @@ export function Library() {
             recent={item.entry}
             size={size}
             now={now}
-            onPress={() => router.push(showHref(segments, item.show.id))}
+            href={showHref(segments, item.show.id)}
           />
         )}
       />

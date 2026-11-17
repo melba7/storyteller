@@ -88,6 +88,7 @@ export function PlaylistScreen({ id }: { id: string }) {
         />
       )}
       <ScreenBar
+        large
         title={current?.title ?? "Playlist"}
         right={
           <>

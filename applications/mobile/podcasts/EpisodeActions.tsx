@@ -2,6 +2,7 @@
 import {
   Bookmark,
   Ellipsis,
+  ListCheck,
   ListPlus,
   Share,
   type LucideIcon,
@@ -22,7 +23,8 @@ import { EpisodeMenu, starAction } from "./EpisodeMenu"
 import { shareContent } from "./ShareButton"
 import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
-const FACE = "size-12 items-center justify-center rounded-full bg-white/25"
+const SHAPE = "size-12 items-center justify-center rounded-full"
+const FACE = `${SHAPE} bg-white/25`
 
 /** One round glass-like button of the row. `on` fills the symbol. */
 function Face({
@@ -81,7 +83,7 @@ export function EpisodeActions({
       ) : null}
       {Podcasts === null || isLocalEpisodeId(episode.id) ? null : (
         <View className={FACE}>
-          <DownloadButton episode={episode} size={48} />
+          <DownloadButton episode={episode} size={48} tone="onColor" />
         </View>
       )}
       {Podcasts === null ? null : (
@@ -110,7 +112,7 @@ export function EpisodeActions({
           ]}
         >
           <Pressable
-            className={FACE}
+            className={queued ? `${SHAPE} bg-white/50` : FACE}
             accessibilityRole="button"
             accessibilityLabel={[
               `Up Next options for ${episode.title}`,
@@ -119,7 +121,11 @@ export function EpisodeActions({
               .filter((part) => part !== "")
               .join(". ")}
           >
-            <Icon as={ListPlus} size={22} className="text-white" />
+            <Icon
+              as={queued ? ListCheck : ListPlus}
+              size={22}
+              className="text-white"
+            />
           </Pressable>
         </Menu>
       )}
@@ -128,7 +134,7 @@ export function EpisodeActions({
         label={`Share ${episode.title}`}
         onPress={() => void shareContent(() => episodeShare(episode, show))}
       />
-      <EpisodeMenu episode={episode} show={show}>
+      <EpisodeMenu episode={episode} show={show} here={{ episode: true }}>
         <View
           className={FACE}
           accessible

@@ -130,7 +130,11 @@ export function PodcastsHome() {
       count: badgeCount(found?.[item.id], item.addedAt),
       onPress: () => router.push(showHref(segments, item.id)),
     }
-    return isList ? <ShowRow {...props} /> : <ShowCell {...props} size={size} />
+    return isList ? (
+      <ShowRow {...props} />
+    ) : (
+      <ShowCell {...props} size={size} href={showHref(segments, item.id)} />
+    )
   }
 
   return (

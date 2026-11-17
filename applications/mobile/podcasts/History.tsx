@@ -109,7 +109,8 @@ export function History() {
         />
       )}
       <ScreenBar
-        title="Listening history"
+        large
+        title="History"
         right={
           <>
             <Stack.Toolbar.Button

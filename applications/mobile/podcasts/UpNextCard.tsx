@@ -31,14 +31,17 @@ export function cardSize(windowWidth: number) {
   return { width, height: Math.round(width * 1.34) }
 }
 
+/** Room kept under the words for the buttons row: its 40 pt, the 14 pt margin and a 12 pt gap. */
+const CONTROLS_ROOM = 66
+
 /** What a card shows when its show's colour is not known yet. */
 const NEUTRAL = "#48484a"
 
 /**
  * One card of Home's Up Next shelf: the artwork fading into its own colour, a line such as
  * "New · 17h ago", the title, a line of the notes, then the play capsule (with a short bar for
- * an episode in progress and the time left), a download button and the "..." menu. The card
- * opens the episode; the capsule plays it.
+ * an episode in progress and the time left), a download button and the "..." menu. The artwork
+ * and words open the episode; the capsule plays it.
  */
 export function UpNextCard({
   entry,
@@ -73,7 +76,7 @@ export function UpNextCard({
   const playing = status === "playing"
 
   return (
-    <PressableScale
+    <View
       style={{
         width,
         height,
@@ -81,60 +84,78 @@ export function UpNextCard({
         overflow: "hidden",
         backgroundColor: palette.background,
       }}
-      accessibilityRole="button"
-      accessibilityLabel={`${episode.title}, ${show.title}. ${line}`}
-      onPress={() => router.push(episodeHref(segments, episode.id))}
     >
-      <Artwork
-        uri={episode.imageUrl ?? show.imageUrl}
-        size={width}
-        className="rounded-none border-0"
-      />
-      {/* The artwork's lower part fades into the card's colour. */}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: width * 0.4,
-          left: 0,
-          right: 0,
-          height: width * 0.6 + 1,
-          backgroundImage: `linear-gradient(180deg, ${palette.background}00, ${palette.background})`,
-        }}
-      />
+      {/* Only the artwork and the words open the episode; the buttons below are not inside
+          this press, so the "..." doesn't open it and VoiceOver reaches each one. */}
+      <PressableScale
+        style={{ width, height }}
+        accessibilityRole="button"
+        accessibilityLabel={`${episode.title}, ${show.title}. ${line}`}
+        onPress={() => router.push(episodeHref(segments, episode.id))}
+      >
+        <Artwork
+          uri={episode.imageUrl ?? show.imageUrl}
+          size={width}
+          className="rounded-none border-0"
+        />
+        {/* The artwork's lower part fades into the card's colour. */}
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: width * 0.4,
+            left: 0,
+            right: 0,
+            height: width * 0.6 + 1,
+            backgroundImage: `linear-gradient(180deg, ${palette.background}00, ${palette.background})`,
+          }}
+        />
+        <View
+          style={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 0,
+            paddingHorizontal: 14,
+            paddingBottom: CONTROLS_ROOM,
+          }}
+        >
+          <Text
+            className="text-sm font-semibold"
+            style={{ color: palette.label }}
+            numberOfLines={1}
+          >
+            {line}
+          </Text>
+          <Text
+            className="mt-0.5 text-xl leading-6 font-bold"
+            style={{ color: palette.text }}
+            numberOfLines={3}
+          >
+            {episode.title}
+          </Text>
+          <Text
+            className="mt-0.5 text-base"
+            style={{ color: palette.text, opacity: 0.85 }}
+            numberOfLines={1}
+          >
+            {plainText(episode.notes)}
+          </Text>
+        </View>
+      </PressableScale>
       <View
         style={{
           position: "absolute",
           left: 0,
           right: 0,
           bottom: 0,
-          padding: 14,
+          paddingHorizontal: 14,
+          paddingBottom: 14,
         }}
       >
-        <Text
-          className="text-sm font-semibold"
-          style={{ color: palette.label }}
-          numberOfLines={1}
-        >
-          {line}
-        </Text>
-        <Text
-          className="mt-0.5 text-xl leading-6 font-bold"
-          style={{ color: palette.text }}
-          numberOfLines={3}
-        >
-          {episode.title}
-        </Text>
-        <Text
-          className="mt-0.5 text-base"
-          style={{ color: palette.text, opacity: 0.85 }}
-          numberOfLines={1}
-        >
-          {plainText(episode.notes)}
-        </Text>
-        <View className="mt-3 flex-row items-center gap-2">
+        <View className="flex-row items-center gap-2">
           <Pressable
-            className="h-10 flex-row items-center gap-2 rounded-full px-3.5"
+            className="min-h-10 flex-row items-center gap-2 rounded-full px-3.5"
             style={{ backgroundColor: palette.capsule }}
             accessibilityRole="button"
             accessibilityLabel={`${playing ? "Pause" : "Play"} ${episode.title}${left ? `, ${left}` : ""}`}
@@ -184,17 +205,16 @@ export function UpNextCard({
               <CircleArrowDown size={24} color={palette.text} />
             </Pressable>
           ) : null}
-          <EpisodeMenu episode={episode} show={show} tint={palette.background}>
-            <View
+          <EpisodeMenu episode={episode} show={show}>
+            <Pressable
               className="size-10 items-center justify-center"
-              accessibilityRole="button"
               accessibilityLabel={`More for ${episode.title}`}
             >
               <Ellipsis size={24} color={palette.text} />
-            </View>
+            </Pressable>
           </EpisodeMenu>
         </View>
       </View>
-    </PressableScale>
+    </View>
   )
 }

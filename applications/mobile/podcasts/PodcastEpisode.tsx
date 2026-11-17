@@ -1,10 +1,9 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Link, useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
-import { Pause } from "lucide-react-native"
+import { StatusBar } from "expo-status-bar"
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { headerColors } from "@/modules/podcasts/artworkTint"
 import { currentChapterIndex } from "@/modules/podcasts/chapters"
@@ -24,8 +23,10 @@ import { DownloadStatusLine } from "./DownloadButton"
 import { EpisodeActions } from "./EpisodeActions"
 import { EpisodeBookmarks } from "./EpisodeBookmarks"
 import { EpisodePeople } from "./EpisodePeople"
+import { HeaderCapsule } from "./HeaderCapsule"
 import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useEpisode, useShow } from "./hooks"
 import { useChapters } from "./useChapters"
 import { useArtworkColor } from "./useWash"
@@ -91,18 +92,24 @@ export function PodcastEpisode({ id }: { id: string }) {
 
   if (episode.loading) {
     return (
-      <View className="bg-background flex-1 pt-8">
-        <ActivityIndicator accessibilityLabel="Loading" />
-      </View>
+      <>
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
+        <ScreenBar title="Episode" titleHidden />
+      </>
     )
   }
   if (!current) {
     return (
-      <View className="bg-background flex-1">
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          {episode.error ?? "This episode isn't in your library."}
-        </Text>
-      </View>
+      <>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {episode.error ?? "This episode isn't in your library."}
+          </Text>
+        </BelowBar>
+        <ScreenBar title="Episode" titleHidden />
+      </>
     )
   }
 
@@ -119,121 +126,111 @@ export function PodcastEpisode({ id }: { id: string }) {
     .join(" · ")
 
   return (
-    <ScrollView
-      className="bg-background flex-1"
-      contentInsetAdjustmentBehavior="automatic"
-    >
-      <View
-        className="px-safe-or-4 items-center gap-3 pb-6"
-        style={{
-          backgroundColor: background,
-          marginTop: -headerHeight,
-          paddingTop: headerHeight + 24,
-        }}
+    <>
+      <ScrollView
+        className="bg-background flex-1"
+        contentInsetAdjustmentBehavior="automatic"
       >
-        {/* Pulling down past the top shows the colour, not the page. */}
         <View
-          pointerEvents="none"
+          className="px-safe-or-4 items-center gap-3 pb-6"
           style={{
-            position: "absolute",
-            top: -1200,
-            left: 0,
-            right: 0,
-            height: 1200,
             backgroundColor: background,
+            marginTop: -headerHeight,
+            paddingTop: headerHeight + 24,
           }}
-        />
-        <View
-          className="rounded-2xl"
-          style={{ boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)" }}
         >
-          <Link.AppleZoomTarget>
-            <Artwork
-              uri={current.imageUrl ?? show.data?.imageUrl ?? null}
-              size={ARTWORK}
-              className="rounded-2xl"
-            />
-          </Link.AppleZoomTarget>
-        </View>
-        {dateLine ? (
-          <Text className="text-[15px] font-semibold" style={{ color: tint }}>
-            {dateLine}
-          </Text>
-        ) : null}
-        <Text
-          className="text-center text-[26px] font-bold"
-          style={{ color: "#ffffff" }}
-          accessibilityRole="header"
-        >
-          {current.title}
-        </Text>
-        {show.data ? (
-          <Pressable
-            accessibilityRole="link"
-            accessibilityLabel={`Open the show ${show.data.title}`}
-            onPress={() =>
-              show.data
-                ? router.push(showHref(segments, show.data.id))
-                : undefined
-            }
+          {/* Pulling down past the top shows the colour, not the page. */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              top: -1200,
+              left: 0,
+              right: 0,
+              height: 1200,
+              backgroundColor: background,
+            }}
+          />
+          <View
+            className="rounded-2xl"
+            style={{ boxShadow: "0 8px 24px rgba(0, 0, 0, 0.3)" }}
           >
-            <Text
-              className="text-center text-[19px] font-semibold"
-              style={{ color: tint }}
-              numberOfLines={2}
-            >
-              {show.data.title}
+            <Link.AppleZoomTarget>
+              <Artwork
+                uri={current.imageUrl ?? show.data?.imageUrl ?? null}
+                size={ARTWORK}
+                className="rounded-2xl"
+              />
+            </Link.AppleZoomTarget>
+          </View>
+          {dateLine ? (
+            <Text className="text-[15px] font-semibold" style={{ color: tint }}>
+              {dateLine}
             </Text>
-          </Pressable>
-        ) : null}
-        <Pressable
-          className="h-12 flex-row items-center justify-center gap-2 rounded-full bg-white px-8 active:opacity-80"
-          accessibilityRole="button"
-          accessibilityLabel={[label, look.spoken]
-            .filter((part) => part !== "")
-            .join(", ")}
-          onPress={() => pressEpisode(current, show.data ?? null, status)}
-        >
-          {status === "buffering" ? (
-            <ActivityIndicator color="#000000" />
-          ) : playing ? (
-            <Icon as={Pause} size={20} className="text-black" fill="#000000" />
-          ) : (
-            <Text className="text-xl leading-6" style={{ color: "#000000" }}>
-              {"▶︎"}
-            </Text>
-          )}
+          ) : null}
           <Text
-            className="text-[19px] font-semibold"
-            style={{ color: "#000000" }}
+            className="text-center text-[26px] font-bold"
+            style={{ color: "#ffffff" }}
+            accessibilityRole="header"
           >
-            {look.label ? `${label} · ${look.spoken}` : label}
+            {current.title}
           </Text>
-        </Pressable>
-        <EpisodeActions episode={current} show={show.data ?? null} />
-      </View>
-      <View className="px-safe-or-4 gap-4 pt-5 pb-8">
-        <DownloadStatusLine episode={current} />
-        <View className="w-full gap-2">
-          <Text className="text-[22px] font-bold" accessibilityRole="header">
-            Notes
-          </Text>
-          {current.notes === "" ? (
-            <Text className="text-muted-foreground">
-              No notes for this episode.
-            </Text>
-          ) : (
-            <LinkedNotes notes={current.notes} />
-          )}
+          {show.data ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Open the show ${show.data.title}`}
+              onPress={() =>
+                show.data
+                  ? router.push(showHref(segments, show.data.id))
+                  : undefined
+              }
+            >
+              <Text
+                className="text-center text-[19px] font-semibold"
+                style={{ color: tint }}
+                numberOfLines={2}
+              >
+                {show.data.title}
+              </Text>
+            </Pressable>
+          ) : null}
+          <HeaderCapsule
+            label={look.label ? `${label} · ${look.spoken}` : label}
+            accessibilityLabel={[label, look.spoken]
+              .filter((part) => part !== "")
+              .join(", ")}
+            status={status}
+            color={background}
+            onPress={() => pressEpisode(current, show.data ?? null, status)}
+          />
+          <EpisodeActions episode={current} show={show.data ?? null} />
         </View>
-        <EpisodeChapters episodeId={current.id} />
-        <EpisodePeople
-          people={peopleForEpisode(current, show.data)}
-          funding={show.data?.funding ?? []}
-        />
-        <EpisodeBookmarks episode={current} show={show.data ?? null} />
-        <AdsFound episode={current} show={show.data ?? null} />
-      </View>
-    </ScrollView>
+        <View className="px-safe-or-4 gap-4 pt-5 pb-8">
+          <DownloadStatusLine episode={current} />
+          <View className="w-full gap-2">
+            <Text className="text-[22px] font-bold" accessibilityRole="header">
+              Notes
+            </Text>
+            {current.notes === "" ? (
+              <Text className="text-muted-foreground">
+                No notes for this episode.
+              </Text>
+            ) : (
+              <LinkedNotes notes={current.notes} />
+            )}
+          </View>
+          <EpisodeChapters episodeId={current.id} />
+          <EpisodePeople
+            people={peopleForEpisode(current, show.data)}
+            funding={show.data?.funding ?? []}
+          />
+          <EpisodeBookmarks episode={current} show={show.data ?? null} />
+          <AdsFound episode={current} show={show.data ?? null} />
+        </View>
+      </ScrollView>
+      {/* The episode's colour is under the bar: white clock and battery. */}
+      <StatusBar style="light" verticalBarBehaviorIOS="disabled" />
+      <ScreenBar title={current.title} titleHidden />
+    </>
   )
 }

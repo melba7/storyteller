@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   applyChange,
   downloadFraction,
+  downloadedCount,
   downloadLook,
   downloadsSummary,
   downloadMenuTitle,
@@ -291,5 +292,18 @@ describe("skipAdsFor", () => {
     expect(skipAdsFor(false, true)).toBe(false)
     expect(skipAdsFor(null, true)).toBe(true)
     expect(skipAdsFor(undefined, false)).toBe(false)
+  })
+})
+
+describe("downloadedCount", () => {
+  it("counts finished and moving downloads, not failed ones", () => {
+    const map = mapFromList([
+      info({ episodeId: "a", state: "downloaded" }),
+      info({ episodeId: "b", state: "downloading" }),
+      info({ episodeId: "c", state: "queued" }),
+      info({ episodeId: "d", state: "failed" }),
+    ])
+    expect(downloadedCount(map)).toBe(3)
+    expect(downloadedCount({})).toBe(0)
   })
 })

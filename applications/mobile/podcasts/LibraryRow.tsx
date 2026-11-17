@@ -7,7 +7,7 @@ import { Text } from "@/components/ui/text"
 
 /**
  * One row of the Library list: a purple icon, the name in large type, an optional grey count
- * and a chevron. The separator under it starts at the text, not at the icon.
+ * and a chevron. The separator under it starts at the text and stops at the chevron's right edge.
  */
 export function LibraryRow({
   icon,
@@ -27,15 +27,15 @@ export function LibraryRow({
   const shown = count === null || count === undefined ? "" : String(count)
   return (
     <Pressable
-      className="active:bg-foreground/5 flex-row items-center pl-4"
+      className="active:bg-foreground/5 flex-row items-center px-4"
       accessibilityRole="button"
       accessibilityLabel={label ?? (shown ? `${title}, ${shown}` : title)}
       onPress={onPress}
     >
-      <View className="w-9 items-start">
+      <View className="w-12 items-start">
         <Icon as={icon} size={26} className="text-primary" />
       </View>
-      <View className="border-foreground/15 min-h-14 flex-1 flex-row items-center gap-2 border-b py-3 pr-4">
+      <View className="border-foreground/15 min-h-14 flex-1 flex-row items-center gap-2 border-b py-3">
         <Text className="flex-1 text-xl" numberOfLines={1}>
           {title}
         </Text>

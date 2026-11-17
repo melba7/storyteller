@@ -9,6 +9,7 @@ const facts: MenuFacts = {
   archived: false,
   queued: false,
   preview: false,
+  transcript: true,
   download: {
     title: "Download",
     destructive: false,
@@ -18,6 +19,34 @@ const facts: MenuFacts = {
 const titles = (items: { title: string }[]) => items.map((item) => item.title)
 
 describe("menuLayout", () => {
+  it("leaves out View Transcript unless the player has the episode", () => {
+    const items = menuLayout({ ...facts, transcript: false }).groups[1]!
+    expect(titles(items)).toEqual([
+      "Go to Episode",
+      "Go to Show",
+      "Add to Playlist",
+    ])
+    const { transcript: _omitted, ...without } = facts
+    expect(titles(menuLayout(without).groups[1]!)).not.toContain(
+      "View Transcript",
+    )
+  })
+
+  it("leaves out the page you are already on", () => {
+    const onEpisode = menuLayout({ ...facts, here: { episode: true } })
+    expect(titles(onEpisode.groups[1]!)).toEqual([
+      "Go to Show",
+      "View Transcript",
+      "Add to Playlist",
+    ])
+    const onShow = menuLayout({ ...facts, here: { show: true } })
+    expect(titles(onShow.groups[1]!)).toEqual([
+      "Go to Episode",
+      "View Transcript",
+      "Add to Playlist",
+    ])
+  })
+
   it("is Apple's order for an episode in the library", () => {
     const layout = menuLayout(facts)
     expect(titles(layout.top)).toEqual(["Save", "Share"])

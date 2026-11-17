@@ -41,12 +41,12 @@ describe("dateWords", () => {
 })
 
 describe("the date line", () => {
-  it("adds the season and episode and Played", () => {
+  it("adds the season and episode, and leaves Played to the capsule", () => {
     const parts = dateLineParts(
       { publishedAt: NOW - 2 * HOUR, season: 2, number: 5, played: true },
       NOW,
     )
-    expect(parts).toEqual(["2h ago", "S2 E5", "Played"])
+    expect(parts).toEqual(["2h ago", "S2 E5"])
   })
 
   it("leaves out what is missing", () => {
@@ -122,7 +122,7 @@ describe("updateFrequency", () => {
 
   it("reads daily, weekly, biweekly and monthly", () => {
     expect(updateFrequency(every(1, 8), NOW)).toBe("Daily")
-    expect(updateFrequency(every(3, 8), NOW)).toBe("Every few days")
+    expect(updateFrequency(every(3, 8), NOW)).toBe("Weekly")
     expect(updateFrequency(every(7, 8), NOW)).toBe("Weekly")
     expect(updateFrequency(every(14, 8), NOW)).toBe("Biweekly")
     expect(updateFrequency(every(30, 8), NOW)).toBe("Monthly")

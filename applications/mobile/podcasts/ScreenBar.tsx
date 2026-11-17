@@ -62,6 +62,7 @@ export function ScreenBar({
           <Stack.Toolbar.Button
             key="account"
             icon="person.crop.circle"
+            separateBackground
             accessibilityLabel="Account and settings"
             onPress={() => router.push(ACCOUNT_HREF)}
           />,

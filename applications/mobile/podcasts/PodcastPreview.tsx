@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
+import { StatusBar } from "expo-status-bar"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
@@ -18,9 +19,11 @@ import {
   previewFromFeed,
 } from "@/modules/podcasts/preview"
 import { showHref } from "@/modules/podcasts/routes"
+import { showShare } from "@/modules/podcasts/share"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
+import { shareContent } from "./ShareButton"
 import { ShowHeader } from "./ShowHeader"
 import { useShows } from "./hooks"
 
@@ -226,9 +229,35 @@ export function PodcastPreview({
           )}
         />
       )}
+      {/* White clock and battery while the coloured header is under the bar. */}
+      {preview && !titleInBar ? (
+        <StatusBar style="light" verticalBarBehaviorIOS="disabled" />
+      ) : null}
       <ScreenBar
         title={preview?.show.title ?? "Podcast"}
         titleHidden={Boolean(preview) && !titleInBar}
+        right={
+          preview ? (
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              accessibilityLabel="More for this show"
+            >
+              <Stack.Toolbar.MenuAction
+                icon="plus.circle"
+                disabled={following}
+                onPress={() => void follow()}
+              >
+                Follow
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                icon="square.and.arrow.up"
+                onPress={() => void shareContent(() => showShare(preview.show))}
+              >
+                Share
+              </Stack.Toolbar.MenuAction>
+            </Stack.Toolbar.Menu>
+          ) : undefined
+        }
       />
     </>
   )

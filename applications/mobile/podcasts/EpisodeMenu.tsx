@@ -19,7 +19,7 @@ import {
 import { type DownloadInfo, Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
-import { markPlayed, player } from "@/modules/podcasts/playerInstance"
+import { markPlayed, usePlayerValue } from "@/modules/podcasts/playerInstance"
 import { requestPlayerPage } from "@/modules/podcasts/playerPageRequest"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref, showHref } from "@/modules/podcasts/routes"
@@ -127,7 +127,7 @@ function EllipsisButton({ episode }: { episode: StoredEpisode }) {
 /**
  * The menu on an episode: Apple's, with Save and Share across the top, then Play Next, Play
  * Last (for a queued one also Remove from Up Next) and Mark as Played; Go to Episode, Go to
- * Show, View Transcript and Add to Playlist; Archive (and an added file's Rename and Delete);
+ * Show, View Transcript (only for the episode in the player) and Add to Playlist; Archive (and an added file's Rename and Delete);
  * and Download, Cancel Download or Remove Download last. Nothing where there is no native
  * player. `children` replaces the grey "..." as what opens it, and `tint` colours it (the Home
  * card's colour).
@@ -137,16 +137,20 @@ export function EpisodeMenu({
   show,
   children,
   tint,
+  here,
 }: {
   episode: StoredEpisode
   show: Show | null
   children?: ReactElement
   tint?: string
+  /** The page this menu is on: its own "Go to" entry is left out. */
+  here?: { episode?: boolean; show?: boolean }
 }) {
   const router = useRouter()
   const segments = useSegments()
   const queue = useUpNext()
   const download = downloadAction(episode, useDownload(episode.id))
+  const inPlayer = usePlayerValue((view) => view.episode?.id === episode.id)
   if (Podcasts === null) return null
   const preview = isPreviewId(episode.id)
   const local = isLocalEpisodeId(episode.id) ? localFileActions(episode) : []
@@ -162,6 +166,8 @@ export function EpisodeMenu({
     archived: episode.archived,
     queued: isQueued(queue, episode.id),
     preview,
+    transcript: inPlayer,
+    ...(here ? { here } : {}),
     download: download
       ? {
           title: download.title,
@@ -181,13 +187,9 @@ export function EpisodeMenu({
     episode: () => router.push(episodeHref(segments, episode.id)),
     show: () => router.push(showHref(segments, episode.showId)),
     transcript: () => {
-      // The player has the transcript of the episode it has loaded; any other opens its page.
-      if (player.getView().episode?.id === episode.id) {
-        requestPlayerPage("transcript")
-        router.push("/podcasts/player")
-      } else {
-        router.push(episodeHref(segments, episode.id))
-      }
+      // Only offered for the episode the player has loaded, which has the transcript.
+      requestPlayerPage("transcript")
+      router.push("/podcasts/player")
     },
     playlist: () => void chooseAndAddToPlaylist(episode, show),
     archive: archiveAction(episode).onPress,

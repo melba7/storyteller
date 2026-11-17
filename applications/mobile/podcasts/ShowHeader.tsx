@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Link } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
-import { Check, Pause, Plus } from "lucide-react-native"
+import { Check, Plus } from "lucide-react-native"
 import { useEffect, useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -23,6 +23,7 @@ import {
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 
 import { Artwork } from "./Artwork"
+import { HeaderCapsule } from "./HeaderCapsule"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { useArtworkColor } from "./useWash"
 
@@ -74,10 +75,12 @@ function PlayCapsuleWhite({
   show,
   episodes,
   preview,
+  color,
 }: {
   show: Show
   episodes: readonly StoredEpisode[]
   preview: boolean
+  color: string
 }) {
   const target = useMemo(() => showPlayTarget(episodes), [episodes])
   const status = useEpisodeStatus(target?.episode.id ?? "")
@@ -90,33 +93,16 @@ function PlayCapsuleWhite({
         ? "Resume"
         : "Latest Episode"
   return (
-    <Pressable
-      className="h-12 flex-row items-center justify-center gap-2 rounded-full bg-white px-8 active:opacity-80"
-      style={{ opacity: target ? 1 : 0.6 }}
-      accessibilityRole="button"
+    <HeaderCapsule
+      label={label}
       accessibilityLabel={`${label}, ${show.title}`}
+      status={status}
+      color={color}
       disabled={!target}
       onPress={() =>
         target ? pressEpisode(target.episode, show, status) : undefined
       }
-    >
-      {status === "buffering" ? (
-        <ActivityIndicator color="#000000" />
-      ) : playing ? (
-        <Icon as={Pause} size={20} className="text-black" fill="#000000" />
-      ) : (
-        <Text className="text-xl leading-6" style={{ color: "#000000" }}>
-          {"▶︎"}
-        </Text>
-      )}
-      <Text
-        className="text-[19px] font-semibold"
-        style={{ color: "#000000" }}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-    </Pressable>
+    />
   )
 }
 
@@ -175,19 +161,21 @@ export function ShowHeader({
           backgroundColor: background,
         }}
       />
-      <View
-        style={{ width, height: width }}
-        accessible
-        accessibilityRole="header"
-        accessibilityLabel={show.title}
-      >
-        <Link.AppleZoomTarget>
-          <Artwork
-            uri={show.imageUrl}
-            size={width}
-            className="rounded-none border-0"
-          />
-        </Link.AppleZoomTarget>
+      <View style={{ width, height: width }}>
+        {/* Only the picture is the header for VoiceOver: the buttons below stay reachable. */}
+        <View
+          accessible
+          accessibilityRole="header"
+          accessibilityLabel={show.title}
+        >
+          <Link.AppleZoomTarget>
+            <Artwork
+              uri={show.imageUrl}
+              size={width}
+              className="rounded-none border-0"
+            />
+          </Link.AppleZoomTarget>
+        </View>
         <View
           pointerEvents="none"
           style={{
@@ -200,7 +188,12 @@ export function ShowHeader({
           }}
         />
         <View className="absolute right-0 bottom-3 left-0 flex-row items-center justify-center gap-3">
-          <PlayCapsuleWhite show={show} episodes={list} preview={preview} />
+          <PlayCapsuleWhite
+            show={show}
+            episodes={list}
+            preview={preview}
+            color={background}
+          />
           {onFollow ? (
             <GlassCircle
               label={`Follow ${show.title}`}

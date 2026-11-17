@@ -92,7 +92,7 @@ export function Downloads() {
           )
         }}
       />
-      <ScreenBar title="Downloads" />
+      <ScreenBar large title="Downloaded" />
     </>
   )
 }

@@ -8,7 +8,7 @@ import { useCSSVariable } from "uniwind"
  * the tabs.
  */
 export default function AccountLayout() {
-  const tint = useCSSVariable("--color-primary") as string
+  const tint = useCSSVariable("--color-foreground") as string
   const background = useCSSVariable("--color-background") as string
   return (
     <Stack

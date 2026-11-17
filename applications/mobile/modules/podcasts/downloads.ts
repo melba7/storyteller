@@ -166,6 +166,11 @@ export function sortDownloads(list: readonly DownloadInfo[]): DownloadInfo[] {
   )
 }
 
+/** How many downloads Library's "Downloaded" row counts: every one but a failed one. */
+export function downloadedCount(map: DownloadMap): number {
+  return Object.values(map).filter((info) => info.state !== "failed").length
+}
+
 /** "3 episodes, 1.2 GB" for the Profile row; "No downloads" when there are none. */
 export function downloadsSummary(map: DownloadMap): string {
   const count = Object.keys(map).length

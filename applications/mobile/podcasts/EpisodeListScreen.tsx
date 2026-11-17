@@ -73,6 +73,7 @@ export function EpisodeListScreen({
         />
       )}
       <ScreenBar
+        large
         title={title}
         right={
           <Stack.Toolbar.Button

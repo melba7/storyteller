@@ -3,6 +3,7 @@
 // Pure rules for how Home's cards and shelves read: the line over a card's title, the time
 // left, the description without markup, the card's colours and how often a show updates.
 import { blendOver, contrastBetween, vivid } from "./artworkTint"
+import { cadenceWord } from "./cadence"
 import { topLevelNames } from "./categories"
 import { type ShelfEntry } from "./home"
 import { type Show, formatEpisodeDate } from "./library"
@@ -120,28 +121,10 @@ export function cardPalette(color: string): CardPalette {
   }
 }
 
-/**
- * "Updated Daily", "Weekly", "Biweekly" or "Monthly", from the median gap between a show's
- * newest episodes (the six newest are read). Empty with fewer than three dates, or when the
- * gap fits none of them.
- */
-export function updateCadence(dates: readonly number[]): string {
-  const newest = [...dates].sort((a, b) => b - a).slice(0, 6)
-  if (newest.length < 3) return ""
-  const gaps = newest
-    .slice(1)
-    .map((date, i) => ((newest[i] ?? date) - date) / DAY)
-    .sort((a, b) => a - b)
-  const middle = Math.floor(gaps.length / 2)
-  const median =
-    gaps.length % 2 === 1
-      ? (gaps[middle] ?? 0)
-      : ((gaps[middle - 1] ?? 0) + (gaps[middle] ?? 0)) / 2
-  if (median <= 2.5) return "Updated Daily"
-  if (median <= 9) return "Updated Weekly"
-  if (median <= 18) return "Updated Biweekly"
-  if (median <= 45) return "Updated Monthly"
-  return ""
+/** "Updated Daily", "Weekly", "Biweekly" or "Monthly"; empty when the rhythm is unknown. */
+export function updateCadence(dates: readonly number[], now: number): string {
+  const word = cadenceWord(dates, now)
+  return word ? `Updated ${word}` : ""
 }
 
 /** The bold line under a Top Shows tile: the show's first category, else its title. */

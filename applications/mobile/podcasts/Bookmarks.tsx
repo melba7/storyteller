@@ -64,7 +64,7 @@ export function Bookmarks() {
           }}
         />
       )}
-      <ScreenBar title="Bookmarks" />
+      <ScreenBar large title="Bookmarks" />
     </>
   )
 }

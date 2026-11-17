@@ -103,8 +103,8 @@ export function Home() {
                 key: show.id,
                 imageUrl: show.imageUrl,
                 title: topShowCaption(show),
-                caption: updateCadence(dates?.get(show.id) ?? []),
-                onPress: () => router.push(showHref(segments, show.id)),
+                caption: updateCadence(dates?.get(show.id) ?? [], Date.now()),
+                href: showHref(segments, show.id),
               }))}
             />
           </>
