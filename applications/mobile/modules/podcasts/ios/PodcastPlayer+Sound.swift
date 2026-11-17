@@ -18,17 +18,12 @@ import PodcastAds
 import PodcastDownloads
 import PodcastPlayback
 
-/// The seconds trimming has saved, kept in the app's defaults so a stats screen can read them.
+/// The seconds trimming has saved. They live in the stats file (PodcastPlayer+Stats.swift); the
+/// old defaults key that held them is folded in there once.
 enum TrimSavingsStore {
-  private static let key = "podcasts.trim.savedSeconds"
+  static var seconds: Double { StatsStore.shared.trimSeconds }
 
-  static var seconds: Double { UserDefaults.standard.double(forKey: key) }
-
-  static func add(_ saved: Double) {
-    var savings = TrimSavings(seconds: seconds)
-    savings.add(saved)
-    UserDefaults.standard.set(savings.seconds, forKey: key)
-  }
+  static func add(_ saved: Double) { StatsStore.shared.addSaved(.trim, saved) }
 }
 
 @MainActor

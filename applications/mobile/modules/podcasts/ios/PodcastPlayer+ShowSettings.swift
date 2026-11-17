@@ -74,6 +74,7 @@ extension PodcastPlayer {
     if showState.outroStart == nil { refreshOutro() }
     guard ShowRules.shouldEnd(position: position, outroStart: showState.outroStart) else { return }
     showState.outroHandled = true
+    if let duration = currentDuration { noteSaved(.skipping, audioSeconds: duration - position) }
     player.pause()
     ended()
   }

@@ -118,6 +118,11 @@ final class PodcastPlayer {
         to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
         toleranceAfter: .zero)
     }
+    noteSaved(
+      .skipping,
+      audioSeconds: ListeningStats.introSkipped(
+        savedPosition: episode.savedPosition, duration: episode.duration,
+        played: episode.played, intro: showState.settings.introSeconds))
     adSkipping.begin(episode.id, startingAt: start)
     sound.begin(episode.id, startingAt: start)
     beginChapters(episode, startingAt: start)
@@ -261,6 +266,7 @@ final class PodcastPlayer {
 
   private func tick() {
     ticks += 1
+    statsTick()
     endAtOutroIfReached()
     chapterTick()
     sleepTick()
@@ -270,7 +276,10 @@ final class PodcastPlayer {
 
   private func playStateChanged() {
     if player.timeControlStatus == .playing { takeTheLockScreen() }
-    if player.timeControlStatus == .paused { notePaused() }
+    if player.timeControlStatus == .paused {
+      notePaused()
+      StatsStore.shared.flush()
+    }
     // Transcribing may run while a podcast plays, which keeps the app alive.
     PodcastTranscriber.shared.playbackChanged(isPlaying: player.timeControlStatus == .playing)
     publish()

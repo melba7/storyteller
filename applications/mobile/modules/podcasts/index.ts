@@ -323,6 +323,10 @@ type PodcastsNativeModule = {
    * screen can read it.
    */
   getTrimSavings(): Promise<number>
+  /** The listening stats (`ListeningStats` in PodcastPlayback) as a plain object. */
+  getStats(): Promise<Record<string, unknown>>
+  /** Clears the listening stats. */
+  resetStats(): Promise<void>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>

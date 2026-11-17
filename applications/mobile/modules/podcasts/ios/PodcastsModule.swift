@@ -279,6 +279,10 @@ public final class PodcastsModule: Module {
     // Seconds of audio that silence trimming has cut so far (for a stats screen).
     AsyncFunction("getTrimSavings") { () -> Double in TrimSavingsStore.seconds }
 
+    // The listening stats, counted here so they count with the screen locked.
+    AsyncFunction("getStats") { () -> [String: Any] in StatsStore.shared.object() }
+    AsyncFunction("resetStats") { () in StatsStore.shared.reset() }
+
     // MARK: Transcripts
 
     // Every downloaded episode's transcript state, and one finished transcript as JSON.
