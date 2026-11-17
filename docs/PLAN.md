@@ -3,7 +3,7 @@
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
 Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
-(B2) are in one pull request with main merged in, waiting on its iOS build |
+(B2) done in PR #48, which goes to TestFlight in one build with the Books look |
 Books look: B1 to B7 merged (PR #49), B8 (look check) next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
@@ -949,7 +949,7 @@ look in `docs/PODCASTS-APPLE-DESIGN.md`, from Mo's screenshots (kept in the
 project files, not the repository). One pull request with R1 to R8, one
 TestFlight build.
 
-- [ ] **B2. Second bug check of the whole Podcasts section** (Mo's ask): Opus
+- [x] **B2. Second bug check of the whole Podcasts section** (Mo's ask): Opus
       reads the Swift side and the data and logic side; Sonnet fixes what holds
       up; the screens are checked after the redesign (A6).
   - Done when: every finding is fixed or noted with a reason, `check.sh` passes
@@ -958,7 +958,7 @@ TestFlight build.
     back play-through, the downloader knowing about it, Up Next language, the
     Apple follow list read with retries and a status row in Profile, pending
     Apple-played episodes, serial subscribe); Fable 5.2 reviews the fixes.
-- [ ] **A1. Tabs and rooms** (L): Home, New, Library and Search (the system
+- [x] **A1. Tabs and rooms** (L): Home, New, Library and Search (the system
       search tab); the account button and Profile as a sheet; the Library list
       and Recently Updated; Shows as its own screen; the Up Next page with the
       queue; nothing lost from the old Profile, Playlists and Up Next tabs.
@@ -967,32 +967,32 @@ TestFlight build.
   - Status: built 2026-11-17 (four tabs, one shared route group
     `(home,new,library,search)`, Profile at `/podcasts/account`, Library rows
     with counts); `check.sh` passes; the iOS build in CI is still to run.
-- [ ] **A2. Home** (L): the Up Next cards (in progress, then the newest unplayed
+- [x] **A2. Home** (L): the Up Next cards (in progress, then the newest unplayed
       episode per show), the shared episode "…" menu, Your Top Shows, You Might
       Like, Saved and Latest Episodes.
   - Done when: the shelf's SQL and order are tested and `check.sh` passes.
   - Status: built 2026-11-17; the card's "…" is white and tints its menu with
     the card's colour. Top Shows rank by recent plays (the stats keep no time
     per show).
-- [ ] **A3. Rows, show page and episode page** (L) in Apple's look, with the
+- [x] **A3. Rows, show page and episode page** (L) in Apple's look, with the
       purple accent and the system font.
   - Done when: `check.sh` passes; the look is checked on TestFlight.
   - Status: built 2026-11-17 (rows, native menu with Save and Share on top, show
     and episode headers in the artwork's colour, zoom targets); the purple and
     the system font come from the app-wide theme of the Books restyle.
-- [ ] **A4. Player and mini player** (L): the screenshot's layout, the queue and
+- [x] **A4. Player and mini player** (L): the screenshot's layout, the queue and
       transcript in place of the artwork, the "…" menu, the zoom from the mini
       player where it works.
   - Done when: `check.sh` passes and nothing the old player did is lost.
   - Status: built 2026-11-17 (sheet in the artwork's colour, volume slider as a
     second native module, six panels in place of the artwork). No zoom from the
     mini player: it lives in the tab bar's accessory, outside the stack.
-- [ ] **A5. Search and New** (M): category tiles, scopes, featured cards and
+- [x] **A5. Search and New** (M): category tiles, scopes, featured cards and
       ranked Top Shows.
   - Done when: `check.sh` passes.
   - Status: built 2026-11-17 (paging featured cards, ranked Top Shows, For You
     shelves, gradient category tiles, scope chips, a shared `SectionHeader`).
-- [ ] **A6. Look and motion check** (M): every screen against the screenshots in
+- [x] **A6. Look and motion check** (M): every screen against the screenshots in
       each theme, animations with Reduce Motion, VoiceOver and large text.
   - Done when: the Opus check's findings are fixed and `check.sh` passes.
   - Status: the check found 27 items (L1 to L27, 2026-11-17); all fixed but the
