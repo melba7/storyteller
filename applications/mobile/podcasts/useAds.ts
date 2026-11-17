@@ -3,6 +3,7 @@ import { useEffect, useState, useSyncExternalStore } from "react"
 
 import {
   type AdsFile,
+  type KeptAds,
   type AdsMap,
   adsMapFromList,
   adsFileAfterRead,
@@ -63,14 +64,14 @@ export function useAdsInfo(episodeId: string): AdsInfo | undefined {
 export function useAdsFile(episodeId: string): AdsFile | null {
   const info = useAdsInfo(episodeId)
   const undone = useSyncExternalStore(subscribe, () => undoneCount)
-  const [file, setFile] = useState<AdsFile | null>(null)
+  const [kept, setKept] = useState<KeptAds | null>(null)
   // The full pass keeps the ads found so far on show (the partial file is read meanwhile).
   const reads = readsAdsFile(info)
   const state = info?.state
   const count = info?.count
   useEffect(() => {
     if (!reads) {
-      setFile(null)
+      setKept(null)
       return
     }
     let cancelled = false
@@ -78,7 +79,10 @@ export function useAdsFile(episodeId: string): AdsFile | null {
       (json) => {
         if (cancelled) return
         const read = json === null ? null : parseAdsFile(json)
-        setFile((last) => adsFileAfterRead(state, last, read))
+        setKept((last) => ({
+          episodeId,
+          file: adsFileAfterRead(state, last, episodeId, read),
+        }))
       },
       (cause: unknown) => console.warn("Couldn't read the ads", cause),
     )
@@ -86,5 +90,6 @@ export function useAdsFile(episodeId: string): AdsFile | null {
       cancelled = true
     }
   }, [episodeId, reads, state, count, undone])
-  return file
+  // A file read for the episode shown before this one is never handed on.
+  return kept !== null && kept.episodeId === episodeId ? kept.file : null
 }

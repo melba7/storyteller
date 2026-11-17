@@ -1,48 +1,48 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { useEffect } from "react"
-import Animated, {
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated"
+import { View } from "react-native"
 
 import { Artwork } from "./Artwork"
 
-const PAUSED_SCALE = 0.88
-
-/** The large artwork: rounded, with a soft shadow, springing a little smaller while paused. */
+/**
+ * The player's artwork, edge to edge: a square as wide as the sheet with square corners, cut
+ * off at `height` when the room is shorter than that, its lower part fading into the sheet's
+ * colour (`fadeTo`) as the Home card's artwork does.
+ */
 export function PlayerArtwork({
   uri,
-  size,
-  playing,
+  width,
+  height,
+  fadeTo,
 }: {
   uri: string | null
-  size: number
-  playing: boolean
+  width: number
+  height: number
+  /** The sheet's "#rrggbb" colour where the artwork ends. */
+  fadeTo: string
 }) {
-  const reduceMotion = useReducedMotion()
-  const scale = useSharedValue(playing ? 1 : PAUSED_SCALE)
-  useEffect(() => {
-    const target = playing ? 1 : PAUSED_SCALE
-    scale.set(reduceMotion ? target : withSpring(target))
-  }, [playing, reduceMotion, scale])
-  const style = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.get() }],
-  }))
   return (
-    <Animated.View
-      style={[
-        {
-          width: size,
-          height: size,
-          borderRadius: 12,
-          boxShadow: "0 18px 40px rgba(0,0,0,0.35)",
-        },
-        style,
-      ]}
+    <View
+      pointerEvents="none"
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width,
+        height,
+        overflow: "hidden",
+      }}
     >
-      <Artwork uri={uri} size={size} className="rounded-xl border-0" />
-    </Animated.View>
+      <Artwork uri={uri} size={width} className="rounded-none border-0" />
+      <View
+        style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: height * 0.5 + 1,
+          backgroundImage: `linear-gradient(180deg, ${fadeTo}00, ${fadeTo})`,
+        }}
+      />
+    </View>
   )
 }

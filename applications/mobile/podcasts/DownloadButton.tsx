@@ -25,6 +25,8 @@ interface Props {
   size?: number
   /** "onColor" draws everything in white, for a button on a coloured surface. */
   tone?: "default" | "onColor"
+  /** With "onColor": the ink to draw in instead of white (a card whose colour is light). */
+  ink?: string
 }
 
 /**
@@ -65,12 +67,13 @@ export function DownloadButton({
   episode,
   size = 36,
   tone = "default",
+  ink = WHITE,
 }: Props) {
   const info = useDownload(episode.id)
   const themePrimary = useCSSVariable("--color-primary") as string
   const onColor = tone === "onColor"
-  const primary = onColor ? WHITE : themePrimary
-  const spinner = onColor ? WHITE : undefined
+  const primary = onColor ? ink : themePrimary
+  const spinner = onColor ? ink : undefined
   // An added file's download is its only copy: no button, so it can't be deleted from here.
   if (Podcasts === null || isLocalEpisodeId(episode.id)) return null
   const look = downloadLook(info, episode.title)
@@ -88,7 +91,9 @@ export function DownloadButton({
           <Icon
             as={ArrowDownToLine}
             size={inner + 2}
-            className={onColor ? "text-white" : "text-muted-foreground"}
+            {...(onColor
+              ? { color: ink }
+              : { className: "text-muted-foreground" })}
           />
         ) : null}
         {look.icon === "waiting" ? (
@@ -113,20 +118,26 @@ export function DownloadButton({
               <Icon
                 as={X}
                 size={inner - 2}
-                className={onColor ? "text-white" : "text-primary"}
+                {...(onColor ? { color: ink } : { className: "text-primary" })}
               />
             </>
           )
         ) : null}
         {look.icon === "done" ? (
           <View
-            className={`items-center justify-center rounded-full ${onColor ? "border-2 border-white" : "bg-primary"}`}
-            style={{ width: inner + 6, height: inner + 6 }}
+            className={`items-center justify-center rounded-full ${onColor ? "border-2" : "bg-primary"}`}
+            style={{
+              width: inner + 6,
+              height: inner + 6,
+              borderColor: onColor ? ink : undefined,
+            }}
           >
             <Icon
               as={Check}
               size={inner - 2}
-              className={onColor ? "text-white" : "text-primary-foreground"}
+              {...(onColor
+                ? { color: ink }
+                : { className: "text-primary-foreground" })}
             />
           </View>
         ) : null}
@@ -134,7 +145,7 @@ export function DownloadButton({
           <Icon
             as={CircleAlert}
             size={inner + 4}
-            className={onColor ? "text-white" : "text-destructive"}
+            {...(onColor ? { color: ink } : { className: "text-destructive" })}
           />
         ) : null}
       </Pressable>

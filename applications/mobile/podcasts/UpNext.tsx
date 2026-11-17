@@ -21,6 +21,7 @@ import { formatDuration } from "@/modules/podcasts/library"
 import { SEARCH_HREF, episodeHref } from "@/modules/podcasts/routes"
 import {
   moveBetween,
+  outsideQueue,
   progressFraction,
   rowLabel,
   upNextSummary,
@@ -67,7 +68,11 @@ export function UpNext() {
   )
   const ids = useMemo(() => queue.map((item) => item.id), [queue])
   const episodes = useEpisodesByIds(ids)
-  const shelf = useUpNextShelf().data ?? []
+  const shelfAll = useUpNextShelf().data
+  const shelf = useMemo(
+    () => outsideQueue(shelfAll ?? [], queue),
+    [shelfAll, queue],
+  )
   const shows = useShows()
   const showById = useMemo(
     () => new Map((shows.data ?? []).map((show) => [show.id, show])),

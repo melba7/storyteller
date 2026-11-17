@@ -195,6 +195,15 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     fetching.resume()
   }
 
+  /// No network: before the first byte the player plays the plain address instead, which says
+  /// at once that it couldn't be played. After bytes arrived the wait goes on for a resume.
+  func urlSession(_ session: URLSession, taskIsWaitingForConnectivity task: URLSessionTask) {
+    guard StreamResume.givesUpWaiting(available: available), !stopped, onFallback != nil else {
+      return
+    }
+    giveUp(.noFirstByte)
+  }
+
   func urlSession(
     _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
     completionHandler: @escaping (URLSession.ResponseDisposition) -> Void

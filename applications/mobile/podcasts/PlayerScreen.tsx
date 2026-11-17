@@ -5,12 +5,14 @@ import { useMemo, useState } from "react"
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { blendOver } from "@/modules/podcasts/artworkTint"
 import { chapterArtwork } from "@/modules/podcasts/chapters"
 import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
 import { sheetColors } from "@/modules/podcasts/playerSheet"
-import { showHref } from "@/modules/podcasts/routes"
+import { isPreviewId } from "@/modules/podcasts/preview"
+import { previewHref, showHref } from "@/modules/podcasts/routes"
 
 import { ChapterList } from "./ChapterList"
 import { PlayerArtwork } from "./PlayerArtwork"
@@ -27,8 +29,10 @@ import { TranscriptView } from "./TranscriptView"
 import { SheetProvider } from "./playerSheetContext"
 import { useChapters } from "./useChapters"
 
-/** The space kept free left and right of the artwork and the controls. */
+/** The space kept free left and right of the panels and the controls. */
 const SIDE = 32
+/** The height of the grabber's row, which the artwork reaches up under. */
+const GRABBER = 24
 /** Under this height (large text), the artwork area is too small for a picture, so it is left out. */
 const MIN_ART_AREA = 140
 
@@ -48,6 +52,7 @@ export function PlayerScreen() {
     () => takePlayerPageRequest() ?? "art",
   )
   const [areaHeight, setAreaHeight] = useState(0)
+  const [sheetHeight, setSheetHeight] = useState(0)
   const { episode, show } = view
   const colors = useMemo(
     () => sheetColors(show?.artworkColor ?? null),
@@ -56,9 +61,19 @@ export function PlayerScreen() {
   const chapters = useChapters(episode?.id ?? "")
   // The chapters panel goes away with the chapters (a new episode without any).
   const panel = chosen === "chapters" && chapters.length === 0 ? "art" : chosen
-  // Until the area is measured the artwork is as wide as it can be, so it doesn't jump.
-  const wide = width - SIDE * 2
-  const size = areaHeight > 0 ? Math.min(wide, areaHeight - 8) : wide
+  // The artwork is as wide as the sheet and square, and is cut off where the controls begin.
+  // Until the area is measured it is as tall as it can be, so it doesn't jump.
+  const artHeight =
+    areaHeight > 0 ? Math.min(width, areaHeight + GRABBER) : width
+  // The sheet's gradient at the artwork's lower edge, where the fade ends.
+  const fadeTo =
+    sheetHeight > 0
+      ? blendOver(
+          colors.bottom,
+          colors.top,
+          Math.min(1, artHeight / sheetHeight),
+        )
+      : colors.top
   const showArt = areaHeight === 0 || areaHeight >= MIN_ART_AREA
 
   function close() {
@@ -67,9 +82,13 @@ export function PlayerScreen() {
   }
 
   function goToShow() {
-    if (!show) return
+    if (!show || !episode) return
     close()
-    router.push(showHref(segments, show.id))
+    router.push(
+      isPreviewId(episode.id)
+        ? previewHref(segments, show.feedUrl)
+        : showHref(segments, show.id),
+    )
   }
 
   // The player is a modal sheet, which already starts below the status bar, so its top needs
@@ -79,11 +98,25 @@ export function PlayerScreen() {
       <StatusBar style={colors.ink === "#ffffff" ? "light" : "dark"} />
       <View
         className="pb-safe-offset-2 flex-1"
+        onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}
         style={{
           backgroundColor: colors.top,
           backgroundImage: `linear-gradient(180deg, ${colors.top}, ${colors.bottom})`,
         }}
       >
+        {panel === "art" && showArt && episode ? (
+          <PlayerArtwork
+            uri={
+              chapterArtwork(chapters, view.position) ??
+              episode.imageUrl ??
+              show?.imageUrl ??
+              null
+            }
+            width={width}
+            height={artHeight}
+            fadeTo={fadeTo}
+          />
+        ) : null}
         <Pressable
           className="h-6 items-center justify-center"
           accessibilityRole="button"
@@ -107,26 +140,13 @@ export function PlayerScreen() {
           <>
             <View
               className="flex-1"
-              style={{ paddingHorizontal: SIDE }}
+              style={{ paddingHorizontal: panel === "art" ? 0 : SIDE }}
               onLayout={(event) =>
                 setAreaHeight(event.nativeEvent.layout.height)
               }
             >
               {panel === "art" ? (
-                <View className="flex-1 items-center justify-center">
-                  {showArt ? (
-                    <PlayerArtwork
-                      uri={
-                        chapterArtwork(chapters, view.position) ??
-                        episode.imageUrl ??
-                        show?.imageUrl ??
-                        null
-                      }
-                      size={size}
-                      playing={view.isPlaying}
-                    />
-                  ) : null}
-                </View>
+                <View className="flex-1" />
               ) : panel === "transcript" ? (
                 <TranscriptView key={episode.id} episode={episode} />
               ) : panel === "queue" ? (

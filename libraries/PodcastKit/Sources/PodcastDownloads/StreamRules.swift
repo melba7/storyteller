@@ -126,6 +126,13 @@ public enum StreamResume {
     return code == -1009 || code == -1020
   }
 
+  /// Whether a request that is waiting for the network is given up: only when nothing has arrived
+  /// yet, so the player plays the plain address (which reports the network error at once). Once
+  /// bytes are on disk the wait goes on, because a resume will carry on from them.
+  public static func givesUpWaiting(available: Int64) -> Bool {
+    available == 0
+  }
+
   /// What `If-Range` carries: a strong ETag, else Last-Modified, else nil (the file cannot be
   /// proved the same, so it is not resumed). A weak ETag (`W/`) is not a proof of the same bytes.
   public static func validator(etag: String?, lastModified: String?) -> String? {
@@ -164,7 +171,7 @@ public enum StreamResume {
     let tries = isConnectivity(failure) ? waits < maxConnectivityWaits : resumes < maxResumes
     guard available > 0, validator != nil, tries, !failure.diskFull,
       !failure.forceQuit, let code = failure.urlErrorCode,
-      DownloadRecovery.isDroppedConnection(code)
+      isConnectivity(failure) || DownloadRecovery.isDroppedConnection(code)
     else { return false }
     if let status = failure.httpStatus, !(200..<300).contains(status) { return false }
     return true

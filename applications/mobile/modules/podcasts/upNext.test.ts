@@ -7,6 +7,7 @@ import {
   isQueued,
   moveBetween,
   orderAfterMove,
+  outsideQueue,
   progressFraction,
   queueItem,
   queueTimeLeft,
@@ -228,5 +229,16 @@ describe("progressFraction", () => {
   })
   it("stays within the bar", () => {
     expect(progressFraction(900, 600)).toBe(1)
+  })
+})
+
+describe("outsideQueue", () => {
+  const entries = [{ episode: { id: "a" } }, { episode: { id: "b" } }]
+  const queue = [{ id: "b" }] as UpNextItem[]
+  it("leaves out the episodes already queued", () => {
+    expect(outsideQueue(entries, queue)).toEqual([{ episode: { id: "a" } }])
+  })
+  it("keeps everything when nothing is queued", () => {
+    expect(outsideQueue(entries, [])).toEqual(entries)
   })
 })

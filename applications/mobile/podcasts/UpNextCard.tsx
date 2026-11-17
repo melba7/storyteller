@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { CircleArrowDown, Ellipsis, Pause, Play } from "lucide-react-native"
+import { Ellipsis, Pause, Play } from "lucide-react-native"
 import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
@@ -19,10 +19,11 @@ import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
+import { DownloadButton } from "./DownloadButton"
 import { EpisodeMenu } from "./EpisodeMenu"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { PressableScale } from "./PressableScale"
-import { useDownload, pressDownload } from "./useDownloads"
+import { useDownload } from "./useDownloads"
 import { useArtworkColor } from "./useWash"
 
 /** A card's width and height for a window width: two thirds across, a third taller than wide. */
@@ -196,14 +197,12 @@ export function UpNextCard({
           </Pressable>
           <View className="flex-1" />
           {canDownload ? (
-            <Pressable
-              className="size-10 items-center justify-center"
-              accessibilityRole="button"
-              accessibilityLabel={look.label}
-              onPress={() => pressDownload(look.action, episode)}
-            >
-              <CircleArrowDown size={24} color={palette.text} />
-            </Pressable>
+            <DownloadButton
+              episode={episode}
+              size={40}
+              tone="onColor"
+              ink={palette.text}
+            />
           ) : null}
           <EpisodeMenu episode={episode} show={show}>
             <Pressable

@@ -81,6 +81,15 @@ export function isQueued(items: readonly UpNextItem[], id: string): boolean {
   return items.some((item) => item.id === id)
 }
 
+/** The shelf's entries whose episode is not already in the queue, so none is listed twice. */
+export function outsideQueue<T extends { episode: { id: string } }>(
+  shelf: readonly T[],
+  items: readonly UpNextItem[],
+): T[] {
+  const queued = new Set(items.map((item) => item.id))
+  return shelf.filter((entry) => !queued.has(entry.episode.id))
+}
+
 /** What an episode row says about the queue: its place, or nothing. */
 export function queuedLabel(items: readonly UpNextItem[], id: string): string {
   const at = items.findIndex((item) => item.id === id)

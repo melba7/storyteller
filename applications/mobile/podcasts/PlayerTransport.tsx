@@ -2,13 +2,15 @@
 import { Pause, Play, RotateCcw, RotateCw } from "lucide-react-native"
 import { useState } from "react"
 import { ActivityIndicator, Pressable, View } from "react-native"
+import { type SFSymbol } from "sf-symbols-typescript"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { speedLabel } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import { player, type usePlayer } from "@/modules/podcasts/playerInstance"
+import { skipSymbol } from "@/modules/podcasts/playerLook"
 
+import { SFIcon } from "./SFIcon"
 import { SleepTimerButton } from "./SleepTimerSheet"
 import { SpeedSheet } from "./SpeedPanel"
 import { tap } from "./haptics"
@@ -47,6 +49,7 @@ export function PlayerTransport({
       </View>
       <SkipButton
         label={skipLabel("back", skipBack)}
+        symbol={skipSymbol("back", skipBack)}
         seconds={skipBack}
         icon={RotateCcw}
         onPress={() => {
@@ -66,16 +69,18 @@ export function PlayerTransport({
         {view.isBuffering ? (
           <ActivityIndicator color={sheet.ink} accessibilityLabel="Buffering" />
         ) : (
-          <Icon
-            as={view.isPlaying ? Pause : Play}
-            size={52}
+          <SFIcon
+            name={view.isPlaying ? "pause.fill" : "play.fill"}
+            size={56}
             color={sheet.ink}
-            fill={sheet.ink}
+            fallback={view.isPlaying ? Pause : Play}
+            filled
           />
         )}
       </Pressable>
       <SkipButton
         label={skipLabel("ahead", skipForward)}
+        symbol={skipSymbol("ahead", skipForward)}
         seconds={skipForward}
         icon={RotateCw}
         onPress={() => {
@@ -98,11 +103,13 @@ export function PlayerTransport({
 
 function SkipButton({
   label,
+  symbol,
   seconds,
   icon,
   onPress,
 }: {
   label: string
+  symbol: SFSymbol
   seconds: number
   icon: typeof RotateCcw
   onPress: () => void
@@ -115,10 +122,13 @@ function SkipButton({
       accessibilityLabel={label}
       onPress={onPress}
     >
-      <Icon as={icon} size={44} color={sheet.ink} strokeWidth={1.5} />
-      <Text className="absolute text-xs font-bold" style={{ color: sheet.ink }}>
-        {seconds}
-      </Text>
+      <SFIcon
+        name={symbol}
+        size={40}
+        color={sheet.ink}
+        fallback={icon}
+        badge={seconds}
+      />
     </Pressable>
   )
 }

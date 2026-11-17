@@ -94,9 +94,16 @@ export function PlayerQueue() {
                 ? `${item.title}. ${details(item)}. ${index + 1} of ${count}`
                 : ""
             }}
-            actions={[{ name: "remove", label: "Remove" }]}
+            actions={[
+              { name: "play", label: "Play now" },
+              { name: "remove", label: "Remove" },
+            ]}
             onAction={(id, name) => {
               if (name === "remove") removeQueued(id)
+              else if (name === "play") {
+                const item = byId.get(id)
+                if (item) void playQueued(item)
+              }
             }}
             renderContent={(id) => {
               const item = byId.get(id)

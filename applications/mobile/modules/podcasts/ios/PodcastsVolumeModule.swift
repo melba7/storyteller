@@ -5,6 +5,7 @@
 // takes the "Podcasts" module's.
 
 import ExpoModulesCore
+import UIKit
 
 public class PodcastsVolumeModule: Module {
   public func definition() -> ModuleDefinition {
@@ -12,6 +13,8 @@ public class PodcastsVolumeModule: Module {
 
     View(VolumeSliderView.self) {
       Prop("light") { (view: VolumeSliderView, light: Bool) in view.setLight(light) }
+      Prop("fill") { (view: VolumeSliderView, color: UIColor?) in view.setFill(color) }
+      Prop("track") { (view: VolumeSliderView, color: UIColor?) in view.setTrack(color) }
       Prop("label") { (view: VolumeSliderView, label: String) in view.setLabel(label) }
     }
   }

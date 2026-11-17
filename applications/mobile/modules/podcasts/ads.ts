@@ -31,13 +31,21 @@ export function readsAdsFile(info: AdsInfo | undefined): boolean {
   return info?.state === "found" || info?.state === "finding"
 }
 
-/** The file to show once a read came back: while finding, an empty read keeps the last file. */
+/** An ads file together with the episode it was read for. */
+export type KeptAds = { episodeId: string; file: AdsFile | null }
+
+/**
+ * The file to show once a read came back for `episodeId`: while finding, an empty read keeps
+ * the last file, but only when it was read for this same episode.
+ */
 export function adsFileAfterRead(
   state: AdsInfo["state"] | undefined,
-  last: AdsFile | null,
+  last: KeptAds | null,
+  episodeId: string,
   read: AdsFile | null,
 ): AdsFile | null {
-  return read === null && state === "finding" ? last : read
+  if (read !== null || state !== "finding") return read
+  return last !== null && last.episodeId === episodeId ? last.file : null
 }
 
 export function adsStatus(info: AdsInfo | undefined): string {

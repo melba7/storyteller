@@ -2,6 +2,7 @@
 //
 // The small calculations behind the player's look: the background colour taken from a
 // show's artwork, and the seek bar's positions. Pure, so they are tested without a screen.
+import { type SFSymbol } from "sf-symbols-typescript"
 
 /** The player's background when a show has no artwork colour: the app's dark theme colour. */
 export const PLAYER_FALLBACK_BACKGROUND = "#0a0a0a"
@@ -57,4 +58,18 @@ export function progressFraction(
 ): number {
   if (duration === null || !(duration > 0)) return 0
   return Math.min(1, Math.max(0, position / duration))
+}
+
+/** The skip lengths that have a numbered SF Symbol ("gobackward.15"). */
+const NUMBERED_SKIPS = [5, 10, 15, 30, 45, 60, 75, 90]
+
+/** The SF Symbol for a skip button: the numbered one when there is one, else the plain arrow. */
+export function skipSymbol(
+  direction: "back" | "ahead",
+  seconds: number,
+): SFSymbol {
+  const base = direction === "back" ? "gobackward" : "goforward"
+  return (
+    NUMBERED_SKIPS.includes(seconds) ? `${base}.${seconds}` : base
+  ) as SFSymbol
 }

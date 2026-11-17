@@ -4,7 +4,6 @@ import { NativeTabs } from "expo-router/native-tabs"
 import { Pause, Play, RotateCw } from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { skipNoteText } from "@/modules/podcasts/ads"
 import {
@@ -18,9 +17,11 @@ import {
   usePlayerValue,
   useRestoreLastEpisode,
 } from "@/modules/podcasts/playerInstance"
+import { skipSymbol } from "@/modules/podcasts/playerLook"
 import { miniSubtitle } from "@/modules/podcasts/playerSheet"
 
 import { Artwork } from "./Artwork"
+import { SFIcon } from "./SFIcon"
 import { tap } from "./haptics"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 import { pressUndo, useSkipNote } from "./useSkipNote"
@@ -108,10 +109,11 @@ export function MiniPlayerContent() {
           {view.isBuffering ? (
             <ActivityIndicator accessibilityLabel="Buffering" />
           ) : (
-            <Icon
-              as={view.isPlaying ? Pause : Play}
+            <SFIcon
+              name={view.isPlaying ? "pause.fill" : "play.fill"}
               size={compact ? 22 : 26}
-              fill="currentColor"
+              fallback={view.isPlaying ? Pause : Play}
+              filled
             />
           )}
         </Pressable>
@@ -125,10 +127,12 @@ export function MiniPlayerContent() {
               void player.skip(skipForward)
             }}
           >
-            <Icon as={RotateCw} size={30} strokeWidth={1.5} />
-            <Text className="absolute text-[10px] font-bold">
-              {skipForward}
-            </Text>
+            <SFIcon
+              name={skipSymbol("ahead", skipForward)}
+              size={28}
+              fallback={RotateCw}
+              badge={skipForward}
+            />
           </Pressable>
         )}
       </View>

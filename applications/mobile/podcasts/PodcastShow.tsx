@@ -28,23 +28,16 @@ import {
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { settingsHref, tabBase } from "@/modules/podcasts/routes"
-import { type EpisodeSort } from "@/modules/podcasts/showSettings"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
+import { SectionHeader } from "./SectionHeader"
 import { SelectionBar } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
 import { useDownloadMap } from "./useDownloads"
 import { useSelection } from "./useSelection"
-
-const SORT_NAMES: Record<EpisodeSort, string> = {
-  newest: "Newest first",
-  oldest: "Oldest first",
-  shortest: "Shortest first",
-  longest: "Longest first",
-}
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
@@ -164,17 +157,7 @@ export function PodcastShow({ id }: { id: string }) {
                 episodes={episodes.data}
                 onTitleBottom={(bottom) => (titleBottom.current = bottom)}
               />
-              <View className="px-safe-or-4 flex-row items-baseline justify-between pt-5 pb-2">
-                <Text
-                  className="text-[26px] font-bold"
-                  accessibilityRole="header"
-                >
-                  Episodes
-                </Text>
-                <Text className="text-muted-foreground text-sm">
-                  {SORT_NAMES[current.settings.sort]}
-                </Text>
-              </View>
+              <SectionHeader title="Episodes" />
             </>
           }
           ListEmptyComponent={

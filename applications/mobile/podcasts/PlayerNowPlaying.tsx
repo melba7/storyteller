@@ -2,7 +2,6 @@
 import { Volume1, Volume2 } from "lucide-react-native"
 import { View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { adMarks, adRows } from "@/modules/podcasts/ads"
 import type { PodcastChapter } from "@/modules/podcasts/index"
@@ -18,6 +17,7 @@ import { ChapterTitle } from "./ChapterBar"
 import { PlayerMenu } from "./PlayerMenu"
 import { type PlayerPanel } from "./PlayerPages"
 import { PlayerTransport } from "./PlayerTransport"
+import { SFIcon } from "./SFIcon"
 import { SeekBar } from "./SeekBar"
 import { SkippedAdNote } from "./SkippedAdNote"
 import { useSheet } from "./playerSheetContext"
@@ -123,13 +123,25 @@ export function PlayerNowPlaying({
 
       {VolumeView === null ? null : (
         <View className="flex-row items-center gap-3">
-          <Icon as={Volume1} size={18} color={sheet.muted} />
+          <SFIcon
+            name="speaker.fill"
+            size={16}
+            color={sheet.muted}
+            fallback={Volume1}
+          />
           <VolumeView
             light={isLightSheet(sheet.top)}
+            fill={sheet.fill}
+            track={sheet.rest}
             label="Volume"
             style={{ flex: 1, height: 40 }}
           />
-          <Icon as={Volume2} size={18} color={sheet.muted} />
+          <SFIcon
+            name="speaker.wave.3.fill"
+            size={16}
+            color={sheet.muted}
+            fallback={Volume2}
+          />
         </View>
       )}
     </View>

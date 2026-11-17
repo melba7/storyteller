@@ -1,11 +1,11 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { List, MessageSquareQuote } from "lucide-react-native"
 import { Pressable, View } from "react-native"
-
-import { Icon } from "@/components/ui/icon"
+import { type SFSymbol } from "sf-symbols-typescript"
 
 import { AirPlayButton } from "./AirPlayButton"
 import { type PlayerPanel } from "./PlayerPages"
+import { SFIcon } from "./SFIcon"
 import { pick } from "./haptics"
 import { useSheet } from "./playerSheetContext"
 
@@ -23,6 +23,7 @@ export function PlayerToolbar({
   return (
     <View className="w-full flex-row items-center justify-around">
       <PanelButton
+        symbol="quote.bubble"
         icon={MessageSquareQuote}
         label="Transcript"
         target="transcript"
@@ -31,6 +32,7 @@ export function PlayerToolbar({
       />
       <AirPlayButton />
       <PanelButton
+        symbol="list.bullet"
         icon={List}
         label="Playing Next"
         target="queue"
@@ -42,12 +44,14 @@ export function PlayerToolbar({
 }
 
 function PanelButton({
+  symbol,
   icon,
   label,
   target,
   panel,
   onPanel,
 }: {
+  symbol: SFSymbol
   icon: typeof List
   label: string
   target: PlayerPanel
@@ -68,7 +72,12 @@ function PanelButton({
         onPanel(on ? "art" : target)
       }}
     >
-      <Icon as={icon} size={24} color={on ? sheet.ink : sheet.tint} />
+      <SFIcon
+        name={symbol}
+        size={24}
+        color={on ? sheet.ink : sheet.tint}
+        fallback={icon}
+      />
     </Pressable>
   )
 }

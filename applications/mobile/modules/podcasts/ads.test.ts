@@ -229,9 +229,16 @@ describe("the ads file while the full pass runs", () => {
   })
 
   it("keeps the last file when a read finds none while finding", () => {
-    expect(adsFileAfterRead("finding", partial, null)).toBe(partial)
-    expect(adsFileAfterRead("found", partial, null)).toBeNull()
+    const kept = { episodeId: "a", file: partial }
+    expect(adsFileAfterRead("finding", kept, "a", null)).toBe(partial)
+    expect(adsFileAfterRead("found", kept, "a", null)).toBeNull()
     const next = { ads: [1] } as unknown as AdsFile
-    expect(adsFileAfterRead("finding", partial, next)).toBe(next)
+    expect(adsFileAfterRead("finding", kept, "a", next)).toBe(next)
+  })
+
+  it("never keeps another episode's file", () => {
+    const kept = { episodeId: "a", file: partial }
+    expect(adsFileAfterRead("finding", kept, "b", null)).toBeNull()
+    expect(adsFileAfterRead("finding", null, "b", null)).toBeNull()
   })
 })

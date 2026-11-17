@@ -3,7 +3,6 @@ import { Moon } from "lucide-react-native"
 import { useState } from "react"
 import { Modal, Pressable, TextInput, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import {
@@ -16,6 +15,7 @@ import {
   sleepSecondsLeft,
 } from "@/modules/podcasts/sleepTimer"
 
+import { SFIcon } from "./SFIcon"
 import { useSheet } from "./playerSheetContext"
 import { useChapters } from "./useChapters"
 import { sleepTimer, useNow, useSleepTimer } from "./useSleepTimer"
@@ -46,7 +46,12 @@ export function SleepTimerButton() {
         onPress={() => setOpen(true)}
       >
         {text === "" ? (
-          <Icon as={Moon} size={24} color={sheet.tint} />
+          <SFIcon
+            name="moon.zzz.fill"
+            size={24}
+            color={sheet.tint}
+            fallback={Moon}
+          />
         ) : (
           <Text
             className="text-sm font-semibold"

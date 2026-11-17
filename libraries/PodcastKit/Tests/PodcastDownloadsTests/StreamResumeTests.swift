@@ -75,6 +75,24 @@ final class StreamResumeTests: XCTestCase {
         DownloadFailure(urlErrorCode: -999), available: 10, validator: "\"a\"", resumes: 0))
   }
 
+  func testADataNotAllowedFailureIsResumedAsAConnectivityWait() {
+    let blocked = DownloadFailure(urlErrorCode: -1020)
+    XCTAssertTrue(StreamResume.isConnectivity(blocked))
+    XCTAssertTrue(
+      StreamResume.shouldResume(
+        blocked, available: 10, validator: "\"a\"", resumes: StreamResume.maxResumes, waits: 3))
+    XCTAssertFalse(
+      StreamResume.shouldResume(
+        blocked, available: 10, validator: "\"a\"", resumes: 0, waits: StreamResume.maxConnectivityWaits))
+    XCTAssertFalse(StreamResume.shouldResume(blocked, available: 0, validator: "\"a\"", resumes: 0))
+  }
+
+  func testAWaitForTheNetworkIsGivenUpOnlyBeforeAnyBytesArrived() {
+    XCTAssertTrue(StreamResume.givesUpWaiting(available: 0))
+    XCTAssertFalse(StreamResume.givesUpWaiting(available: 1))
+    XCTAssertFalse(StreamResume.givesUpWaiting(available: 5_000_000))
+  }
+
   func testTheWaitBeforeAnotherTryGrowsAndStops() {
     XCTAssertEqual(StreamResume.delay(afterResumes: 0), 2)
     XCTAssertEqual(StreamResume.delay(afterResumes: 1), 4)

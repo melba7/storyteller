@@ -12,6 +12,10 @@ import { Podcasts } from "./index"
 type VolumeViewProps = {
   /** True on a light sheet, so the slider is dark. */
   light: boolean
+  /** The bar's colour up to the volume, "#rrggbb". */
+  fill: string
+  /** The bar's colour for the rest, "#rrggbb". */
+  track: string
   /** What VoiceOver says for the slider. */
   label: string
   style?: StyleProp<ViewStyle>
