@@ -9,7 +9,7 @@ import {
   History,
 } from "lucide-react-native"
 import { useEffect, useState } from "react"
-import { Pressable, View } from "react-native"
+import { Pressable, ScrollView, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Switch } from "@/components/ui/switch"
@@ -95,7 +95,10 @@ export function Profile() {
           Downloads need the iOS app.
         </Text>
       ) : (
-        <View className="px-safe-or-4">
+        <ScrollView
+          contentContainerClassName="px-safe-or-4 pb-8"
+          contentInsetAdjustmentBehavior="automatic"
+        >
           <Pressable
             className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
             accessibilityRole="button"
@@ -203,7 +206,7 @@ export function Profile() {
           <AddAudioFilesRow />
           <OpmlSection />
           <AdSkipSwitches />
-        </View>
+        </ScrollView>
       )}
     </View>
   )

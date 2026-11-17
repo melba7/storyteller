@@ -145,12 +145,56 @@ describe("an episode that Swift starts from Up Next", () => {
     expect(playback.getView()).toMatchObject({ isPlaying: true, position: 5 })
   })
 
-  it("is ignored when the library does not have the episode", async () => {
+  it("is ignored when the library and Up Next both lack the episode", async () => {
     const { playback, deps, handlers } = setup()
     await playback.playEpisode(episode(), show)
     handlers.onPlaybackAdvanced?.({ episodeId: "gone" })
     await vi.waitFor(() => expect(deps.getEpisode).toHaveBeenCalledWith("gone"))
     expect(playback.getView().episode?.id).toBe("e1")
+  })
+
+  // This used to assert that an episode the library lacks froze the player on the old one.
+  it("follows an episode only Up Next knows, built from its queue item", async () => {
+    const { playback, handlers } = setup()
+    await playback.playEpisode(episode(), show)
+    handlers.onUpNextChange?.({
+      items: [
+        {
+          id: "preview:x#g9",
+          showId: "preview:x",
+          url: "https://cdn.example.com/9.mp3",
+          type: "audio/mpeg",
+          title: "Unfollowed one",
+          showTitle: "Other",
+          artworkUrl: "https://example.com/9.jpg",
+          duration: 300,
+          position: 12,
+        },
+      ],
+    })
+    handlers.onUpNextChange?.({ items: [] }) // Swift drops it before it announces it
+    handlers.onPlaybackAdvanced?.({ episodeId: "preview:x#g9" })
+    await vi.waitFor(() =>
+      expect(playback.getView().episode?.id).toBe("preview:x#g9"),
+    )
+    expect(playback.getView()).toMatchObject({
+      loaded: true,
+      position: 12,
+      duration: 300,
+    })
+    expect(playback.getView().episode).toMatchObject({
+      title: "Unfollowed one",
+      audioUrl: "https://cdn.example.com/9.mp3",
+    })
+    handlers.onPlaybackState?.({
+      episodeId: "preview:x#g9",
+      position: 40,
+      duration: 300,
+      isPlaying: true,
+      isBuffering: false,
+      rate: 1,
+    })
+    expect(playback.getView()).toMatchObject({ isPlaying: true, position: 40 })
   })
 })
 
@@ -521,5 +565,111 @@ describe("restoreLast", () => {
     await playback.playEpisode(episode(), show)
     await playback.restoreLast()
     expect(playback.getView().episode?.id).toBe("e1")
+  })
+})
+
+describe("marking the loaded episode", () => {
+  it("keeps played through the player's next save", async () => {
+    const { playback, deps, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(30, true)
+    await playback.episodesMarked(["e1"], true)
+    state(31, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 31, true)
+  })
+
+  it("unplayed goes back to the start and is saved as unplayed", async () => {
+    const { playback, native, deps, state } = setup()
+    await playback.playEpisode(episode({ played: true }), show)
+    state(590, true)
+    await playback.episodesMarked(["e1"], true)
+    await playback.episodesMarked(["e1"], false)
+    expect(native.seekTo).toHaveBeenCalledWith(0)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 0, false)
+    state(1, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 1, false)
+  })
+
+  it("ignores other episodes", async () => {
+    const { playback, native, state, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    state(10, true)
+    await playback.episodesMarked(["other"], false)
+    expect(native.seekTo).not.toHaveBeenCalled()
+    state(11, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 11, false)
+  })
+})
+
+describe("a followed preview", () => {
+  const preview = episode({
+    id: "preview:f#g1",
+    guid: "g1",
+    showId: "preview:f",
+  })
+
+  it("saves its place to the library episode with the same guid", async () => {
+    const { playback, deps, handlers } = setup()
+    await playback.playEpisode(preview, show)
+    handlers.onPlaybackState?.({
+      episodeId: "preview:f#g1",
+      position: 77,
+      duration: 600,
+      isPlaying: true,
+      isBuffering: false,
+      rate: 1,
+    })
+    playback.adoptLibrary(
+      [
+        episode({ id: "lib2", guid: "g2" }),
+        episode({ id: "lib1", guid: "g1" }),
+      ],
+      show,
+    )
+    expect(playback.getView().episode?.id).toBe("lib1")
+    expect(deps.savePlayback).toHaveBeenCalledWith("lib1", 77, false)
+    // The native player still calls it by the preview id, and the view keeps following.
+    handlers.onPlaybackState?.({
+      episodeId: "preview:f#g1",
+      position: 80,
+      duration: 600,
+      isPlaying: true,
+      isBuffering: false,
+      rate: 1,
+    })
+    expect(playback.getView().position).toBe(80)
+  })
+
+  it("leaves a library episode alone", async () => {
+    const { playback } = setup()
+    await playback.playEpisode(episode(), show)
+    playback.adoptLibrary([episode({ id: "lib1" })], show)
+    expect(playback.getView().episode?.id).toBe("e1")
+  })
+})
+
+describe("seeking before the first Play", () => {
+  it("stores the place and starts there on load", async () => {
+    const { playback, native, deps } = setup(episode({ positionSeconds: 10 }))
+    await playback.restoreLast()
+    await playback.seekTo(200)
+    await playback.skip(15)
+    expect(playback.getView().position).toBe(215)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 215, false)
+    expect(native.seekTo).not.toHaveBeenCalled()
+    await playback.togglePlayPause()
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ savedPosition: 215 }),
+    )
+  })
+})
+
+describe("a renamed episode", () => {
+  it("shows its new title", async () => {
+    const { playback, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    deps.getEpisode.mockResolvedValue(episode({ title: "Renamed" }))
+    await playback.refreshEpisode()
+    expect(playback.getView().episode?.title).toBe("Renamed")
   })
 })

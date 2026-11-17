@@ -75,6 +75,14 @@ describe("fundingFromJson", () => {
     ])
   })
 
+  it("keeps a repeated address once", () => {
+    expect(
+      fundingFromJson(
+        '[{"url":"https://x.test/give","label":"Give"},{"url":"https://x.test/give","label":"Again"},{"url":"https://x.test/other"}]',
+      ).map((l) => l.url),
+    ).toEqual(["https://x.test/give", "https://x.test/other"])
+  })
+
   it("gives none for bad input and keeps at most 5", () => {
     expect(fundingFromJson(undefined)).toEqual([])
     expect(fundingFromJson("{")).toEqual([])

@@ -83,7 +83,11 @@ export function ArrangeShows() {
       {problem ? (
         <Text className="text-destructive px-4 py-2 text-sm">{problem}</Text>
       ) : null}
-      {ids === null ? (
+      {shows.error && ids === null ? (
+        <Text className="text-destructive px-8 py-12 text-center">
+          {shows.error}
+        </Text>
+      ) : ids === null ? (
         <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
       ) : (
         <DragList

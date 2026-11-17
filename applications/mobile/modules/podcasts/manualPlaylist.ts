@@ -144,6 +144,21 @@ export function resolveItems(
  * What "Play all" does with the playlist's episodes: the first plays now, and the rest go to
  * the top of Up Next, so they follow in order ahead of what was already queued.
  */
+/**
+ * Plays the plan's first episode, then queues the rest at the top. In this order, so what was
+ * playing is queued by the start itself and the rest land ahead of it.
+ */
+export async function runPlayAll(
+  plan: ReturnType<typeof playAllPlan>,
+  ops: {
+    play(id: string): Promise<void>
+    queue(id: string, place: "next" | "last"): Promise<void>
+  },
+): Promise<void> {
+  if (plan.play !== null) await ops.play(plan.play)
+  for (const step of plan.queue) await ops.queue(step.id, step.place)
+}
+
 export function playAllPlan(ids: readonly string[]): {
   play: string | null
   queue: { id: string; place: "next" | "last" }[]

@@ -6,6 +6,7 @@
 import { notifyLibraryChanged } from "./changes"
 import { database, listShows } from "./db"
 import { deleteDownloads } from "./downloadsNative"
+import { withoutLocalIds } from "./localFiles"
 import {
   SETTING_COLUMNS,
   type ShowSettings,
@@ -47,11 +48,12 @@ export async function saveShowSettings(
 
 /**
  * Archives episodes: their downloads are deleted first, so a download that can't be removed
- * leaves the episode as it was.
+ * leaves the episode as it was. An added file is only hidden: its download is its only copy.
  */
 export async function archiveEpisodes(ids: readonly string[]): Promise<void> {
   if (ids.length === 0) return
-  await deleteDownloads([...ids])
+  const removable = withoutLocalIds(ids)
+  if (removable.length > 0) await deleteDownloads(removable)
   await setArchivedFlag(ids, 1)
 }
 

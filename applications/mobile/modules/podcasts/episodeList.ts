@@ -9,6 +9,15 @@ export type EpisodeListItem =
   | { kind: "header"; key: string; title: string }
   | { kind: "episode"; key: string; episode: StoredEpisode }
 
+/** The episodes of the arranged list, in the order it shows them (the headers left out). */
+export function episodesInView(
+  items: readonly EpisodeListItem[],
+): StoredEpisode[] {
+  return items.flatMap((item) =>
+    item.kind === "episode" ? [item.episode] : [],
+  )
+}
+
 /** Newest first for "newest", else by the key; episodes with no value go last. Stable. */
 export function sortForView(
   episodes: readonly StoredEpisode[],

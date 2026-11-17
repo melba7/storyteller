@@ -12,6 +12,7 @@ import {
   formatEpisodeDate,
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
+import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref } from "@/modules/podcasts/routes"
 import { queuedLabel } from "@/modules/podcasts/upNext"
 
@@ -115,7 +116,9 @@ export function EpisodeRow({
       {picking ? null : (
         <>
           <EpisodeMenu episode={episode} show={show} />
-          <DownloadButton episode={episode} />
+          {isPreviewId(episode.id) ? null : (
+            <DownloadButton episode={episode} />
+          )}
           <PlayButton
             episode={episode}
             show={show}

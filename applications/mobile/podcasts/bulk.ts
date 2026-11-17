@@ -2,7 +2,7 @@
 import { Alert } from "react-native"
 
 import { getShow } from "@/modules/podcasts/db"
-import { setPlayed, setStarred } from "@/modules/podcasts/dbEpisodes"
+import { setStarred } from "@/modules/podcasts/dbEpisodes"
 import {
   archiveEpisodes,
   unarchiveEpisodes,
@@ -10,6 +10,7 @@ import {
 import { startDownload } from "@/modules/podcasts/downloadsNative"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { markPlayed } from "@/modules/podcasts/playerInstance"
 import {
   type BulkAction,
   bulkTargets,
@@ -41,9 +42,9 @@ export async function runBulk(
   try {
     switch (action) {
       case "played":
-        return await setPlayed(ids, true)
+        return await markPlayed(ids, true)
       case "unplayed":
-        return await setPlayed(ids, false)
+        return await markPlayed(ids, false)
       case "star":
         return await setStarred(ids, true)
       case "unstar":
