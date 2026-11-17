@@ -73,9 +73,12 @@
   "allowedChanges": [
     "applications/mobile/app/(root)/_layout.tsx",
     "applications/mobile/app/(root)/book/[uuid].tsx",
+    "applications/mobile/app/(root)/search.tsx",
+    "applications/mobile/components/BookDescription.tsx",
     "applications/mobile/components/BookGrid.tsx",
     "applications/mobile/components/BookThumbnail.tsx",
     "applications/mobile/components/Shelf.tsx",
+    "applications/mobile/components/bookGridLayout.ts",
     "applications/mobile/components/ui/button.tsx",
     "applications/mobile/components/ui/input.tsx",
     "applications/mobile/components/ui/switch.tsx",

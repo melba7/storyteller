@@ -22,7 +22,7 @@ export default function BookDescription({ description, textColor }: Props) {
         }
       `}</style>
       <div
-        className="font-sans text-sm leading-relaxed"
+        className="font-sans text-[17px] leading-relaxed"
         dangerouslySetInnerHTML={{ __html: description }}
       />
     </>

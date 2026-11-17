@@ -1,5 +1,5 @@
 const gap = 12
-const horizontalPadding = 36
+const horizontalPadding = 40
 const minThumbnailWidth = 150
 
 export function calculateBookGridLayout(widthOutsideSafeArea: number) {
