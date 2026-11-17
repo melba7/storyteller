@@ -4,7 +4,11 @@
 // homeSql.ts and tested there, the order in home.ts.
 import { rows } from "./db"
 import { type ShelfEntry, orderUpNextShelf } from "./home"
-import { SHOW_PLAYS_SQL, UP_NEXT_CANDIDATES_SQL } from "./homeSql"
+import {
+  SHOW_DATES_SQL,
+  SHOW_PLAYS_SQL,
+  UP_NEXT_CANDIDATES_SQL,
+} from "./homeSql"
 import { episodeFromRow } from "./library"
 
 /** Home's Up Next shelf, in order. */
@@ -23,4 +27,16 @@ export async function listShowPlays(): Promise<Map<string, number>> {
     }
   }
   return plays
+}
+
+/** The dates of each show's six newest episodes (show id to milliseconds, newest first). */
+export async function listShowDates(): Promise<Map<string, number[]>> {
+  const dates = new Map<string, number[]>()
+  for (const row of await rows(SHOW_DATES_SQL)) {
+    const at = row["published_at"]
+    const id = row["show_id"]
+    if (typeof id !== "string" || typeof at !== "number") continue
+    dates.set(id, [...(dates.get(id) ?? []), at])
+  }
+  return dates
 }

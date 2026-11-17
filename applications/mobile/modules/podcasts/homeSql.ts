@@ -28,3 +28,11 @@ SELECT e.* FROM episodes e
 export const SHOW_PLAYS_SQL = `SELECT show_id, MAX(history_at) AS last_at FROM episodes
   WHERE history_at IS NOT NULL AND show_id != 'local-files'
   GROUP BY show_id`
+
+/** The dates of each followed show's six newest episodes, for how often it updates. */
+export const SHOW_DATES_SQL = `SELECT show_id, published_at FROM (
+    SELECT show_id, published_at,
+      ROW_NUMBER() OVER (PARTITION BY show_id ORDER BY published_at DESC) AS n
+    FROM episodes WHERE published_at IS NOT NULL AND show_id != 'local-files')
+  WHERE n <= 6
+  ORDER BY show_id, published_at DESC`

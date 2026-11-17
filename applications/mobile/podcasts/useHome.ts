@@ -2,7 +2,11 @@
 import { useMemo } from "react"
 
 import { type ChartShow } from "@/modules/podcasts/charts"
-import { listShowPlays, listUpNextShelf } from "@/modules/podcasts/dbHome"
+import {
+  listShowDates,
+  listShowPlays,
+  listUpNextShelf,
+} from "@/modules/podcasts/dbHome"
 import { type ShelfEntry, rankTopShows } from "@/modules/podcasts/home"
 import { type Show } from "@/modules/podcasts/library"
 
@@ -47,4 +51,9 @@ export function useYouMightLike(limit = 12): ChartShow[] {
     }
     return picked.slice(0, limit)
   }, [suggestions, limit])
+}
+
+/** Each show's six newest episode dates, for "Updated Weekly" and the like. */
+export function useShowDates(): ReadonlyMap<string, number[]> | undefined {
+  return useLibraryQuery(listShowDates, "home-dates").data
 }

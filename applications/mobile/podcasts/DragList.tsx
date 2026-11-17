@@ -28,6 +28,8 @@ interface ListProps {
   onAction?: (id: string, name: string) => void
   /** Shown above the rows, inside the scroll view, so a large title can shrink. */
   header?: ReactNode
+  /** Shown below the rows, inside the scroll view. */
+  footer?: ReactNode
   /** Called when a row is let go after it was moved to a new place. */
   onDrop?: () => void
 }
@@ -46,6 +48,7 @@ export function DragList({
   actions = [],
   onAction,
   header,
+  footer,
   onDrop,
 }: ListProps) {
   // The row being dragged, where it started, and how far the finger has moved.
@@ -115,6 +118,7 @@ export function DragList({
           {renderContent(id, index)}
         </DragRow>
       ))}
+      {footer}
     </ScrollView>
   )
 }

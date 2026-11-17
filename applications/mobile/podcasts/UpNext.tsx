@@ -29,9 +29,11 @@ import {
 import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
 import { EmptyState } from "./EmptyState"
+import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { pick } from "./haptics"
-import { useEpisodesByIds } from "./hooks"
+import { useEpisodesByIds, useShows } from "./hooks"
+import { useUpNextShelf } from "./useHome"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import {
   confirmClear,
@@ -65,6 +67,12 @@ export function UpNext() {
   )
   const ids = useMemo(() => queue.map((item) => item.id), [queue])
   const episodes = useEpisodesByIds(ids)
+  const shelf = useUpNextShelf().data ?? []
+  const shows = useShows()
+  const showById = useMemo(
+    () => new Map((shows.data ?? []).map((show) => [show.id, show])),
+    [shows.data],
+  )
   const inLibrary = useMemo(
     () => new Set((episodes.data ?? []).map((episode) => episode.id)),
     [episodes.data],
@@ -94,7 +102,7 @@ export function UpNext() {
             body="This version of the app can't play podcasts."
           />
         </BelowBar>
-      ) : queue.length === 0 ? (
+      ) : queue.length === 0 && shelf.length === 0 ? (
         <BelowBar>
           <EmptyState
             icon={ListEnd}
@@ -109,12 +117,41 @@ export function UpNext() {
       ) : (
         <DragList
           header={
-            <Text
-              className="text-muted-foreground py-2 text-sm"
-              accessibilityLabel={upNextSummary(queue)}
-            >
-              {upNextSummary(queue)}
-            </Text>
+            <View className="gap-1 pt-2 pb-2">
+              <Text className="text-2xl font-bold" accessibilityRole="header">
+                Playing Next
+              </Text>
+              <Text
+                className="text-muted-foreground text-sm"
+                accessibilityLabel={
+                  queue.length === 0 ? undefined : upNextSummary(queue)
+                }
+              >
+                {queue.length === 0
+                  ? "Nothing queued. Choose Play Next or Play Last from an episode's menu."
+                  : upNextSummary(queue)}
+              </Text>
+            </View>
+          }
+          footer={
+            shelf.length > 0 ? (
+              <View className="pt-6 pb-6">
+                <Text className="text-2xl font-bold" accessibilityRole="header">
+                  Next from your shows
+                </Text>
+                {shelf.map(({ episode }) => {
+                  const show = showById.get(episode.showId)
+                  return show ? (
+                    <EpisodeRow
+                      key={episode.id}
+                      artwork
+                      episode={episode}
+                      show={show}
+                    />
+                  ) : null
+                })}
+              </View>
+            ) : null
           }
           ids={ids}
           rowHeight={ROW_HEIGHT}
