@@ -1,0 +1,164 @@
+// LOFI-FORK: turns a detector's answers into the ads to show and skip (see FORK.md).
+//
+// The merge of ads with little speech between them (12 seconds, at most 5 minutes) and the
+// carried-on end follow MinusPod (MIT, github.com/ttlequals0/MinusPod); see FORK.md.
+import Foundation
+import PodcastTranscripts
+
+/// The numbers the clean-up uses.
+public enum AdRules {
+  /// Two ads of one kind with less speech than this between them are one ad break.
+  public static let mergeSpeech = 12.0
+  /// A merged break is never longer than this.
+  public static let mergeCap = 300.0
+  /// Anything shorter is dropped.
+  public static let minLength = 10.0
+  /// Anything longer is dropped: it is more likely a mistake than an ad.
+  public static let maxLength = 300.0
+  /// How many lines after an ad may still be carried into it.
+  public static let carryLines = 8
+  /// An edge moves to a pause at most this far away.
+  public static let snapReach = 4.0
+  /// A gap between two words counts as a pause from this long.
+  public static let pause = 0.3
+  /// How many words of the ad's start are kept to recognise it.
+  public static let firstWords = 14
+}
+
+public enum AdCleanup {
+  /// The ads in an episode from all the detector's answers for its pieces. Steps: guesses and
+  /// answers that name no real lines are dropped; each end is carried on while the next lines
+  /// still read as the ad; line numbers become times; overlapping answers (an ad across a cut)
+  /// are joined into one, and so are ads of one kind with little speech between them; edges
+  /// move to the nearest pause; what is too short or too long is dropped.
+  public static func run(ranges: [AdRange], transcript: Transcript) -> [FoundAd] {
+    let lines = transcript.lines
+    guard !lines.isEmpty else { return [] }
+
+    var spans: [Span] = []
+    for range in ranges where range.confidence != .guess {
+      let first = min(range.startLine, range.endLine)
+      let last = max(range.startLine, range.endLine)
+      guard first >= 1, last <= lines.count else { continue }
+      let carried = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
+      spans.append(
+        Span(
+          start: lines[first - 1].start, end: lines[carried - 1].end, kind: range.kind,
+          advertiser: range.advertiser, confidence: range.confidence))
+    }
+
+    let words = transcript.words
+    let pauses = Pauses(words: words)
+    var ads: [FoundAd] = []
+    for var span in merge(spans, words: words) {
+      span.start = max(0, pauses.nearest(to: span.start, reach: AdRules.snapReach) ?? span.start)
+      span.end = min(
+        transcript.duration > 0 ? transcript.duration : .infinity,
+        pauses.nearest(to: span.end, reach: AdRules.snapReach) ?? span.end)
+      guard span.end - span.start >= AdRules.minLength, span.end - span.start <= AdRules.maxLength
+      else { continue }
+      ads.append(
+        FoundAd(
+          start: span.start, end: span.end, kind: span.kind, advertiser: span.advertiser,
+          confidence: span.confidence, firstWords: opening(of: span, words: words)))
+    }
+    return ads
+  }
+
+  private struct Span {
+    var start: Double
+    var end: Double
+    var kind: AdKind
+    var advertiser: String
+    var confidence: AdConfidence
+    var length: Double { end - start }
+  }
+
+  /// The last line number of an ad after carrying it on: while the line after it names the
+  /// advertiser or gives a web address or promo code, it belongs to the ad.
+  static func carriedEnd(of last: Int, advertiser: String, lines: [TranscriptLine]) -> Int {
+    var end = last
+    while end < lines.count, end - last < AdRules.carryLines,
+      AdSignals.readsLikeAd(lines[end].text, advertiser: advertiser)
+    {
+      end += 1
+    }
+    return end
+  }
+
+  /// Joins spans that overlap (the same ad seen in two pieces: the surer answer stands), and
+  /// spans of one kind with less than `mergeSpeech` seconds of speech between them when the
+  /// result stays within `mergeCap` (one break: the less sure answer stands).
+  private static func merge(_ spans: [Span], words: [TranscriptWord]) -> [Span] {
+    var result: [Span] = []
+    for span in spans.sorted(by: { $0.start < $1.start }) {
+      guard var last = result.popLast() else {
+        result.append(span)
+        continue
+      }
+      if span.start < last.end {
+        let longer = span.length > last.length ? span : last
+        last.kind = longer.kind
+        if !longer.advertiser.isEmpty {
+          last.advertiser = longer.advertiser
+        } else if last.advertiser.isEmpty {
+          last.advertiser = span.advertiser
+        }
+        last.confidence = max(last.confidence, span.confidence)
+        last.end = max(last.end, span.end)
+        result.append(last)
+      } else if span.kind == last.kind, span.end - last.start <= AdRules.mergeCap,
+        speech(from: last.end, to: span.start, words: words) < AdRules.mergeSpeech
+      {
+        last.end = span.end
+        last.confidence = min(last.confidence, span.confidence)
+        if last.advertiser.isEmpty { last.advertiser = span.advertiser }
+        result.append(last)
+      } else {
+        result.append(last)
+        result.append(span)
+      }
+    }
+    return result
+  }
+
+  /// Seconds of speech between two times: the length of the words that lie between them.
+  static func speech(from: Double, to: Double, words: [TranscriptWord]) -> Double {
+    words.reduce(0) { total, word in
+      total + max(0, min(word.end, to) - max(word.start, from))
+    }
+  }
+
+  private static func opening(of span: Span, words: [TranscriptWord]) -> String {
+    words.filter { $0.start >= span.start - 0.01 && $0.start < span.end }
+      .prefix(AdRules.firstWords).map(\.text).joined(separator: " ")
+  }
+}
+
+/// The pauses between words, as the places an edge may move to.
+struct Pauses {
+  /// The middle of each pause, in order.
+  let middles: [Double]
+
+  init(words: [TranscriptWord], minimum: Double = AdRules.pause) {
+    var found: [Double] = []
+    for (before, after) in zip(words, words.dropFirst()) where after.start - before.end >= minimum {
+      found.append((before.end + after.start) / 2)
+    }
+    middles = found
+  }
+
+  /// The middle of the pause nearest to `time`, if one is within `reach` seconds.
+  func nearest(to time: Double, reach: Double) -> Double? {
+    var low = 0
+    var high = middles.count
+    while low < high {
+      let mid = (low + high) / 2
+      if middles[mid] < time { low = mid + 1 } else { high = mid }
+    }
+    let candidates = [low - 1, low].filter { middles.indices.contains($0) }.map { middles[$0] }
+    let best = candidates.min { abs($0 - time) < abs($1 - time) }
+    guard let best, abs(best - time) <= reach else { return nil }
+    return best
+  }
+}

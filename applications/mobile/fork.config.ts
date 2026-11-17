@@ -59,6 +59,8 @@ const lofiScorePods = [
     "PodcastDownloads",
     "PodcastTranscripts",
     "PodcastSpeech",
+    "PodcastAds",
+    "PodcastAdsOnDevice",
   ].map((name) => ({
     name,
     path: "../../../libraries/PodcastKit",
