@@ -134,6 +134,7 @@ export function PodcastShow({ id }: { id: string }) {
           )}
         />
       )}
+      <MiniPlayer />
     </View>
   )
 }

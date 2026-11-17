@@ -199,6 +199,7 @@ export function PodcastsHome() {
           renderItem={renderShow}
         />
       )}
+      <MiniPlayer />
     </View>
   )
 }

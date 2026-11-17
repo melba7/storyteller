@@ -72,6 +72,7 @@ export function PodcastEpisode({ id }: { id: string }) {
           </Text>
         </ScrollView>
       )}
+      <MiniPlayer />
     </View>
   )
 }
