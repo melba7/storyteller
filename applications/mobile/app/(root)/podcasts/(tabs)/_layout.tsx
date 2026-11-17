@@ -7,8 +7,8 @@ import { MiniPlayerContent, useHasMiniPlayer } from "@/podcasts/MiniPlayer"
 import { useUpNext } from "@/podcasts/useUpNext"
 
 /**
- * The Podcasts section's tab bar (iOS 26's native one). The tab bar shrinks when a list scrolls down. The mini player sits in the bar's
- * accessory, above the tabs, once an episode is loaded. Each tab has its own stack. The icons
+ * The Podcasts section's tab bar (iOS 26's native one), which shrinks when a list scrolls
+ * down. The mini player sits in the bar's accessory, above the tabs, once an episode is loaded. Each tab has its own stack. The icons
  * and labels take the section's theme colours; NativeTabs has no prop for a dark or light bar,
  * and on iOS 26 the system draws the bar's glass itself, so only the tint can follow the theme.
  */
