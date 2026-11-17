@@ -236,8 +236,8 @@ Why the big ones are big:
 ### Order
 
 P1 (play, the layout, Discover, search) comes first, then downloads and Up Next
-(P2), which ad skipping needs. Ad skipping (P3-P4) and the Pocket Casts features
-(P5) both follow; Mo picks which goes first.
+(P2), which ad skipping needs. Ad skipping (P3-P4) comes next, then the Pocket
+Casts features (P5): Mo's choice, 2026-11-17.
 
 ## Finding ads
 

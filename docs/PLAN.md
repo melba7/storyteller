@@ -470,12 +470,12 @@ once reviewed and green.
 
 ### Pocket Casts features (Mo's ask, 2026-11-17)
 
-The rest of Pocket Casts' features, one session each. Each step's "done when"
-is: check.sh passes, the iOS build passes in CI, and the behaviour named works
-on TestFlight. Each one starts with tests of its rules (JS or Swift, run in
-`check.sh`). Size: S is small, M medium, L a big lift. Details and what is left
-out, with the reasons, are in "Matching Pocket Casts" in
-`docs/PODCASTS-PLAN.md`.
+The rest of Pocket Casts' features, one session each, after ad skipping (P3-P4;
+Mo's choice, 2026-11-17). Each step's "done when" is: check.sh passes, the iOS
+build passes in CI, and the behaviour named works on TestFlight. Each one starts
+with tests of its rules (JS or Swift, run in `check.sh`). Size: S is small, M
+medium, L a big lift. Details and what is left out, with the reasons, are in
+"Matching Pocket Casts" in `docs/PODCASTS-PLAN.md`.
 
 - [ ] **P5a. Per-show settings** (S): skip the first and last N seconds of every
       episode (intros and outros), the show's own speed, auto-download on or
