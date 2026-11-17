@@ -24,6 +24,8 @@ function show(id: string, overrides: Partial<Show> = {}): Show {
     addedAt: 1,
     refreshedAt: 1,
     artworkColor: null,
+    ownPosition: null,
+    categories: [],
     ...overrides,
   }
 }
@@ -101,6 +103,28 @@ describe("sortShows by newest episode", () => {
   })
 })
 
+describe("sortShows in your own order", () => {
+  it("puts placed shows first by position, then unplaced ones oldest first", () => {
+    const shows = [
+      show("late", { addedAt: 90 }),
+      show("second", { ownPosition: 1, addedAt: 5 }),
+      show("early", { addedAt: 10 }),
+      show("first", { ownPosition: 0, addedAt: 50 }),
+    ]
+    expect(ids(sortShows(shows, "own", {}))).toEqual([
+      "first",
+      "second",
+      "early",
+      "late",
+    ])
+  })
+
+  it("keeps the given order for unplaced shows added at the same time", () => {
+    const shows = [show("a"), show("b"), show("c")]
+    expect(ids(sortShows(shows, "own", {}))).toEqual(["a", "b", "c"])
+  })
+})
+
 describe("badgeCount", () => {
   it("is 1 for a show just followed whose newest episode is unplayed", () => {
     const found = activity({ newestAt: 50, newestPlayed: false })
@@ -169,6 +193,13 @@ describe("parseLibraryView", () => {
   it("reads a saved choice", () => {
     const saved = serializeLibraryView({ layout: "list", order: "newest" })
     expect(parseLibraryView(saved)).toEqual({ layout: "list", order: "newest" })
+  })
+
+  it("reads your own order", () => {
+    expect(parseLibraryView('{"layout":"list","order":"own"}')).toEqual({
+      layout: "list",
+      order: "own",
+    })
   })
 
   it("falls back to large grid and name for unknown values", () => {

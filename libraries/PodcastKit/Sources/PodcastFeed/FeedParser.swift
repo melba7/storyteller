@@ -35,6 +35,8 @@ private final class FeedReader: NSObject, XMLParserDelegate {
   private(set) var sawChannel = false
   private var title = "", author = "", showDescription = "", summary = "", subtitle = ""
   private var link = "", language = "", itunesImage = "", plainImage = ""
+  private var topCategories: [String] = [], subCategories: [String] = []
+  private var currentTop = ""
 
   func feed() -> PodcastFeed {
     PodcastFeed(
@@ -44,6 +46,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       imageURL: URL(string: itunesImage.isEmpty ? plainImage : itunesImage),
       link: URL(string: link),
       language: language.isEmpty ? nil : language,
+      categories: topCategories + subCategories,
       episodes: episodes)
   }
 
@@ -65,6 +68,15 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       item = Item()
     case "rss/channel/itunes:image":
       if itunesImage.isEmpty { itunesImage = clean(attributes["href"] ?? "") }
+    case "rss/channel/itunes:category":
+      currentTop = clean(attributes["text"] ?? "")
+      if !currentTop.isEmpty && !topCategories.contains(currentTop) { topCategories.append(currentTop) }
+    case "rss/channel/itunes:category/itunes:category":
+      let sub = clean(attributes["text"] ?? "")
+      let name = "\(currentTop) › \(sub)"
+      if !currentTop.isEmpty && !sub.isEmpty && !subCategories.contains(name) {
+        subCategories.append(name)
+      }
     case "rss/channel/item/itunes:image":
       item?.image = clean(attributes["href"] ?? "")
     case "rss/channel/item/enclosure":

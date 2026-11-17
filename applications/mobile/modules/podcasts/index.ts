@@ -10,6 +10,8 @@ export type PodcastFeedData = {
   imageUrl?: string | null
   link?: string | null
   language?: string | null
+  /** `itunes:category` names: top-level ones, then "Top › Sub" ones. */
+  categories?: string[]
   /** In feed order. */
   episodes: PodcastFeedEpisode[]
 }

@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Ellipsis, Plus } from "lucide-react-native"
+import { Ellipsis, Plus, Search } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu, type MenuAction } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
-import { refreshAllShows } from "@/modules/podcasts/db"
+import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
 import {
@@ -50,11 +50,14 @@ const ORDERS: { id: LibraryOrder; title: string }[] = [
   { id: "name", title: "Name" },
   { id: "added", title: "Date added" },
   { id: "newest", title: "Newest episode" },
+  { id: "own", title: "Your order" },
 ]
 
 function menuActions(
   view: LibraryView,
   change: (patch: Partial<LibraryView>) => void,
+  arrange: () => void,
+  arranged: boolean,
 ): MenuAction[] {
   return [
     {
@@ -76,8 +79,20 @@ function menuActions(
         id: `order-${order.id}`,
         title: order.title,
         state: view.order === order.id ? "on" : "off",
-        onPress: () => change({ order: order.id }),
+        // "Your order" opens the arrange screen until the listener has placed shows once.
+        onPress: () =>
+          order.id === "own" && !arranged
+            ? arrange()
+            : change({ order: order.id }),
       })),
+    },
+    {
+      id: "arrange",
+      title: "Arrange",
+      displayInline: true,
+      subactions: [
+        { id: "arrange-shows", title: "Arrange shows", onPress: arrange },
+      ],
     },
   ]
 }
@@ -114,6 +129,8 @@ export function PodcastsHome() {
     }
   }
 
+  const arranged = (shows.data ?? []).some((s) => s.ownPosition !== null)
+  const openArrange = () => router.push("/podcasts/arrange")
   const columns = LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3
   const size = cellSize(width, columns)
   const isList = view?.layout === "list"
@@ -138,13 +155,21 @@ export function PodcastsHome() {
             <Button
               variant="ghost"
               size="icon"
+              accessibilityLabel="Search episodes"
+              onPress={() => router.push("/podcasts/search")}
+            >
+              <Icon as={Search} size={24} className="text-primary" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
               accessibilityLabel="Find a podcast to add"
               onPress={() => router.navigate("/podcasts/discover")}
             >
               <Icon as={Plus} size={24} className="text-primary" />
             </Button>
             {view ? (
-              <Menu actions={menuActions(view, change)}>
+              <Menu actions={menuActions(view, change, openArrange, arranged)}>
                 <Button
                   variant="ghost"
                   size="icon"

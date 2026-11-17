@@ -1,0 +1,39 @@
+{
+  "resultCount": 5,
+  "results": [
+    {
+      "wrapperType": "podcastEpisode",
+      "kind": "podcast-episode",
+      "trackId": 1000700001,
+      "trackName": "The Moon Base Episode",
+      "collectionName": "Space Talk",
+      "collectionId": 555,
+      "releaseDate": "2023-01-02T10:30:00Z",
+      "trackTimeMillis": 2535000,
+      "episodeGuid": "abc-123",
+      "episodeUrl": "https://cdn.example.com/moon.mp3?src=apple",
+      "feedUrl": "https://feeds.example.com/space-talk",
+      "artworkUrl160": "https://img/160.jpg",
+      "artworkUrl600": "https://img/600.jpg"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "trackId": 1000700002,
+      "trackName": "Bare answer",
+      "collectionName": "Other Show",
+      "feedUrl": "https://feeds.example.com/other",
+      "releaseDate": "not a date",
+      "trackTimeMillis": 0
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "trackName": "No feed",
+      "collectionName": "X"
+    },
+    {
+      "wrapperType": "podcastEpisode",
+      "feedUrl": "https://feeds.example.com/y"
+    },
+    "not an object"
+  ]
+}

@@ -57,6 +57,47 @@ final class FeedParserTests: XCTestCase {
     XCTAssertNil(parsed.author)
   }
 
+  // MARK: Categories
+
+  /// Sample channel tags as feeds write them: a nested category, several, and none.
+  func testReadsANestedCategoryAsTopAndSub() throws {
+    let data = feed(
+      "",
+      channelExtra: """
+        <itunes:category text="Business">
+          <itunes:category text="Investing"/>
+        </itunes:category>
+        """)
+    XCTAssertEqual(try FeedParser.parse(data).categories, ["Business", "Business › Investing"])
+  }
+
+  func testReadsSeveralCategoriesTopLevelFirst() throws {
+    let data = feed(
+      "",
+      channelExtra: """
+        <itunes:category text="Society &amp; Culture">
+          <itunes:category text="History"/>
+          <itunes:category text="Documentary"/>
+        </itunes:category>
+        <itunes:category text="Comedy"/>
+        <itunes:category text="Comedy"/>
+        """)
+    XCTAssertEqual(
+      try FeedParser.parse(data).categories,
+      ["Society & Culture", "Comedy", "Society & Culture › History", "Society & Culture › Documentary"])
+  }
+
+  func testAFeedWithoutCategoriesHasNone() throws {
+    XCTAssertEqual(try FeedParser.parse(feed("")).categories, [])
+  }
+
+  func testIgnoresCategoriesWithoutTextAndEpisodeCategories() throws {
+    let data = feed(
+      item("<title>One</title><itunes:category text=\"Sports\"/>"),
+      channelExtra: "<itunes:category/><category>Plain</category>")
+    XCTAssertEqual(try FeedParser.parse(data).categories, [])
+  }
+
   // MARK: Episodes
 
   func testReadsAnEpisodeWithItunesTags() throws {

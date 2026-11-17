@@ -75,7 +75,7 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   its tab bar, artwork grid, player and mini player, and its features (per-show
   settings, playlists, sleep timer, chapters, bookmarks, effects, stats, themes
   and more), rebuilt here with nothing copied. Check: each step in
-  `docs/PLAN.md` (P1c, P5a to P5p) works on the phone.
+  `docs/PLAN.md` (P1c, P5a to P5o) works on the phone.
 - The user can play an episode with speed, skip buttons and the lock screen, and
   a book and a podcast never play at the same time. Check: switching between
   them on the phone plays only one.
@@ -89,6 +89,11 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
 - The phone transcribes each downloaded episode and finds its ads, with nothing
   sent off the phone and no paid service. Check: the episode shows "N ads found"
   and an "Ads found" list.
+- The user can follow an episode's transcript in the player, like a book's
+  read-along: it scrolls with the audio, highlights the line playing now, and
+  plays from a line when tapped (Mo's ask, 2026-11-17). The feed's own
+  transcript is used when there is one, else the phone's. Check: the transcript
+  follows a playing episode and a tap plays from that line.
 - The player skips those ads by itself, shows "Skipped ad" with Undo, and can be
   turned off per show. The hosts' own plugs (Patreon, merch) are skipped too,
   under their own switch. Check: on 3 episodes Mo picks, most ads (4 in 5) are

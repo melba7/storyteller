@@ -70,7 +70,7 @@ in `FORK.md`.
 - **Sounds folder:** `Atmosphere/<Family>[.<Kind>]/*.m4a`, `sounds.json`
   (including `rejected`), and `OneShots/`.
 - **Podcast library** (`podcasts.db`, its own SQLite file next to the books'
-  database, schema version 2 in `PRAGMA user_version`): `shows` (id, unique feed
+  database, schema version 4 in `PRAGMA user_version`): `shows` (id, unique feed
   address, title, author, description, picture, link, language, when it was
   added and last refreshed) and `episodes` (id, show, the feed's guid, title,
   date, length, plain-text notes, audio address, type and size, picture, season,
@@ -82,6 +82,13 @@ in `FORK.md`.
   (`position_seconds`), whether it was played (`played`), when it was last
   played (`last_played_at`) and the show's artwork colour (`artwork_color`,
   worked out once by the player and used to tint the full-screen player).
+  Version 3 (P1c3, same way) adds where the listener put each show in "Your
+  order" (`shows.own_position`, null until placed; placed shows come first, the
+  rest after them, oldest first). Version 4 (P1d, same way) adds the feed's
+  category names (`shows.categories`, a JSON list: each top-level name, then
+  "Top › Sub" ones; shows followed before get them at their next refresh) and a
+  `cache` table (key, value, saved at) that keeps Apple's chart answers for a
+  day.
 
 ## Decisions log
 
@@ -111,6 +118,7 @@ in `FORK.md`.
 | 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                   | iOS gives other apps no access; Mo's choice                |
 | 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1d)                                      | Apple has no public "similar shows" list; Mo's choice      |
 | 2026-11-17 | Native tabs in the Podcasts section; the mini player sits in the bar's accessory. Profile joins with P2a                                   | Mo's ask: the Pocket Casts layout, inside Podcasts         |
+| 2026-11-17 | An episode opens as a form sheet in the tab's stack, not a full screen; links in notes come from a tested splitter                         | Mo's ask: the episode card; no new package                 |
 | 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
 | 2026-11-17 | The podcast player is one Swift `AVPlayer`; a playing podcast owns the lock screen through `LofiRemoteHandoff`                             | The book's handlers stay registered and stand aside        |
 

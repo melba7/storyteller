@@ -261,6 +261,7 @@ once reviewed and green.
     show's page and the episode card look and work as described.
   - Files: `podcasts/` (show page, episode card, progress ring),
     `app/(root)/podcasts/` (the card's route).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
 
 - [ ] **P1c3. Your own order** (part 3 of 3)
   - A fourth order for the Podcasts tab: your own, set by dragging artwork in
@@ -270,6 +271,9 @@ once reviewed and green.
     dragged order stays after a restart.
   - Files: `podcasts/` (the grid), `modules/podcasts` (`schema.ts`, `db.ts`,
     `library.ts`).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
+    Dragging is on a separate Arrange screen (a handle on each row, plus
+    VoiceOver Move up and Move down), not in the grid itself.
 
 - [ ] **P1d. Discover** (Mo's ask, 2026-11-16, planned as "Explore")
   - The Discover tab shows Apple's free US top chart, Apple's main categories
@@ -306,6 +310,8 @@ once reviewed and green.
     `categories.ts`, `db.ts` version 4, with tests), `podcasts/` (Discover, show
     preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (discover and preview
     routes).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI and
+    for the chart addresses to be tried on the phone.
 
 - [ ] **P1e. Search episodes** (Mo's ask, 2026-11-16)
   - Search on the Podcasts screen has two tabs. "Your shows" finds episodes of
@@ -326,6 +332,9 @@ once reviewed and green.
   - Files: `modules/podcasts` (`search.ts`, `directory.ts`, `db.ts`, with
     tests), `podcasts/` (search screen, `PodcastsHome.tsx`),
     `app/(root)/podcasts/search.tsx`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    search is a button in the Podcasts top bar (`(tabs)/(library)/search.tsx`).
+    The saved Apple answer for the episode search is hand-written.
 
 - [ ] **P2a. Download episodes**
   - Download and delete buttons per episode. Downloads use a background session,
@@ -426,6 +435,23 @@ once reviewed and green.
     episode downloaded before bed is transcribed by morning.
   - Files: `modules/podcasts/ios`, `fork.config.ts` (task id).
 
+- [ ] **P3c. Moving transcript** (Mo's ask, 2026-11-17; replaces the old P5p)
+  - Like the books' read-along: the player shows the episode's transcript. It
+    scrolls with the audio, highlights the line playing now, and plays from a
+    line when you tap it. You can search in it.
+  - The feed's own transcript (`podcast:transcript`, as WebVTT, SRT or JSON) is
+    used when there is one, so it also works while streaming. Otherwise the
+    on-device transcript from P3a is used. Without either, the player says why.
+  - Test first: tests reading WebVTT, SRT and JSON transcripts (times, speakers,
+    a broken file), choosing the source, and finding the line playing at a given
+    time.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the transcript follows a playing episode and a tap on a line plays from
+    there.
+  - Files: `PodcastKit` (the feed's `podcast:transcript` tag),
+    `modules/podcasts` (transcript readers, with tests), `podcasts/` (the
+    transcript in the player).
+
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token
     budget, 2 minutes of overlap), the on-device detector (Foundation Models,
@@ -470,12 +496,12 @@ once reviewed and green.
 
 ### Pocket Casts features (Mo's ask, 2026-11-17)
 
-The rest of Pocket Casts' features, one session each. Each step's "done when"
-is: check.sh passes, the iOS build passes in CI, and the behaviour named works
-on TestFlight. Each one starts with tests of its rules (JS or Swift, run in
-`check.sh`). Size: S is small, M medium, L a big lift. Details and what is left
-out, with the reasons, are in "Matching Pocket Casts" in
-`docs/PODCASTS-PLAN.md`.
+The rest of Pocket Casts' features, one session each, after ad skipping (P3-P4;
+Mo's choice, 2026-11-17). Each step's "done when" is: check.sh passes, the iOS
+build passes in CI, and the behaviour named works on TestFlight. Each one starts
+with tests of its rules (JS or Swift, run in `check.sh`). Size: S is small, M
+medium, L a big lift. Details and what is left out, with the reasons, are in
+"Matching Pocket Casts" in `docs/PODCASTS-PLAN.md`.
 
 - [ ] **P5a. Per-show settings** (S): skip the first and last N seconds of every
       episode (intros and outros), the show's own speed, auto-download on or
@@ -527,10 +553,6 @@ out, with the reasons, are in "Matching Pocket Casts" in
 - [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
       play them like episodes, and put them in Up Next. They are transcribed and
       ad-checked like downloads.
-- [ ] **P5p. Transcript in the player** (M, after P3a): the episode's transcript
-      beside the player, the words playing now highlighted, tap a line to jump
-      there, and search in it. A feed's own transcript (`podcast:transcript`) is
-      shown when there is one.
 
 ## Later
 

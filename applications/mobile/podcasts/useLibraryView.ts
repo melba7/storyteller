@@ -28,6 +28,10 @@ async function save(view: LibraryView): Promise<void> {
   }
 }
 
+// Every screen that uses the view hears a change made by another one (the arrange screen
+// switches the library to "Your order" while the library is still open underneath).
+const listeners = new Set<(view: LibraryView) => void>()
+
 /**
  * The library's layout and order, kept on the phone. `view` is null until the saved choice
  * has been read, so the screen does not flash the default first. A failure to read or save
@@ -39,6 +43,17 @@ export function useLibraryView(): {
 } {
   const [view, setView] = useState<LibraryView | null>(null)
   const latest = useRef<LibraryView | null>(null)
+
+  useEffect(() => {
+    const listener = (next: LibraryView) => {
+      latest.current = next
+      setView(next)
+    }
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }, [])
 
   useEffect(() => {
     let current = true
@@ -57,7 +72,7 @@ export function useLibraryView(): {
   const change = useCallback((patch: Partial<LibraryView>) => {
     const next = { ...(latest.current ?? DEFAULT_VIEW), ...patch }
     latest.current = next
-    setView(next)
+    for (const listener of listeners) listener(next)
     void save(next)
   }, [])
 

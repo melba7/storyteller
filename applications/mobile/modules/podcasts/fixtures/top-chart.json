@@ -1,0 +1,39 @@
+{
+  "feed": {
+    "title": "Top Podcasts",
+    "country": "us",
+    "results": [
+      {
+        "id": "1200361736",
+        "name": "The Daily",
+        "artistName": "The New York Times",
+        "kind": "podcasts",
+        "artworkUrl100": "https://example.com/art/daily/200x200bb.png",
+        "genres": [{ "genreId": "1489", "name": "News" }],
+        "url": "https://podcasts.apple.com/us/podcast/the-daily/id1200361736"
+      },
+      {
+        "id": "360084272",
+        "name": "The Joe Rogan Experience",
+        "artistName": "Joe Rogan",
+        "kind": "podcasts",
+        "artworkUrl100": "https://example.com/art/jre/200x200bb.png",
+        "genres": [{ "genreId": "1303", "name": "Comedy" }]
+      },
+      {
+        "id": "1200361736",
+        "name": "The Daily (repeated)",
+        "artistName": "The New York Times",
+        "artworkUrl100": "https://example.com/art/daily/200x200bb.png"
+      },
+      { "name": "No id", "artistName": "Nobody" },
+      "not an object",
+      {
+        "id": "999",
+        "name": "Has no feed",
+        "artistName": "Somebody",
+        "artworkUrl100": "https://example.com/art/nofeed/200x200bb.png"
+      }
+    ]
+  }
+}
