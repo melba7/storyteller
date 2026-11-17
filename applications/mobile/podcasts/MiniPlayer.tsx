@@ -6,6 +6,7 @@ import { ActivityIndicator, Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { skipNoteText } from "@/modules/podcasts/ads"
 import { showsMiniPlayer, timeLeft } from "@/modules/podcasts/playbackRules"
 import {
   player,
@@ -16,6 +17,7 @@ import {
 import { progressFraction } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
+import { pressUndo, useSkipNote } from "./useSkipNote"
 
 /**
  * Whether the tab bar should carry the mini player: an episode is loaded or one was played
@@ -35,6 +37,7 @@ export function MiniPlayerContent() {
   const router = useRouter()
   const view = usePlayer()
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
+  const note = useSkipNote()
   const { episode, show } = view
   if (!episode) return null
 
@@ -60,11 +63,24 @@ export function MiniPlayerContent() {
             </Text>
             {compact ? null : (
               <Text className="text-muted-foreground text-sm" numberOfLines={1}>
-                {view.error ?? timeLeft(view.position, view.duration)}
+                {view.error ??
+                  (note
+                    ? skipNoteText(note)
+                    : timeLeft(view.position, view.duration))}
               </Text>
             )}
           </View>
         </Pressable>
+        {note ? (
+          <Pressable
+            className="bg-secondary rounded-full px-3 py-1.5 active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel="Undo the ad skip"
+            onPress={pressUndo}
+          >
+            <Text className="text-sm font-semibold">Undo</Text>
+          </Pressable>
+        ) : null}
         <Pressable
           className="size-11 items-center justify-center"
           accessibilityRole="button"

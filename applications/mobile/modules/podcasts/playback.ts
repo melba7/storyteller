@@ -293,6 +293,23 @@ export function createPlayback(deps: PlaybackDeps) {
     if (show) tintFor(show).catch(() => {})
   }
 
+  /** Plays the episode from this second (an ad's start): a loaded one seeks, else it loads there. */
+  async function playFrom(
+    episode: StoredEpisode,
+    show: Show | null,
+    seconds: number,
+  ) {
+    if (view.episode?.id === episode.id && view.loaded) {
+      await seekTo(seconds)
+      if (!view.isPlaying) await run(() => native().play())
+      return
+    }
+    await playEpisode(
+      { ...episode, positionSeconds: Math.max(0, seconds), played: false },
+      show,
+    )
+  }
+
   /** Play or pause. An episode only remembered after a restart is loaded first. */
   async function togglePlayPause() {
     const { episode, show, loaded, isPlaying } = view
@@ -337,6 +354,7 @@ export function createPlayback(deps: PlaybackDeps) {
     },
     restoreLast,
     playEpisode,
+    playFrom,
     togglePlayPause,
     seekTo,
     skip,

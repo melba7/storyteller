@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
+import { withAds } from "@/modules/podcasts/ads"
 import {
   downloadLook,
   formatStorage,
@@ -25,6 +26,7 @@ import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisodesByIds, useShows } from "./hooks"
+import { useAdsInfo } from "./useAds"
 import { confirmDelete, useDownloadMap, useStorageUsed } from "./useDownloads"
 import { useTranscript } from "./useTranscripts"
 
@@ -108,12 +110,18 @@ function DownloadRow({
   const title = episode?.title ?? "An episode no longer in your library"
   const look = downloadLook(info, title)
   const transcript = useTranscript(info.episodeId)
+  const ads = useAdsInfo(info.episodeId)
   const details = [
     showTitle,
     episode ? formatEpisodeDate(episode.publishedAt) : "",
-    withTranscript(
-      look.status,
-      info.state === "downloaded" ? transcript : undefined,
+    withAds(
+      withTranscript(
+        look.status,
+        info.state === "downloaded" ? transcript : undefined,
+      ),
+      info.state === "downloaded" && transcript?.state === "done"
+        ? ads
+        : undefined,
     ),
   ]
     .filter((part) => part !== "")

@@ -18,6 +18,7 @@ import {
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { adMarks, adRows } from "@/modules/podcasts/ads"
 import { speedLabel } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
@@ -26,7 +27,9 @@ import { playerBackground } from "@/modules/podcasts/playerLook"
 import { Artwork } from "./Artwork"
 import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
+import { SkippedAdNote } from "./SkippedAdNote"
 import { SpeedPanel } from "./SpeedPanel"
+import { useAdsFile } from "./useAds"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 
 /** The full-screen player, laid out like Pocket Casts': artwork, seek bar, controls, notes. */
@@ -37,6 +40,8 @@ export function PlayerScreen() {
   const { width } = useWindowDimensions()
   const [showSpeed, setShowSpeed] = useState(false)
   const { episode, show } = view
+  const adsFile = useAdsFile(episode?.id ?? "")
+  const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
   const artwork = Math.min(width - 64, 340)
 
   function close() {
@@ -104,7 +109,9 @@ export function PlayerScreen() {
             position={view.position}
             duration={view.duration}
             onSeek={(seconds) => void player.seekTo(seconds)}
+            marks={marks}
           />
+          <SkippedAdNote />
 
           <View className="w-full flex-row items-center justify-center gap-8">
             <SkipButton

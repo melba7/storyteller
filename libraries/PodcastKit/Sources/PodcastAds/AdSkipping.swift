@@ -1,0 +1,137 @@
+// LOFI-FORK: when the player skips an ad (see FORK.md). Plain values, no AVFoundation.
+import Foundation
+
+/// The listener's two switches, both on until they turn them off.
+public struct AdSkipSettings: Equatable, Sendable {
+  /// Skip sponsor reads and other produced ads.
+  public var skipAds: Bool
+  /// Skip the hosts' own plugs (Patreon, merch, their other shows).
+  public var skipOwnPlugs: Bool
+
+  public init(skipAds: Bool = true, skipOwnPlugs: Bool = true) {
+    self.skipAds = skipAds
+    self.skipOwnPlugs = skipOwnPlugs
+  }
+
+  /// Whether an ad of this kind may be skipped under these switches.
+  public func allows(_ kind: AdKind) -> Bool {
+    switch kind {
+    case .ad: return skipAds
+    case .ownPlug: return skipOwnPlugs
+    }
+  }
+}
+
+/// A skip the player is to make: jump to `target` seconds.
+public struct AdSkip: Equatable, Sendable {
+  public var ad: FoundAd
+  public var target: Double
+
+  public init(ad: FoundAd, target: Double) {
+    self.ad = ad
+    self.target = target
+  }
+}
+
+/// The player's decisions about ads in one loaded episode. The player sets a marker at each
+/// `boundaryTimes` entry and calls `reached` when playback crosses one; it calls `seeked`
+/// whenever the listener (or the app) moves the playhead and `undo` for the Undo button.
+public struct AdSkipper: Sendable {
+  /// The wrong skips can be undone for this long (the app shows the note for 6 seconds).
+  public static let undoSeconds = 6.0
+  /// A little more, for the time the tap takes to get here.
+  public static let undoGrace = 2.0
+  /// A marker is set this far in when an ad starts at the very start, because a marker at
+  /// zero is never crossed.
+  static let firstBoundary = 0.05
+
+  /// The ads sure enough to skip and not undone before, whatever the switches say.
+  private var candidates: [FoundAd]
+  public private(set) var settings: AdSkipSettings
+  /// Where the playhead was put last, and the ads it landed in.
+  private var lastSeek: Double?
+  private var enteredBySeek: Set<Double> = []
+  private var undone: Set<Double> = []
+  private var last: (skip: AdSkip, at: Double)?
+
+  /// - Parameter file: the episode's ads file, nil when it has none. Only sure ads that the
+  ///   listener did not undo before are ever skipped; unsure ones are only listed.
+  public init(file: AdsFile?, settings: AdSkipSettings) {
+    self.settings = settings
+    candidates = Self.candidates(in: file)
+  }
+
+  private static func candidates(in file: AdsFile?) -> [FoundAd] {
+    (file?.ads ?? []).filter { ad in
+      ad.confidence == .sure && file?.isUndone(ad) == false && ad.end > ad.start
+    }.sorted { $0.start < $1.start }
+  }
+
+  /// The ads file changed (ads were found while the episode plays). Where the playhead was put
+  /// last and what was undone stay, so the new ads are treated as if they had been there.
+  public mutating func replace(file: AdsFile?) {
+    candidates = Self.candidates(in: file)
+    if let lastSeek { seeked(to: lastSeek) }
+  }
+
+  /// The ads that will be skipped under the current switches.
+  public var ads: [FoundAd] { candidates.filter { settings.allows($0.kind) && !undone.contains($0.start) } }
+
+  /// Where to set the markers, in seconds, in order.
+  public var boundaryTimes: [Double] { ads.map { max(Self.firstBoundary, $0.start) } }
+
+  /// The switches changed. What was entered by a seek and what was undone stays.
+  public mutating func apply(settings: AdSkipSettings) { self.settings = settings }
+
+  /// The playhead was moved to `position`. An ad it lands in is not skipped, so a seek into an
+  /// ad (and Undo, and playing from an ad's start in the list) plays it.
+  public mutating func seeked(to position: Double) {
+    lastSeek = position
+    enteredBySeek = Set(candidates.filter { $0.start <= position && position < $0.end }.map(\.start))
+  }
+
+  /// How far past a marker playback may be when the player is told about it and still count as
+  /// having reached it: more at a higher speed, because the same delay covers more audio. Past
+  /// that, the listener got there by seeking.
+  public static func reachWindow(rate: Double) -> Double {
+    1.0 + (rate.isFinite && rate > 1 ? rate : 1)
+  }
+
+  /// Where a skip of this ad lands. An ad that runs to the end of the episode lands just
+  /// before it, so the episode ends as it would have.
+  public static func target(for ad: FoundAd, duration: Double?) -> Double {
+    guard let duration, duration.isFinite, duration > 0 else { return ad.end }
+    if ad.end >= duration - 0.5 { return max(ad.start, duration - 0.05) }
+    return ad.end
+  }
+
+  /// Playback crossed a marker at `position` while playing at `rate`. The skip to make, or
+  /// nil when the playhead is not at the start of an ad that is to be skipped (it got into
+  /// it by a seek, the ad was undone, or its switch is off). `now` is any steady clock in
+  /// seconds, kept for Undo.
+  public mutating func reached(
+    position: Double, rate: Double, duration: Double?, now: Double
+  ) -> AdSkip? {
+    guard position.isFinite else { return nil }
+    let window = Self.reachWindow(rate: rate)
+    guard
+      let ad = ads.last(where: {
+        let boundary = max(Self.firstBoundary, $0.start)
+        return position >= boundary - 0.5 && position <= boundary + window
+      }),
+      !enteredBySeek.contains(ad.start)
+    else { return nil }
+    let skip = AdSkip(ad: ad, target: Self.target(for: ad, duration: duration))
+    last = (skip, now)
+    return skip
+  }
+
+  /// The listener tapped Undo: the ad that was just skipped, to be played from its start, or nil
+  /// when nothing was skipped lately. The ad is not skipped again.
+  public mutating func undo(now: Double) -> FoundAd? {
+    guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
+    undone.insert(last.skip.ad.start)
+    self.last = nil
+    return last.skip.ad
+  }
+}

@@ -11,6 +11,7 @@ import {
 } from "@/modules/podcasts/library"
 import { episodeShare } from "@/modules/podcasts/share"
 
+import { AdsFound } from "./AdsFound"
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { LinkedNotes } from "./LinkedNotes"
@@ -103,6 +104,7 @@ export function PodcastEpisode({ id }: { id: string }) {
         label={`Share ${current.title}`}
         build={() => episodeShare(current, show.data ?? null)}
       />
+      <AdsFound episode={current} show={show.data ?? null} />
       <View className="w-full pt-2">
         {current.notes === "" ? (
           <Text className="text-muted-foreground">

@@ -23,6 +23,7 @@ import { Podcasts } from "@/modules/podcasts/index"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
+import { AdSkipSwitches } from "./AdSkipSwitches"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { useDownloadMap } from "./useDownloads"
@@ -134,6 +135,7 @@ export function Profile() {
           <NotifyRow />
           <PlaybackSection />
           <OpmlSection />
+          <AdSkipSwitches />
         </View>
       )}
     </View>

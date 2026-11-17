@@ -282,6 +282,44 @@ describe("the next button starting another episode", () => {
   })
 })
 
+describe("playFrom", () => {
+  it("loads a new episode at the given second, even if it was played", async () => {
+    const { playback, native } = setup()
+    await playback.playFrom(
+      episode({ positionSeconds: 30, played: true }),
+      show,
+      95,
+    )
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({
+        savedPosition: 95,
+        played: false,
+        autoplay: true,
+      }),
+    )
+    expect(playback.getView().position).toBe(95)
+  })
+
+  it("seeks the loaded episode and plays it", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(10, false)
+    await playback.playFrom(episode(), show, 95)
+    expect(native.load).toHaveBeenCalledTimes(1)
+    expect(native.seekTo).toHaveBeenCalledWith(95)
+    expect(native.play).toHaveBeenCalledTimes(1)
+  })
+
+  it("only seeks when the episode is already playing", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(10, true)
+    await playback.playFrom(episode(), show, 95)
+    expect(native.seekTo).toHaveBeenCalledWith(95)
+    expect(native.play).not.toHaveBeenCalled()
+  })
+})
+
 describe("keeping the place", () => {
   it("saves on pause", async () => {
     const { playback, deps, state } = setup()

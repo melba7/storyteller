@@ -58,11 +58,13 @@ final class PodcastTranscriber: @unchecked Sendable {
       return sink
     }
     languages?.note(nil, for: episodeId)
+    PodcastAdFinder.shared.removed(episodeId)
     send?("onTranscriptChange", ["episodeId": episodeId, "state": "none"])
   }
 
   func playbackChanged(isPlaying: Bool) {
     lock.withLock { playing = isPlaying }
+    PodcastAdFinder.shared.playbackChanged(isPlaying: isPlaying)
     if isPlaying { kick() }
   }
 
@@ -172,7 +174,9 @@ final class PodcastTranscriber: @unchecked Sendable {
         progress: { [weak self] percent in self?.set(id, .transcribing(percent: percent)) },
         shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
       switch outcome {
-      case .finished: set(id, .done)
+      case .finished:
+        set(id, .done)
+        PodcastAdFinder.shared.scan()
       case .paused: pause(id)
       }
     } catch let error as TranscriptError {

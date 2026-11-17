@@ -115,6 +115,37 @@ export type TranscriptChange =
   | TranscriptInfo
   | { episodeId: string; state: "none" }
 
+/** Where an episode's ad finding is, as the Swift side reports it (once its transcript is ready). */
+export type AdsInfo = {
+  episodeId: string
+  state: "waiting" | "finding" | "found" | "noAds" | "unavailable"
+  /** 0 to 100 while finding. */
+  percent?: number
+  /** How many ads were found, with "found". */
+  count?: number
+  /** Plain words for an unavailable one ("Apple Intelligence is off"). */
+  reason?: string
+}
+
+/** An episode's ad finding changed, or (state "none") went with its download. */
+export type AdsChange = AdsInfo | { episodeId: string; state: "none" }
+
+/** The player skipped an ad (the app shows "Skipped ad (1:05)" with Undo for a few seconds). */
+export type AdSkipped = {
+  episodeId: string
+  /** Seconds: where the ad started and ended. */
+  start: number
+  end: number
+  /** Seconds: how long the ad was. */
+  length: number
+}
+
+/** The listener undid the skip of the ad that started here. */
+export type AdUndone = { episodeId: string; start: number }
+
+/** The two switches for skipping ads, both on until turned off. */
+export type AdSkipSettings = { skipAds: boolean; skipOwnPlugs: boolean }
+
 /** An episode in Up Next, with what the player needs to start it without JavaScript. */
 export type UpNextItem = {
   id: string
@@ -148,6 +179,9 @@ export type PodcastsEvents = {
   onPlaybackAdvanced: (event: PlaybackAdvanced) => void
   onDownloadChange: (change: DownloadChange) => void
   onTranscriptChange: (change: TranscriptChange) => void
+  onAdsChange: (change: AdsChange) => void
+  onAdSkipped: (event: AdSkipped) => void
+  onAdUndone: (event: AdUndone) => void
   onPlaybackState: (state: PlaybackState) => void
   onPlaybackEnded: (event: PlaybackEnded) => void
   onPlaybackError: (event: PlaybackError) => void
@@ -223,6 +257,17 @@ type PodcastsNativeModule = {
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
   getTranscript(episodeId: string): Promise<string | null>
+  /** Where each transcribed episode's ad finding is. */
+  listAds(): Promise<AdsInfo[]>
+  /** An episode's saved ads as JSON (`AdsFile` in PodcastAds), or null. */
+  getAds(episodeId: string): Promise<string | null>
+  getAdSkipSettings(): Promise<AdSkipSettings>
+  setAdSkipSettings(skipAds: boolean, skipOwnPlugs: boolean): Promise<void>
+  /**
+   * Takes back the skip that was just made: back to the ad's start, playing, and the skip is
+   * recorded as wrong. False when it is too late.
+   */
+  undoAdSkip(): Promise<boolean>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>
