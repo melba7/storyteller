@@ -33,7 +33,7 @@ export function ChapterList({
   }
 
   return (
-    <ScrollView contentContainerClassName="px-safe-or-4 pb-safe gap-1 pb-8">
+    <ScrollView contentContainerClassName="px-safe-or-4 pb-safe-offset-3 gap-1">
       {chapters.map((chapter, index) => (
         <View
           key={chapter.start}

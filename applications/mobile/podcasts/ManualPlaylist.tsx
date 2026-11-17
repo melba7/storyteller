@@ -128,27 +128,7 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title={playlist.title}
-        right={
-          <Stack.Toolbar.Menu
-            icon="ellipsis"
-            accessibilityLabel="More for this playlist"
-          >
-            <Stack.Toolbar.MenuAction icon="pencil" onPress={rename}>
-              Rename
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="trash"
-              destructive
-              onPress={confirmDelete}
-            >
-              Delete playlist
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-        }
-      />
+    <>
       {entries.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -201,7 +181,27 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
           }}
         />
       )}
-    </View>
+      <ScreenBar
+        title={playlist.title}
+        right={
+          <Stack.Toolbar.Menu
+            icon="ellipsis"
+            accessibilityLabel="More for this playlist"
+          >
+            <Stack.Toolbar.MenuAction icon="pencil" onPress={rename}>
+              Rename
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={confirmDelete}
+            >
+              Delete playlist
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        }
+      />
+    </>
   )
 }
 

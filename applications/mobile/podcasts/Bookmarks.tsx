@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Bookmark as BookmarkIcon } from "lucide-react-native"
 import { useMemo } from "react"
-import { ActivityIndicator, FlatList, View } from "react-native"
+import { ActivityIndicator, FlatList } from "react-native"
 
 import { type Bookmark } from "@/modules/podcasts/bookmarks"
 
@@ -26,14 +26,14 @@ export function Bookmarks() {
     [shows.data],
   )
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Bookmarks" />
+    <>
       {bookmarks.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
         </BelowBar>
       ) : (
         <FlatList<Bookmark>
+          className="bg-background flex-1"
           data={list}
           keyExtractor={(bookmark) => bookmark.id}
           contentContainerClassName="px-safe-or-4"
@@ -64,6 +64,7 @@ export function Bookmarks() {
           }}
         />
       )}
-    </View>
+      <ScreenBar title="Bookmarks" />
+    </>
   )
 }

@@ -2,7 +2,7 @@
 import { useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, FlatList, View } from "react-native"
+import { ActivityIndicator, FlatList } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { useIsFocused } from "@/hooks/useIsFocused"
@@ -145,8 +145,7 @@ export function PodcastPreview({
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title={preview?.show.title ?? "Podcast"} />
+    <>
       {error ? (
         <BelowBar>
           <Text className="text-destructive px-8 py-12 text-center">
@@ -160,6 +159,7 @@ export function PodcastPreview({
       ) : (
         <FlatList<StoredEpisode>
           ref={list}
+          className="bg-background flex-1"
           onScrollToIndexFailed={({ averageItemLength, index }) => {
             // The row isn't drawn yet: go roughly there, then to the row itself.
             list.current?.scrollToOffset({
@@ -205,6 +205,7 @@ export function PodcastPreview({
           )}
         />
       )}
-    </View>
+      <ScreenBar title={preview?.show.title ?? "Podcast"} />
+    </>
   )
 }

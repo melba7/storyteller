@@ -36,7 +36,7 @@ export function SpeedSheet({
           accessibilityLabel="Close the speed choices"
           onPress={onClose}
         />
-        <View className="pb-safe gap-4 rounded-t-3xl bg-neutral-900 px-6 pt-5 pb-6">
+        <View className="pb-safe-offset-3 gap-4 rounded-t-3xl bg-neutral-900 px-6 pt-5">
           <Text className="text-lg font-semibold text-white">
             Playback speed
           </Text>

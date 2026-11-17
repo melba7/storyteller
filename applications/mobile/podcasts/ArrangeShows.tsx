@@ -56,28 +56,7 @@ export function ArrangeShows() {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title="Arrange"
-        left={
-          <Stack.Toolbar.Button
-            accessibilityLabel="Cancel"
-            onPress={() => router.back()}
-          >
-            Cancel
-          </Stack.Toolbar.Button>
-        }
-        right={
-          <Stack.Toolbar.Button
-            variant="done"
-            disabled={ids === null || saving}
-            accessibilityLabel="Done"
-            onPress={done}
-          >
-            Done
-          </Stack.Toolbar.Button>
-        }
-      />
+    <>
       {shows.error && ids === null ? (
         <BelowBar>
           <Text className="text-destructive px-8 py-12 text-center">
@@ -115,6 +94,27 @@ export function ArrangeShows() {
           }}
         />
       )}
-    </View>
+      <ScreenBar
+        title="Arrange"
+        left={
+          <Stack.Toolbar.Button
+            accessibilityLabel="Cancel"
+            onPress={() => router.back()}
+          >
+            Cancel
+          </Stack.Toolbar.Button>
+        }
+        right={
+          <Stack.Toolbar.Button
+            variant="done"
+            disabled={ids === null || saving}
+            accessibilityLabel="Done"
+            onPress={done}
+          >
+            Done
+          </Stack.Toolbar.Button>
+        }
+      />
+    </>
   )
 }

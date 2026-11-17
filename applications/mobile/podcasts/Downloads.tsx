@@ -50,9 +50,9 @@ export function Downloads() {
   const showById = new Map((shows.data ?? []).map((show) => [show.id, show]))
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Downloads" />
+    <>
       <FlatList<DownloadInfo>
+        className="bg-background flex-1"
         data={list}
         keyExtractor={(info) => info.episodeId}
         contentInsetAdjustmentBehavior="automatic"
@@ -92,7 +92,8 @@ export function Downloads() {
           )
         }}
       />
-    </View>
+      <ScreenBar title="Downloads" />
+    </>
   )
 }
 

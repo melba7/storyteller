@@ -79,6 +79,7 @@ export function ScreenBar({
 export function BelowBar({ children }: { children: ReactNode }) {
   return (
     <ScrollView
+      className="bg-background flex-1"
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={{ flexGrow: 1 }}
     >

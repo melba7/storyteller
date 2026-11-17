@@ -53,7 +53,32 @@ export function Playlists() {
   }
 
   return (
-    <View className="bg-background flex-1">
+    <>
+      {playlists.loading ? (
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
+      ) : (
+        <FlatList<Playlist>
+          className="bg-background flex-1"
+          data={playlists.data ?? []}
+          keyExtractor={(playlist) => playlist.id}
+          contentContainerClassName="px-safe-or-4"
+          contentInsetAdjustmentBehavior="automatic"
+          ListEmptyComponent={
+            <EmptyState
+              icon={ListMusic}
+              title="No playlists yet"
+              body={
+                playlists.error ??
+                "Make one from rules you choose, or fill one yourself."
+              }
+              action={{ label: "New playlist", onPress: chooseNew }}
+            />
+          }
+          renderItem={({ item }) => <PlaylistRow playlist={item} />}
+        />
+      )}
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
         large
@@ -77,31 +102,7 @@ export function Playlists() {
           </Stack.Toolbar.Menu>
         }
       />
-      {playlists.loading ? (
-        <BelowBar>
-          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
-        </BelowBar>
-      ) : (
-        <FlatList<Playlist>
-          data={playlists.data ?? []}
-          keyExtractor={(playlist) => playlist.id}
-          contentContainerClassName="px-safe-or-4"
-          contentInsetAdjustmentBehavior="automatic"
-          ListEmptyComponent={
-            <EmptyState
-              icon={ListMusic}
-              title="No playlists yet"
-              body={
-                playlists.error ??
-                "Make one from rules you choose, or fill one yourself."
-              }
-              action={{ label: "New playlist", onPress: chooseNew }}
-            />
-          }
-          renderItem={({ item }) => <PlaylistRow playlist={item} />}
-        />
-      )}
-    </View>
+    </>
   )
 }
 

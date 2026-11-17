@@ -24,10 +24,22 @@ const ACTIONS: { id: BulkAction; title: string }[] = [
   { id: "queueLast", title: "Play last (bottom of Up Next)" },
 ]
 
+/** How tall the bar is, so the list can leave room for it at the top. */
+const BAR_HEIGHT = 48
+
+/**
+ * Room at the top of a list for the selection bar, which is drawn over the list (the list
+ * has to be the screen's first child so the native bar can track it). Put it first in the
+ * list's header while `selection.on`.
+ */
+export function SelectionSpacer() {
+  return <View style={{ height: BAR_HEIGHT }} />
+}
+
 /**
  * The bar over a list while episodes are being picked: how many, Select all, the actions
- * menu and Done. `episodes` is every episode in the list. It sits above the list, outside
- * any scroll view, so it starts below the transparent header.
+ * menu and Done. `episodes` is every episode in the list. It is drawn after the list,
+ * pinned just below the transparent header; the list leaves room with `SelectionSpacer`.
  */
 export function SelectionBar({
   selection,
@@ -50,8 +62,8 @@ export function SelectionBar({
   )
   return (
     <View
-      className="px-safe-or-4 border-border flex-row items-center gap-1 border-b pb-1"
-      style={{ paddingTop: headerHeight }}
+      className="bg-background px-safe-or-4 border-border absolute inset-x-0 flex-row items-center gap-1 border-b"
+      style={{ top: headerHeight, height: BAR_HEIGHT }}
     >
       <Text className="flex-1 font-semibold">
         {selectionLabel(selection.selected.length)}

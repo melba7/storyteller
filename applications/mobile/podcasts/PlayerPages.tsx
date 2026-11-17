@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { Pressable, ScrollView } from "react-native"
+import { Pressable, ScrollView, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 
@@ -21,7 +21,10 @@ export function pagesFor(hasChapters: boolean): PlayerPage[] {
     : ["now", "notes", "transcript"]
 }
 
-/** The page pills in a sideways scroll, so they fit at large text sizes. */
+/**
+ * The page pills in one row that fits the width: each pill takes an equal share and shrinks
+ * its text to fit, so the last one never runs off the edge, with four pages too.
+ */
 export function PagePills({
   pages,
   page,
@@ -32,11 +35,8 @@ export function PagePills({
   onChange: (page: PlayerPage) => void
 }) {
   return (
-    <ScrollView
-      horizontal
-      className="flex-1"
-      contentContainerClassName="items-center gap-2 pr-2"
-      showsHorizontalScrollIndicator={false}
+    <View
+      className="flex-1 flex-row items-center gap-1.5 pr-2"
       accessibilityRole="tablist"
     >
       {pages.map((name) => {
@@ -44,7 +44,7 @@ export function PagePills({
         return (
           <Pressable
             key={name}
-            className={`min-h-11 justify-center rounded-full px-4 ${
+            className={`min-h-11 flex-1 items-center justify-center rounded-full px-2 ${
               selected ? "bg-white" : "bg-white/15 active:bg-white/25"
             }`}
             accessibilityRole="tab"
@@ -56,22 +56,24 @@ export function PagePills({
             }}
           >
             <Text
-              className={`font-semibold ${selected ? "text-black" : "text-white"}`}
+              className={`text-center font-semibold ${selected ? "text-black" : "text-white"}`}
               numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
             >
               {TITLES[name]}
             </Text>
           </Pressable>
         )
       })}
-    </ScrollView>
+    </View>
   )
 }
 
 /** The episode's show notes, on their own page. */
 export function NotesPage({ notes }: { notes: string }) {
   return (
-    <ScrollView contentContainerClassName="px-safe-or-6 pb-safe gap-2 pb-8">
+    <ScrollView contentContainerClassName="px-safe-or-6 pb-safe-offset-3 gap-2">
       <Text className="text-lg font-bold text-white">Show notes</Text>
       <Text selectable className="text-base leading-6 text-white/85">
         {notes === "" ? "No notes for this episode." : notes}

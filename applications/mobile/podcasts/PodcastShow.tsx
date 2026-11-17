@@ -27,7 +27,7 @@ import { type EpisodeSort } from "@/modules/podcasts/showSettings"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SelectionBar } from "./SelectionBar"
+import { SelectionBar, SelectionSpacer } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
@@ -105,7 +105,80 @@ export function PodcastShow({ id }: { id: string }) {
 
   const current = show.data
   return (
-    <View className="bg-background flex-1">
+    <>
+      {show.loading ? (
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
+      ) : !current ? (
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {show.error ?? "This show isn't in your library."}
+          </Text>
+        </BelowBar>
+      ) : (
+        <FlatList<EpisodeListItem>
+          className="bg-background flex-1"
+          data={items}
+          keyExtractor={(item) => item.key}
+          contentContainerClassName="px-safe-or-4"
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={32}
+          onScroll={(event) => {
+            // The list starts under the bar (its automatic inset is the header's height), so
+            // the page's top edge below the bar is at the offset plus that height.
+            if (titleBottom.current === null) return
+            setTitleInBar(
+              event.nativeEvent.contentOffset.y + headerHeight >=
+                titleBottom.current,
+            )
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+          }
+          ListHeaderComponent={
+            <>
+              {selection.on ? <SelectionSpacer /> : null}
+              <ShowHeader
+                show={current}
+                problem={problem}
+                onUnfollow={() => confirmUnsubscribe(current.title)}
+                episodeCount={episodes.data ? episodes.data.length : null}
+                onTitleBottom={(bottom) => (titleBottom.current = bottom)}
+              />
+              <View className="flex-row items-baseline justify-between pt-2 pb-1">
+                <Text className="text-xl font-bold" accessibilityRole="header">
+                  Episodes
+                </Text>
+                <Text className="text-muted-foreground text-sm">
+                  {SORT_NAMES[current.settings.sort]}
+                </Text>
+              </View>
+            </>
+          }
+          ListEmptyComponent={
+            episodes.loading ? undefined : (
+              <Text className="text-muted-foreground py-6 text-center text-sm">
+                {episodes.error ?? "This feed has no episodes yet."}
+              </Text>
+            )
+          }
+          renderItem={({ item }) =>
+            item.kind === "header" ? (
+              <Text variant="h4" className="pt-4 pb-1">
+                {item.title}
+              </Text>
+            ) : (
+              <EpisodeRow
+                episode={item.episode}
+                show={current}
+                selection={selection}
+              />
+            )
+          }
+          extraData={selection.selected}
+        />
+      )}
       <ScreenBar
         title={current ? current.title : "Podcast"}
         titleHidden={Boolean(current) && !titleInBar}
@@ -122,89 +195,13 @@ export function PodcastShow({ id }: { id: string }) {
             : undefined
         }
       />
-      {show.loading ? (
-        <BelowBar>
-          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
-        </BelowBar>
-      ) : !current ? (
-        <BelowBar>
-          <Text className="text-muted-foreground px-8 py-12 text-center">
-            {show.error ?? "This show isn't in your library."}
-          </Text>
-        </BelowBar>
-      ) : (
-        <>
-          {selection.on ? (
-            <SelectionBar
-              selection={selection}
-              episodes={episodesInView(items)}
-              shows={shows}
-            />
-          ) : null}
-          <FlatList<EpisodeListItem>
-            data={items}
-            keyExtractor={(item) => item.key}
-            contentContainerClassName="px-safe-or-4"
-            contentInsetAdjustmentBehavior="automatic"
-            scrollEventThrottle={32}
-            onScroll={(event) => {
-              // The list starts under the bar (its automatic inset is the header's height), so
-              // the page's top edge below the bar is at the offset plus that height.
-              if (titleBottom.current === null) return
-              setTitleInBar(
-                event.nativeEvent.contentOffset.y + headerHeight >=
-                  titleBottom.current,
-              )
-            }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} />
-            }
-            ListHeaderComponent={
-              <>
-                <ShowHeader
-                  show={current}
-                  problem={problem}
-                  onUnfollow={() => confirmUnsubscribe(current.title)}
-                  episodeCount={episodes.data ? episodes.data.length : null}
-                  onTitleBottom={(bottom) => (titleBottom.current = bottom)}
-                />
-                <View className="flex-row items-baseline justify-between pt-2 pb-1">
-                  <Text
-                    className="text-xl font-bold"
-                    accessibilityRole="header"
-                  >
-                    Episodes
-                  </Text>
-                  <Text className="text-muted-foreground text-sm">
-                    {SORT_NAMES[current.settings.sort]}
-                  </Text>
-                </View>
-              </>
-            }
-            ListEmptyComponent={
-              episodes.loading ? undefined : (
-                <Text className="text-muted-foreground py-6 text-center text-sm">
-                  {episodes.error ?? "This feed has no episodes yet."}
-                </Text>
-              )
-            }
-            renderItem={({ item }) =>
-              item.kind === "header" ? (
-                <Text variant="h4" className="pt-4 pb-1">
-                  {item.title}
-                </Text>
-              ) : (
-                <EpisodeRow
-                  episode={item.episode}
-                  show={current}
-                  selection={selection}
-                />
-              )
-            }
-            extraData={selection.selected}
-          />
-        </>
-      )}
-    </View>
+      {selection.on ? (
+        <SelectionBar
+          selection={selection}
+          episodes={episodesInView(items)}
+          shows={shows}
+        />
+      ) : null}
+    </>
   )
 }

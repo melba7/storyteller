@@ -3,7 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { Bookmark, Download, History } from "lucide-react-native"
 import { useEffect, useState } from "react"
-import { ScrollView, View } from "react-native"
+import { ScrollView } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import {
@@ -82,17 +82,7 @@ export function Profile() {
   const summary = downloadsSummary(map)
 
   return (
-    <View className="bg-background flex-1">
-      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
-      <ScreenBar
-        large
-        title="Profile"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
-      />
+    <>
       {Podcasts === null ? (
         <BelowBar>
           <Text className="text-muted-foreground px-8 py-12 text-center">
@@ -101,6 +91,7 @@ export function Profile() {
         </BelowBar>
       ) : (
         <ScrollView
+          className="bg-background flex-1"
           contentContainerClassName="px-safe-or-4 pb-8"
           contentInsetAdjustmentBehavior="automatic"
         >
@@ -164,6 +155,16 @@ export function Profile() {
           </SettingsGroup>
         </ScrollView>
       )}
-    </View>
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
+      <ScreenBar
+        large
+        title="Profile"
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
+      />
+    </>
   )
 }

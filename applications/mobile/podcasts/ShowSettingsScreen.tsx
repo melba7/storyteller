@@ -179,24 +179,24 @@ export function ShowSettingsScreen({ id }: { id: string }) {
   const current = show.data
   if (show.loading) {
     return (
-      <View className="bg-background flex-1">
-        <ScreenBar title="Show settings" />
+      <>
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
         </BelowBar>
-      </View>
+        <ScreenBar title="Show settings" />
+      </>
     )
   }
   if (!current) {
     return (
-      <View className="bg-background flex-1">
-        <ScreenBar title="Show settings" />
+      <>
         <BelowBar>
           <Text className="text-muted-foreground px-8 py-12 text-center">
             {show.error ?? "This show isn't in your library."}
           </Text>
         </BelowBar>
-      </View>
+        <ScreenBar title="Show settings" />
+      </>
     )
   }
   const settings = current.settings
@@ -206,9 +206,9 @@ export function ShowSettingsScreen({ id }: { id: string }) {
     )
   }
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title={current.title} />
+    <>
       <ScrollView
+        className="bg-background flex-1"
         contentContainerClassName="px-safe-or-4 pb-12"
         contentInsetAdjustmentBehavior="automatic"
       >
@@ -307,6 +307,7 @@ export function ShowSettingsScreen({ id }: { id: string }) {
           onChange={(keepNewest) => change({ keepNewest })}
         />
       </ScrollView>
-    </View>
+      <ScreenBar title={current.title} />
+    </>
   )
 }

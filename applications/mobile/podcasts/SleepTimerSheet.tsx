@@ -99,7 +99,7 @@ function SleepSheet({
         accessibilityLabel="Close the sleep timer"
         onPress={onClose}
       />
-      <View className="bg-background pb-safe gap-1 rounded-t-3xl px-6 pt-5 pb-6">
+      <View className="bg-background pb-safe-offset-3 gap-1 rounded-t-3xl px-6 pt-5">
         <Text className="pb-2 text-lg font-semibold">Sleep timer</Text>
         {SLEEP_PRESET_MINUTES.map((minutes) => (
           <Choice

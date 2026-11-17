@@ -90,6 +90,7 @@ export function DragList({
 
   return (
     <ScrollView
+      className="bg-background flex-1"
       scrollEnabled={dragging === null}
       contentContainerClassName="px-safe-or-4"
       contentInsetAdjustmentBehavior="automatic"

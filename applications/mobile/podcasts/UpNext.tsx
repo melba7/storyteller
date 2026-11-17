@@ -86,26 +86,7 @@ export function UpNext() {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
-      <ScreenBar
-        large
-        title="Up Next"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
-        right={
-          <Stack.Toolbar.Button
-            hidden={queue.length === 0}
-            accessibilityLabel="Clear Up Next"
-            onPress={() => confirmClear(queue.length)}
-          >
-            Clear
-          </Stack.Toolbar.Button>
-        }
-      />
+    <>
       {Podcasts === null ? (
         <BelowBar>
           <EmptyState
@@ -127,36 +108,53 @@ export function UpNext() {
           />
         </BelowBar>
       ) : (
-        <>
-          <DragList
-            header={
-              <Text
-                className="text-muted-foreground py-2 text-sm"
-                accessibilityLabel={upNextSummary(queue)}
-              >
-                {upNextSummary(queue)}
-              </Text>
-            }
-            ids={ids}
-            rowHeight={ROW_HEIGHT}
-            onChange={reorder}
-            onDrop={pick}
-            label={(id, index, count) => {
-              const item = byId.get(id)
-              return item ? rowLabel(item, index, count) : ""
-            }}
-            actions={ACTIONS}
-            onAction={act}
-            renderContent={(id) => {
-              const item = byId.get(id)
-              return item ? (
-                <QueueRow item={item} openable={inLibrary.has(id)} />
-              ) : null
-            }}
-          />
-        </>
+        <DragList
+          header={
+            <Text
+              className="text-muted-foreground py-2 text-sm"
+              accessibilityLabel={upNextSummary(queue)}
+            >
+              {upNextSummary(queue)}
+            </Text>
+          }
+          ids={ids}
+          rowHeight={ROW_HEIGHT}
+          onChange={reorder}
+          onDrop={pick}
+          label={(id, index, count) => {
+            const item = byId.get(id)
+            return item ? rowLabel(item, index, count) : ""
+          }}
+          actions={ACTIONS}
+          onAction={act}
+          renderContent={(id) => {
+            const item = byId.get(id)
+            return item ? (
+              <QueueRow item={item} openable={inLibrary.has(id)} />
+            ) : null
+          }}
+        />
       )}
-    </View>
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
+      <ScreenBar
+        large
+        title="Up Next"
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
+        right={
+          <Stack.Toolbar.Button
+            hidden={queue.length === 0}
+            accessibilityLabel="Clear Up Next"
+            onPress={() => confirmClear(queue.length)}
+          >
+            Clear
+          </Stack.Toolbar.Button>
+        }
+      />
+    </>
   )
 }
 

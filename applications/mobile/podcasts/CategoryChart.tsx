@@ -15,8 +15,7 @@ export function CategoryChart({ id }: { id: string }) {
   const chart = useChart(id)
   const open = useOpenPreview()
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title={category?.name ?? "Category"} />
+    <>
       {!category ? (
         <BelowBar>
           <Text className="text-muted-foreground px-8 py-12 text-center">
@@ -35,6 +34,7 @@ export function CategoryChart({ id }: { id: string }) {
         </BelowBar>
       ) : (
         <FlatList<ChartShow>
+          className="bg-background flex-1"
           data={chart.data ?? []}
           keyExtractor={(show) => show.appleId}
           contentContainerClassName="px-safe-or-4 gap-3"
@@ -75,6 +75,7 @@ export function CategoryChart({ id }: { id: string }) {
           )}
         />
       )}
-    </View>
+      <ScreenBar title={category?.name ?? "Category"} />
+    </>
   )
 }

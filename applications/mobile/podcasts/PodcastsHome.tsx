@@ -13,8 +13,8 @@ import {
 
 import { Text } from "@/components/ui/text"
 import { followUpNew } from "@/modules/podcasts/automaticRun"
-import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
+import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
 import {
@@ -159,38 +159,7 @@ export function PodcastsHome() {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
-      <ScreenBar
-        large
-        title="Podcasts"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
-        right={
-          <>
-            <Stack.Toolbar.Button
-              icon="magnifyingglass"
-              accessibilityLabel="Search episodes"
-              onPress={() => router.push("/podcasts/search")}
-            />
-            <Stack.Toolbar.Button
-              icon="plus"
-              accessibilityLabel="Find a podcast to add"
-              onPress={() => router.navigate("/podcasts/discover")}
-            />
-            <Stack.Toolbar.Menu
-              icon="ellipsis"
-              hidden={!view}
-              accessibilityLabel="Layout and order"
-            >
-              {view ? menuItems(view, change, openArrange, arranged) : null}
-            </Stack.Toolbar.Menu>
-          </>
-        }
-      />
+    <>
       {Podcasts === null ? (
         <BelowBar>
           <Message
@@ -210,6 +179,7 @@ export function PodcastsHome() {
         <FlatList<Show>
           // A different column count needs a fresh list.
           key={`columns-${columns}`}
+          className="bg-background flex-1"
           data={sorted}
           numColumns={columns}
           keyExtractor={(show) => show.id}
@@ -260,7 +230,38 @@ export function PodcastsHome() {
           renderItem={renderShow}
         />
       )}
-    </View>
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
+      <ScreenBar
+        large
+        title="Podcasts"
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
+        right={
+          <>
+            <Stack.Toolbar.Button
+              icon="magnifyingglass"
+              accessibilityLabel="Search episodes"
+              onPress={() => router.push("/podcasts/search")}
+            />
+            <Stack.Toolbar.Button
+              icon="plus"
+              accessibilityLabel="Find a podcast to add"
+              onPress={() => router.navigate("/podcasts/discover")}
+            />
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              hidden={!view}
+              accessibilityLabel="Layout and order"
+            >
+              {view ? menuItems(view, change, openArrange, arranged) : null}
+            </Stack.Toolbar.Menu>
+          </>
+        }
+      />
+    </>
   )
 }
 

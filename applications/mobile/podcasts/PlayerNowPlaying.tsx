@@ -166,7 +166,7 @@ export function PlayerNowPlaying({
           />
         </View>
       </ScrollView>
-      <View className="px-safe-or-4 pb-safe pt-2">
+      <View className="px-safe-or-4 pb-safe-offset-3 pt-2">
         <PlayerToolbar />
       </View>
     </>

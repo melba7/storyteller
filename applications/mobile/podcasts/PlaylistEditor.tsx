@@ -2,7 +2,7 @@
 import { randomUUID } from "expo-crypto"
 import { Stack, useRouter } from "expo-router"
 import { useEffect, useState } from "react"
-import { ActivityIndicator, Alert, ScrollView, View } from "react-native"
+import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -78,8 +78,7 @@ export function PlaylistEditor({ id }: { id: string }) {
 
   if (!draft) {
     return (
-      <View className="bg-background flex-1">
-        <ScreenBar title={creating ? "New playlist" : "Playlist"} />
+      <>
         {existing.loading && !creating ? (
           <BelowBar>
             <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -91,7 +90,8 @@ export function PlaylistEditor({ id }: { id: string }) {
             </Text>
           </BelowBar>
         )}
-      </View>
+        <ScreenBar title={creating ? "New playlist" : "Playlist"} />
+      </>
     )
   }
 
@@ -148,21 +148,10 @@ export function PlaylistEditor({ id }: { id: string }) {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title={creating ? "New playlist" : "Edit playlist"}
-        right={
-          <Stack.Toolbar.Button
-            variant="done"
-            disabled={saving}
-            accessibilityLabel="Save the playlist"
-            onPress={save}
-          >
-            Save
-          </Stack.Toolbar.Button>
-        }
-      />
+    <>
       <ScrollView
+        className="bg-background flex-1"
+        contentInsetAdjustmentBehavior="automatic"
         contentContainerClassName="px-safe-or-4 pb-12"
         keyboardShouldPersistTaps="handled"
       >
@@ -270,6 +259,19 @@ export function PlaylistEditor({ id }: { id: string }) {
           </Button>
         )}
       </ScrollView>
-    </View>
+      <ScreenBar
+        title={creating ? "New playlist" : "Edit playlist"}
+        right={
+          <Stack.Toolbar.Button
+            variant="done"
+            disabled={saving}
+            accessibilityLabel="Save the playlist"
+            onPress={save}
+          >
+            Save
+          </Stack.Toolbar.Button>
+        }
+      />
+    </>
   )
 }

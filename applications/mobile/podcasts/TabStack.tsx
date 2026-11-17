@@ -13,6 +13,7 @@ import { useCSSVariable } from "uniwind"
  */
 export function TabStack() {
   const tint = useCSSVariable("--color-primary") as string
+  const background = useCSSVariable("--color-background") as string
   return (
     <Stack
       screenOptions={{
@@ -21,6 +22,8 @@ export function TabStack() {
         headerShadowVisible: false,
         headerBackButtonDisplayMode: "minimal",
         headerTintColor: tint,
+        // Nothing white behind a list while it loads or bounces.
+        contentStyle: { backgroundColor: background },
       }}
     >
       <Stack.Screen

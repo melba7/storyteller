@@ -90,25 +90,9 @@ export function Discover() {
   const statusBarStyle = useStatusBarStyle()
 
   return (
-    <View className="bg-background flex-1">
-      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
-      <ScreenBar
-        large
-        title="Discover"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
-      />
-      <Stack.SearchBar
-        placeholder="Search podcasts or paste a link"
-        autoCapitalize="none"
-        hideWhenScrolling={false}
-        onChangeText={(event) => setTerm(event.nativeEvent.text)}
-        onCancelButtonPress={() => setTerm("")}
-      />
+    <>
       <ScrollView
+        className="bg-background flex-1"
         contentContainerClassName="px-safe-or-4 gap-3"
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
@@ -185,6 +169,23 @@ export function Discover() {
           </View>
         ) : null}
       </ScrollView>
-    </View>
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
+      <ScreenBar
+        large
+        title="Discover"
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
+      />
+      <Stack.SearchBar
+        placeholder="Search podcasts or paste a link"
+        autoCapitalize="none"
+        hideWhenScrolling={false}
+        onChangeText={(event) => setTerm(event.nativeEvent.text)}
+        onCancelButtonPress={() => setTerm("")}
+      />
+    </>
   )
 }
