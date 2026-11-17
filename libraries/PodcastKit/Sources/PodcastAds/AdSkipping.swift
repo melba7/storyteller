@@ -31,11 +31,18 @@ public struct AdSkipSettings: Equatable, Sendable {
 public struct AdSkip: Equatable, Sendable {
   public var ad: FoundAd
   public var target: Double
+  /// The ads that follow `ad` at once (an ad and then the hosts' plug), skipped with it.
+  public var chained: [FoundAd]
 
-  public init(ad: FoundAd, target: Double) {
+  public init(ad: FoundAd, target: Double, chained: [FoundAd] = []) {
     self.ad = ad
     self.target = target
+    self.chained = chained
   }
+
+  /// Where the skipped stretch ends according to the ads (the target may be a little earlier at
+  /// the end of the episode).
+  public var end: Double { chained.last?.end ?? ad.end }
 }
 
 /// The player's decisions about ads in one loaded episode. The player sets a marker at each
@@ -49,6 +56,8 @@ public struct AdSkipper: Sendable {
   /// A marker is set this far in when an ad starts at the very start, because a marker at
   /// zero is never crossed.
   static let firstBoundary = 0.05
+  /// An ad that starts this close to where the one before ends is skipped with it.
+  static let chainGap = 0.5
 
   /// The ads sure enough to skip and not undone before, whatever the switches say.
   private var candidates: [FoundAd]
@@ -95,6 +104,34 @@ public struct AdSkipper: Sendable {
     enteredBySeek = Set(candidates.filter { $0.start <= position && position < $0.end }.map(\.start))
   }
 
+  /// An episode was loaded to start at `position`. That is the app's choice and not the listener's
+  /// seek, so an ad that starts later is skipped as usual. When the start lies inside an ad that is
+  /// to be skipped, the skip to make at once.
+  public mutating func started(at position: Double, duration: Double?, now: Double) -> AdSkip? {
+    lastSeek = nil
+    enteredBySeek = []
+    guard position.isFinite,
+      let ad = ads.first(where: { $0.start <= position && position < $0.end })
+    else { return nil }
+    return makeSkip(ad, duration: duration, now: now)
+  }
+
+  /// The skip for `ad`, taking on the ads that start within `chainGap` of where it ends.
+  private mutating func makeSkip(_ ad: FoundAd, duration: Double?, now: Double) -> AdSkip {
+    var chained: [FoundAd] = []
+    var end = ad.end
+    for next in ads where next.start > ad.start && !chained.contains(next) && next != ad {
+      if next.start <= end + Self.chainGap && next.end > end {
+        chained.append(next)
+        end = next.end
+      }
+    }
+    let skip = AdSkip(
+      ad: ad, target: Self.target(for: chained.last ?? ad, duration: duration), chained: chained)
+    last = (skip, now)
+    return skip
+  }
+
   /// How far past a marker playback may be when the player is told about it and still count as
   /// having reached it: more at a higher speed, because the same delay covers more audio. Past
   /// that, the listener got there by seeking.
@@ -126,9 +163,7 @@ public struct AdSkipper: Sendable {
       }),
       !enteredBySeek.contains(ad.start)
     else { return nil }
-    let skip = AdSkip(ad: ad, target: Self.target(for: ad, duration: duration))
-    last = (skip, now)
-    return skip
+    return makeSkip(ad, duration: duration, now: now)
   }
 
   /// The listener tapped Undo: the ad that was just skipped, to be played from its start, or nil
@@ -136,6 +171,7 @@ public struct AdSkipper: Sendable {
   public mutating func undo(now: Double) -> FoundAd? {
     guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
     undone.insert(last.skip.ad.start)
+    for later in last.skip.chained { undone.insert(later.start) }
     self.last = nil
     return last.skip.ad
   }

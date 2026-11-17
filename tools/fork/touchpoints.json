@@ -65,8 +65,8 @@
     },
     {
       "file": "applications/mobile/modules/readium/ios/AudiobookPlayerActor.swift",
-      "markers": 16,
-      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer. Each of the eight lock-screen handlers also asks LofiRemoteHandoff.swift first, so a playing podcast owns the lock screen and headphone buttons."
+      "markers": 17,
+      "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer. Each of the eight lock-screen handlers also asks LofiRemoteHandoff.swift first, so a playing podcast owns the lock screen and headphone buttons. The book does not resume after a call or Siri while a podcast owns the lock screen (the podcast player resumes its own episode)."
     }
   ],
   "allowedChanges": [],

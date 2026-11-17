@@ -173,6 +173,12 @@ final class DownloadRecoveryTests: XCTestCase {
       .fail("No connection, tap to try again"))
   }
 
+  func testAPlainHttpLinkIOSBlocksFailsWithAReadableReason() {
+    XCTAssertEqual(
+      DownloadRecovery.decide(DownloadFailure(urlErrorCode: -1022)),
+      .fail("The episode's link is plain http, which iOS blocks"))
+  }
+
   func testOtherErrorsFail() {
     XCTAssertEqual(
       DownloadRecovery.decide(DownloadFailure(urlErrorCode: -1202)),

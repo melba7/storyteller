@@ -7,6 +7,17 @@ struct PodcastFetchError: LocalizedError {
   var errorDescription: String? { message }
 }
 
+extension URL {
+  /// A plain http address as its https twin, because iOS blocks public http for everything but
+  /// the player's own media loading. Any other address is returned as it is.
+  var upgradedToHTTPS: URL {
+    guard scheme?.lowercased() == "http", var parts = URLComponents(url: self, resolvingAgainstBaseURL: false)
+    else { return self }
+    parts.scheme = "https"
+    return parts.url ?? self
+  }
+}
+
 enum PodcastFeedFetcher {
   /// The most a feed may weigh. Real feeds are well under this.
   static let maxBytes = 30 * 1024 * 1024

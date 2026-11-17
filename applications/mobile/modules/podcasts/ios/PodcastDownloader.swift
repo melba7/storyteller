@@ -110,9 +110,11 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   func download(episodeId: String, url: String, type: String, automatic: Bool) throws {
     guard let store else { throw PodcastFetchError(message: "Downloads are not available.") }
     _ = try store.folder(for: episodeId)
-    guard let address = URL(string: url), let scheme = address.scheme?.lowercased(),
-      scheme == "http" || scheme == "https", address.host != nil
+    guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
+      scheme == "http" || scheme == "https", given.host != nil
     else { throw PodcastFetchError(message: "This episode has no downloadable link.") }
+    // A background download can't use plain http, which iOS blocks (error -1022).
+    let address = given.upgradedToHTTPS
     if let existing = store.entry(for: episodeId) {
       if existing.state.isActive, lock.withLock({ active.contains(episodeId) }) { return }
       if case .downloaded = existing.state, store.localFile(for: episodeId) != nil { return }
@@ -219,10 +221,14 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
         throw error
       }
       let done = try store.install(
-        episodeId: id, staged: staged, sha256: hash, fileExtension: entry.fileExtension, bytes: bytes)
+        episodeId: id, staged: staged, sha256: hash, fileExtension: entry.fileExtension, bytes: bytes,
+        requireEntry: true)
       finished(id, taskIdentifier: downloadTask.taskIdentifier)
       emit(done)
       PodcastTranscriber.shared.downloaded(id)
+    } catch DownloadError.noEntry {
+      // Removed by the listener while the file was being filed: nothing is brought back.
+      finished(id, taskIdentifier: downloadTask.taskIdentifier)
     } catch {
       let full = DownloadFailure.isDiskFull(error)
       recover(id, DownloadFailure(diskFull: full, attempts: DownloadRecovery.maxRetries))

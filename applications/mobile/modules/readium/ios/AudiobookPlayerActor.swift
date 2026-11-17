@@ -704,7 +704,7 @@ public actor AudiobookPlayerActor {
                 try AVAudioSession.sharedInstance().setActive(true)
 
                 if let optionsUInt = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt,
-                    AVAudioSession.InterruptionOptions(rawValue: optionsUInt).contains(.shouldResume) {
+                    AVAudioSession.InterruptionOptions(rawValue: optionsUInt).contains(.shouldResume), !LofiRemoteHandoff.shared.podcastIsActive { // LOFI-FORK: a playing podcast, not the book, resumes after a call
                     Task { @AudiobookPlayerActor in
                         await AudiobookPlayerActor.shared.play(automaticRewind: true)
                     }

@@ -115,7 +115,9 @@ final class PodcastTranscriber: @unchecked Sendable {
     }
     let gone = lock.withLock { Set(statuses.keys).subtracting(present) }
     for id in gone { removed(id) }
-    languages?.prune(keeping: present)
+    // Keep the language of an episode that is still downloading too: it is saved when the
+    // download starts and is needed when the file arrives.
+    languages?.prune(keeping: Set(downloads.entries().map(\.episodeId)))
     kick()
   }
 

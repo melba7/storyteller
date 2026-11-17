@@ -41,6 +41,18 @@ final class ChapterJSONTests: XCTestCase {
     XCTAssertNil(chapters[2].imageURL)
   }
 
+  func testAChapterStartingBeyondAnySaneEpisodeIsDroppedInsteadOfCrashing() {
+    let chapters = parse(
+      """
+      {"chapters":[{"startTime":5,"title":"ok"},{"startTime":1e300,"title":"huge"},
+      {"startTime":1e16,"title":"big"}]}
+      """)
+    XCTAssertEqual(chapters.map(\.title), ["ok"])
+    XCTAssertEqual(ChapterList.tidy([Chapter(start: 1e300, title: "x")]).count, 0)
+    // The key never traps, even for a chapter built by hand.
+    XCTAssertEqual(Chapter(start: 1e300, title: "x").key, 10_000_000_000)
+  }
+
   func testNotAChaptersFileGivesNone() {
     XCTAssertTrue(parse("").isEmpty)
     XCTAssertTrue(parse("[1,2]").isEmpty)

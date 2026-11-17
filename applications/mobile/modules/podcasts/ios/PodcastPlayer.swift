@@ -152,7 +152,9 @@ final class PodcastPlayer {
   }
 
   func togglePlayPause() {
-    if wantsToPlay || player.timeControlStatus == .playing { pause() } else { play() }
+    // What the player really does decides, not what the listener last asked for: iOS can pause
+    // it by itself (headphones out, a call), and then one press must play.
+    if player.timeControlStatus != .paused { pause() } else { play() }
   }
 
   func seek(to seconds: Double) {
@@ -329,9 +331,27 @@ final class PodcastPlayer {
       let options = note.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
       let shouldResume = AVAudioSession.InterruptionOptions(rawValue: options).contains(.shouldResume)
       Task { @MainActor in
-        guard let self, shouldResume, self.wantsToPlay, self.lockScreen.owner.current == .podcast
-        else { return }
-        self.play()
+        guard let self, self.wantsToPlay, self.lockScreen.owner.current == .podcast else { return }
+        if shouldResume {
+          self.play()
+        } else if self.player.timeControlStatus == .paused {
+          // The system did not say to carry on: it is paused for good until the listener plays.
+          self.wantsToPlay = false
+          self.publish()
+        }
+      }
+    }
+    // Headphones or a Bluetooth speaker went away: pause instead of playing on the speaker.
+    NotificationCenter.default.addObserver(
+      forName: AVAudioSession.routeChangeNotification, object: AVAudioSession.sharedInstance(),
+      queue: .main
+    ) { [weak self] note in
+      guard let raw = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+        AVAudioSession.RouteChangeReason(rawValue: raw) == .oldDeviceUnavailable
+      else { return }
+      Task { @MainActor in
+        guard let self, self.wantsToPlay || self.player.timeControlStatus != .paused else { return }
+        self.pause()
       }
     }
   }
