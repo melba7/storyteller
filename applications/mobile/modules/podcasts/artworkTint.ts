@@ -103,3 +103,19 @@ export function playerGradient(color: string | null): string {
   const [top, bottom] = gradientEnds(color)
   return `linear-gradient(180deg, ${top}, ${bottom})`
 }
+
+/** The colour behind a show or episode header when the artwork's colour is not known yet. */
+export const HEADER_FALLBACK = "#3a3a3c"
+
+/**
+ * The colours of a show's or episode's header: the artwork's colour made dark enough for white
+ * text (the same as the player's), and a lighter tint of it for the small lines (category,
+ * show name, the date), which keeps the hue and still reads on the background.
+ */
+export function headerColors(color: string | null): {
+  background: string
+  tint: string
+} {
+  const background = color === null ? HEADER_FALLBACK : gradientEnds(color)[0]
+  return { background, tint: blendOver("#ffffff", background, 0.65) }
+}

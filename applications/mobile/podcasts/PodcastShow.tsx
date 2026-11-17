@@ -20,6 +20,10 @@ import {
   arrangeEpisodes,
   episodesInView,
 } from "@/modules/podcasts/episodeList"
+import {
+  type EpisodeFilter,
+  filterEpisodes,
+} from "@/modules/podcasts/episodeRowLook"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { settingsHref, tabBase } from "@/modules/podcasts/routes"
@@ -31,6 +35,7 @@ import { SelectionBar, SelectionSpacer } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
+import { useDownloadMap } from "./useDownloads"
 import { useSelection } from "./useSelection"
 
 const SORT_NAMES: Record<EpisodeSort, string> = {
@@ -47,16 +52,30 @@ export function PodcastShow({ id }: { id: string }) {
   const episodes = useEpisodes(id)
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [filter, setFilter] = useState<EpisodeFilter>("all")
+  const downloads = useDownloadMap()
   const selection = useSelection()
   // The bar's title appears once the header's own title has scrolled under the bar.
   const headerHeight = useHeaderHeight()
   const titleBottom = useRef<number | null>(null)
   const [titleInBar, setTitleInBar] = useState(false)
-  const items = useMemo(
-    () =>
-      show.data ? arrangeEpisodes(episodes.data ?? [], show.data.settings) : [],
-    [episodes.data, show.data],
-  )
+  const items = useMemo(() => {
+    if (!show.data) return []
+    const downloaded = new Set(
+      Object.values(downloads)
+        .filter((info) => info.state === "downloaded")
+        .map((info) => info.episodeId),
+    )
+    // The Archived filter has to see the archived episodes the view hides.
+    const view =
+      filter === "archived"
+        ? { ...show.data.settings, showArchived: true }
+        : show.data.settings
+    return arrangeEpisodes(
+      filterEpisodes(episodes.data ?? [], filter, downloaded),
+      view,
+    )
+  }, [episodes.data, show.data, filter, downloads])
   const shows = useMemo(
     () => new Map(show.data ? [[show.data.id, show.data]] : []),
     [show.data],
@@ -121,7 +140,6 @@ export function PodcastShow({ id }: { id: string }) {
           className="bg-background flex-1"
           data={items}
           keyExtractor={(item) => item.key}
-          contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
           scrollEventThrottle={32}
           onScroll={(event) => {
@@ -143,11 +161,14 @@ export function PodcastShow({ id }: { id: string }) {
                 show={current}
                 problem={problem}
                 onUnfollow={() => confirmUnsubscribe(current.title)}
-                episodeCount={episodes.data ? episodes.data.length : null}
+                episodes={episodes.data}
                 onTitleBottom={(bottom) => (titleBottom.current = bottom)}
               />
-              <View className="flex-row items-baseline justify-between pt-2 pb-1">
-                <Text className="text-xl font-bold" accessibilityRole="header">
+              <View className="px-safe-or-4 flex-row items-baseline justify-between pt-5 pb-2">
+                <Text
+                  className="text-[26px] font-bold"
+                  accessibilityRole="header"
+                >
                   Episodes
                 </Text>
                 <Text className="text-muted-foreground text-sm">
@@ -158,22 +179,27 @@ export function PodcastShow({ id }: { id: string }) {
           }
           ListEmptyComponent={
             episodes.loading ? undefined : (
-              <Text className="text-muted-foreground py-6 text-center text-sm">
-                {episodes.error ?? "This feed has no episodes yet."}
+              <Text className="text-muted-foreground px-safe-or-4 py-6 text-center text-sm">
+                {episodes.error ??
+                  (filter === "all"
+                    ? "This feed has no episodes yet."
+                    : "No episodes match this filter.")}
               </Text>
             )
           }
           renderItem={({ item }) =>
             item.kind === "header" ? (
-              <Text variant="h4" className="pt-4 pb-1">
+              <Text variant="h4" className="px-safe-or-4 pt-4 pb-1">
                 {item.title}
               </Text>
             ) : (
-              <EpisodeRow
-                episode={item.episode}
-                show={current}
-                selection={selection}
-              />
+              <View className="px-safe-or-4">
+                <EpisodeRow
+                  episode={item.episode}
+                  show={current}
+                  selection={selection}
+                />
+              </View>
             )
           }
           extraData={selection.selected}
@@ -187,6 +213,8 @@ export function PodcastShow({ id }: { id: string }) {
             ? showBarItems({
                 show: current,
                 archivedCount: archivedCount(episodes.data ?? []),
+                filter,
+                onFilter: setFilter,
                 onSelect: () => selection.begin(),
                 onSettings: () =>
                   router.push(settingsHref(segments, current.id)),

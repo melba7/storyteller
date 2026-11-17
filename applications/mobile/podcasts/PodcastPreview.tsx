@@ -2,7 +2,7 @@
 import { useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
-import { ActivityIndicator, FlatList } from "react-native"
+import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { useIsFocused } from "@/hooks/useIsFocused"
@@ -54,6 +54,9 @@ export function PodcastPreview({
   const [error, setError] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  // The bar's title appears once the picture at the top has scrolled under the bar.
+  const titleBottom = useRef<number | null>(null)
+  const [titleInBar, setTitleInBar] = useState(false)
   const left = useRef(false)
   // Following only moves on to the show's page while this page is still the one on screen.
   const isFocused = useIsFocused()
@@ -178,34 +181,55 @@ export function PodcastPreview({
           }}
           data={preview.episodes}
           keyExtractor={(episode) => episode.id}
-          contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={32}
+          onScroll={(event) => {
+            if (titleBottom.current === null) return
+            setTitleInBar(
+              event.nativeEvent.contentOffset.y + headerHeight >=
+                titleBottom.current,
+            )
+          }}
           ListHeaderComponent={
-            <ShowHeader
-              show={preview.show}
-              problem={problem}
-              onFollow={follow}
-              busy={following}
-              episodeCount={preview.episodes.length}
-            />
+            <>
+              <ShowHeader
+                show={preview.show}
+                problem={problem}
+                onFollow={follow}
+                busy={following}
+                episodes={preview.episodes}
+                onTitleBottom={(bottom) => (titleBottom.current = bottom)}
+              />
+              <Text
+                className="px-safe-or-4 pt-5 pb-2 text-[26px] font-bold"
+                accessibilityRole="header"
+              >
+                Episodes
+              </Text>
+            </>
           }
           ListEmptyComponent={
-            <Text className="text-muted-foreground py-6 text-center text-sm">
+            <Text className="text-muted-foreground px-safe-or-4 py-6 text-center text-sm">
               This feed has no episodes yet.
             </Text>
           }
           renderItem={({ item, index }) => (
-            <EpisodeRow
-              artwork
-              episode={item}
-              show={preview.show}
-              openable={false}
-              highlighted={index === target}
-            />
+            <View className="px-safe-or-4">
+              <EpisodeRow
+                artwork
+                episode={item}
+                show={preview.show}
+                openable={false}
+                highlighted={index === target}
+              />
+            </View>
           )}
         />
       )}
-      <ScreenBar title={preview?.show.title ?? "Podcast"} />
+      <ScreenBar
+        title={preview?.show.title ?? "Podcast"}
+        titleHidden={Boolean(preview) && !titleInBar}
+      />
     </>
   )
 }
