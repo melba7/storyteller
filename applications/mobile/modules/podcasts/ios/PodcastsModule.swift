@@ -312,6 +312,10 @@ public final class PodcastsModule: Module {
     AsyncFunction("getTranscript") { (episodeId: String) -> String? in
       PodcastTranscriber.shared.transcriptJSON(episodeId)
     }
+    // The words said in every finished transcript: hits with the episode, time and line.
+    AsyncFunction("searchTranscripts") { (query: String) async -> [[String: Any]] in
+      await PodcastTranscriber.shared.search(query)
+    }
 
     // MARK: Ads
 

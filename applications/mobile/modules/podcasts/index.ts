@@ -119,6 +119,15 @@ export type TranscriptInfo = {
   reason?: string
 }
 
+/** One place a search found its words: the line's start in seconds and the lines around it. */
+export type SpokenHit = {
+  episodeId: string
+  seconds: number
+  text: string
+  before: string
+  after: string
+}
+
 /** A transcript changed, or (state "none") went with its download. */
 export type TranscriptChange =
   | TranscriptInfo
@@ -322,6 +331,8 @@ type PodcastsNativeModule = {
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
   getTranscript(episodeId: string): Promise<string | null>
+  /** Where the words are said in the finished transcripts (see transcriptSearch.ts). */
+  searchTranscripts(query: string): Promise<SpokenHit[]>
   /** Where each transcribed episode's ad finding is. */
   listAds(): Promise<AdsInfo[]>
   /** An episode's saved ads as JSON (`AdsFile` in PodcastAds), or null. */

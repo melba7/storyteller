@@ -17,16 +17,19 @@ import {
 } from "@/modules/podcasts/library"
 import { episodeHref, previewHref } from "@/modules/podcasts/routes"
 import { type EpisodeHit } from "@/modules/podcasts/search"
+import { searchSpoken } from "@/modules/podcasts/spokenSearch"
 
 import { Artwork } from "./Artwork"
 import { ScreenBar } from "./ScreenBar"
+import { SpokenResults } from "./SpokenResults"
 import { useDebouncedSearch } from "./useDebouncedSearch"
 
-type Scope = "mine" | "all"
+type Scope = "mine" | "all" | "spoken"
 
 const SCOPES: { id: Scope; label: string }[] = [
   { id: "mine", label: "Your shows" },
   { id: "all", label: "All podcasts" },
+  { id: "spoken", label: "Spoken" },
 ]
 
 function Segments({
@@ -110,7 +113,12 @@ export function SearchEpisodes() {
     searchDirectoryEpisodes,
     500,
   )
-  const state = scope === "mine" ? mine : all
+  const spoken = useDebouncedSearch(
+    scope === "spoken" ? term : "",
+    searchSpoken,
+    400,
+  )
+  const state = scope === "mine" ? mine : scope === "all" ? all : spoken
   const typed = term.trim() !== ""
 
   const rows =
@@ -167,26 +175,35 @@ export function SearchEpisodes() {
         <Text className="text-destructive px-8 py-6 text-center text-sm">
           {state.error}
         </Text>
-      ) : typed && rows.length === 0 ? (
+      ) : scope !== "spoken" && typed && rows.length === 0 ? (
         <Text className="text-muted-foreground px-8 py-6 text-center text-sm">
           No episodes found.
         </Text>
       ) : null}
-      <FlatList
-        data={rows}
-        keyExtractor={(row) => row.key}
-        contentContainerClassName="px-safe-or-4 gap-3 pb-6"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        renderItem={({ item }) => (
-          <ResultRow
-            title={item.title}
-            line={item.line}
-            imageUrl={item.imageUrl}
-            onPress={item.open}
-          />
-        )}
-      />
+      {scope === "spoken" ? (
+        <SpokenResults
+          results={spoken.results}
+          active
+          typed={typed}
+          waiting={spoken.searching || spoken.error !== null}
+        />
+      ) : (
+        <FlatList
+          data={rows}
+          keyExtractor={(row) => row.key}
+          contentContainerClassName="px-safe-or-4 gap-3 pb-6"
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          renderItem={({ item }) => (
+            <ResultRow
+              title={item.title}
+              line={item.line}
+              imageUrl={item.imageUrl}
+              onPress={item.open}
+            />
+          )}
+        />
+      )}
     </View>
   )
 }
