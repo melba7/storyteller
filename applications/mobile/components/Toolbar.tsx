@@ -63,7 +63,12 @@ export function Toolbar({
   const items = (
     <>
       <View
-        className={cn("items-center gap-1", vertical ? "flex-col" : "flex-row")}
+        className={cn(
+          "items-center",
+          // No gaps in the reader's capsule, so the bar is narrower than before.
+          mode === "text" ? "gap-0" : "gap-1",
+          vertical ? "flex-col" : "flex-row",
+        )}
       >
         {mode === "text" && <LayoutItem iconClassName={tone} />}
         {mode === "text" && <SettingsItem iconClassName={tone} />}
@@ -98,7 +103,7 @@ export function Toolbar({
                 accessibilityLabel={`Switch to reading ${book.title}`}
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
+                className="h-10 w-10 rounded-full sm:h-10 sm:w-10"
               >
                 <Icon as={BookOpen} size={24} className={tone} />
               </Button>
@@ -116,7 +121,7 @@ export function Toolbar({
                 accessibilityLabel={`Switch to listening to ${book.title}`}
                 variant="ghost"
                 size="icon"
-                className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
+                className="h-10 w-10 rounded-full sm:h-10 sm:w-10"
               >
                 <Icon as={Headphones} size={24} className={tone} />
               </Button>

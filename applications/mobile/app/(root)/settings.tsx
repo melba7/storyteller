@@ -6,6 +6,7 @@ import {
   ExternalLinkIcon,
   PlusIcon,
 } from "lucide-react-native"
+import { View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 
 import {
@@ -65,11 +66,13 @@ export default function Settings() {
                 key={`${server.uuid}-host`}
                 title={server.username ? "Logged in to" : "Logging in to"}
                 trailing={
-                  <Link href={homepageUrl.toString()}>
-                    <Text className="text-link text-[17px]">
-                      {serverUrl.hostname}
-                    </Text>
-                  </Link>
+                  <View className="max-w-[60%] shrink">
+                    <Link href={homepageUrl.toString()} numberOfLines={1}>
+                      <Text className="text-link text-[17px]">
+                        {serverUrl.hostname}
+                      </Text>
+                    </Link>
+                  </View>
                 }
               />,
               server.username ? (

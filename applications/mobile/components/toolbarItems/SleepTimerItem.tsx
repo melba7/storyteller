@@ -116,7 +116,7 @@ export function SleepTimerItem({ iconClassName = "text-foreground" }: Props) {
         }
         variant="ghost"
         size="icon"
-        className="h-11 min-w-11 rounded-full px-2 sm:h-11 sm:min-w-11"
+        className="h-10 min-w-10 rounded-full px-2 sm:h-10 sm:min-w-10"
       >
         {formattedSleepTimer ? (
           <Text

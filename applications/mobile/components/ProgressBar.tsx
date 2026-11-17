@@ -125,11 +125,12 @@ function SlimProgressBar({
   }
   const jump = Math.max(step, (stop - start) / 20)
 
-  // The touch starts the seek at once, so a tap on the bar jumps there.
+  // Seeking starts only once a sideways drag does, like the old slider,
+  // so a stray tap on the bar never moves the position.
   const gesture = Gesture.Pan()
     .enabled(!!onProgressChange)
-    .minDistance(0)
-    .onBegin((event) => {
+    .activeOffsetX([-4, 4])
+    .onStart((event) => {
       "worklet"
       if (onPanStart) scheduleOnRN(onPanStart)
       scheduleOnRN(seekToX, event.x)
@@ -138,7 +139,7 @@ function SlimProgressBar({
       "worklet"
       scheduleOnRN(seekToX, event.x)
     })
-    .onFinalize(() => {
+    .onEnd(() => {
       "worklet"
       if (onPanStop) scheduleOnRN(onPanStop)
     })

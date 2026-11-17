@@ -82,10 +82,10 @@ export function CustomThemeEditor({
         </Text>
         <ButtonGroup value={isDark} onChange={setIsDark}>
           <ButtonGroupButton accessibilityLabel="Use light theme" value={false}>
-            <Text style={isDark && { color: foreground }}>Light</Text>
+            <Text>Light</Text>
           </ButtonGroupButton>
           <ButtonGroupButton accessibilityLabel="Use dark theme" value={true}>
-            <Text style={!isDark && { color: foreground }}>Dark</Text>
+            <Text>Dark</Text>
           </ButtonGroupButton>
         </ButtonGroup>
         <Text className="text-[17px]" style={{ color: foreground }}>

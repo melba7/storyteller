@@ -20,7 +20,7 @@ export function SettingsItem({ iconClassName = "text-foreground" }: Props) {
       accessibilityLabel="Open reading settings"
       variant="ghost"
       size="icon"
-      className="h-11 w-11 rounded-full sm:h-11 sm:w-11 items-center"
+      className="h-10 w-10 rounded-full sm:h-10 sm:w-10 items-center"
       disabled={!bookUuid}
       onPress={() => {
         if (!bookUuid) return

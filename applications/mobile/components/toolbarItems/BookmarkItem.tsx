@@ -99,7 +99,7 @@ export function BookmarkItem({
     <Animated.View style={buttonAnimatedStyle}>
       <Button
         accessibilityLabel={showActive ? "Remove bookmark" : "Add bookmark"}
-        className="h-11 w-11 items-center rounded-full sm:h-11 sm:w-11"
+        className="h-10 w-10 items-center rounded-full sm:h-10 sm:w-10"
         size="icon"
         variant="ghost"
         onPress={() => {

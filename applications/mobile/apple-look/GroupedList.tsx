@@ -91,11 +91,21 @@ export function GroupedSection({
   )
 }
 
+type InsetProps = {
+  icon?: LucideIcon
+  leading?: ReactNode
+  asChild?: boolean
+  children?: ReactNode
+}
+
 function separatorInset(next: unknown) {
-  const props = isValidElement(next)
-    ? (next as ReactElement<{ icon?: LucideIcon; leading?: ReactNode }>).props
-    : undefined
-  return props?.icon || props?.leading ? ICON_INSET : TEXT_INSET
+  if (!isValidElement(next)) return TEXT_INSET
+  let props = (next as ReactElement<InsetProps>).props
+  // A row wrapped in `<Link asChild>` is the Link's only child.
+  if (props.asChild && isValidElement(props.children)) {
+    props = (props.children as ReactElement<InsetProps>).props
+  }
+  return props.icon || props.leading ? ICON_INSET : TEXT_INSET
 }
 
 function Separator({ inset }: { inset: number }) {

@@ -216,7 +216,13 @@ export default function Home() {
       <>
         {shelves}
         <StatusBar verticalBarBehaviorIOS="disabled" />
-        <BooksHomeBar onImportBook={importBook} onOpenSettings={openSettings} />
+        <BooksHomeBar
+          onImportBook={importBook}
+          onOpenSettings={openSettings}
+          onScrollToTop={() => {
+            scrollViewRef.current?.scrollTo({ y: 0, animated: true })
+          }}
+        />
         <MiniPlayerWidget />
       </>
     )

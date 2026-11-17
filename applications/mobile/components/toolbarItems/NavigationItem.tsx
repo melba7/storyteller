@@ -28,7 +28,7 @@ export function NavigationItem({
       accessibilityLabel="Open navigation menu"
       variant="ghost"
       size="icon"
-      className="h-11 w-11 rounded-full sm:h-11 sm:w-11"
+      className="h-10 w-10 rounded-full sm:h-10 sm:w-10"
       disabled={!bookUuid}
       onPress={() => {
         if (!bookUuid) return

@@ -306,6 +306,7 @@ export function MiniPlayer({ book, format, hidden, floatingToolbar }: Props) {
                   <Button
                     accessibilityLabel="Previous section"
                     variant="ghost"
+                    size="icon"
                     className="rounded-full"
                     onPress={() => {
                       dispatch(previousFragmentPressed())
@@ -313,10 +314,11 @@ export function MiniPlayer({ book, format, hidden, floatingToolbar }: Props) {
                   >
                     <Icon as={Rewind} size={20} fill="currentColor" />
                   </Button>
-                  <PlayPause automaticRewind={false} buttonSize="default" />
+                  <PlayPause automaticRewind={false} buttonSize="icon" />
                   <Button
                     accessibilityLabel="Next section"
                     variant="ghost"
+                    size="icon"
                     className="rounded-full"
                     onPress={() => {
                       dispatch(nextFragmentPressed())
