@@ -18,6 +18,7 @@ import {
 } from "./automatic"
 import { loadLastRun, loadSettings, saveLastRun } from "./automaticSettings"
 import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
+import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
 import { listPlaylists, smartEpisodes } from "./dbPlaylists"
 import { archiveEpisodes, syncShowSettings } from "./dbSettings"
@@ -173,6 +174,10 @@ export function runAutomatic(): Promise<void> {
     try {
       const now = Date.now()
       const settings = await loadSettings()
+      // The headphones' bookmarks, which the background task may be the first to see.
+      await importPendingBookmarks().catch((cause) =>
+        console.warn("Couldn't import the headphone bookmarks", cause),
+      )
       // First, so a show followed on the Mac is in the library when the feeds are read.
       await syncApplePodcasts()
       const { added } = await refreshAllShows()

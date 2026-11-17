@@ -4,7 +4,13 @@
 // settings live in Swift (PodcastPlayback's PlaybackSettings, kept in UserDefaults) because the
 // player uses them with the screen locked; playbackSettingsStore.ts talks to it.
 
-export type HeadphoneNext = "skip" | "nextEpisode"
+export type HeadphoneNext = "skip" | "nextEpisode" | "bookmark"
+
+export const HEADPHONE_NEXT_CHOICES: readonly HeadphoneNext[] = [
+  "skip",
+  "nextEpisode",
+  "bookmark",
+]
 
 export type PlaybackSettings = {
   /** Seconds the back button jumps. */
@@ -39,6 +45,26 @@ function oneOf<T extends number>(
   return choices.find((choice) => choice === value) ?? fallback
 }
 
+function oneOfText<T extends string>(
+  value: unknown,
+  choices: readonly T[],
+  fallback: T,
+): T {
+  return choices.find((choice) => choice === value) ?? fallback
+}
+
+/** What each headphone choice is called in Profile. */
+export function headphoneNextLabel(choice: HeadphoneNext): string {
+  switch (choice) {
+    case "skip":
+      return "Skip ahead"
+    case "nextEpisode":
+      return "Next in Up Next"
+    case "bookmark":
+      return "Add a bookmark"
+  }
+}
+
 /** Stored values; anything missing or not one of the choices keeps its default. */
 export function parsePlaybackSettings(value: unknown): PlaybackSettings {
   const defaults = DEFAULT_PLAYBACK_SETTINGS
@@ -51,8 +77,11 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       SKIP_CHOICES,
       defaults.skipForward,
     ),
-    headphoneNext:
-      record["headphoneNext"] === "nextEpisode" ? "nextEpisode" : "skip",
+    headphoneNext: oneOfText(
+      record["headphoneNext"],
+      HEADPHONE_NEXT_CHOICES,
+      defaults.headphoneNext,
+    ),
     markPlayedWhenLeft: oneOf(
       record["markPlayedWhenLeft"],
       MARK_PLAYED_CHOICES,

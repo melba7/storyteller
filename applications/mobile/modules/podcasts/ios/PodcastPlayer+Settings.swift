@@ -62,6 +62,8 @@ extension PodcastPlayer {
     case .nextEpisode:
       // Nothing playable queued: skip instead.
       if !startNextInQueue() { skip(by: Double(settings.skipForward)) }
+    case .bookmark:
+      bookmarkFromHeadphones()
     }
   }
 

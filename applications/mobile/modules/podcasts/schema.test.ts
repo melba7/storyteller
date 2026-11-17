@@ -22,8 +22,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 10", () => {
-    expect(SCHEMA_VERSION).toBe(10)
+  it("is at version 11", () => {
+    expect(SCHEMA_VERSION).toBe(11)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -142,6 +142,13 @@ describe("migrationStatements", () => {
     expect(db.prepare("SELECT DISTINCT kind FROM playlists").all()).toEqual([
       { kind: "smart" },
     ])
+  })
+
+  it("version 11 adds the bookmarks table, which goes with its episode", () => {
+    const statements = stepFrom(10)
+    expect(statements[0]).toContain("CREATE TABLE bookmarks")
+    expect(statements[0]).toContain("REFERENCES episodes(id) ON DELETE CASCADE")
+    expect(statements).toHaveLength(2)
   })
 
   it("has a column for every setting the screen saves", () => {

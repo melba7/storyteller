@@ -7,7 +7,7 @@
 import { starterStatements } from "./playlists"
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 10
+export const SCHEMA_VERSION = 11
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -151,6 +151,21 @@ const VERSION_10 = [
   "CREATE INDEX playlist_items_order ON playlist_items (playlist_id, position)",
 ]
 
+/**
+ * Version 11: bookmarks. Each is a place in a library episode with a title; it goes with
+ * the episode (and so with its show).
+ */
+const VERSION_11 = [
+  `CREATE TABLE bookmarks (
+    id TEXT PRIMARY KEY NOT NULL,
+    episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    position_seconds REAL NOT NULL,
+    title TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  "CREATE INDEX bookmarks_episode ON bookmarks (episode_id, position_seconds)",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -163,6 +178,7 @@ const STEPS = [
   VERSION_8,
   VERSION_9,
   VERSION_10,
+  VERSION_11,
 ]
 
 /**
