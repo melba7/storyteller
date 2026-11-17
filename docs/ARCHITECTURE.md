@@ -160,6 +160,16 @@ in `FORK.md`.
 | 2026-11-17 | Time saved by a jump (intro, outro, ad, chapter, silence) is the audio skipped divided by the speed; an undone ad takes its skip back      | One rule for every saving                                  |
 | 2026-11-17 | Own audio files are copied, hashed and installed by `DownloadStore.install` as `file-<sha256 prefix>`, in the local show `local-files`     | Transcripts, ads, chapters work unchanged                  |
 | 2026-11-17 | The local show's feed address is `local:files`: refresh, OPML, the Apple Podcasts sync and Discover skip it                                | No schema change                                           |
+| 2026-11-17 | Stars and history are episode columns (`starred_at`, `history_at`); history is kept apart from `last_played_at`                            | Clearing history leaves auto-delete as is                  |
+| 2026-11-17 | Rule playlists filter in SQL for what the database knows and in JS for "downloaded", which lives in Swift                                  | SQL tested on `node:sqlite`                                |
+| 2026-11-17 | The three starter playlists are made by schema step 11, once, so deleting one sticks                                                       | No re-creation on launch                                   |
+| 2026-11-17 | A playlist with auto-download gets its first 5 episodes once each, on Wi-Fi only; hand-filled playlists never auto-download                | Bounded downloads                                          |
+| 2026-11-17 | Hand-filled playlist items keep a snapshot; a library episode is read live and wins over its snapshot                                      | Any episode, followed or not                               |
+| 2026-11-17 | Headphone bookmarks wait in a Swift file until the app saves them, then are removed by id; two presses within 5 s count once               | Bookmarks work while locked                                |
+| 2026-11-17 | A bookmark belongs to a library episode (foreign key, deleted with it); previews cannot be bookmarked                                      | No orphan bookmarks                                        |
+| 2026-11-17 | Podcasts themes are Uniwind extra themes in `podcasts/themes.css`, with one `@import` in `global.css` and `extraThemes` in Metro           | Two small touch points                                     |
+| 2026-11-17 | The Podcasts section sits in one `ScopedTheme`; "Like the app" passes the app's own light or dark name                                     | Sheets and mini player follow                              |
+| 2026-11-17 | The Discover tab's stack is anchored on `discover` (`unstable_settings.anchor`); a test checks every tab's first screen                    | Shared screens sort first                                  |
 
 ## Known problems
 

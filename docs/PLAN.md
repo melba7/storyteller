@@ -1,6 +1,7 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1a, P1b merged; TestFlight 20.1 next
+Done: 2 | Last cleanup: none | Podcasts: P1 to P3b merged (TestFlight 23.1); P3c
+to P5o built, merging next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -600,13 +601,22 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5c. Star, history and bulk actions** (M): star episodes, mark played or
       unplayed, a listening history in Profile, and multi-select with bulk
       actions (download, mark played, archive, star, add to Up Next).
+  - Status: built and passing `check.sh` (schema version 10): star, mark played,
+    a Listening history in Profile, and multi-select with bulk actions on the
+    show page and in the history.
 - [ ] **P5d. Smart playlists** (M): the Playlists tab, with playlists built from
       rules (shows, played state, release date, length, downloaded, starred),
       sorted and with auto-download. It starts with New Releases, In Progress
       and Starred.
+  - Status: built and passing `check.sh` (schema version 11): a Playlists tab
+    with rule playlists, the three starters, and auto-download of each
+    playlist's first 5 episodes on Wi-Fi.
 - [ ] **P5e. Your own playlists** (S): playlists you fill by hand, with any
       episode (also from shows you don't follow), drag to reorder, and "Play
       all" into Up Next.
+  - Status: built and passing `check.sh` (schema version 12): hand-filled
+    playlists with any episode, drag to reorder, and Play all (the first plays,
+    the rest go to the top of Up Next).
 - [ ] **P5f. Sleep timer** (S): 5 to 60 minutes or your own time, end of
       episode, end of chapter once P5g is in, add 5 minutes, and a fade-out at
       the end.
@@ -627,12 +637,15 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
       title you can edit, from the player and as a headphone action; listed per
       episode and in Profile; tap to play from there.
+  - Status: built and passing `check.sh` (schema version 13): bookmarks from the
+    player and from the headphones (kept in Swift while locked, saved by the app
+    later), listed per episode and in Profile.
 - [ ] **P5i. Playback settings** (S): skip back and ahead amounts, what the
       headphones' next and previous buttons do (skip, next chapter or bookmark),
       mark an episode played when N seconds are left, and going back a few
       seconds after a long pause.
   - Status: built and passing `check.sh`: a Playback section in Profile, kept in
-    Swift. "Next chapter" came with P5g; "bookmark" waits for P5h.
+    Swift. "Next chapter" came with P5g and "bookmark" with P5h.
 - [ ] **P5j. Volume boost and trim silence** (L): a second Swift player
       (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
       silent gaps, in three strengths, per show or for everything. Streamed
@@ -654,6 +667,11 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5l. Themes** (M): Light, Dark, Extra Dark (true black) and a few colour
       themes with names and colours of our own, following iOS light and dark
       mode if you like, for the Podcasts section.
+  - Status: built and passing `check.sh`: Light, Dark, Extra Dark, Midnight,
+    Paper and Forest in Profile > Appearance, as "Like the app", one theme, or
+    "Follow iOS" with a light and a dark choice. The section sits in one Uniwind
+    `ScopedTheme`. The iOS 26 tab bar glass and the status bar follow iOS, not
+    the theme.
 - [ ] **P5m. Share and OPML** (S): share a show, an episode or the place playing
       now (the feed's own links); import and export your shows as an OPML file
       (with the document picker and share sheet the app already has).
@@ -677,6 +695,11 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 
 ## Later
 
+- Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
+  round) the status bar text follows iOS, not the theme. The three screens that
+  draw a `StatusBar` could take its style from the theme.
+- Podcasts: marking an episode unplayed does not reset its saved place for Up
+  Next in Swift.
 - Podcasts: deleting an imported file from the Downloads screen leaves its row
   in "Your files"; the empty "Your files" page says "This feed has no episodes
   yet."

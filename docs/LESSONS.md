@@ -30,3 +30,8 @@ One line per lesson.
   `values["x"] as? Int` on a `[String: Any]` from JavaScript is always nil and
   the playback settings fell back to their defaults. Read numbers from
   JavaScript as `Double` (or through a helper that takes both).
+- Expo Router opens a stack on its first screen, and with no
+  `unstable_settings.anchor` it orders static names shortest first. The shared
+  "preview" screen in every Podcasts tab group sorted before "discover", so the
+  Discover tab opened on an empty preview (Mo saw it on build 23.1). A tab whose
+  home is not `index` needs an anchor; `tabStacks.test.ts` checks every tab.

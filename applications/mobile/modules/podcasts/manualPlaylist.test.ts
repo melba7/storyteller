@@ -58,6 +58,7 @@ function episode(
     imageUrl: null,
     season: null,
     number: null,
+    chaptersUrl: null,
     transcriptUrl: null,
     transcriptType: null,
     positionSeconds: 42,
