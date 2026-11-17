@@ -175,6 +175,13 @@ type PodcastsNativeModule = {
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
 
+  /** "granted", "denied" or "undetermined" (not asked yet). */
+  notificationPermission(): Promise<"granted" | "denied" | "undetermined">
+  /** Asks the listener (iOS shows its question the first time). True when allowed. */
+  requestNotificationPermission(): Promise<boolean>
+  /** Shows a local notification now; one with the same id replaces it. Needs permission. */
+  postNotification(id: string, title: string, body: string): Promise<void>
+
   /** The listener's playback settings, as Swift keeps them (see playbackSettings.ts). */
   getPlaybackSettings(): Promise<PlaybackSettings>
   /** Saves the settings; a value that is not a choice keeps its default. Returns what was kept. */

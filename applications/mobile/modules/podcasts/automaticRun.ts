@@ -15,6 +15,7 @@ import { loadLastRun, loadSettings, saveLastRun } from "./automaticSettings"
 import { getShow, listEpisodesByIds } from "./db"
 import { refreshAllShows } from "./dbFeeds"
 import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
+import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 
 let running: Promise<void> | null = null
@@ -74,6 +75,7 @@ export function runAutomatic(): Promise<void> {
       await syncApplePodcasts()
       const { added } = await refreshAllShows()
       await startNew(added, settings)
+      await notifyAboutNewEpisodes(added)
       await deletePlayed(now, settings)
       await saveLastRun(now)
     } finally {

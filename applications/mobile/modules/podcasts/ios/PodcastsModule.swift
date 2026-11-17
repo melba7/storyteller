@@ -141,6 +141,32 @@ public final class PodcastsModule: Module {
       await MainActor.run { PodcastPlayer.shared.clearUpNext() }
     }
 
+    // MARK: Notifications
+
+    // "granted", "denied" or "undetermined".
+    AsyncFunction("notificationPermission") { () async -> String in
+      await PodcastNotifier.shared.permission()
+    }
+    // Asks the listener (iOS shows its question the first time); returns whether it is allowed.
+    AsyncFunction("requestNotificationPermission") { () async -> Bool in
+      await PodcastNotifier.shared.requestPermission()
+    }
+    // Posts a notification now. Nothing happens without permission.
+    AsyncFunction("postNotification") { (id: String, title: String, body: String) async throws in
+      do {
+        try await PodcastNotifier.shared.post(id: id, title: title, body: body)
+      } catch {
+        throw PodcastFetchError(message: error.localizedDescription)
+      }
+    }
+
+    // MARK: AirPlay
+
+    // The system's AirPlay button, for the player (see AirPlayRouteView).
+    View(AirPlayRouteView.self) {
+      Prop("label") { (view: AirPlayRouteView, label: String) in view.setLabel(label) }
+    }
+
     // MARK: Playback settings
 
     // The listener's playback settings (see PlaybackSettings). Saving returns what was kept.

@@ -20,6 +20,7 @@ import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
 
+import { NotifyRow } from "./NotifyRow"
 import { PlaybackSection } from "./PlaybackSection"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
@@ -129,6 +130,7 @@ export function Profile() {
             checked={automatic?.deletePlayed ?? null}
             onChange={(on) => changeAutomatic({ deletePlayed: on })}
           />
+          <NotifyRow />
           <PlaybackSection />
         </View>
       )}
