@@ -24,6 +24,7 @@ struct PlaybackLoadOptions: Record {
   @Field var autoplay: Bool = true
   @Field var audioType: String = ""
   @Field var showId: String?
+  @Field var chaptersUrl: String?
 }
 
 /// An episode to put in Up Next.
@@ -37,6 +38,7 @@ struct UpNextItemOptions: Record {
   @Field var duration: Double?
   @Field var position: Double = 0
   @Field var showId: String?
+  @Field var chaptersUrl: String?
 }
 
 public final class PodcastsModule: Module {
@@ -45,7 +47,7 @@ public final class PodcastsModule: Module {
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
       "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange",
-      "onAdsChange", "onAdSkipped", "onAdUndone")
+      "onAdsChange", "onAdSkipped", "onAdUndone", "onChaptersChange")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -88,7 +90,7 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType, showId: options.showId)
+        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -134,7 +136,7 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position, showId: item.showId)
+        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -196,6 +198,10 @@ public final class PodcastsModule: Module {
     AsyncFunction("sleepUntilEndOfEpisode") { () async in
       await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfEpisode() }
     }
+    AsyncFunction("sleepUntilEndOfChapter") { () async throws in
+      let started = await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfChapter() }
+      if !started { throw PodcastFetchError(message: "This episode has no chapter playing now.") }
+    }
     AsyncFunction("extendSleepTimer") { () async in
       await MainActor.run { PodcastPlayer.shared.extendSleep() }
     }
@@ -204,6 +210,25 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("getSleepTimer") { () async -> [String: Any] in
       await MainActor.run { PodcastPlayer.shared.sleepObject() }
+    }
+
+    // MARK: Chapters
+
+    // The loaded episode's chapters (they are also sent with `onChaptersChange`), the previous
+    // and next chapter buttons, and the switch that skips a chapter (`start` in seconds).
+    AsyncFunction("getChapters") { () async -> [String: Any] in
+      await MainActor.run { PodcastPlayer.shared.chaptersInfo() }
+    }
+    AsyncFunction("previousChapter") { () async in
+      await MainActor.run { PodcastPlayer.shared.previousChapter() }
+    }
+    AsyncFunction("nextChapter") { () async in
+      await MainActor.run { _ = PodcastPlayer.shared.nextChapter() }
+    }
+    AsyncFunction("setChapterSkipped") { (episodeId: String, start: Double, skipped: Bool) async in
+      await MainActor.run {
+        PodcastPlayer.shared.setChapterSkipped(episodeId: episodeId, start: start, skipped: skipped)
+      }
     }
 
     // MARK: Downloading

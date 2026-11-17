@@ -156,6 +156,28 @@ final class FeedParserTests: XCTestCase {
     XCTAssertEqual(episodes[1].transcripts, [])
   }
 
+  func testReadsTheChaptersTag() throws {
+    let data = feed(
+      item(
+        """
+        <guid>c1</guid>
+        <podcast:chapters url="https://cdn.example.com/c1.json" type="application/json+chapters"/>
+        <podcast:chapters url="https://cdn.example.com/other.json" type="application/json+chapters"/>
+        """)
+        + item(
+          "<guid>c2</guid><podcast:chapters url=\"https://cdn.example.com/c2.json\"/>")
+        + item("<guid>c3</guid><podcast:chapters url=\"https://cdn.example.com/c3.srt\" type=\"application/x-subrip\"/>")
+        + item("<guid>c4</guid><podcast:chapters url=\"ftp://cdn.example.com/c4.json\" type=\"application/json+chapters\"/>")
+        + item("<guid>c5</guid>"),
+      channelExtra: "")
+    let episodes = try FeedParser.parse(data).episodes
+    XCTAssertEqual(episodes[0].chaptersURL, URL(string: "https://cdn.example.com/c1.json"))
+    XCTAssertEqual(episodes[1].chaptersURL, URL(string: "https://cdn.example.com/c2.json"))
+    XCTAssertNil(episodes[2].chaptersURL)
+    XCTAssertNil(episodes[3].chaptersURL)
+    XCTAssertNil(episodes[4].chaptersURL)
+  }
+
   func testKeepsTheFeedOrder() throws {
     let data = feed(
       item("<title>A</title><guid>1</guid>") + item("<title>B</title><guid>2</guid>"))

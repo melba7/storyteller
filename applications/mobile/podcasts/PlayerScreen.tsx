@@ -19,18 +19,22 @@ import {
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { adMarks, adRows } from "@/modules/podcasts/ads"
+import { chapterArtwork } from "@/modules/podcasts/chapters"
 import { speedLabel } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 import { playerBackground } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
+import { ChapterBar } from "./ChapterBar"
+import { ChapterList } from "./ChapterList"
 import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
 import { SkippedAdNote } from "./SkippedAdNote"
 import { SpeedPanel } from "./SpeedPanel"
 import { TranscriptView } from "./TranscriptView"
 import { useAdsFile } from "./useAds"
+import { useChapters } from "./useChapters"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 
 /** The full-screen player, laid out like Pocket Casts': artwork, seek bar, controls, notes. */
@@ -41,7 +45,9 @@ export function PlayerScreen() {
   const { width } = useWindowDimensions()
   const [showSpeed, setShowSpeed] = useState(false)
   const [showTranscript, setShowTranscript] = useState(false)
+  const [showChapters, setShowChapters] = useState(false)
   const { episode, show } = view
+  const chapters = useChapters(episode?.id ?? "")
   const adsFile = useAdsFile(episode?.id ?? "")
   const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
   const artwork = Math.min(width - 64, 340)
@@ -66,18 +72,40 @@ export function PlayerScreen() {
           <Icon as={ChevronDown} size={28} className="text-white" />
         </Pressable>
         {episode ? (
-          <Pressable
-            className="ml-auto rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
-            accessibilityRole="button"
-            accessibilityLabel={
-              showTranscript ? "Back to the player" : "Open the transcript"
-            }
-            onPress={() => setShowTranscript((value) => !value)}
-          >
-            <Text className="font-semibold text-white">
-              {showTranscript ? "Player" : "Transcript"}
-            </Text>
-          </Pressable>
+          <View className="ml-auto flex-row gap-2">
+            {chapters.length > 0 ? (
+              <Pressable
+                className="rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
+                accessibilityRole="button"
+                accessibilityLabel={
+                  showChapters ? "Back to the player" : "Open the chapters"
+                }
+                onPress={() => {
+                  setShowTranscript(false)
+                  setShowChapters((value) => !value)
+                }}
+              >
+                <Text className="font-semibold text-white">
+                  {showChapters ? "Player" : "Chapters"}
+                </Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              className="rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
+              accessibilityRole="button"
+              accessibilityLabel={
+                showTranscript ? "Back to the player" : "Open the transcript"
+              }
+              onPress={() => {
+                setShowChapters(false)
+                setShowTranscript((value) => !value)
+              }}
+            >
+              <Text className="font-semibold text-white">
+                {showTranscript ? "Player" : "Transcript"}
+              </Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
 
@@ -85,6 +113,8 @@ export function PlayerScreen() {
         <Text className="px-8 py-12 text-center text-white/70">
           Nothing is playing. Pick an episode to start.
         </Text>
+      ) : showChapters && chapters.length > 0 ? (
+        <ChapterList episodeId={episode.id} chapters={chapters} />
       ) : showTranscript ? (
         <TranscriptView key={episode.id} episode={episode} />
       ) : (
@@ -93,7 +123,12 @@ export function PlayerScreen() {
           showsVerticalScrollIndicator={false}
         >
           <Artwork
-            uri={episode.imageUrl ?? show?.imageUrl ?? null}
+            uri={
+              chapterArtwork(chapters, view.position) ??
+              episode.imageUrl ??
+              show?.imageUrl ??
+              null
+            }
             size={artwork}
             className="rounded-2xl"
           />
@@ -128,6 +163,11 @@ export function PlayerScreen() {
             duration={view.duration}
             onSeek={(seconds) => void player.seekTo(seconds)}
             marks={marks}
+          />
+          <ChapterBar
+            chapters={chapters}
+            position={view.position}
+            onOpen={() => setShowChapters(true)}
           />
           <SkippedAdNote />
 

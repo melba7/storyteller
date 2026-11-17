@@ -65,6 +65,8 @@ final class PodcastPlayer {
     var type = ""
     /// The show, for its settings.
     var showId: String?
+    /// The feed's JSON chapters file (PodcastPlayer+Chapters.swift).
+    var chaptersUrl: String?
   }
 
   /// The listener chose this episode. The one playing goes back to the top of Up Next.
@@ -82,7 +84,8 @@ final class PodcastPlayer {
     current = QueueItem(
       id: episode.id, url: episode.url.absoluteString, type: episode.type, title: episode.title,
       showTitle: episode.showTitle, artworkUrl: episode.artworkUrl, duration: episode.duration,
-      position: episode.savedPosition, showId: episode.showId)
+      position: episode.savedPosition, showId: episode.showId,
+      chaptersUrl: episode.chaptersUrl)
     wantsToPlay = false
     player.pause()
     removeItemObservers()
@@ -117,6 +120,7 @@ final class PodcastPlayer {
     }
     adSkipping.begin(episode.id, startingAt: start)
     sound.begin(episode.id, startingAt: start)
+    beginChapters(episode, startingAt: start)
     publish()
     if episode.autoplay { play() }
   }
@@ -150,6 +154,7 @@ final class PodcastPlayer {
     let target = Skip.clamp(seconds, duration: currentDuration)
     adSkipping.seeked(to: target)
     sound.seeked(to: target)
+    chapterSeeked(to: target)
     player.seek(
       to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero
@@ -257,6 +262,7 @@ final class PodcastPlayer {
   private func tick() {
     ticks += 1
     endAtOutroIfReached()
+    chapterTick()
     sleepTick()
     // The lock screen card keeps its own clock, so it is rewritten only now and then.
     publish(refreshCard: ticks % 10 == 0)

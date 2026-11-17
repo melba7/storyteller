@@ -174,3 +174,14 @@ final class UpNextTests: XCTestCase {
     XCTAssertTrue(UpNextQueue.load(from: broken).isEmpty)
   }
 }
+
+final class QueueItemChaptersTests: XCTestCase {
+  func testChaptersAddressSurvivesSavingAndOldFilesStillRead() throws {
+    let item = QueueItem(id: "a", url: "https://x/a.mp3", title: "A", chaptersUrl: "https://x/c.json")
+    let data = try JSONEncoder().encode(UpNextQueue(items: [item]))
+    XCTAssertEqual(try JSONDecoder().decode(UpNextQueue.self, from: data).items.first?.chaptersUrl, "https://x/c.json")
+    let old = Data(
+      #"{"items":[{"id":"a","url":"u","type":"","title":"A","showTitle":"","position":0}]}"#.utf8)
+    XCTAssertNil(try JSONDecoder().decode(UpNextQueue.self, from: old).items.first?.chaptersUrl)
+  }
+}

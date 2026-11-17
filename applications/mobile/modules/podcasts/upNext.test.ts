@@ -144,6 +144,7 @@ describe("queueItem", () => {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    chaptersUrl: null,
     positionSeconds: 300,
     played: false,
     lastPlayedAt: null,
@@ -166,7 +167,12 @@ describe("queueItem", () => {
       artworkUrl: "https://x/a.jpg",
       duration: 1000,
       position: 300,
+      chaptersUrl: null,
     })
+  })
+  it("carries the chapters address", () => {
+    const chaptered = { ...episode, chaptersUrl: "https://x.test/c.json" }
+    expect(queueItem(chaptered, show).chaptersUrl).toBe("https://x.test/c.json")
   })
   it("starts a played or nearly finished episode over", () => {
     expect(queueItem({ ...episode, played: true }, show).position).toBe(0)

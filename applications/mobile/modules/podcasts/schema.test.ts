@@ -21,8 +21,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 8", () => {
-    expect(SCHEMA_VERSION).toBe(8)
+  it("is at version 9", () => {
+    expect(SCHEMA_VERSION).toBe(9)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -104,6 +104,12 @@ describe("migrationStatements", () => {
     expect(stepFrom(7)).toEqual([
       "ALTER TABLE shows ADD COLUMN voice_boost TEXT",
       "ALTER TABLE shows ADD COLUMN trim_silence TEXT",
+    ])
+  })
+
+  it("version 9 adds the feed's chapters address to episodes", () => {
+    expect(stepFrom(8)).toEqual([
+      "ALTER TABLE episodes ADD COLUMN chapters_url TEXT",
     ])
   })
 

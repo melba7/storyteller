@@ -64,12 +64,14 @@ public struct FeedEpisode: Sendable, Equatable {
   public var number: Int?
   /// Every `podcast:transcript` tag, in feed order.
   public var transcripts: [FeedTranscript]
+  /// The `podcast:chapters` JSON file's address (Podcasting 2.0), when the feed has one.
+  public var chaptersURL: URL?
 
   public init(
     guid: String, title: String, published: Date? = nil, durationSeconds: Double? = nil,
     notes: String = "", audioURL: URL, audioType: String, audioBytes: Int64? = nil,
     imageURL: URL? = nil, season: Int? = nil, number: Int? = nil,
-    transcripts: [FeedTranscript] = []
+    transcripts: [FeedTranscript] = [], chaptersURL: URL? = nil
   ) {
     self.guid = guid
     self.title = title
@@ -83,6 +85,7 @@ public struct FeedEpisode: Sendable, Equatable {
     self.season = season
     self.number = number
     self.transcripts = transcripts
+    self.chaptersURL = chaptersURL
   }
 }
 

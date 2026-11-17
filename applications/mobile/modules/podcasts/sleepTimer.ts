@@ -18,6 +18,14 @@ export function readSleepState(value: unknown): SleepTimerState {
   if (typeof value !== "object" || value === null) return NO_SLEEP_TIMER
   const record = value as Record<string, unknown>
   if (record["kind"] === "endOfEpisode") return { kind: "endOfEpisode" }
+  const chapterEnd = record["chapterEnd"]
+  if (
+    record["kind"] === "endOfChapter" &&
+    typeof chapterEnd === "number" &&
+    Number.isFinite(chapterEnd)
+  ) {
+    return { kind: "endOfChapter", chapterEnd }
+  }
   const endsAt = record["endsAt"]
   if (
     record["kind"] === "countdown" &&
@@ -39,7 +47,8 @@ export function parseCustomMinutes(text: string): number | null {
 
 /**
  * Seconds of listening left on the timer, or null with no timer. For the end of the episode
- * it is what is left of the episode at the current speed (null while the length is unknown).
+ * it is what is left of the episode at the current speed (null while the length is unknown);
+ * for the end of the chapter, what is left of the chapter.
  */
 export function sleepSecondsLeft(
   state: SleepTimerState,
@@ -53,6 +62,10 @@ export function sleepSecondsLeft(
   if (state.kind === "endOfEpisode") {
     if (duration === null || !(duration > 0) || !(rate > 0)) return null
     return Math.max(0, (duration - position) / rate)
+  }
+  if (state.kind === "endOfChapter") {
+    if (!(rate > 0)) return null
+    return Math.max(0, (state.chapterEnd - position) / rate)
   }
   return null
 }
@@ -73,6 +86,9 @@ export function sleepButtonLabel(
     return left === null
       ? "Sleep timer, at the end of the episode"
       : `Sleep timer, at the end of the episode, ${formatTime(left)} left`
+  }
+  if (state.kind === "endOfChapter") {
+    return `Sleep timer, at the end of the chapter, ${formatTime(left ?? 0)} left`
   }
   return `Sleep timer, ${formatTime(left ?? 0)} left`
 }

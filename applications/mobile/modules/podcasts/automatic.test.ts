@@ -107,6 +107,7 @@ describe("newEpisodes", () => {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    chaptersUrl: null,
   })
 
   it("pairs each inserted episode with the id it was saved under", () => {

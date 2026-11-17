@@ -29,6 +29,11 @@ describe("parsePlaybackSettings", () => {
     }
     expect(parsePlaybackSettings(saved)).toEqual(saved)
   })
+  it("reads the next chapter choice", () => {
+    expect(
+      parsePlaybackSettings({ headphoneNext: "nextChapter" }).headphoneNext,
+    ).toBe("nextChapter")
+  })
   it("keeps the default for anything that is not a choice", () => {
     expect(
       parsePlaybackSettings({

@@ -49,6 +49,8 @@ export type FetchedEpisode = {
   /** The feed's own transcript (best format, see chooseTranscript), or null. */
   transcriptUrl: string | null
   transcriptType: string | null
+  /** The feed's `podcast:chapters` JSON file (Podcasting 2.0), or null. */
+  chaptersUrl: string | null
 }
 
 export type StoredEpisode = FetchedEpisode & {
@@ -78,6 +80,7 @@ const FETCHED_KEYS: (keyof FetchedEpisode)[] = [
   "number",
   "transcriptUrl",
   "transcriptType",
+  "chaptersUrl",
 ]
 
 function unchanged(stored: StoredEpisode, fetched: FetchedEpisode): boolean {
@@ -205,6 +208,7 @@ export function fetchedEpisode(episode: PodcastFeedEpisode): FetchedEpisode {
     number: orNull(episode.number),
     transcriptUrl: chosen?.url ?? null,
     transcriptType: chosen?.type ?? null,
+    chaptersUrl: orNull(episode.chaptersUrl),
   }
 }
 
@@ -272,6 +276,7 @@ export function episodeFromRow(row: Row): StoredEpisode {
     number: numOrNull(row["number"]),
     transcriptUrl: strOrNull(row["transcript_url"]),
     transcriptType: strOrNull(row["transcript_type"]),
+    chaptersUrl: strOrNull(row["chapters_url"]),
     positionSeconds: Math.max(0, numOrNull(row["position_seconds"]) ?? 0),
     played: row["played"] === 1 || row["played"] === true,
     lastPlayedAt: numOrNull(row["last_played_at"]),

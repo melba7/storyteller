@@ -4,8 +4,10 @@ import { Pressable, View } from "react-native"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import {
+  HEADPHONE_NEXT_CHOICES,
   MARK_PLAYED_CHOICES,
   SKIP_CHOICES,
+  headphoneNextLabel,
   markPlayedLabel,
   secondsLabel,
 } from "@/modules/podcasts/playbackSettings"
@@ -47,10 +49,10 @@ export function PlaybackSection() {
       />
       <Choices
         title="Headphones' next button"
-        body="Previous always skips back."
-        choices={["skip", "nextEpisode"] as const}
+        body="Previous always skips back. Next chapter skips ahead where an episode has no chapters."
+        choices={HEADPHONE_NEXT_CHOICES}
         selected={settings.headphoneNext}
-        label={(value) => (value === "skip" ? "Skip ahead" : "Next in Up Next")}
+        label={headphoneNextLabel}
         onChoose={(headphoneNext) => updatePlaybackSettings({ headphoneNext })}
       />
       <Choices

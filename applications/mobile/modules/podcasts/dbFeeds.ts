@@ -40,8 +40,8 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
   return [
     `INSERT INTO episodes (id, show_id, guid, title, published_at, duration_seconds, notes,
        audio_url, audio_type, audio_bytes, image_url, season, number, transcript_url,
-       transcript_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       transcript_type, chapters_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       showId,
@@ -58,6 +58,7 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
       episode.number,
       episode.transcriptUrl,
       episode.transcriptType,
+      episode.chaptersUrl,
     ],
   ] as const
 }
@@ -66,7 +67,7 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
   return [
     `UPDATE episodes SET title = ?, published_at = ?, duration_seconds = ?, notes = ?,
        audio_url = ?, audio_type = ?, audio_bytes = ?, image_url = ?, season = ?, number = ?,
-       transcript_url = ?, transcript_type = ?
+       transcript_url = ?, transcript_type = ?, chapters_url = ?
      WHERE id = ?`,
     [
       episode.title,
@@ -81,6 +82,7 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
       episode.number,
       episode.transcriptUrl,
       episode.transcriptType,
+      episode.chaptersUrl,
       id,
     ],
   ] as const

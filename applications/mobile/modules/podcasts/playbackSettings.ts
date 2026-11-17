@@ -11,7 +11,7 @@ import {
   parseTrim,
 } from "./sound"
 
-export type HeadphoneNext = "skip" | "nextEpisode"
+export type HeadphoneNext = "skip" | "nextEpisode" | "nextChapter"
 
 export type PlaybackSettings = {
   /** Seconds the back button jumps. */
@@ -29,6 +29,12 @@ export type PlaybackSettings = {
   /** Cut the quiet gaps, for everything (a show can choose its own). */
   trimSilence: TrimStrength
 }
+
+export const HEADPHONE_NEXT_CHOICES = [
+  "skip",
+  "nextEpisode",
+  "nextChapter",
+] as const satisfies readonly HeadphoneNext[]
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 45, 60] as const
 export const MARK_PLAYED_CHOICES = [0, 10, 30, 60] as const
@@ -65,7 +71,9 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       defaults.skipForward,
     ),
     headphoneNext:
-      record["headphoneNext"] === "nextEpisode" ? "nextEpisode" : "skip",
+      HEADPHONE_NEXT_CHOICES.find(
+        (choice) => choice === record["headphoneNext"],
+      ) ?? defaults.headphoneNext,
     markPlayedWhenLeft: oneOf(
       record["markPlayedWhenLeft"],
       MARK_PLAYED_CHOICES,
@@ -75,6 +83,12 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
     voiceBoost: parseBoost(record["voiceBoost"]),
     trimSilence: parseTrim(record["trimSilence"]),
   }
+}
+
+/** The words for each choice of the headphones' next button. */
+export function headphoneNextLabel(choice: HeadphoneNext): string {
+  if (choice === "nextEpisode") return "Next in Up Next"
+  return choice === "nextChapter" ? "Next chapter" : "Skip ahead"
 }
 
 /** "5 s", "1 min". */

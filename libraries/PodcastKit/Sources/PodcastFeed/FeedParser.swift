@@ -25,6 +25,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     var description = "", summary = "", content = "", image = ""
     var audio: (url: URL, type: String, bytes: Int64?)?
     var transcripts: [FeedTranscript] = []
+    var chaptersURL: URL?
   }
 
   private var path: [String] = []
@@ -84,6 +85,8 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       readEnclosure(attributes)
     case "rss/channel/item/podcast:transcript":
       readTranscript(attributes)
+    case "rss/channel/item/podcast:chapters":
+      readChapters(attributes)
     default:
       break
     }
@@ -156,6 +159,16 @@ private final class FeedReader: NSObject, XMLParserDelegate {
         language: language.isEmpty ? nil : language, rel: rel.isEmpty ? nil : rel))
   }
 
+  /// Keeps the first chapters tag that has a web address and is a JSON file (or says no type).
+  private func readChapters(_ attributes: [String: String]) {
+    guard item?.chaptersURL == nil, let url = URL(string: clean(attributes["url"] ?? "")),
+      url.scheme?.lowercased().hasPrefix("http") == true
+    else { return }
+    let type = clean(attributes["type"] ?? "").lowercased()
+    guard type.isEmpty || type.contains("json") else { return }
+    item?.chaptersURL = url
+  }
+
   private func finishItem() {
     defer { item = nil }
     guard let item, let audio = item.audio else { return }
@@ -174,6 +187,6 @@ private final class FeedReader: NSObject, XMLParserDelegate {
         imageURL: URL(string: item.image).flatMap { item.image.isEmpty ? nil : $0 },
         season: Int(item.season),
         number: Int(item.number),
-        transcripts: item.transcripts))
+        transcripts: item.transcripts, chaptersURL: item.chaptersURL))
   }
 }
