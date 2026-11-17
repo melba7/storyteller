@@ -25,8 +25,9 @@ opens or refreshes.
 
 `Podcasts/apple-podcasts.json` in `~/Storyteller Lofi/LofiMusic` and in its
 iCloud Drive copy: the feed link and title of every followed show, and the feed
-link and guid of every finished episode. It is only rewritten when something
-changed.
+link and guid of every finished episode. An episode is finished when you played
+it or marked it as played; the old episodes Apple Podcasts marks as played when
+you follow a show do not count. It is only rewritten when something changed.
 
 On the phone, a followed show that is new to the app is subscribed to, but none
 of its episodes is downloaded. Finished episodes are marked played. A show you

@@ -12,6 +12,14 @@ SHOW_COLUMNS = "Z_PK INTEGER PRIMARY KEY, ZFEEDURL VARCHAR, ZUPDATEDFEEDURL VARC
 EPISODE_COLUMNS = "Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR, ZHASBEENPLAYED INTEGER"
 
 
+# The current library: a play state, a play count and some dates, with ZHASBEENPLAYED left empty.
+STATE_EPISODE_COLUMNS = (
+    "Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR, ZHASBEENPLAYED INTEGER, "
+    "ZPLAYSTATE INTEGER, ZPLAYCOUNT INTEGER, ZLASTUSERMARKEDASPLAYEDDATE REAL, "
+    "ZLASTDATEPLAYED REAL, ZPLAYSTATESOURCE INTEGER"
+)
+
+
 def load(path):
     with open(path, encoding="utf-8") as handle:
         return json.load(handle)
@@ -46,7 +54,7 @@ def add_episode(conn, show, guid, played):
     )
 
 
-class ExportTests(unittest.TestCase):
+class LibraryTestCase(unittest.TestCase):
     def setUp(self):
         self.dir = tempfile.TemporaryDirectory()
         self.addCleanup(self.dir.cleanup)
@@ -63,6 +71,8 @@ class ExportTests(unittest.TestCase):
         conn.commit()
         return export.export(self.source, [self.music])
 
+
+class ExportTests(LibraryTestCase):
     def test_followed_shows_and_finished_episodes(self):
         conn = self.make()
         add_show(conn, 1, "https://a.example/feed", "Show A", 1)
@@ -143,10 +153,10 @@ class ExportTests(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(self.dir.name)), ["LofiMusic", "MTLibrary.sqlite"])
 
     def test_a_missing_column_names_what_changed(self):
-        conn = self.make(episodes_sql="Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR")
+        conn = self.make(episodes_sql="Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZHASBEENPLAYED INTEGER")
         with self.assertRaises(export.FormatChanged) as caught:
             self.read(conn)
-        self.assertIn("column ZMTEPISODE.ZHASBEENPLAYED", str(caught.exception))
+        self.assertIn("column ZMTEPISODE.ZGUID", str(caught.exception))
         self.assertIn("Apple Podcasts' library has changed", str(caught.exception))
         self.assertFalse(os.path.exists(os.path.join(self.music, "Podcasts")))
 
@@ -171,6 +181,71 @@ class ExportTests(unittest.TestCase):
         conn.execute("INSERT INTO ZMTPODCAST VALUES (1, 'https://a.example/feed', 1)")
         shows, _, _ = self.read(conn)
         self.assertEqual(shows, [{"feed": "https://a.example/feed", "title": ""}])
+
+
+class PlayStateTests(LibraryTestCase):
+    """Finished episodes in the current library, where ZHASBEENPLAYED is empty and the play
+    state decides."""
+
+    def add(self, conn, guid, state, count=None, marked=None, last=None, source=None):
+        conn.execute(
+            "INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZPLAYSTATE, ZPLAYCOUNT, "
+            "ZLASTUSERMARKEDASPLAYEDDATE, ZLASTDATEPLAYED, ZPLAYSTATESOURCE) "
+            "VALUES (1, ?, ?, ?, ?, ?, ?)",
+            (guid, state, count, marked, last, source),
+        )
+
+    def finished_guids(self, conn):
+        _, finished, _ = self.read(conn)
+        return [f["guid"] for f in finished]
+
+    def library(self):
+        conn = self.make(episodes_sql=STATE_EPISODE_COLUMNS)
+        add_show(conn, 1, "https://a.example/feed", "A", 1)
+        return conn
+
+    def test_played_to_the_end_and_marked_by_hand_are_finished(self):
+        conn = self.library()
+        self.add(conn, "listened", 0, count=1, last=700000000)
+        self.add(conn, "marked", 0, count=0, marked=700000000)
+        self.assertEqual(self.finished_guids(conn), ["listened", "marked"])
+
+    def test_the_back_catalogue_of_a_followed_show_is_not_finished(self):
+        conn = self.library()
+        self.add(conn, "catalogue-dated", 0, count=0, last=700000000, source=6)
+        self.add(conn, "catalogue-bare", 0, count=0)
+        self.add(conn, "catalogue-null", 0)
+        self.assertEqual(self.finished_guids(conn), [])
+
+    def test_a_last_played_date_from_another_source_counts(self):
+        conn = self.library()
+        self.add(conn, "played", 0, count=0, last=700000000, source=2)
+        self.add(conn, "played-no-source", 0, count=0, last=700000000)
+        self.assertEqual(self.finished_guids(conn), ["played", "played-no-source"])
+
+    def test_in_progress_and_unplayed_are_not_finished(self):
+        conn = self.library()
+        self.add(conn, "in-progress", 1, count=1, marked=700000000, last=700000000)
+        self.add(conn, "unplayed", 2, count=1, marked=700000000, last=700000000)
+        self.assertEqual(self.finished_guids(conn), [])
+
+    def test_an_old_played_flag_still_counts_next_to_the_play_state(self):
+        conn = self.library()
+        conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZHASBEENPLAYED, ZPLAYSTATE) VALUES (1, 'flag', 1, 2)")
+        self.assertEqual(self.finished_guids(conn), ["flag"])
+
+    def test_a_play_state_without_any_listened_column_counts_nothing(self):
+        conn = self.make(episodes_sql="Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR, ZPLAYSTATE INTEGER")
+        add_show(conn, 1, "https://a.example/feed", "A", 1)
+        conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZPLAYSTATE) VALUES (1, 'x', 0)")
+        self.assertEqual(self.finished_guids(conn), [])
+
+    def test_neither_a_play_state_nor_a_played_flag_names_what_is_missing(self):
+        conn = self.make(episodes_sql="Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR")
+        with self.assertRaises(export.FormatChanged) as caught:
+            self.read(conn)
+        self.assertIn("ZMTEPISODE.ZPLAYSTATE or ZMTEPISODE.ZHASBEENPLAYED", str(caught.exception))
+        self.assertIn("Apple Podcasts' library has changed", str(caught.exception))
 
 
 class WriteTests(unittest.TestCase):
