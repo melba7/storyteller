@@ -806,6 +806,37 @@ only. No new npm packages and no new CSS variables.
     Stats, empty states, and no uppercase headers. The look waits for
     TestFlight.
 
+### Mo's first try of build 27.1 (2026-11-17)
+
+Mo: "the ad skip doesn't seem to work. There is no place to see downloaded
+podcasts. The transcript takes way too long. There seem to be interface glitches
+like the top bar covering parts of text. Doesn't look like a modern app." What the
+code shows: Downloads exists but only under Profile; episodes are transcribed one
+at a time in download order, the one playing does not go first, nothing shows
+until the whole episode is done, and ads are looked for only after that, so a
+fresh download is usually past its ads before they are known.
+
+- [ ] **R1. Downloaded episodes in the Library** (S): a "Downloaded" row at the
+      top of the Library (with how many) opens the downloads list inside the
+      Library tab; Profile keeps its row.
+  - Done when: `check.sh` passes and the row opens the list without switching
+    tabs.
+- [ ] **R2. The playing episode first** (M): the transcriber and the ad finder
+      put the playing episode at the front of their queues and pause another
+      episode at its next piece; playing an episode that is not downloaded
+      starts its download when "Skip ads" is on, so it can be transcribed.
+  - Done when: `check.sh` passes (queue order tested in PodcastKit), and the iOS
+    build passes in CI.
+- [ ] **R3. Lines as they are transcribed** (M): the transcript shows the lines
+      saved so far with "Transcribing, N%" under them and grows after each
+      five-minute piece, instead of a wait for the whole episode.
+  - Done when: `check.sh` passes and the iOS build passes in CI.
+- [ ] **R4. Ads found as the transcript grows** (L): waits for Mo's answer on
+      Apple Intelligence (the finder needs it).
+- [ ] **R5. The top bar over text** (S to M): waits for Mo's screenshots.
+- [ ] **R6. A more modern look** (M to L): waits for Mo to name the app to
+      follow and the screens that look dated.
+
 ## Later
 
 - Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
