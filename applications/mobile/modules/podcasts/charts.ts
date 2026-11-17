@@ -30,6 +30,7 @@ export const CHART_CATEGORIES: readonly ChartCategory[] = [
   { id: "1303", name: "Comedy" },
   { id: "1304", name: "Education" },
   { id: "1483", name: "Fiction" },
+  { id: "1511", name: "Government" },
   { id: "1512", name: "Health & Fitness" },
   { id: "1487", name: "History" },
   { id: "1305", name: "Kids & Family" },

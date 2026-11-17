@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Ellipsis, Plus } from "lucide-react-native"
+import { Ellipsis, Plus, Search } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu, type MenuAction } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
-import { refreshAllShows } from "@/modules/podcasts/db"
+import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
 import {
@@ -152,6 +152,14 @@ export function PodcastsHome() {
         left={<SectionMenuButton current="podcasts" />}
         right={
           <View className="flex-row items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              accessibilityLabel="Search episodes"
+              onPress={() => router.push("/podcasts/search")}
+            >
+              <Icon as={Search} size={24} className="text-primary" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"

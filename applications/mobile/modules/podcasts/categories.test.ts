@@ -43,7 +43,8 @@ describe("topLevelNames", () => {
 describe("chartCategoryFor", () => {
   it("finds Apple's category by name, ignoring case", () => {
     expect(chartCategoryFor("health & fitness")?.id).toBe("1512")
-    expect(chartCategoryFor("Government")).toBeNull()
+    expect(chartCategoryFor("Government")?.id).toBe("1511")
+    expect(chartCategoryFor("Gardening")).toBeNull()
   })
 })
 
@@ -85,8 +86,8 @@ describe("pickForYou", () => {
 
   it("skips categories Apple has no chart for, and gives nothing without categories", () => {
     const picks = pickForYou([
-      followed("A", ["Government"]),
-      followed("B", ["Government", "Music"]),
+      followed("A", ["Gardening"]),
+      followed("B", ["Gardening", "Music"]),
     ])
     expect(picks.map((p) => p.category.name)).toEqual(["Music"])
     expect(pickForYou([followed("A", [])])).toEqual([])

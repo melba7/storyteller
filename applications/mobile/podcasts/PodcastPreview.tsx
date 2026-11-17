@@ -4,11 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { fetchFeed, subscribe } from "@/modules/podcasts/db"
+import { fetchFeed, subscribe } from "@/modules/podcasts/dbFeeds"
 import { normalizeFeedUrl } from "@/modules/podcasts/feedUrl"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { type Preview, previewFromFeed } from "@/modules/podcasts/preview"
+import {
+  type EpisodeTarget,
+  type Preview,
+  findEpisodeIndex,
+  previewFromFeed,
+} from "@/modules/podcasts/preview"
 import { showHref } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
@@ -29,7 +34,14 @@ function sameFeed(a: string, b: string): boolean {
  * with Play. Following saves it and swaps this page for the show's own page. A show that is
  * already followed goes straight to its page.
  */
-export function PodcastPreview({ feedUrl }: { feedUrl: string }) {
+export function PodcastPreview({
+  feedUrl,
+  episode = {},
+}: {
+  feedUrl: string
+  /** The episode a search result meant, to scroll to and mark. */
+  episode?: EpisodeTarget
+}) {
   const router = useRouter()
   const segments = useSegments()
   const shows = useShows()
@@ -38,6 +50,14 @@ export function PodcastPreview({ feedUrl }: { feedUrl: string }) {
   const [following, setFollowing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const left = useRef(false)
+  const list = useRef<FlatList<StoredEpisode>>(null)
+  const scrolled = useRef(false)
+  const { guid, audioUrl } = episode
+  const target = useMemo(
+    () =>
+      preview ? findEpisodeIndex(preview.episodes, { guid, audioUrl }) : -1,
+    [preview, guid, audioUrl],
+  )
 
   useEffect(() => {
     let current = true
@@ -60,6 +80,17 @@ export function PodcastPreview({ feedUrl }: { feedUrl: string }) {
     () => shows.data?.find((show) => sameFeed(show.feedUrl, feedUrl)),
     [shows.data, feedUrl],
   )
+
+  // Scrolls to the episode a search result meant, once the list is there.
+  useEffect(() => {
+    if (target < 0 || scrolled.current) return
+    scrolled.current = true
+    const timer = setTimeout(
+      () => list.current?.scrollToIndex({ index: target, animated: true }),
+      100,
+    )
+    return () => clearTimeout(timer)
+  }, [target])
 
   // Replaces this page with the show's own, once, when the show is in the library.
   useEffect(() => {
@@ -94,6 +125,18 @@ export function PodcastPreview({ feedUrl }: { feedUrl: string }) {
         <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
       ) : (
         <FlatList<StoredEpisode>
+          ref={list}
+          onScrollToIndexFailed={({ averageItemLength, index }) => {
+            // The row isn't drawn yet: go roughly there, then to the row itself.
+            list.current?.scrollToOffset({
+              offset: averageItemLength * index,
+              animated: false,
+            })
+            setTimeout(
+              () => list.current?.scrollToIndex({ index, animated: true }),
+              150,
+            )
+          }}
           data={preview.episodes}
           keyExtractor={(episode) => episode.id}
           contentContainerClassName="px-safe-or-4"
@@ -111,8 +154,13 @@ export function PodcastPreview({ feedUrl }: { feedUrl: string }) {
               This feed has no episodes yet.
             </Text>
           }
-          renderItem={({ item }) => (
-            <EpisodeRow episode={item} show={preview.show} openable={false} />
+          renderItem={({ item, index }) => (
+            <EpisodeRow
+              episode={item}
+              show={preview.show}
+              openable={false}
+              highlighted={index === target}
+            />
           )}
         />
       )}

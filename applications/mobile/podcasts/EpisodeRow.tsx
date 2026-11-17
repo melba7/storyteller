@@ -22,11 +22,14 @@ export function EpisodeRow({
   episode,
   show,
   openable = true,
+  highlighted = false,
 }: {
   episode: StoredEpisode
   show: Show
   /** False in a preview, where the episode has no card because it isn't in the library. */
   openable?: boolean
+  /** The episode a search result pointed at. */
+  highlighted?: boolean
 }) {
   const router = useRouter()
   const segments = useSegments()
@@ -35,7 +38,7 @@ export function EpisodeRow({
   const length = formatEpisodeLength(episode)
   return (
     <View
-      className="border-border flex-row items-center gap-3 border-b py-3"
+      className={`border-border flex-row items-center gap-3 border-b py-3 ${highlighted ? "bg-secondary rounded-md px-2" : ""}`}
       style={{ opacity: state === "played" ? 0.5 : 1 }}
     >
       <Pressable

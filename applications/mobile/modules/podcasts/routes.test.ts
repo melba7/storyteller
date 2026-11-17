@@ -51,6 +51,17 @@ describe("preview and category links", () => {
     )
   })
 
+  it("name the episode a search result meant, when it is known", () => {
+    expect(
+      previewHref(["(tabs)", "(library)"], "u", { guid: "g", audioUrl: "a" })
+        .params,
+    ).toEqual({ feed: "u", guid: "g", audio: "a" })
+    expect(
+      previewHref(["(tabs)", "(library)"], "u", { guid: null, audioUrl: "" })
+        .params,
+    ).toEqual({ feed: "u" })
+  })
+
   it("open a category's chart in the Discover tab", () => {
     expect(categoryHref("1321")).toEqual({
       pathname: "/podcasts/(tabs)/(discover)/category/[id]",

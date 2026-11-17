@@ -7,7 +7,7 @@ import {
   pickForYou,
 } from "@/modules/podcasts/categories"
 import { type ChartShow, loadChart } from "@/modules/podcasts/charts"
-import { cacheGet, cachePut } from "@/modules/podcasts/db"
+import { cacheGet, cachePut } from "@/modules/podcasts/dbFeeds"
 import { readableError } from "@/modules/podcasts/nativeError"
 
 import { type Query, useShows } from "./hooks"

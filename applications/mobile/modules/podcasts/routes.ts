@@ -26,12 +26,21 @@ export function episodeHref(
   return { pathname: `${tabBase(segments)}/episode/[id]`, params: { id } }
 }
 
-/** A show read from its feed without saving it, in the tab you are in. */
-export function previewHref(segments: readonly string[], feedUrl: string) {
-  return {
-    pathname: `${tabBase(segments)}/preview`,
-    params: { feed: feedUrl },
+/**
+ * A show read from its feed without saving it, in the tab you are in. A search result also
+ * names its episode (guid, audio address) so the preview can point at it.
+ */
+export function previewHref(
+  segments: readonly string[],
+  feedUrl: string,
+  episode: { guid?: string | null; audioUrl?: string | null } = {},
+) {
+  const params: { feed: string; guid?: string; audio?: string } = {
+    feed: feedUrl,
   }
+  if (episode.guid) params.guid = episode.guid
+  if (episode.audioUrl) params.audio = episode.audioUrl
+  return { pathname: `${tabBase(segments)}/preview`, params }
 }
 
 /** A category's chart. Only the Discover tab has it, so the link always names that tab. */

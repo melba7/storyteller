@@ -9,30 +9,24 @@ import {
   IOS_DOCUMENT_PATH,
   open,
 } from "@op-engineering/op-sqlite"
-import { randomUUID } from "expo-crypto"
 import { Platform } from "react-native"
 
 import { notifyLibraryChanged } from "./changes"
-import { normalizeFeedUrl } from "./feedUrl"
-import { Podcasts, type PodcastFeedData } from "./index"
 import {
-  type FetchedEpisode,
   type Show,
   type StoredEpisode,
   episodeFromRow,
-  fetchedEpisode,
-  mergeEpisodes,
   showFromRow,
   sortEpisodes,
 } from "./library"
 import { type ActivityByShow } from "./libraryView"
-import { readableError } from "./nativeError"
 import { migrationStatements } from "./schema"
+import { type EpisodeHit, hitFromRow, localSearchQuery } from "./search"
 
 let opened: Promise<DB> | null = null
 
 /** Opens the file the first time it is needed and creates or upgrades its tables. */
-function database(): Promise<DB> {
+export function database(): Promise<DB> {
   opened ??= (async () => {
     const db = open({
       name: "podcasts.db",
@@ -59,7 +53,7 @@ function database(): Promise<DB> {
   return opened
 }
 
-async function rows(sql: string, params: (string | number)[] = []) {
+export async function rows(sql: string, params: (string | number)[] = []) {
   const db = await database()
   return (await db.execute(sql, params)).rows
 }
@@ -130,6 +124,13 @@ export async function getEpisode(id: string): Promise<StoredEpisode | null> {
   return found[0] ? episodeFromRow(found[0]) : null
 }
 
+/** Episodes of followed shows with every word in the title or notes (see search.ts). */
+export async function searchEpisodes(input: string): Promise<EpisodeHit[]> {
+  const query = localSearchQuery(input)
+  if (!query) return []
+  return (await rows(query.sql, query.params)).map(hitFromRow)
+}
+
 // MARK: Playing
 
 /** Keeps where the listener is in an episode, and whether it counts as played. */
@@ -167,161 +168,6 @@ export async function saveArtworkColor(
   notifyLibraryChanged()
 }
 
-// MARK: Reading a feed
-
-function orNull<T>(value: T | null | undefined): T | null {
-  return value ?? null
-}
-
-/** Downloads and reads a feed without saving it. Throws a message to show the listener. */
-export async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
-  if (!Podcasts) throw new Error("Podcasts need the iOS app.")
-  try {
-    return await Podcasts.fetchFeed(feedUrl)
-  } catch (cause) {
-    throw new Error(readableError(cause))
-  }
-}
-
-// MARK: Writing
-
-function insertEpisode(showId: string, episode: FetchedEpisode) {
-  return [
-    `INSERT INTO episodes (id, show_id, guid, title, published_at, duration_seconds, notes,
-       audio_url, audio_type, audio_bytes, image_url, season, number)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      randomUUID(),
-      showId,
-      episode.guid,
-      episode.title,
-      episode.publishedAt,
-      episode.durationSeconds,
-      episode.notes,
-      episode.audioUrl,
-      episode.audioType,
-      episode.audioBytes,
-      episode.imageUrl,
-      episode.season,
-      episode.number,
-    ],
-  ] as const
-}
-
-function updateEpisode(id: string, episode: FetchedEpisode) {
-  return [
-    `UPDATE episodes SET title = ?, published_at = ?, duration_seconds = ?, notes = ?,
-       audio_url = ?, audio_type = ?, audio_bytes = ?, image_url = ?, season = ?, number = ?
-     WHERE id = ?`,
-    [
-      episode.title,
-      episode.publishedAt,
-      episode.durationSeconds,
-      episode.notes,
-      episode.audioUrl,
-      episode.audioType,
-      episode.audioBytes,
-      episode.imageUrl,
-      episode.season,
-      episode.number,
-      id,
-    ],
-  ] as const
-}
-
-/** Subscribes to the feed at this link (a pasted one or one from the directory). */
-export async function subscribe(link: string): Promise<Show> {
-  const feedUrl = normalizeFeedUrl(link)
-  const existing = (
-    await rows("SELECT * FROM shows WHERE feed_url = ?", [feedUrl])
-  )[0]
-  if (existing) return showFromRow(existing)
-
-  const feed = await fetchFeed(feedUrl)
-  const now = Date.now()
-  const id = randomUUID()
-  const { insert } = mergeEpisodes([], feed.episodes.map(fetchedEpisode))
-  const db = await database()
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      `INSERT INTO shows (id, feed_url, title, author, description, image_url, link, language,
-         added_at, refreshed_at, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id,
-        feedUrl,
-        feed.title,
-        orNull(feed.author),
-        feed.description,
-        orNull(feed.imageUrl),
-        orNull(feed.link),
-        orNull(feed.language),
-        now,
-        now,
-        JSON.stringify(feed.categories ?? []),
-      ],
-    )
-    for (const episode of insert) {
-      const [sql, params] = insertEpisode(id, episode)
-      await tx.execute(sql, [...params])
-    }
-  })
-  notifyLibraryChanged()
-  const show = await getShow(id)
-  if (!show) throw new Error("The show couldn't be saved.")
-  return show
-}
-
-/** Reads the show's feed again: adds new episodes, updates changed ones, deletes none. */
-export async function refreshShow(id: string): Promise<void> {
-  const show = await getShow(id)
-  if (!show) return
-  const feed = await fetchFeed(show.feedUrl)
-  const { insert, update } = mergeEpisodes(
-    await listEpisodes(id),
-    feed.episodes.map(fetchedEpisode),
-  )
-  const db = await database()
-  await db.transaction(async (tx) => {
-    await tx.execute(
-      `UPDATE shows SET title = ?, author = ?, description = ?, image_url = ?, link = ?,
-         language = ?, refreshed_at = ?, categories = ? WHERE id = ?`,
-      [
-        feed.title,
-        orNull(feed.author),
-        feed.description,
-        orNull(feed.imageUrl),
-        orNull(feed.link),
-        orNull(feed.language),
-        Date.now(),
-        JSON.stringify(feed.categories ?? []),
-        id,
-      ],
-    )
-    for (const episode of insert) {
-      const [sql, params] = insertEpisode(id, episode)
-      await tx.execute(sql, [...params])
-    }
-    for (const { id: episodeId, episode } of update) {
-      const [sql, params] = updateEpisode(episodeId, episode)
-      await tx.execute(sql, [...params])
-    }
-  })
-  notifyLibraryChanged()
-}
-
-/** Refreshes every show, one after the other. A show that fails does not stop the rest. */
-export async function refreshAllShows(): Promise<{ failed: string[] }> {
-  const failed: string[] = []
-  for (const show of await listShows()) {
-    try {
-      await refreshShow(show.id)
-    } catch {
-      failed.push(show.title)
-    }
-  }
-  return { failed }
-}
-
 /** Removes the show and its episodes from the library. */
 export async function unsubscribe(id: string): Promise<void> {
   const db = await database()
@@ -330,26 +176,4 @@ export async function unsubscribe(id: string): Promise<void> {
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])
   })
   notifyLibraryChanged()
-}
-
-// MARK: Kept answers
-
-/** An answer kept in the cache table, with when it was saved (milliseconds since 1970). */
-export async function cacheGet(
-  key: string,
-): Promise<{ value: string; savedAt: number } | null> {
-  const found = await rows("SELECT value, saved_at FROM cache WHERE key = ?", [
-    key,
-  ])
-  const row = found[0]
-  if (!row || typeof row["value"] !== "string") return null
-  return { value: row["value"], savedAt: Number(row["saved_at"] ?? 0) }
-}
-
-export async function cachePut(key: string, value: string): Promise<void> {
-  const db = await database()
-  await db.execute(
-    "INSERT OR REPLACE INTO cache (key, value, saved_at) VALUES (?, ?, ?)",
-    [key, value, Date.now()],
-  )
 }

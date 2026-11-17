@@ -10,7 +10,8 @@ import {
 } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { refreshShow, unsubscribe } from "@/modules/podcasts/db"
+import { unsubscribe } from "@/modules/podcasts/db"
+import { refreshShow } from "@/modules/podcasts/dbFeeds"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { tabBase } from "@/modules/podcasts/routes"

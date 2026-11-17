@@ -6,7 +6,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
-import { subscribe } from "@/modules/podcasts/db"
+import { subscribe } from "@/modules/podcasts/dbFeeds"
 import {
   type DirectoryShow,
   searchDirectory,

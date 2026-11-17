@@ -104,12 +104,12 @@ describe("parseLookup", () => {
 
 describe("the category list", () => {
   it("has Apple's genre numbers and no repeats", () => {
-    expect(CHART_CATEGORIES).toHaveLength(18)
+    expect(CHART_CATEGORIES).toHaveLength(19)
     expect(CHART_CATEGORIES.find((c) => c.name === "True Crime")?.id).toBe(
       "1488",
     )
-    expect(new Set(CHART_CATEGORIES.map((c) => c.id)).size).toBe(18)
-    expect(new Set(CHART_CATEGORIES.map((c) => c.name)).size).toBe(18)
+    expect(new Set(CHART_CATEGORIES.map((c) => c.id)).size).toBe(19)
+    expect(new Set(CHART_CATEGORIES.map((c) => c.name)).size).toBe(19)
   })
 })
 

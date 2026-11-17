@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest"
 
 import { type PodcastFeedData } from "./index"
-import { isPreviewId, previewFromFeed } from "./preview"
+import { findEpisodeIndex, isPreviewId, previewFromFeed } from "./preview"
 
 const feed: PodcastFeedData = {
   title: "The Show",
@@ -69,5 +69,45 @@ describe("previewFromFeed", () => {
 
   it("does not take a library id for a preview", () => {
     expect(isPreviewId("3f2a-uuid")).toBe(false)
+  })
+})
+
+describe("findEpisodeIndex", () => {
+  const list = [
+    { guid: "a", audioUrl: "https://cdn.test/one.mp3?token=1" },
+    { guid: "b", audioUrl: "https://cdn.test/two.mp3" },
+  ]
+
+  it("finds an episode by its guid first", () => {
+    expect(
+      findEpisodeIndex(list, {
+        guid: "b",
+        audioUrl: "https://cdn.test/one.mp3",
+      }),
+    ).toBe(1)
+  })
+
+  it("falls back to the audio address, ignoring scheme, query and case", () => {
+    expect(
+      findEpisodeIndex(list, {
+        guid: "zzz",
+        audioUrl: "http://CDN.test/one.mp3?src=apple",
+      }),
+    ).toBe(0)
+    expect(
+      findEpisodeIndex(list, { audioUrl: "https://cdn.test/two.mp3" }),
+    ).toBe(1)
+  })
+
+  it("is -1 when the feed has no such episode or none was named", () => {
+    expect(
+      findEpisodeIndex(list, {
+        guid: "zzz",
+        audioUrl: "https://other.test/x.mp3",
+      }),
+    ).toBe(-1)
+    expect(findEpisodeIndex(list, {})).toBe(-1)
+    expect(findEpisodeIndex(list, { guid: null, audioUrl: "" })).toBe(-1)
+    expect(findEpisodeIndex([], { guid: "a" })).toBe(-1)
   })
 })

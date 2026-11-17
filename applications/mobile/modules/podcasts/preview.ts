@@ -58,3 +58,39 @@ export function previewFromFeed(
     episodes: sortEpisodes(episodes),
   }
 }
+
+/** What a search result knows about its episode: the feed's guid and the audio address. */
+export type EpisodeTarget = {
+  guid?: string | null | undefined
+  audioUrl?: string | null | undefined
+}
+
+/** An audio address without its scheme, query and trailing slash, in lower case. */
+function audioKey(url: string): string {
+  return url
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .replace(/[?#].*$/, "")
+    .replace(/\/+$/, "")
+}
+
+/**
+ * The place in the preview's list of the episode a search result meant: by the feed's guid,
+ * or else by the audio address. -1 when the feed has no such episode, or none was named.
+ */
+export function findEpisodeIndex(
+  episodes: Pick<StoredEpisode, "guid" | "audioUrl">[],
+  target: EpisodeTarget,
+): number {
+  if (target.guid) {
+    const byGuid = episodes.findIndex((e) => e.guid === target.guid)
+    if (byGuid >= 0) return byGuid
+  }
+  if (target.audioUrl) {
+    const wanted = audioKey(target.audioUrl)
+    if (wanted !== "")
+      return episodes.findIndex((e) => audioKey(e.audioUrl) === wanted)
+  }
+  return -1
+}

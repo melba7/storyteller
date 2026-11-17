@@ -332,6 +332,9 @@ once reviewed and green.
   - Files: `modules/podcasts` (`search.ts`, `directory.ts`, `db.ts`, with
     tests), `podcasts/` (search screen, `PodcastsHome.tsx`),
     `app/(root)/podcasts/search.tsx`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    search is a button in the Podcasts top bar (`(tabs)/(library)/search.tsx`).
+    The saved Apple answer for the episode search is hand-written.
 
 - [ ] **P2a. Download episodes**
   - Download and delete buttons per episode. Downloads use a background session,
