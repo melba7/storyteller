@@ -79,6 +79,21 @@ final class RelaunchTests: XCTestCase {
     XCTAssertEqual(Relaunch.action(for: .failed(reason: "no"), taskIsAlive: false), .keep)
   }
 
+  func testAnUnfinishedPlayThroughDownloadIsDroppedAtLaunchNotShownAsStopped() {
+    XCTAssertEqual(
+      Relaunch.action(for: .downloading(bytes: 5, expected: 10), taskIsAlive: false, playThrough: true),
+      .drop)
+    XCTAssertEqual(Relaunch.action(for: .queued, taskIsAlive: false, playThrough: true), .drop)
+    // One the player is still feeding (it registered itself) is left alone.
+    XCTAssertEqual(
+      Relaunch.action(for: .downloading(bytes: 5, expected: 10), taskIsAlive: true, playThrough: true),
+      .keep)
+    let done = DownloadState.downloaded(file: "f.mp3", sha256: "x", bytes: 1, date: Date())
+    XCTAssertEqual(Relaunch.action(for: done, taskIsAlive: false, playThrough: true), .keep)
+    XCTAssertEqual(
+      Relaunch.action(for: .failed(reason: "no"), taskIsAlive: false, playThrough: true), .keep)
+  }
+
   func testThePlanCoversEveryEntry() {
     let plan = Relaunch.plan(
       entries: [

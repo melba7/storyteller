@@ -37,6 +37,10 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   private var active = Set<String>()
   private var throttles: [Int: ProgressThrottle] = [:]
   private var retries: [String: Int] = [:]
+  /// Episodes the player is fetching as they play (PodcastStreamDownload), each with what stops
+  /// that. The background session knows nothing about them, so this keeps clean-up and a second
+  /// download from treating their entries as its own.
+  private var playThrough: [String: @Sendable () -> Void] = [:]
   private var backgroundCompletion: (() -> Void)?
 
   private override init() {
@@ -88,11 +92,16 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Applies the restart rule: downloads that lost their task fail, queued ones start again.
   private func settle() {
     guard let store else { return }
-    let live = lock.withLock { active }
+    let live = lock.withLock { active.union(playThrough.keys) }
     let before = store.entries()
     guard let restart = try? store.reconcile(liveEpisodeIds: live) else { return }
     for entry in before {
-      if let now = store.entry(for: entry.episodeId), now.state != entry.state { emit(now) }
+      guard let now = store.entry(for: entry.episodeId) else {
+        // An unfinished play-through download left by a kill: it is gone, not "Stopped".
+        if entry.playThrough { emitRemoved(entry.episodeId) }
+        continue
+      }
+      if now.state != entry.state { emit(now) }
     }
     for entry in restart { begin(entry) }
   }
@@ -117,6 +126,8 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS
     let plain = scheme == "http" ? given.absoluteString : nil
+    // The player is already fetching it as the episode plays.
+    if lock.withLock({ playThrough[episodeId] != nil }) { return }
     if let existing = store.entry(for: episodeId) {
       if existing.state.isActive, lock.withLock({ active.contains(episodeId) }) { return }
       if case .downloaded = existing.state, store.localFile(for: episodeId) != nil { return }
@@ -142,6 +153,9 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Stops any task for the episode and removes its folder, files and entry.
   func remove(episodeId: String) throws {
     guard let store else { return }
+    // A download the player is feeding stops too, and the player plays the plain address.
+    let stopLoader = lock.withLock { playThrough[episodeId] }
+    stopLoader?()
     _ = try store.delete(episodeId: episodeId)
     lock.withLock { active.remove(episodeId); retries[episodeId] = nil }
     session?.getAllTasks { tasks in
@@ -152,6 +166,23 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   }
 
   func localFile(for episodeId: String) -> URL? { store?.localFile(for: episodeId) }
+
+  // MARK: Play-through downloads
+
+  /// The player started fetching this episode as it plays. `stop` is called when the listener
+  /// removes or cancels the download meanwhile.
+  func registerPlayThrough(_ episodeId: String, stop: @escaping @Sendable () -> Void) {
+    lock.withLock { playThrough[episodeId] = stop }
+  }
+
+  /// The player's fetch of this episode is over (filed, failed, stopped or given up).
+  func unregisterPlayThrough(_ episodeId: String) {
+    lock.withLock { _ = playThrough.removeValue(forKey: episodeId) }
+  }
+
+  func isPlayThrough(_ episodeId: String) -> Bool {
+    lock.withLock { playThrough[episodeId] != nil }
+  }
 
   /// Begins a task for the entry's address. Wi-Fi only is read now, per request.
   private func begin(_ entry: DownloadEntry) {
@@ -312,7 +343,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     send?("onDownloadChange", DownloadJSON.object(entry))
   }
 
-  private func emitRemoved(_ id: String) {
+  func emitRemoved(_ id: String) {
     let send = lock.withLock { sink }
     send?("onDownloadChange", ["episodeId": id, "state": "none"])
   }

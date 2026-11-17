@@ -69,6 +69,9 @@ public enum RelaunchAction: Sendable, Equatable {
   /// Start the download again from the beginning.
   case restart
   case fail(String)
+  /// Forget it, with its folder: a download the player fed as the episode played, which the
+  /// listener never asked for and which is no use unfinished.
+  case drop
 }
 
 public enum Relaunch {
@@ -79,8 +82,13 @@ public enum Relaunch {
   /// download that was moving but lost its task (the listener force-quit the app, which
   /// cancels background downloads) is marked failed, so a phone on mobile data does not
   /// start a big download by itself. One that was only queued has lost nothing, so it
-  /// restarts.
-  public static func action(for state: DownloadState, taskIsAlive: Bool) -> RelaunchAction {
+  /// restarts. An unfinished play-through download is dropped when the player is not feeding
+  /// it (`taskIsAlive` is then false); the player registers itself, so one that is still
+  /// playing is kept.
+  public static func action(for state: DownloadState, taskIsAlive: Bool, playThrough: Bool = false)
+    -> RelaunchAction
+  {
+    if playThrough, state.isActive { return taskIsAlive ? .keep : .drop }
     switch state {
     case .downloaded, .failed: return .keep
     case .queued: return taskIsAlive ? .keep : .restart
@@ -95,7 +103,8 @@ public enum Relaunch {
     var actions: [String: RelaunchAction] = [:]
     for entry in entries {
       actions[entry.episodeId] = action(
-        for: entry.state, taskIsAlive: liveEpisodeIds.contains(entry.episodeId))
+        for: entry.state, taskIsAlive: liveEpisodeIds.contains(entry.episodeId),
+        playThrough: entry.playThrough)
     }
     return actions
   }

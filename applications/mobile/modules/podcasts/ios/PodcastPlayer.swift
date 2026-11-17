@@ -45,6 +45,8 @@ final class PodcastPlayer {
   private var ticks = 0
   /// Feeds the loaded item from its own download, while there is one (PodcastPlayer+Stream.swift).
   var streamDownload: PodcastStreamDownload?
+  /// Where the loaded episode was told to start (PodcastPlayer+Stream.swift's fallback).
+  var itemStart = 0.0
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -75,6 +77,9 @@ final class PodcastPlayer {
     var playThroughDownload = false
     /// The feed's language, for the transcript of an episode that starts downloading here.
     var language: String?
+    /// The address to keep in Up Next when `url` is a local file (an episode started from the
+    /// queue plays its download), so the item can go back to the queue and be fetched again.
+    var queueURL: String?
   }
 
   /// The listener chose this episode. The one playing goes back to the top of Up Next.
@@ -90,10 +95,10 @@ final class PodcastPlayer {
     watchTheBook()
     currentEnded = false
     current = QueueItem(
-      id: episode.id, url: episode.url.absoluteString, type: episode.type, title: episode.title,
-      showTitle: episode.showTitle, artworkUrl: episode.artworkUrl, duration: episode.duration,
-      position: episode.savedPosition, showId: episode.showId,
-      chaptersUrl: episode.chaptersUrl)
+      id: episode.id, url: episode.queueURL ?? episode.url.absoluteString, type: episode.type,
+      title: episode.title, showTitle: episode.showTitle, artworkUrl: episode.artworkUrl,
+      duration: episode.duration, position: episode.savedPosition, showId: episode.showId,
+      chaptersUrl: episode.chaptersUrl, language: episode.language)
     wantsToPlay = false
     player.pause()
     removeItemObservers()
@@ -122,6 +127,7 @@ final class PodcastPlayer {
     let start = ShowRules.start(
       savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played,
       intro: showState.settings.introSeconds)
+    itemStart = start
     if start > 0 {
       player.seek(
         to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
@@ -242,7 +248,7 @@ final class PodcastPlayer {
 
   // MARK: Watching the player
 
-  private func watch(_ item: AVPlayerItem) {
+  func watch(_ item: AVPlayerItem) {
     if timeObserver == nil {
       timeObserver = player.addPeriodicTimeObserver(
         forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main
@@ -272,7 +278,7 @@ final class PodcastPlayer {
       })
   }
 
-  private func removeItemObservers() {
+  func removeItemObservers() {
     itemObservation = nil
     for observer in itemObservers { NotificationCenter.default.removeObserver(observer) }
     itemObservers = []

@@ -190,21 +190,27 @@ public final class DownloadStore: @unchecked Sendable {
   }
 
   /// Applies `Relaunch`'s rule after the app starts, given the episodes that still have a
-  /// URLSession task. Entries that lost their task are marked failed; the ones to start
-  /// again are returned.
+  /// URLSession task. Entries that lost their task are marked failed, unfinished play-through
+  /// ones are removed; the ones to start again are returned.
   public func reconcile(liveEpisodeIds: Set<String>) throws -> [DownloadEntry] {
     try lock.withLock {
       let plan = Relaunch.plan(entries: index.entries, liveEpisodeIds: liveEpisodeIds)
       var restart: [DownloadEntry] = []
+      var dropped: [String] = []
       for at in index.entries.indices {
         let entry = index.entries[at]
         switch plan[entry.episodeId] ?? .keep {
         case .keep: break
         case .restart: restart.append(entry)
+        case .drop: dropped.append(entry.episodeId)
         case .fail(let reason):
           index.entries[at].state = .failed(reason: reason)
           index.entries[at].updatedAt = Date()
         }
+      }
+      for id in dropped {
+        index.entries.removeAll { $0.episodeId == id }
+        if let folder = try? folder(for: id) { try? FileManager.default.removeItem(at: folder) }
       }
       try save()
       return restart

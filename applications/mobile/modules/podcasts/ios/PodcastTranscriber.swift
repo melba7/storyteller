@@ -42,9 +42,10 @@ final class PodcastTranscriber: @unchecked Sendable {
 
   // MARK: What the app tells us
 
-  /// The language an episode is to be transcribed in, noted when its download starts.
+  /// The language an episode is to be transcribed in, noted when its download starts. A start
+  /// that does not know the language leaves the one already noted.
   func noteLanguage(_ language: String?, for episodeId: String) {
-    languages?.note(language, for: episodeId)
+    languages?.remember(language, for: episodeId)
   }
 
   /// A download was installed: transcribe it.

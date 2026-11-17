@@ -6,6 +6,9 @@ public enum AdsStatus: Sendable, Equatable {
   case waiting
   case finding(percent: Int)
   case found(count: Int)
+  /// Ads found in the part of the transcript made so far. The player already skips them, and
+  /// the episode still waits for its full pass.
+  case partialFound(count: Int)
   case noneFound
   /// Not now, with the words for the listener ("Apple Intelligence is off").
   case notPossible(reason: String)
@@ -16,26 +19,36 @@ public enum AdsRules {
   ///
   /// - Parameters:
   ///   - file: the saved result of the detector, if any.
+  ///   - partial: the result for the transcript made so far, if any (no use once `file` is there).
   ///   - detectorVersion: the running detector's version; a result of another version is old
   ///     and the episode is checked again.
   ///   - finding: the percent done while a run is going.
   ///   - unavailable: why the model cannot be used now, or nil when it can.
   ///   - failure: why the last run in this launch failed, so it is not retried in a loop.
   public static func status(
-    file: AdsFile?, detectorVersion: String, finding: Int?, unavailable: AdUnavailable?,
-    failure: String?
+    file: AdsFile?, partial: AdsFile? = nil, detectorVersion: String, finding: Int?,
+    unavailable: AdUnavailable?, failure: String?
   ) -> AdsStatus {
     if let finding { return .finding(percent: finding) }
     if let file, file.detectorVersion == detectorVersion {
       return file.ads.isEmpty ? .noneFound : .found(count: file.ads.count)
     }
+    // A failed run is not tried again in a loop, whatever a partial result says.
     if let failure { return .notPossible(reason: failure) }
+    if let partial, partial.detectorVersion == detectorVersion, !partial.ads.isEmpty {
+      return .partialFound(count: partial.ads.count)
+    }
     if let unavailable { return .notPossible(reason: unavailable.reason) }
     return .waiting
   }
 
-  /// Whether the episode is to be queued: only a waiting one is.
-  public static func wantsRun(_ status: AdsStatus) -> Bool { status == .waiting }
+  /// Whether the episode is to be queued: a waiting one, or one that has only a partial result.
+  public static func wantsRun(_ status: AdsStatus) -> Bool {
+    switch status {
+    case .waiting, .partialFound: return true
+    default: return false
+    }
+  }
 
   /// Whether the work may go on now: the app is on the screen, a podcast is playing (iOS keeps
   /// the app running), or iOS gave a background turn.

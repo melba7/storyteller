@@ -48,6 +48,9 @@ public enum DownloadRecovery {
   /// no internet, DNS trouble.
   private static let transient: Set<Int> = [-1001, -1003, -1004, -1005, -1006, -1009]
 
+  /// Whether a URLError code is a connection that dropped or is not there for now.
+  public static func isDroppedConnection(_ code: Int) -> Bool { transient.contains(code) }
+
   /// URLError codes for an https address that could not be reached or trusted: secure
   /// connection failed, the server certificate was bad, dated, untrusted or from an unknown
   /// root, cannot find or connect to the host.

@@ -43,6 +43,7 @@ struct UpNextItemOptions: Record {
   @Field var position: Double = 0
   @Field var showId: String?
   @Field var chaptersUrl: String?
+  @Field var language: String?
 }
 
 public final class PodcastsModule: Module {
@@ -141,7 +142,8 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl)
+        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
+        language: item.language)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in

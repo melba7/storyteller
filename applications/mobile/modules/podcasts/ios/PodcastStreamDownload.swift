@@ -16,10 +16,16 @@
 //
 // Everything below runs on `queue`: AVFoundation's delegate calls and the data task's callbacks.
 // The rules (what can be answered, the type, the made-up address) are PodcastDownloads' StreamRules.
+//
+// A dropped connection is carried on with a Range request that proves it is the same file
+// (PodcastStreamDownload+Resume.swift), and an app that goes to the background keeps running
+// until the download ends. A server that cannot be fetched this way (it refuses, or sends no
+// length) is not an error for the listener: the player plays the plain address instead.
 
 import AVFoundation
 import Foundation
 import PodcastDownloads
+import UIKit
 
 final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLSessionDataDelegate,
   @unchecked Sendable
@@ -38,11 +44,13 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   private let enclosureType: String
   private let fileExtension: String
   private let store: DownloadStore
-  private var address: URL
+  /// The episode's own address, as the feed gives it.
+  let originalURL: URL
+  var address: URL
   private var plainURL: URL?
 
-  private var session: URLSession?
-  private var task: URLSessionDataTask?
+  var session: URLSession?
+  var task: URLSessionDataTask?
   private var stagedURL: URL?
   private var writer: FileHandle?
   var reader: FileHandle?
@@ -52,12 +60,24 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   private var throttle = ProgressThrottle()
   var pending: [AVAssetResourceLoadingRequest] = []
   private var started = false
+  /// The address after redirects, the validator of the first response and how often in a row
+  /// the download was carried on (see PodcastStreamDownload+Resume.swift).
+  var finalURL: URL?
+  var validator: String?
+  var resumes = 0
+  var resuming = false
+  /// Told when playing from this download is given up and the plain address should play.
+  var onFallback: (@Sendable (StreamFallback) -> Void)?
+  let backgroundLock = NSLock()
+  var backgroundTask = UIBackgroundTaskIdentifier.invalid
+  private let shaLock = NSLock()
+  private var filed: String?
   var serveScheduled = false
   var stopped = false
   /// The data task is over, one way or the other.
-  private var ended = false
+  var ended = false
   /// The task finished without error: the file is whole and is being filed.
-  private var completed = false
+  var completed = false
   var failure: Error?
 
   /// Nil when downloads are not available or the episode cannot be played this way.
@@ -68,6 +88,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     guard let custom = StreamScheme.customURL(for: upgraded) else { return nil }
     self.store = store
     self.episodeId = episodeId
+    self.originalURL = url
     self.enclosureType = type
     self.fileExtension = DownloadFile.fileExtension(type: type, url: upgraded)
     self.address = upgraded
@@ -83,8 +104,19 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     return asset
   }
 
+  /// The hash of the file this download filed, once it has. The ads of a filed download are the
+  /// player's only when this is the file it hears.
+  var filedSha: String? { shaLock.withLock { filed } }
+
   /// Starts fetching. Call it before the player is given the asset.
+  @MainActor
   func start() {
+    holdBackground()
+    // The downloader keeps its own clean-up and any second download away from this episode,
+    // and calls this when the listener removes the download.
+    PodcastDownloader.shared.registerPlayThrough(episodeId) { [weak self] in
+      self?.requestFallback(.removed)
+    }
     queue.async { self.begin() }
   }
 
@@ -95,6 +127,8 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     queue.sync {
       guard !stopped else { return }
       stopped = true
+      PodcastDownloader.shared.unregisterPlayThrough(episodeId)
+      releaseBackground()
       task?.cancel()
       session?.invalidateAndCancel()
       task = nil
@@ -108,8 +142,11 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       reader = nil
       guard started, !completed else { return }
       if let staged = stagedURL { try? FileManager.default.removeItem(at: staged) }
-      if let entry = store.entry(for: episodeId), entry.state.isActive {
-        try? PodcastDownloader.shared.remove(episodeId: episodeId)
+      // Only this loader's own entry: a download of the background session is not touched.
+      if let entry = store.entry(for: episodeId), entry.state.isActive, entry.playThrough {
+        _ = try? store.delete(episodeId: episodeId)
+        PodcastDownloader.shared.emitRemoved(episodeId)
+        PodcastTranscriber.shared.removed(episodeId)
       }
     }
   }
@@ -127,7 +164,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       let entry = DownloadEntry(
         episodeId: episodeId, url: address.absoluteString, fileExtension: fileExtension,
         state: .downloading(bytes: 0, expected: nil), automatic: false,
-        plainURL: plainURL?.absoluteString)
+        plainURL: plainURL?.absoluteString, playThrough: true)
       try store.put(entry)
       PodcastDownloader.shared.emit(entry)
     } catch {
@@ -139,10 +176,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   /// One foreground data task for the current address. Wi-Fi only is read now, as for a
   /// download the listener asked for.
   private func fetch() {
-    var request = URLRequest(url: address)
-    let wifiOnly = NetworkPolicy.wifiOnly(automatic: false, setting: DownloadSettings.wifiOnly)
-    request.allowsCellularAccess = !wifiOnly
-    request.allowsExpensiveNetworkAccess = !wifiOnly
+    let request = makeRequest(for: address)
     let config = URLSessionConfiguration.default
     config.urlCache = nil
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
@@ -162,6 +196,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   ) {
     guard !stopped, !ended, dataTask === task else { return completionHandler(.cancel) }
     let http = response as? HTTPURLResponse
+    if resuming { return answerResume(http, completionHandler) }
     if let status = http?.statusCode, !(200..<300).contains(status) {
       completionHandler(.cancel)
       return failed(DownloadFailure(httpStatus: status))
@@ -169,6 +204,15 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     // A length that is for the compressed bytes says nothing about the file.
     let encoded = http?.value(forHTTPHeaderField: "Content-Encoding").map { $0 != "identity" } ?? false
     if response.expectedContentLength > 0, !encoded { expected = response.expectedContentLength }
+    // Without a length the player would wait for the whole file before a sound is heard.
+    guard expected != nil else {
+      completionHandler(.cancel)
+      return giveUp(.noLength)
+    }
+    finalURL = http?.url
+    validator = StreamResume.validator(
+      etag: http?.value(forHTTPHeaderField: "ETag"),
+      lastModified: http?.value(forHTTPHeaderField: "Last-Modified"))
     contentType = StreamContentType.uti(
       responseType: response.mimeType, enclosureType: enclosureType, url: address)
     completionHandler(.allow)
@@ -186,6 +230,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       return failed(DownloadFailure(diskFull: DownloadFailure.isDiskFull(error)))
     }
     available += Int64(data.count)
+    resumes = 0
     if throttle.shouldReport(bytes: available, expected: expected, at: Date()),
       let entry = store.updateProgress(episodeId: episodeId, bytes: available, expected: expected)
     {
@@ -198,11 +243,14 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     // A task that was replaced (the plain http try) still reports; it is not this one.
     guard !stopped, !ended, task === self.task else { return }
     if let error {
-      // A dropped connection is not retried: the bytes after a new request could be another
-      // file (ads inserted on the fly), which is what this exists to avoid.
-      return failed(
-        DownloadFailure(
-          error: error, response: task.response, attempts: DownloadRecovery.maxRetries))
+      let failure = DownloadFailure(
+        error: error, response: task.response, attempts: DownloadRecovery.maxRetries)
+      // A dropped connection is carried on only with a request that proves the bytes after it
+      // are the same file (ads inserted on the fly differ between requests).
+      if StreamResume.shouldResume(failure, available: available, validator: validator, resumes: resumes) {
+        return scheduleResume()
+      }
+      return failed(failure)
     }
     guard available > 0 else { return failed(DownloadFailure()) }
     complete()
@@ -223,8 +271,13 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     let (store, id, ext) = (self.store, episodeId, fileExtension)
     // Off the player's queue, so hashing a long episode does not hold up a request.
     DispatchQueue.global(qos: .utility).async {
+      defer {
+        PodcastDownloader.shared.unregisterPlayThrough(id)
+        self.releaseBackground()
+      }
       do {
         let done = try store.installStaged(staged, episodeId: id, fileExtension: ext)
+        if case .downloaded(_, let sha, _, _) = done.state { self.noteFiled(sha) }
         PodcastDownloader.shared.emit(done)
         PodcastTranscriber.shared.downloaded(id)
       } catch DownloadError.noEntry {
@@ -243,7 +296,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   /// The task failed. An address that was upgraded from http gets its own http address once,
   /// when nothing has arrived. Otherwise the row says why, and requests for bytes that never
   /// came fail with that reason.
-  private func failed(_ failure: DownloadFailure) {
+  func failed(_ failure: DownloadFailure) {
     task?.cancel()
     if DownloadRecovery.shouldFallBackToPlainHTTP(failure, plainURL: plainURL?.absoluteString),
       available == 0, let plain = plainURL
@@ -258,7 +311,11 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       plainURL = nil
       return fetch()
     }
+    // Nothing arrived, so nothing is lost by playing the plain address instead.
+    if available == 0, !stopped, onFallback != nil { return giveUp(.noFirstByte) }
     ended = true
+    PodcastDownloader.shared.unregisterPlayThrough(episodeId)
+    releaseBackground()
     let reason = DownloadRecovery.reason(for: failure)
     self.failure = PodcastFetchError(message: reason)
     try? writer?.close()
@@ -270,4 +327,8 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     }
     serve()
   }
+}
+
+extension PodcastStreamDownload {
+  func noteFiled(_ sha256: String) { shaLock.withLock { filed = sha256 } }
 }

@@ -118,6 +118,13 @@ public final class TranscriptLanguages: @unchecked Sendable {
     }
   }
 
+  /// Notes a language that is known, and leaves what was noted alone when there is none, so a
+  /// start that does not know the show's language never erases the one a download was given.
+  public func remember(_ language: String?, for episodeId: String) {
+    guard let language, !language.isEmpty else { return }
+    note(language, for: episodeId)
+  }
+
   /// Forgets the episodes that are not in `keep` (their downloads are gone).
   public func prune(keeping keep: Set<String>) {
     lock.withLock {

@@ -68,12 +68,13 @@ final class PodcastAdFinder: @unchecked Sendable {
     lock.withLock { statuses }.map { AdsJSON.object($0.key, $0.value) }
   }
 
-  /// An episode's saved ads as JSON (`AdsFile` in PodcastAds), or nil when there are none.
+  /// An episode's saved ads as JSON (`AdsFile` in PodcastAds), or nil when there are none. While
+  /// the full pass is not done, the ads found so far (the ones the player already skips).
   func adsJSON(_ episodeId: String) -> String? {
     guard let downloads = PodcastDownloader.shared.store,
       let (ads, _) = stores(for: episodeId, in: downloads)
     else { return nil }
-    return ads.json(detector: Self.detectorName)
+    return ads.bestJSON(detector: Self.detectorName)
   }
 
   // MARK: Looking at the downloads
@@ -94,13 +95,26 @@ final class PodcastAdFinder: @unchecked Sendable {
     var present = Set<String>()
     for entry in downloads.entries() {
       let id = entry.episodeId
-      guard let (ads, transcripts) = stores(for: id, in: downloads), transcripts.hasTranscript
-      else { continue }
+      guard let (ads, transcripts) = stores(for: id, in: downloads) else { continue }
+      guard transcripts.hasTranscript else {
+        // The transcript is still being made: the ads found in it so far are shown, and the
+        // episode is not queued until the transcript is whole.
+        let status = AdsRules.status(
+          file: nil, partial: ads.loadPartial(detector: Self.detectorName),
+          detectorVersion: detector?.version ?? "", finding: nil, unavailable: nil, failure: nil)
+        if case .partialFound = status {
+          present.insert(id)
+          set(id, status)
+        }
+        continue
+      }
       present.insert(id)
       var finding: Int?
       if case .finding(let percent)? = lock.withLock({ statuses[id] }) { finding = percent }
       let status = AdsRules.status(
-        file: ads.load(detector: Self.detectorName), detectorVersion: detector?.version ?? "",
+        file: ads.load(detector: Self.detectorName),
+        partial: ads.loadPartial(detector: Self.detectorName),
+        detectorVersion: detector?.version ?? "",
         finding: finding, unavailable: unavailable, failure: lock.withLock { failures[id] })
       set(id, status)
       if AdsRules.wantsRun(status) {
@@ -231,6 +245,8 @@ final class PodcastAdFinder: @unchecked Sendable {
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
       if case .finished = outcome {
+        // The list and the seek bar show what was found so far.
+        scan()
         Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
       }
     } catch {
@@ -301,7 +317,8 @@ enum AdsJSON {
     switch status {
     case .waiting: return ["episodeId": id, "state": "waiting"]
     case .finding(let percent): return ["episodeId": id, "state": "finding", "percent": percent]
-    case .found(let count): return ["episodeId": id, "state": "found", "count": count]
+    case .found(let count), .partialFound(let count):
+      return ["episodeId": id, "state": "found", "count": count]
     case .noneFound: return ["episodeId": id, "state": "noAds"]
     case .notPossible(let reason): return ["episodeId": id, "state": "unavailable", "reason": reason]
     }

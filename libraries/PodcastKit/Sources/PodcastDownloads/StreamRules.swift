@@ -82,6 +82,20 @@ public enum StreamThroughDownload {
   }
 }
 
+extension StreamThroughDownload {
+  /// An automatic download (a new episode, waiting for Wi-Fi) that has not received a byte.
+  /// The listener playing the episode now should not be kept from its own download by it, so
+  /// the player cancels it and plays through a download of its own.
+  public static func isWaitingAutomatic(_ entry: DownloadEntry) -> Bool {
+    guard entry.automatic else { return false }
+    switch entry.state {
+    case .queued: return true
+    case .downloading(let bytes, _): return bytes == 0
+    case .downloaded, .failed: return false
+    }
+  }
+}
+
 public enum StreamScheme {
   /// The episode's address with its scheme replaced, so AVFoundation hands the request to the
   /// app's resource loader instead of fetching it. Nil for anything but http and https.
@@ -91,5 +105,61 @@ public enum StreamScheme {
     else { return nil }
     parts.scheme = scheme == "https" ? "lofistreams" : "lofistream"
     return parts.url
+  }
+}
+
+/// Carrying on a play-through download whose connection dropped. The new request asks for the
+/// rest of the same file; the bytes are used only when the server proves it is that file, so
+/// two halves of different recordings (ads inserted on the fly) are never joined.
+public enum StreamResume {
+  /// A download is carried on this many times in a row before it gives up.
+  public static let maxResumes = 5
+
+  /// What `If-Range` carries: a strong ETag, else Last-Modified, else nil (the file cannot be
+  /// proved the same, so it is not resumed). A weak ETag (`W/`) is not a proof of the same bytes.
+  public static func validator(etag: String?, lastModified: String?) -> String? {
+    if let tag = etag?.trimmingCharacters(in: .whitespaces), !tag.isEmpty, !tag.hasPrefix("W/") {
+      return tag
+    }
+    if let date = lastModified?.trimmingCharacters(in: .whitespaces), !date.isEmpty { return date }
+    return nil
+  }
+
+  /// The first byte of a `Content-Range: bytes 100-999/1000` header, nil for anything else.
+  public static func contentRangeStart(_ header: String?) -> Int64? {
+    guard let header else { return nil }
+    let parts = header.trimmingCharacters(in: .whitespaces).split(separator: " ", maxSplits: 1)
+    guard parts.count == 2, parts[0].lowercased() == "bytes",
+      let first = parts[1].split(separator: "-").first
+    else { return nil }
+    return Int64(first)
+  }
+
+  /// Whether the answer to the resuming request continues exactly where the file on disk ends.
+  public static func accepts(status: Int, contentRange: String?, available: Int64) -> Bool {
+    status == 206 && contentRangeStart(contentRange) == available
+  }
+
+  /// The headers of the resuming request.
+  public static func headers(available: Int64, validator: String) -> [String: String] {
+    ["Range": "bytes=\(available)-", "If-Range": validator, "Accept-Encoding": "identity"]
+  }
+
+  /// Whether a failed transfer is carried on: it dropped (not stopped or refused), part of the
+  /// file is on disk, the file can be proved the same, and it has not been tried too often.
+  public static func shouldResume(
+    _ failure: DownloadFailure, available: Int64, validator: String?, resumes: Int
+  ) -> Bool {
+    guard available > 0, validator != nil, resumes < maxResumes, !failure.diskFull,
+      !failure.forceQuit, let code = failure.urlErrorCode,
+      DownloadRecovery.isDroppedConnection(code)
+    else { return false }
+    if let status = failure.httpStatus, !(200..<300).contains(status) { return false }
+    return true
+  }
+
+  /// Seconds to wait before the next try: 2, 4, 8, ... and never more than 30.
+  public static func delay(afterResumes resumes: Int) -> Double {
+    min(30, Double(2 << min(max(0, resumes), 4)))
   }
 }

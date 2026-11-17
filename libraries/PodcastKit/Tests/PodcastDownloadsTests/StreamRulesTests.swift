@@ -106,6 +106,20 @@ final class StreamThroughDownloadTests: XCTestCase {
     XCTAssertTrue(use())
   }
 
+  func testAnAutomaticDownloadThatHasNotStartedIsNotInTheWay() {
+    let waiting = DownloadEntry(
+      episodeId: "a", url: "https://x/a.mp3", fileExtension: "mp3", state: .queued, automatic: true)
+    XCTAssertTrue(StreamThroughDownload.isWaitingAutomatic(waiting))
+    var started = waiting
+    started.state = .downloading(bytes: 0, expected: nil)
+    XCTAssertTrue(StreamThroughDownload.isWaitingAutomatic(started))
+    started.state = .downloading(bytes: 5, expected: 10)
+    XCTAssertFalse(StreamThroughDownload.isWaitingAutomatic(started))
+    var manual = waiting
+    manual.automatic = false
+    XCTAssertFalse(StreamThroughDownload.isWaitingAutomatic(manual))
+  }
+
   func testNotWhenNotAsked() {
     XCTAssertFalse(use(asked: false))
   }

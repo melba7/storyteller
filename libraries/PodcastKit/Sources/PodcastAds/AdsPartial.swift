@@ -90,6 +90,16 @@ extension AdsStore {
     load(detector: detector) ?? loadPartial(detector: detector)
   }
 
+  /// The text of `best`, as saved, for the app to read: the ads list and the seek bar show the
+  /// ads the player is already skipping.
+  public func bestJSON(detector: String) -> String? {
+    if let final = json(detector: detector) { return final }
+    guard loadPartial(detector: detector) != nil,
+      let data = try? Data(contentsOf: scratchURL(detector, "partial"))
+    else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
   /// Removes the progress and partial files, once the final file is saved.
   public func removeScratch(detector: String) {
     for kind in ["progress", "partial"] {

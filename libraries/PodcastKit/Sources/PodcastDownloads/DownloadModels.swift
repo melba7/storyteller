@@ -82,10 +82,14 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   /// The feed's own plain http address, kept while the https one in `url` is being tried. If
   /// https fails to connect, the downloader tries this once. Nil for an https feed.
   public var plainURL: String?
+  /// Being fetched by the player as the episode plays (PodcastStreamDownload), not by the
+  /// background session. It cannot outlive the app, so a relaunch drops it unfinished.
+  public var playThrough: Bool
 
   public init(
     episodeId: String, url: String, fileExtension: String, state: DownloadState,
-    updatedAt: Date = Date(), automatic: Bool = false, plainURL: String? = nil
+    updatedAt: Date = Date(), automatic: Bool = false, plainURL: String? = nil,
+    playThrough: Bool = false
   ) {
     self.episodeId = episodeId
     self.url = url
@@ -94,6 +98,7 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
     self.updatedAt = updatedAt
     self.automatic = automatic
     self.plainURL = plainURL
+    self.playThrough = playThrough
   }
 
   /// Switches to the original http address, once: the entry keeps no second chance after.
@@ -104,11 +109,12 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   }
 
   private enum Keys: String, CodingKey {
-    case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL
+    case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL, playThrough
   }
 
   /// An index written before automatic downloads has no `automatic` (it means false), and one
-  /// written before the plain http fallback has no `plainURL` (it means none).
+  /// written before the plain http fallback has no `plainURL` (it means none), and one written
+  /// before play-through downloads has no `playThrough` (it means false).
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
     self.init(
@@ -118,7 +124,8 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
       state: try c.decode(DownloadState.self, forKey: .state),
       updatedAt: try c.decode(Date.self, forKey: .updatedAt),
       automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false,
-      plainURL: try c.decodeIfPresent(String.self, forKey: .plainURL))
+      plainURL: try c.decodeIfPresent(String.self, forKey: .plainURL),
+      playThrough: try c.decodeIfPresent(Bool.self, forKey: .playThrough) ?? false)
   }
 }
 

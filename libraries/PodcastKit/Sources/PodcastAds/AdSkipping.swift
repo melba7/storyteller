@@ -168,11 +168,15 @@ public struct AdSkipper: Sendable {
 
   /// The listener tapped Undo: the ad that was just skipped, to be played from its start, or nil
   /// when nothing was skipped lately. The ad is not skipped again.
-  public mutating func undo(now: Double) -> FoundAd? {
+  public mutating func undo(now: Double) -> FoundAd? { undoSkip(now: now)?.ad }
+
+  /// Like `undo`, but gives back the whole skip, so the ads that were skipped with the first
+  /// one (an ad and then the hosts' plug) can be saved as undone as well.
+  public mutating func undoSkip(now: Double) -> AdSkip? {
     guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
     undone.insert(last.skip.ad.start)
     for later in last.skip.chained { undone.insert(later.start) }
     self.last = nil
-    return last.skip.ad
+    return last.skip
   }
 }

@@ -50,6 +50,7 @@ enum DownloadJSON {
     var object: [String: Any] = [
       "episodeId": entry.episodeId,
       "updatedAt": entry.updatedAt.timeIntervalSince1970 * 1000,
+      "automatic": entry.automatic,
     ]
     switch entry.state {
     case .queued:

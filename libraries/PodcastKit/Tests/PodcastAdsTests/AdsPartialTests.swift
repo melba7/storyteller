@@ -109,6 +109,18 @@ final class AdsPartialStoreTests: XCTestCase {
     XCTAssertNil(store.best(detector: "fake")?.coveredUntil)
   }
 
+  func testTheTextTheAppReadsIsTheFinalFileElseThePartialOne() throws {
+    let store = AdsStore(folder: folder, sha256: sha)
+    XCTAssertNil(store.bestJSON(detector: "fake"))
+    try store.savePartial(file(until: 300))
+    let partial = try XCTUnwrap(store.bestJSON(detector: "fake"))
+    XCTAssertTrue(partial.contains("\"coveredUntil\":300"))
+    try store.save(file(until: nil))
+    let final = try XCTUnwrap(store.bestJSON(detector: "fake"))
+    XCTAssertFalse(final.contains("coveredUntil"))
+    XCTAssertEqual(final, store.json(detector: "fake"))
+  }
+
   func testAnOlderFileWithoutCoveredUntilStillDecodes() throws {
     let old = """
       {"version":1,"sha256":"aa","detector":"fake","detectorVersion":"1","osVersion":"26","duration":5,"ads":[],"undone":[]}
