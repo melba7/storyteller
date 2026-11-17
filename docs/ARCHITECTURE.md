@@ -172,6 +172,8 @@ in `FORK.md`.
 | 2026-11-17 | The Discover tab's stack is anchored on `discover` (`unstable_settings.anchor`); a test checks every tab's first screen                    | Shared screens sort first                                  |
 | 2026-11-17 | Spoken search matches in PodcastKit `TranscriptSearch`: normalised words, the phrase first, else all words in one line; 3 hits an episode  | Tested on Linux                                            |
 | 2026-11-17 | Spoken search reads the finished transcript files on each search, off the main thread, with no index; feed-only transcripts are skipped    | No schema change                                           |
+| 2026-11-17 | `podcast:person` (show and episode) and `podcast:funding` (show) are parsed in PodcastKit, at most 20 and 5, links kept only if http(s)    | Safe links from feeds                                      |
+| 2026-11-17 | Schema v14 keeps them as JSON text in `shows.people`, `shows.funding` and `episodes.people`; an episode's own people replace the show's    | Podcasting 2.0 spec rule                                   |
 
 ## Known problems
 

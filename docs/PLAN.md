@@ -725,6 +725,10 @@ rebuilt here with nothing copied.
     the next refresh. Only `http` and `https` links open.
   - Done when: a feed with these tags shows them in its episodes' descriptions
     after a refresh, and a feed without them shows nothing new.
+  - Status: built and passing `check.sh` (schema version 14): the parser keeps
+    at most 20 people and 5 support links, http(s) only; the episode's
+    description shows "Support the show" and "Hosts and guests". An existing
+    show shows them after its next refresh.
 
 ## Later
 
