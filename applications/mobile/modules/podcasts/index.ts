@@ -1,6 +1,7 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 import { requireOptionalNativeModule } from "expo-modules-core"
 
+import type { ImportedAudio } from "./localFiles"
 import type { PlaybackSettings } from "./playbackSettings"
 
 /** A podcast feed as the Swift side reads it. A value the feed lacks is missing or null. */
@@ -14,9 +15,25 @@ export type PodcastFeedData = {
   language?: string | null
   /** `itunes:category` names: top-level ones, then "Top › Sub" ones. */
   categories?: string[]
+  /** The channel's `podcast:person` tags (at most 20). */
+  people?: PodcastPerson[]
+  /** The channel's `podcast:funding` tags (at most 5). */
+  funding?: PodcastFunding[]
   /** In feed order. */
   episodes: PodcastFeedEpisode[]
 }
+
+/** A `podcast:person` tag. `img` and `href` are http(s) addresses or missing. */
+export type PodcastPerson = {
+  name: string
+  role: string
+  group: string
+  img?: string | null
+  href?: string | null
+}
+
+/** A `podcast:funding` tag. `label` is empty when the feed has no text. */
+export type PodcastFunding = { url: string; label: string }
 
 export type PodcastFeedEpisode = {
   guid: string
@@ -34,6 +51,10 @@ export type PodcastFeedEpisode = {
   number?: number | null
   /** Every `podcast:transcript` tag of the episode. */
   transcripts?: { url: string; type: string; language?: string; rel?: string }[]
+  /** The `podcast:chapters` JSON file's address. */
+  chaptersUrl?: string | null
+  /** The episode's own `podcast:person` tags. */
+  people?: PodcastPerson[]
 }
 
 /** What the player is doing, sent about twice a second while playing and on every change. */
@@ -66,6 +87,8 @@ export type PlaybackLoadOptions = {
   autoplay: boolean
   /** The feed's audio type, kept for Up Next. */
   audioType: string
+  /** The feed's JSON chapters file, for the chapters of an episode that is not downloaded. */
+  chaptersUrl?: string | null
 }
 
 /** The episode played to its end. */
@@ -112,6 +135,15 @@ export type TranscriptInfo = {
   percent?: number
   /** Plain words for an unsupported or failed one ("Needs iOS 26", "Language not supported"). */
   reason?: string
+}
+
+/** One place a search found its words: the line's start in seconds and the lines around it. */
+export type SpokenHit = {
+  episodeId: string
+  seconds: number
+  text: string
+  before: string
+  after: string
 }
 
 /** A transcript changed, or (state "none") went with its download. */
@@ -165,6 +197,8 @@ export type UpNextItem = {
   duration?: number | null
   /** Where the listener left off, in seconds. */
   position: number
+  /** The feed's JSON chapters file; missing in a queue saved before chapters. */
+  chaptersUrl?: string | null
 }
 
 /** The queue changed. `items` is the whole queue, in play order. */
@@ -173,13 +207,33 @@ export type UpNextChange = { items: UpNextItem[] }
 /** The player started the next queued episode by itself. */
 export type PlaybackAdvanced = { episodeId: string }
 
+/** One chapter of the loaded episode, as Swift sends it. */
+export type PodcastChapter = {
+  /** Seconds. */
+  start: number
+  /** Seconds, when the source says where it ends. */
+  end?: number
+  title: string
+  /** A web address, or a file address for a picture read from an MP3. */
+  imageUrl: string | null
+  url: string | null
+  /** The listener switched this chapter off: the player jumps over it. */
+  skipped: boolean
+}
+
+/** The chapters of the loaded episode (none until they are read). */
+export type ChaptersInfo = { episodeId: string; chapters: PodcastChapter[] }
+
 /** The sleep timer: off, a countdown that ends at `endsAt` (milliseconds), or the episode's end. */
 export type SleepTimerState =
   | { kind: "none" }
   | { kind: "countdown"; endsAt: number }
   | { kind: "endOfEpisode" }
+  /** `chapterEnd` is the second of the episode where the chapter ends. */
+  | { kind: "endOfChapter"; chapterEnd: number }
 
 export type PodcastsEvents = {
+  onChaptersChange: (info: ChaptersInfo) => void
   onSleepTimerChange: (state: SleepTimerState) => void
   onUpNextChange: (change: UpNextChange) => void
   onPlaybackAdvanced: (event: PlaybackAdvanced) => void
@@ -188,6 +242,8 @@ export type PodcastsEvents = {
   onAdsChange: (change: AdsChange) => void
   onAdSkipped: (event: AdSkipped) => void
   onAdUndone: (event: AdUndone) => void
+  /** The headphones made a bookmark: `readPendingBookmarks` has it. */
+  onBookmarksPending: () => void
   onPlaybackState: (state: PlaybackState) => void
   onPlaybackEnded: (event: PlaybackEnded) => void
   onPlaybackError: (event: PlaybackError) => void
@@ -217,6 +273,13 @@ type PodcastsNativeModule = {
 
   /** Saves every show's playback settings (JSON, show id to settings) for the player. */
   writeShowSettings(json: string): Promise<void>
+  /**
+   * The bookmarks the headphones made (`Podcasts/pending-bookmarks.json`) as a JSON list;
+   * "[]" when there are none. They stay in the file until `removePendingBookmarks`.
+   */
+  readPendingBookmarks(): Promise<string>
+  /** Takes the bookmarks with these ids out of the file, once they are saved. */
+  removePendingBookmarks(ids: string[]): Promise<void>
 
   /** "granted", "denied" or "undetermined" (not asked yet). */
   notificationPermission(): Promise<"granted" | "denied" | "undetermined">
@@ -233,10 +296,25 @@ type PodcastsNativeModule = {
   /** Counts down this many minutes (1 to 720), then fades out and pauses. */
   startSleepTimer(minutes: number): Promise<void>
   sleepUntilEndOfEpisode(): Promise<void>
+  /** Stops where the chapter playing now ends. Rejects when the episode has no chapters. */
+  sleepUntilEndOfChapter(): Promise<void>
   /** Adds 5 minutes to a running countdown. */
   extendSleepTimer(): Promise<void>
   cancelSleepTimer(): Promise<void>
   getSleepTimer(): Promise<SleepTimerState>
+
+  /** The chapters of the loaded episode. */
+  getChapters(): Promise<ChaptersInfo>
+  /** Goes to the start of this chapter (after 3 seconds into it) or of the one before. */
+  previousChapter(): Promise<void>
+  /** Goes to the start of the next chapter. */
+  nextChapter(): Promise<void>
+  /** Switches a chapter's skipping on or off (`start` is the chapter's start in seconds). */
+  setChapterSkipped(
+    episodeId: string,
+    start: number,
+    skipped: boolean,
+  ): Promise<void>
 
   listUpNext(): Promise<UpNextItem[]>
   /** Puts an episode at the top ("next") or the bottom ("last"). One already queued moves. */
@@ -257,6 +335,11 @@ type PodcastsNativeModule = {
     automatic: boolean,
     language: string | null,
   ): Promise<void>
+  /**
+   * Copies an audio file from the Files app in and installs it like a finished download. The
+   * answer has the episode's id (from the file's content), title, length, size and extension.
+   */
+  importAudioFile(uri: string, fileName: string | null): Promise<ImportedAudio>
   /** Stops a download that is not finished and forgets it. */
   cancelDownload(episodeId: string): Promise<void>
   /** Removes a download: the audio, its side files and its entry. */
@@ -266,6 +349,8 @@ type PodcastsNativeModule = {
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
   getTranscript(episodeId: string): Promise<string | null>
+  /** Where the words are said in the finished transcripts (see transcriptSearch.ts). */
+  searchTranscripts(query: string): Promise<SpokenHit[]>
   /** Where each transcribed episode's ad finding is. */
   listAds(): Promise<AdsInfo[]>
   /** An episode's saved ads as JSON (`AdsFile` in PodcastAds), or null. */
@@ -277,6 +362,15 @@ type PodcastsNativeModule = {
    * recorded as wrong. False when it is too late.
    */
   undoAdSkip(): Promise<boolean>
+  /**
+   * What silence trimming has saved so far, in seconds of audio, kept in Swift so a stats
+   * screen can read it.
+   */
+  getTrimSavings(): Promise<number>
+  /** The listening stats (`ListeningStats` in PodcastPlayback) as a plain object. */
+  getStats(): Promise<Record<string, unknown>>
+  /** Clears the listening stats. */
+  resetStats(): Promise<void>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>

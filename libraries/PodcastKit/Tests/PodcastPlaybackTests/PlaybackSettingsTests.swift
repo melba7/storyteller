@@ -65,6 +65,31 @@ final class PlaybackSettingsTests: XCTestCase {
     XCTAssertEqual(settings.nextAction(queueHasNext: false), .skip(seconds: 30))
   }
 
+  func testNextCanGoToTheNextChapter() {
+    var settings = PlaybackSettings(values: ["headphoneNext": "nextChapter"])
+    XCTAssertEqual(settings.headphoneNext, .nextChapter)
+    XCTAssertEqual(settings.nextAction(queueHasNext: true, chapterAhead: true), .nextChapter)
+    // In the last chapter, or with none, it skips ahead.
+    settings.skipForward = 30
+    XCTAssertEqual(settings.nextAction(queueHasNext: true, chapterAhead: false), .skip(seconds: 30))
+    XCTAssertEqual(settings.nextAction(queueHasNext: true), .skip(seconds: 30))
+    XCTAssertEqual(settings.values["headphoneNext"] as? String, "nextChapter")
+  }
+
+  func testNextMakesABookmarkWhenAskedWhateverIsQueued() {
+    var settings = PlaybackSettings()
+    settings.headphoneNext = .bookmark
+    XCTAssertEqual(settings.nextAction(queueHasNext: true), .bookmark)
+    XCTAssertEqual(settings.nextAction(queueHasNext: false), .bookmark)
+  }
+
+  func testTheBookmarkChoiceIsStoredAndReadBack() {
+    var settings = PlaybackSettings()
+    settings.headphoneNext = .bookmark
+    XCTAssertEqual(settings.values["headphoneNext"] as? String, "bookmark")
+    XCTAssertEqual(PlaybackSettings(values: settings.values).headphoneNext, .bookmark)
+  }
+
   func testPreviousIsTheSkipBackAmount() {
     var settings = PlaybackSettings()
     settings.skipBack = 5
@@ -111,5 +136,17 @@ final class PlayedEarlyTests: XCTestCase {
 
   func testASmallerWindowNeverShrinksTheFiveSeconds() {
     XCTAssertTrue(PlayedRule.isPlayed(position: 596, duration: 600, reachedEnd: false, within: 2))
+  }
+
+  func testSoundSettingsAreOffByDefaultAndRoundTrip() {
+    XCTAssertEqual(PlaybackSettings().voiceBoost, .off)
+    XCTAssertEqual(PlaybackSettings().trimSilence, .off)
+    var settings = PlaybackSettings()
+    settings.voiceBoost = .high
+    settings.trimSilence = .medium
+    XCTAssertEqual(PlaybackSettings(values: settings.values), settings)
+    let odd = PlaybackSettings(values: ["voiceBoost": "max", "trimSilence": 4])
+    XCTAssertEqual(odd.voiceBoost, .off)
+    XCTAssertEqual(odd.trimSilence, .off)
   }
 }

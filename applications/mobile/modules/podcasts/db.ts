@@ -13,6 +13,7 @@ import { Platform } from "react-native"
 
 import { notifyLibraryChanged } from "./changes"
 import { deleteDownloads } from "./downloadsNative"
+import { RECORD_LISTEN_SQL } from "./episodeSql"
 import {
   type Show,
   type StoredEpisode,
@@ -155,10 +156,14 @@ export async function savePlayback(
   played: boolean,
 ): Promise<void> {
   const db = await database()
-  await db.execute(
-    "UPDATE episodes SET position_seconds = ?, played = ?, last_played_at = ? WHERE id = ?",
-    [Math.max(0, position), played ? 1 : 0, Date.now(), episodeId],
-  )
+  const now = Date.now()
+  await db.execute(RECORD_LISTEN_SQL, [
+    Math.max(0, position),
+    played ? 1 : 0,
+    now,
+    now,
+    episodeId,
+  ])
   notifyLibraryChanged()
 }
 

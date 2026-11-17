@@ -1,6 +1,7 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1a, P1b merged; TestFlight 20.1 next
+Done: 2 | Last cleanup: none | Podcasts: P1 to P3b merged (TestFlight 23.1); P3c
+to P5o built, merging next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -600,41 +601,77 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5c. Star, history and bulk actions** (M): star episodes, mark played or
       unplayed, a listening history in Profile, and multi-select with bulk
       actions (download, mark played, archive, star, add to Up Next).
+  - Status: built and passing `check.sh` (schema version 10): star, mark played,
+    a Listening history in Profile, and multi-select with bulk actions on the
+    show page and in the history.
 - [ ] **P5d. Smart playlists** (M): the Playlists tab, with playlists built from
       rules (shows, played state, release date, length, downloaded, starred),
       sorted and with auto-download. It starts with New Releases, In Progress
       and Starred.
+  - Status: built and passing `check.sh` (schema version 11): a Playlists tab
+    with rule playlists, the three starters, and auto-download of each
+    playlist's first 5 episodes on Wi-Fi.
 - [ ] **P5e. Your own playlists** (S): playlists you fill by hand, with any
       episode (also from shows you don't follow), drag to reorder, and "Play
       all" into Up Next.
+  - Status: built and passing `check.sh` (schema version 12): hand-filled
+    playlists with any episode, drag to reorder, and Play all (the first plays,
+    the rest go to the top of Up Next).
 - [ ] **P5f. Sleep timer** (S): 5 to 60 minutes or your own time, end of
       episode, end of chapter once P5g is in, add 5 minutes, and a fade-out at
       the end.
   - Status: built and passing `check.sh` (Swift timer, 10 s fade-out, moon
-    button in the player). "End of chapter" waits for P5g.
+    button in the player). "End of chapter" came with P5g.
 - [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
       from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
-      read with OutcastID3, MIT, copied in), a chapter list in the player,
-      previous and next chapter, chapter artwork, and skipping a chapter.
+      read by our own reader), a chapter list in the player, previous and next
+      chapter, chapter artwork, and skipping a chapter.
+  - Status: built and passing `check.sh` (schema version 9,
+    `episodes.chapters_url`): chapters from the feed's JSON file, MP3 ID3 tags
+    (a reader written from the ID3 spec in PodcastKit `PodcastChapters`) and M4A
+    chapter tracks, kept in Swift so they work locked and with Up Next. The
+    player has a Chapters list with a skip switch per chapter, a chapter bar
+    with previous and next, and chapter artwork. The sleep timer's "End of
+    chapter" and the headphones' "Next chapter" are in. Not built: chapter
+    titles on the lock screen.
 - [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
       title you can edit, from the player and as a headphone action; listed per
       episode and in Profile; tap to play from there.
+  - Status: built and passing `check.sh` (schema version 13): bookmarks from the
+    player and from the headphones (kept in Swift while locked, saved by the app
+    later), listed per episode and in Profile.
 - [ ] **P5i. Playback settings** (S): skip back and ahead amounts, what the
       headphones' next and previous buttons do (skip, next chapter or bookmark),
       mark an episode played when N seconds are left, and going back a few
       seconds after a long pause.
   - Status: built and passing `check.sh`: a Playback section in Profile, kept in
-    Swift. "Next chapter or bookmark" waits for P5g and P5h.
+    Swift. "Next chapter" came with P5g and "bookmark" with P5h.
 - [ ] **P5j. Volume boost and trim silence** (L): a second Swift player
       (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
       silent gaps, in three strengths, per show or for everything. Streamed
       episodes keep speed only.
+  - Status: built and passing `check.sh`, with the one AVPlayer instead of a
+    second player (decision 2026-11-17, so ads, the sleep timer, Up Next and the
+    lock screen keep working): voice boost is an audio tap on the player item
+    (downloads, and streams where the tap attaches), and trim silence jumps over
+    the silent gaps of a download, measured once per file. Both are set in
+    Profile and per show. The tap and the file reader are compiled for the first
+    time in Fork CI.
 - [ ] **P5k. Stats** (S to M): total time listened, time saved by speed,
       skipping, intro and outro skipping, trimmed silence and skipped ads, and
       listening by day, in Profile.
+  - Status: built and passing `check.sh`: Swift counts the time listened and the
+    time saved by speed, intro and outro skipping, trimmed silence, skipped ads
+    and skipped chapters in `Podcasts/stats.json` (also locked); Profile > Stats
+    shows them with a 30-day bar chart and a reset. No schema change.
 - [ ] **P5l. Themes** (M): Light, Dark, Extra Dark (true black) and a few colour
       themes with names and colours of our own, following iOS light and dark
       mode if you like, for the Podcasts section.
+  - Status: built and passing `check.sh`: Light, Dark, Extra Dark, Midnight,
+    Paper and Forest in Profile > Appearance, as "Like the app", one theme, or
+    "Follow iOS" with a light and a dark choice. The section sits in one Uniwind
+    `ScopedTheme`. The iOS 26 tab bar glass and the status bar follow iOS, not
+    the theme.
 - [ ] **P5m. Share and OPML** (S): share a show, an episode or the place playing
       now (the feed's own links); import and export your shows as an OPML file
       (with the document picker and share sheet the app already has).
@@ -649,8 +686,62 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
       play them like episodes, and put them in Up Next. They are transcribed and
       ad-checked like downloads.
+  - Status: built and passing `check.sh`, no schema change: "Add audio files" in
+    the Podcasts menu and Profile copies files from the Files app into the app
+    and installs them like downloads (`file-<sha256 prefix>`), so they play
+    offline, go in Up Next, and are transcribed and checked for ads. They live
+    in a local "Your files" show (`local-files`) that feeds, OPML, the Apple
+    Podcasts sync and Discover skip. Rename and delete from the episode menu.
+
+### Features from other podcast apps (Mo's ask, 2026-11-17)
+
+Mo picked these from a list of ideas taken from other podcast apps. Each is
+rebuilt here with nothing copied.
+
+- [ ] **P6a. Search inside episodes** (S to M): search the words spoken in every
+      episode the phone has transcribed (downloads and your own files), as a
+      third choice in the episode search ("Spoken"). A result shows the episode,
+      the time and the line around the words, and a tap plays the episode from
+      that line.
+  - Swift does the search: PodcastKit `PodcastTranscripts` gets the matching
+    rules (case and accents ignored, the words as a phrase first, then all the
+    words in one line; a few hits per episode, a cap in all), tested on Linux.
+    The module reads the finished `<sha256>.transcript.json` files off the main
+    thread. No schema change. Feed transcripts that were never downloaded are
+    not searched.
+  - Done when: a phrase said in a downloaded episode is found, and the tap plays
+    from that line.
+  - Status: built and passing `check.sh`, no schema change: "Spoken" in the
+    episode search, results grouped by episode (newest first) with the time and
+    the lines around the words, whole words only. Each search reads every
+    transcript file; no index is kept.
+- [ ] **P6b. Hosts, guests and support links** (S): the feed's own
+      `podcast:person` (show and episode) and `podcast:funding` (show) tags,
+      shown in the episode's description: "Support the show" links and the hosts
+      and guests with their pictures and links. An episode's own people replace
+      the show's, as the Podcasting 2.0 spec says.
+  - The feed parser reads the tags (tested on Linux); one schema step keeps them
+    as JSON text (`shows.funding`, `shows.people`, `episodes.people`), filled at
+    the next refresh. Only `http` and `https` links open.
+  - Done when: a feed with these tags shows them in its episodes' descriptions
+    after a refresh, and a feed without them shows nothing new.
+  - Status: built and passing `check.sh` (schema version 14): the parser keeps
+    at most 20 people and 5 support links, http(s) only; the episode's
+    description shows "Support the show" and "Hosts and guests". An existing
+    show shows them after its next refresh.
 
 ## Later
+
+- Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
+  round) the status bar text follows iOS, not the theme. The three screens that
+  draw a `StatusBar` could take its style from the theme.
+- Podcasts: marking an episode unplayed does not reset its saved place for Up
+  Next in Swift.
+- Podcasts: deleting an imported file from the Downloads screen leaves its row
+  in "Your files"; the empty "Your files" page says "This feed has no episodes
+  yet."
+- Podcasts: the trimmer reads the ads only when an episode loads, so ads found
+  while it plays are not avoided until the next load.
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
 - Podcasts: `savePlayback` notifies the library on every 15 s save, so open

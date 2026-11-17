@@ -4,8 +4,10 @@
 // db.ts, which needs the native SQLite module, so the steps can be tested. A new install
 // runs every step; an older file runs only the steps it lacks.
 
+import { starterStatements } from "./playlists"
+
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 14
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -102,6 +104,91 @@ const VERSION_7 = [
   "ALTER TABLE shows ADD COLUMN show_archived INTEGER NOT NULL DEFAULT 0",
 ]
 
+/**
+ * Version 8: each show's own voice boost and silence trimming. Null follows the main setting
+ * in Profile; otherwise the strength's name (off, low, medium, high / off, mild, medium,
+ * strong).
+ */
+const VERSION_8 = [
+  "ALTER TABLE shows ADD COLUMN voice_boost TEXT",
+  "ALTER TABLE shows ADD COLUMN trim_silence TEXT",
+]
+
+/** Version 9: the address of the feed's `podcast:chapters` file for each episode. */
+const VERSION_9 = ["ALTER TABLE episodes ADD COLUMN chapters_url TEXT"]
+
+/**
+ * Version 10: starred episodes (when each was starred, null for none) and the listening
+ * history. `history_at` is when an episode was last listened to, kept apart from
+ * `last_played_at` so clearing the history does not touch what the automatic clean-up reads.
+ */
+const VERSION_10 = [
+  "ALTER TABLE episodes ADD COLUMN starred_at INTEGER",
+  "ALTER TABLE episodes ADD COLUMN history_at INTEGER",
+  "UPDATE episodes SET history_at = last_played_at WHERE last_played_at IS NOT NULL",
+  "CREATE INDEX episodes_history ON episodes (history_at)",
+]
+
+/**
+ * Version 11: smart playlists, with the three every library starts with (New Releases, In
+ * Progress and Starred). They are made here, once, so deleting one keeps it deleted.
+ */
+const VERSION_11 = [
+  `CREATE TABLE playlists (
+    id TEXT PRIMARY KEY NOT NULL,
+    title TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    rules TEXT NOT NULL,
+    sort TEXT NOT NULL DEFAULT 'newest',
+    auto_download INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL
+  )`,
+  ...starterStatements(),
+]
+
+/**
+ * Version 12: playlists you fill by hand. `kind` is "smart" (rules) or "manual". An item
+ * keeps a snapshot of its episode and show, so it plays even when the show isn't followed
+ * (or is unfollowed later); `episode_id` is the library's id when it has one, else a preview id.
+ */
+const VERSION_12 = [
+  "ALTER TABLE playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'smart'",
+  `CREATE TABLE playlist_items (
+    playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    episode_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    snapshot TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (playlist_id, episode_id)
+  )`,
+  "CREATE INDEX playlist_items_order ON playlist_items (playlist_id, position)",
+]
+
+/**
+ * Version 13: bookmarks. Each is a place in a library episode with a title; it goes with
+ * the episode (and so with its show).
+ */
+const VERSION_13 = [
+  `CREATE TABLE bookmarks (
+    id TEXT PRIMARY KEY NOT NULL,
+    episode_id TEXT NOT NULL REFERENCES episodes(id) ON DELETE CASCADE,
+    position_seconds REAL NOT NULL,
+    title TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  )`,
+  "CREATE INDEX bookmarks_episode ON bookmarks (episode_id, position_seconds)",
+]
+
+/**
+ * Version 14: the feed's hosts, guests and support links (`podcast:person` and
+ * `podcast:funding`) as JSON text, filled at the next refresh.
+ */
+const VERSION_14 = [
+  "ALTER TABLE shows ADD COLUMN funding TEXT",
+  "ALTER TABLE shows ADD COLUMN people TEXT",
+  "ALTER TABLE episodes ADD COLUMN people TEXT",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -111,6 +198,13 @@ const STEPS = [
   VERSION_5,
   VERSION_6,
   VERSION_7,
+  VERSION_8,
+  VERSION_9,
+  VERSION_10,
+  VERSION_11,
+  VERSION_12,
+  VERSION_13,
+  VERSION_14,
 ]
 
 /**

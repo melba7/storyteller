@@ -38,6 +38,27 @@ const feed: PodcastFeedData = {
   ],
 }
 
+describe("previewFromFeed people and funding", () => {
+  it("carries the feed's people and support links, and none when absent", () => {
+    const person = { name: "Ann", role: "host", group: "cast" }
+    const withTags = previewFromFeed("https://f.test/rss", {
+      ...feed,
+      people: [person],
+      funding: [{ url: "https://x.test/give", label: "Give" }],
+      episodes: [{ ...feed.episodes[0]!, people: [person] }],
+    })
+    expect(withTags.show.people).toHaveLength(1)
+    expect(withTags.show.funding).toEqual([
+      { url: "https://x.test/give", label: "Give" },
+    ])
+    expect(withTags.episodes[0]!.people).toHaveLength(1)
+    const bare = previewFromFeed("https://f.test/rss", feed)
+    expect(bare.show.people).toEqual([])
+    expect(bare.show.funding).toEqual([])
+    expect(bare.episodes[0]!.people).toEqual([])
+  })
+})
+
 describe("previewFromFeed", () => {
   const { show, episodes } = previewFromFeed("https://f.test/rss", feed)
 

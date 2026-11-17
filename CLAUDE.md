@@ -58,7 +58,8 @@ time by Claude on a Mac.
 - Changed: added atmosphere sounds (LofiScoreKit, Expo module, UI, server
   route), the fork's identity, CI, and the shelved music.
 - Touch points: `README.md`, `applications/mobile/app.config.ts`,
-  `app/(root)/settings.tsx`, `components/Toolbar.tsx`, `store/store.ts`,
+  `app/(root)/settings.tsx`, `components/Toolbar.tsx`, `global.css`,
+  `metro.config.js`, `store/store.ts`,
   `modules/readium/ios/AudiobookPlayerActor.swift`.
 
 ## WORKFLOW (tech-lead v3)

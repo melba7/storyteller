@@ -16,7 +16,9 @@ import {
   mergeEpisodes,
   showFromRow,
 } from "./library"
+import { feedShows, isLocalFeedUrl } from "./localFiles"
 import { readableError } from "./nativeError"
+import { fundingFromJson, peopleFromJson, toJson } from "./people"
 
 // MARK: Reading a feed
 
@@ -40,8 +42,8 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
   return [
     `INSERT INTO episodes (id, show_id, guid, title, published_at, duration_seconds, notes,
        audio_url, audio_type, audio_bytes, image_url, season, number, transcript_url,
-       transcript_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       transcript_type, chapters_url, people)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       showId,
@@ -58,6 +60,8 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
       episode.number,
       episode.transcriptUrl,
       episode.transcriptType,
+      episode.chaptersUrl,
+      toJson(episode.people),
     ],
   ] as const
 }
@@ -66,7 +70,7 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
   return [
     `UPDATE episodes SET title = ?, published_at = ?, duration_seconds = ?, notes = ?,
        audio_url = ?, audio_type = ?, audio_bytes = ?, image_url = ?, season = ?, number = ?,
-       transcript_url = ?, transcript_type = ?
+       transcript_url = ?, transcript_type = ?, chapters_url = ?, people = ?
      WHERE id = ?`,
     [
       episode.title,
@@ -81,6 +85,8 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
       episode.number,
       episode.transcriptUrl,
       episode.transcriptType,
+      episode.chaptersUrl,
+      toJson(episode.people),
       id,
     ],
   ] as const
@@ -102,7 +108,8 @@ export async function subscribe(link: string): Promise<Show> {
   await db.transaction(async (tx) => {
     await tx.execute(
       `INSERT INTO shows (id, feed_url, title, author, description, image_url, link, language,
-         added_at, refreshed_at, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         added_at, refreshed_at, categories, funding, people)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         feedUrl,
@@ -115,6 +122,8 @@ export async function subscribe(link: string): Promise<Show> {
         now,
         now,
         JSON.stringify(feed.categories ?? []),
+        toJson(fundingFromJson(toJson(feed.funding))),
+        toJson(peopleFromJson(toJson(feed.people))),
       ],
     )
     for (const episode of insert) {
@@ -134,7 +143,8 @@ export async function subscribe(link: string): Promise<Show> {
  */
 export async function refreshShow(id: string): Promise<NewEpisode[]> {
   const show = await getShow(id)
-  if (!show) return []
+  // "Your files" has no feed to read.
+  if (!show || isLocalFeedUrl(show.feedUrl)) return []
   const feed = await fetchFeed(show.feedUrl)
   const { insert, update } = mergeEpisodes(
     await listEpisodes(id),
@@ -145,7 +155,8 @@ export async function refreshShow(id: string): Promise<NewEpisode[]> {
   await db.transaction(async (tx) => {
     await tx.execute(
       `UPDATE shows SET title = ?, author = ?, description = ?, image_url = ?, link = ?,
-         language = ?, refreshed_at = ?, categories = ? WHERE id = ?`,
+         language = ?, refreshed_at = ?, categories = ?, funding = ?, people = ?
+       WHERE id = ?`,
       [
         feed.title,
         orNull(feed.author),
@@ -155,6 +166,8 @@ export async function refreshShow(id: string): Promise<NewEpisode[]> {
         orNull(feed.language),
         Date.now(),
         JSON.stringify(feed.categories ?? []),
+        toJson(fundingFromJson(toJson(feed.funding))),
+        toJson(peopleFromJson(toJson(feed.people))),
         id,
       ],
     )
@@ -181,7 +194,7 @@ export async function refreshAllShows(): Promise<{
 }> {
   const failed: string[] = []
   const added: NewEpisode[] = []
-  for (const show of await listShows()) {
+  for (const show of feedShows(await listShows())) {
     try {
       added.push(...(await refreshShow(show.id)))
     } catch {

@@ -3,7 +3,8 @@
 // Pure functions: what a show and an episode are, merging a
 // refreshed feed into the stored episodes, sorting, and how dates and lengths read.
 // Nothing here touches the database (db.ts does) or the screen.
-import type { PodcastFeedEpisode } from "./index"
+import type { PodcastFeedEpisode, PodcastFunding, PodcastPerson } from "./index"
+import { fundingFromJson, peopleFromJson, samePeople, toJson } from "./people"
 import { type ShowSettings, showSettingsFromRow } from "./showSettings"
 import { chooseTranscript } from "./transcriptChoice"
 
@@ -28,6 +29,10 @@ export type Show = {
    * until the feed has been read since categories were added.
    */
   categories: string[]
+  /** The feed's `podcast:funding` links. Empty until the feed has been read since P6b. */
+  funding: PodcastFunding[]
+  /** The feed's `podcast:person` tags for the whole show. */
+  people: PodcastPerson[]
   /** The show's own settings (skips, speed, new episodes, archiving, the page's view). */
   settings: ShowSettings
 }
@@ -49,6 +54,10 @@ export type FetchedEpisode = {
   /** The feed's own transcript (best format, see chooseTranscript), or null. */
   transcriptUrl: string | null
   transcriptType: string | null
+  /** The feed's `podcast:chapters` JSON file (Podcasting 2.0), or null. */
+  chaptersUrl: string | null
+  /** The episode's own `podcast:person` tags; none means the show's apply. */
+  people: PodcastPerson[]
 }
 
 export type StoredEpisode = FetchedEpisode & {
@@ -61,6 +70,8 @@ export type StoredEpisode = FetchedEpisode & {
   lastPlayedAt: number | null
   /** Put away: hidden on the show page unless asked for, and its download is deleted. */
   archived: boolean
+  /** Milliseconds since 1970 when it was starred, or null when it is not. */
+  starredAt: number | null
 }
 
 // MARK: Refreshing
@@ -78,10 +89,14 @@ const FETCHED_KEYS: (keyof FetchedEpisode)[] = [
   "number",
   "transcriptUrl",
   "transcriptType",
+  "chaptersUrl",
 ]
 
 function unchanged(stored: StoredEpisode, fetched: FetchedEpisode): boolean {
-  return FETCHED_KEYS.every((key) => stored[key] === fetched[key])
+  return (
+    FETCHED_KEYS.every((key) => stored[key] === fetched[key]) &&
+    samePeople(stored.people, fetched.people)
+  )
 }
 
 /**
@@ -205,6 +220,8 @@ export function fetchedEpisode(episode: PodcastFeedEpisode): FetchedEpisode {
     number: orNull(episode.number),
     transcriptUrl: chosen?.url ?? null,
     transcriptType: chosen?.type ?? null,
+    chaptersUrl: orNull(episode.chaptersUrl),
+    people: peopleFromJson(toJson(episode.people)),
   }
 }
 
@@ -251,6 +268,8 @@ export function showFromRow(row: Row): Show {
     artworkColor: strOrNull(row["artwork_color"]),
     ownPosition: numOrNull(row["own_position"]),
     categories: categoriesFromJson(row["categories"]),
+    funding: fundingFromJson(row["funding"]),
+    people: peopleFromJson(row["people"]),
     settings: showSettingsFromRow(row),
   }
 }
@@ -272,9 +291,12 @@ export function episodeFromRow(row: Row): StoredEpisode {
     number: numOrNull(row["number"]),
     transcriptUrl: strOrNull(row["transcript_url"]),
     transcriptType: strOrNull(row["transcript_type"]),
+    chaptersUrl: strOrNull(row["chapters_url"]),
+    people: peopleFromJson(row["people"]),
     positionSeconds: Math.max(0, numOrNull(row["position_seconds"]) ?? 0),
     played: row["played"] === 1 || row["played"] === true,
     lastPlayedAt: numOrNull(row["last_played_at"]),
     archived: row["archived"] === 1 || row["archived"] === true,
+    starredAt: numOrNull(row["starred_at"]),
   }
 }

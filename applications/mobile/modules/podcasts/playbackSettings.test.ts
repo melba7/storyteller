@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest"
 import { isPlayed } from "./playbackRules"
 import {
   DEFAULT_PLAYBACK_SETTINGS,
+  HEADPHONE_NEXT_CHOICES,
+  headphoneNextLabel,
   markPlayedLabel,
   parsePlaybackSettings,
   secondsLabel,
@@ -24,8 +26,27 @@ describe("parsePlaybackSettings", () => {
       headphoneNext: "nextEpisode",
       markPlayedWhenLeft: 60,
       rewindAfterPause: true,
+      voiceBoost: "high",
+      trimSilence: "mild",
     }
     expect(parsePlaybackSettings(saved)).toEqual(saved)
+  })
+  it("reads the next chapter choice", () => {
+    expect(
+      parsePlaybackSettings({ headphoneNext: "nextChapter" }).headphoneNext,
+    ).toBe("nextChapter")
+  })
+
+  it("reads the bookmark choice for the headphones' next button", () => {
+    expect(
+      parsePlaybackSettings({ headphoneNext: "bookmark" }).headphoneNext,
+    ).toBe("bookmark")
+    expect(HEADPHONE_NEXT_CHOICES).toEqual([
+      "skip",
+      "nextEpisode",
+      "nextChapter",
+      "bookmark",
+    ])
   })
   it("keeps the default for anything that is not a choice", () => {
     expect(
@@ -35,6 +56,8 @@ describe("parsePlaybackSettings", () => {
         headphoneNext: "teleport",
         markPlayedWhenLeft: 25,
         rewindAfterPause: "yes",
+        voiceBoost: "max",
+        trimSilence: 2,
       }),
     ).toEqual(DEFAULT_PLAYBACK_SETTINGS)
   })
@@ -48,6 +71,12 @@ describe("labels", () => {
     expect(markPlayedLabel(30)).toBe("30 s")
     expect(skipLabel("back", 15)).toBe("Back 15 seconds")
     expect(skipLabel("ahead", 45)).toBe("Ahead 45 seconds")
+    expect(HEADPHONE_NEXT_CHOICES.map(headphoneNextLabel)).toEqual([
+      "Skip ahead",
+      "Next in Up Next",
+      "Next chapter",
+      "Add a bookmark",
+    ])
   })
 })
 

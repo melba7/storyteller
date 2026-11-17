@@ -20,6 +20,7 @@ export function queueItem(
     showId: episode.showId,
     url: episode.audioUrl,
     type: episode.audioType,
+    chaptersUrl: episode.chaptersUrl,
     title: episode.title,
     showTitle: show?.title ?? "",
     artworkUrl: episode.imageUrl ?? show?.imageUrl ?? null,

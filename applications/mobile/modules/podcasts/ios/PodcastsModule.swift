@@ -24,6 +24,7 @@ struct PlaybackLoadOptions: Record {
   @Field var autoplay: Bool = true
   @Field var audioType: String = ""
   @Field var showId: String?
+  @Field var chaptersUrl: String?
 }
 
 /// An episode to put in Up Next.
@@ -37,6 +38,7 @@ struct UpNextItemOptions: Record {
   @Field var duration: Double?
   @Field var position: Double = 0
   @Field var showId: String?
+  @Field var chaptersUrl: String?
 }
 
 public final class PodcastsModule: Module {
@@ -45,7 +47,7 @@ public final class PodcastsModule: Module {
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
       "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange",
-      "onAdsChange", "onAdSkipped", "onAdUndone")
+      "onAdsChange", "onAdSkipped", "onAdUndone", "onChaptersChange", "onBookmarksPending")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -88,7 +90,7 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType, showId: options.showId)
+        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -134,7 +136,7 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position, showId: item.showId)
+        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -185,6 +187,17 @@ public final class PodcastsModule: Module {
       return kept.values
     }
 
+    // MARK: Bookmarks
+
+    // The bookmarks the headphones made while the app wasn't running, as a JSON list (see
+    // PendingBookmarks). The app saves them, then asks to remove the ones it saved.
+    AsyncFunction("readPendingBookmarks") { () async -> String in
+      await MainActor.run { PodcastPlayer.readPendingBookmarks() }
+    }
+    AsyncFunction("removePendingBookmarks") { (ids: [String]) async throws in
+      try await MainActor.run { try PodcastPlayer.removePendingBookmarks(ids: ids) }
+    }
+
     // MARK: Sleep timer
 
     // A countdown in minutes (1 to 720), or until the end of the episode. Both replace any
@@ -196,6 +209,10 @@ public final class PodcastsModule: Module {
     AsyncFunction("sleepUntilEndOfEpisode") { () async in
       await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfEpisode() }
     }
+    AsyncFunction("sleepUntilEndOfChapter") { () async throws in
+      let started = await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfChapter() }
+      if !started { throw PodcastFetchError(message: "This episode has no chapter playing now.") }
+    }
     AsyncFunction("extendSleepTimer") { () async in
       await MainActor.run { PodcastPlayer.shared.extendSleep() }
     }
@@ -204,6 +221,25 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("getSleepTimer") { () async -> [String: Any] in
       await MainActor.run { PodcastPlayer.shared.sleepObject() }
+    }
+
+    // MARK: Chapters
+
+    // The loaded episode's chapters (they are also sent with `onChaptersChange`), the previous
+    // and next chapter buttons, and the switch that skips a chapter (`start` in seconds).
+    AsyncFunction("getChapters") { () async -> [String: Any] in
+      await MainActor.run { PodcastPlayer.shared.chaptersInfo() }
+    }
+    AsyncFunction("previousChapter") { () async in
+      await MainActor.run { PodcastPlayer.shared.previousChapter() }
+    }
+    AsyncFunction("nextChapter") { () async in
+      await MainActor.run { _ = PodcastPlayer.shared.nextChapter() }
+    }
+    AsyncFunction("setChapterSkipped") { (episodeId: String, start: Double, skipped: Bool) async in
+      await MainActor.run {
+        PodcastPlayer.shared.setChapterSkipped(episodeId: episodeId, start: start, skipped: skipped)
+      }
     }
 
     // MARK: Downloading
@@ -217,6 +253,17 @@ public final class PodcastsModule: Module {
       do {
         try PodcastDownloader.shared.download(
           episodeId: episodeId, url: url, type: type, automatic: automatic)
+      } catch {
+        throw PodcastFetchError(message: error.localizedDescription)
+      }
+    }
+    // Adds an audio file picked in the Files app: copies it in and installs it like a finished
+    // download. Resolves with the episode's id, title, length, size and extension.
+    AsyncFunction("importAudioFile") { (uri: String, fileName: String?) async throws -> [String: Any] in
+      do {
+        return try await PodcastDownloader.shared.importAudioFile(uri: uri, fileName: fileName)
+      } catch let error as PodcastFetchError {
+        throw error
       } catch {
         throw PodcastFetchError(message: error.localizedDescription)
       }
@@ -243,11 +290,20 @@ public final class PodcastsModule: Module {
 
     // Saves the settings of every show the player must know with the screen locked (speed,
     // intro, outro, skip switches) as one JSON object keyed by show id.
-    AsyncFunction("writeShowSettings") { (json: String) throws in
+    AsyncFunction("writeShowSettings") { (json: String) async throws in
       guard ShowSettingsStore.write(json: json) else {
         throw PodcastFetchError(message: "The show settings could not be saved.")
       }
+      // The loaded show's sound choices may have changed.
+      await MainActor.run { PodcastPlayer.shared.applyShowSound() }
     }
+
+    // Seconds of audio that silence trimming has cut so far (for a stats screen).
+    AsyncFunction("getTrimSavings") { () -> Double in TrimSavingsStore.seconds }
+
+    // The listening stats, counted here so they count with the screen locked.
+    AsyncFunction("getStats") { () -> [String: Any] in StatsStore.shared.object() }
+    AsyncFunction("resetStats") { () in StatsStore.shared.reset() }
 
     // MARK: Transcripts
 
@@ -255,6 +311,10 @@ public final class PodcastsModule: Module {
     AsyncFunction("listTranscripts") { () -> [[String: Any]] in PodcastTranscriber.shared.all() }
     AsyncFunction("getTranscript") { (episodeId: String) -> String? in
       PodcastTranscriber.shared.transcriptJSON(episodeId)
+    }
+    // The words said in every finished transcript: hits with the episode, time and line.
+    AsyncFunction("searchTranscripts") { (query: String) async -> [[String: Any]] in
+      await PodcastTranscriber.shared.search(query)
     }
 
     // MARK: Ads

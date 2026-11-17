@@ -56,17 +56,22 @@ extension PodcastPlayer {
   /// The next button on the headphones or lock screen.
   func headphoneNext() {
     let settings = PlaybackSettingsStore.current
-    switch settings.nextAction(queueHasNext: !queue.items.isEmpty) {
+    switch settings.nextAction(queueHasNext: !queue.items.isEmpty, chapterAhead: chapterAhead) {
     case .skip(let seconds):
       skip(by: seconds)
+    case .nextChapter:
+      if !nextChapter() { skip(by: Double(settings.skipForward)) }
     case .nextEpisode:
       // Nothing playable queued: skip instead.
       if !startNextInQueue() { skip(by: Double(settings.skipForward)) }
+    case .bookmark:
+      bookmarkFromHeadphones()
     }
   }
 
   /// The listener changed the settings: the lock screen's skip buttons follow.
   func settingsChanged() {
     lockScreen.refreshSkipIntervals()
+    sound.refresh()
   }
 }

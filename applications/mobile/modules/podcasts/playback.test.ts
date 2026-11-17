@@ -30,10 +30,13 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    people: [],
+    chaptersUrl: null,
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
     ...overrides,
   }
 }
@@ -52,6 +55,8 @@ const show: Show = {
   artworkColor: null,
   ownPosition: null,
   categories: [],
+  funding: [],
+  people: [],
   settings: DEFAULT_SHOW_SETTINGS,
 }
 
@@ -165,6 +170,7 @@ describe("playEpisode", () => {
       played: false,
       autoplay: true,
       audioType: "audio/mpeg",
+      chaptersUrl: null,
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)

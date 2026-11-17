@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import { SCHEMA_VERSION, migrationStatements } from "./schema"
 import { SETTING_COLUMNS } from "./showSettings"
+import { openTestDatabase } from "./testDatabase"
 
 /** The statements of the step that takes a file from `version` to the next one. */
 function stepFrom(version: number): string[] {
@@ -21,8 +22,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 7", () => {
-    expect(SCHEMA_VERSION).toBe(7)
+  it("is at version 14", () => {
+    expect(SCHEMA_VERSION).toBe(14)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -98,6 +99,77 @@ describe("migrationStatements", () => {
       "ALTER TABLE shows ADD COLUMN episode_sort TEXT NOT NULL DEFAULT 'newest'",
     )
     expect(statements).toHaveLength(7)
+  })
+
+  it("version 8 adds a show's own voice boost and silence trimming, null to follow", () => {
+    expect(stepFrom(7)).toEqual([
+      "ALTER TABLE shows ADD COLUMN voice_boost TEXT",
+      "ALTER TABLE shows ADD COLUMN trim_silence TEXT",
+    ])
+  })
+
+  it("version 9 adds the feed's chapters address to episodes", () => {
+    expect(stepFrom(8)).toEqual([
+      "ALTER TABLE episodes ADD COLUMN chapters_url TEXT",
+    ])
+  })
+
+  it("version 10 adds starring and the listening history, filled from what was played", () => {
+    const statements = stepFrom(9)
+    expect(statements).toContain(
+      "ALTER TABLE episodes ADD COLUMN starred_at INTEGER",
+    )
+    expect(statements).toContain(
+      "ALTER TABLE episodes ADD COLUMN history_at INTEGER",
+    )
+    expect(
+      statements.some((s) => s.startsWith("UPDATE episodes SET history_at")),
+    ).toBe(true)
+  })
+
+  it("version 11 adds the playlists table and the three starter playlists", () => {
+    const statements = stepFrom(10)
+    expect(statements[0]).toContain("CREATE TABLE playlists")
+    expect(statements).toHaveLength(4)
+    const db = openTestDatabase()
+    expect(
+      db
+        .prepare("SELECT id, title, position FROM playlists ORDER BY position")
+        .all(),
+    ).toEqual([
+      { id: "starter-new-releases", title: "New Releases", position: 0 },
+      { id: "starter-in-progress", title: "In Progress", position: 1 },
+      { id: "starter-starred", title: "Starred", position: 2 },
+    ])
+  })
+
+  it("version 12 adds hand-filled playlists and keeps the existing ones smart", () => {
+    const statements = stepFrom(11)
+    expect(statements).toContain(
+      "ALTER TABLE playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'smart'",
+    )
+    expect(
+      statements.some((s) => s.includes("CREATE TABLE playlist_items")),
+    ).toBe(true)
+    const db = openTestDatabase()
+    expect(db.prepare("SELECT DISTINCT kind FROM playlists").all()).toEqual([
+      { kind: "smart" },
+    ])
+  })
+
+  it("version 13 adds the bookmarks table, which goes with its episode", () => {
+    const statements = stepFrom(12)
+    expect(statements[0]).toContain("CREATE TABLE bookmarks")
+    expect(statements[0]).toContain("REFERENCES episodes(id) ON DELETE CASCADE")
+    expect(statements).toHaveLength(2)
+  })
+
+  it("version 14 adds the people and funding columns", () => {
+    expect(stepFrom(13)).toEqual([
+      "ALTER TABLE shows ADD COLUMN funding TEXT",
+      "ALTER TABLE shows ADD COLUMN people TEXT",
+      "ALTER TABLE episodes ADD COLUMN people TEXT",
+    ])
   })
 
   it("has a column for every setting the screen saves", () => {

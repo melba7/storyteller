@@ -4,6 +4,8 @@
 // Apple Podcasts and the episodes finished there. These are the rules for what the phone does
 // with it. Nothing here touches the database or the folder (appleSync.ts does).
 
+import { feedShows, isLocalFeedUrl } from "./localFiles"
+
 export type AppleShow = { feed: string; title: string | null }
 export type AppleFinished = { feed: string; guid: string }
 export type AppleExport = {
@@ -89,6 +91,7 @@ export function planFollows(
   const queued = new Set<string>()
   for (const show of file.shows) {
     const key = feedKey(show.feed)
+    if (isLocalFeedUrl(show.feed)) continue
     if (seenKeys.has(key) || queued.has(key)) continue
     if (library.has(key)) next.add(key)
     else {
@@ -111,7 +114,7 @@ export function planPlayed(
   library: readonly { id: string; feedUrl: string }[],
 ): PlayedInShow[] {
   const showByKey = new Map(
-    library.map((show) => [feedKey(show.feedUrl), show.id]),
+    feedShows(library).map((show) => [feedKey(show.feedUrl), show.id]),
   )
   const byShow = new Map<string, Set<string>>()
   for (const { feed, guid } of file.finished) {

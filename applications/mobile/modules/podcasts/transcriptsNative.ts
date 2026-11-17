@@ -2,7 +2,7 @@
 //
 // Thin wrappers over the native module's transcript functions. Not imported by any test,
 // because the native module is not there; the rules are in transcripts.ts.
-import { type TranscriptInfo, Podcasts } from "./index"
+import { type SpokenHit, type TranscriptInfo, Podcasts } from "./index"
 
 export async function listTranscripts(): Promise<TranscriptInfo[]> {
   return (await Podcasts?.listTranscripts()) ?? []
@@ -11,4 +11,9 @@ export async function listTranscripts(): Promise<TranscriptInfo[]> {
 /** A finished transcript as JSON text, or null. */
 export async function getTranscript(episodeId: string): Promise<string | null> {
   return (await Podcasts?.getTranscript(episodeId)) ?? null
+}
+
+/** Where the words are said in every transcribed episode (at most a few per episode). */
+export async function searchTranscripts(query: string): Promise<SpokenHit[]> {
+  return (await Podcasts?.searchTranscripts(query)) ?? []
 }

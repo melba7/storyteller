@@ -47,7 +47,8 @@ extension PodcastPlayer {
       Episode(
         id: next.id, url: source, title: next.title, showTitle: next.showTitle,
         artworkUrl: next.artworkUrl, savedPosition: next.position, duration: next.duration,
-        played: false, autoplay: true, type: next.type, showId: next.showId))
+        played: false, autoplay: true, type: next.type, showId: next.showId,
+        chaptersUrl: next.chaptersUrl))
     return true
   }
 
@@ -100,6 +101,7 @@ extension PodcastPlayer {
     if let artwork = item.artworkUrl { object["artworkUrl"] = artwork }
     if let duration = item.duration { object["duration"] = duration }
     if let showId = item.showId { object["showId"] = showId }
+    if let chapters = item.chaptersUrl { object["chaptersUrl"] = chapters }
     return object
   }
 }

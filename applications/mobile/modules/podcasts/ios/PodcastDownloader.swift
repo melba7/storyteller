@@ -301,7 +301,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     }
   }
 
-  private func emit(_ entry: DownloadEntry) {
+  func emit(_ entry: DownloadEntry) {
     let send = lock.withLock { sink }
     send?("onDownloadChange", DownloadJSON.object(entry))
   }

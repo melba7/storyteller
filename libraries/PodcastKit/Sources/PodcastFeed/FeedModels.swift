@@ -12,12 +12,16 @@ public struct PodcastFeed: Sendable, Equatable {
   /// The `itunes:category` names: each top-level category once, in feed order, and each
   /// subcategory after them as "Top › Sub". Empty when the feed names none.
   public var categories: [String]
+  /// The channel's `podcast:person` tags: at most `FeedLimits.people`.
+  public var people: [FeedPerson]
+  /// The channel's `podcast:funding` tags: at most `FeedLimits.funding`.
+  public var funding: [FeedFunding]
   public var episodes: [FeedEpisode]
 
   public init(
     title: String, author: String? = nil, description: String = "", imageURL: URL? = nil,
     link: URL? = nil, language: String? = nil, categories: [String] = [],
-    episodes: [FeedEpisode] = []
+    people: [FeedPerson] = [], funding: [FeedFunding] = [], episodes: [FeedEpisode] = []
   ) {
     self.title = title
     self.author = author
@@ -26,7 +30,51 @@ public struct PodcastFeed: Sendable, Equatable {
     self.link = link
     self.language = language
     self.categories = categories
+    self.people = people
+    self.funding = funding
     self.episodes = episodes
+  }
+}
+
+/// How many `podcast:person` and `podcast:funding` tags are kept.
+public enum FeedLimits {
+  public static let people = 20
+  public static let funding = 5
+}
+
+/// A `podcast:person` tag (Podcasting 2.0): someone who made the show or an episode.
+public struct FeedPerson: Sendable, Equatable {
+  public var name: String
+  /// Lower case; "host" when the feed names none.
+  public var role: String
+  /// Lower case; "cast" when the feed names none.
+  public var group: String
+  /// A picture, only when it is an http(s) address.
+  public var imageURL: URL?
+  /// A page about the person, only when it is an http(s) address.
+  public var link: URL?
+
+  public init(
+    name: String, role: String = "host", group: String = "cast", imageURL: URL? = nil,
+    link: URL? = nil
+  ) {
+    self.name = name
+    self.role = role
+    self.group = group
+    self.imageURL = imageURL
+    self.link = link
+  }
+}
+
+/// A `podcast:funding` tag (Podcasting 2.0): where to support the show.
+public struct FeedFunding: Sendable, Equatable {
+  public var url: URL
+  /// The tag's text; empty when the feed has none.
+  public var label: String
+
+  public init(url: URL, label: String = "") {
+    self.url = url
+    self.label = label
   }
 }
 
@@ -64,12 +112,16 @@ public struct FeedEpisode: Sendable, Equatable {
   public var number: Int?
   /// Every `podcast:transcript` tag, in feed order.
   public var transcripts: [FeedTranscript]
+  /// The `podcast:chapters` JSON file's address (Podcasting 2.0), when the feed has one.
+  public var chaptersURL: URL?
+  /// Every `podcast:person` tag of the episode: at most `FeedLimits.people`.
+  public var people: [FeedPerson]
 
   public init(
     guid: String, title: String, published: Date? = nil, durationSeconds: Double? = nil,
     notes: String = "", audioURL: URL, audioType: String, audioBytes: Int64? = nil,
     imageURL: URL? = nil, season: Int? = nil, number: Int? = nil,
-    transcripts: [FeedTranscript] = []
+    transcripts: [FeedTranscript] = [], chaptersURL: URL? = nil, people: [FeedPerson] = []
   ) {
     self.guid = guid
     self.title = title
@@ -83,6 +135,8 @@ public struct FeedEpisode: Sendable, Equatable {
     self.season = season
     self.number = number
     self.transcripts = transcripts
+    self.chaptersURL = chaptersURL
+    self.people = people
   }
 }
 

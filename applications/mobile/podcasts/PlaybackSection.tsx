@@ -4,11 +4,21 @@ import { Pressable, View } from "react-native"
 import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import {
+  HEADPHONE_NEXT_CHOICES,
   MARK_PLAYED_CHOICES,
   SKIP_CHOICES,
+  headphoneNextLabel,
   markPlayedLabel,
   secondsLabel,
 } from "@/modules/podcasts/playbackSettings"
+import {
+  BOOST_BODY,
+  BOOST_CHOICES,
+  TRIM_BODY,
+  TRIM_CHOICES,
+  boostLabel,
+  trimLabel,
+} from "@/modules/podcasts/sound"
 
 import {
   updatePlaybackSettings,
@@ -39,10 +49,10 @@ export function PlaybackSection() {
       />
       <Choices
         title="Headphones' next button"
-        body="Previous always skips back."
-        choices={["skip", "nextEpisode"] as const}
+        body="Previous always skips back. Next chapter skips ahead where an episode has no chapters."
+        choices={HEADPHONE_NEXT_CHOICES}
         selected={settings.headphoneNext}
-        label={(value) => (value === "skip" ? "Skip ahead" : "Next in Up Next")}
+        label={headphoneNextLabel}
         onChoose={(headphoneNext) => updatePlaybackSettings({ headphoneNext })}
       />
       <Choices
@@ -53,6 +63,22 @@ export function PlaybackSection() {
         onChoose={(markPlayedWhenLeft) =>
           updatePlaybackSettings({ markPlayedWhenLeft })
         }
+      />
+      <Choices
+        title="Volume boost"
+        body={BOOST_BODY}
+        choices={BOOST_CHOICES}
+        selected={settings.voiceBoost}
+        label={boostLabel}
+        onChoose={(voiceBoost) => updatePlaybackSettings({ voiceBoost })}
+      />
+      <Choices
+        title="Trim silence"
+        body={TRIM_BODY}
+        choices={TRIM_CHOICES}
+        selected={settings.trimSilence}
+        label={trimLabel}
+        onChoose={(trimSilence) => updatePlaybackSettings({ trimSilence })}
       />
       <View className="border-border flex-row items-center gap-3 border-b py-3">
         <View className="flex-1">

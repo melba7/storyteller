@@ -94,6 +94,11 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   plays from a line when tapped (Mo's ask, 2026-11-17). The feed's own
   transcript is used when there is one, else the phone's. Check: the transcript
   follows a playing episode and a tap plays from that line.
+- The user can search the words spoken in the episodes on the phone and play
+  from the line found, and an episode's description shows the show's support
+  links and its hosts and guests when the feed has them (Mo's ask, 2026-11-17).
+  Check: a phrase from a downloaded episode is found and plays from there; a
+  Podcasting 2.0 feed shows its people and support link.
 - The player skips those ads by itself, shows "Skipped ad" with Undo, and can be
   turned off per show. The hosts' own plugs (Patreon, merch) are skipped too,
   under their own switch. Check: on 3 episodes Mo picks, most ads (4 in 5) are

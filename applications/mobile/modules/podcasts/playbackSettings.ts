@@ -4,7 +4,14 @@
 // settings live in Swift (PodcastPlayback's PlaybackSettings, kept in UserDefaults) because the
 // player uses them with the screen locked; playbackSettingsStore.ts talks to it.
 
-export type HeadphoneNext = "skip" | "nextEpisode"
+import {
+  type BoostStrength,
+  type TrimStrength,
+  parseBoost,
+  parseTrim,
+} from "./sound"
+
+export type HeadphoneNext = "skip" | "nextEpisode" | "nextChapter" | "bookmark"
 
 export type PlaybackSettings = {
   /** Seconds the back button jumps. */
@@ -17,7 +24,18 @@ export type PlaybackSettings = {
   markPlayedWhenLeft: number
   /** Go back 3 seconds after a 5-minute pause and 10 after an hour. */
   rewindAfterPause: boolean
+  /** Make voices louder, for everything (a show can choose its own). */
+  voiceBoost: BoostStrength
+  /** Cut the quiet gaps, for everything (a show can choose its own). */
+  trimSilence: TrimStrength
 }
+
+export const HEADPHONE_NEXT_CHOICES = [
+  "skip",
+  "nextEpisode",
+  "nextChapter",
+  "bookmark",
+] as const satisfies readonly HeadphoneNext[]
 
 export const SKIP_CHOICES = [5, 10, 15, 30, 45, 60] as const
 export const MARK_PLAYED_CHOICES = [0, 10, 30, 60] as const
@@ -29,6 +47,8 @@ export const DEFAULT_PLAYBACK_SETTINGS: PlaybackSettings = {
   headphoneNext: "skip",
   markPlayedWhenLeft: 0,
   rewindAfterPause: false,
+  voiceBoost: "off",
+  trimSilence: "off",
 }
 
 function oneOf<T extends number>(
@@ -37,6 +57,28 @@ function oneOf<T extends number>(
   fallback: T,
 ): T {
   return choices.find((choice) => choice === value) ?? fallback
+}
+
+function oneOfText<T extends string>(
+  value: unknown,
+  choices: readonly T[],
+  fallback: T,
+): T {
+  return choices.find((choice) => choice === value) ?? fallback
+}
+
+/** What each headphone choice is called in Profile. */
+export function headphoneNextLabel(choice: HeadphoneNext): string {
+  switch (choice) {
+    case "skip":
+      return "Skip ahead"
+    case "nextEpisode":
+      return "Next in Up Next"
+    case "nextChapter":
+      return "Next chapter"
+    case "bookmark":
+      return "Add a bookmark"
+  }
 }
 
 /** Stored values; anything missing or not one of the choices keeps its default. */
@@ -51,14 +93,19 @@ export function parsePlaybackSettings(value: unknown): PlaybackSettings {
       SKIP_CHOICES,
       defaults.skipForward,
     ),
-    headphoneNext:
-      record["headphoneNext"] === "nextEpisode" ? "nextEpisode" : "skip",
+    headphoneNext: oneOfText(
+      record["headphoneNext"],
+      HEADPHONE_NEXT_CHOICES,
+      defaults.headphoneNext,
+    ),
     markPlayedWhenLeft: oneOf(
       record["markPlayedWhenLeft"],
       MARK_PLAYED_CHOICES,
       defaults.markPlayedWhenLeft,
     ),
     rewindAfterPause: record["rewindAfterPause"] === true,
+    voiceBoost: parseBoost(record["voiceBoost"]),
+    trimSilence: parseTrim(record["trimSilence"]),
   }
 }
 

@@ -7,12 +7,18 @@ public enum HeadphoneNext: String, Equatable, Sendable {
   case skip
   /// Start the next episode in Up Next (skips ahead when the queue is empty).
   case nextEpisode
+  /// Go to the start of the next chapter (skips ahead in the last chapter or with none).
+  case nextChapter
+  /// Add a bookmark at the place playing now.
+  case bookmark
 }
 
 /// What the player does about a press of the headphones' or lock screen's next button.
 public enum HeadphoneAction: Equatable, Sendable {
   case skip(seconds: Double)
   case nextEpisode
+  case nextChapter
+  case bookmark
 }
 
 /// The listener's playback settings. Stored natively because the player uses them with the
@@ -28,6 +34,9 @@ public struct PlaybackSettings: Equatable, Sendable {
   public var headphoneNext = HeadphoneNext.skip
   public var markPlayedWhenLeft = 0
   public var rewindAfterPause = false
+  /// Voice boost and silence trimming for everything; a show can choose its own.
+  public var voiceBoost = BoostStrength.off
+  public var trimSilence = TrimStrength.off
 
   /// The defaults are what the player used before there were settings.
   public init() {}
@@ -47,6 +56,8 @@ public struct PlaybackSettings: Equatable, Sendable {
       markPlayedWhenLeft = left
     }
     if let rewind = values["rewindAfterPause"] as? Bool { rewindAfterPause = rewind }
+    voiceBoost = BoostStrength(stored: values["voiceBoost"])
+    trimSilence = TrimStrength(stored: values["trimSilence"])
   }
 
   /// A whole number from storage (Int) or from JavaScript, which hands every number over as a
@@ -63,11 +74,15 @@ public struct PlaybackSettings: Equatable, Sendable {
     [
       "skipBack": skipBack, "skipForward": skipForward, "headphoneNext": headphoneNext.rawValue,
       "markPlayedWhenLeft": markPlayedWhenLeft, "rewindAfterPause": rewindAfterPause,
+      "voiceBoost": voiceBoost.rawValue, "trimSilence": trimSilence.rawValue,
     ]
   }
 
-  /// What the next button does now. Next episode needs one in Up Next; otherwise it skips.
-  public func nextAction(queueHasNext: Bool) -> HeadphoneAction {
+  /// What the next button does now. A bookmark is made whatever the queue holds; next
+  /// episode needs one in Up Next and next chapter a chapter ahead; otherwise it skips.
+  public func nextAction(queueHasNext: Bool, chapterAhead: Bool = false) -> HeadphoneAction {
+    if headphoneNext == .bookmark { return .bookmark }
+    if headphoneNext == .nextChapter && chapterAhead { return .nextChapter }
     if headphoneNext == .nextEpisode && queueHasNext { return .nextEpisode }
     return .skip(seconds: Double(skipForward))
   }

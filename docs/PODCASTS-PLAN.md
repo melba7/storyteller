@@ -205,9 +205,12 @@ support pages (November 2026).
 
 Why the big ones are big:
 
-- **Volume boost and trim silence** need a second player built on Apple's audio
-  engine that reads the file itself, because the standard player can't drop
-  silent stretches. It works on downloaded episodes; streams keep speed only.
+- **Volume boost and trim silence** were planned as a second player built on
+  Apple's audio engine. They were built on the one player instead (2026-11-17),
+  so ad skipping, the sleep timer and Up Next keep working: an audio tap makes
+  voices louder, and the player jumps over silent gaps it measured once in the
+  downloaded file. Trimming works on downloads; streams get the boost when the
+  tap attaches, and otherwise keep speed only.
 - **Chapters in MP3 files** are stored in ID3 tags that Apple's frameworks don't
   read, so PodcastKit gets its own small reader (tested on Linux).
 
@@ -345,6 +348,11 @@ and transcription (Apple's `SpeechTranscriber`, free; WhisperKit, MIT, stays in
 "Later" in case it disappoints). Pocket Casts (MPL 2.0) and AntennaPod (GPL 3)
 stay references only. No open database of podcast ad times was found.
 
+As built (2026-11-17): MinusPod's rules and part of MinusPod's and Podly's
+wording are used (credited in `FORK.md`), and only Transcriptator's time reading
+was adapted. OutcastID3 could not be fetched, so the MP3 chapter reader was
+written from the ID3 spec in PodcastKit `PodcastChapters`.
+
 ## Risks
 
 | Risk                                                                                       | What the plan does                                                                                                                                                                                                                 |
@@ -423,9 +431,8 @@ support can follow), and Apple Intelligence is on on the phone.
   out of git). iOS 27's Foundation Models can also wrap other providers' models
   behind the same session API.
 - A Mac command that compares two detectors on the same transcripts.
-- Search the words spoken inside downloaded episodes (needs P3a's transcripts),
-  suggestions ranked by how alike the shows' descriptions are (on-device model),
-  and charts for other countries.
+- Suggestions ranked by how alike the shows' descriptions are (on-device model),
+  and charts for other countries. (Searching the spoken words is P6a.)
 - Import subscriptions from another app (OPML), a sleep timer, chapters,
   CarPlay. Sending what you play in Storyteller back to Apple Podcasts is not
   possible (no API).

@@ -1,7 +1,13 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { ChevronRight, Download } from "lucide-react-native"
+import {
+  Bookmark,
+  ChartColumn,
+  ChevronRight,
+  Download,
+  History,
+} from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Pressable, View } from "react-native"
 
@@ -21,6 +27,8 @@ import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
+import { AddAudioFilesRow } from "./AddAudioFilesRow"
+import { AppearanceSection } from "./AppearanceSection"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
@@ -105,6 +113,63 @@ export function Profile() {
               className="text-muted-foreground"
             />
           </Pressable>
+          <Pressable
+            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
+            accessibilityRole="button"
+            accessibilityLabel="Stats"
+            onPress={() => router.push("/podcasts/(tabs)/(profile)/stats")}
+          >
+            <Icon as={ChartColumn} size={22} className="text-primary" />
+            <View className="flex-1">
+              <Text className="font-semibold">Stats</Text>
+              <Text className="text-muted-foreground text-sm">
+                Time listened and time saved.
+              </Text>
+            </View>
+            <Icon
+              as={ChevronRight}
+              size={20}
+              className="text-muted-foreground"
+            />
+          </Pressable>
+          <Pressable
+            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
+            accessibilityRole="button"
+            accessibilityLabel="Listening history"
+            onPress={() => router.push("/podcasts/(tabs)/(profile)/history")}
+          >
+            <Icon as={History} size={22} className="text-primary" />
+            <View className="flex-1">
+              <Text className="font-semibold">Listening history</Text>
+              <Text className="text-muted-foreground text-sm">
+                What you listened to, by day.
+              </Text>
+            </View>
+            <Icon
+              as={ChevronRight}
+              size={20}
+              className="text-muted-foreground"
+            />
+          </Pressable>
+          <Pressable
+            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
+            accessibilityRole="button"
+            accessibilityLabel="Bookmarks"
+            onPress={() => router.push("/podcasts/(tabs)/(profile)/bookmarks")}
+          >
+            <Icon as={Bookmark} size={22} className="text-primary" />
+            <View className="flex-1">
+              <Text className="font-semibold">Bookmarks</Text>
+              <Text className="text-muted-foreground text-sm">
+                Places you marked, in every episode.
+              </Text>
+            </View>
+            <Icon
+              as={ChevronRight}
+              size={20}
+              className="text-muted-foreground"
+            />
+          </Pressable>
           <View className="border-border flex-row items-center gap-3 border-b py-3">
             <View className="flex-1">
               <Text className="font-semibold">Download only on Wi-Fi</Text>
@@ -134,6 +199,8 @@ export function Profile() {
           />
           <NotifyRow />
           <PlaybackSection />
+          <AppearanceSection />
+          <AddAudioFilesRow />
           <OpmlSection />
           <AdSkipSwitches />
         </View>

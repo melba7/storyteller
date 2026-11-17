@@ -10,6 +10,8 @@ enum PodcastFeedJSON {
       "title": feed.title,
       "description": feed.description,
       "categories": feed.categories,
+      "people": feed.people.map(person),
+      "funding": feed.funding.map { ["url": $0.url.absoluteString, "label": $0.label] },
       "episodes": feed.episodes.map(episode),
     ]
     if let author = feed.author { object["author"] = author }
@@ -35,6 +37,8 @@ enum PodcastFeedJSON {
     if let imageURL = episode.imageURL { object["imageUrl"] = imageURL.absoluteString }
     if let season = episode.season { object["season"] = season }
     if let number = episode.number { object["number"] = number }
+    if let chapters = episode.chaptersURL { object["chaptersUrl"] = chapters.absoluteString }
+    object["people"] = episode.people.map(person)
     object["transcripts"] = episode.transcripts.map { transcript -> [String: Any] in
       var entry: [String: Any] = ["url": transcript.url.absoluteString, "type": transcript.type]
       if let language = transcript.language { entry["language"] = language }
@@ -42,5 +46,12 @@ enum PodcastFeedJSON {
       return entry
     }
     return object
+  }
+
+  static func person(_ person: FeedPerson) -> [String: Any] {
+    var entry: [String: Any] = ["name": person.name, "role": person.role, "group": person.group]
+    if let imageURL = person.imageURL { entry["img"] = imageURL.absoluteString }
+    if let link = person.link { entry["href"] = link.absoluteString }
+    return entry
   }
 }

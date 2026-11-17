@@ -25,6 +25,7 @@ let package = Package(
         .library(name: "PodcastTranscripts", targets: ["PodcastTranscripts"]),
         .library(name: "PodcastSpeech", targets: ["PodcastSpeech"]),
         .library(name: "PodcastAds", targets: ["PodcastAds"]),
+        .library(name: "PodcastChapters", targets: ["PodcastChapters"]),
         .library(name: "PodcastAdsOnDevice", targets: ["PodcastAdsOnDevice"]),
         .executable(name: "podcast-transcribe", targets: ["podcast-transcribe"]),
         .executable(name: "podcast-ads", targets: ["podcast-ads"]),
@@ -62,6 +63,11 @@ let package = Package(
         // detector.
         .target(name: "PodcastAds", dependencies: ["PodcastTranscripts"]),
         .testTarget(name: "PodcastAdsTests", dependencies: ["PodcastAds"]),
+        // Chapters: the feed's JSON chapters, the ID3 chapter frames of an MP3 file, which
+        // chapter is playing, the previous and next chapter and the chapters to skip. Foundation
+        // only, so it tests on Linux with hand-built bytes.
+        .target(name: "PodcastChapters"),
+        .testTarget(name: "PodcastChaptersTests", dependencies: ["PodcastChapters"]),
         // The detector made of Apple's on-device model (Foundation Models, iOS 26 and macOS 26).
         // Empty where there is no such framework. Swift 5 mode for the same reason as
         // PodcastSpeech: it cannot be compiled here.

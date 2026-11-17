@@ -9,6 +9,7 @@ import {
   fetchedEpisode,
   sortEpisodes,
 } from "./library"
+import { fundingFromJson, peopleFromJson, toJson } from "./people"
 import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 const PREVIEW_PREFIX = "preview:"
@@ -39,6 +40,7 @@ export function previewFromFeed(
       played: false,
       lastPlayedAt: null,
       archived: false,
+      starredAt: null,
     })
   }
   return {
@@ -56,6 +58,8 @@ export function previewFromFeed(
       artworkColor: null,
       ownPosition: null,
       categories: feed.categories ?? [],
+      funding: fundingFromJson(toJson(feed.funding)),
+      people: peopleFromJson(toJson(feed.people)),
       settings: DEFAULT_SHOW_SETTINGS,
     },
     episodes: sortEpisodes(episodes),

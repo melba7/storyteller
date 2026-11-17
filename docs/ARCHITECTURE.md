@@ -150,6 +150,30 @@ in `FORK.md`.
 | 2026-11-17 | Playback settings (skips, headphones' next, played early, rewind) are a `UserDefaults` dictionary in Swift; JS only shows and saves them   | The lock screen uses them with no JavaScript               |
 | 2026-11-17 | New-episode notifications are local (`UNUserNotificationCenter`), one per show per refresh, from `runAutomatic`; switch in AsyncStorage    | No push service or `expo-notifications` needed             |
 | 2026-11-17 | OPML is read and written by a small hand-written reader in `opml.ts`; files go through the document picker and share sheet                 | No new package                                             |
+| 2026-11-17 | Voice boost is an `MTAudioProcessingTap` on the one AVPlayer item (pure DSP in `VoiceBoost`), not a second `AVAudioEngine` player          | Ads, sleep timer, Up Next keep working                     |
+| 2026-11-17 | Silent gaps are measured once per download (`<sha256>.silence.json`); the player jumps over them with boundary observers in 120 s windows  | An ad skip wins; a seek into a gap plays it                |
+| 2026-11-17 | Trimmed seconds are counted divided by the speed in `UserDefaults` (`podcasts.trim.savedSeconds`) for the stats step                       | Counted in Swift, also while locked                        |
+| 2026-11-17 | `podcasts.db` is at schema version 9: a show's own voice boost and trim (v8), and each episode's feed chapters address (v9)                | Builders' steps renumbered at merge                        |
+| 2026-11-17 | Chapters live in Swift for the loaded episode: feed JSON wins over the file's (ID3 reader of our own, else AVFoundation); JS gets events   | Work locked and with Up Next                               |
+| 2026-11-17 | Chapter skips are kept per episode in `UserDefaults` (`podcasts.chapterSkips`) and run on the 0.5 s tick; a seek into one plays it         | Up to 0.5 s heard before the jump                          |
+| 2026-11-17 | Listening stats are counted in Swift (`StatsStore`, rules in `ListeningStats`) and saved to `Podcasts/stats.json` every 30 s and on pause  | Counts while locked; 90 days kept                          |
+| 2026-11-17 | Time saved by a jump (intro, outro, ad, chapter, silence) is the audio skipped divided by the speed; an undone ad takes its skip back      | One rule for every saving                                  |
+| 2026-11-17 | Own audio files are copied, hashed and installed by `DownloadStore.install` as `file-<sha256 prefix>`, in the local show `local-files`     | Transcripts, ads, chapters work unchanged                  |
+| 2026-11-17 | The local show's feed address is `local:files`: refresh, OPML, the Apple Podcasts sync and Discover skip it                                | No schema change                                           |
+| 2026-11-17 | Stars and history are episode columns (`starred_at`, `history_at`); history is kept apart from `last_played_at`                            | Clearing history leaves auto-delete as is                  |
+| 2026-11-17 | Rule playlists filter in SQL for what the database knows and in JS for "downloaded", which lives in Swift                                  | SQL tested on `node:sqlite`                                |
+| 2026-11-17 | The three starter playlists are made by schema step 11, once, so deleting one sticks                                                       | No re-creation on launch                                   |
+| 2026-11-17 | A playlist with auto-download gets its first 5 episodes once each, on Wi-Fi only; hand-filled playlists never auto-download                | Bounded downloads                                          |
+| 2026-11-17 | Hand-filled playlist items keep a snapshot; a library episode is read live and wins over its snapshot                                      | Any episode, followed or not                               |
+| 2026-11-17 | Headphone bookmarks wait in a Swift file until the app saves them, then are removed by id; two presses within 5 s count once               | Bookmarks work while locked                                |
+| 2026-11-17 | A bookmark belongs to a library episode (foreign key, deleted with it); previews cannot be bookmarked                                      | No orphan bookmarks                                        |
+| 2026-11-17 | Podcasts themes are Uniwind extra themes in `podcasts/themes.css`, with one `@import` in `global.css` and `extraThemes` in Metro           | Two small touch points                                     |
+| 2026-11-17 | The Podcasts section sits in one `ScopedTheme`; "Like the app" passes the app's own light or dark name                                     | Sheets and mini player follow                              |
+| 2026-11-17 | The Discover tab's stack is anchored on `discover` (`unstable_settings.anchor`); a test checks every tab's first screen                    | Shared screens sort first                                  |
+| 2026-11-17 | Spoken search matches in PodcastKit `TranscriptSearch`: normalised words, the phrase first, else all words in one line; 3 hits an episode  | Tested on Linux                                            |
+| 2026-11-17 | Spoken search reads the finished transcript files on each search, off the main thread, with no index; feed-only transcripts are skipped    | No schema change                                           |
+| 2026-11-17 | `podcast:person` (show and episode) and `podcast:funding` (show) are parsed in PodcastKit, at most 20 and 5, links kept only if http(s)    | Safe links from feeds                                      |
+| 2026-11-17 | Schema v14 keeps them as JSON text in `shows.people`, `shows.funding` and `episodes.people`; an episode's own people replace the show's    | Podcasting 2.0 spec rule                                   |
 
 ## Known problems
 

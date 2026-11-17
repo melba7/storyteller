@@ -3,6 +3,7 @@
 // Pure functions. Apple has no "shows like this" list, so suggestions go by category: the
 // categories of the shows you follow, most common first, each with that category's chart.
 import { CHART_CATEGORIES, type ChartCategory, type ChartShow } from "./charts"
+import { feedShows } from "./localFiles"
 
 /** What "For you" needs to know about a followed show. */
 export type FollowedShow = {
@@ -44,7 +45,7 @@ export function chartCategoryFor(name: string): ChartCategory | null {
  */
 export function pickForYou(followed: FollowedShow[], limit = 3): ForYouPick[] {
   const counts = new Map<string, { count: number; because: string }>()
-  for (const show of followed) {
+  for (const show of feedShows(followed)) {
     for (const name of topLevelNames(show.categories)) {
       const found = counts.get(name)
       if (found) found.count += 1

@@ -4,7 +4,8 @@ import { archivesByItself, episodesToArchive } from "./archive"
 //
 // What the app does by itself when it comes to the front and in the background task: follow
 // what the Mac wrote from Apple Podcasts (appleSync.ts), read every feed, download each show's
-// newest new episode (always on Wi-Fi), put new episodes in Up Next where a show says so,
+// newest new episode (always on Wi-Fi), download the first episodes of the playlists that
+// ask for it, put new episodes in Up Next where a show says so,
 // delete played downloads after a day and archive what each show's rules say. The rules are
 // in automatic.ts and archive.ts. Not imported by any test, because the database and the
 // native module are not there.
@@ -17,11 +18,14 @@ import {
 } from "./automatic"
 import { loadLastRun, loadSettings, saveLastRun } from "./automaticSettings"
 import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
+import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
+import { listPlaylists, smartEpisodes } from "./dbPlaylists"
 import { archiveEpisodes, syncShowSettings } from "./dbSettings"
 import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
 import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
+import { filterDownloaded, playlistDownloads } from "./playlistRules"
 import { listUpNext, queueEpisode } from "./upNextNative"
 
 let running: Promise<void> | null = null
@@ -43,6 +47,47 @@ async function startNew(added: Added, settings: AutomaticSettings) {
       )
     } catch (cause) {
       console.warn("Couldn't start an automatic download", cause)
+    }
+  }
+}
+
+/**
+ * Downloads the first few episodes of each playlist that asks for it, on Wi-Fi only. What
+ * is already on the phone, on its way or failed is left alone.
+ */
+async function downloadForPlaylists(now: number) {
+  const playlists = (await listPlaylists()).filter(
+    (p) => p.kind === "smart" && p.autoDownload,
+  )
+  if (playlists.length === 0) return
+  const infos = await listDownloads()
+  const known = new Set(infos.map((info) => info.episodeId))
+  const onPhone = new Set(
+    infos.filter((info) => info.state === "downloaded").map((i) => i.episodeId),
+  )
+  const matches = new Map<string, Awaited<ReturnType<typeof smartEpisodes>>>()
+  for (const playlist of playlists) {
+    matches.set(
+      playlist.id,
+      filterDownloaded(
+        await smartEpisodes(playlist, now),
+        playlist.rules,
+        onPhone,
+      ),
+    )
+  }
+  const languages = new Map((await listShows()).map((s) => [s.id, s.language]))
+  for (const episode of playlistDownloads(playlists, matches, known)) {
+    try {
+      await startDownload(
+        episode.id,
+        episode.audioUrl,
+        episode.audioType,
+        true,
+        languages.get(episode.showId) ?? null,
+      )
+    } catch (cause) {
+      console.warn("Couldn't start a playlist download", cause)
     }
   }
 }
@@ -129,6 +174,10 @@ export function runAutomatic(): Promise<void> {
     try {
       const now = Date.now()
       const settings = await loadSettings()
+      // The headphones' bookmarks, which the background task may be the first to see.
+      await importPendingBookmarks().catch((cause) =>
+        console.warn("Couldn't import the headphone bookmarks", cause),
+      )
       // First, so a show followed on the Mac is in the library when the feeds are read.
       await syncApplePodcasts()
       const { added } = await refreshAllShows()
@@ -137,6 +186,9 @@ export function runAutomatic(): Promise<void> {
       )
       await startNew(added, settings)
       await queueNew(added)
+      await downloadForPlaylists(now).catch((cause) =>
+        console.warn("Couldn't download for the playlists", cause),
+      )
       await notifyAboutNewEpisodes(added)
       await deletePlayed(now, settings)
       await archiveByRules(now)

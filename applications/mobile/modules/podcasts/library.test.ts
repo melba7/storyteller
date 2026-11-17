@@ -32,6 +32,8 @@ function show(overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    funding: [],
+    people: [],
     settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
@@ -55,6 +57,8 @@ function fetched(
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    people: [],
+    chaptersUrl: null,
     ...overrides,
   }
 }
@@ -71,6 +75,7 @@ function stored(
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
     ...overrides,
   }
 }
@@ -249,10 +254,13 @@ describe("rows", () => {
       number: null,
       transcriptUrl: null,
       transcriptType: null,
+      chaptersUrl: null,
+      people: [],
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
       archived: false,
+      starredAt: null,
     })
   })
 
@@ -365,6 +373,19 @@ describe("an episode's transcript", () => {
     expect(update[0]?.episode.transcriptUrl).toBe("https://x.test/g.vtt")
   })
 
+  it("keeps the chapters address of the feed", () => {
+    expect(fetchedEpisode(feedEpisode).chaptersUrl).toBeNull()
+    expect(
+      fetchedEpisode({ ...feedEpisode, chaptersUrl: "https://x.test/c.json" })
+        .chaptersUrl,
+    ).toBe("https://x.test/c.json")
+    const { update } = mergeEpisodes(
+      [stored("g")],
+      [fetched("g", { chaptersUrl: "https://x.test/c.json" })],
+    )
+    expect(update).toHaveLength(1)
+  })
+
   it("is read from the database row", () => {
     const row = {
       id: "e",
@@ -378,11 +399,61 @@ describe("an episode's transcript", () => {
       transcript_type: "text/vtt",
     }
     expect(episodeFromRow(row).transcriptUrl).toBe("https://x.test/g.vtt")
+    expect(episodeFromRow(row).chaptersUrl).toBeNull()
+    expect(
+      episodeFromRow({ ...row, chapters_url: "https://x.test/c.json" })
+        .chaptersUrl,
+    ).toBe("https://x.test/c.json")
     expect(
       episodeFromRow({ ...row, transcript_url: null }).transcriptType,
     ).toBe("text/vtt")
     expect(
       episodeFromRow({ ...row, transcript_url: null }).transcriptUrl,
     ).toBeNull()
+  })
+})
+
+describe("hosts, guests and support links", () => {
+  const person = { name: "Ann", role: "host", group: "cast" }
+
+  it("reads them from the feed, with none when the feed has none", () => {
+    const base = {
+      guid: "g",
+      title: "T",
+      notes: "",
+      audioUrl: "https://cdn.example.com/g.mp3",
+      audioType: "audio/mpeg",
+    }
+    expect(fetchedEpisode(base).people).toEqual([])
+    expect(fetchedEpisode({ ...base, people: [person] }).people).toEqual([
+      { ...person, img: null, href: null },
+    ])
+  })
+
+  it("reads a show's and an episode's saved JSON safely", () => {
+    const people = JSON.stringify([person])
+    expect(showFromRow({ id: "s", feed_url: "u", people }).people).toHaveLength(
+      1,
+    )
+    expect(showFromRow({ id: "s", feed_url: "u" }).people).toEqual([])
+    expect(showFromRow({ id: "s", feed_url: "u" }).funding).toEqual([])
+    expect(
+      showFromRow({
+        id: "s",
+        feed_url: "u",
+        funding:
+          '[{"url":"https://x.test/give","label":"Give"},{"url":"ftp://x"}]',
+      }).funding,
+    ).toEqual([{ url: "https://x.test/give", label: "Give" }])
+    expect(episodeFromRow({ id: "e", people }).people).toHaveLength(1)
+    expect(episodeFromRow({ id: "e", people: "oops" }).people).toEqual([])
+  })
+
+  it("updates a stored episode when its people changed", () => {
+    const changed = fetched("g", {
+      people: [{ ...person, img: null, href: null }],
+    })
+    expect(mergeEpisodes([stored("g")], [fetched("g")]).update).toEqual([])
+    expect(mergeEpisodes([stored("g")], [changed]).update).toHaveLength(1)
   })
 })

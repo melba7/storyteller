@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -17,14 +17,17 @@ import {
   archivedCount,
   arrangeEpisodes,
 } from "@/modules/podcasts/episodeList"
+import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { tabBase } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { ScreenBar } from "./ScreenBar"
+import { SelectionBar } from "./SelectionBar"
 import { ShowBarButtons } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
+import { useSelection } from "./useSelection"
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
@@ -33,6 +36,11 @@ export function PodcastShow({ id }: { id: string }) {
   const episodes = useEpisodes(id)
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const selection = useSelection()
+  const shows = useMemo(
+    () => new Map(show.data ? [[show.data.id, show.data]] : []),
+    [show.data],
+  )
 
   async function refresh() {
     setRefreshing(true)
@@ -47,13 +55,18 @@ export function PodcastShow({ id }: { id: string }) {
   }
 
   function confirmUnsubscribe(title: string) {
+    const own = isLocalFeedUrl(show.data?.feedUrl ?? "")
     Alert.alert(
-      `Unsubscribe from ${title}?`,
-      "The show and its episodes are removed from your library.",
+      own ? `Delete ${title}?` : `Unsubscribe from ${title}?`,
+      own
+        ? "Every file you added is deleted from this phone. The originals in the Files app stay."
+        : "The show and its episodes are removed from your library.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Unsubscribe",
+          text: isLocalFeedUrl(show.data?.feedUrl ?? "")
+            ? "Delete"
+            : "Unsubscribe",
           style: "destructive",
           onPress: () => {
             unsubscribe(id).then(
@@ -80,6 +93,7 @@ export function PodcastShow({ id }: { id: string }) {
             <ShowBarButtons
               show={current}
               archivedCount={archivedCount(episodes.data ?? [])}
+              onSelect={() => selection.begin()}
             />
           ) : undefined
         }
@@ -91,38 +105,52 @@ export function PodcastShow({ id }: { id: string }) {
           {show.error ?? "This show isn't in your library."}
         </Text>
       ) : (
-        <FlatList<EpisodeListItem>
-          data={arrangeEpisodes(episodes.data ?? [], current.settings)}
-          keyExtractor={(item) => item.key}
-          contentContainerClassName="px-safe-or-4"
-          contentInsetAdjustmentBehavior="automatic"
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={refresh} />
-          }
-          ListHeaderComponent={
-            <ShowHeader
-              show={current}
-              problem={problem}
-              onUnfollow={() => confirmUnsubscribe(current.title)}
+        <>
+          {selection.on ? (
+            <SelectionBar
+              selection={selection}
+              episodes={episodes.data ?? []}
+              shows={shows}
             />
-          }
-          ListEmptyComponent={
-            episodes.loading ? undefined : (
-              <Text className="text-muted-foreground py-6 text-center text-sm">
-                {episodes.error ?? "This feed has no episodes yet."}
-              </Text>
-            )
-          }
-          renderItem={({ item }) =>
-            item.kind === "header" ? (
-              <Text variant="h4" className="pt-4 pb-1">
-                {item.title}
-              </Text>
-            ) : (
-              <EpisodeRow episode={item.episode} show={current} />
-            )
-          }
-        />
+          ) : null}
+          <FlatList<EpisodeListItem>
+            data={arrangeEpisodes(episodes.data ?? [], current.settings)}
+            keyExtractor={(item) => item.key}
+            contentContainerClassName="px-safe-or-4"
+            contentInsetAdjustmentBehavior="automatic"
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+            }
+            ListHeaderComponent={
+              <ShowHeader
+                show={current}
+                problem={problem}
+                onUnfollow={() => confirmUnsubscribe(current.title)}
+              />
+            }
+            ListEmptyComponent={
+              episodes.loading ? undefined : (
+                <Text className="text-muted-foreground py-6 text-center text-sm">
+                  {episodes.error ?? "This feed has no episodes yet."}
+                </Text>
+              )
+            }
+            renderItem={({ item }) =>
+              item.kind === "header" ? (
+                <Text variant="h4" className="pt-4 pb-1">
+                  {item.title}
+                </Text>
+              ) : (
+                <EpisodeRow
+                  episode={item.episode}
+                  show={current}
+                  selection={selection}
+                />
+              )
+            }
+            extraData={selection.selected}
+          />
+        </>
       )}
     </View>
   )

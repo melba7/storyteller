@@ -68,8 +68,10 @@ Files and folders that belong to the fork, which upstream never touches:
 - `libraries/PodcastKit/`: the Swift package for the Podcasts section. It holds
   the feed reader (`PodcastFeed`) and the player's rules (`PodcastPlayback`),
   the transcripts and the ad finder (`PodcastAds`, with the Apple-only
-  `PodcastAdsOnDevice`), each with a podspec so CocoaPods builds it from source
-  for the app.
+  `PodcastAdsOnDevice`) and the chapters (`PodcastChapters`: the feed's JSON
+  chapters, an ID3 reader written from the ID3v2.3 and v2.4 specs, and the rules
+  for the current, previous and next chapter and for skipping), each with a
+  podspec so CocoaPods builds it from source for the app.
 - `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
   a feed, reads it with `PodcastFeed` and plays episodes) and the JavaScript
   side: the library in its own SQLite file (`podcasts.db`), Apple's directory
@@ -99,6 +101,13 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   button in the player's toolbar for readaloud books, in the read-along and
   listening screens. It opens a panel with on and off, the sounds' volume, how
   much is going on and the car setting.
+- `applications/mobile/global.css` (1 marker): one `@import` of
+  `podcasts/themes.css`, which declares the Podcasts section's extra themes
+  (Extra Dark, Midnight, Paper, Forest) as Uniwind variants.
+- `applications/mobile/metro.config.js` (1 marker): lists those four theme names
+  in `extraThemes`, so Uniwind builds their colours. The section wraps itself in
+  one `ScopedTheme` (`app/(root)/podcasts/_layout.tsx`) with the listener's
+  choice.
 - `applications/mobile/app/(root)/index.tsx` (2 markers): the menu button at the
   top left of the Books screen. It opens the side menu with Books and Podcasts
   (`podcasts/SectionMenu.tsx`).

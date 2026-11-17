@@ -1,6 +1,6 @@
 # LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md). It reads podcast
 # feeds and plays episodes for the Podcasts section. The PodcastFeed, PodcastPlayback, PodcastDownloads,
-# PodcastTranscripts, PodcastSpeech, PodcastAds and PodcastAdsOnDevice pods are the Swift package in libraries/PodcastKit, added to the Podfile by fork.config.ts. It
+# PodcastTranscripts, PodcastSpeech, PodcastAds, PodcastAdsOnDevice and PodcastChapters pods are the Swift package in libraries/PodcastKit, added to the Podfile by fork.config.ts. It
 # depends on the Readium pod to pause and watch the book player.
 Pod::Spec.new do |s|
   s.name           = 'Podcasts'
@@ -22,6 +22,7 @@ Pod::Spec.new do |s|
   s.dependency 'PodcastSpeech'
   s.dependency 'PodcastAds'
   s.dependency 'PodcastAdsOnDevice'
+  s.dependency 'PodcastChapters'
   s.dependency 'Readium'
 
   s.pod_target_xcconfig = {

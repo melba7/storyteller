@@ -27,6 +27,8 @@ function show(id: string, overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    funding: [],
+    people: [],
     settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
