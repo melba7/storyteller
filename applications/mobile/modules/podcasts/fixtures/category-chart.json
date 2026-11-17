@@ -1,0 +1,45 @@
+{
+  "feed": {
+    "author": { "name": { "label": "iTunes Store" } },
+    "entry": [
+      {
+        "im:name": { "label": "Planet Money" },
+        "im:image": [
+          {
+            "label": "https://example.com/pm/55.png",
+            "attributes": { "height": "55" }
+          },
+          {
+            "label": "https://example.com/pm/170.png",
+            "attributes": { "height": "170" }
+          },
+          {
+            "label": "https://example.com/pm/60.png",
+            "attributes": { "height": "60" }
+          }
+        ],
+        "id": {
+          "label": "https://podcasts.apple.com/us/podcast/planet-money/id290783428?uo=2",
+          "attributes": { "im:id": "290783428" }
+        },
+        "im:artist": { "label": "NPR" },
+        "category": { "attributes": { "im:id": "1321", "label": "Business" } }
+      },
+      {
+        "im:name": { "label": "Acquired" },
+        "im:image": [
+          {
+            "label": "https://example.com/acq/170.png",
+            "attributes": { "height": "170" }
+          }
+        ],
+        "id": {
+          "label": "https://podcasts.apple.com/us/podcast/acquired/id1050462261?uo=2",
+          "attributes": { "im:id": "1050462261" }
+        },
+        "im:artist": { "label": "Ben Gilbert and David Rosenthal" }
+      },
+      { "im:name": { "label": "Missing id" } }
+    ]
+  }
+}

@@ -310,6 +310,8 @@ once reviewed and green.
     `categories.ts`, `db.ts` version 4, with tests), `podcasts/` (Discover, show
     preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (discover and preview
     routes).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI and
+    for the chart addresses to be tried on the phone.
 
 - [ ] **P1e. Search episodes** (Mo's ask, 2026-11-16)
   - Search on the Podcasts screen has two tabs. "Your shows" finds episodes of

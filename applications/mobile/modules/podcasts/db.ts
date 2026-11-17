@@ -14,16 +14,13 @@ import { Platform } from "react-native"
 
 import { notifyLibraryChanged } from "./changes"
 import { normalizeFeedUrl } from "./feedUrl"
-import {
-  Podcasts,
-  type PodcastFeedData,
-  type PodcastFeedEpisode,
-} from "./index"
+import { Podcasts, type PodcastFeedData } from "./index"
 import {
   type FetchedEpisode,
   type Show,
   type StoredEpisode,
   episodeFromRow,
+  fetchedEpisode,
   mergeEpisodes,
   showFromRow,
   sortEpisodes,
@@ -176,23 +173,8 @@ function orNull<T>(value: T | null | undefined): T | null {
   return value ?? null
 }
 
-function fetchedEpisode(episode: PodcastFeedEpisode): FetchedEpisode {
-  return {
-    guid: episode.guid,
-    title: episode.title,
-    publishedAt: orNull(episode.publishedAt),
-    durationSeconds: orNull(episode.durationSeconds),
-    notes: episode.notes,
-    audioUrl: episode.audioUrl,
-    audioType: episode.audioType,
-    audioBytes: orNull(episode.audioBytes),
-    imageUrl: orNull(episode.imageUrl),
-    season: orNull(episode.season),
-    number: orNull(episode.number),
-  }
-}
-
-async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
+/** Downloads and reads a feed without saving it. Throws a message to show the listener. */
+export async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
   if (!Podcasts) throw new Error("Podcasts need the iOS app.")
   try {
     return await Podcasts.fetchFeed(feedUrl)
@@ -263,7 +245,7 @@ export async function subscribe(link: string): Promise<Show> {
   await db.transaction(async (tx) => {
     await tx.execute(
       `INSERT INTO shows (id, feed_url, title, author, description, image_url, link, language,
-         added_at, refreshed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         added_at, refreshed_at, categories) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         feedUrl,
@@ -275,6 +257,7 @@ export async function subscribe(link: string): Promise<Show> {
         orNull(feed.language),
         now,
         now,
+        JSON.stringify(feed.categories ?? []),
       ],
     )
     for (const episode of insert) {
@@ -301,7 +284,7 @@ export async function refreshShow(id: string): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.execute(
       `UPDATE shows SET title = ?, author = ?, description = ?, image_url = ?, link = ?,
-         language = ?, refreshed_at = ? WHERE id = ?`,
+         language = ?, refreshed_at = ?, categories = ? WHERE id = ?`,
       [
         feed.title,
         orNull(feed.author),
@@ -310,6 +293,7 @@ export async function refreshShow(id: string): Promise<void> {
         orNull(feed.link),
         orNull(feed.language),
         Date.now(),
+        JSON.stringify(feed.categories ?? []),
         id,
       ],
     )
@@ -346,4 +330,26 @@ export async function unsubscribe(id: string): Promise<void> {
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])
   })
   notifyLibraryChanged()
+}
+
+// MARK: Kept answers
+
+/** An answer kept in the cache table, with when it was saved (milliseconds since 1970). */
+export async function cacheGet(
+  key: string,
+): Promise<{ value: string; savedAt: number } | null> {
+  const found = await rows("SELECT value, saved_at FROM cache WHERE key = ?", [
+    key,
+  ])
+  const row = found[0]
+  if (!row || typeof row["value"] !== "string") return null
+  return { value: row["value"], savedAt: Number(row["saved_at"] ?? 0) }
+}
+
+export async function cachePut(key: string, value: string): Promise<void> {
+  const db = await database()
+  await db.execute(
+    "INSERT OR REPLACE INTO cache (key, value, saved_at) VALUES (?, ?, ?)",
+    [key, value, Date.now()],
+  )
 }

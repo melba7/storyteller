@@ -25,6 +25,7 @@ function show(id: string, overrides: Partial<Show> = {}): Show {
     refreshedAt: 1,
     artworkColor: null,
     ownPosition: null,
+    categories: [],
     ...overrides,
   }
 }

@@ -9,6 +9,7 @@ enum PodcastFeedJSON {
     var object: [String: Any] = [
       "title": feed.title,
       "description": feed.description,
+      "categories": feed.categories,
       "episodes": feed.episodes.map(episode),
     ]
     if let author = feed.author { object["author"] = author }

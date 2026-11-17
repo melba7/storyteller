@@ -3,6 +3,7 @@
 // Pure functions: what a show and an episode are, merging a
 // refreshed feed into the stored episodes, sorting, and how dates and lengths read.
 // Nothing here touches the database (db.ts does) or the screen.
+import type { PodcastFeedEpisode } from "./index"
 
 export type Show = {
   id: string
@@ -20,6 +21,11 @@ export type Show = {
   artworkColor: string | null
   /** Where the listener put the show in "Your order", or null when not placed yet. */
   ownPosition: number | null
+  /**
+   * The feed's `itunes:category` names: each top-level one, then "Top › Sub" ones. Empty
+   * until the feed has been read since categories were added.
+   */
+  categories: string[]
 }
 
 /** An episode as the feed gives it (what the Swift side returns). */
@@ -165,6 +171,29 @@ export function formatEpisodeLength(
   return formatDuration(duration)
 }
 
+// MARK: Reading a feed
+
+function orNull<T>(value: T | null | undefined): T | null {
+  return value ?? null
+}
+
+/** A feed's episode with every missing value made null. */
+export function fetchedEpisode(episode: PodcastFeedEpisode): FetchedEpisode {
+  return {
+    guid: episode.guid,
+    title: episode.title,
+    publishedAt: orNull(episode.publishedAt),
+    durationSeconds: orNull(episode.durationSeconds),
+    notes: episode.notes,
+    audioUrl: episode.audioUrl,
+    audioType: episode.audioType,
+    audioBytes: orNull(episode.audioBytes),
+    imageUrl: orNull(episode.imageUrl),
+    season: orNull(episode.season),
+    number: orNull(episode.number),
+  }
+}
+
 // MARK: Database rows
 
 type Row = Record<string, unknown>
@@ -181,6 +210,18 @@ function numOrNull(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null
 }
 
+/** Reads the saved JSON list of names. Anything that isn't a list of text gives none. */
+export function categoriesFromJson(value: unknown): string[] {
+  if (typeof value !== "string") return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((name): name is string => typeof name === "string")
+  } catch {
+    return []
+  }
+}
+
 export function showFromRow(row: Row): Show {
   return {
     id: str(row["id"]),
@@ -195,6 +236,7 @@ export function showFromRow(row: Row): Show {
     refreshedAt: numOrNull(row["refreshed_at"]) ?? 0,
     artworkColor: strOrNull(row["artwork_color"]),
     ownPosition: numOrNull(row["own_position"]),
+    categories: categoriesFromJson(row["categories"]),
   }
 }
 

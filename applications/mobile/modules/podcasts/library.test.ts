@@ -5,6 +5,7 @@ import {
   type FetchedEpisode,
   type Show,
   type StoredEpisode,
+  categoriesFromJson,
   episodeFromRow,
   formatDuration,
   formatEpisodeDate,
@@ -28,6 +29,7 @@ function show(overrides: Partial<Show> = {}): Show {
     refreshedAt: 1,
     artworkColor: null,
     ownPosition: null,
+    categories: [],
     ...overrides,
   }
 }
@@ -285,5 +287,29 @@ describe("formatEpisodeLength", () => {
 
   it("is empty when the length is unknown", () => {
     expect(formatEpisodeLength({ ...base, durationSeconds: null })).toBe("")
+  })
+})
+
+describe("categories", () => {
+  it("are read from the saved JSON list", () => {
+    expect(categoriesFromJson('["Business","Business › Investing"]')).toEqual([
+      "Business",
+      "Business › Investing",
+    ])
+  })
+
+  it("are none for a missing, broken or wrong value", () => {
+    expect(categoriesFromJson(null)).toEqual([])
+    expect(categoriesFromJson("not json")).toEqual([])
+    expect(categoriesFromJson('{"a":1}')).toEqual([])
+    expect(categoriesFromJson('["Comedy",3,null]')).toEqual(["Comedy"])
+  })
+
+  it("come with a show's row", () => {
+    expect(
+      showFromRow({ id: "s", feed_url: "u", categories: '["News"]' })
+        .categories,
+    ).toEqual(["News"])
+    expect(showFromRow({ id: "s", feed_url: "u" }).categories).toEqual([])
   })
 })

@@ -21,9 +21,12 @@ import { PlayButton } from "./PlayButton"
 export function EpisodeRow({
   episode,
   show,
+  openable = true,
 }: {
   episode: StoredEpisode
   show: Show
+  /** False in a preview, where the episode has no card because it isn't in the library. */
+  openable?: boolean
 }) {
   const router = useRouter()
   const segments = useSegments()
@@ -41,6 +44,7 @@ export function EpisodeRow({
         accessibilityLabel={[episode.title, date, length]
           .filter((part) => part !== "")
           .join(", ")}
+        disabled={!openable}
         onPress={() => router.push(episodeHref(segments, episode.id))}
       >
         {date ? (

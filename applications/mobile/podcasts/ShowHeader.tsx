@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Check } from "lucide-react-native"
 import { useState } from "react"
-import { Pressable, View } from "react-native"
+import { ActivityIndicator, Pressable, View } from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
@@ -15,11 +15,21 @@ interface Props {
   show: Show
   problem: string | null
   /** Called when the listener taps Following; the screen asks to confirm. */
-  onUnfollow: () => void
+  onUnfollow?: () => void
+  /** For a show not in the library yet: shows Follow, in place of Following. */
+  onFollow?: () => void
+  /** The follow is being saved. */
+  busy?: boolean
 }
 
 /** The top of a show's page: big artwork, title, author, Following, and the description. */
-export function ShowHeader({ show, problem, onUnfollow }: Props) {
+export function ShowHeader({
+  show,
+  problem,
+  onUnfollow,
+  onFollow,
+  busy = false,
+}: Props) {
   const [expanded, setExpanded] = useState(false)
   const long = needsMore(show.description)
   return (
@@ -35,15 +45,25 @@ export function ShowHeader({ show, problem, onUnfollow }: Props) {
           </Text>
         ) : null}
       </View>
-      {/* Every show on this page is followed; tapping asks to unfollow. */}
-      <Button
-        variant="outline"
-        accessibilityLabel={`Following ${show.title}. Tap to unfollow`}
-        onPress={onUnfollow}
-      >
-        <Icon as={Check} size={18} className="text-primary" />
-        <Text>Following</Text>
-      </Button>
+      {onFollow ? (
+        <Button
+          accessibilityLabel={`Follow ${show.title}`}
+          disabled={busy}
+          onPress={onFollow}
+        >
+          {busy ? <ActivityIndicator /> : <Text>Follow</Text>}
+        </Button>
+      ) : (
+        // A show in the library: tapping asks to unfollow.
+        <Button
+          variant="outline"
+          accessibilityLabel={`Following ${show.title}. Tap to unfollow`}
+          onPress={onUnfollow}
+        >
+          <Icon as={Check} size={18} className="text-primary" />
+          <Text>Following</Text>
+        </Button>
+      )}
       {show.description ? (
         <View className="w-full gap-1">
           <Text className="text-sm" numberOfLines={expanded ? undefined : 3}>

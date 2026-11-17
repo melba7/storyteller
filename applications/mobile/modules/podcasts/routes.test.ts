@@ -1,7 +1,13 @@
 // LOFI-FORK: the podcasts section's routes (see FORK.md).
 import { describe, expect, it } from "vitest"
 
-import { episodeHref, showHref, tabBase } from "./routes"
+import {
+  categoryHref,
+  episodeHref,
+  previewHref,
+  showHref,
+  tabBase,
+} from "./routes"
 
 describe("tabBase", () => {
   it("stays in the Discover tab", () => {
@@ -28,6 +34,27 @@ describe("show and episode links", () => {
     expect(episodeHref(segments, "e1")).toEqual({
       pathname: "/podcasts/(tabs)/(discover)/episode/[id]",
       params: { id: "e1" },
+    })
+  })
+})
+
+describe("preview and category links", () => {
+  it("open a preview in the tab you are in, with the feed as a parameter", () => {
+    expect(previewHref(["(tabs)", "(discover)"], "https://f.test/rss")).toEqual(
+      {
+        pathname: "/podcasts/(tabs)/(discover)/preview",
+        params: { feed: "https://f.test/rss" },
+      },
+    )
+    expect(previewHref(["(tabs)", "(library)"], "u").pathname).toBe(
+      "/podcasts/(tabs)/(library)/preview",
+    )
+  })
+
+  it("open a category's chart in the Discover tab", () => {
+    expect(categoryHref("1321")).toEqual({
+      pathname: "/podcasts/(tabs)/(discover)/category/[id]",
+      params: { id: "1321" },
     })
   })
 })

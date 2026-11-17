@@ -25,3 +25,19 @@ export function episodeHref(
 ): PodcastHref {
   return { pathname: `${tabBase(segments)}/episode/[id]`, params: { id } }
 }
+
+/** A show read from its feed without saving it, in the tab you are in. */
+export function previewHref(segments: readonly string[], feedUrl: string) {
+  return {
+    pathname: `${tabBase(segments)}/preview`,
+    params: { feed: feedUrl },
+  }
+}
+
+/** A category's chart. Only the Discover tab has it, so the link always names that tab. */
+export function categoryHref(id: string) {
+  return {
+    pathname: "/podcasts/(tabs)/(discover)/category/[id]",
+    params: { id },
+  }
+}

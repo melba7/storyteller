@@ -1,0 +1,18 @@
+{
+  "feed": {
+    "entry": {
+      "im:name": { "label": "Only One" },
+      "im:image": [
+        {
+          "label": "https://example.com/one/100.png",
+          "attributes": { "height": "100" }
+        }
+      ],
+      "id": {
+        "label": "https://podcasts.apple.com/us/podcast/only-one/id42",
+        "attributes": { "im:id": "42" }
+      },
+      "im:artist": { "label": "Solo" }
+    }
+  }
+}

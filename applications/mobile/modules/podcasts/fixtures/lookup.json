@@ -1,0 +1,30 @@
+{
+  "resultCount": 5,
+  "results": [
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 1200361736,
+      "feedUrl": "https://feeds.example.com/the-daily"
+    },
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 360084272,
+      "feedUrl": "https://feeds.example.com/jre"
+    },
+    { "wrapperType": "track", "kind": "podcast", "collectionId": 999 },
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 290783428,
+      "feedUrl": "https://feeds.example.com/planet-money"
+    },
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 1050462261,
+      "feedUrl": "https://feeds.example.com/acquired"
+    }
+  ]
+}

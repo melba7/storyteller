@@ -47,6 +47,7 @@ const show: Show = {
   refreshedAt: 1,
   artworkColor: null,
   ownPosition: null,
+  categories: [],
 }
 
 function setup(last: StoredEpisode | null = null) {

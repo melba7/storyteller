@@ -13,9 +13,10 @@ import {
 } from "@/modules/podcasts/directory"
 import { Podcasts } from "@/modules/podcasts/index"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { showHref } from "@/modules/podcasts/routes"
+import { previewHref, showHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
+import { DiscoverBrowse } from "./DiscoverBrowse"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 
@@ -29,7 +30,7 @@ export function Discover() {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [link, setLink] = useState("")
-  // What is being subscribed to now: a directory show's feed address or "link".
+  // Whether the pasted link is being followed now.
   const [adding, setAdding] = useState<string | null>(null)
   const [addError, setAddError] = useState<string | null>(null)
   const latestSearch = useRef(0)
@@ -128,10 +129,8 @@ export function Discover() {
             key={show.id}
             className="active:bg-secondary flex-row items-center gap-3 rounded-md py-1"
             accessibilityRole="button"
-            accessibilityLabel={`Add ${show.title}`}
-            accessibilityState={{ disabled: !canAdd }}
-            disabled={!canAdd}
-            onPress={() => add(show.feedUrl, show.feedUrl)}
+            accessibilityLabel={`Preview ${show.title}`}
+            onPress={() => router.push(previewHref(segments, show.feedUrl))}
           >
             <Artwork uri={show.imageUrl} size={56} />
             <View className="flex-1">
@@ -147,7 +146,6 @@ export function Discover() {
                 </Text>
               ) : null}
             </View>
-            {adding === show.feedUrl ? <ActivityIndicator /> : null}
           </Pressable>
         ))}
 
@@ -172,6 +170,12 @@ export function Discover() {
         >
           {adding === "link" ? <ActivityIndicator /> : <Text>Add</Text>}
         </Button>
+
+        {term.trim() === "" ? (
+          <View className="mt-4 pb-6">
+            <DiscoverBrowse />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   )

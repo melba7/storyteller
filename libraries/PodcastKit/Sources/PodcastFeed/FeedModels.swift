@@ -9,11 +9,15 @@ public struct PodcastFeed: Sendable, Equatable {
   public var imageURL: URL?
   public var link: URL?
   public var language: String?
+  /// The `itunes:category` names: each top-level category once, in feed order, and each
+  /// subcategory after them as "Top › Sub". Empty when the feed names none.
+  public var categories: [String]
   public var episodes: [FeedEpisode]
 
   public init(
     title: String, author: String? = nil, description: String = "", imageURL: URL? = nil,
-    link: URL? = nil, language: String? = nil, episodes: [FeedEpisode] = []
+    link: URL? = nil, language: String? = nil, categories: [String] = [],
+    episodes: [FeedEpisode] = []
   ) {
     self.title = title
     self.author = author
@@ -21,6 +25,7 @@ public struct PodcastFeed: Sendable, Equatable {
     self.imageURL = imageURL
     self.link = link
     self.language = language
+    self.categories = categories
     self.episodes = episodes
   }
 }
