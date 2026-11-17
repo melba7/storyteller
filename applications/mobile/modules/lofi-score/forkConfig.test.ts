@@ -180,3 +180,27 @@ describe("soundEdition", () => {
     })
   })
 })
+
+describe("applyForkIdentity's name", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it("is Storyteller+ on the home screen, whatever upstream calls the app", () => {
+    vi.stubEnv("APP_VARIANT", "")
+    const config = applyForkIdentity({
+      name: "Storyteller",
+      slug: "storyteller",
+    })
+    expect(config.name).toBe("Storyteller+")
+  })
+
+  it("adds (dev) for development builds", () => {
+    vi.stubEnv("APP_VARIANT", "development")
+    const config = applyForkIdentity({
+      name: "Storyteller",
+      slug: "storyteller",
+    })
+    expect(config.name).toBe("Storyteller+ (dev)")
+  })
+})

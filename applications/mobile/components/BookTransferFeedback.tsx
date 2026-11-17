@@ -60,24 +60,24 @@ export function BookTransferFeedback() {
       accessibilityLiveRegion="polite"
     >
       {importStage && (
-        <View className="bg-popover border-border mb-safe-offset-4 mx-safe-or-4 flex-row items-center gap-3 rounded-xl border p-3 shadow-lg shadow-black/5">
+        <View className="bg-popover border-border mb-safe-offset-4 mx-safe-or-4 flex-row items-center gap-3 rounded-[14px] border p-3 shadow-lg shadow-black/15">
           <DownloadingIndicator
             progress={IMPORT_PROGRESS[importStage]}
             size={INDICATOR_SIZE}
             style={{}}
             icon={BookOpen}
           />
-          <Text className="flex-1 text-sm">{IMPORT_LABEL[importStage]}</Text>
+          <Text className="flex-1 text-[15px]">{IMPORT_LABEL[importStage]}</Text>
         </View>
       )}
       {failure && (
-        <View className="bg-popover border-destructive mb-safe-offset-4 mx-safe-or-4 flex-row items-center gap-3 rounded-xl border p-3 shadow-lg shadow-black/5">
+        <View className="bg-popover border-destructive mb-safe-offset-4 mx-safe-or-4 flex-row items-center gap-3 rounded-[14px] border p-3 shadow-lg shadow-black/15">
           <Icon
             as={TriangleAlert}
             size={INDICATOR_SIZE}
             className="text-destructive"
           />
-          <Text className="flex-1 text-sm" numberOfLines={4}>
+          <Text className="flex-1 text-[15px]" numberOfLines={4}>
             {failure}
           </Text>
           <Button
@@ -90,7 +90,7 @@ export function BookTransferFeedback() {
               )
             }
           >
-            <Text>Dismiss</Text>
+            <Text className="text-primary text-[15px] font-semibold">Dismiss</Text>
           </Button>
         </View>
       )}

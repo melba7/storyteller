@@ -72,7 +72,7 @@ function DialogContent({
         <DialogOverlay>
           <DialogPrimitive.Content
             className={cn(
-              "border-border bg-background z-50 mx-auto flex w-full max-w-full flex-col gap-4 rounded-lg border p-6 shadow-lg shadow-black/5 sm:max-w-lg",
+              "bg-popover z-50 mx-auto flex w-full max-w-full flex-col gap-4 rounded-[20px] p-6 shadow-lg shadow-black/10 sm:max-w-lg",
               Platform.select({
                 web: "animate-in fade-in-0 zoom-in-95 duration-200",
               }),
@@ -133,7 +133,7 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       className={cn(
-        "text-foreground text-lg leading-none font-semibold",
+        "text-foreground text-[17px] leading-none font-semibold",
         className,
       )}
       {...props}
@@ -148,7 +148,7 @@ function DialogDescription({
   React.RefAttributes<DialogPrimitive.DescriptionRef>) {
   return (
     <DialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground text-[15px]", className)}
       {...props}
     />
   )

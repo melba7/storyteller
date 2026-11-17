@@ -1,16 +1,12 @@
 import { Link, useLocalSearchParams, useRouter } from "expo-router"
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   CircleX,
-  LibraryBig,
-  LibrarySquare,
-  Tag,
 } from "lucide-react-native"
 import { Fragment, useState } from "react"
 import { RefreshControl, ScrollView, View } from "react-native"
 
+import { SectionHeader } from "@/apple-look/SectionHeader"
 import { BackButton } from "@/components/BackButton"
 import BookDescription from "@/components/BookDescription"
 import { BookThumbnailImage } from "@/components/BookThumbnail"
@@ -151,22 +147,24 @@ export default function BookDetailsScreen() {
               <BackButton />
             </View>
           )}
-          <Stack className="px-safe-or-8 items-start">
-            <BookThumbnailImage
-              className="self-center"
-              book={book}
-              height={352}
-              width={232}
-            />
-            <Text className="font-youngserif mt-4 mb-1 text-2xl" variant="h1">
+          <Stack className="px-safe-or-5 items-start">
+            <View className="mt-2 self-center rounded-xl shadow-xl shadow-black/20">
+              <BookThumbnailImage book={book} height={352} width={232} />
+            </View>
+            <Text
+              className="mt-6 mb-1 self-stretch text-center text-[28px] font-bold"
+              variant="h1"
+            >
               {book.title}
             </Text>
             {book.subtitle && (
-              <Text className="mb-4 text-base italic">{book.subtitle}</Text>
+              <Text className="text-muted-foreground mb-2 self-stretch text-center text-[17px]">
+                {book.subtitle}
+              </Text>
             )}
-            <Stack className="mb-4 gap-1 pl-0">
-              <Group>
-                <Text className="text-muted-foreground text-sm">
+            <Stack className="mb-5 gap-1 self-stretch pl-0">
+              <Group className="justify-center">
+                <Text className="text-muted-foreground text-center text-[17px]">
                   by{" "}
                   {book.authors.map((author, index) => (
                     <Fragment key={author.uuid}>
@@ -179,11 +177,11 @@ export default function BookDetailsScreen() {
                         }}
                         className="active:text-primary active:underline"
                       >
-                        <Text className="text-primary text-sm">
+                        <Text className="text-primary text-[17px]">
                           {author.name}
                         </Text>
                       </Link>
-                      <Text className="text-sm">
+                      <Text className="text-[17px]">
                         {index < book.authors.length - 1 && ", "}
                       </Text>
                     </Fragment>
@@ -191,7 +189,7 @@ export default function BookDetailsScreen() {
                 </Text>
               </Group>
               {!!book.narrators.length && (
-                <Text className="text-muted-foreground text-sm">
+                <Text className="text-muted-foreground text-center text-[15px]">
                   narrated by{" "}
                   {book.narrators.map((narrator, index) => (
                     <Fragment key={narrator.uuid}>
@@ -204,11 +202,11 @@ export default function BookDetailsScreen() {
                         }}
                         className="active:text-primary active:underline"
                       >
-                        <Text className="text-primary text-sm">
+                        <Text className="text-primary text-[15px]">
                           {narrator.name}
                         </Text>
                       </Link>
-                      <Text className="text-sm">
+                      <Text className="text-[15px]">
                         {index < book.narrators.length - 1 && ", "}
                       </Text>
                     </Fragment>
@@ -216,7 +214,7 @@ export default function BookDetailsScreen() {
                 </Text>
               )}
             </Stack>
-            <Group className="mb-4 items-center justify-between self-stretch">
+            <Group className="mb-6 flex-row flex-wrap items-center justify-center gap-3 self-stretch">
               {book.status && (
                 <Select
                   value={{
@@ -233,6 +231,8 @@ export default function BookDetailsScreen() {
                 >
                   <SelectTrigger
                     accessibilityLabel={`Reading status, ${book.status.name}`}
+                    iconColor="primary"
+                    className="bg-primary/15 dark:bg-primary/15 dark:active:bg-primary/15 h-11 rounded-full border-0 px-5 shadow-none active:opacity-70"
                   >
                     <SelectValue placeholder="" />
                   </SelectTrigger>
@@ -246,7 +246,7 @@ export default function BookDetailsScreen() {
                 </Select>
               )}
               <Stack className="gap-1">
-                <Group className="self-end rounded-md px-2 py-[0.05rem]">
+                <Group>
                   {availableFormats.length > 1 ? (
                     <Menu
                       actions={availableFormats.map((format) => {
@@ -295,11 +295,10 @@ export default function BookDetailsScreen() {
                       })}
                     >
                       <Button
-                        variant="outline"
-                        className="border-primary dark:border-primary"
+                        variant="secondary"
                         accessibilityLabel="Open download options"
                       >
-                        <Text className="text-primary">Downloads</Text>
+                        <Text>Downloads</Text>
                         <Icon
                           as={ChevronDown}
                           size={16}
@@ -311,7 +310,13 @@ export default function BookDetailsScreen() {
                     onlyFormat && (
                       <>
                         <Button
-                          variant="outline"
+                          variant={
+                            book[onlyFormat]?.downloadStatus === "DOWNLOADED" ||
+                            book[onlyFormat]?.downloadStatus === "DOWNLOADING" ||
+                            book[onlyFormat]?.downloadStatus === "QUEUED"
+                              ? "secondary"
+                              : "default"
+                          }
                           accessibilityLabel={
                             book[onlyFormat]?.downloadStatus === "DOWNLOADED"
                               ? `Remove ${onlyFormat}`
@@ -326,8 +331,8 @@ export default function BookDetailsScreen() {
                             book[onlyFormat]?.downloadStatus ===
                               "DOWNLOADING" ||
                             book[onlyFormat]?.downloadStatus === "QUEUED"
-                              ? "border-destructive dark:border-destructive"
-                              : "border-primary dark:border-primary"
+                              ? "bg-destructive/15"
+                              : ""
                           }
                           onPress={() => {
                             const status = book[onlyFormat]?.downloadStatus
@@ -361,7 +366,7 @@ export default function BookDetailsScreen() {
                                 "DOWNLOADING" ||
                               book[onlyFormat]?.downloadStatus === "QUEUED"
                                 ? "text-destructive"
-                                : "text-primary"
+                                : "text-primary-foreground"
                             }
                           >
                             {book[onlyFormat]?.downloadStatus === "DOWNLOADED"
@@ -388,17 +393,17 @@ export default function BookDetailsScreen() {
                 </Group>
               </Stack>
             </Group>
+            <View className="self-stretch">
+              <BookDescription
+                description={book.description}
+                textColor={foreground}
+                dom={{ matchContents: true }}
+              />
+            </View>
             {!!book.series.length && (
               <>
-                <Group className="mb-2 flex-row items-center gap-1">
-                  <Icon
-                    as={LibrarySquare}
-                    size={16}
-                    className="text-muted-foreground"
-                  />
-                  <Text className="text-muted-foreground text-sm">Series</Text>
-                </Group>
-                <Group className="flex-stretch mb-4 flex-wrap">
+                <SectionHeader title="Series" className="mt-6 mb-2" />
+                <Stack className="mb-2 self-stretch">
                   {book.series.map((series) => (
                     <Link
                       href={{
@@ -412,25 +417,24 @@ export default function BookDetailsScreen() {
                       <Button
                         accessibilityLabel={`Open series ${series.name}, book ${series.position}`}
                         variant="link"
-                        className="y-0 mt-[-5px] flex flex-row items-center gap-1 px-0"
+                        className="min-h-11 flex-row items-center justify-start gap-2 self-stretch px-0"
                       >
-                        <Text className="text-primary">{series.name}</Text>
-                        <Text className="text-muted-foreground font-normal">
+                        <Text className="text-primary text-[17px] font-normal">
+                          {series.name}
+                        </Text>
+                        <Text className="text-muted-foreground text-[17px] font-normal">
                           #{series.position}
                         </Text>
                       </Button>
                     </Link>
                   ))}
-                </Group>
+                </Stack>
               </>
             )}
             {!!book.tags.length && (
               <>
-                <Group className="mb-2 flex-row items-center gap-1">
-                  <Icon as={Tag} size={16} className="text-muted-foreground" />
-                  <Text className="text-muted-foreground text-sm">Tags</Text>
-                </Group>
-                <Group className="mb-4 flex-wrap gap-2">
+                <SectionHeader title="Tags" className="mt-6 mb-3" />
+                <Group className="mb-2 flex-wrap gap-2">
                   {tagsToShow.map((tag) => (
                     <Link
                       href={{
@@ -444,20 +448,21 @@ export default function BookDetailsScreen() {
                     >
                       <Button
                         accessibilityLabel={`Open tag ${tag.name}`}
-                        variant="secondary"
+                        variant="ghost"
                         size="sm"
-                        className="flex flex-row items-center gap-2 rounded-full px-3"
+                        className="bg-secondary flex flex-row items-center gap-2 rounded-full px-3.5"
                       >
-                        {/* <Icon as={Tag} size={12} /> */}
-                        <Text>{tag.name}</Text>
+                        <Text className="text-foreground text-[15px] font-normal">
+                          {tag.name}
+                        </Text>
                       </Button>
                     </Link>
                   ))}
                   {tagsMoreNeeded && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="flex flex-row items-center gap-2 rounded-full px-3"
+                      className="flex flex-row items-center gap-1 rounded-full px-2"
                       accessibilityLabel={
                         showTagsMore
                           ? "Show fewer tags"
@@ -467,11 +472,7 @@ export default function BookDetailsScreen() {
                         setShowTagsMore(!showTagsMore)
                       }}
                     >
-                      <Icon
-                        as={showTagsMore ? ChevronLeft : ChevronRight}
-                        size={12}
-                      />
-                      <Text>
+                      <Text className="text-primary text-[15px] font-semibold">
                         {showTagsMore ? "Less" : "More (" + numTagsHidden + ")"}
                       </Text>
                     </Button>
@@ -481,17 +482,8 @@ export default function BookDetailsScreen() {
             )}
             {!!book.collections.length && (
               <>
-                <Group className="mb-2 flex-row items-center gap-1">
-                  <Icon
-                    as={LibraryBig}
-                    size={16}
-                    className="text-muted-foreground"
-                  />
-                  <Text className="text-muted-foreground text-sm">
-                    Collections
-                  </Text>
-                </Group>
-                <Group className="flex-stretch mb-4 flex-wrap gap-2">
+                <SectionHeader title="Collections" className="mt-6 mb-3" />
+                <Group className="mb-2 flex-wrap gap-2">
                   {collectionsToShow.map((collection) => (
                     <Link
                       href={{
@@ -503,18 +495,21 @@ export default function BookDetailsScreen() {
                     >
                       <Button
                         accessibilityLabel={`Open collection ${collection.name}`}
-                        variant="secondary"
-                        className="flex flex-row items-center gap-2 rounded-md px-4 py-0"
+                        variant="ghost"
+                        size="sm"
+                        className="bg-secondary flex flex-row items-center gap-2 rounded-full px-3.5"
                       >
-                        <Text>{collection.name}</Text>
+                        <Text className="text-foreground text-[15px] font-normal">
+                          {collection.name}
+                        </Text>
                       </Button>
                     </Link>
                   ))}
                   {collectionsMoreNeeded && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="flex flex-row items-center gap-2 rounded-full px-3"
+                      className="flex flex-row items-center gap-1 rounded-full px-2"
                       accessibilityLabel={
                         showCollectionsMore
                           ? "Show fewer collections"
@@ -524,11 +519,7 @@ export default function BookDetailsScreen() {
                         setShowCollectionsMore(!showCollectionsMore)
                       }}
                     >
-                      <Icon
-                        as={showCollectionsMore ? ChevronLeft : ChevronRight}
-                        size={12}
-                      />
-                      <Text>
+                      <Text className="text-primary text-[15px] font-semibold">
                         {showCollectionsMore
                           ? "Less"
                           : "More (" + numCollectionsHidden + ")"}
@@ -539,13 +530,6 @@ export default function BookDetailsScreen() {
               </>
             )}
           </Stack>
-          <View className="pb-safe px-safe-or-8">
-            <BookDescription
-              description={book.description}
-              textColor={foreground}
-              dom={{ matchContents: true }}
-            />
-          </View>
         </Stack>
         {/* Spacer for the miniplayer */}
         <View className="h-40 w-full" />

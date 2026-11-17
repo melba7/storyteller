@@ -23,12 +23,12 @@ step() { # name, command...
   fi
 }
 
-FORK_JS=(applications/mobile/lofi applications/mobile/modules/lofi-score
+FORK_JS=(applications/mobile/lofi applications/mobile/apple-look applications/mobile/modules/lofi-score
   applications/mobile/modules/podcasts applications/mobile/podcasts
   "applications/mobile/app/(root)/podcasts" tools/fork)
 FORMAT=(FORK.md CLAUDE.md docs .github/workflows tools/fork
   applications/mobile/fork.config.ts applications/mobile/app.config.ts
-  applications/mobile/lofi applications/mobile/modules/lofi-score
+  applications/mobile/lofi applications/mobile/apple-look applications/mobile/modules/lofi-score
   applications/mobile/modules/podcasts applications/mobile/podcasts
   "applications/mobile/app/(root)/podcasts" libraries/PodcastKit)
 

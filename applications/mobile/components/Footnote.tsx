@@ -19,7 +19,7 @@ export default function Footnote({ footnote, textColor }: Props) {
         }
       `}</style>
       <div
-        className="font-sans text-sm leading-relaxed"
+        className="font-sans text-[15px] leading-relaxed"
         dangerouslySetInnerHTML={{ __html: footnote }}
       />
     </>

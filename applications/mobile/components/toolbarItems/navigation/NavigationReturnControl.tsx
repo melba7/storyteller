@@ -24,7 +24,7 @@ export function NavigationReturnControl({
   if (!bookUuid || !returnPosition) return null
 
   return (
-    <View className="border-border bg-background h-10 flex-row items-center gap-1 border-b px-2">
+    <View className="border-border bg-background min-h-11 flex-row items-center gap-1 border-b px-2">
       <Button
         accessibilityLabel="Back to previous position"
         className="h-9 flex-1 justify-start px-2"
@@ -42,9 +42,9 @@ export function NavigationReturnControl({
         <Icon
           as={Undo2Icon}
           size={16}
-          className="text-blue-700 dark:text-blue-300"
+          className="text-primary"
         />
-        <Text className="text-sm font-bold text-blue-700 dark:text-blue-300">
+        <Text className="text-[15px] font-semibold text-primary">
           Back to previous position
         </Text>
       </Button>
@@ -58,7 +58,7 @@ export function NavigationReturnControl({
         size="icon"
         variant="ghost"
       >
-        <Icon as={X} size={16} className="text-blue-700 dark:text-blue-300" />
+        <Icon as={X} size={16} className="text-primary" />
       </Button>
     </View>
   )

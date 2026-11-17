@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View, type ViewStyle } from "react-native"
+import { useCSSVariable } from "uniwind"
 
 import { type HighlightTint, highlightTints } from "@/colors"
 import { useColorTheme } from "@/hooks/useColorTheme"
@@ -11,6 +12,7 @@ type Props = {
 
 export function HighlightColorPicker({ style, value, onChange }: Props) {
   const { foreground, dark } = useColorTheme()
+  const edge = useCSSVariable("--color-border") as string
   return (
     <View style={[styles.container, style]}>
       {(
@@ -30,6 +32,7 @@ export function HighlightColorPicker({ style, value, onChange }: Props) {
               styles.button,
               {
                 backgroundColor: highlightTints[dark ? "dark" : "light"][color],
+                borderColor: edge,
               },
               value === color && {
                 borderWidth: 2,
@@ -53,6 +56,5 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     margin: 8,
     borderWidth: 1,
-    borderColor: "#AAA",
   },
 })

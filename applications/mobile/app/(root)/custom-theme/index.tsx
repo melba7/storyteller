@@ -4,8 +4,8 @@ import { View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 
+import { GroupedRow, GroupedSection, groupedScreenClass } from "@/apple-look/GroupedList"
 import { LoadingView } from "@/components/LoadingView"
-import { Group } from "@/components/ui/Group"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
@@ -27,7 +27,7 @@ export default function CustomThemeListScreen() {
   const { colorThemes } = preferences
 
   return (
-    <View className="android:pt-safe w-full flex-1">
+    <View className={`android:pt-safe w-full flex-1 ${groupedScreenClass}`}>
       <View className="mb-2 w-full flex-row items-center px-4 pt-3">
         <Button
           accessibilityLabel="Close custom themes"
@@ -40,69 +40,70 @@ export default function CustomThemeListScreen() {
           <Icon as={ChevronDown} size={24} />
         </Button>
       </View>
-      <Text variant="h2" className="mx-6 mb-8 text-center">
+      <Text variant="h2" className="mx-4 mb-2 border-b-0 text-[28px] font-bold">
         Custom themes
       </Text>
-      <ScrollView className="mx-6 flex-1">
-        <Link href="/custom-theme/new" asChild>
-          <Button
-            accessibilityLabel="Create new custom theme"
-            variant="ghost"
-            className="h-20 sm:h-20"
-          >
-            <Icon as={Plus} size={24} />
-            <Text>New theme</Text>
-          </Button>
-        </Link>
-        {colorThemes.map((theme, index) => (
-          <Swipeable
-            key={theme.name}
-            renderRightActions={() => (
-              <Button
-                accessibilityLabel={`Delete custom theme ${theme.name}`}
-                className="align-center h-full w-20 justify-center rounded-l-none bg-red-500 sm:h-full"
-                variant="destructive"
-                onPress={() => {
-                  updatePreference({
-                    name: "colorThemes",
-                    value: colorThemes.filter((_, i) => i !== index),
-                  })
-                }}
-              >
-                <Icon as={Trash2} size={24} className="text-white" />
-              </Button>
-            )}
-          >
-            <Link
-              href={{
-                pathname: "/custom-theme/[name]",
-                params: { name: theme.name },
-              }}
-              asChild
+      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-8">
+        <GroupedSection separatorInset={52}>
+          <Link key="new" href="/custom-theme/new" asChild>
+            <GroupedRow
+              accessibilityLabel="Create new custom theme"
+              icon={Plus}
+              title="New theme"
+              hideChevron
+              onPress={() => {}}
+            />
+          </Link>
+          {colorThemes.map((theme, index) => (
+            <Swipeable
+              key={theme.name}
+              renderRightActions={() => (
+                <Button
+                  accessibilityLabel={`Delete custom theme ${theme.name}`}
+                  className="align-center h-full w-20 justify-center rounded-none"
+                  variant="destructive"
+                  onPress={() => {
+                    updatePreference({
+                      name: "colorThemes",
+                      value: colorThemes.filter((_, i) => i !== index),
+                    })
+                  }}
+                >
+                  <Icon as={Trash2} size={24} className="text-white" />
+                </Button>
+              )}
             >
-              <Button
-                accessibilityLabel={`Edit custom theme ${theme.name}`}
-                variant="ghost"
-                className="h-20 justify-start sm:h-20"
+              <Link
+                href={{
+                  pathname: "/custom-theme/[name]",
+                  params: { name: theme.name },
+                }}
+                asChild
               >
-                <Group className="shrink-0 basis-1/2 items-center gap-4">
-                  <Icon as={Pencil} size={16} />
-                  <Text className="text-lg">{theme.name}</Text>
-                </Group>
-                <Group className="shrink-0 basis-1/2 gap-2">
-                  <View
-                    className="h-12 w-12 border border-gray-500"
-                    style={{ backgroundColor: theme.foreground }}
-                  />
-                  <View
-                    className="h-12 w-12 border border-gray-500"
-                    style={{ backgroundColor: theme.background }}
-                  />
-                </Group>
-              </Button>
-            </Link>
-          </Swipeable>
-        ))}
+                <GroupedRow
+                  accessibilityLabel={`Edit custom theme ${theme.name}`}
+                  icon={Pencil}
+                  title={theme.name}
+                  className="bg-card"
+                  hideChevron
+                  trailing={
+                    <View className="flex-row gap-2">
+                      <View
+                        className="border-foreground/10 h-8 w-8 rounded-lg border"
+                        style={{ backgroundColor: theme.foreground }}
+                      />
+                      <View
+                        className="border-foreground/10 h-8 w-8 rounded-lg border"
+                        style={{ backgroundColor: theme.background }}
+                      />
+                    </View>
+                  }
+                  onPress={() => {}}
+                />
+              </Link>
+            </Swipeable>
+          ))}
+        </GroupedSection>
       </ScrollView>
     </View>
   )

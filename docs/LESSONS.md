@@ -61,3 +61,9 @@ One line per lesson.
   not one key.
 - Run `yarn oxfmt` on directories before `check.sh`: on single files it can sort
   imports differently from the check.
+- In `global.css`, an `@import` after other rules is an error ("@import rules
+  must precede all rules"), so a theme that must override upstream values goes
+  in a marked block appended at the end of the file (2026-11-17).
+- With `withUniwind` missing, a third-party native view such as `GlassView`
+  silently ignores `className`. Wrap it once (`withUniwind(GlassView)`) before
+  styling it with classes (2026-11-17).

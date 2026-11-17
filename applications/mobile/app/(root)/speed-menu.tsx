@@ -1,6 +1,7 @@
 import { useGlobalSearchParams } from "expo-router"
 import { View } from "react-native"
 
+import { groupedScreenClass } from "@/apple-look/GroupedList"
 import { SpeedMenuContent } from "@/components/toolbarItems/SpeedItem"
 import {
   readerFormSheetBottomPadding,
@@ -19,7 +20,7 @@ export default function SpeedMenuScreen() {
 
   return (
     <View
-      className="bg-background overflow-hidden"
+      className={`${groupedScreenClass} overflow-hidden`}
       style={{ marginBottom: -bottomInset, paddingBottom: bottomInset }}
     >
       <View

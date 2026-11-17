@@ -1,10 +1,10 @@
 # Plan
 
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
-(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix and R1 to R8
-from Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug
-check (B2) are built in one pull request; waiting on the iOS build in CI and
-Fable 5.2's final check
+(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
+Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
+(B2) are in one pull request with main merged in, waiting on its iOS build |
+Books look: B1 to B7 merged (PR #49), B8 (look check) next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -155,6 +155,30 @@ locally too.
   - Done when: Mo says both books sound right on the new build.
   - Try it: install the build from TestFlight and play both books.
   - Files: none beyond what's merged.
+
+## The Apple look for Books
+
+Mo's ask (2026-11-17): give everything outside Podcasts the Apple Podcasts look,
+with no feature changes. Mo chose "Every Books screen". The plan, the colours
+and the screen-by-screen table are in `docs/BOOKS-APPLE-DESIGN.md`. One pull
+request with all of it, merged before PR #48, then one TestFlight build carries
+both.
+
+- [x] **B1. Colours and font.** Apple's colours in `global.css`, headings in the
+      system font.
+- [x] **B2. Shared pieces and Home.**
+- [x] **B3. Book page.**
+- [x] **B4. Grids and search.**
+- [x] **B5. Settings and sheets.**
+- [x] **B6. Players.**
+- [x] **B7. Reader chrome.**
+- [ ] **B8. Look check.** Every screen against the table and Mo's screenshots,
+      the iOS build in CI, then Mo's look on TestFlight.
+  - Done when: `tools/fork/check.sh` passes, every restyled upstream file is in
+    `allowedChanges`, the iOS build passes, and a review of the diff finds no
+    handler, menu item, label or screen removed.
+  - Try it: install the TestFlight build and open Books, a book, Settings, the
+    player and the reader in light and dark.
 
 ## Podcasts
 

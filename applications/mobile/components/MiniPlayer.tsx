@@ -2,6 +2,7 @@ import { FastForward, Rewind } from "lucide-react-native"
 import { useMemo, useRef } from "react"
 import { TouchableOpacity, View } from "react-native"
 
+import { GlassCapsule } from "@/apple-look/GlassCapsule"
 import { type BookWithRelations } from "@/database/books"
 import { cn } from "@/lib/utils"
 import { getHrefChapterTitle, positionToPageCount } from "@/links"
@@ -194,18 +195,22 @@ export function MiniPlayer({ book, format, hidden, floatingToolbar }: Props) {
         <HideableView
           hidden={hidden}
           className={cn(
-            "ios:pb-[max(calc(env(safe-area-inset-bottom)_-_--spacing(4)),--spacing(2))] android:pb-2 z-3 px-safe-or-3",
+            "ios:pb-safe-offset-2 android:pb-2 z-3 px-safe-or-3",
             {
-              "bg-background border-t-foreground ios:bottom-0 android:bottom-safe absolute right-0 left-0 border-t":
+              "ios:bottom-0 android:bottom-safe absolute right-0 left-0":
                 floatingToolbar,
               "android:mb-safe-or-2": !floatingToolbar,
             },
           )}
         >
-          <View className="-mr-3 flex-row items-center gap-0">
+          {/* The scrubber sits above the capsule with a full-height touch area, because it moves
+              through the chapter's pages in the reader. */}
+          <View className="mb-1 px-4">
             <ProgressBar
+              slim
+              className="h-8"
+              fillClassName="bg-primary"
               accessibilityLabel="Mini player progress"
-              className="grow"
               start={progressStart}
               stop={progressEnd ?? 0}
               progress={progress}
@@ -235,85 +240,96 @@ export function MiniPlayer({ book, format, hidden, floatingToolbar }: Props) {
                     }
               }
             />
-            {format !== "ebook" && (
-              <>
-                <Button
-                  accessibilityLabel="Previous section"
-                  variant="ghost"
-                  onPress={() => {
-                    dispatch(previousFragmentPressed())
-                  }}
-                >
-                  <Icon as={Rewind} size={20} />
-                </Button>
-                <PlayPause automaticRewind={false} buttonSize="default" />
-                <Button
-                  accessibilityLabel="Next section"
-                  variant="ghost"
-                  onPress={() => {
-                    dispatch(nextFragmentPressed())
-                  }}
-                >
-                  <Icon as={FastForward} size={20} />
-                </Button>
-              </>
-            )}
           </View>
-
-          <View className="pr-safe-or-6 pl-safe-or-3 flex-row items-center justify-between gap-3">
-            <TouchableOpacity
-              accessibilityLabel={`Open details for ${title}`}
-              accessibilityRole="button"
-              className="w-10 p-0"
-              onPress={() => {
-                dispatch(bookDetailPressed({ bookUuid: book.uuid, format }))
-              }}
-            >
-              <View
-                className={cn(
-                  "m-auto h-10 overflow-hidden rounded-sm",
-                  bookPrefs.detailView?.mode === "audio" ? "w-10" : "w-[26px]",
-                )}
+          <GlassCapsule className="h-14">
+            <View className="h-14 flex-row items-center gap-2 pr-2 pl-2">
+              <TouchableOpacity
+                accessibilityLabel={`Open details for ${title}`}
+                accessibilityRole="button"
+                className="w-10 p-0"
+                onPress={() => {
+                  dispatch(bookDetailPressed({ bookUuid: book.uuid, format }))
+                }}
               >
-                {bookPrefs.detailView?.mode === "audio" ? (
-                  <AudiobookCover book={book} />
-                ) : (
-                  <EbookCover book={book} />
-                )}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              accessibilityLabel={`Open details for ${title}`}
-              accessibilityRole="button"
-              className="flex-1 flex-col items-stretch"
-              onPress={() => {
-                dispatch(bookDetailPressed({ bookUuid: book.uuid, format }))
-              }}
-            >
-              <Text
-                maxFontSizeMultiplier={1.25}
-                numberOfLines={1}
-                className="text-sm"
+                <View
+                  className={cn(
+                    "border-foreground/10 m-auto h-10 overflow-hidden border",
+                    bookPrefs.detailView?.mode === "audio"
+                      ? "w-10"
+                      : "w-[26px]",
+                  )}
+                  style={{ borderRadius: 6 }}
+                >
+                  {bookPrefs.detailView?.mode === "audio" ? (
+                    <AudiobookCover book={book} />
+                  ) : (
+                    <EbookCover book={book} />
+                  )}
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityLabel={`Open details for ${title}`}
+                accessibilityRole="button"
+                className="flex-1 flex-col items-stretch"
+                onPress={() => {
+                  dispatch(bookDetailPressed({ bookUuid: book.uuid, format }))
+                }}
               >
-                {title}
-              </Text>
-              <View className="grow flex-row justify-between">
                 <Text
                   maxFontSizeMultiplier={1.25}
                   numberOfLines={1}
-                  className="text-sm"
+                  className="text-[15px] font-semibold"
                 >
-                  {formattedProgress}
+                  {title}
                 </Text>
-                <Text maxFontSizeMultiplier={1.25} className="text-sm">
-                  {Math.round(
-                    (locator?.locations?.totalProgression ?? 0) * 100,
-                  )}
-                  %
-                </Text>
-              </View>
-            </TouchableOpacity>
-          </View>
+                <View className="grow flex-row justify-between gap-2">
+                  <Text
+                    maxFontSizeMultiplier={1.25}
+                    numberOfLines={1}
+                    className="text-muted-foreground shrink text-[13px]"
+                  >
+                    {formattedProgress}
+                  </Text>
+                  <Text
+                    maxFontSizeMultiplier={1.25}
+                    className="text-muted-foreground text-[13px]"
+                  >
+                    {Math.round(
+                      (locator?.locations?.totalProgression ?? 0) * 100,
+                    )}
+                    %
+                  </Text>
+                </View>
+              </TouchableOpacity>
+              {format !== "ebook" && (
+                <>
+                  <Button
+                    accessibilityLabel="Previous section"
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onPress={() => {
+                      dispatch(previousFragmentPressed())
+                    }}
+                  >
+                    <Icon as={Rewind} size={20} fill="currentColor" />
+                  </Button>
+                  <PlayPause automaticRewind={false} buttonSize="icon" />
+                  <Button
+                    accessibilityLabel="Next section"
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onPress={() => {
+                      dispatch(nextFragmentPressed())
+                    }}
+                  >
+                    <Icon as={FastForward} size={20} fill="currentColor" />
+                  </Button>
+                </>
+              )}
+            </View>
+          </GlassCapsule>
         </HideableView>
       </View>
     )

@@ -7,6 +7,7 @@
     "CLAUDE.md",
     "FORK.md",
     "applications/mobile/app/(root)/podcasts/",
+    "applications/mobile/apple-look/",
     "applications/mobile/fork.config.ts",
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
@@ -35,13 +36,13 @@
     },
     {
       "file": "applications/mobile/global.css",
-      "markers": 1,
-      "purpose": "One @import of podcasts/themes.css, which declares the Podcasts section's extra themes (Extra Dark, Midnight, Paper, Forest) as Uniwind variants."
+      "markers": 2,
+      "purpose": "One @import of podcasts/themes.css, which declares the Podcasts section's extra themes (Extra Dark, Midnight, Paper, Forest) as Uniwind variants. A block at the end gives the app's own light and dark themes Apple's colours (docs/BOOKS-APPLE-DESIGN.md); it sits at the end because Uniwind allows @import only at the top, where the upstream values would override it."
     },
     {
       "file": "applications/mobile/app/(root)/index.tsx",
       "markers": 2,
-      "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts."
+      "purpose": "Puts the menu button at the top left of the Books screen. It opens the side menu with Books and Podcasts. The screen is also restyled with the Apple look (docs/BOOKS-APPLE-DESIGN.md): on iOS its list comes first and apple-look/BooksHomeBar.tsx draws the native bar with the side menu, Search and the home menu."
     },
     {
       "file": "applications/mobile/metro.config.js",
@@ -51,12 +52,12 @@
     {
       "file": "applications/mobile/app/(root)/settings.tsx",
       "markers": 2,
-      "purpose": "Shows the atmosphere sounds' section (on and off, volume, how much is going on, the car, importing a sounds folder) under the reading settings."
+      "purpose": "Shows the atmosphere sounds' section (on and off, volume, how much is going on, the car, importing a sounds folder) under the reading settings. The screen is also restyled with the Apple look (docs/BOOKS-APPLE-DESIGN.md) as inset grouped lists under a large title."
     },
     {
       "file": "applications/mobile/components/Toolbar.tsx",
       "markers": 2,
-      "purpose": "Adds the atmosphere sounds button to the player's toolbar for readaloud books, in both the read-along and listening screens."
+      "purpose": "Adds the atmosphere sounds button to the player's toolbar for readaloud books, in both the read-along and listening screens. The toolbar is also restyled with the Apple look (docs/BOOKS-APPLE-DESIGN.md): round buttons, a glass capsule in the reader, white icons over the player's cover wash."
     },
     {
       "file": "applications/mobile/store/store.ts",
@@ -69,6 +70,61 @@
       "purpose": "Lets the atmosphere pause the narration for a moment at a big scene change (the hold in LofiNarratorBridge.swift) without the app, the lock screen or the remote buttons seeing a pause, and ends that hold on pause, play or the sleep timer. Each of the eight lock-screen handlers also asks LofiRemoteHandoff.swift first, so a playing podcast owns the lock screen and headphone buttons. The book does not resume after a call or Siri while a podcast owns the lock screen (the podcast player resumes its own episode)."
     }
   ],
-  "allowedChanges": [],
+  "allowedChanges": [
+    "applications/mobile/app/(root)/_layout.tsx",
+    "applications/mobile/app/(root)/book/[uuid].tsx",
+    "applications/mobile/app/(root)/custom-fonts.tsx",
+    "applications/mobile/app/(root)/custom-theme/index.tsx",
+    "applications/mobile/app/(root)/listen/[uuid].tsx",
+    "applications/mobile/app/(root)/log.tsx",
+    "applications/mobile/app/(root)/navigation-menu/_layout.tsx",
+    "applications/mobile/app/(root)/reading-settings.tsx",
+    "applications/mobile/app/(root)/search.tsx",
+    "applications/mobile/app/(root)/server.tsx",
+    "applications/mobile/app/(root)/speed-menu.tsx",
+    "applications/mobile/components/BookDescription.tsx",
+    "applications/mobile/components/BookGrid.tsx",
+    "applications/mobile/components/BookThumbnail.tsx",
+    "applications/mobile/components/BookTransferFeedback.tsx",
+    "applications/mobile/components/ColorPickerDialog.tsx",
+    "applications/mobile/components/CustomThemeEditor.tsx",
+    "applications/mobile/components/DownloadingIndicator.tsx",
+    "applications/mobile/components/Epub.tsx",
+    "applications/mobile/components/Footnote.tsx",
+    "applications/mobile/components/HighlightColorPicker.tsx",
+    "applications/mobile/components/LoadingView.tsx",
+    "applications/mobile/components/MiniPlayer.tsx",
+    "applications/mobile/components/MiniPlayerWidget.tsx",
+    "applications/mobile/components/PlayPause.tsx",
+    "applications/mobile/components/ProgressBar.tsx",
+    "applications/mobile/components/ReadingSettings.tsx",
+    "applications/mobile/components/SelectionMenu.tsx",
+    "applications/mobile/components/Shelf.tsx",
+    "applications/mobile/components/bookGridLayout.ts",
+    "applications/mobile/components/toolbarItems/BookmarkItem.tsx",
+    "applications/mobile/components/toolbarItems/LayoutItem.tsx",
+    "applications/mobile/components/toolbarItems/NavigationItem.tsx",
+    "applications/mobile/components/toolbarItems/SettingsItem.tsx",
+    "applications/mobile/components/toolbarItems/SleepTimerItem.tsx",
+    "applications/mobile/components/toolbarItems/SpeedItem.tsx",
+    "applications/mobile/components/toolbarItems/navigation/Bookmarks.tsx",
+    "applications/mobile/components/toolbarItems/navigation/Highlights.tsx",
+    "applications/mobile/components/toolbarItems/navigation/NavigationReturnControl.tsx",
+    "applications/mobile/components/toolbarItems/navigation/TableOfContents.tsx",
+    "applications/mobile/components/toolbarItems/navigation/TrackList.tsx",
+    "applications/mobile/components/ui/ButtonGroup.tsx",
+    "applications/mobile/components/ui/accordion.tsx",
+    "applications/mobile/components/ui/alert-dialog.tsx",
+    "applications/mobile/components/ui/button.tsx",
+    "applications/mobile/components/ui/dialog.tsx",
+    "applications/mobile/components/ui/input.tsx",
+    "applications/mobile/components/ui/popover.tsx",
+    "applications/mobile/components/ui/select.tsx",
+    "applications/mobile/components/ui/switch.tsx",
+    "applications/mobile/components/ui/tabs.tsx",
+    "applications/mobile/components/ui/text.tsx",
+    "applications/mobile/package.json",
+    "yarn.lock"
+  ],
   "allowedAudio": []
 }

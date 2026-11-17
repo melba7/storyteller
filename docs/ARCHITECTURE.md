@@ -38,6 +38,7 @@ in `FORK.md`.
 | `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
 | `applications/mobile/podcasts/`                                          | React UI: side menu, library grid, discover, show, episode and player screens, mini player                                    |
 | `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover, Up Next, Profile), a stack per tab, the player pushed                              |
+| `applications/mobile/apple-look/`                                        | Shared pieces of the Apple Podcasts look on the Books side: large-title bar, section heading, grouped lists, glass capsule    |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
@@ -226,6 +227,12 @@ in `FORK.md`.
 | 2026-11-17 | The background session ignores a cancel the app asked for (-999 with no iOS reason); iOS's own cancels are still handled                   | A replaced download read as failed                         |
 | 2026-11-17 | The player's artwork is full width under the grabber, fading into the sheet; its buttons are SF Symbols (`SFIcon`, `@expo/ui` Image)       | As in Apple's player (Mo's screenshot 08)                  |
 | 2026-11-17 | A play-through with no byte yet that waits for the network gives up, so the plain address plays and shows its error                        | No silent spinner with Skip ads on                         |
+| 2026-11-17 | Apple's colours are the app's own light and dark themes, in one marked block appended to `global.css`                                      | Uniwind allows `@import` only first                        |
+| 2026-11-17 | Books screens use native large titles: on iOS the list is the screen's first child and the bar is `Stack.Title`/`Stack.Toolbar`            | Large titles shrink on scroll                              |
+| 2026-11-17 | Shared Books pieces (bars, headings, grouped lists, glass capsule) live in `apple-look/`; restyled upstream files are allowed changes      | Upstream syncs merge by hand there                         |
+| 2026-11-17 | Mini players are Liquid Glass capsules (`expo-glass-effect`), `bg-secondary` before iOS 26; the reader's scrubber sits above               | Apple's look, seek stays easy to hit                       |
+| 2026-11-17 | The listening player is washed with the cover's colour (`artworkColor`) under 50% black, with white text and a light status bar            | Readable on any cover                                      |
+| 2026-11-17 | The home screen shows "Storyteller+"; TestFlight and the App Store show the App Store Connect record's name until Mo renames it            | Bundle id unchanged                                        |
 
 ## Known problems
 
