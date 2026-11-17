@@ -348,6 +348,11 @@ and transcription (Apple's `SpeechTranscriber`, free; WhisperKit, MIT, stays in
 "Later" in case it disappoints). Pocket Casts (MPL 2.0) and AntennaPod (GPL 3)
 stay references only. No open database of podcast ad times was found.
 
+As built (2026-11-17): MinusPod's rules and part of MinusPod's and Podly's
+wording are used (credited in `FORK.md`), and only Transcriptator's time reading
+was adapted. OutcastID3 could not be fetched, so the MP3 chapter reader was
+written from the ID3 spec in PodcastKit `PodcastChapters`.
+
 ## Risks
 
 | Risk                                                                                       | What the plan does                                                                                                                                                                                                                 |

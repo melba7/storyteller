@@ -611,11 +611,19 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       episode, end of chapter once P5g is in, add 5 minutes, and a fade-out at
       the end.
   - Status: built and passing `check.sh` (Swift timer, 10 s fade-out, moon
-    button in the player). "End of chapter" waits for P5g.
+    button in the player). "End of chapter" came with P5g.
 - [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
       from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
-      read with OutcastID3, MIT, copied in), a chapter list in the player,
-      previous and next chapter, chapter artwork, and skipping a chapter.
+      read by our own reader), a chapter list in the player, previous and next
+      chapter, chapter artwork, and skipping a chapter.
+  - Status: built and passing `check.sh` (schema version 9,
+    `episodes.chapters_url`): chapters from the feed's JSON file, MP3 ID3 tags
+    (a reader written from the ID3 spec in PodcastKit `PodcastChapters`) and M4A
+    chapter tracks, kept in Swift so they work locked and with Up Next. The
+    player has a Chapters list with a skip switch per chapter, a chapter bar
+    with previous and next, and chapter artwork. The sleep timer's "End of
+    chapter" and the headphones' "Next chapter" are in. Not built: chapter
+    titles on the lock screen.
 - [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
       title you can edit, from the player and as a headphone action; listed per
       episode and in Profile; tap to play from there.
@@ -624,7 +632,7 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       mark an episode played when N seconds are left, and going back a few
       seconds after a long pause.
   - Status: built and passing `check.sh`: a Playback section in Profile, kept in
-    Swift. "Next chapter or bookmark" waits for P5g and P5h.
+    Swift. "Next chapter" came with P5g; "bookmark" waits for P5h.
 - [ ] **P5j. Volume boost and trim silence** (L): a second Swift player
       (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
       silent gaps, in three strengths, per show or for everything. Streamed

@@ -153,6 +153,9 @@ in `FORK.md`.
 | 2026-11-17 | Voice boost is an `MTAudioProcessingTap` on the one AVPlayer item (pure DSP in `VoiceBoost`), not a second `AVAudioEngine` player          | Ads, sleep timer, Up Next keep working                     |
 | 2026-11-17 | Silent gaps are measured once per download (`<sha256>.silence.json`); the player jumps over them with boundary observers in 120 s windows  | An ad skip wins; a seek into a gap plays it                |
 | 2026-11-17 | Trimmed seconds are counted divided by the speed in `UserDefaults` (`podcasts.trim.savedSeconds`) for the stats step                       | Counted in Swift, also while locked                        |
+| 2026-11-17 | `podcasts.db` is at schema version 9: a show's own voice boost and trim (v8), and each episode's feed chapters address (v9)                | Builders' steps renumbered at merge                        |
+| 2026-11-17 | Chapters live in Swift for the loaded episode: feed JSON wins over the file's (ID3 reader of our own, else AVFoundation); JS gets events   | Work locked and with Up Next                               |
+| 2026-11-17 | Chapter skips are kept per episode in `UserDefaults` (`podcasts.chapterSkips`) and run on the 0.5 s tick; a seek into one plays it         | Up to 0.5 s heard before the jump                          |
 
 ## Known problems
 
