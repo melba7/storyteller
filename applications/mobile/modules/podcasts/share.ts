@@ -4,6 +4,7 @@
 // messages are made here so they can be tested; the share sheet is React Native's Share.
 // An episode has no web page of its own in the library, so an episode is shared by its
 // audio address.
+import { isLocalAudioUrl } from "./localFiles"
 import { formatTime } from "./playbackRules"
 
 export type ShareMessage = {
@@ -18,7 +19,7 @@ type EpisodeInfo = { title: string; audioUrl: string }
 /** Only web addresses are worth sending to someone. */
 function webLink(value: string | null | undefined): string | null {
   const text = value?.trim() ?? ""
-  return /^https?:\/\/\S+$/i.test(text) ? text : null
+  return /^https?:\/\/\S+$/i.test(text) && !isLocalAudioUrl(text) ? text : null
 }
 
 /** A show: its name, its feed link and, when it has one, its web page. */

@@ -246,6 +246,17 @@ public final class PodcastsModule: Module {
         throw PodcastFetchError(message: error.localizedDescription)
       }
     }
+    // Adds an audio file picked in the Files app: copies it in and installs it like a finished
+    // download. Resolves with the episode's id, title, length, size and extension.
+    AsyncFunction("importAudioFile") { (uri: String, fileName: String?) async throws -> [String: Any] in
+      do {
+        return try await PodcastDownloader.shared.importAudioFile(uri: uri, fileName: fileName)
+      } catch let error as PodcastFetchError {
+        throw error
+      } catch {
+        throw PodcastFetchError(message: error.localizedDescription)
+      }
+    }
     // Stops a download that is not finished and forgets it.
     AsyncFunction("cancelDownload") { (episodeId: String) throws in
       try PodcastDownloader.shared.cancel(episodeId: episodeId)

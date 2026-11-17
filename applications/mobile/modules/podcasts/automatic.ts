@@ -4,6 +4,7 @@
 // download, which played downloads to delete, how often to refresh while the app is open, and
 // the two settings. Reading feeds and the native calls are in automaticRun.ts.
 import type { FetchedEpisode } from "./library"
+import { isLocalEpisodeId } from "./localFiles"
 import { type AutoUpNext } from "./showSettings"
 
 // MARK: Settings
@@ -162,6 +163,7 @@ export function downloadsToDelete(
   return episodes
     .filter(
       (episode) =>
+        !isLocalEpisodeId(episode.id) &&
         episode.played &&
         episode.id !== loadedId &&
         episode.lastPlayedAt !== null &&

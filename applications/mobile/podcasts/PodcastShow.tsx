@@ -17,6 +17,7 @@ import {
   archivedCount,
   arrangeEpisodes,
 } from "@/modules/podcasts/episodeList"
+import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { tabBase } from "@/modules/podcasts/routes"
 
@@ -47,13 +48,18 @@ export function PodcastShow({ id }: { id: string }) {
   }
 
   function confirmUnsubscribe(title: string) {
+    const own = isLocalFeedUrl(show.data?.feedUrl ?? "")
     Alert.alert(
-      `Unsubscribe from ${title}?`,
-      "The show and its episodes are removed from your library.",
+      own ? `Delete ${title}?` : `Unsubscribe from ${title}?`,
+      own
+        ? "Every file you added is deleted from this phone. The originals in the Files app stay."
+        : "The show and its episodes are removed from your library.",
       [
         { text: "Cancel", style: "cancel" },
         {
-          text: "Unsubscribe",
+          text: isLocalFeedUrl(show.data?.feedUrl ?? "")
+            ? "Delete"
+            : "Unsubscribe",
           style: "destructive",
           onPress: () => {
             unsubscribe(id).then(
