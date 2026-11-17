@@ -48,6 +48,23 @@ public enum DownloadRecovery {
   /// no internet, DNS trouble.
   private static let transient: Set<Int> = [-1001, -1003, -1004, -1005, -1006, -1009]
 
+  /// URLError codes for an https address that could not be reached or trusted: secure
+  /// connection failed, the server certificate was bad, dated, untrusted or from an unknown
+  /// root, cannot find or connect to the host.
+  private static let httpsUnreachable: Set<Int> = [-1200, -1201, -1202, -1203, -1204, -1003, -1004]
+
+  /// Whether a download that was upgraded from plain http should try the original http
+  /// address, because https could not connect or its certificate was refused. The server
+  /// answering anything, or the user or the phone stopping the download, never counts.
+  public static func shouldFallBackToPlainHTTP(_ failure: DownloadFailure, plainURL: String?)
+    -> Bool
+  {
+    guard plainURL != nil, failure.httpStatus == nil, !failure.forceQuit, !failure.diskFull,
+      let code = failure.urlErrorCode
+    else { return false }
+    return httpsUnreachable.contains(code)
+  }
+
   /// Whether to resume, start again or give up. A swipe-away always carries on (resuming
   /// when iOS left resume data), and the state stays "downloading" meanwhile. Real errors,
   /// such as the server saying 404 or a full phone, fail with a reason the listener can read.

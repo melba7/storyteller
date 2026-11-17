@@ -79,10 +79,13 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   /// Started by the app by itself (a new episode), not by the listener. These wait for Wi-Fi
   /// whatever the "Download only on Wi-Fi" switch says.
   public var automatic: Bool
+  /// The feed's own plain http address, kept while the https one in `url` is being tried. If
+  /// https fails to connect, the downloader tries this once. Nil for an https feed.
+  public var plainURL: String?
 
   public init(
     episodeId: String, url: String, fileExtension: String, state: DownloadState,
-    updatedAt: Date = Date(), automatic: Bool = false
+    updatedAt: Date = Date(), automatic: Bool = false, plainURL: String? = nil
   ) {
     self.episodeId = episodeId
     self.url = url
@@ -90,13 +93,22 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
     self.state = state
     self.updatedAt = updatedAt
     self.automatic = automatic
+    self.plainURL = plainURL
+  }
+
+  /// Switches to the original http address, once: the entry keeps no second chance after.
+  public mutating func fallBackToPlainHTTP() {
+    guard let plain = plainURL else { return }
+    url = plain
+    plainURL = nil
   }
 
   private enum Keys: String, CodingKey {
-    case episodeId, url, fileExtension, state, updatedAt, automatic
+    case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL
   }
 
-  /// An index written before automatic downloads has no `automatic`: it means false.
+  /// An index written before automatic downloads has no `automatic` (it means false), and one
+  /// written before the plain http fallback has no `plainURL` (it means none).
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
     self.init(
@@ -105,7 +117,8 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
       fileExtension: try c.decode(String.self, forKey: .fileExtension),
       state: try c.decode(DownloadState.self, forKey: .state),
       updatedAt: try c.decode(Date.self, forKey: .updatedAt),
-      automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false)
+      automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false,
+      plainURL: try c.decodeIfPresent(String.self, forKey: .plainURL))
   }
 }
 

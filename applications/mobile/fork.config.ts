@@ -129,8 +129,9 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const modes = (plist["UIBackgroundModes"] as string[] | undefined) ?? []
   const tasks =
     (plist["BGTaskSchedulerPermittedIdentifiers"] as string[] | undefined) ?? []
-  // Many podcast hosts serve episodes over plain http, which iOS blocks unless the app
-  // allows it for media. This is a plist key, not an entitlement.
+  // Podcast feeds and episodes come from any host, and some still serve only plain http,
+  // which iOS blocks unless the app allows it. Other podcast apps allow it too. The app
+  // still tries https first. These are plist keys, not entitlements.
   const transport =
     (plist["NSAppTransportSecurity"] as Record<string, unknown> | undefined) ??
     {}
@@ -151,6 +152,7 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: {
         ...transport,
+        NSAllowsArbitraryLoads: true,
         NSAllowsArbitraryLoadsForMedia: true,
       },
     },

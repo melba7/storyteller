@@ -188,6 +188,46 @@ final class DownloadRecoveryTests: XCTestCase {
   }
 }
 
+final class PlainHTTPFallbackTests: XCTestCase {
+  private let plain = "http://feeds.example/ep.mp3"
+
+  func testAnHTTPSConnectionOrCertificateFailureFallsBackToTheOriginalAddress() {
+    for code in [-1200, -1201, -1202, -1203, -1204, -1004, -1003] {
+      XCTAssertTrue(
+        DownloadRecovery.shouldFallBackToPlainHTTP(
+          DownloadFailure(urlErrorCode: code), plainURL: plain), "code \(code)")
+    }
+  }
+
+  func testWithoutAnOriginalHTTPAddressThereIsNothingToFallBackTo() {
+    XCTAssertFalse(
+      DownloadRecovery.shouldFallBackToPlainHTTP(DownloadFailure(urlErrorCode: -1200), plainURL: nil))
+  }
+
+  func testOtherFailuresDoNotFallBack() {
+    for failure in [
+      DownloadFailure(urlErrorCode: -1001), DownloadFailure(urlErrorCode: -1009),
+      DownloadFailure(urlErrorCode: -999, forceQuit: true), DownloadFailure(httpStatus: 404),
+      DownloadFailure(urlErrorCode: -1200, httpStatus: 500), DownloadFailure(diskFull: true),
+      DownloadFailure(),
+    ] {
+      XCTAssertFalse(
+        DownloadRecovery.shouldFallBackToPlainHTTP(failure, plainURL: plain), "\(failure)")
+    }
+  }
+
+  func testWhenThePlainAddressIsTriedItsKeptNoMore() {
+    var entry = DownloadEntry(
+      episodeId: "a", url: "https://feeds.example/ep.mp3", fileExtension: "mp3", state: .queued,
+      plainURL: plain)
+    entry.fallBackToPlainHTTP()
+    XCTAssertEqual(entry.url, plain)
+    XCTAssertNil(entry.plainURL)
+    entry.fallBackToPlainHTTP()
+    XCTAssertEqual(entry.url, plain)
+  }
+}
+
 final class NetworkPolicyTests: XCTestCase {
   func testAutomaticDownloadsAlwaysWaitForWifi() {
     XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: true, setting: false))

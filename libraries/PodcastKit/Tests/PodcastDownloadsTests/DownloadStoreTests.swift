@@ -70,6 +70,17 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(try DownloadStore(root: root).entry(for: "c")?.automatic, false)
   }
 
+  func testThePlainAddressSurvivesARestartAndAnOldIndexHasNone() throws {
+    let store = try DownloadStore(root: root)
+    var withPlain = entry("a", .queued)
+    withPlain.plainURL = "http://x.example/a.mp3"
+    try store.put(withPlain)
+    try store.put(entry("b", .queued))
+    let reopened = try DownloadStore(root: root)
+    XCTAssertEqual(reopened.entry(for: "a")?.plainURL, "http://x.example/a.mp3")
+    XCTAssertNil(reopened.entry(for: "b")?.plainURL)
+  }
+
   func testFinishingKeepsTheAutomaticFlag() throws {
     let store = try DownloadStore(root: root)
     var auto = entry("a", .queued)

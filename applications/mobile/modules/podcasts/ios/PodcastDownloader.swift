@@ -113,8 +113,10 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
       scheme == "http" || scheme == "https", given.host != nil
     else { throw PodcastFetchError(message: "This episode has no downloadable link.") }
-    // A background download can't use plain http, which iOS blocks (error -1022).
+    // https is tried first. A feed that only serves http gets its original address back once,
+    // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS
+    let plain = scheme == "http" ? given.absoluteString : nil
     if let existing = store.entry(for: episodeId) {
       if existing.state.isActive, lock.withLock({ active.contains(episodeId) }) { return }
       if case .downloaded = existing.state, store.localFile(for: episodeId) != nil { return }
@@ -124,7 +126,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     let entry = DownloadEntry(
       episodeId: episodeId, url: address.absoluteString,
       fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued,
-      automatic: automatic)
+      automatic: automatic, plainURL: plain)
     try store.put(entry)
     emit(entry)
     begin(entry)
@@ -259,6 +261,15 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Does what DownloadRecovery says: carry on from the resume data, start again, or fail.
   private func recover(_ id: String, _ failure: DownloadFailure, resumeData: Data? = nil) {
     guard let store, let entry = store.entry(for: id) else { return }
+    if DownloadRecovery.shouldFallBackToPlainHTTP(failure, plainURL: entry.plainURL) {
+      var plain = entry
+      plain.fallBackToPlainHTTP()
+      plain.updatedAt = Date()
+      try? store.put(plain)
+      lock.withLock { retries[id] = nil }
+      reactivate(plain)
+      return begin(plain)
+    }
     switch DownloadRecovery.decide(failure) {
     case .resume:
       count(retry: failure, id)

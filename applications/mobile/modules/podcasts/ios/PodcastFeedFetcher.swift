@@ -30,7 +30,8 @@ enum PodcastFeedFetcher {
       throw PodcastFetchError(message: "That isn't a web link.")
     }
 
-    // A plain http link is tried over https first, because iOS blocks public http.
+    // A plain http link is tried over https first. The app now allows plain http, so the
+    // original address is the second try, for a feed that has no https at all.
     if scheme == "http", var secure = URLComponents(url: url, resolvingAgainstBaseURL: false) {
       secure.scheme = "https"
       if let secureURL = secure.url, let data = try? await load(secureURL) {
@@ -53,6 +54,7 @@ enum PodcastFeedFetcher {
     do {
       (data, response) = try await URLSession.shared.data(for: request)
     } catch let error as URLError where error.code == .appTransportSecurityRequiresSecureConnection {
+      // Only if the build's App Transport Security setting ever stops allowing plain http.
       throw PodcastFetchError(message: "This feed only works over plain http, which iOS blocks.")
     }
     if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
