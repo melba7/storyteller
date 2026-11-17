@@ -25,12 +25,16 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   @unchecked Sendable
 {
   /// The most bytes handed to the player in one piece.
-  private static let chunk: Int64 = 1 << 20
+  static let chunk: Int64 = 1 << 20
+  /// The most bytes handed to one request in one turn of the queue. The rest follows in the
+  /// next turn, so a request the player cancels (it has enough) is seen between turns and a
+  /// whole file is never pushed at once.
+  static let perTurn: Int64 = 4 << 20
 
   let queue = DispatchQueue(label: "PodcastStreamDownload")
   /// The address AVFoundation is given, which comes back to this class.
   let assetURL: URL
-  private let episodeId: String
+  let episodeId: String
   private let enclosureType: String
   private let fileExtension: String
   private let store: DownloadStore
@@ -41,19 +45,20 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   private var task: URLSessionDataTask?
   private var stagedURL: URL?
   private var writer: FileHandle?
-  private var reader: FileHandle?
-  private var available: Int64 = 0
-  private var expected: Int64?
-  private var contentType: String?
+  var reader: FileHandle?
+  var available: Int64 = 0
+  var expected: Int64?
+  var contentType: String?
   private var throttle = ProgressThrottle()
-  private var pending: [AVAssetResourceLoadingRequest] = []
+  var pending: [AVAssetResourceLoadingRequest] = []
   private var started = false
-  private var stopped = false
+  var serveScheduled = false
+  var stopped = false
   /// The data task is over, one way or the other.
   private var ended = false
   /// The task finished without error: the file is whole and is being filed.
   private var completed = false
-  private var failure: Error?
+  var failure: Error?
 
   /// Nil when downloads are not available or the episode cannot be played this way.
   init?(episodeId: String, url: URL, type: String) {
@@ -264,84 +269,5 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       PodcastDownloader.shared.emit(entry)
     }
     serve()
-  }
-
-  // MARK: Answering the player
-
-  func resourceLoader(
-    _ resourceLoader: AVAssetResourceLoader,
-    shouldWaitForLoadingOfRequestedResource loadingRequest: AVAssetResourceLoadingRequest
-  ) -> Bool {
-    guard !stopped else { return false }
-    if !answer(loadingRequest) { pending.append(loadingRequest) }
-    return true
-  }
-
-  func resourceLoader(
-    _ resourceLoader: AVAssetResourceLoader, didCancel loadingRequest: AVAssetResourceLoadingRequest
-  ) {
-    pending.removeAll { $0 === loadingRequest }
-  }
-
-  /// Answers every waiting request as far as the file allows.
-  private func serve() {
-    pending = pending.filter { request in
-      guard !request.isCancelled, !request.isFinished else { return false }
-      return !answer(request)
-    }
-  }
-
-  /// Hands over what can be handed over now. True when the request is finished (done or failed).
-  private func answer(_ request: AVAssetResourceLoadingRequest) -> Bool {
-    if let info = request.contentInformationRequest {
-      if let contentType, let expected {
-        info.contentType = contentType
-        info.contentLength = expected
-        info.isByteRangeAccessSupported = true
-      } else if let failure {
-        request.finishLoading(with: failure)
-        return true
-      } else {
-        // The length is not known yet; it is when the response says so, or the download ends.
-        return false
-      }
-    }
-    guard let data = request.dataRequest else {
-      request.finishLoading()
-      return true
-    }
-    guard let reader else {
-      request.finishLoading(with: failure ?? PodcastFetchError(message: "The download was stopped."))
-      return true
-    }
-    do {
-      while true {
-        let wanted: Int64? =
-          data.requestsAllDataToEndOfResource
-          ? nil : max(0, data.requestedOffset + Int64(data.requestedLength) - data.currentOffset)
-        let slice = StreamRules.answerable(
-          offset: data.currentOffset, length: wanted, available: available, expected: expected)
-        if slice.length > 0 {
-          try reader.seek(toOffset: UInt64(slice.offset))
-          guard let bytes = try reader.read(upToCount: Int(min(slice.length, Self.chunk))),
-            !bytes.isEmpty
-          else { throw PodcastFetchError(message: "The downloaded part couldn't be read.") }
-          data.respond(with: bytes)
-          continue
-        }
-        if slice.complete {
-          request.finishLoading()
-          return true
-        }
-        if let failure {
-          request.finishLoading(with: failure)
-          return true
-        }
-        return false
-      }
-    } catch {
-      request.finishLoading(with: error)
-      return true
-    }
   }
 }

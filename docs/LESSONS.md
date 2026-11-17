@@ -52,3 +52,6 @@ One line per lesson.
   text in 27.1. Return the list first and put the bar and overlays after it.
 - `pb-safe` and a later `pb-N` on the same element fight; use `pb-safe-offset-N`
   for the inset plus a gap.
+- Keep a round of Mo's fixes in one pull request and one TestFlight build. I
+  planned the streaming ad skip for "after this round is on TestFlight", and Mo
+  asked why it was split: add the bigger fix to the same pull request instead.

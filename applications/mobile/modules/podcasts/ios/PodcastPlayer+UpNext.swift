@@ -48,7 +48,10 @@ extension PodcastPlayer {
         id: next.id, url: source, title: next.title, showTitle: next.showTitle,
         artworkUrl: next.artworkUrl, savedPosition: next.position, duration: next.duration,
         played: false, autoplay: true, type: next.type, showId: next.showId,
-        chaptersUrl: next.chaptersUrl))
+        chaptersUrl: next.chaptersUrl,
+        // As the app asks when the listener plays an episode: through its own download while
+        // Skip ads is on, so its ads can be skipped (PodcastPlayer+Stream.swift checks the rest).
+        playThroughDownload: AdSkipDefaults.settings.skipAds))
     return true
   }
 
