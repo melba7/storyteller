@@ -29,6 +29,7 @@ import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
 import { SkippedAdNote } from "./SkippedAdNote"
 import { SpeedPanel } from "./SpeedPanel"
+import { TranscriptView } from "./TranscriptView"
 import { useAdsFile } from "./useAds"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 
@@ -39,6 +40,7 @@ export function PlayerScreen() {
   const { skipBack, skipForward } = usePlaybackSettings()
   const { width } = useWindowDimensions()
   const [showSpeed, setShowSpeed] = useState(false)
+  const [showTranscript, setShowTranscript] = useState(false)
   const { episode, show } = view
   const adsFile = useAdsFile(episode?.id ?? "")
   const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
@@ -63,12 +65,28 @@ export function PlayerScreen() {
         >
           <Icon as={ChevronDown} size={28} className="text-white" />
         </Pressable>
+        {episode ? (
+          <Pressable
+            className="ml-auto rounded-full bg-white/15 px-4 py-2 active:bg-white/25"
+            accessibilityRole="button"
+            accessibilityLabel={
+              showTranscript ? "Back to the player" : "Open the transcript"
+            }
+            onPress={() => setShowTranscript((value) => !value)}
+          >
+            <Text className="font-semibold text-white">
+              {showTranscript ? "Player" : "Transcript"}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {!episode ? (
         <Text className="px-8 py-12 text-center text-white/70">
           Nothing is playing. Pick an episode to start.
         </Text>
+      ) : showTranscript ? (
+        <TranscriptView key={episode.id} episode={episode} />
       ) : (
         <ScrollView
           contentContainerClassName="px-safe-or-6 pb-safe items-center gap-5 pb-8"

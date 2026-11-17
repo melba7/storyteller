@@ -505,6 +505,22 @@ once reviewed and green.
   - Files: `PodcastKit` (the feed's `podcast:transcript` tag),
     `modules/podcasts` (transcript readers, with tests, adapted from
     Transcriptator, MIT), `podcasts/` (the transcript in the player).
+  - Status: built and passing `check.sh`; not yet compiled in CI or run on a
+    phone. The feed's `podcast:transcript` tags are read in PodcastKit; the best
+    one per episode (JSON, then WebVTT, SRT, HTML; plain text skipped) is kept
+    in `podcasts.db` (schema version 5) and filled at the next refresh for
+    episodes saved before. Transcriptator was read: its WebVTT, SRT and JSON
+    readers need no packages, but its HTML reader needs `node-html-parser`, so
+    only its time reading is adapted (`transcriptFormats/timestamp.ts`, notice
+    in `FORK.md`) and the readers are written for the fork. HTML transcripts are
+    not read yet: the screen says so and uses the phone's own transcript when
+    there is one. The player screen has a "Transcript" button: a full-height
+    list that follows the playing line (about a third from the top), stops
+    following when scrolled by hand ("Follow along" brings it back), plays from
+    a tapped line, shows speakers when they change, and searches with next and
+    previous. The feed's file is fetched when the transcript opens and cached
+    for a week. Plain `http` transcript links may be blocked by iOS (the app's
+    exception covers media, not `fetch`); the screen then says it can't load it.
 
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token

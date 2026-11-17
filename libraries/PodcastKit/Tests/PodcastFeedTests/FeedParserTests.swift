@@ -8,7 +8,8 @@ final class FeedParserTests: XCTestCase {
       """
       <?xml version="1.0" encoding="UTF-8"?>
       <rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd"
-           xmlns:content="http://purl.org/rss/1.0/modules/content/">
+           xmlns:content="http://purl.org/rss/1.0/modules/content/"
+           xmlns:podcast="https://podcastindex.org/namespace/1.0">
         <channel>
           <title>The Test Show</title>
           \(channelExtra)
@@ -127,6 +128,32 @@ final class FeedParserTests: XCTestCase {
     XCTAssertEqual(episode.audioURL, URL(string: "https://cdn.example.com/one.mp3"))
     XCTAssertEqual(episode.audioType, "audio/mpeg")
     XCTAssertEqual(episode.audioBytes, 4567)
+  }
+
+  func testReadsEveryTranscriptTag() throws {
+    let data = feed(
+      item(
+        """
+        <guid>t1</guid>
+        <podcast:transcript url="https://cdn.example.com/t1.json" type="application/json" language="en"/>
+        <podcast:transcript url="https://cdn.example.com/t1.vtt" type="Text/VTT" rel="captions"/>
+        <podcast:transcript url="https://cdn.example.com/t1.srt" type="application/x-subrip"/>
+        <podcast:transcript url="ftp://cdn.example.com/t1.txt" type="text/plain"/>
+        <podcast:transcript type="text/html"/>
+        """) + item("<guid>t2</guid>"),
+      channelExtra: "")
+    let episodes = try FeedParser.parse(data).episodes
+    XCTAssertEqual(
+      episodes[0].transcripts,
+      [
+        FeedTranscript(
+          url: URL(string: "https://cdn.example.com/t1.json")!, type: "application/json",
+          language: "en"),
+        FeedTranscript(
+          url: URL(string: "https://cdn.example.com/t1.vtt")!, type: "text/vtt", rel: "captions"),
+        FeedTranscript(url: URL(string: "https://cdn.example.com/t1.srt")!, type: "application/x-subrip"),
+      ])
+    XCTAssertEqual(episodes[1].transcripts, [])
   }
 
   func testKeepsTheFeedOrder() throws {

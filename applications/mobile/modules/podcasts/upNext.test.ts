@@ -142,6 +142,8 @@ describe("queueItem", () => {
     imageUrl: null,
     season: null,
     number: null,
+    transcriptUrl: null,
+    transcriptType: null,
     positionSeconds: 300,
     played: false,
     lastPlayedAt: null,

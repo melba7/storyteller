@@ -22,3 +22,7 @@ One line per lesson.
   that tip's non-conflicting changes (P1b's mini players came back into P1c's
   screens). Use `git merge -s ours FETCH_HEAD`, which keeps the tree as it is,
   and check that `git diff HEAD^1 HEAD` is empty before pushing.
+- A PodcastKit test class had a property named `hash`. It passed on Linux, but
+  on macOS `XCTestCase` is an `NSObject`, so Fork CI failed to compile it. Don't
+  give test classes properties that `NSObject` already has (`hash`,
+  `description`, `name`).
