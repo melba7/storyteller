@@ -158,6 +158,8 @@ in `FORK.md`.
 | 2026-11-17 | Chapter skips are kept per episode in `UserDefaults` (`podcasts.chapterSkips`) and run on the 0.5 s tick; a seek into one plays it         | Up to 0.5 s heard before the jump                          |
 | 2026-11-17 | Listening stats are counted in Swift (`StatsStore`, rules in `ListeningStats`) and saved to `Podcasts/stats.json` every 30 s and on pause  | Counts while locked; 90 days kept                          |
 | 2026-11-17 | Time saved by a jump (intro, outro, ad, chapter, silence) is the audio skipped divided by the speed; an undone ad takes its skip back      | One rule for every saving                                  |
+| 2026-11-17 | Own audio files are copied, hashed and installed by `DownloadStore.install` as `file-<sha256 prefix>`, in the local show `local-files`     | Transcripts, ads, chapters work unchanged                  |
+| 2026-11-17 | The local show's feed address is `local:files`: refresh, OPML, the Apple Podcasts sync and Discover skip it                                | No schema change                                           |
 
 ## Known problems
 

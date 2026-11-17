@@ -668,8 +668,20 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
       play them like episodes, and put them in Up Next. They are transcribed and
       ad-checked like downloads.
+  - Status: built and passing `check.sh`, no schema change: "Add audio files" in
+    the Podcasts menu and Profile copies files from the Files app into the app
+    and installs them like downloads (`file-<sha256 prefix>`), so they play
+    offline, go in Up Next, and are transcribed and checked for ads. They live
+    in a local "Your files" show (`local-files`) that feeds, OPML, the Apple
+    Podcasts sync and Discover skip. Rename and delete from the episode menu.
 
 ## Later
+
+- Podcasts: deleting an imported file from the Downloads screen leaves its row
+  in "Your files"; the empty "Your files" page says "This feed has no episodes
+  yet."
+- Podcasts: the trimmer reads the ads only when an episode loads, so ads found
+  while it plays are not avoided until the next load.
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
 - Podcasts: `savePlayback` notifies the library on every 15 s save, so open
