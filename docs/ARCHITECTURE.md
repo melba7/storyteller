@@ -199,6 +199,14 @@ in `FORK.md`.
 | 2026-11-17 | Profile groups are `SettingsGroup` cards; rows split by `border-foreground/10`, controls in cards use `bg-foreground/10`                   | Dark's border equals its card colour                       |
 | 2026-11-17 | `rulePills` is the one source of a smart playlist's rule words; `DragList` gets `onDrop` for the drop haptic                               | No second copy of the words                                |
 | 2026-11-17 | Apple Podcasts finished episodes come from the play state (0) with a sign of listening; `ZHASBEENPLAYED` is empty in today's library       | Following a show marks its old episodes played             |
+| 2026-11-17 | The episode loaded in the player is urgent in the transcript and ad queues; the one at work stops at its next piece (QueueOrder)           | Progress kept in the partial file                          |
+| 2026-11-17 | With Skip ads on, play downloads first and plays the file; it streams after a failure, no bytes on Wi-Fi only, 60 s or Stream now          | Ads are found only in the exact file                       |
+| 2026-11-17 | A transcript being made shows its saved lines (`getPartialTranscript`); the feed's own transcript still wins                               | Reloads once per five-minute piece                         |
+| 2026-11-17 | Podcasts screens return their list first with no wrapping View; bar, status bar and overlays come after it                                 | iOS tracks the first scroll view only                      |
+| 2026-11-17 | The selection bar is drawn over the list under the header, with a 48 pt spacer at the top of the list                                      | The list has to stay first                                 |
+| 2026-11-17 | Bottom-pinned controls use `pb-safe-offset-3`, never `pb-safe` with another bottom padding                                                 | A later `pb-N` overrides the inset                         |
+| 2026-11-17 | App Transport Security allows any load; https is tried first and a download falls back once to the feed's http address                     | Some feeds serve only http                                 |
+| 2026-11-17 | The downloads list is a shared route (`downloadsHref`); the Library has a Downloaded row and Profile keeps its row                         | Mo could not find Downloads                                |
 
 ## Known problems
 

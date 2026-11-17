@@ -46,3 +46,9 @@ One line per lesson.
 - Column names found by other people's tools are not proof of what a column
   holds: Apple's library has `ZHASBEENPLAYED` but leaves it empty. Check a value
   against the real data (or say it is unchecked) before relying on it.
+- A native large title shrinks, and the transparent bar blurs, only when the
+  screen's first child is its scroll view. ScreenBar's comment said so, but
+  every screen wrapped the list in a View anyway, and Mo saw titles over the
+  text in 27.1. Return the list first and put the bar and overlays after it.
+- `pb-safe` and a later `pb-N` on the same element fight; use `pb-safe-offset-N`
+  for the inset plus a gap.

@@ -1,7 +1,8 @@
 # Plan
 
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
-(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix is in review
+(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix and R1 to R7
+from Mo's first try are in review
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -824,19 +825,34 @@ that, so a fresh download is usually past its ads before they are known.
   - Status: built. The downloads list is a shared route (`downloadsHref`), so it
     opens in the tab you are in; the Library's "Downloaded" row sits above the
     shows and Profile uses the same link. The look waits for TestFlight.
-- [ ] **R2. The playing episode first** (M): the transcriber and the ad finder
+- [x] **R2. The playing episode first** (M): the transcriber and the ad finder
       put the playing episode at the front of their queues and pause another
       episode at its next piece; playing an episode that is not downloaded
       starts its download when "Skip ads" is on, so it can be transcribed.
   - Done when: `check.sh` passes (queue order tested in PodcastKit), and the iOS
     build passes in CI.
-- [ ] **R3. Lines as they are transcribed** (M): the transcript shows the lines
+  - Status: built (QueueOrder in PodcastKit, tested): the episode loaded in the
+    player goes first in the transcript and ad queues, and the one at work stops
+    at its next piece. Waiting for the iOS build in CI.
+- [x] **R3. Lines as they are transcribed** (M): the transcript shows the lines
       saved so far with "Transcribing, N%" under them and grows after each
       five-minute piece, instead of a wait for the whole episode.
   - Done when: `check.sh` passes and the iOS build passes in CI.
+  - Status: built: the transcript shows the saved lines with "Transcribing, N%"
+    under them and reads again after each piece; its buttons sit above the home
+    indicator. Waiting for the iOS build in CI.
+- [x] **R2b. Play waits for the download** (M, Mo's card, recommended option):
+      with Skip ads on, playing an episode that is not downloaded downloads it
+      first and plays the file; it streams when the download fails, nothing
+      arrives under Wi-Fi only, a minute passes, or the listener taps "Stream
+      now". A card in the mini player's place shows the percent.
+  - Done when: `check.sh` passes (the wait rules tested) and the iOS build
+    passes in CI.
+  - Status: built (`playWait.ts`, 13 tests; a newer play wins). The episode
+    already playing keeps playing while the next one downloads.
 - [ ] **R4. Ads found as the transcript grows** (L): waits for Mo's answer on
       Apple Intelligence (the finder needs it).
-- [ ] **R5. The top bar over text, and controls off the edge** (M): Mo's
+- [x] **R5. The top bar over text, and controls off the edge** (M): Mo's
       screenshots (Profile scrolled, the player's transcript) show the large
       title staying large over the content, the page pills running off the right
       edge, and the transcript's buttons under the home indicator. Every
@@ -847,13 +863,21 @@ that, so a fresh download is usually past its ads before they are known.
       indicator. Then a pass over every Podcasts screen for the same faults.
   - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
     the Profile title shrinks on scroll and nothing is clipped in the player.
-- [ ] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows failed
+  - Status: built: every Podcasts screen but episode search returns its list
+    first, the stack draws the theme background, the selection bar is drawn over
+    the list with a spacer, the player pills share the width, and bottom
+    controls use the safe inset plus 12. Waiting for CI and TestFlight.
+- [x] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows failed
       with "only works over plain http". The app allows plain http (like other
       podcast apps), keeps trying https first, and a download whose https
       address fails falls back to the feed's http address. Marketplace's 403 is
       looked at separately.
   - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
     the Bloomberg feeds subscribe.
+  - Status: built: plain http is allowed, https is still tried first, and a
+    download keeps the feed's http address (optional `plainURL`, older indexes
+    read fine) to try once if https cannot connect. Marketplace's 403 is not
+    looked at yet.
 - [ ] **R6. A more modern look** (M to L): waits for Mo to name the app to
       follow and the screens that look dated.
 
