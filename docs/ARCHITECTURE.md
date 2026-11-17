@@ -187,6 +187,12 @@ in `FORK.md`.
 | 2026-11-17 | Ads that start within 0.5 s of the one before are skipped as one stretch; failed ad scans are retried when the app opens                   | An ad then a plug, rate limits                             |
 | 2026-11-17 | Episode, chapter and artwork links on plain http are fetched over https; a finished download refuses to return after a delete              | iOS blocks http outside media                              |
 | 2026-11-17 | While a podcast owns the lock screen the book doesn't resume after a call (`LofiRemoteHandoff.podcastIsActive`)                            | The book took over                                         |
+| 2026-11-17 | `ScreenBar` draws `Stack.Title` and `Stack.Toolbar`; toolbar items are direct children, so the show page builds them with a function       | iOS draws the header; the toolbar finds items by type      |
+| 2026-11-17 | Headers are transparent with a minimal back button and the status bar from the Podcasts theme; non-list states sit in `BelowBar`           | Large titles need a scroll view first                      |
+| 2026-11-17 | The tab bar shrinks on scroll; the player is a modal sheet (chevron kept for VoiceOver) with no top safe-area padding                      | Swipe down to close                                        |
+| 2026-11-17 | A show's wash is the artwork colour at the strongest alpha from 0.15 to 0.45 that keeps the theme's text at 4.5:1                          | Readable in every theme                                    |
+| 2026-11-17 | `ensureArtworkColor` (shared by the player and the show page) measures a show's colour once and saves it                                   | Tinted on the first visit                                  |
+| 2026-11-17 | Episode rows have "…" and play only; downloading moved into "…" and the card's action strip, never for previews or own files               | Two controls per row                                       |
 
 ## Known problems
 
