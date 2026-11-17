@@ -19,6 +19,7 @@ import { Podcasts } from "@/modules/podcasts/index"
 import { AdSkipSwitches } from "./AdSkipSwitches"
 import { AddAudioFilesRow } from "./AddAudioFilesRow"
 import { AppearanceSection } from "./AppearanceSection"
+import { AppleSyncStatus } from "./AppleSyncStatus"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
@@ -118,6 +119,9 @@ export function Profile() {
           </SettingsGroup>
           <SettingsGroup title="OPML">
             <OpmlSection />
+          </SettingsGroup>
+          <SettingsGroup title="Apple Podcasts">
+            <AppleSyncStatus />
           </SettingsGroup>
           <SettingsGroup title="Ad skipping">
             <AdSkipSwitches />

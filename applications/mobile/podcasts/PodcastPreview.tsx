@@ -107,16 +107,16 @@ export function PodcastPreview({
   // Scrolls to the episode a search result meant, once the list is there.
   useEffect(() => {
     if (target < 0 || scrolled.current) return
-    scrolled.current = true
-    const timer = setTimeout(
-      () =>
-        list.current?.scrollToIndex({
-          index: target,
-          animated: true,
-          viewOffset: headerHeight,
-        }),
-      100,
-    )
+    // Marked done only when it runs: a header height change in between clears this timer, and
+    // the next run sets a new one.
+    const timer = setTimeout(() => {
+      scrolled.current = true
+      list.current?.scrollToIndex({
+        index: target,
+        animated: true,
+        viewOffset: headerHeight,
+      })
+    }, 100)
     return () => clearTimeout(timer)
   }, [target, headerHeight])
 
