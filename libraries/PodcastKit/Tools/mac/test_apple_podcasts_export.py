@@ -1,5 +1,7 @@
 """Tests for apple_podcasts_export.py, on a small library file built here with the same table
 and column names. Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import contextlib
+import io
 import json
 import os
 import sqlite3
@@ -229,10 +231,20 @@ class PlayStateTests(LibraryTestCase):
         self.add(conn, "unplayed", 2, count=1, marked=700000000, last=700000000)
         self.assertEqual(self.finished_guids(conn), [])
 
-    def test_an_old_played_flag_still_counts_next_to_the_play_state(self):
+    def test_the_played_flag_is_ignored_when_the_library_has_the_play_state(self):
+        # If a macOS update starts filling the flag for the back catalogue, it must not send
+        # every old episode to the phone as finished.
         conn = self.library()
         conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZHASBEENPLAYED, ZPLAYSTATE) VALUES (1, 'flag', 1, 2)")
-        self.assertEqual(self.finished_guids(conn), ["flag"])
+        conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZHASBEENPLAYED, ZPLAYSTATE) VALUES (1, 'flag-0', 1, 0)")
+        self.assertEqual(self.finished_guids(conn), [])
+
+    def test_an_older_library_with_only_the_flag_still_uses_it(self):
+        conn = self.make(episodes_sql=EPISODE_COLUMNS)
+        add_show(conn, 1, "https://a.example/feed", "A", 1)
+        conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZHASBEENPLAYED) VALUES (1, 'old', 1)")
+        conn.execute("INSERT INTO ZMTEPISODE (ZPODCAST, ZGUID, ZHASBEENPLAYED) VALUES (1, 'unplayed', 0)")
+        self.assertEqual(self.finished_guids(conn), ["old"])
 
     def test_a_play_state_without_any_listened_column_counts_nothing(self):
         conn = self.make(episodes_sql="Z_PK INTEGER PRIMARY KEY, ZPODCAST INTEGER, ZGUID VARCHAR, ZPLAYSTATE INTEGER")
@@ -297,6 +309,29 @@ class WriteTests(unittest.TestCase):
 
 
 class MainTests(unittest.TestCase):
+    def test_a_refused_write_is_not_reported_as_a_refused_read(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source = os.path.join(folder, "lib.sqlite")
+            build(source).close()
+            target = os.path.join(folder, "icloud")
+            os.makedirs(target)
+            errors = io.StringIO()
+            real = export.write_document
+
+            def refused(*args, **kwargs):
+                raise PermissionError(1, "Operation not permitted")
+
+            export.write_document = refused
+            try:
+                with contextlib.redirect_stderr(errors):
+                    code = export.main(["--source", source, "--folder", target])
+            finally:
+                export.write_document = real
+        self.assertEqual(code, 2)
+        self.assertIn("Could not write the export", errors.getvalue())
+        self.assertIn(target, errors.getvalue())
+        self.assertNotIn("did not let this read Apple Podcasts' library", errors.getvalue())
+
     def test_a_missing_library_says_so(self):
         with tempfile.TemporaryDirectory() as folder:
             code = export.main(["--source", os.path.join(folder, "none.sqlite"), "--folder", folder])

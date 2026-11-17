@@ -160,7 +160,9 @@ def finished_condition(have):
             listened.append(played)
         if listened:
             parts.append("(e.%s = 0 AND (%s))" % (EPISODE_PLAY_STATE, " OR ".join(listened)))
-    if EPISODE_PLAYED_FLAG in have:
+    # Only an older library, with no play state, goes by the flag: if a macOS update filled it
+    # for the back catalogue, every old episode would go to the phone as finished.
+    if EPISODE_PLAYED_FLAG in have and EPISODE_PLAY_STATE not in have:
         parts.append("e.%s = 1" % EPISODE_PLAYED_FLAG)
     return " OR ".join(parts) if parts else "0"
 
@@ -176,7 +178,7 @@ def read_library(conn):
     finished: [{"feed": the show's address, "guid": the episode's id}] for episodes of those
     shows that you really finished: the play state is played and the episode was played at
     least once, marked as played by you, or last played at a time that was not Apple marking
-    the back catalogue (or, in an older library, ZHASBEENPLAYED = 1). A show you unfollowed
+    the back catalogue (or, in an older library with no play state, ZHASBEENPLAYED = 1). A show you unfollowed
     is left out with its episodes.
     """
     check_format(conn)
@@ -217,6 +219,16 @@ def read_library(conn):
     return shows, finished
 
 
+class WriteFailed(Exception):
+    """The export could not be written into `folder` (an OSError, such as macOS refusing access
+    to the iCloud copy), apart from errors reading Apple's library."""
+
+    def __init__(self, folder, cause):
+        super().__init__("%s: %s" % (folder, cause))
+        self.folder = folder
+        self.cause = cause
+
+
 def export(source, folders, now=None):
     """Reads the library at `source` and writes Podcasts/apple-podcasts.json into each folder
     (a folder that does not exist is skipped). Returns (shows, finished, written folders)."""
@@ -236,8 +248,11 @@ def export(source, folders, now=None):
     for folder in folders:
         if not os.path.isdir(folder):
             continue
-        if write_document(folder, shows, finished, now):
-            written.append(folder)
+        try:
+            if write_document(folder, shows, finished, now):
+                written.append(folder)
+        except OSError as error:
+            raise WriteFailed(folder, error)
     return shows, finished, written
 
 
@@ -297,6 +312,13 @@ ACCESS_HELP = (
 )
 
 
+WRITE_HELP = (
+    "macOS did not let this write into that folder. Give the program that runs this access to "
+    "iCloud Drive (System Settings > Privacy & Security > Files & Folders, or Full Disk Access "
+    "> +, press Cmd-Shift-G, type /bin/bash, add it and switch it on)."
+)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--source", default=os.path.expanduser(LIBRARY))
@@ -312,6 +334,13 @@ def main(argv=None):
     except FormatChanged as error:
         print(str(error), file=sys.stderr)
         return 3
+    except WriteFailed as failed:
+        print(
+            "Could not write the export into %s: %s. If it is the iCloud copy: %s"
+            % (failed.folder, failed.cause, WRITE_HELP),
+            file=sys.stderr,
+        )
+        return 2
     except (PermissionError, sqlite3.OperationalError) as error:
         if not os.path.exists(args.source):
             print("Apple Podcasts' library is not at %s (is Apple Podcasts set up on this Mac?)" % args.source, file=sys.stderr)
@@ -319,7 +348,7 @@ def main(argv=None):
             print("%s (%s)" % (ACCESS_HELP, error), file=sys.stderr)
         return 2
     except OSError as error:
-        print("Could not write the export: %s. If it is the iCloud copy: %s" % (error, ACCESS_HELP), file=sys.stderr)
+        print("Could not read Apple Podcasts' library: %s. %s" % (error, ACCESS_HELP), file=sys.stderr)
         return 2
     print(
         "%d followed shows, %d finished episodes; %s"
