@@ -32,6 +32,7 @@ function episode(
     played: false,
     lastPlayedAt: null,
     archived: false,
+    starredAt: null,
     ...overrides,
   } as StoredEpisode
 }

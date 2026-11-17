@@ -5,6 +5,7 @@ import { usePlayerValue, player } from "@/modules/podcasts/playerInstance"
 import { placeShare } from "@/modules/podcasts/share"
 
 import { AirPlayButton } from "./AirPlayButton"
+import { LibraryButtons } from "./LibraryButtons"
 import { ShareButton } from "./ShareButton"
 import { SleepTimerButton } from "./SleepTimerSheet"
 
@@ -15,6 +16,7 @@ export function PlayerButtons() {
     <View className="w-full flex-row flex-wrap items-center justify-center gap-3">
       <SleepTimerButton />
       <AirPlayButton />
+      <LibraryButtons />
       {sharable ? (
         <ShareButton
           look="player"

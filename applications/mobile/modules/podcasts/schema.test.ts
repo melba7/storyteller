@@ -21,8 +21,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 7", () => {
-    expect(SCHEMA_VERSION).toBe(7)
+  it("is at version 8", () => {
+    expect(SCHEMA_VERSION).toBe(8)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -98,6 +98,19 @@ describe("migrationStatements", () => {
       "ALTER TABLE shows ADD COLUMN episode_sort TEXT NOT NULL DEFAULT 'newest'",
     )
     expect(statements).toHaveLength(7)
+  })
+
+  it("version 8 adds starring and the listening history, filled from what was played", () => {
+    const statements = stepFrom(7)
+    expect(statements).toContain(
+      "ALTER TABLE episodes ADD COLUMN starred_at INTEGER",
+    )
+    expect(statements).toContain(
+      "ALTER TABLE episodes ADD COLUMN history_at INTEGER",
+    )
+    expect(
+      statements.some((s) => s.startsWith("UPDATE episodes SET history_at")),
+    ).toBe(true)
   })
 
   it("has a column for every setting the screen saves", () => {

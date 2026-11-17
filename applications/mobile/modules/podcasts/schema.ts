@@ -5,7 +5,7 @@
 // runs every step; an older file runs only the steps it lacks.
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 7
+export const SCHEMA_VERSION = 8
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -102,6 +102,18 @@ const VERSION_7 = [
   "ALTER TABLE shows ADD COLUMN show_archived INTEGER NOT NULL DEFAULT 0",
 ]
 
+/**
+ * Version 8: starred episodes (when each was starred, null for none) and the listening
+ * history. `history_at` is when an episode was last listened to, kept apart from
+ * `last_played_at` so clearing the history does not touch what the automatic clean-up reads.
+ */
+const VERSION_8 = [
+  "ALTER TABLE episodes ADD COLUMN starred_at INTEGER",
+  "ALTER TABLE episodes ADD COLUMN history_at INTEGER",
+  "UPDATE episodes SET history_at = last_played_at WHERE last_played_at IS NOT NULL",
+  "CREATE INDEX episodes_history ON episodes (history_at)",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -111,6 +123,7 @@ const STEPS = [
   VERSION_5,
   VERSION_6,
   VERSION_7,
+  VERSION_8,
 ]
 
 /**

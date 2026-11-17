@@ -4,19 +4,21 @@ import { Ellipsis } from "lucide-react-native"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu } from "@/components/ui/menu"
+import { setPlayed, setStarred } from "@/modules/podcasts/dbEpisodes"
 import {
   archiveEpisodes,
   unarchiveEpisodes,
 } from "@/modules/podcasts/dbSettings"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
+import { isPreviewId } from "@/modules/podcasts/preview"
 import { isQueued } from "@/modules/podcasts/upNext"
 
 import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
 /**
  * The menu on an episode row: Play next and Play last (which also move an episode that is
- * already queued), for a queued one Remove from Up Next, and Archive or Unarchive. Nothing
+ * already queued), for a queued one Remove from Up Next, Star, Mark played and Archive (for episodes in the library). Nothing
  * where there is no native player.
  */
 export function archiveAction(episode: StoredEpisode) {
@@ -30,6 +32,33 @@ export function archiveAction(episode: StoredEpisode) {
         : archiveEpisodes([episode.id])
       done.catch((cause: unknown) =>
         console.warn("Couldn't change the episode's archive", cause),
+      )
+    },
+  }
+}
+
+/** Star or Unstar, for an episode in the library. */
+export function starAction(episode: StoredEpisode) {
+  const starred = episode.starredAt !== null
+  return {
+    id: "star",
+    title: starred ? "Unstar" : "Star",
+    onPress: () => {
+      setStarred([episode.id], !starred).catch((cause: unknown) =>
+        console.warn("Couldn't change the episode's star", cause),
+      )
+    },
+  }
+}
+
+/** Mark played or Mark unplayed, for an episode in the library. */
+export function playedAction(episode: StoredEpisode) {
+  return {
+    id: "played",
+    title: episode.played ? "Mark unplayed" : "Mark played",
+    onPress: () => {
+      setPlayed([episode.id], !episode.played).catch((cause: unknown) =>
+        console.warn("Couldn't change the episode's played mark", cause),
       )
     },
   }
@@ -68,7 +97,13 @@ export function EpisodeMenu({
               },
             ]
           : []),
-        archiveAction(episode),
+        ...(isPreviewId(episode.id)
+          ? []
+          : [
+              starAction(episode),
+              playedAction(episode),
+              archiveAction(episode),
+            ]),
       ]}
     >
       <Button

@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { ChevronRight, Download } from "lucide-react-native"
+import { ChevronRight, Download, History } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { Pressable, View } from "react-native"
 
@@ -98,6 +98,25 @@ export function Profile() {
             <View className="flex-1">
               <Text className="font-semibold">Downloads</Text>
               <Text className="text-muted-foreground text-sm">{summary}</Text>
+            </View>
+            <Icon
+              as={ChevronRight}
+              size={20}
+              className="text-muted-foreground"
+            />
+          </Pressable>
+          <Pressable
+            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
+            accessibilityRole="button"
+            accessibilityLabel="Listening history"
+            onPress={() => router.push("/podcasts/(tabs)/(profile)/history")}
+          >
+            <Icon as={History} size={22} className="text-primary" />
+            <View className="flex-1">
+              <Text className="font-semibold">Listening history</Text>
+              <Text className="text-muted-foreground text-sm">
+                What you listened to, by day.
+              </Text>
             </View>
             <Icon
               as={ChevronRight}

@@ -61,6 +61,8 @@ export type StoredEpisode = FetchedEpisode & {
   lastPlayedAt: number | null
   /** Put away: hidden on the show page unless asked for, and its download is deleted. */
   archived: boolean
+  /** Milliseconds since 1970 when it was starred, or null when it is not. */
+  starredAt: number | null
 }
 
 // MARK: Refreshing
@@ -276,5 +278,6 @@ export function episodeFromRow(row: Row): StoredEpisode {
     played: row["played"] === 1 || row["played"] === true,
     lastPlayedAt: numOrNull(row["last_played_at"]),
     archived: row["archived"] === 1 || row["archived"] === true,
+    starredAt: numOrNull(row["starred_at"]),
   }
 }
