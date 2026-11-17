@@ -199,6 +199,12 @@ in `FORK.md`.
 | 2026-11-17 | Hero cards put white text on blurred artwork under 60% black                                                                               | 4.5:1 even on white artwork                                |
 | 2026-11-17 | Profile groups are `SettingsGroup` cards; rows split by `border-foreground/10`, controls in cards use `bg-foreground/10`                   | Dark's border equals its card colour                       |
 | 2026-11-17 | `rulePills` is the one source of a smart playlist's rule words; `DragList` gets `onDrop` for the drop haptic                               | No second copy of the words                                |
+| 2026-11-17 | Apple's colours are the app's own light and dark themes, in one marked block appended to `global.css`                                      | Uniwind allows `@import` only first                        |
+| 2026-11-17 | Books screens use native large titles: on iOS the list is the screen's first child and the bar is `Stack.Title`/`Stack.Toolbar`            | Large titles shrink on scroll                              |
+| 2026-11-17 | Shared Books pieces (bars, headings, grouped lists, glass capsule) live in `apple-look/`; restyled upstream files are allowed changes      | Upstream syncs merge by hand there                         |
+| 2026-11-17 | Mini players are Liquid Glass capsules (`expo-glass-effect`), `bg-secondary` before iOS 26; the reader's scrubber sits above               | Apple's look, seek stays easy to hit                       |
+| 2026-11-17 | The listening player is washed with the cover's colour (`artworkColor`) under 50% black, with white text and a light status bar            | Readable on any cover                                      |
+| 2026-11-17 | The home screen shows "Storyteller+"; TestFlight and the App Store show the App Store Connect record's name until Mo renames it            | Bundle id unchanged                                        |
 
 ## Known problems
 

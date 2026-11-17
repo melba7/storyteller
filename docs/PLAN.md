@@ -1,7 +1,8 @@
 # Plan
 
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b merged (TestFlight 24.1); the
-bug check fixes and the design (D1 to D5) are built, in review
+bug check fixes and the design (D1 to D5) are built, in review | Books look: B1
+to B7 built, B8 (look check) next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -161,14 +162,14 @@ and the screen-by-screen table are in `docs/BOOKS-APPLE-DESIGN.md`. One pull
 request with all of it, merged before PR #48, then one TestFlight build carries
 both.
 
-- [ ] **B1. Colours and font.** Apple's colours in `global.css` (done), headings
-      in the system font.
-- [ ] **B2. Shared pieces and Home.**
-- [ ] **B3. Book page.**
-- [ ] **B4. Grids and search.**
-- [ ] **B5. Settings and sheets.**
-- [ ] **B6. Players.**
-- [ ] **B7. Reader chrome.**
+- [x] **B1. Colours and font.** Apple's colours in `global.css`, headings in the
+      system font.
+- [x] **B2. Shared pieces and Home.**
+- [x] **B3. Book page.**
+- [x] **B4. Grids and search.**
+- [x] **B5. Settings and sheets.**
+- [x] **B6. Players.**
+- [x] **B7. Reader chrome.**
 - [ ] **B8. Look check.** Every screen against the table and Mo's screenshots,
       the iOS build in CI, then Mo's look on TestFlight.
   - Done when: `tools/fork/check.sh` passes, every restyled upstream file is in
