@@ -27,6 +27,7 @@ import { player, usePlayer } from "@/modules/podcasts/playerInstance"
 import { playerBackground } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
+import { PlayerButtons } from "./PlayerButtons"
 import { SeekBar } from "./SeekBar"
 import { SpeedPanel } from "./SpeedPanel"
 
@@ -159,6 +160,8 @@ export function PlayerScreen() {
               />
             </View>
           ) : null}
+
+          <PlayerButtons />
 
           <View className="w-full gap-2 pt-4">
             <Text className="text-lg font-semibold text-white">Show notes</Text>

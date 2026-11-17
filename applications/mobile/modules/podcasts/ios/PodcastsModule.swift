@@ -41,7 +41,7 @@ public final class PodcastsModule: Module {
     Name("Podcasts")
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
-      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange")
+      "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -137,6 +137,27 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("clearUpNext") { () async in
       await MainActor.run { PodcastPlayer.shared.clearUpNext() }
+    }
+
+    // MARK: Sleep timer
+
+    // A countdown in minutes (1 to 720), or until the end of the episode. Both replace any
+    // timer. The state is "none", "countdown" (with `endsAt`, milliseconds) or "endOfEpisode".
+    AsyncFunction("startSleepTimer") { (minutes: Double) async throws in
+      let started = await MainActor.run { PodcastPlayer.shared.startSleep(minutes: minutes) }
+      if !started { throw PodcastFetchError(message: "That is not a time the timer can use.") }
+    }
+    AsyncFunction("sleepUntilEndOfEpisode") { () async in
+      await MainActor.run { PodcastPlayer.shared.sleepUntilEndOfEpisode() }
+    }
+    AsyncFunction("extendSleepTimer") { () async in
+      await MainActor.run { PodcastPlayer.shared.extendSleep() }
+    }
+    AsyncFunction("cancelSleepTimer") { () async in
+      await MainActor.run { PodcastPlayer.shared.cancelSleep() }
+    }
+    AsyncFunction("getSleepTimer") { () async -> [String: Any] in
+      await MainActor.run { PodcastPlayer.shared.sleepObject() }
     }
 
     // MARK: Downloading

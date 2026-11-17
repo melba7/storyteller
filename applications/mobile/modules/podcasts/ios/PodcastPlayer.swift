@@ -240,6 +240,7 @@ final class PodcastPlayer {
 
   private func tick() {
     ticks += 1
+    sleepTick()
     // The lock screen card keeps its own clock, so it is rewritten only now and then.
     publish(refreshCard: ticks % 10 == 0)
   }
@@ -276,8 +277,9 @@ final class PodcastPlayer {
     sink?(
       "onPlaybackEnded",
       ["episodeId": episodeId ?? "", "position": duration, "duration": duration, "played": true])
-    // The next queued episode starts here in Swift, so it also starts with the screen locked.
-    if startNextInQueue() { return }
+    // The next queued episode starts here in Swift, so it also starts with the screen locked,
+    // unless the sleep timer was set for the end of this one.
+    if !sleepStopsQueue(), startNextInQueue() { return }
     publish(positionOverride: duration)
   }
 

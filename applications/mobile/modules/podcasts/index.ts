@@ -134,7 +134,14 @@ export type UpNextChange = { items: UpNextItem[] }
 /** The player started the next queued episode by itself. */
 export type PlaybackAdvanced = { episodeId: string }
 
+/** The sleep timer: off, a countdown that ends at `endsAt` (milliseconds), or the episode's end. */
+export type SleepTimerState =
+  | { kind: "none" }
+  | { kind: "countdown"; endsAt: number }
+  | { kind: "endOfEpisode" }
+
 export type PodcastsEvents = {
+  onSleepTimerChange: (state: SleepTimerState) => void
   onUpNextChange: (change: UpNextChange) => void
   onPlaybackAdvanced: (event: PlaybackAdvanced) => void
   onDownloadChange: (change: DownloadChange) => void
@@ -165,6 +172,14 @@ type PodcastsNativeModule = {
   getPlaybackState(): Promise<PlaybackState>
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
+
+  /** Counts down this many minutes (1 to 720), then fades out and pauses. */
+  startSleepTimer(minutes: number): Promise<void>
+  sleepUntilEndOfEpisode(): Promise<void>
+  /** Adds 5 minutes to a running countdown. */
+  extendSleepTimer(): Promise<void>
+  cancelSleepTimer(): Promise<void>
+  getSleepTimer(): Promise<SleepTimerState>
 
   listUpNext(): Promise<UpNextItem[]>
   /** Puts an episode at the top ("next") or the bottom ("last"). One already queued moves. */
