@@ -36,6 +36,11 @@ export function settingsHref(
   return { pathname: `${tabBase(segments)}/show-settings/[id]`, params: { id } }
 }
 
+/** The downloads list, in the tab you are in. */
+export function downloadsHref(segments: readonly string[]): string {
+  return `${tabBase(segments)}/downloads`
+}
+
 export function episodeHref(
   segments: readonly string[],
   id: string,

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   categoryHref,
+  downloadsHref,
   episodeHref,
   previewHref,
   settingsHref,
@@ -67,6 +68,17 @@ describe("settingsHref", () => {
         pathname: "/podcasts/(tabs)/(profile)/show-settings/[id]",
         params: { id: "s1" },
       },
+    )
+  })
+})
+
+describe("downloadsHref", () => {
+  it("opens the downloads list in the tab you are in", () => {
+    expect(downloadsHref(["(tabs)", "(library)"])).toBe(
+      "/podcasts/(tabs)/(library)/downloads",
+    )
+    expect(downloadsHref(["(tabs)", "(profile)"])).toBe(
+      "/podcasts/(tabs)/(profile)/downloads",
     )
   })
 })

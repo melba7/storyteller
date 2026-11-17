@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Podcast } from "lucide-react-native"
+import { Download, Podcast } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -13,6 +13,7 @@ import {
 
 import { Text } from "@/components/ui/text"
 import { followUpNew } from "@/modules/podcasts/automaticRun"
+import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
@@ -24,7 +25,7 @@ import {
   sortShows,
 } from "@/modules/podcasts/libraryView"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { showHref } from "@/modules/podcasts/routes"
+import { downloadsHref, showHref } from "@/modules/podcasts/routes"
 
 import { EmptyState } from "./EmptyState"
 import {
@@ -36,8 +37,10 @@ import {
 } from "./LibraryShows"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
+import { LinkRow } from "./SettingsGroup"
 import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
+import { useDownloadMap } from "./useDownloads"
 import { useLibraryView } from "./useLibraryView"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 
@@ -110,6 +113,7 @@ export function PodcastsHome() {
   const segments = useSegments()
   const { width } = useWindowDimensions()
   const shows = useShows()
+  const downloads = useDownloadMap()
   const activity = useShowActivity()
   const { view, change } = useLibraryView()
   const [refreshing, setRefreshing] = useState(false)
@@ -138,6 +142,7 @@ export function PodcastsHome() {
     }
   }
 
+  const summary = downloadsSummary(downloads)
   const arranged = (shows.data ?? []).some((s) => s.ownPosition !== null)
   const openArrange = () => router.push("/podcasts/arrange")
   const columns = LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3
@@ -219,16 +224,27 @@ export function PodcastsHome() {
             <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
           ListHeaderComponent={
-            refreshProblem ? (
-              <View className="bg-destructive/10 mb-3 rounded-xl p-3">
-                <Text
-                  className="text-destructive text-sm"
-                  accessibilityRole="alert"
-                >
-                  {refreshProblem}
-                </Text>
+            <>
+              {refreshProblem ? (
+                <View className="bg-destructive/10 mb-3 rounded-xl p-3">
+                  <Text
+                    className="text-destructive text-sm"
+                    accessibilityRole="alert"
+                  >
+                    {refreshProblem}
+                  </Text>
+                </View>
+              ) : null}
+              <View className="bg-secondary mb-3 overflow-hidden rounded-3xl px-4">
+                <LinkRow
+                  icon={Download}
+                  title="Downloaded"
+                  body={summary}
+                  label={`Downloaded, ${summary}`}
+                  onPress={() => router.push(downloadsHref(segments))}
+                />
               </View>
-            ) : undefined
+            </>
           }
           ListEmptyComponent={
             <EmptyState

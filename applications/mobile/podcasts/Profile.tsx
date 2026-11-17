@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack, useRouter } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { Bookmark, Download, History } from "lucide-react-native"
 import { useEffect, useState } from "react"
@@ -17,6 +17,7 @@ import {
 import { downloadsSummary } from "@/modules/podcasts/downloads"
 import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+import { downloadsHref } from "@/modules/podcasts/routes"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
 import { AddAudioFilesRow } from "./AddAudioFilesRow"
@@ -35,6 +36,7 @@ import { useStatusBarStyle } from "./usePodcastsTheme"
 export function Profile() {
   const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
+  const segments = useSegments()
   const map = useDownloadMap()
   const [wifiOnly, setWifi] = useState<boolean | null>(null)
   const [automatic, setAutomatic] = useState<AutomaticSettings | null>(null)
@@ -109,9 +111,7 @@ export function Profile() {
               title="Downloads"
               body={summary}
               label={`Downloads, ${summary}`}
-              onPress={() =>
-                router.push("/podcasts/(tabs)/(profile)/downloads")
-              }
+              onPress={() => router.push(downloadsHref(segments))}
             />
             <LinkRow
               icon={History}
