@@ -158,7 +158,10 @@ Mo's ask (2026-11-16): a Podcasts section beside Books with ads skipped on the
 phone. Design, risks and Mo's answers are in `docs/PODCASTS-PLAN.md`. Mo
 approved the plan on 2026-11-16. These milestones do not wait for the sound
 milestones above. Mo's way of working here: Opus 5.5 plans and checks, Sonnet
-writes the code.
+writes the code. Since 2026-11-17 the section follows Pocket Casts' look and
+features (Mo's ask; reference only, see "Matching Pocket Casts" in
+`docs/PODCASTS-PLAN.md`). Mo gave a standing OK (2026-11-17) to merge these PRs
+once reviewed and green.
 
 - [ ] **P1a. Podcasts section: subscribe and browse** Status: merged into main
       on 2026-11-16 (PR #37; the iOS build passed on an Intel Mac); waiting for
@@ -184,8 +187,14 @@ writes the code.
 
 - [ ] **P1b. Play an episode**
   - A Swift player in `modules/podcasts` streams an episode: play and pause,
-    back 15 s and ahead 30 s, a seek bar, speed (0.8x to 3x), the place kept per
-    episode, a player screen and a mini player on the Podcasts screens.
+    back 10 s and ahead 45 s (Pocket Casts' defaults), a seek bar, speed 0.5x to
+    3x in 0.1 steps, and the place kept per episode.
+  - The full-screen player is laid out like Pocket Casts': large artwork, the
+    background tinted with the artwork's main colour (worked out in Swift and
+    kept per show), title and show, the seek bar with time played and time left,
+    the big play button between the skip buttons, and the speed button. Show
+    notes sit below. A mini player at the bottom of the Podcasts screens shows
+    the artwork, title, time left and play button, and opens the player.
   - Lock screen and headphone buttons control the podcast while it is the active
     player. Starting a podcast pauses the book; starting the book pauses the
     podcast. The book's lock-screen handlers stand aside while a podcast plays
@@ -206,9 +215,37 @@ writes the code.
     `modules/readium/ios/AudiobookPlayerActor.swift`,
     `tools/fork/touchpoints.json`.
 
-- [ ] **P1c. Explore** (Mo's ask, 2026-11-16, after P1b)
-  - An Explore button on the Podcasts screen opens Apple's free US top chart,
-    Apple's main categories (each with its own top chart), and "For you".
+- [ ] **P1c. The Pocket Casts layout** (Mo's ask, 2026-11-17)
+  - The Podcasts section gets a bottom tab bar like Pocket Casts': Podcasts,
+    Discover and Profile to start. Up Next joins with P2b and Playlists with
+    P5d, so no tab is ever empty. The mini player sits just above the tabs. Try
+    expo-router's native iOS tabs first (the iOS 26 glass bar, no new package);
+    if they can't sit inside the section, draw the bar in React.
+  - Podcasts tab: a grid of artwork (large grid, small grid or list) with a
+    badge for unplayed episodes, sorted by name, date added, newest episode or
+    your own order (drag), with the add button and the side menu button on top.
+  - A show's page: a large header (artwork, title, author, Follow or Following,
+    a description that expands), then episode rows with date, title, length or
+    time left, a play button with a progress ring, and played episodes dimmed.
+    An episode opens as a card (artwork, title, date, length, play, notes with
+    working links).
+  - Profile tab: settings for the Podcasts section and, later, stats, downloads,
+    history and bookmarks.
+  - Own icons (lucide, already in the app) and colours: nothing is copied from
+    Pocket Casts.
+  - Test first: JS tests for the grid's sorting, the badge counts and the row
+    states (unplayed, in progress, played); screenshots of each screen checked
+    by Opus against the reference.
+  - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
+    the three tabs, the grid, a show's page and the episode card work.
+  - Try it: Podcasts, then each tab.
+  - Files: `podcasts/` (tab layout, grid, show page, episode card, Profile),
+    `app/(root)/podcasts/` (the tab routes), `modules/podcasts/library.ts`
+    (sorting and counts, with tests).
+
+- [ ] **P1d. Discover** (Mo's ask, 2026-11-16, planned as "Explore")
+  - The Discover tab shows Apple's free US top chart, Apple's main categories
+    (each with its own top chart), and "For you".
   - "For you" takes the categories of the shows you follow (each feed's
     `itunes:category`), most common first, and lists the top shows in up to
     three of them, leaving out shows you already follow. Each one says "Because
@@ -217,7 +254,7 @@ writes the code.
     feed without saving it, a Follow button, and Play (P1b's player; the place
     is kept only once you follow). Search results in Add open this preview too,
     instead of following at once.
-  - The charts are fetched when Explore opens and kept for a day. Chart entries
+  - The charts are fetched when Discover opens and kept for a day. Chart entries
     carry Apple ids, not feeds, so one lookup call
     (`https://itunes.apple.com/lookup?id=<ids>`) gets their feed links.
   - The feed reader keeps each show's categories. `podcasts.db` goes to version
@@ -233,22 +270,22 @@ writes the code.
     you" (most common categories first, followed shows left out, the "because"
     show) and the one-day cache.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight Mo
-    opens Explore, browses a category, sees suggestions from the shows already
+    opens Discover, browses a category, sees suggestions from the shows already
     followed, and follows one from its preview.
-  - Try it: Podcasts, Explore.
+  - Try it: Podcasts, Discover.
   - Files: `PodcastKit` (categories), `modules/podcasts` (`charts.ts`,
-    `categories.ts`, `db.ts` version 2, with tests), `podcasts/` (Explore, show
-    preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (explore and preview
+    `categories.ts`, `db.ts` version 2, with tests), `podcasts/` (Discover, show
+    preview, `AddPodcast.tsx`), `app/(root)/podcasts/` (discover and preview
     routes).
 
-- [ ] **P1d. Search episodes** (Mo's ask, 2026-11-16, after P1c)
+- [ ] **P1e. Search episodes** (Mo's ask, 2026-11-16)
   - Search on the Podcasts screen has two tabs. "Your shows" finds episodes of
     the shows you follow by words in the title or show notes, on the phone (it
     works offline), title matches first, then newest. "All podcasts" uses
     Apple's free episode search
     (`https://itunes.apple.com/search?media=podcast&entity=podcastEpisode&term=`).
   - A result from your shows opens the episode. A result from all podcasts opens
-    its show's preview (P1c) at that episode, found by guid or else by its audio
+    its show's preview (P1d) at that episode, found by guid or else by its audio
     link, where it can be played.
   - Test first: JS tests for the search words (`%` and `_` taken literally,
     every word required), the order of results, and reading Apple's episode
@@ -265,6 +302,8 @@ writes the code.
   - Download and delete buttons per episode. Downloads use a background session,
     so they finish with the app closed. A downloaded episode plays from the
     file. Each file's SHA-256 becomes its identity.
+  - Like Pocket Casts: a Downloads list in Profile with the storage used,
+    "Download only on Wi-Fi", and the download state on each episode row.
   - Test first: Swift tests for download bookkeeping (resume after a restart,
     the hash, deleting a file and its side files).
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight an
@@ -275,6 +314,9 @@ writes the code.
 - [ ] **P2b. Up Next**
   - Add to Up Next, play next, reorder and remove. The queue lives in Swift, so
     the next episode starts when one ends, even with the screen locked.
+  - Like Pocket Casts: Up Next becomes a tab with the number of episodes on it,
+    with swipe actions (play next, play last, remove), drag to reorder, and
+    "Clear Up Next".
   - Test first: Swift tests for the queue rules (end of episode, removing the
     playing one, a missing file); a JS test for the screen's list.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
@@ -397,6 +439,70 @@ writes the code.
   - Files: `PodcastKit` (skip rules), `modules/podcasts/ios` (player),
     `podcasts/` (note, seek bar, switches).
 
+### Pocket Casts features (Mo's ask, 2026-11-17)
+
+The rest of Pocket Casts' features, one session each. Each step's "done when"
+is: check.sh passes, the iOS build passes in CI, and the behaviour named works
+on TestFlight. Each one starts with tests of its rules (JS or Swift, run in
+`check.sh`). Size: S is small, M medium, L a big lift. Details and what is left
+out, with the reasons, are in "Matching Pocket Casts" in
+`docs/PODCASTS-PLAN.md`.
+
+- [ ] **P5a. Per-show settings** (S): skip the first and last N seconds of every
+      episode (intros and outros), the show's own speed, auto-download on or
+      off, and add new episodes to Up Next (top, bottom or off).
+- [ ] **P5b. Archive and tidy** (S): archive and unarchive episodes, archive by
+      itself after playing or after N days, keep only the newest N episodes,
+      sort episodes (newest, oldest, shortest, longest), group by season, and
+      show or hide archived episodes.
+- [ ] **P5c. Star, history and bulk actions** (M): star episodes, mark played or
+      unplayed, a listening history in Profile, and multi-select with bulk
+      actions (download, mark played, archive, star, add to Up Next).
+- [ ] **P5d. Smart playlists** (M): the Playlists tab, with playlists built from
+      rules (shows, played state, release date, length, downloaded, starred),
+      sorted and with auto-download. It starts with New Releases, In Progress
+      and Starred.
+- [ ] **P5e. Your own playlists** (S): playlists you fill by hand, with any
+      episode (also from shows you don't follow), drag to reorder, and "Play
+      all" into Up Next.
+- [ ] **P5f. Sleep timer** (S): 5 to 60 minutes or your own time, end of
+      episode, end of chapter once P5g is in, add 5 minutes, and a fade-out at
+      the end.
+- [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
+      from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
+      read in Swift), a chapter list in the player, previous and next chapter,
+      chapter artwork, and skipping a chapter.
+- [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
+      title you can edit, from the player and as a headphone action; listed per
+      episode and in Profile; tap to play from there.
+- [ ] **P5i. Playback settings** (S): skip back and ahead amounts, what the
+      headphones' next and previous buttons do (skip, next chapter or bookmark),
+      mark an episode played when N seconds are left, and going back a few
+      seconds after a long pause.
+- [ ] **P5j. Volume boost and trim silence** (L): a second Swift player
+      (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
+      silent gaps, in three strengths, per show or for everything. Streamed
+      episodes keep speed only.
+- [ ] **P5k. Stats** (S to M): total time listened, time saved by speed,
+      skipping, intro and outro skipping, trimmed silence and skipped ads, and
+      listening by day, in Profile.
+- [ ] **P5l. Themes** (M): Light, Dark, Extra Dark (true black) and a few colour
+      themes with names and colours of our own, following iOS light and dark
+      mode if you like, for the Podcasts section.
+- [ ] **P5m. Share and OPML** (S): share a show, an episode or the place playing
+      now (the feed's own links); import and export your shows as an OPML file
+      (with the document picker and share sheet the app already has).
+- [ ] **P5n. AirPlay and notifications** (S): the AirPlay button in the player,
+      and a notification when a followed show has a new episode (per show, from
+      P2c's background refresh).
+- [ ] **P5o. Your own audio files** (M): add audio files from the Files app,
+      play them like episodes, and put them in Up Next. They are transcribed and
+      ad-checked like downloads.
+- [ ] **P5p. Transcript in the player** (M, after P3a): the episode's transcript
+      beside the player, the words playing now highlighted, tap a line to jump
+      there, and search in it. A feed's own transcript (`podcast:transcript`) is
+      shown when there is one.
+
 ## Later
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
@@ -412,3 +518,7 @@ writes the code.
 - Podcasts: search the words spoken inside downloaded episodes (needs P3a's
   transcripts), suggestions ranked by how alike the shows' descriptions are
   (on-device model), and charts for other countries.
+- Podcasts, left out of the Pocket Casts match for now (reasons in
+  `docs/PODCASTS-PLAN.md`): CarPlay, Apple Watch, widgets, Live Activities, Siri
+  Shortcuts, Chromecast and Sonos, video podcasts, the iPad layout, app icons,
+  and sync with other devices.

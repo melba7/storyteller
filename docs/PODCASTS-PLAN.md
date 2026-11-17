@@ -2,7 +2,8 @@
 
 Status: approved by Mo on 2026-11-16 with the suggested answers below, except
 that the hosts' own plugs are skipped too, under a separate switch (question 5).
-The milestones are P1a to P4c in `docs/PLAN.md`.
+On 2026-11-17 Mo asked for Pocket Casts' look and features as well (see
+"Matching Pocket Casts"). The milestones are P1a to P5p in `docs/PLAN.md`.
 
 ## Goal
 
@@ -30,9 +31,9 @@ and the app keeps reaching TestFlight the way it does now.
   player (`modules/readium`), the fork's sounds module (`modules/lofi-score`)
   and the Swift package `libraries/LofiScoreKit`.
 - **Pocket Casts iOS is a native Swift app**, so the two cannot be merged. It is
-  used only as a reference for what the features do (subscriptions, downloads,
-  Up Next, speed, the player). No code, artwork, names or screen designs are
-  copied from it.
+  used only as a reference for what the features do and, since 2026-11-17 (Mo's
+  ask), for how the screens are laid out. No code, name, logo, icons or artwork
+  are copied from it.
 - **There is no left menu on the iPhone today.** The Books screen has a top bar
   with the logo, the search field and a "⋯" menu (Import book, Settings). The
   plan adds a menu button at the top left that opens a side menu with Books and
@@ -82,7 +83,7 @@ also starts the iOS build and TestFlight.
 ### Data and files
 
 - **Library** (`podcasts.db`, a separate SQLite file): shows (with their
-  categories from P1c), episodes, played and position, and a small cache for
+  categories from P1d), episodes, played and position, and a small cache for
   Apple's charts. The books database and upstream's migrations are not touched.
 - **Downloads**: `Application Support/Podcasts/<episode>/<sha256>.<ext>`. The
   SHA-256 of the downloaded bytes is the file's identity.
@@ -127,8 +128,9 @@ Podcasts):
 
 ### Explore and search (Mo's ask, 2026-11-16)
 
-Mo chose to build these right after playback, as P1c and P1d. Everything uses
-Apple's free, keyless addresses; nothing is paid.
+Mo chose to build these right after playback, as P1d (Discover, first called
+Explore) and P1e, after the Pocket Casts layout (P1c). Everything uses Apple's
+free, keyless addresses; nothing is paid.
 
 - **Top charts**: Apple's US top chart, overall and for each of Apple's main
   categories, fetched when Explore opens and kept for a day. Chart entries carry
@@ -144,6 +146,97 @@ Apple's free, keyless addresses; nothing is paid.
   across all podcasts, through Apple's episode search.
 - The cloud can't reach Apple's chart addresses, so the tests use saved answers,
   and the first build checks them on the phone.
+
+## Matching Pocket Casts (Mo's ask, 2026-11-17)
+
+Mo asked for the Podcasts section to have Pocket Casts' look and its features.
+Pocket Casts is still only a reference: the features are rebuilt in this app's
+React Native screens and Swift module, and nothing is copied (see "Pocket Casts
+licence"). The checks below come from Pocket Casts' App Store page and its
+support pages (November 2026).
+
+### The look
+
+- A bottom tab bar inside the Podcasts section: Podcasts, Discover and Profile,
+  then Up Next (P2b) and Playlists (P5d). The mini player sits above the tabs.
+  expo-router's native tabs (in the app already) give iOS 26's glass tab bar; if
+  they can't sit inside the section, the bar is drawn in React. The side menu
+  button stays, to get back to Books.
+- Podcasts: a grid of artwork with a badge for unplayed episodes (large grid,
+  small grid or list), sortable, with drag to reorder.
+- A show's page: a large header, then episode rows with a play button that shows
+  progress. An episode opens as a card.
+- The player: large artwork on a background tinted from the artwork, the seek
+  bar, big skip and play buttons, and a row of small buttons for speed and,
+  later, the sleep timer, star, share and more. Show notes, chapters, bookmarks
+  and the transcript sit under or beside it.
+- Own icons (lucide, already in the app), colours and theme names. Pocket Casts'
+  name, logo, icons and artwork are not used.
+
+### Features
+
+| Pocket Casts feature                                                               | Where                                              | Size      |
+| ---------------------------------------------------------------------------------- | -------------------------------------------------- | --------- |
+| Follow by search, link, Apple link, OPML                                           | P1a, P2d, P5m                                      | done or S |
+| Discover: charts, categories, suggestions                                          | P1d (Apple's charts)                               | M         |
+| Search shows and episodes                                                          | P1a, P1e                                           | S         |
+| Player: speed 0.5x-3x, skip 10/45 s, lock screen, mini player                      | P1b                                                | M         |
+| The Pocket Casts layout (tabs, grid, show page, episode card)                      | P1c                                                | M         |
+| Downloads, storage, Wi-Fi only                                                     | P2a                                                | M         |
+| Up Next (tab, swipe actions, reorder, clear)                                       | P2b                                                | M         |
+| New episodes and auto-download                                                     | P2c                                                | M         |
+| Transcripts                                                                        | P3a (made on the phone), P5p (shown in the player) | M         |
+| Per-show settings: skip intro and outro, speed, auto-download, auto-add to Up Next | P5a                                                | S         |
+| Archive, auto archive, episode limit, sort, group by season                        | P5b                                                | S         |
+| Star, mark played, listening history, multi-select                                 | P5c                                                | M         |
+| Smart playlists (formerly filters) and playlists                                   | P5d, P5e                                           | M, S      |
+| Sleep timer                                                                        | P5f                                                | S         |
+| Chapters (feed, M4A, MP3), chapter artwork, skip a chapter                         | P5g                                                | M to L    |
+| Bookmarks                                                                          | P5h                                                | S to M    |
+| Skip amounts, headphone actions, smart resume                                      | P5i                                                | S         |
+| Volume boost and trim silence                                                      | P5j                                                | L         |
+| Listening stats and time saved                                                     | P5k                                                | S to M    |
+| Themes: Light, Dark, Extra Dark and colour themes                                  | P5l                                                | M         |
+| Share shows, episodes and the place playing                                        | P5m                                                | S         |
+| AirPlay, new-episode notifications                                                 | P5n                                                | S         |
+| Your own audio files                                                               | P5o                                                | M         |
+| Ad skipping (not in Pocket Casts)                                                  | P3a-P4c                                            | L         |
+
+Why the big ones are big:
+
+- **Volume boost and trim silence** need a second player built on Apple's audio
+  engine that reads the file itself, because the standard player can't drop
+  silent stretches. It works on downloaded episodes; streams keep speed only.
+- **Chapters in MP3 files** are stored in ID3 tags that Apple's frameworks don't
+  read, so PodcastKit gets its own small reader (tested on Linux).
+
+### Left out for now, and why
+
+- **Sync with other devices and the web**: Pocket Casts keeps this on its own
+  servers and accounts. Here everything stays on the phone (the Mac sync in P2e
+  is one way, from Apple Podcasts).
+- **Pocket Casts' own Discover lists, networks, curated lists, Clips, What's New
+  and the yearly review**: these are Pocket Casts' own content and service.
+  Discover uses Apple's free charts instead.
+- **CarPlay**: needs a CarPlay permission (entitlement) that Apple grants on
+  request, and the app must stay free of entitlements for the unsigned
+  TestFlight build. Possible later, with a change to how builds are signed.
+- **Apple Watch, widgets, Live Activities and Siri Shortcuts**: each needs an
+  extra app target or extension, with its own build and signing setup. Big lifts
+  for later.
+- **Chromecast and Sonos**: need Google's or Sonos's SDK (new native packages)
+  and the local network permission. AirPlay (P5n) covers Apple TVs and AirPlay
+  speakers.
+- **Video podcasts**: need a video view and picture in picture. Later.
+- **iPad layout and app icons**: Mo uses an iPhone, and the fork has no icon of
+  its own yet.
+- **Plus and Patron**: there are no subscriptions here; every feature is free.
+
+### Order
+
+P1 (play, the layout, Discover, search) comes first, then downloads and Up Next
+(P2), which ad skipping needs. Ad skipping (P3-P4) and the Pocket Casts features
+(P5) both follow; Mo picks which goes first.
 
 ## Finding ads
 
@@ -222,7 +315,8 @@ file: a copied file, and changes to it, must stay under MPL 2.0 with its notice,
 and its source must stay available. The rest of the app could stay MIT. The plan
 avoids this entirely by reimplementing the features and copying nothing. If a
 file is ever copied, it stays a separate file with its MPL header and is listed
-in `FORK.md`. The Pocket Casts name, icons and look are not used.
+in `FORK.md`. The screens follow Pocket Casts' layout (Mo's ask), but its name,
+logo, icons, artwork and theme names are not used.
 
 ## Risks
 
@@ -247,22 +341,24 @@ in `FORK.md`. The Pocket Casts name, icons and look are not used.
 
 ## How each milestone is checked
 
-| Milestone             | In the cloud (`check.sh`)                              | Fork CI (macOS)            | Mo's Mac                                                                 | Only on Mo's phone                              |
-| --------------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
-| P1a Subscribe         | Feed parser (Swift, Linux), library logic (JS)         | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
-| P1b Play              | Player rules (Swift), player state (JS)                | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
-| P1c Explore           | Feed categories, charts, lookup, For you, cache        | iOS build                  |                                                                          | Charts load, suggestions, follow from a preview |
-| P1d Search episodes   | Search words and order, Apple's episode answer         | iOS build                  |                                                                          | Find by a word in notes, play a found episode   |
-| P2a Downloads         | Download bookkeeping, file identity                    | iOS build                  |                                                                          | Download with the app closed, play offline      |
-| P2b Up Next           | Queue rules                                            | iOS build                  |                                                                          | Next episode starts with the screen locked      |
-| P2c New episodes      | Refresh and clean-up rules                             | iOS build                  |                                                                          | New episodes appear and download by themselves  |
-| P2d Share links       | Reading Apple links and the lookup                     | iOS build                  |                                                                          | A link from Apple Podcasts adds the show        |
-| P2e Mac sync          | Library file reader (Python), what the phone adds (JS) | iOS build                  | Job writes the file from the real library                                | A followed show appears within the hour         |
-| P3a Transcribe        | Transcript format and storage                          | Builds the Apple-only code | `.command` transcribes an episode                                        | Speed, battery, the first model download        |
-| P3b In the background | Resume rules                                           | iOS build                  |                                                                          | Transcribed after the app was closed            |
-| P4a Ad finder         | Chunker, clean-up, saving, with a fake detector        | Builds the Apple-only code | `.command` finds ads in an episode (needs Apple Intelligence on the Mac) |                                                 |
-| P4b Ads on the phone  | Status rules                                           | iOS build                  |                                                                          | Ads found on the iPhone's model, time taken     |
-| P4c Skipping          | Skip rules (seek into an ad, Undo, speed)              | iOS build                  |                                                                          | Skip, note and Undo while listening, locked too |
+| Milestone                     | In the cloud (`check.sh`)                              | Fork CI (macOS)            | Mo's Mac                                                                 | Only on Mo's phone                              |
+| ----------------------------- | ------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------------ | ----------------------------------------------- |
+| P1a Subscribe                 | Feed parser (Swift, Linux), library logic (JS)         | iOS build                  |                                                                          | Side menu, search, a real feed's episodes       |
+| P1b Play                      | Player rules (Swift), player state (JS)                | iOS build                  |                                                                          | Lock screen, speed, hand-over with a book       |
+| P1c Layout                    | Grid sorting, badges, row states                       | iOS build                  |                                                                          | Tabs, grid, show page, episode card             |
+| P1d Discover                  | Feed categories, charts, lookup, For you, cache        | iOS build                  |                                                                          | Charts load, suggestions, follow from a preview |
+| P1e Search episodes           | Search words and order, Apple's episode answer         | iOS build                  |                                                                          | Find by a word in notes, play a found episode   |
+| P2a Downloads                 | Download bookkeeping, file identity                    | iOS build                  |                                                                          | Download with the app closed, play offline      |
+| P2b Up Next                   | Queue rules                                            | iOS build                  |                                                                          | Next episode starts with the screen locked      |
+| P2c New episodes              | Refresh and clean-up rules                             | iOS build                  |                                                                          | New episodes appear and download by themselves  |
+| P2d Share links               | Reading Apple links and the lookup                     | iOS build                  |                                                                          | A link from Apple Podcasts adds the show        |
+| P2e Mac sync                  | Library file reader (Python), what the phone adds (JS) | iOS build                  | Job writes the file from the real library                                | A followed show appears within the hour         |
+| P3a Transcribe                | Transcript format and storage                          | Builds the Apple-only code | `.command` transcribes an episode                                        | Speed, battery, the first model download        |
+| P3b In the background         | Resume rules                                           | iOS build                  |                                                                          | Transcribed after the app was closed            |
+| P4a Ad finder                 | Chunker, clean-up, saving, with a fake detector        | Builds the Apple-only code | `.command` finds ads in an episode (needs Apple Intelligence on the Mac) |                                                 |
+| P4b Ads on the phone          | Status rules                                           | iOS build                  |                                                                          | Ads found on the iPhone's model, time taken     |
+| P4c Skipping                  | Skip rules (seek into an ad, Undo, speed)              | iOS build                  |                                                                          | Skip, note and Undo while listening, locked too |
+| P5a-P5p Pocket Casts features | Each step's rules                                      | iOS build                  |                                                                          | The feature named in the step                   |
 
 The Mac commands are double-clickable `.command` files, because the Mac's auto
 mode refuses `swift run`.

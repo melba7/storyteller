@@ -71,6 +71,11 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   before following it, and search episodes in their own shows (offline) and
   across all podcasts. Check: no suggestion is a show already followed, and an
   episode is found by a word in its notes.
+- The Podcasts section looks and works like Pocket Casts (Mo's ask, 2026-11-17):
+  its tab bar, artwork grid, player and mini player, and its features (per-show
+  settings, playlists, sleep timer, chapters, bookmarks, effects, stats, themes
+  and more), rebuilt here with nothing copied. Check: each step in
+  `docs/PLAN.md` (P1c, P5a to P5p) works on the phone.
 - The user can play an episode with speed, skip buttons and the lock screen, and
   a book and a podcast never play at the same time. Check: switching between
   them on the phone plays only one.
