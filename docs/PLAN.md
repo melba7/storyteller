@@ -935,17 +935,29 @@ TestFlight build.
       queue; nothing lost from the old Profile, Playlists and Up Next tabs.
   - Done when: `check.sh` passes, route tests cover every tab's home screen and
     the shared detail routes, and the iOS build passes in CI.
+  - Status: built 2026-11-17 (four tabs, one shared route group
+    `(home,new,library,search)`, Profile at `/podcasts/account`, Library rows
+    with counts); `check.sh` passes; the iOS build in CI is still to run.
 - [ ] **A2. Home** (L): the Up Next cards (in progress, then the newest unplayed
       episode per show), the shared episode "…" menu, Your Top Shows, You Might
       Like, Saved and Latest Episodes.
   - Done when: the shelf's SQL and order are tested and `check.sh` passes.
+  - Status: built 2026-11-17; the card's "…" is white and tints its menu with
+    the card's colour. Top Shows rank by recent plays (the stats keep no time
+    per show).
 - [ ] **A3. Rows, show page and episode page** (L) in Apple's look, with the
       purple accent and the system font.
   - Done when: `check.sh` passes; the look is checked on TestFlight.
+  - Status: built 2026-11-17 (rows, native menu with Save and Share on top,
+    show and episode headers in the artwork's colour, zoom targets); the purple
+    and the system font come from the app-wide theme of the Books restyle.
 - [ ] **A4. Player and mini player** (L): the screenshot's layout, the queue and
       transcript in place of the artwork, the "…" menu, the zoom from the mini
       player where it works.
   - Done when: `check.sh` passes and nothing the old player did is lost.
+  - Status: built 2026-11-17 (sheet in the artwork's colour, volume slider as a
+    second native module, six panels in place of the artwork). No zoom from the
+    mini player: it lives in the tab bar's accessory, outside the stack.
 - [ ] **A5. Search and New** (M): category tiles, scopes, featured cards and
       ranked Top Shows.
   - Done when: `check.sh` passes.

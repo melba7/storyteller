@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { CircleArrowDown, Pause, Play } from "lucide-react-native"
+import { CircleArrowDown, Ellipsis, Pause, Play } from "lucide-react-native"
 import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
@@ -184,7 +184,15 @@ export function UpNextCard({
               <CircleArrowDown size={24} color={palette.text} />
             </Pressable>
           ) : null}
-          <EpisodeMenu episode={episode} show={show} />
+          <EpisodeMenu episode={episode} show={show} tint={palette.background}>
+            <View
+              className="size-10 items-center justify-center"
+              accessibilityRole="button"
+              accessibilityLabel={`More for ${episode.title}`}
+            >
+              <Ellipsis size={24} color={palette.text} />
+            </View>
+          </EpisodeMenu>
         </View>
       </View>
     </PressableScale>

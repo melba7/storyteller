@@ -14,14 +14,14 @@ import { type Selection } from "./useSelection"
 
 const ACTIONS: { id: BulkAction; title: string }[] = [
   { id: "download", title: "Download" },
-  { id: "played", title: "Mark played" },
-  { id: "unplayed", title: "Mark unplayed" },
+  { id: "played", title: "Mark as Played" },
+  { id: "unplayed", title: "Mark as Unplayed" },
   { id: "archive", title: "Archive" },
   { id: "unarchive", title: "Unarchive" },
-  { id: "star", title: "Star" },
-  { id: "unstar", title: "Unstar" },
-  { id: "queueNext", title: "Play next (top of Up Next)" },
-  { id: "queueLast", title: "Play last (bottom of Up Next)" },
+  { id: "star", title: "Save" },
+  { id: "unstar", title: "Unsave" },
+  { id: "queueNext", title: "Play Next" },
+  { id: "queueLast", title: "Play Last" },
 ]
 
 /** How tall the bar is, so the list can leave room for it at the top. */
