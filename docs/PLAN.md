@@ -850,8 +850,32 @@ that, so a fresh download is usually past its ads before they are known.
     passes in CI.
   - Status: built (`playWait.ts`, 13 tests; a newer play wins). The episode
     already playing keeps playing while the next one downloads.
-- [ ] **R4. Ads found as the transcript grows** (L): waits for Mo's answer on
-      Apple Intelligence (the finder needs it).
+- [ ] **R8. Skip ads while streaming: play the download as it arrives** (L, Mo
+      2026-11-17: "If you can find a way to skip ads while streaming would be
+      better"): with Skip ads on, an episode that is not downloaded starts at
+      once from its own download as the bytes arrive (an
+      `AVAssetResourceLoaderDelegate` that feeds the player from a foreground
+      download of the episode's address and waits for bytes not there yet), so
+      what is heard is the exact file that is then saved, transcribed and
+      checked for ads. It replaces R2b's wait; R2b's card stays only for the
+      cases where the bytes cannot come fast enough (Wi-Fi only off Wi-Fi).
+  - Test first: PodcastKit rules for which byte ranges can be answered now,
+    content length and type from the response, and handing the finished file to
+    the download store (same sha256 and folder as a normal download).
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    a new episode starts at once with Skip ads on and appears in Downloaded when
+    its bytes are all in.
+- [ ] **R4. Ads found as the transcript grows** (L): the ad finder works on the
+      playing episode's transcript after each five-minute piece instead of after
+      the whole episode. Pieces that end before the transcript's edge are asked
+      once (the chunking is greedy, so a prefix gives the same pieces); their
+      answers are kept in a progress file, a partial ads file covers what is
+      done, the player skips from it, and the final run reuses the answers.
+  - Test first: PodcastKit tests that pieces from a prefix match the full
+    transcript's pieces up to the edge, that kept answers are reused, and that
+    the partial file only covers finished pieces.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    a mid-roll in a just-started episode is skipped.
 - [x] **R5. The top bar over text, and controls off the edge** (M): Mo's
       screenshots (Profile scrolled, the player's transcript) show the large
       title staying large over the content, the page pills running off the right
