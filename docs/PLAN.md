@@ -647,6 +647,10 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5k. Stats** (S to M): total time listened, time saved by speed,
       skipping, intro and outro skipping, trimmed silence and skipped ads, and
       listening by day, in Profile.
+  - Status: built and passing `check.sh`: Swift counts the time listened and the
+    time saved by speed, intro and outro skipping, trimmed silence, skipped ads
+    and skipped chapters in `Podcasts/stats.json` (also locked); Profile > Stats
+    shows them with a 30-day bar chart and a reset. No schema change.
 - [ ] **P5l. Themes** (M): Light, Dark, Extra Dark (true black) and a few colour
       themes with names and colours of our own, following iOS light and dark
       mode if you like, for the Podcasts section.

@@ -156,6 +156,8 @@ in `FORK.md`.
 | 2026-11-17 | `podcasts.db` is at schema version 9: a show's own voice boost and trim (v8), and each episode's feed chapters address (v9)                | Builders' steps renumbered at merge                        |
 | 2026-11-17 | Chapters live in Swift for the loaded episode: feed JSON wins over the file's (ID3 reader of our own, else AVFoundation); JS gets events   | Work locked and with Up Next                               |
 | 2026-11-17 | Chapter skips are kept per episode in `UserDefaults` (`podcasts.chapterSkips`) and run on the 0.5 s tick; a seek into one plays it         | Up to 0.5 s heard before the jump                          |
+| 2026-11-17 | Listening stats are counted in Swift (`StatsStore`, rules in `ListeningStats`) and saved to `Podcasts/stats.json` every 30 s and on pause  | Counts while locked; 90 days kept                          |
+| 2026-11-17 | Time saved by a jump (intro, outro, ad, chapter, silence) is the audio skipped divided by the speed; an undone ad takes its skip back      | One rule for every saving                                  |
 
 ## Known problems
 
