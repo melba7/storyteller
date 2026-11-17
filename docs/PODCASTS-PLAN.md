@@ -205,9 +205,12 @@ support pages (November 2026).
 
 Why the big ones are big:
 
-- **Volume boost and trim silence** need a second player built on Apple's audio
-  engine that reads the file itself, because the standard player can't drop
-  silent stretches. It works on downloaded episodes; streams keep speed only.
+- **Volume boost and trim silence** were planned as a second player built on
+  Apple's audio engine. They were built on the one player instead (2026-11-17),
+  so ad skipping, the sleep timer and Up Next keep working: an audio tap makes
+  voices louder, and the player jumps over silent gaps it measured once in the
+  downloaded file. Trimming works on downloads; streams get the boost when the
+  tap attaches, and otherwise keep speed only.
 - **Chapters in MP3 files** are stored in ID3 tags that Apple's frameworks don't
   read, so PodcastKit gets its own small reader (tested on Linux).
 

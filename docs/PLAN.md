@@ -629,6 +629,13 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       (AVAudioEngine) for downloaded episodes that makes voices louder and cuts
       silent gaps, in three strengths, per show or for everything. Streamed
       episodes keep speed only.
+  - Status: built and passing `check.sh`, with the one AVPlayer instead of a
+    second player (decision 2026-11-17, so ads, the sleep timer, Up Next and the
+    lock screen keep working): voice boost is an audio tap on the player item
+    (downloads, and streams where the tap attaches), and trim silence jumps over
+    the silent gaps of a download, measured once per file. Both are set in
+    Profile and per show. The tap and the file reader are compiled for the first
+    time in Fork CI.
 - [ ] **P5k. Stats** (S to M): total time listened, time saved by speed,
       skipping, intro and outro skipping, trimmed silence and skipped ads, and
       listening by day, in Profile.

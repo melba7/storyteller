@@ -150,6 +150,9 @@ in `FORK.md`.
 | 2026-11-17 | Playback settings (skips, headphones' next, played early, rewind) are a `UserDefaults` dictionary in Swift; JS only shows and saves them   | The lock screen uses them with no JavaScript               |
 | 2026-11-17 | New-episode notifications are local (`UNUserNotificationCenter`), one per show per refresh, from `runAutomatic`; switch in AsyncStorage    | No push service or `expo-notifications` needed             |
 | 2026-11-17 | OPML is read and written by a small hand-written reader in `opml.ts`; files go through the document picker and share sheet                 | No new package                                             |
+| 2026-11-17 | Voice boost is an `MTAudioProcessingTap` on the one AVPlayer item (pure DSP in `VoiceBoost`), not a second `AVAudioEngine` player          | Ads, sleep timer, Up Next keep working                     |
+| 2026-11-17 | Silent gaps are measured once per download (`<sha256>.silence.json`); the player jumps over them with boundary observers in 120 s windows  | An ad skip wins; a seek into a gap plays it                |
+| 2026-11-17 | Trimmed seconds are counted divided by the speed in `UserDefaults` (`podcasts.trim.savedSeconds`) for the stats step                       | Counted in Swift, also while locked                        |
 
 ## Known problems
 
