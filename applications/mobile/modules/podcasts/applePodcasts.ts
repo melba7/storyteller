@@ -95,6 +95,8 @@ export function planFollows(
     const key = feedKey(show.feed)
     if (isLocalFeedUrl(show.feed)) continue
     if (seenKeys.has(key) || queued.has(key)) continue
+    // A show the listener unsubscribed from stays dropped under another address too.
+    if (show.title !== null && seenKeys.has(titleSeenKey(show.title))) continue
     // The same show under another address (a feed that moved, or the other app's export)
     // is the show the listener already has, or chose to drop.
     const title = show.title === null ? "" : titleKey(show.title)
@@ -111,10 +113,54 @@ function titleKey(title: string): string {
   return title.trim().toLowerCase()
 }
 
-/** The seen list with this feed's key added (an unsubscribed show is not added again). */
-export function withSeen(seen: readonly string[], feed: string): string[] {
-  const key = feedKey(feed)
-  return seen.includes(key) ? [...seen] : [...seen, key]
+function titleSeenKey(title: string): string {
+  return `title:${titleKey(title)}`
+}
+
+/**
+ * The seen list with this feed's key added (an unsubscribed show is not added again), and
+ * its title's, so the same show under another address in the file is not added either.
+ */
+export function withSeen(
+  seen: readonly string[],
+  feed: string,
+  title: string | null = null,
+): string[] {
+  const keys = [feedKey(feed)]
+  if (title !== null && titleKey(title) !== "") keys.push(titleSeenKey(title))
+  return [...new Set([...seen, ...keys])]
+}
+
+/**
+ * The file with each finished episode of a show the library has under another address pointed
+ * at the library's address (matched by the show's title in the file), so the episodes finished
+ * in Apple Podcasts are marked played for it. A feed key that matches is left alone.
+ */
+export function withLibraryFeeds(
+  file: AppleExport,
+  library: readonly { feedUrl: string; title?: string }[],
+): AppleExport {
+  const shows = feedShows(library)
+  const known = new Set(shows.map((show) => feedKey(show.feedUrl)))
+  const byTitle = new Map<string, string>()
+  for (const show of shows) {
+    const title = titleKey(show.title ?? "")
+    if (title !== "" && !byTitle.has(title)) byTitle.set(title, show.feedUrl)
+  }
+  const titleOf = new Map<string, string>()
+  for (const show of file.shows) {
+    if (show.title !== null)
+      titleOf.set(feedKey(show.feed), titleKey(show.title))
+  }
+  return {
+    ...file,
+    finished: file.finished.map((item) => {
+      const key = feedKey(item.feed)
+      if (known.has(key)) return item
+      const match = byTitle.get(titleOf.get(key) ?? "")
+      return match === undefined ? item : { ...item, feed: match }
+    }),
+  }
 }
 
 export type PlayedInShow = { showId: string; guids: string[] }

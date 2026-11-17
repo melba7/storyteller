@@ -36,9 +36,16 @@ extension PodcastStreamDownload {
   // MARK: Carrying on
 
   /// The connection dropped with part of the file on disk: asks again a little later.
-  func scheduleResume() {
-    let wait = StreamResume.delay(afterResumes: resumes)
-    resumes += 1
+  func scheduleResume(for failure: DownloadFailure) {
+    // A missing network is waited for and does not use up one of the tries.
+    let wait: Double
+    if StreamResume.isConnectivity(failure) {
+      wait = StreamResume.connectivityDelay
+      waits += 1
+    } else {
+      wait = StreamResume.delay(afterResumes: resumes)
+      resumes += 1
+    }
     task = nil
     queue.asyncAfter(deadline: .now() + wait) { [weak self] in self?.resume() }
   }

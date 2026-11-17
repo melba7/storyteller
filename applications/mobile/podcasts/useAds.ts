@@ -5,8 +5,10 @@ import {
   type AdsFile,
   type AdsMap,
   adsMapFromList,
+  adsFileAfterRead,
   applyAdsChange,
   parseAdsFile,
+  readsAdsFile,
 } from "@/modules/podcasts/ads"
 import { getAds, listAds } from "@/modules/podcasts/adsNative"
 import { type AdsInfo, Podcasts } from "@/modules/podcasts/index"
@@ -62,23 +64,27 @@ export function useAdsFile(episodeId: string): AdsFile | null {
   const info = useAdsInfo(episodeId)
   const undone = useSyncExternalStore(subscribe, () => undoneCount)
   const [file, setFile] = useState<AdsFile | null>(null)
-  const found = info?.state === "found"
+  // The full pass keeps the ads found so far on show (the partial file is read meanwhile).
+  const reads = readsAdsFile(info)
+  const state = info?.state
   const count = info?.count
   useEffect(() => {
-    if (!found) {
+    if (!reads) {
       setFile(null)
       return
     }
     let cancelled = false
     getAds(episodeId).then(
       (json) => {
-        if (!cancelled) setFile(json === null ? null : parseAdsFile(json))
+        if (cancelled) return
+        const read = json === null ? null : parseAdsFile(json)
+        setFile((last) => adsFileAfterRead(state, last, read))
       },
       (cause: unknown) => console.warn("Couldn't read the ads", cause),
     )
     return () => {
       cancelled = true
     }
-  }, [episodeId, found, count, undone])
+  }, [episodeId, reads, state, count, undone])
   return file
 }

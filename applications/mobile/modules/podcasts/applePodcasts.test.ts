@@ -14,6 +14,7 @@ import {
   pendingGuids,
   planPlayedOnce,
   settleArrival,
+  withLibraryFeeds,
   withSeen,
 } from "./applePodcasts"
 
@@ -368,5 +369,59 @@ describe("parseFailures", () => {
     expect(parseFailures("nope")).toEqual({})
     expect(parseFailures(null)).toEqual({})
     expect(parseFailures("[1]")).toEqual({})
+  })
+})
+
+describe("an unsubscribed show remembered by its title too", () => {
+  it("is not followed again under another address", () => {
+    const seen = withSeen([], "https://old.test/f", " The Daily ")
+    expect(seen).toEqual(["old.test/f", "title:the daily"])
+    const plan = planFollows(
+      {
+        shows: [{ feed: "https://apple.test/f", title: "the daily" }],
+        finished: [],
+      },
+      seen,
+      [],
+    )
+    expect(plan.subscribe).toEqual([])
+  })
+
+  it("does not remember an empty title", () => {
+    expect(withSeen([], "https://old.test/f", "  ")).toEqual(["old.test/f"])
+  })
+})
+
+describe("withLibraryFeeds", () => {
+  const library = [
+    { id: "s1", feedUrl: "https://lib.test/feed", title: "The Daily" },
+  ]
+  const apple: AppleExport = {
+    shows: [{ feed: "https://apple.test/feed", title: " the daily " }],
+    finished: [
+      { feed: "https://apple.test/feed", guid: "g1" },
+      { feed: "https://other.test/feed", guid: "g2" },
+    ],
+  }
+
+  it("points a finished episode of a title-matched show at the library's address", () => {
+    const resolved = withLibraryFeeds(apple, library)
+    expect(resolved.finished).toEqual([
+      { feed: "https://lib.test/feed", guid: "g1" },
+      { feed: "https://other.test/feed", guid: "g2" },
+    ])
+  })
+
+  it("leaves a feed key that matches alone, and marks the title-matched show played", () => {
+    const same = withLibraryFeeds(
+      {
+        shows: [],
+        finished: [{ feed: "http://www.lib.test/feed", guid: "g" }],
+      },
+      library,
+    )
+    expect(same.finished[0]?.feed).toBe("http://www.lib.test/feed")
+    const plan = planPlayedOnce(withLibraryFeeds(apple, library), library, [])
+    expect(plan.plays).toEqual([{ showId: "s1", guids: ["g1"] }])
   })
 })

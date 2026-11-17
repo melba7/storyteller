@@ -81,4 +81,27 @@ final class StreamResumeTests: XCTestCase {
     XCTAssertEqual(StreamResume.delay(afterResumes: 2), 8)
     XCTAssertEqual(StreamResume.delay(afterResumes: 10), 30)
   }
+
+  func testAMissingNetworkWaitsAndDoesNotUseUpTheResumes() {
+    let offline = DownloadFailure(urlErrorCode: -1009)
+    XCTAssertTrue(StreamResume.isConnectivity(offline))
+    XCTAssertTrue(StreamResume.isConnectivity(DownloadFailure(urlErrorCode: -1020)))
+    XCTAssertFalse(StreamResume.isConnectivity(DownloadFailure(urlErrorCode: -1005)))
+    // Five used-up resumes do not stop a wait for the network.
+    XCTAssertTrue(
+      StreamResume.shouldResume(
+        offline, available: 10, validator: "\"a\"", resumes: StreamResume.maxResumes, waits: 3))
+    // A dropped connection is still capped by the resumes, not by the waits.
+    XCTAssertFalse(
+      StreamResume.shouldResume(
+        DownloadFailure(urlErrorCode: -1005), available: 10, validator: "\"a\"",
+        resumes: StreamResume.maxResumes, waits: 0))
+  }
+
+  func testTheWaitForTheNetworkHasACap() {
+    XCTAssertFalse(
+      StreamResume.shouldResume(
+        DownloadFailure(urlErrorCode: -1009), available: 10, validator: "\"a\"", resumes: 0,
+        waits: StreamResume.maxConnectivityWaits))
+  }
 }

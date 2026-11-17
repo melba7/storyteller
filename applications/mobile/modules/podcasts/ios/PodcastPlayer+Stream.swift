@@ -19,7 +19,10 @@ extension PodcastPlayer {
     // A new episode's automatic download that is still waiting for Wi-Fi has nothing to play,
     // so it does not keep the listener from a download of their own.
     let waiting = entry.map(StreamThroughDownload.isWaitingAutomatic) ?? false
-    let hasDownload = (entry?.state.isActive ?? false) && !waiting
+    // A play-through entry nobody is feeding is left over from a run that was stopped; the new
+    // loader replaces it.
+    let stale = (entry?.playThrough ?? false) && !PodcastDownloader.shared.isPlayThrough(episode.id)
+    let hasDownload = (entry?.state.isActive ?? false) && !waiting && !stale
     guard
       StreamThroughDownload.shouldUse(
         asked: episode.playThroughDownload, episodeId: episode.id, hasDownload: hasDownload,
@@ -48,17 +51,20 @@ extension PodcastPlayer {
     // A seek to the saved place may not have happened yet on an item that never became ready.
     let ready = player.currentItem?.status == .readyToPlay
     let place = ready ? position : max(position, itemStart)
+    // The old item is let go first, so its requests failing in stop() never reach the player.
+    removeItemObservers()
     loader.stop()
     streamDownload = nil
     if reason == .noLength, let type = current?.type {
-      // The ad finder still needs the file; an ordinary download handles any length.
+      // The ad finder still needs the file; an ordinary download handles any length. stop()
+      // forgot the show's language, so it is noted again for the transcriber.
+      PodcastTranscriber.shared.noteLanguage(current?.language, for: loader.episodeId)
       try? PodcastDownloader.shared.download(
         episodeId: loader.episodeId, url: loader.originalURL.absoluteString, type: type,
         automatic: false)
     }
     let item = AVPlayerItem(url: loader.originalURL)
     item.audioTimePitchAlgorithm = .timeDomain
-    removeItemObservers()
     player.replaceCurrentItem(with: item)
     watch(item)
     if place > 0 {

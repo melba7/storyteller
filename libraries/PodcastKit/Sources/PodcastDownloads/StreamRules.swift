@@ -115,6 +115,17 @@ public enum StreamResume {
   /// A download is carried on this many times in a row before it gives up.
   public static let maxResumes = 5
 
+  /// A missing network is waited for this many times in a row (about ten minutes at the longest
+  /// wait), so a tunnel or a lift does not end the download but a gone player cannot retry forever.
+  public static let maxConnectivityWaits = 20
+
+  /// Whether the failure is only that the phone has no usable network (no internet, data not
+  /// allowed). Such a failure waits for the network and does not use up one of the resumes.
+  public static func isConnectivity(_ failure: DownloadFailure) -> Bool {
+    guard let code = failure.urlErrorCode else { return false }
+    return code == -1009 || code == -1020
+  }
+
   /// What `If-Range` carries: a strong ETag, else Last-Modified, else nil (the file cannot be
   /// proved the same, so it is not resumed). A weak ETag (`W/`) is not a proof of the same bytes.
   public static func validator(etag: String?, lastModified: String?) -> String? {
@@ -148,15 +159,19 @@ public enum StreamResume {
   /// Whether a failed transfer is carried on: it dropped (not stopped or refused), part of the
   /// file is on disk, the file can be proved the same, and it has not been tried too often.
   public static func shouldResume(
-    _ failure: DownloadFailure, available: Int64, validator: String?, resumes: Int
+    _ failure: DownloadFailure, available: Int64, validator: String?, resumes: Int, waits: Int = 0
   ) -> Bool {
-    guard available > 0, validator != nil, resumes < maxResumes, !failure.diskFull,
+    let tries = isConnectivity(failure) ? waits < maxConnectivityWaits : resumes < maxResumes
+    guard available > 0, validator != nil, tries, !failure.diskFull,
       !failure.forceQuit, let code = failure.urlErrorCode,
       DownloadRecovery.isDroppedConnection(code)
     else { return false }
     if let status = failure.httpStatus, !(200..<300).contains(status) { return false }
     return true
   }
+
+  /// Seconds to wait before the next try when the network is missing.
+  public static let connectivityDelay: Double = 30
 
   /// Seconds to wait before the next try: 2, 4, 8, ... and never more than 30.
   public static func delay(afterResumes resumes: Int) -> Double {

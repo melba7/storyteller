@@ -254,3 +254,27 @@ final class NetworkPolicyTests: XCTestCase {
     XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: false, setting: true))
   }
 }
+
+final class DownloadCompletionIgnoredTests: XCTestCase {
+  func testAnythingFromAnOlderTaskOfAPlayThroughEntryIsIgnored() {
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -999), playThrough: true))
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -1005), playThrough: true))
+  }
+
+  func testACancelTheAppAskedForIsIgnoredForANormalDownload() {
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -999), playThrough: false))
+  }
+
+  func testASwipeAwayAndRealFailuresAreStillReported() {
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(
+        DownloadFailure(urlErrorCode: -999, forceQuit: true), playThrough: false))
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -1005), playThrough: false))
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(httpStatus: 404), playThrough: false))
+  }
+}

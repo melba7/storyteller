@@ -2,14 +2,17 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  type AdsFile,
   SKIP_NOTE_MS,
   adMarks,
   adRows,
+  adsFileAfterRead,
   adsMapFromList,
   adsStatus,
   applyAdsChange,
   formatClock,
   noteAfterUndo,
+  readsAdsFile,
   parseAdsFile,
   skipNote,
   skipNoteShown,
@@ -211,5 +214,24 @@ describe("adMarks", () => {
     expect(adMarks([{ start: 1200, end: 1300, skipped: true }], 1000)).toEqual(
       [],
     )
+  })
+})
+
+describe("the ads file while the full pass runs", () => {
+  const partial = { ads: [] } as unknown as AdsFile
+  it("is read when found and while finding, not otherwise", () => {
+    expect(readsAdsFile(info("found"))).toBe(true)
+    expect(readsAdsFile(info("finding", { percent: 10 }))).toBe(true)
+    for (const state of ["waiting", "noAds", "unavailable"] as const) {
+      expect(readsAdsFile(info(state))).toBe(false)
+    }
+    expect(readsAdsFile(undefined)).toBe(false)
+  })
+
+  it("keeps the last file when a read finds none while finding", () => {
+    expect(adsFileAfterRead("finding", partial, null)).toBe(partial)
+    expect(adsFileAfterRead("found", partial, null)).toBeNull()
+    const next = { ads: [1] } as unknown as AdsFile
+    expect(adsFileAfterRead("finding", partial, next)).toBe(next)
   })
 })

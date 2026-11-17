@@ -6,6 +6,7 @@
 // are in applePodcasts.ts. Not imported by any test, because AsyncStorage is native.
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
+import { withAppleLists } from "./appleLists"
 import {
   parseFailures,
   parseSeen,
@@ -34,10 +35,13 @@ export async function saveFailures(failed: Record<string, number>) {
   await AsyncStorage.setItem(FAILED_KEY, JSON.stringify(failed))
 }
 
-/** An unsubscribed show goes on the seen list, so the sync does not add it again. */
-export async function rememberUnsubscribed(feedUrl: string): Promise<void> {
+/** An unsubscribed show (its address and title) goes on the seen list, so the sync does not add it again. */
+export async function rememberUnsubscribed(
+  feedUrl: string,
+  title: string | null = null,
+): Promise<void> {
   try {
-    await saveList(SEEN_KEY, withSeen(await loadList(SEEN_KEY), feedUrl))
+    await saveList(SEEN_KEY, withSeen(await loadList(SEEN_KEY), feedUrl, title))
   } catch (cause) {
     console.warn("Couldn't remember an unsubscribed show", cause)
   }
@@ -50,14 +54,16 @@ export async function settleArrived(
 ): Promise<void> {
   if (guids.length === 0) return
   try {
-    const settled = settleArrival(
-      await loadList(PENDING_KEY),
-      await loadList(APPLIED_KEY),
-      feedUrl,
-      guids,
-    )
-    await saveList(PENDING_KEY, settled.pending)
-    await saveList(APPLIED_KEY, settled.applied)
+    await withAppleLists(async () => {
+      const settled = settleArrival(
+        await loadList(PENDING_KEY),
+        await loadList(APPLIED_KEY),
+        feedUrl,
+        guids,
+      )
+      await saveList(PENDING_KEY, settled.pending)
+      await saveList(APPLIED_KEY, settled.applied)
+    })
   } catch (cause) {
     console.warn("Couldn't keep the Apple Podcasts played list", cause)
   }

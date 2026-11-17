@@ -48,6 +48,16 @@ public enum DownloadRecovery {
   /// no internet, DNS trouble.
   private static let transient: Set<Int> = [-1001, -1003, -1004, -1005, -1006, -1009]
 
+  /// Whether the background session's report of a stopped task is not about the entry's own
+  /// download and must change nothing. A play-through entry is fed by the player, never by the
+  /// background session, so any report is from an older task (the automatic download the player
+  /// cancelled to take over). A cancel the app asked for (-999, and not iOS stopping the
+  /// transfer after a swipe-away) is a download the app already removed or replaced.
+  public static func ignoresCompletion(_ failure: DownloadFailure, playThrough: Bool) -> Bool {
+    if playThrough { return true }
+    return failure.urlErrorCode == -999 && !failure.forceQuit
+  }
+
   /// Whether a URLError code is a connection that dropped or is not there for now.
   public static func isDroppedConnection(_ code: Int) -> Bool { transient.contains(code) }
 

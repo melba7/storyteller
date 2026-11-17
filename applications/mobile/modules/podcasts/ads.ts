@@ -23,6 +23,23 @@ export function adsMapFromList(list: readonly AdsInfo[]): AdsMap {
 }
 
 /** What a row says about the ads; empty when there is nothing to say. */
+/**
+ * Whether the saved ads file is read for this state: "found", and "finding" too, because the
+ * full pass runs after the partial ones and the ads found so far stay listed meanwhile.
+ */
+export function readsAdsFile(info: AdsInfo | undefined): boolean {
+  return info?.state === "found" || info?.state === "finding"
+}
+
+/** The file to show once a read came back: while finding, an empty read keeps the last file. */
+export function adsFileAfterRead(
+  state: AdsInfo["state"] | undefined,
+  last: AdsFile | null,
+  read: AdsFile | null,
+): AdsFile | null {
+  return read === null && state === "finding" ? last : read
+}
+
 export function adsStatus(info: AdsInfo | undefined): string {
   if (!info) return ""
   switch (info.state) {

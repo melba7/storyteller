@@ -261,9 +261,13 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     lock.withLock { _ = throttles.removeValue(forKey: task.taskIdentifier) }
     guard let error, let id = task.taskDescription, let store else { return }
     // Removed by the listener (their cancel is an error too): nothing left to keep.
-    guard store.entry(for: id) != nil else { return finished(id, taskIdentifier: task.taskIdentifier) }
+    guard let entry = store.entry(for: id) else {
+      return finished(id, taskIdentifier: task.taskIdentifier)
+    }
     let attempts = lock.withLock { retries[id] ?? 0 }
     let failure = DownloadFailure(error: error, response: task.response, attempts: attempts)
+    // The cancelled automatic download the player replaced reports late, beside the new entry.
+    if DownloadRecovery.ignoresCompletion(failure, playThrough: entry.playThrough) { return }
     recover(id, failure, resumeData: failure.hasResumeData ? (error as? URLError)?.downloadTaskResumeData : nil)
   }
 

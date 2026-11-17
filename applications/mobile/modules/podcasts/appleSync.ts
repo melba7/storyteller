@@ -11,6 +11,7 @@ import { AppState } from "react-native"
 
 import { LofiScore, type LinkedFileRead } from "@/modules/lofi-score"
 
+import { withAppleLists } from "./appleLists"
 import {
   APPLIED_KEY,
   PENDING_KEY,
@@ -27,6 +28,7 @@ import {
   parseAppleExport,
   planFollows,
   planPlayedOnce,
+  withLibraryFeeds,
 } from "./applePodcasts"
 import { problemFor, retryDelay, setAppleSyncStatus } from "./appleStatus"
 import { notifyLibraryChanged } from "./changes"
@@ -103,7 +105,10 @@ function askAgainLater() {
 async function syncOnce(): Promise<void> {
   const read = await readFile()
   if (read.status === "notDownloaded") askAgainLater()
-  else retries = 0
+  else {
+    retries = 0
+    clearTimeout(retryTimer)
+  }
   if (read.status !== "found") {
     setAppleSyncStatus({ reading: false, problem: problemFor(read) })
     return
@@ -147,22 +152,28 @@ async function syncOnce(): Promise<void> {
   // Each finished episode is marked once, so one marked unplayed here stays unplayed. One the
   // phone does not have yet waits (pending) and is marked when the feed brings it.
   const shows = await listShows()
+  // A show the library has under another address is found by its title.
+  const finished = withLibraryFeeds(file, shows)
   const have = await episodesOnPhone(
     shows,
-    new Set(file.finished.map((item) => feedKey(item.feed))),
+    new Set(finished.finished.map((item) => feedKey(item.feed))),
   )
-  const once = planPlayedOnce(
-    file,
-    shows,
-    await loadList(APPLIED_KEY),
-    (feed, guid) => have.has(appliedKey(feed, guid)),
-  )
-  let changed = 0
-  for (const { showId, guids } of once.plays) {
-    changed += await markPlayed(showId, guids)
-  }
-  await saveList(APPLIED_KEY, once.applied)
-  await saveList(PENDING_KEY, once.pending)
+  // The lists are read and written beside refreshes settling arrived episodes: one at a time.
+  const changed = await withAppleLists(async () => {
+    const once = planPlayedOnce(
+      finished,
+      shows,
+      await loadList(APPLIED_KEY),
+      (feed, guid) => have.has(appliedKey(feed, guid)),
+    )
+    let marked = 0
+    for (const { showId, guids } of once.plays) {
+      marked += await markPlayed(showId, guids)
+    }
+    await saveList(APPLIED_KEY, once.applied)
+    await saveList(PENDING_KEY, once.pending)
+    return marked
+  })
   if (changed > 0 || followed > 0) notifyLibraryChanged()
   setAppleSyncStatus({
     reading: false,

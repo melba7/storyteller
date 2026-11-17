@@ -207,6 +207,6 @@ export async function unsubscribe(id: string): Promise<void> {
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])
   })
   // The Apple Podcasts list never adds a show the listener dropped.
-  if (show) await rememberUnsubscribed(show.feedUrl)
+  if (show) await rememberUnsubscribed(show.feedUrl, show.title)
   notifyLibraryChanged()
 }

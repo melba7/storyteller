@@ -65,6 +65,8 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   var finalURL: URL?
   var validator: String?
   var resumes = 0
+  /// How many times in a row the network was missing when a resume was due.
+  var waits = 0
   var resuming = false
   /// Told when playing from this download is given up and the plain address should play.
   var onFallback: (@Sendable (StreamFallback) -> Void)?
@@ -180,6 +182,9 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     let config = URLSessionConfiguration.default
     config.urlCache = nil
     config.requestCachePolicy = .reloadIgnoringLocalCacheData
+    // A request made with no network waits for it instead of failing at once.
+    config.waitsForConnectivity = true
+    config.timeoutIntervalForResource = 6 * 60 * 60
     let operations = OperationQueue()
     operations.maxConcurrentOperationCount = 1
     operations.underlyingQueue = queue
@@ -231,6 +236,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     }
     available += Int64(data.count)
     resumes = 0
+    waits = 0
     if throttle.shouldReport(bytes: available, expected: expected, at: Date()),
       let entry = store.updateProgress(episodeId: episodeId, bytes: available, expected: expected)
     {
@@ -247,8 +253,10 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
         error: error, response: task.response, attempts: DownloadRecovery.maxRetries)
       // A dropped connection is carried on only with a request that proves the bytes after it
       // are the same file (ads inserted on the fly differ between requests).
-      if StreamResume.shouldResume(failure, available: available, validator: validator, resumes: resumes) {
-        return scheduleResume()
+      if StreamResume.shouldResume(
+          failure, available: available, validator: validator, resumes: resumes, waits: waits)
+      {
+        return scheduleResume(for: failure)
       }
       return failed(failure)
     }
