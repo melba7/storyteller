@@ -105,7 +105,8 @@ enum VoiceBoostTap {
       version: kMTAudioProcessingTapCallbacksVersion_0, clientInfo: retained.toOpaque(),
       init: tapInit, finalize: tapFinalize, prepare: tapPrepare, unprepare: tapUnprepare,
       process: tapProcess)
-    var tap: Unmanaged<MTAudioProcessingTap>?
+    // The SDK hands the tap back as a managed object (`MTAudioProcessingTap?`), not Unmanaged.
+    var tap: MTAudioProcessingTap?
     let status = MTAudioProcessingTapCreate(
       kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
     guard status == noErr, let tap else {
@@ -113,6 +114,6 @@ enum VoiceBoostTap {
       retained.release()
       return nil
     }
-    return tap.takeRetainedValue()
+    return tap
   }
 }
