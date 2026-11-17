@@ -224,6 +224,8 @@ in `FORK.md`.
 | 2026-11-17 | Ads found in a transcript so far count as found for the player, the ads list and the status line until the full pass is done               | Skipping starts while transcribing                         |
 | 2026-11-17 | Play-through waits for a missing network (up to 20 waits of 30 s, not counted as resume tries); old task reports are ignored               | A tunnel must not end the episode                          |
 | 2026-11-17 | The background session ignores a cancel the app asked for (-999 with no iOS reason); iOS's own cancels are still handled                   | A replaced download read as failed                         |
+| 2026-11-17 | The player's artwork is full width under the grabber, fading into the sheet; its buttons are SF Symbols (`SFIcon`, `@expo/ui` Image)       | As in Apple's player (Mo's screenshot 08)                  |
+| 2026-11-17 | A play-through with no byte yet that waits for the network gives up, so the plain address plays and shows its error                        | No silent spinner with Skip ads on                         |
 
 ## Known problems
 

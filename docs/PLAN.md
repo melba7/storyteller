@@ -973,8 +973,11 @@ TestFlight build.
   - Done when: the Opus check's findings are fixed and `check.sh` passes.
   - Status: the check found 27 items (L1 to L27, 2026-11-17); all fixed but the
     mini player's title fade (the glass has no colour to fade into) and the
-    episode artwork's zoom (no tile opens an episode). The final check of the
-    whole pull request is Fable 5.2's (Mo, 2026-11-17).
+    episode artwork's zoom (no tile opens an episode). Fable 5.2's final check
+    of the whole pull request (Mo, 2026-11-17) found no serious issue and seven
+    smaller ones, all fixed, plus the player's full-width artwork, SF Symbol
+    buttons and a thick volume bar. Left for a device: pulling down on a show
+    page opened by the zoom may close it instead of refreshing.
 
 ## Later
 
