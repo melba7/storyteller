@@ -3,6 +3,7 @@
 // Following the shows of an OPML file: the ones already followed are left alone, the rest are
 // followed one after the other, with a progress line, and a summary of what happened. The
 // follow itself is handed in, so the rules are tested without the database.
+import { feedKey } from "./applePodcasts"
 import { normalizeFeedUrl } from "./feedUrl"
 import type { OpmlFeed } from "./opml"
 
@@ -30,7 +31,7 @@ export async function importFeeds(
   const known = new Set<string>()
   for (const url of followed) {
     try {
-      known.add(normalizeFeedUrl(url))
+      known.add(feedKey(normalizeFeedUrl(url)))
     } catch {
       // A stored address that does not read cannot match anything.
     }
@@ -48,13 +49,13 @@ export async function importFeeds(
       summary.failed.push({ title: name, reason: reasonOf(cause) })
       continue
     }
-    if (known.has(url)) {
+    if (known.has(feedKey(url))) {
       summary.alreadyFollowed += 1
       continue
     }
     try {
       await follow(url)
-      known.add(url)
+      known.add(feedKey(url))
       summary.added += 1
     } catch (cause) {
       summary.failed.push({ title: name, reason: reasonOf(cause) })

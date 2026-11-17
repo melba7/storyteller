@@ -10,6 +10,7 @@ import {
 } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { followUpNew } from "@/modules/podcasts/automaticRun"
 import { unsubscribe } from "@/modules/podcasts/db"
 import { refreshShow } from "@/modules/podcasts/dbFeeds"
 import {
@@ -46,7 +47,7 @@ export function PodcastShow({ id }: { id: string }) {
     setRefreshing(true)
     setProblem(null)
     try {
-      await refreshShow(id)
+      await followUpNew(await refreshShow(id))
     } catch (cause) {
       setProblem(readableError(cause))
     } finally {

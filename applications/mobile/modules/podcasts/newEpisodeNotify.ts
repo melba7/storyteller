@@ -3,17 +3,23 @@
 // After a refresh (in the app or the background task), tells the listener about the episodes it
 // added, when "Notify me about new episodes" is on. Not imported by any test, because the
 // database and the native module are not there; the words are in newEpisodeNotice.ts.
-import type { NewEpisode } from "./automatic"
-import { getShow, listEpisodesByIds } from "./db"
+import { type NewEpisode, episodesToNotify } from "./automatic"
+import { getShow, listEpisodesByIds, listShows } from "./db"
 import { noticesForNewEpisodes } from "./newEpisodeNotice"
 import { loadNotifyNew, postNotification } from "./notificationsNative"
 
 /** Posts one notification per show that gained episodes. A failure is logged, not thrown. */
 export async function notifyAboutNewEpisodes(
-  added: readonly NewEpisode[],
+  everyAdded: readonly NewEpisode[],
 ): Promise<void> {
-  if (added.length === 0 || !(await loadNotifyNew())) return
+  if (everyAdded.length === 0 || !(await loadNotifyNew())) return
   try {
+    // Only the shows whose own "Notify about new episodes" switch is on.
+    const switches = new Map(
+      (await listShows()).map((show) => [show.id, show.settings.notify]),
+    )
+    const added = episodesToNotify(everyAdded, switches)
+    if (added.length === 0) return
     const shows = new Map<string, string>()
     for (const showId of new Set(added.map((episode) => episode.showId))) {
       const show = await getShow(showId)

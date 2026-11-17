@@ -252,26 +252,35 @@ type Downloadable = {
   showId: string
   audioUrl: string
   audioType: string
+  played?: boolean
 }
 
 /**
  * The episodes to download for the playlists that ask for it: each playlist's first
  * `AUTO_DOWNLOAD_LIMIT` episodes, in the playlists' order, once each, leaving out what is
  * already on the phone, on its way or failed (`known`). `matches` is playlist id to its
- * episodes in order.
+ * episodes in order. A playlist of episodes that are "Not downloaded" is skipped (it would
+ * download the whole library, five at a time). With `skipPlayed`, played episodes are left
+ * out too, so deleting played downloads does not start a fight with this.
  */
 export function playlistDownloads<T extends Downloadable>(
-  playlists: readonly { id: string; autoDownload: boolean }[],
+  playlists: readonly {
+    id: string
+    autoDownload: boolean
+    rules?: Pick<PlaylistRules, "downloaded">
+  }[],
   matches: ReadonlyMap<string, readonly T[]>,
   known: ReadonlySet<string>,
+  skipPlayed = false,
 ): T[] {
   const picked = new Map<string, T>()
   for (const playlist of playlists) {
     if (!playlist.autoDownload) continue
-    for (const episode of (matches.get(playlist.id) ?? []).slice(
-      0,
-      AUTO_DOWNLOAD_LIMIT,
-    )) {
+    if (playlist.rules?.downloaded === "notDownloaded") continue
+    const wanted = (matches.get(playlist.id) ?? []).filter(
+      (episode) => !(skipPlayed && episode.played === true),
+    )
+    for (const episode of wanted.slice(0, AUTO_DOWNLOAD_LIMIT)) {
       if (!known.has(episode.id) && !picked.has(episode.id)) {
         picked.set(episode.id, episode)
       }

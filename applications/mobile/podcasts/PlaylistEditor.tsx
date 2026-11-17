@@ -106,7 +106,11 @@ export function PlaylistEditor({ id }: { id: string }) {
   }
 
   async function save() {
-    const trouble = playlistProblem(finished.title, finished.rules)
+    const trouble = playlistProblem(
+      finished.title,
+      finished.rules,
+      finished.autoDownload,
+    )
     if (trouble) return setProblem(trouble)
     setSaving(true)
     try {

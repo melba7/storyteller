@@ -108,6 +108,7 @@ export function parseMinutes(text: string): number | null {
 export function playlistProblem(
   title: string,
   rules: PlaylistRules,
+  autoDownload = false,
 ): string | null {
   if (title.trim() === "") return "Give the playlist a name."
   if (rules.showIds !== null && rules.showIds.length === 0) {
@@ -119,6 +120,9 @@ export function playlistProblem(
     rules.longerThan >= rules.shorterThan
   ) {
     return "No episode is both longer and shorter than that."
+  }
+  if (autoDownload && rules.downloaded === "notDownloaded") {
+    return "Episodes that aren't downloaded can't be downloaded by themselves. Turn off Auto-download, or change Downloaded."
   }
   return null
 }

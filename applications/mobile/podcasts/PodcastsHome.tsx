@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu, type MenuAction } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
+import { followUpNew } from "@/modules/podcasts/automaticRun"
 import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
@@ -124,7 +125,8 @@ export function PodcastsHome() {
     setRefreshing(true)
     setRefreshProblem(null)
     try {
-      const { failed } = await refreshAllShows()
+      const { failed, added } = await refreshAllShows()
+      await followUpNew(added)
       if (failed.length > 0) {
         setRefreshProblem(`Couldn't refresh ${failed.join(", ")}.`)
       }

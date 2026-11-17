@@ -4,7 +4,9 @@
 // charts. These use db.ts's open file. Not imported by any test, because op-sqlite is native.
 import { randomUUID } from "expo-crypto"
 
+import { findShowByFeed } from "./applePodcasts"
 import { type NewEpisode, newEpisodes } from "./automatic"
+import { CACHE_KEEP_MS, PRUNE_CACHE_SQL } from "./cacheSql"
 import { notifyLibraryChanged } from "./changes"
 import { database, getShow, listEpisodes, listShows, rows } from "./db"
 import { normalizeFeedUrl } from "./feedUrl"
@@ -14,11 +16,11 @@ import {
   type Show,
   fetchedEpisode,
   mergeEpisodes,
-  showFromRow,
 } from "./library"
 import { feedShows, isLocalFeedUrl } from "./localFiles"
 import { readableError } from "./nativeError"
 import { fundingFromJson, peopleFromJson, toJson } from "./people"
+import { serialByKey } from "./serialByKey"
 
 // MARK: Reading a feed
 
@@ -37,6 +39,9 @@ export async function fetchFeed(feedUrl: string): Promise<PodcastFeedData> {
 }
 
 // MARK: Writing
+
+/** A pull-to-refresh and the automatic run never read one show at the same time. */
+const oneRefreshAtATime = serialByKey()
 
 function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
   return [
@@ -95,10 +100,9 @@ function updateEpisode(id: string, episode: FetchedEpisode) {
 /** Subscribes to the feed at this link (a pasted one or one from the directory). */
 export async function subscribe(link: string): Promise<Show> {
   const feedUrl = normalizeFeedUrl(link)
-  const existing = (
-    await rows("SELECT * FROM shows WHERE feed_url = ?", [feedUrl])
-  )[0]
-  if (existing) return showFromRow(existing)
+  // The same feed under another spelling (http, www, a closing slash) is the same show.
+  const existing = findShowByFeed(await listShows(), feedUrl)
+  if (existing) return existing
 
   const feed = await fetchFeed(feedUrl)
   const now = Date.now()
@@ -141,13 +145,18 @@ export async function subscribe(link: string): Promise<Show> {
  * Reads the show's feed again: adds new episodes, updates changed ones, deletes none. Returns
  * the episodes it added, for downloading the newest one by itself.
  */
-export async function refreshShow(id: string): Promise<NewEpisode[]> {
+export function refreshShow(id: string): Promise<NewEpisode[]> {
+  return oneRefreshAtATime(id, () => readFeedAgain(id))
+}
+
+async function readFeedAgain(id: string): Promise<NewEpisode[]> {
   const show = await getShow(id)
   // "Your files" has no feed to read.
   if (!show || isLocalFeedUrl(show.feedUrl)) return []
   const feed = await fetchFeed(show.feedUrl)
+  const stored = await listEpisodes(id)
   const { insert, update } = mergeEpisodes(
-    await listEpisodes(id),
+    stored,
     feed.episodes.map(fetchedEpisode),
   )
   const ids = insert.map(() => randomUUID())
@@ -181,7 +190,7 @@ export async function refreshShow(id: string): Promise<NewEpisode[]> {
     }
   })
   notifyLibraryChanged()
-  return newEpisodes(id, insert, ids)
+  return newEpisodes(id, insert, ids, stored)
 }
 
 /**
@@ -224,4 +233,6 @@ export async function cachePut(key: string, value: string): Promise<void> {
     "INSERT OR REPLACE INTO cache (key, value, saved_at) VALUES (?, ?, ?)",
     [key, value, Date.now()],
   )
+  // Answers older than a week are not read again; the transcripts among them are large.
+  await db.execute(PRUNE_CACHE_SQL, [Date.now() - CACHE_KEEP_MS])
 }

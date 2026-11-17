@@ -10,6 +10,7 @@ import {
   downloadsToDelete,
   episodesForUpNext,
   episodesToDownload,
+  episodesToNotify,
   newEpisodes,
   parseSettings,
   refreshDue,
@@ -111,29 +112,63 @@ describe("newEpisodes", () => {
     chaptersUrl: null,
   })
 
+  const stored = (publishedAt: number | null) => ({ publishedAt })
+
   it("pairs each inserted episode with the id it was saved under", () => {
     expect(
-      newEpisodes("S", [fetched("x", 10), fetched("y", null)], ["id1", "id2"]),
+      newEpisodes(
+        "S",
+        [fetched("x", 10), fetched("y", 20)],
+        ["id1", "id2"],
+        [stored(5)],
+      ).map((e) => [e.id, e.publishedAt, e.audioUrl]),
     ).toEqual([
-      {
-        id: "id1",
-        showId: "S",
-        publishedAt: 10,
-        audioUrl: "https://cdn.example.com/x.mp3",
-        audioType: "audio/mpeg",
-      },
-      {
-        id: "id2",
-        showId: "S",
-        publishedAt: null,
-        audioUrl: "https://cdn.example.com/y.mp3",
-        audioType: "audio/mpeg",
-      },
+      ["id1", 10, "https://cdn.example.com/x.mp3"],
+      ["id2", 20, "https://cdn.example.com/y.mp3"],
     ])
   })
 
   it("has nothing when nothing was inserted", () => {
-    expect(newEpisodes("S", [], [])).toEqual([])
+    expect(newEpisodes("S", [], [], [stored(1)])).toEqual([])
+  })
+
+  it("counts only episodes newer than the newest stored one", () => {
+    const picked = newEpisodes(
+      "S",
+      [fetched("old", 50), fetched("same", 100), fetched("new", 101)],
+      ["i1", "i2", "i3"],
+      [stored(100), stored(40), stored(null)],
+    )
+    expect(picked.map((e) => e.id)).toEqual(["i3"])
+  })
+
+  it("counts nothing as new on a show's first refresh, and nothing undated", () => {
+    expect(newEpisodes("S", [fetched("a", 10)], ["i1"], [])).toEqual([])
+    expect(newEpisodes("S", [fetched("u", null)], ["i1"], [stored(5)])).toEqual(
+      [],
+    )
+  })
+
+  it("counts a dated episode when the stored ones have no dates", () => {
+    expect(
+      newEpisodes("S", [fetched("a", 10)], ["i1"], [stored(null)]).map(
+        (e) => e.id,
+      ),
+    ).toEqual(["i1"])
+  })
+})
+
+describe("episodesToNotify", () => {
+  it("keeps episodes of shows whose own notify switch is on", () => {
+    const list = [added("a", "A", 1), added("b", "B", 2), added("c", "C", 3)]
+    const picked = episodesToNotify(
+      list,
+      new Map([
+        ["A", true],
+        ["B", false],
+      ]),
+    )
+    expect(picked.map((e) => e.id)).toEqual(["a"])
   })
 })
 
