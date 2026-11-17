@@ -6,6 +6,7 @@ import {
   getEpisode,
   getShow,
   listEpisodes,
+  listEpisodesByIds,
   listShowActivity,
   listShows,
 } from "@/modules/podcasts/db"
@@ -78,4 +79,14 @@ export function useEpisodes(showId: string): Query<StoredEpisode[]> {
 
 export function useEpisode(id: string): Query<StoredEpisode | null> {
   return useLibraryQuery(() => getEpisode(id), `episode:${id}`)
+}
+
+/** The library's episodes with these ids (the Downloads list reads its titles from here). */
+export function useEpisodesByIds(
+  ids: readonly string[],
+): Query<StoredEpisode[]> {
+  return useLibraryQuery(
+    () => listEpisodesByIds(ids),
+    `episodes-by-ids:${ids.join(",")}`,
+  )
 }

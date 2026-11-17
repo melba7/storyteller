@@ -40,6 +40,7 @@ describe("withLofiScorePods", () => {
       "LofiScoreHost",
       "PodcastFeed",
       "PodcastPlayback",
+      "PodcastDownloads",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
@@ -47,7 +48,7 @@ describe("withLofiScorePods", () => {
     })
   })
 
-  it("adds the podcast feed reader's and player rules' pods from PodcastKit", () => {
+  it("adds the podcast feed reader's, player rules' and downloads' pods from PodcastKit", () => {
     const plugins = withLofiScorePods([
       ["expo-build-properties", { ios: { extraPods: [] } }],
     ])
@@ -55,9 +56,10 @@ describe("withLofiScorePods", () => {
       string,
       { ios: { extraPods: { name: string; path: string }[] } },
     ]
-    expect(options.ios.extraPods.slice(-2)).toEqual([
+    expect(options.ios.extraPods.slice(-3)).toEqual([
       { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
       { name: "PodcastPlayback", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastDownloads", path: "../../../libraries/PodcastKit" },
     ])
   })
 

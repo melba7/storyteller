@@ -53,7 +53,7 @@ const lofiScorePods = [
     "LofiAtmosphere",
     "LofiScoreHost",
   ].map((name) => ({ name, path: "../../../libraries/LofiScoreKit" })),
-  ...["PodcastFeed", "PodcastPlayback"].map((name) => ({
+  ...["PodcastFeed", "PodcastPlayback", "PodcastDownloads"].map((name) => ({
     name,
     path: "../../../libraries/PodcastKit",
   })),

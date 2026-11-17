@@ -66,7 +66,8 @@ final class PodcastPlayer {
       emitError(episode.id, "The audio session couldn't start: \(error.localizedDescription)")
     }
 
-    let item = AVPlayerItem(url: episode.url)
+    // A downloaded episode plays from its file; any other streams from its address.
+    let item = AVPlayerItem(url: PodcastDownloader.shared.localFile(for: episode.id) ?? episode.url)
     // Keeps voices natural at any speed.
     item.audioTimePitchAlgorithm = .timeDomain
     player.defaultRate = Float(speed.value)

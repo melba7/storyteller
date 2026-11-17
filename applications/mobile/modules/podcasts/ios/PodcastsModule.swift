@@ -6,6 +6,7 @@
 
 import ExpoModulesCore
 import Foundation
+import PodcastDownloads
 import PodcastFeed
 import PodcastPlayback
 
@@ -26,9 +27,11 @@ public final class PodcastsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("Podcasts")
 
-    Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError")
+    Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange")
 
     OnCreate {
+      PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
+      PodcastDownloader.shared.start()
       Task { @MainActor [weak self] in
         PodcastPlayer.shared.sink = { name, body in self?.sendEvent(name, body) }
       }
@@ -92,6 +95,35 @@ public final class PodcastsModule: Module {
     AsyncFunction("getPlaybackState") { () async -> [String: Any] in
       await MainActor.run { PodcastPlayer.shared.state() }
     }
+
+    // MARK: Downloading
+
+    // Starts downloading an episode; carries on with the app closed. `type` is the feed's
+    // audio type, used to name the file.
+    AsyncFunction("download") { (episodeId: String, url: String, type: String) throws in
+      do {
+        try PodcastDownloader.shared.download(episodeId: episodeId, url: url, type: type)
+      } catch {
+        throw PodcastFetchError(message: error.localizedDescription)
+      }
+    }
+    // Stops a download that is not finished and forgets it.
+    AsyncFunction("cancelDownload") { (episodeId: String) throws in
+      try PodcastDownloader.shared.cancel(episodeId: episodeId)
+    }
+    // Removes a download: the audio, its side files and its entry.
+    AsyncFunction("deleteDownload") { (episodeId: String) throws in
+      try PodcastDownloader.shared.remove(episodeId: episodeId)
+    }
+    AsyncFunction("listDownloads") { () -> [[String: Any]] in
+      (PodcastDownloader.shared.store?.entries() ?? []).map(DownloadJSON.object)
+    }
+    // Bytes taken by finished downloads.
+    AsyncFunction("storageUsed") { () -> Double in
+      Double(PodcastDownloader.shared.store?.storageUsed() ?? 0)
+    }
+    AsyncFunction("setWifiOnly") { (on: Bool) in DownloadSettings.wifiOnly = on }
+    AsyncFunction("getWifiOnly") { () -> Bool in DownloadSettings.wifiOnly }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.
     AsyncFunction("artworkColor") { (address: String) async -> String? in

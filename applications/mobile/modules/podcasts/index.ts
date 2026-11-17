@@ -74,7 +74,30 @@ export type PlaybackError = {
   message: string
 }
 
+/** Where an episode's download is, as the Swift side reports it. */
+export type DownloadInfo = {
+  episodeId: string
+  state: "queued" | "downloading" | "downloaded" | "failed"
+  /** Bytes so far while downloading; the file's size once downloaded. */
+  bytes?: number
+  /** Bytes expected, when the server said. */
+  expected?: number
+  /** The file name (`<sha256>.<ext>`) once downloaded. */
+  file?: string
+  sha256?: string
+  /** Milliseconds since 1970 when the download finished. */
+  date?: number
+  /** Plain words for a failed download. */
+  reason?: string
+  /** Milliseconds since 1970. */
+  updatedAt: number
+}
+
+/** A download changed, or (state "none") was removed. */
+export type DownloadChange = DownloadInfo | { episodeId: string; state: "none" }
+
 export type PodcastsEvents = {
+  onDownloadChange: (change: DownloadChange) => void
   onPlaybackState: (state: PlaybackState) => void
   onPlaybackEnded: (event: PlaybackEnded) => void
   onPlaybackError: (event: PlaybackError) => void
@@ -101,6 +124,18 @@ type PodcastsNativeModule = {
   getPlaybackState(): Promise<PlaybackState>
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
+
+  /** Starts downloading an episode. It carries on with the app closed. */
+  download(episodeId: string, url: string, type: string): Promise<void>
+  /** Stops a download that is not finished and forgets it. */
+  cancelDownload(episodeId: string): Promise<void>
+  /** Removes a download: the audio, its side files and its entry. */
+  deleteDownload(episodeId: string): Promise<void>
+  listDownloads(): Promise<DownloadInfo[]>
+  /** Bytes taken by finished downloads. */
+  storageUsed(): Promise<number>
+  setWifiOnly(on: boolean): Promise<void>
+  getWifiOnly(): Promise<boolean>
   addListener<E extends keyof PodcastsEvents>(
     event: E,
     listener: PodcastsEvents[E],

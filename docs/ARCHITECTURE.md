@@ -34,10 +34,10 @@ in `FORK.md`.
 | `applications/mobile/lofi/`                                              | React UI: toolbar button, panel, settings, reader follow                                                                      |
 | `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`       | Hooks on upstream's audiobook player                                                                                          |
 | `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`        | Lets a playing podcast own the lock screen; the book's remote handlers ask it first                                           |
-| `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader (`PodcastFeed`), player rules (`PodcastPlayback`), tests, podspecs                    |
+| `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader, player rules, downloads, tests, podspecs                                             |
 | `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
 | `applications/mobile/podcasts/`                                          | React UI: side menu, library grid, discover, show, episode and player screens, mini player                                    |
-| `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover), one stack per tab, the player pushed                                              |
+| `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover, Profile), a stack per tab, the player pushed                                       |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
@@ -121,6 +121,8 @@ in `FORK.md`.
 | 2026-11-17 | An episode opens as a form sheet in the tab's stack, not a full screen; links in notes come from a tested splitter                         | Mo's ask: the episode card; no new package                 |
 | 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
 | 2026-11-17 | The podcast player is one Swift `AVPlayer`; a playing podcast owns the lock screen through `LofiRemoteHandoff`                             | The book's handlers stay registered and stand aside        |
+| 2026-11-17 | Downloads: one background URLSession made at launch; Swift files each download and writes the index first                                  | Finishes with the app closed, even when iOS relaunches it  |
+| 2026-11-17 | A swipe-away stops downloads until the app opens; then they resume or start again. Wi-Fi only is native                                    | iOS never relaunches a swiped-away app; no stray data use  |
 
 ## Known problems
 

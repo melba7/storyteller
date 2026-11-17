@@ -16,6 +16,12 @@ describe("tabBase", () => {
     ).toBe("/podcasts/(tabs)/(discover)")
   })
 
+  it("stays in the Profile tab", () => {
+    expect(
+      tabBase(["(root)", "podcasts", "(tabs)", "(profile)", "downloads"]),
+    ).toBe("/podcasts/(tabs)/(profile)")
+  })
+
   it("uses the Podcasts tab otherwise", () => {
     expect(tabBase(["(root)", "podcasts", "(tabs)", "(library)"])).toBe(
       "/podcasts/(tabs)/(library)",

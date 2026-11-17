@@ -12,10 +12,11 @@ import {
 } from "@/modules/podcasts/library"
 import { episodeHref } from "@/modules/podcasts/routes"
 
+import { DownloadButton } from "./DownloadButton"
 import { PlayButton } from "./PlayButton"
 
 /**
- * One episode on a show's page: date, title, length or time left, and a play button whose
+ * One episode on a show's page: date, title, length or time left, and a download button and a play button whose
  * ring shows how much was heard. A played episode is dimmed, has no ring and says "Played".
  */
 export function EpisodeRow({
@@ -60,6 +61,7 @@ export function EpisodeRow({
           <Text className="text-muted-foreground text-sm">{length}</Text>
         ) : null}
       </Pressable>
+      <DownloadButton episode={episode} />
       <PlayButton episode={episode} show={show} ring={ringFraction(episode)} />
     </View>
   )

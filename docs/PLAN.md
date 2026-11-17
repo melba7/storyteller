@@ -348,6 +348,12 @@ once reviewed and green.
     episode downloaded with the app closed plays in airplane mode.
   - Files: `modules/podcasts/ios` (downloads), `PodcastKit` (file store),
     `podcasts/` (buttons, storage used).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. After
+    a swipe-away in the app switcher the downloads continue the next time the
+    app opens, because iOS stops them until then; left or locked, they carry on
+    by themselves. Wi-Fi only is off by default. Not tried on a phone yet: a
+    download with the app closed, a swipe-away and resume, airplane-mode
+    playback.
 
 - [ ] **P2b. Up Next**
   - Add to Up Next, play next, reorder and remove. The queue lives in Swift, so
