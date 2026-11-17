@@ -2,7 +2,7 @@
 //
 // The pure rules of playing and how times read, with the same numbers as PodcastKit's
 // PodcastPlayback. Nothing here touches the native player or the database.
-import type { StoredEpisode } from "./library"
+import { type StoredEpisode, formatDuration } from "./library"
 
 export const SKIP_BACK_SECONDS = 10
 export const SKIP_AHEAD_SECONDS = 45
@@ -32,6 +32,19 @@ export function timeLeft(position: number, duration: number | null): string {
 /** "1.0x", "1.5x". */
 export function speedLabel(rate: number): string {
   return `${rate.toFixed(1)}x`
+}
+
+/** What VoiceOver reads for the mini player's open button: the title and the time left. */
+export function miniPlayerLabel(
+  title: string,
+  position: number,
+  duration: number | null,
+): string {
+  const left =
+    duration === null ? "" : formatDuration(Math.max(0, duration - position))
+  return left === ""
+    ? `Open the player, ${title}`
+    : `Open the player, ${title}, ${left} left`
 }
 
 /** The speed one step (0.1) up or down, kept inside 0.5x to 3.0x. */

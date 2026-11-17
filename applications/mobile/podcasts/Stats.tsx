@@ -15,7 +15,7 @@ import {
 } from "@/modules/podcasts/stats"
 import { getStats, resetStats } from "@/modules/podcasts/statsNative"
 
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 
 const BAR_AREA = 120
 
@@ -52,14 +52,19 @@ export function Stats() {
 
   const days = lastDays(stats.days, new Date())
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Stats" />
       {Podcasts === null ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          Stats need the iOS app.
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            Stats need the iOS app.
+          </Text>
+        </BelowBar>
       ) : (
-        <ScrollView contentContainerClassName="px-safe-or-4 pb-8">
+        <ScrollView
+          contentContainerClassName="px-safe-or-4 pb-8"
+          contentInsetAdjustmentBehavior="automatic"
+        >
           <View className="border-border border-b py-4">
             <Text className="text-muted-foreground text-sm">Time listened</Text>
             <Text variant="h3">{formatDuration(stats.listened)}</Text>

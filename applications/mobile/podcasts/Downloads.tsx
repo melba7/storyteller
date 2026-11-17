@@ -49,7 +49,7 @@ export function Downloads() {
   const showById = new Map((shows.data ?? []).map((show) => [show.id, show]))
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Downloads" />
       <FlatList<DownloadInfo>
         data={list}

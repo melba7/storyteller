@@ -72,3 +72,8 @@ export function usePodcastsTheme() {
   )
   return { choice, name, dark: isDarkTheme(name), setChoice }
 }
+
+/** The status bar text colour that reads on the Podcasts theme's background. */
+export function useStatusBarStyle(): "light" | "dark" {
+  return usePodcastsTheme().dark ? "light" : "dark"
+}

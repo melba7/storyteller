@@ -1,73 +1,70 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { ChevronRight, Plus } from "lucide-react-native"
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  View,
-} from "react-native"
+import { ChevronRight } from "lucide-react-native"
+import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
 
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { episodeCount } from "@/modules/podcasts/playlistLook"
 import { describeRules } from "@/modules/podcasts/playlistRules"
 import { type Playlist } from "@/modules/podcasts/playlists"
 
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { askNewPlaylist } from "./addToPlaylist"
 import { useItemCounts, usePlaylists, useSmartEpisodes } from "./usePlaylists"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 
 /** The Playlists tab: the smart playlists, each with how many episodes it holds now. */
 export function Playlists() {
+  const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const playlists = usePlaylists()
   return (
-    <View className="pt-safe bg-background flex-1">
-      <StatusBar verticalBarBehaviorIOS="disabled" />
+    <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
+        large
         title="Playlists"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
         right={
-          <Button
-            variant="ghost"
-            size="icon"
-            accessibilityLabel="New playlist"
-            onPress={() =>
-              Alert.alert("New playlist", undefined, [
-                {
-                  text: "Smart playlist, from rules",
-                  onPress: () =>
-                    router.push({
-                      pathname:
-                        "/podcasts/(tabs)/(playlists)/playlist-edit/[id]",
-                      params: { id: "new" },
-                    }),
-                },
-                {
-                  text: "Playlist I fill myself",
-                  onPress: () =>
-                    askNewPlaylist((id) =>
-                      router.push({
-                        pathname: "/podcasts/(tabs)/(playlists)/playlist/[id]",
-                        params: { id },
-                      }),
-                    ),
-                },
-                { text: "Cancel", style: "cancel" },
-              ])
-            }
-          >
-            <Icon as={Plus} size={22} className="text-primary" />
-          </Button>
+          <Stack.Toolbar.Menu icon="plus" accessibilityLabel="New playlist">
+            <Stack.Toolbar.MenuAction
+              icon="wand.and.stars"
+              onPress={() =>
+                router.push({
+                  pathname: "/podcasts/(tabs)/(playlists)/playlist-edit/[id]",
+                  params: { id: "new" },
+                })
+              }
+            >
+              Smart playlist, from rules
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="music.note.list"
+              onPress={() =>
+                askNewPlaylist((id) =>
+                  router.push({
+                    pathname: "/podcasts/(tabs)/(playlists)/playlist/[id]",
+                    params: { id },
+                  }),
+                )
+              }
+            >
+              Playlist I fill myself
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
         }
       />
       {playlists.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
         <FlatList<Playlist>
           data={playlists.data ?? []}

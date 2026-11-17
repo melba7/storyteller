@@ -1,15 +1,13 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
-import { ArrowUpDown, ListChecks, Settings } from "lucide-react-native"
-import { View } from "react-native"
+import { Stack } from "expo-router"
 
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Menu } from "@/components/ui/menu"
 import { saveShowSettings } from "@/modules/podcasts/dbSettings"
 import { type Show } from "@/modules/podcasts/library"
-import { settingsHref } from "@/modules/podcasts/routes"
+import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
+import { showShare } from "@/modules/podcasts/share"
 import { type EpisodeSort } from "@/modules/podcasts/showSettings"
+
+import { shareContent } from "./ShareButton"
 
 const SORTS: { id: EpisodeSort; title: string }[] = [
   { id: "newest", title: "Newest first" },
@@ -18,80 +16,94 @@ const SORTS: { id: EpisodeSort; title: string }[] = [
   { id: "longest", title: "Longest first" },
 ]
 
-/**
- * The show page's buttons: how the episodes are ordered and grouped (kept per show), picking
- * several episodes, and the show's settings.
- */
-export function ShowBarButtons({
-  show,
-  archivedCount,
-  onSelect,
-}: {
+interface Options {
   show: Show
   archivedCount: number
   /** Starts picking several episodes. */
   onSelect: () => void
-}) {
-  const router = useRouter()
-  const segments = useSegments()
+  /** Opens the show's settings. */
+  onSettings: () => void
+  /** Asks to unfollow (or, for the "Your files" show, delete it). */
+  onUnfollow: () => void
+}
+
+/**
+ * The show page's native toolbar items: a sort menu (how the episodes are ordered and grouped,
+ * kept per show) and a "…" menu with Select episodes, Share, Settings and Unfollow. It returns
+ * the items themselves, not a component, because a toolbar finds its items by their type among
+ * its direct children.
+ */
+export function showBarItems({
+  show,
+  archivedCount,
+  onSelect,
+  onSettings,
+  onUnfollow,
+}: Options) {
   const { settings } = show
   const save = (patch: Partial<typeof settings>) => {
     saveShowSettings(show.id, { ...settings, ...patch }).catch(
       (cause: unknown) => console.warn("Couldn't save the show's view", cause),
     )
   }
-  return (
-    <View className="flex-row items-center">
-      <Menu
-        actions={[
-          ...SORTS.map((sort) => ({
-            id: sort.id,
-            title: sort.title,
-            state:
-              settings.sort === sort.id ? ("on" as const) : ("off" as const),
-            onPress: () => save({ sort: sort.id }),
-          })),
-          {
-            id: "season",
-            title: "Group by season",
-            state: settings.groupBySeason ? ("on" as const) : ("off" as const),
-            onPress: () => save({ groupBySeason: !settings.groupBySeason }),
-          },
-          {
-            id: "archived",
-            title:
-              archivedCount > 0
-                ? `Show archived (${archivedCount})`
-                : "Show archived",
-            state: settings.showArchived ? ("on" as const) : ("off" as const),
-            onPress: () => save({ showArchived: !settings.showArchived }),
-          },
-        ]}
-      >
-        <Button
-          variant="ghost"
-          size="icon"
-          accessibilityLabel="Sort and group episodes"
+  return [
+    <Stack.Toolbar.Menu
+      key="sort"
+      icon="arrow.up.arrow.down"
+      accessibilityLabel="Sort and group episodes"
+    >
+      <Stack.Toolbar.Menu inline title="Sort by">
+        {SORTS.map((sort) => (
+          <Stack.Toolbar.MenuAction
+            key={sort.id}
+            isOn={settings.sort === sort.id}
+            onPress={() => save({ sort: sort.id })}
+          >
+            {sort.title}
+          </Stack.Toolbar.MenuAction>
+        ))}
+      </Stack.Toolbar.Menu>
+      <Stack.Toolbar.Menu inline title="Group">
+        <Stack.Toolbar.MenuAction
+          isOn={settings.groupBySeason}
+          onPress={() => save({ groupBySeason: !settings.groupBySeason })}
         >
-          <Icon as={ArrowUpDown} size={20} className="text-primary" />
-        </Button>
-      </Menu>
-      <Button
-        variant="ghost"
-        size="icon"
-        accessibilityLabel="Select episodes"
-        onPress={onSelect}
+          Group by season
+        </Stack.Toolbar.MenuAction>
+        <Stack.Toolbar.MenuAction
+          isOn={settings.showArchived}
+          onPress={() => save({ showArchived: !settings.showArchived })}
+        >
+          {archivedCount > 0
+            ? `Show archived (${archivedCount})`
+            : "Show archived"}
+        </Stack.Toolbar.MenuAction>
+      </Stack.Toolbar.Menu>
+    </Stack.Toolbar.Menu>,
+    <Stack.Toolbar.Menu
+      key="more"
+      icon="ellipsis"
+      accessibilityLabel="More for this show"
+    >
+      <Stack.Toolbar.MenuAction icon="checklist" onPress={onSelect}>
+        Select episodes
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="square.and.arrow.up"
+        onPress={() => void shareContent(() => showShare(show))}
       >
-        <Icon as={ListChecks} size={20} className="text-primary" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        accessibilityLabel="Show settings"
-        onPress={() => router.push(settingsHref(segments, show.id))}
+        Share
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction icon="gearshape" onPress={onSettings}>
+        Settings
+      </Stack.Toolbar.MenuAction>
+      <Stack.Toolbar.MenuAction
+        icon="minus.circle"
+        destructive
+        onPress={onUnfollow}
       >
-        <Icon as={Settings} size={20} className="text-primary" />
-      </Button>
-    </View>
-  )
+        {isLocalFeedUrl(show.feedUrl) ? "Delete show" : "Unfollow"}
+      </Stack.Toolbar.MenuAction>
+    </Stack.Toolbar.Menu>,
+  ]
 }

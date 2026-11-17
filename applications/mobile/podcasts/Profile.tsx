@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import {
   Bookmark,
@@ -32,12 +32,14 @@ import { AppearanceSection } from "./AppearanceSection"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { useDownloadMap } from "./useDownloads"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 
 /** The Profile tab: Downloads (how many and how much room they take) and Wi-Fi only. */
 export function Profile() {
+  const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const map = useDownloadMap()
   const [wifiOnly, setWifi] = useState<boolean | null>(null)
@@ -84,16 +86,23 @@ export function Profile() {
   const summary = downloadsSummary(map)
 
   return (
-    <View className="pt-safe bg-background flex-1">
-      <StatusBar verticalBarBehaviorIOS="disabled" />
+    <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
+        large
         title="Profile"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
       />
       {Podcasts === null ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          Downloads need the iOS app.
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            Downloads need the iOS app.
+          </Text>
+        </BelowBar>
       ) : (
         <ScrollView
           contentContainerClassName="px-safe-or-4 pb-8"

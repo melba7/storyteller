@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 
@@ -84,10 +84,15 @@ export function Discover() {
   const canAdd = Podcasts !== null && adding === null
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
+        large
         title="Discover"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
       />
       <ScrollView
         contentContainerClassName="px-safe-or-4 gap-3"

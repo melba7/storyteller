@@ -1,7 +1,8 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useState } from "react"
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
+import { useCSSVariable } from "uniwind"
 
 import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
@@ -99,6 +100,7 @@ const join = (parts: string[]) =>
 
 /** Search for episodes: in the followed shows (on the phone) or in all of Apple's podcasts. */
 export function SearchEpisodes() {
+  const background = useCSSVariable("--color-background") as string
   const router = useRouter()
   const segments = useSegments()
   const [scope, setScope] = useState<Scope>("mine")
@@ -153,8 +155,15 @@ export function SearchEpisodes() {
         }))
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Search" />
+      {/* The search box sits above the results, not in a scroll view, so the header is solid. */}
+      <Stack.Screen
+        options={{
+          headerTransparent: false,
+          headerStyle: { backgroundColor: background },
+        }}
+      />
       <View className="px-safe-or-4 gap-3 pb-2">
         <Input
           accessibilityLabel="Search episodes"

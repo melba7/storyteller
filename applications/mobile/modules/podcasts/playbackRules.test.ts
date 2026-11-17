@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import type { StoredEpisode } from "./library"
 import {
   clampSpeed,
+  miniPlayerLabel,
   formatTime,
   isPlayed,
   resumeStart,
@@ -86,5 +87,25 @@ describe("showsMiniPlayer", () => {
     expect(showsMiniPlayer(null, null)).toBe(false)
     expect(showsMiniPlayer(episode, null)).toBe(true)
     expect(showsMiniPlayer(null, episode)).toBe(true)
+  })
+})
+
+describe("miniPlayerLabel", () => {
+  it("says the title and the time left for VoiceOver", () => {
+    expect(miniPlayerLabel("Episode 4", 600, 3600)).toBe(
+      "Open the player, Episode 4, 50 min left",
+    )
+    expect(miniPlayerLabel("Episode 4", 0, 3900)).toBe(
+      "Open the player, Episode 4, 1 h 5 min left",
+    )
+  })
+
+  it("leaves the time out when the length is unknown or used up", () => {
+    expect(miniPlayerLabel("Episode 4", 10, null)).toBe(
+      "Open the player, Episode 4",
+    )
+    expect(miniPlayerLabel("Episode 4", 3600, 3600)).toBe(
+      "Open the player, Episode 4",
+    )
   })
 })

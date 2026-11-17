@@ -21,12 +21,12 @@ import {
 } from "@/modules/podcasts/episodeList"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { tabBase } from "@/modules/podcasts/routes"
+import { settingsHref, tabBase } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SelectionBar } from "./SelectionBar"
-import { ShowBarButtons } from "./ShowBarButtons"
+import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
 import { useSelection } from "./useSelection"
@@ -92,25 +92,32 @@ export function PodcastShow({ id }: { id: string }) {
 
   const current = show.data
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
         title={current?.title ?? "Podcast"}
         right={
-          current ? (
-            <ShowBarButtons
-              show={current}
-              archivedCount={archivedCount(episodes.data ?? [])}
-              onSelect={() => selection.begin()}
-            />
-          ) : undefined
+          current
+            ? showBarItems({
+                show: current,
+                archivedCount: archivedCount(episodes.data ?? []),
+                onSelect: () => selection.begin(),
+                onSettings: () =>
+                  router.push(settingsHref(segments, current.id)),
+                onUnfollow: () => confirmUnsubscribe(current.title),
+              })
+            : undefined
         }
       />
       {show.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : !current ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          {show.error ?? "This show isn't in your library."}
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {show.error ?? "This show isn't in your library."}
+          </Text>
+        </BelowBar>
       ) : (
         <>
           {selection.on ? (

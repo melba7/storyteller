@@ -26,6 +26,8 @@ interface ListProps {
   label: (id: string, index: number, count: number) => string
   actions?: RowAction[]
   onAction?: (id: string, name: string) => void
+  /** Shown above the rows, inside the scroll view, so a large title can shrink. */
+  header?: ReactNode
 }
 
 /**
@@ -41,6 +43,7 @@ export function DragList({
   label,
   actions = [],
   onAction,
+  header,
 }: ListProps) {
   // The row being dragged, where it started, and how far the finger has moved.
   const [dragging, setDragging] = useState<string | null>(null)
@@ -81,6 +84,7 @@ export function DragList({
       contentContainerClassName="px-safe-or-4"
       contentInsetAdjustmentBehavior="automatic"
     >
+      {header}
       {ids.map((id, index) => (
         <DragRow
           key={id}

@@ -6,7 +6,7 @@ import { Text } from "@/components/ui/text"
 import { type Bookmark } from "@/modules/podcasts/bookmarks"
 
 import { BookmarkRow, playBookmark } from "./BookmarkRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useEpisodesByIds, useShows } from "./hooks"
 import { useAllBookmarks } from "./useBookmarks"
 
@@ -25,10 +25,12 @@ export function Bookmarks() {
     [shows.data],
   )
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Bookmarks" />
       {bookmarks.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
         <FlatList<Bookmark>
           data={list}

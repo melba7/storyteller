@@ -6,7 +6,7 @@ import { CHART_CATEGORIES, type ChartShow } from "@/modules/podcasts/charts"
 
 import { Artwork } from "./Artwork"
 import { useOpenPreview } from "./ChartRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useChart } from "./discoverHooks"
 
 /** A category's top podcasts as a list, pushed from Discover. */
@@ -15,18 +15,24 @@ export function CategoryChart({ id }: { id: string }) {
   const chart = useChart(id)
   const open = useOpenPreview()
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title={category?.name ?? "Category"} />
       {!category ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          This category isn&apos;t in the list.
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            This category isn&apos;t in the list.
+          </Text>
+        </BelowBar>
       ) : chart.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : chart.error ? (
-        <Text className="text-destructive px-8 py-12 text-center">
-          {chart.error}
-        </Text>
+        <BelowBar>
+          <Text className="text-destructive px-8 py-12 text-center">
+            {chart.error}
+          </Text>
+        </BelowBar>
       ) : (
         <FlatList<ChartShow>
           data={chart.data ?? []}

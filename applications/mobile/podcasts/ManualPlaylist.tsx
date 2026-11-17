@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
-import { Ellipsis, Play } from "lucide-react-native"
+import { Stack, useRouter, useSegments } from "expo-router"
+import { Play } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Alert, Pressable, View } from "react-native"
 import Swipeable, {
@@ -9,7 +9,6 @@ import Swipeable, {
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
-import { Menu } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
 import {
   deletePlaylist,
@@ -31,7 +30,7 @@ import { moveBetween } from "@/modules/podcasts/upNext"
 import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
 import { PlayButton } from "./PlayButton"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { playAll } from "./playAll"
 import { useEntries } from "./usePlaylists"
 
@@ -129,33 +128,31 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
         title={playlist.title}
         right={
-          <Menu
-            actions={[
-              { id: "rename", title: "Rename", onPress: rename },
-              {
-                id: "delete",
-                title: "Delete playlist",
-                attributes: { destructive: true },
-                onPress: confirmDelete,
-              },
-            ]}
+          <Stack.Toolbar.Menu
+            icon="ellipsis"
+            accessibilityLabel="More for this playlist"
           >
-            <Button
-              variant="ghost"
-              size="icon"
-              accessibilityLabel="More for this playlist"
+            <Stack.Toolbar.MenuAction icon="pencil" onPress={rename}>
+              Rename
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={confirmDelete}
             >
-              <Icon as={Ellipsis} size={22} className="text-primary" />
-            </Button>
-          </Menu>
+              Delete playlist
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
         }
       />
       {entries.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : list.length === 0 ? (
         <View className="items-center gap-2 px-8 py-12">
           <Text className="text-center font-semibold">

@@ -19,7 +19,7 @@ import {
 import { showHref } from "@/modules/podcasts/routes"
 
 import { EpisodeRow } from "./EpisodeRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { ShowHeader } from "./ShowHeader"
 import { useShows } from "./hooks"
 
@@ -137,12 +137,14 @@ export function PodcastPreview({
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title={preview?.show.title ?? "Podcast"} />
       {error ? (
         <Text className="text-destructive px-8 py-12 text-center">{error}</Text>
       ) : !preview ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
         <FlatList<StoredEpisode>
           ref={list}

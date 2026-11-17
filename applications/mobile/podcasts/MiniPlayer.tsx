@@ -1,13 +1,18 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter } from "expo-router"
 import { NativeTabs } from "expo-router/native-tabs"
-import { Pause, Play } from "lucide-react-native"
+import { Pause, Play, RotateCw } from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { skipNoteText } from "@/modules/podcasts/ads"
-import { showsMiniPlayer, timeLeft } from "@/modules/podcasts/playbackRules"
+import {
+  miniPlayerLabel,
+  showsMiniPlayer,
+  timeLeft,
+} from "@/modules/podcasts/playbackRules"
+import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import {
   player,
   usePlayer,
@@ -17,6 +22,8 @@ import {
 import { progressFraction } from "@/modules/podcasts/playerLook"
 
 import { Artwork } from "./Artwork"
+import { tap } from "./haptics"
+import { usePlaybackSettings } from "./usePlaybackSettings"
 import { pressUndo, useSkipNote } from "./useSkipNote"
 
 /**
@@ -38,6 +45,7 @@ export function MiniPlayerContent() {
   const view = usePlayer()
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
   const note = useSkipNote()
+  const { skipForward } = usePlaybackSettings()
   const { episode, show } = view
   if (!episode) return null
 
@@ -47,12 +55,17 @@ export function MiniPlayerContent() {
         <Pressable
           className="flex-1 flex-row items-center gap-3"
           accessibilityRole="button"
-          accessibilityLabel={`Open the player, ${episode.title}`}
+          accessibilityLabel={miniPlayerLabel(
+            episode.title,
+            view.position,
+            view.duration,
+          )}
           onPress={() => router.push("/podcasts/player")}
         >
           <Artwork
             uri={episode.imageUrl ?? show?.imageUrl ?? null}
             size={compact ? 32 : 40}
+            className="rounded-lg"
           />
           <View className="flex-1">
             <Text
@@ -85,7 +98,10 @@ export function MiniPlayerContent() {
           className="size-11 items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel={view.isPlaying ? "Pause" : "Play"}
-          onPress={() => void player.togglePlayPause()}
+          onPress={() => {
+            tap()
+            void player.togglePlayPause()
+          }}
         >
           {view.isBuffering ? (
             <ActivityIndicator accessibilityLabel="Buffering" />
@@ -97,6 +113,22 @@ export function MiniPlayerContent() {
             />
           )}
         </Pressable>
+        {compact ? null : (
+          <Pressable
+            className="size-11 items-center justify-center active:opacity-60"
+            accessibilityRole="button"
+            accessibilityLabel={skipLabel("ahead", skipForward)}
+            onPress={() => {
+              tap()
+              void player.skip(skipForward)
+            }}
+          >
+            <Icon as={RotateCw} size={30} strokeWidth={1.5} />
+            <Text className="absolute text-[10px] font-bold">
+              {skipForward}
+            </Text>
+          </Pressable>
+        )}
       </View>
       {compact ? null : (
         <View className="bg-foreground/10 absolute right-4 bottom-0 left-4 h-0.5 rounded-full">

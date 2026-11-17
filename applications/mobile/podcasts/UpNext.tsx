@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useMemo } from "react"
 import { Pressable, View } from "react-native"
@@ -16,9 +16,10 @@ import { moveBetween, rowLabel, upNextSummary } from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { useEpisodesByIds } from "./hooks"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 import {
   confirmClear,
   moveQueued,
@@ -41,6 +42,7 @@ const ACTIONS: RowAction[] = [
  * and Play last, left for Remove. Tapping a row opens the episode.
  */
 export function UpNext() {
+  const statusBarStyle = useStatusBarStyle()
   const queue = useUpNext()
   const byId = useMemo(
     () => new Map(queue.map((item) => [item.id, item])),
@@ -67,42 +69,51 @@ export function UpNext() {
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
-      <StatusBar verticalBarBehaviorIOS="disabled" />
+    <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
+        large
         title="Up Next"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
         right={
-          queue.length > 0 ? (
-            <Button
-              variant="ghost"
-              accessibilityLabel="Clear Up Next"
-              onPress={() => confirmClear(queue.length)}
-            >
-              <Text className="text-primary">Clear</Text>
-            </Button>
-          ) : null
+          <Stack.Toolbar.Button
+            hidden={queue.length === 0}
+            accessibilityLabel="Clear Up Next"
+            onPress={() => confirmClear(queue.length)}
+          >
+            Clear
+          </Stack.Toolbar.Button>
         }
       />
       {Podcasts === null ? (
-        <Message
-          title="Up Next needs the iOS app"
-          body="This version of the app can't play podcasts."
-        />
+        <BelowBar>
+          <Message
+            title="Up Next needs the iOS app"
+            body="This version of the app can't play podcasts."
+          />
+        </BelowBar>
       ) : queue.length === 0 ? (
-        <Message
-          title="Nothing in Up Next"
-          body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
-        />
+        <BelowBar>
+          <Message
+            title="Nothing in Up Next"
+            body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
+          />
+        </BelowBar>
       ) : (
         <>
-          <Text
-            className="text-muted-foreground px-safe-or-4 py-2 text-sm"
-            accessibilityLabel={upNextSummary(queue)}
-          >
-            {upNextSummary(queue)}
-          </Text>
           <DragList
+            header={
+              <Text
+                className="text-muted-foreground py-2 text-sm"
+                accessibilityLabel={upNextSummary(queue)}
+              >
+                {upNextSummary(queue)}
+              </Text>
+            }
             ids={ids}
             rowHeight={ROW_HEIGHT}
             onChange={reorder}

@@ -1,9 +1,8 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { useMemo, useState } from "react"
 import { ActivityIndicator, View } from "react-native"
 
-import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 import { saveOwnOrder } from "@/modules/podcasts/db"
 import { sortShows } from "@/modules/podcasts/libraryView"
@@ -11,7 +10,7 @@ import { readableError } from "@/modules/podcasts/nativeError"
 
 import { Artwork } from "./Artwork"
 import { DragList } from "./DragList"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useShowActivity, useShows } from "./hooks"
 import { useLibraryView } from "./useLibraryView"
 
@@ -57,38 +56,41 @@ export function ArrangeShows() {
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
         title="Arrange"
         left={
-          <Button
-            variant="ghost"
+          <Stack.Toolbar.Button
             accessibilityLabel="Cancel"
             onPress={() => router.back()}
           >
-            <Text className="text-primary">Cancel</Text>
-          </Button>
+            Cancel
+          </Stack.Toolbar.Button>
         }
         right={
-          <Button
-            variant="ghost"
-            accessibilityLabel="Done"
+          <Stack.Toolbar.Button
+            variant="done"
             disabled={ids === null || saving}
+            accessibilityLabel="Done"
             onPress={done}
           >
-            <Text className="text-primary font-semibold">Done</Text>
-          </Button>
+            Done
+          </Stack.Toolbar.Button>
         }
       />
       {problem ? (
         <Text className="text-destructive px-4 py-2 text-sm">{problem}</Text>
       ) : null}
       {shows.error && ids === null ? (
-        <Text className="text-destructive px-8 py-12 text-center">
-          {shows.error}
-        </Text>
+        <BelowBar>
+          <Text className="text-destructive px-8 py-12 text-center">
+            {shows.error}
+          </Text>
+        </BelowBar>
       ) : ids === null ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
         <DragList
           ids={ids}

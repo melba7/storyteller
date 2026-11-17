@@ -1,7 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { Ellipsis, Plus, Search } from "lucide-react-native"
 import { useMemo, useState } from "react"
 import {
   ActivityIndicator,
@@ -11,9 +10,6 @@ import {
   useWindowDimensions,
 } from "react-native"
 
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Menu, type MenuAction } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
 import { followUpNew } from "@/modules/podcasts/automaticRun"
 import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
@@ -36,11 +32,12 @@ import {
   ShowRow,
   cellSize,
 } from "./LibraryShows"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
 import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
 import { useLibraryView } from "./useLibraryView"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 
 const LAYOUTS: { id: LibraryLayout; title: string; columns: number }[] = [
   { id: "large", title: "Large grid", columns: 3 },
@@ -55,56 +52,58 @@ const ORDERS: { id: LibraryOrder; title: string }[] = [
   { id: "own", title: "Your order" },
 ]
 
-function menuActions(
+/** The "…" menu's native items: Layout, Sort by, Add audio files and Arrange. */
+function menuItems(
   view: LibraryView,
   change: (patch: Partial<LibraryView>) => void,
   arrange: () => void,
   arranged: boolean,
-): MenuAction[] {
+) {
   return [
-    {
-      id: "layout",
-      title: "Layout",
-      displayInline: true,
-      subactions: LAYOUTS.map((layout) => ({
-        id: `layout-${layout.id}`,
-        title: layout.title,
-        state: view.layout === layout.id ? "on" : "off",
-        onPress: () => change({ layout: layout.id }),
-      })),
-    },
-    {
-      id: "order",
-      title: "Sort by",
-      displayInline: true,
-      subactions: ORDERS.map((order) => ({
-        id: `order-${order.id}`,
-        title: order.title,
-        state: view.order === order.id ? "on" : "off",
-        // "Your order" opens the arrange screen until the listener has placed shows once.
-        onPress: () =>
-          order.id === "own" && !arranged
-            ? arrange()
-            : change({ order: order.id }),
-      })),
-    },
-    {
-      id: "add-files",
-      title: "Add audio files",
-      onPress: () => void addAudioFiles(),
-    },
-    {
-      id: "arrange",
-      title: "Arrange",
-      displayInline: true,
-      subactions: [
-        { id: "arrange-shows", title: "Arrange shows", onPress: arrange },
-      ],
-    },
+    <Stack.Toolbar.Menu key="layout" inline title="Layout">
+      {LAYOUTS.map((layout) => (
+        <Stack.Toolbar.MenuAction
+          key={layout.id}
+          isOn={view.layout === layout.id}
+          onPress={() => change({ layout: layout.id })}
+        >
+          {layout.title}
+        </Stack.Toolbar.MenuAction>
+      ))}
+    </Stack.Toolbar.Menu>,
+    <Stack.Toolbar.Menu key="order" inline title="Sort by">
+      {ORDERS.map((order) => (
+        <Stack.Toolbar.MenuAction
+          key={order.id}
+          isOn={view.order === order.id}
+          // "Your order" opens the arrange screen until the listener has placed shows once.
+          onPress={() =>
+            order.id === "own" && !arranged
+              ? arrange()
+              : change({ order: order.id })
+          }
+        >
+          {order.title}
+        </Stack.Toolbar.MenuAction>
+      ))}
+    </Stack.Toolbar.Menu>,
+    <Stack.Toolbar.MenuAction
+      key="add-files"
+      icon="doc.badge.plus"
+      onPress={() => void addAudioFiles()}
+    >
+      Add audio files
+    </Stack.Toolbar.MenuAction>,
+    <Stack.Toolbar.Menu key="arrange" inline title="Arrange">
+      <Stack.Toolbar.MenuAction onPress={arrange}>
+        Arrange shows
+      </Stack.Toolbar.MenuAction>
+    </Stack.Toolbar.Menu>,
   ]
 }
 
 export function PodcastsHome() {
+  const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const segments = useSegments()
   const { width } = useWindowDimensions()
@@ -153,52 +152,53 @@ export function PodcastsHome() {
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
-      <StatusBar verticalBarBehaviorIOS="disabled" />
+    <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
+        large
         title="Podcasts"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
         right={
-          <View className="flex-row items-center">
-            <Button
-              variant="ghost"
-              size="icon"
+          <>
+            <Stack.Toolbar.Button
+              icon="magnifyingglass"
               accessibilityLabel="Search episodes"
               onPress={() => router.push("/podcasts/search")}
-            >
-              <Icon as={Search} size={24} className="text-primary" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            />
+            <Stack.Toolbar.Button
+              icon="plus"
               accessibilityLabel="Find a podcast to add"
               onPress={() => router.navigate("/podcasts/discover")}
+            />
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              hidden={!view}
+              accessibilityLabel="Layout and order"
             >
-              <Icon as={Plus} size={24} className="text-primary" />
-            </Button>
-            {view ? (
-              <Menu actions={menuActions(view, change, openArrange, arranged)}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  accessibilityLabel="Layout and order"
-                >
-                  <Icon as={Ellipsis} size={24} className="text-primary" />
-                </Button>
-              </Menu>
-            ) : null}
-          </View>
+              {view ? menuItems(view, change, openArrange, arranged) : null}
+            </Stack.Toolbar.Menu>
+          </>
         }
       />
       {Podcasts === null ? (
-        <Message
-          title="Podcasts need the iOS app"
-          body="This version of the app can't read podcast feeds."
-        />
+        <BelowBar>
+          <Message
+            title="Podcasts need the iOS app"
+            body="This version of the app can't read podcast feeds."
+          />
+        </BelowBar>
       ) : shows.loading || view === null ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : shows.error ? (
-        <Message title="The library couldn't be read" body={shows.error} />
+        <BelowBar>
+          <Message title="The library couldn't be read" body={shows.error} />
+        </BelowBar>
       ) : (
         <FlatList<Show>
           // A different column count needs a fresh list.
