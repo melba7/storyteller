@@ -810,11 +810,11 @@ only. No new npm packages and no new CSS variables.
 
 Mo: "the ad skip doesn't seem to work. There is no place to see downloaded
 podcasts. The transcript takes way too long. There seem to be interface glitches
-like the top bar covering parts of text. Doesn't look like a modern app." What the
-code shows: Downloads exists but only under Profile; episodes are transcribed one
-at a time in download order, the one playing does not go first, nothing shows
-until the whole episode is done, and ads are looked for only after that, so a
-fresh download is usually past its ads before they are known.
+like the top bar covering parts of text. Doesn't look like a modern app." What
+the code shows: Downloads exists but only under Profile; episodes are
+transcribed one at a time in download order, the one playing does not go first,
+nothing shows until the whole episode is done, and ads are looked for only after
+that, so a fresh download is usually past its ads before they are known.
 
 - [x] **R1. Downloaded episodes in the Library** (S): a "Downloaded" row at the
       top of the Library (with how many) opens the downloads list inside the
@@ -838,8 +838,8 @@ fresh download is usually past its ads before they are known.
       Apple Intelligence (the finder needs it).
 - [ ] **R5. The top bar over text, and controls off the edge** (M): Mo's
       screenshots (Profile scrolled, the player's transcript) show the large
-      title staying large over the content, the page pills running off the
-      right edge, and the transcript's buttons under the home indicator. Every
+      title staying large over the content, the page pills running off the right
+      edge, and the transcript's buttons under the home indicator. Every
       screen's list or scroll view becomes the screen's first child (no wrapping
       View, the bar and status bar after it), so iOS tracks it: the large title
       shrinks and the bar blurs what passes under it. The player's pills fit the
@@ -847,9 +847,9 @@ fresh download is usually past its ads before they are known.
       indicator. Then a pass over every Podcasts screen for the same faults.
   - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
     the Profile title shrinks on scroll and nothing is clipped in the player.
-- [ ] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows
-      failed with "only works over plain http". The app allows plain http (like
-      other podcast apps), keeps trying https first, and a download whose https
+- [ ] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows failed
+      with "only works over plain http". The app allows plain http (like other
+      podcast apps), keeps trying https first, and a download whose https
       address fails falls back to the feed's http address. Marketplace's 403 is
       looked at separately.
   - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
