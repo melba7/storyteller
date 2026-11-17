@@ -21,11 +21,23 @@ describe("isFollowLink", () => {
     ).toBe(true)
   })
 
+  it("accepts every other spelling of a feed link that the link reader accepts", () => {
+    expect(isFollowLink("feed://example.com/rss")).toBe(true)
+    expect(isFollowLink("itpc://example.com/rss")).toBe(true)
+    expect(isFollowLink("pcast://example.com/rss")).toBe(true)
+    expect(isFollowLink("feed:https://example.com/rss")).toBe(true)
+    expect(isFollowLink("//example.com/rss")).toBe(true)
+    expect(isFollowLink("example.com")).toBe(true)
+    expect(isFollowLink("example.com/feed.xml")).toBe(true)
+    expect(isFollowLink("example.com:8080/feed")).toBe(true)
+  })
+
   it("rejects words to search for", () => {
     expect(isFollowLink("")).toBe(false)
     expect(isFollowLink("true crime")).toBe(false)
-    expect(isFollowLink("example.com")).toBe(false)
+    expect(isFollowLink("serial")).toBe(false)
     expect(isFollowLink("http")).toBe(false)
+    expect(isFollowLink("feed")).toBe(false)
   })
 
   it("rejects a link with spaces or another scheme", () => {

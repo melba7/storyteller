@@ -72,7 +72,7 @@ export function Downloads() {
             <EmptyState
               icon={Download}
               title="No downloads yet"
-              body="Tap the arrow on an episode to keep it on your phone."
+              body="Tap the “…” menu on an episode and choose Download to keep it on your phone."
             />
           )
         }

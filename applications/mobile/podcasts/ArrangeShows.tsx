@@ -78,9 +78,6 @@ export function ArrangeShows() {
           </Stack.Toolbar.Button>
         }
       />
-      {problem ? (
-        <Text className="text-destructive px-4 py-2 text-sm">{problem}</Text>
-      ) : null}
       {shows.error && ids === null ? (
         <BelowBar>
           <Text className="text-destructive px-8 py-12 text-center">
@@ -93,6 +90,11 @@ export function ArrangeShows() {
         </BelowBar>
       ) : (
         <DragList
+          header={
+            problem ? (
+              <Text className="text-destructive py-2 text-sm">{problem}</Text>
+            ) : null
+          }
           ids={ids}
           rowHeight={ROW_HEIGHT}
           onChange={setOrder}

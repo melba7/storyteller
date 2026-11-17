@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Check, Share2 } from "lucide-react-native"
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { ActivityIndicator, Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
@@ -24,6 +24,12 @@ interface Props {
   busy?: boolean
   /** How many episodes the show has, for the meta line; null while unknown. */
   episodeCount?: number | null
+  /**
+   * Called with how far down the page (from the top of the list) the show's title ends, once
+   * it is laid out and again if it moves. The screen uses it to know when the title has
+   * scrolled under the bar.
+   */
+  onTitleBottom?: (bottom: number) => void
 }
 
 /** Room above the header that the wash also covers, so it runs behind a transparent bar. */
@@ -43,7 +49,16 @@ export function ShowHeader({
   onFollow,
   busy = false,
   episodeCount = null,
+  onTitleBottom,
 }: Props) {
+  // The title group's top and the title's bottom inside it, which arrive as two layouts.
+  const groupTop = useRef<number | null>(null)
+  const titleEnd = useRef<number | null>(null)
+  function reportTitleBottom() {
+    if (groupTop.current !== null && titleEnd.current !== null) {
+      onTitleBottom?.(groupTop.current + titleEnd.current)
+    }
+  }
   const [expanded, setExpanded] = useState(false)
   const long = needsMore(show.description)
   // A preview's show isn't in the database, so its colour is measured but not saved.
@@ -72,8 +87,24 @@ export function ShowHeader({
       >
         <Artwork uri={show.imageUrl} size={ARTWORK} className="rounded-2xl" />
       </View>
-      <View className="items-center gap-1">
-        <Text className="text-center text-2xl font-bold">{show.title}</Text>
+      <View
+        className="items-center gap-1"
+        onLayout={(event) => {
+          groupTop.current = event.nativeEvent.layout.y
+          reportTitleBottom()
+        }}
+      >
+        <Text
+          className="text-center text-2xl font-bold"
+          accessibilityRole="header"
+          onLayout={(event) => {
+            const { y, height } = event.nativeEvent.layout
+            titleEnd.current = y + height
+            reportTitleBottom()
+          }}
+        >
+          {show.title}
+        </Text>
         {show.author ? (
           <Text className="text-muted-foreground text-center text-base">
             {show.author}

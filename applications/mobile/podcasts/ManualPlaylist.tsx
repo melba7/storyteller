@@ -154,50 +154,52 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
         </BelowBar>
       ) : list.length === 0 ? (
-        <View className="items-center gap-2 px-8 py-12">
-          <Text className="text-center font-semibold">
-            {entries.error ?? "Nothing in this playlist yet"}
-          </Text>
-          <Text className="text-muted-foreground text-center text-sm">
-            Tap the three dots on any episode, or open it, and choose Add to
-            playlist.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View className="px-safe-or-4 flex-row items-center gap-2 py-2">
-            <Text className="text-muted-foreground flex-1 text-sm">
-              {episodeCount(list.length)}
+        <BelowBar>
+          <View className="items-center gap-2 px-8 py-12">
+            <Text className="text-center font-semibold">
+              {entries.error ?? "Nothing in this playlist yet"}
             </Text>
-            <Button
-              className="rounded-full"
-              accessibilityLabel="Play all"
-              onPress={() => void playAll(list)}
-            >
-              <Icon as={Play} size={16} className="text-primary-foreground" />
-              <Text>Play all</Text>
-            </Button>
+            <Text className="text-muted-foreground text-center text-sm">
+              Tap the three dots on any episode, or open it, and choose Add to
+              playlist.
+            </Text>
           </View>
-          <DragList
-            ids={ids}
-            rowHeight={ROW_HEIGHT}
-            onChange={reorder}
-            label={(id, index, count) => {
-              const entry = byId.get(id)
-              return entry ? entryLabel(entry, index, count) : ""
-            }}
-            actions={ACTIONS}
-            onAction={(id, name) => {
-              if (name === "remove") remove(playlist.id, id)
-            }}
-            renderContent={(id) => {
-              const entry = byId.get(id)
-              return entry ? (
-                <EntryRow playlistId={playlist.id} entry={entry} />
-              ) : null
-            }}
-          />
-        </>
+        </BelowBar>
+      ) : (
+        <DragList
+          header={
+            <View className="flex-row items-center gap-2 py-2">
+              <Text className="text-muted-foreground flex-1 text-sm">
+                {episodeCount(list.length)}
+              </Text>
+              <Button
+                className="rounded-full"
+                accessibilityLabel="Play all"
+                onPress={() => void playAll(list)}
+              >
+                <Icon as={Play} size={16} className="text-primary-foreground" />
+                <Text>Play all</Text>
+              </Button>
+            </View>
+          }
+          ids={ids}
+          rowHeight={ROW_HEIGHT}
+          onChange={reorder}
+          label={(id, index, count) => {
+            const entry = byId.get(id)
+            return entry ? entryLabel(entry, index, count) : ""
+          }}
+          actions={ACTIONS}
+          onAction={(id, name) => {
+            if (name === "remove") remove(playlist.id, id)
+          }}
+          renderContent={(id) => {
+            const entry = byId.get(id)
+            return entry ? (
+              <EntryRow playlistId={playlist.id} entry={entry} />
+            ) : null
+          }}
+        />
       )}
     </View>
   )

@@ -1,5 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
+import { useHeaderHeight } from "expo-router/react-navigation"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
@@ -47,6 +48,8 @@ export function PodcastPreview({
   const router = useRouter()
   const segments = useSegments()
   const shows = useShows()
+  // The list scrolls under the transparent header: a row scrolled to must land below it.
+  const headerHeight = useHeaderHeight()
   const [preview, setPreview] = useState<Preview | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
@@ -103,11 +106,16 @@ export function PodcastPreview({
     if (target < 0 || scrolled.current) return
     scrolled.current = true
     const timer = setTimeout(
-      () => list.current?.scrollToIndex({ index: target, animated: true }),
+      () =>
+        list.current?.scrollToIndex({
+          index: target,
+          animated: true,
+          viewOffset: headerHeight,
+        }),
       100,
     )
     return () => clearTimeout(timer)
-  }, [target])
+  }, [target, headerHeight])
 
   // Replaces this page with the show's own, once, when the show is in the library.
   useEffect(() => {
@@ -140,7 +148,11 @@ export function PodcastPreview({
     <View className="bg-background flex-1">
       <ScreenBar title={preview?.show.title ?? "Podcast"} />
       {error ? (
-        <Text className="text-destructive px-8 py-12 text-center">{error}</Text>
+        <BelowBar>
+          <Text className="text-destructive px-8 py-12 text-center">
+            {error}
+          </Text>
+        </BelowBar>
       ) : !preview ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -155,7 +167,12 @@ export function PodcastPreview({
               animated: false,
             })
             setTimeout(
-              () => list.current?.scrollToIndex({ index, animated: true }),
+              () =>
+                list.current?.scrollToIndex({
+                  index,
+                  animated: true,
+                  viewOffset: headerHeight,
+                }),
               150,
             )
           }}

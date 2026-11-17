@@ -1,5 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
+import { StatusBar } from "expo-status-bar"
 import { Link } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
@@ -20,6 +21,7 @@ import { Artwork } from "./Artwork"
 import { DiscoverBrowse } from "./DiscoverBrowse"
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 
 const SEARCH_DELAY_MS = 400
 
@@ -85,9 +87,11 @@ export function Discover() {
   const canAdd = Podcasts !== null && adding === null
   const typed = term.trim() !== ""
   const isLink = isFollowLink(term)
+  const statusBarStyle = useStatusBarStyle()
 
   return (
     <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
         large
         title="Discover"

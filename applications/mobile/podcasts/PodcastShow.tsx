@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { useMemo, useState } from "react"
+import { useHeaderHeight } from "expo-router/react-navigation"
+import { useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -39,9 +40,6 @@ const SORT_NAMES: Record<EpisodeSort, string> = {
   longest: "Longest first",
 }
 
-/** How far the list scrolls before the header's title is under the bar (about 270 pt). */
-const TITLE_UNDER_BAR = 270
-
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
   const segments = useSegments()
@@ -51,6 +49,8 @@ export function PodcastShow({ id }: { id: string }) {
   const [problem, setProblem] = useState<string | null>(null)
   const selection = useSelection()
   // The bar's title appears once the header's own title has scrolled under the bar.
+  const headerHeight = useHeaderHeight()
+  const titleBottom = useRef<number | null>(null)
   const [titleInBar, setTitleInBar] = useState(false)
   const items = useMemo(
     () =>
@@ -107,7 +107,8 @@ export function PodcastShow({ id }: { id: string }) {
   return (
     <View className="bg-background flex-1">
       <ScreenBar
-        title={current ? (titleInBar ? current.title : "") : "Podcast"}
+        title={current ? current.title : "Podcast"}
+        titleHidden={Boolean(current) && !titleInBar}
         right={
           current
             ? showBarItems({
@@ -147,9 +148,12 @@ export function PodcastShow({ id }: { id: string }) {
             contentInsetAdjustmentBehavior="automatic"
             scrollEventThrottle={32}
             onScroll={(event) => {
-              const { contentOffset, contentInset } = event.nativeEvent
+              // The list starts under the bar (its automatic inset is the header's height), so
+              // the page's top edge below the bar is at the offset plus that height.
+              if (titleBottom.current === null) return
               setTitleInBar(
-                contentOffset.y + (contentInset?.top ?? 0) > TITLE_UNDER_BAR,
+                event.nativeEvent.contentOffset.y + headerHeight >=
+                  titleBottom.current,
               )
             }}
             refreshControl={
@@ -162,6 +166,7 @@ export function PodcastShow({ id }: { id: string }) {
                   problem={problem}
                   onUnfollow={() => confirmUnsubscribe(current.title)}
                   episodeCount={episodes.data ? episodes.data.length : null}
+                  onTitleBottom={(bottom) => (titleBottom.current = bottom)}
                 />
                 <View className="flex-row items-baseline justify-between pt-2 pb-1">
                   <Text

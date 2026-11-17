@@ -14,7 +14,7 @@ export const HERO_COUNT = 5
 
 const GUTTER = 16
 const GAP = 12
-const HEIGHT = 220
+const MIN_HEIGHT = 220
 const ART = 140
 
 /**
@@ -38,13 +38,15 @@ export function HeroCarousel({ shows }: { shows: ChartShow[] }) {
       {shows.slice(0, HERO_COUNT).map((show, index) => (
         <PressableScale
           key={show.appleId}
-          style={{ width: card, height: HEIGHT }}
+          style={{ width: card, minHeight: MIN_HEIGHT }}
           accessibilityRole="button"
           accessibilityLabel={`Number ${index + 1}, ${show.title}${show.author ? `, ${show.author}` : ""}`}
           onPress={() => open(show.feedUrl)}
         >
           <View
-            className="bg-secondary flex-1 overflow-hidden rounded-3xl"
+            className="bg-secondary overflow-hidden rounded-3xl"
+            // Grows with large text; flex-1 would ignore the text's height here.
+            style={{ flexGrow: 1, minHeight: MIN_HEIGHT }}
             accessible={false}
           >
             {show.imageUrl ? (
@@ -57,7 +59,7 @@ export function HeroCarousel({ shows }: { shows: ChartShow[] }) {
               />
             ) : null}
             <View className="absolute inset-0 bg-black/60" />
-            <View className="flex-1 flex-row items-center gap-4 p-4">
+            <View className="grow flex-row items-center gap-4 p-4">
               <Artwork uri={show.imageUrl} size={ART} />
               <View className="flex-1 gap-1">
                 <Text className="text-sm font-semibold text-white">
