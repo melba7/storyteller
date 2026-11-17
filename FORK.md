@@ -80,6 +80,10 @@ Files and folders that belong to the fork, which upstream never touches:
   `applications/mobile/app/(root)/podcasts/`: the Podcasts screens (the side
   menu, the library grid, Discover, a show's episodes, an episode's notes, the
   mini player in the tab bar) and their routes.
+- `applications/mobile/apple-look/`: the shared pieces of the Apple Podcasts
+  look on the Books side (the large-title bar, section headings, capsule
+  buttons, grouped lists, the glass capsule), used by the restyled screens below
+  (`docs/BOOKS-APPLE-DESIGN.md`).
 - `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`: the server route
   that keeps a book's score (its atmosphere track, and a mood track when the
   shelved music has one) inside the read-aloud EPUB, `GET` for the app and `PUT`
@@ -101,9 +105,12 @@ markers, and `tools/fork/touchpoints.json` lists them with their marker counts:
   button in the player's toolbar for readaloud books, in the read-along and
   listening screens. It opens a panel with on and off, the sounds' volume, how
   much is going on and the car setting.
-- `applications/mobile/global.css` (1 marker): one `@import` of
+- `applications/mobile/global.css` (2 markers): one `@import` of
   `podcasts/themes.css`, which declares the Podcasts section's extra themes
-  (Extra Dark, Midnight, Paper, Forest) as Uniwind variants.
+  (Extra Dark, Midnight, Paper, Forest) as Uniwind variants, and a block at the
+  end that gives the app's own light and dark themes Apple's colours. The block
+  sits at the end because Uniwind allows `@import` only at the top of the file,
+  where the upstream values after it would win.
 - `applications/mobile/metro.config.js` (1 marker): lists those four theme names
   in `extraThemes`, so Uniwind builds their colours. The section wraps itself in
   one `ScopedTheme` (`app/(root)/podcasts/_layout.tsx`) with the listener's
@@ -140,6 +147,16 @@ To add a touch point, keep the edit to a line or two and put the real code in a
 fork-owned folder. Mark each changed line or block with a `LOFI-FORK` comment,
 and register the file in `touchpoints.json` and in the list above in the same
 commit.
+
+### Restyled screens
+
+Mo chose on 2026-11-17 to give every Books screen the Apple Podcasts look
+(`docs/BOOKS-APPLE-DESIGN.md`), accepting that upstream updates then need hand
+merging in those files. The restyled upstream files carry no markers; they are
+listed in `allowedChanges` in `touchpoints.json`. The edits change how things
+are drawn (class names, wrappers, layout), not what they do, and shared pieces
+live in `applications/mobile/apple-look/`. When a sync conflicts in one of these
+files, take upstream's change to the logic and keep the fork's styling.
 
 `node tools/fork/check-fork.mjs` enforces all of this. It fails when a marker
 disappears, when an unregistered file carries a marker, when the fork commits an

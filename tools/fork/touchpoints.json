@@ -7,6 +7,7 @@
     "CLAUDE.md",
     "FORK.md",
     "applications/mobile/app/(root)/podcasts/",
+    "applications/mobile/apple-look/",
     "applications/mobile/fork.config.ts",
     "applications/mobile/lofi/",
     "applications/mobile/modules/lofi-score/",
@@ -35,8 +36,8 @@
     },
     {
       "file": "applications/mobile/global.css",
-      "markers": 1,
-      "purpose": "One @import of podcasts/themes.css, which declares the Podcasts section's extra themes (Extra Dark, Midnight, Paper, Forest) as Uniwind variants."
+      "markers": 2,
+      "purpose": "One @import of podcasts/themes.css, which declares the Podcasts section's extra themes (Extra Dark, Midnight, Paper, Forest) as Uniwind variants. A block at the end gives the app's own light and dark themes Apple's colours (docs/BOOKS-APPLE-DESIGN.md); it sits at the end because Uniwind allows @import only at the top, where the upstream values would override it."
     },
     {
       "file": "applications/mobile/app/(root)/index.tsx",
