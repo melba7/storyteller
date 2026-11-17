@@ -107,6 +107,7 @@ describe("newEpisodes", () => {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    people: [],
     chaptersUrl: null,
   })
 

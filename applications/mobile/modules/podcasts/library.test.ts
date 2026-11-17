@@ -32,6 +32,8 @@ function show(overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    funding: [],
+    people: [],
     settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
@@ -55,6 +57,7 @@ function fetched(
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    people: [],
     chaptersUrl: null,
     ...overrides,
   }
@@ -252,6 +255,7 @@ describe("rows", () => {
       transcriptUrl: null,
       transcriptType: null,
       chaptersUrl: null,
+      people: [],
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
@@ -406,5 +410,50 @@ describe("an episode's transcript", () => {
     expect(
       episodeFromRow({ ...row, transcript_url: null }).transcriptUrl,
     ).toBeNull()
+  })
+})
+
+describe("hosts, guests and support links", () => {
+  const person = { name: "Ann", role: "host", group: "cast" }
+
+  it("reads them from the feed, with none when the feed has none", () => {
+    const base = {
+      guid: "g",
+      title: "T",
+      notes: "",
+      audioUrl: "https://cdn.example.com/g.mp3",
+      audioType: "audio/mpeg",
+    }
+    expect(fetchedEpisode(base).people).toEqual([])
+    expect(fetchedEpisode({ ...base, people: [person] }).people).toEqual([
+      { ...person, img: null, href: null },
+    ])
+  })
+
+  it("reads a show's and an episode's saved JSON safely", () => {
+    const people = JSON.stringify([person])
+    expect(showFromRow({ id: "s", feed_url: "u", people }).people).toHaveLength(
+      1,
+    )
+    expect(showFromRow({ id: "s", feed_url: "u" }).people).toEqual([])
+    expect(showFromRow({ id: "s", feed_url: "u" }).funding).toEqual([])
+    expect(
+      showFromRow({
+        id: "s",
+        feed_url: "u",
+        funding:
+          '[{"url":"https://x.test/give","label":"Give"},{"url":"ftp://x"}]',
+      }).funding,
+    ).toEqual([{ url: "https://x.test/give", label: "Give" }])
+    expect(episodeFromRow({ id: "e", people }).people).toHaveLength(1)
+    expect(episodeFromRow({ id: "e", people: "oops" }).people).toEqual([])
+  })
+
+  it("updates a stored episode when its people changed", () => {
+    const changed = fetched("g", {
+      people: [{ ...person, img: null, href: null }],
+    })
+    expect(mergeEpisodes([stored("g")], [fetched("g")]).update).toEqual([])
+    expect(mergeEpisodes([stored("g")], [changed]).update).toHaveLength(1)
   })
 })

@@ -37,6 +37,8 @@ const show: Show = {
   artworkColor: "#123456",
   ownPosition: 2,
   categories: ["News"],
+  funding: [],
+  people: [],
   settings: DEFAULT_SHOW_SETTINGS,
 }
 
@@ -58,6 +60,7 @@ function episode(
     imageUrl: null,
     season: null,
     number: null,
+    people: [],
     chaptersUrl: null,
     transcriptUrl: null,
     transcriptType: null,

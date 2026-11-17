@@ -14,12 +14,14 @@ import {
   formatEpisodeDate,
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
+import { peopleForEpisode } from "@/modules/podcasts/people"
 import { episodeShare } from "@/modules/podcasts/share"
 
 import { AdsFound } from "./AdsFound"
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
 import { EpisodeBookmarks } from "./EpisodeBookmarks"
+import { EpisodePeople } from "./EpisodePeople"
 import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { QueueButtons } from "./QueueButtons"
@@ -176,6 +178,10 @@ export function PodcastEpisode({ id }: { id: string }) {
           <LinkedNotes notes={current.notes} />
         )}
       </View>
+      <EpisodePeople
+        people={peopleForEpisode(current, show.data)}
+        funding={show.data?.funding ?? []}
+      />
     </ScrollView>
   )
 }

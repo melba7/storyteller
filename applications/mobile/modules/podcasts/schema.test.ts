@@ -22,8 +22,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 13", () => {
-    expect(SCHEMA_VERSION).toBe(13)
+  it("is at version 14", () => {
+    expect(SCHEMA_VERSION).toBe(14)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -162,6 +162,14 @@ describe("migrationStatements", () => {
     expect(statements[0]).toContain("CREATE TABLE bookmarks")
     expect(statements[0]).toContain("REFERENCES episodes(id) ON DELETE CASCADE")
     expect(statements).toHaveLength(2)
+  })
+
+  it("version 14 adds the people and funding columns", () => {
+    expect(stepFrom(13)).toEqual([
+      "ALTER TABLE shows ADD COLUMN funding TEXT",
+      "ALTER TABLE shows ADD COLUMN people TEXT",
+      "ALTER TABLE episodes ADD COLUMN people TEXT",
+    ])
   })
 
   it("has a column for every setting the screen saves", () => {

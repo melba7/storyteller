@@ -15,9 +15,25 @@ export type PodcastFeedData = {
   language?: string | null
   /** `itunes:category` names: top-level ones, then "Top › Sub" ones. */
   categories?: string[]
+  /** The channel's `podcast:person` tags (at most 20). */
+  people?: PodcastPerson[]
+  /** The channel's `podcast:funding` tags (at most 5). */
+  funding?: PodcastFunding[]
   /** In feed order. */
   episodes: PodcastFeedEpisode[]
 }
+
+/** A `podcast:person` tag. `img` and `href` are http(s) addresses or missing. */
+export type PodcastPerson = {
+  name: string
+  role: string
+  group: string
+  img?: string | null
+  href?: string | null
+}
+
+/** A `podcast:funding` tag. `label` is empty when the feed has no text. */
+export type PodcastFunding = { url: string; label: string }
 
 export type PodcastFeedEpisode = {
   guid: string
@@ -37,6 +53,8 @@ export type PodcastFeedEpisode = {
   transcripts?: { url: string; type: string; language?: string; rel?: string }[]
   /** The `podcast:chapters` JSON file's address. */
   chaptersUrl?: string | null
+  /** The episode's own `podcast:person` tags. */
+  people?: PodcastPerson[]
 }
 
 /** What the player is doing, sent about twice a second while playing and on every change. */

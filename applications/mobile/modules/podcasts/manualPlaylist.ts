@@ -98,6 +98,8 @@ function showOf(kept: KeptShow): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    funding: [],
+    people: [],
     settings: DEFAULT_SHOW_SETTINGS,
   }
 }
