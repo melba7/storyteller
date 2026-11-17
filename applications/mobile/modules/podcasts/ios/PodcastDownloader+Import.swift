@@ -19,7 +19,8 @@ extension PodcastDownloader {
     guard let ext = AudioImport.fileExtension(fileName: name) else {
       throw PodcastFetchError(message: "This isn't an audio file the app can play.")
     }
-    let (entry, isNew) = try await withCheckedThrowingContinuation { continuation in
+    let (entry, isNew): (DownloadEntry, Bool) = try await withCheckedThrowingContinuation {
+      continuation in
       DispatchQueue.global(qos: .userInitiated).async {
         continuation.resume(
           with: Result { try Self.copyAndInstall(source, fileExtension: ext, into: store) })
