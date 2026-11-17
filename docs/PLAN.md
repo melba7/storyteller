@@ -948,9 +948,9 @@ TestFlight build.
 - [ ] **A3. Rows, show page and episode page** (L) in Apple's look, with the
       purple accent and the system font.
   - Done when: `check.sh` passes; the look is checked on TestFlight.
-  - Status: built 2026-11-17 (rows, native menu with Save and Share on top,
-    show and episode headers in the artwork's colour, zoom targets); the purple
-    and the system font come from the app-wide theme of the Books restyle.
+  - Status: built 2026-11-17 (rows, native menu with Save and Share on top, show
+    and episode headers in the artwork's colour, zoom targets); the purple and
+    the system font come from the app-wide theme of the Books restyle.
 - [ ] **A4. Player and mini player** (L): the screenshot's layout, the queue and
       transcript in place of the artwork, the "…" menu, the zoom from the mini
       player where it works.
