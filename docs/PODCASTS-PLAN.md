@@ -431,9 +431,8 @@ support can follow), and Apple Intelligence is on on the phone.
   out of git). iOS 27's Foundation Models can also wrap other providers' models
   behind the same session API.
 - A Mac command that compares two detectors on the same transcripts.
-- Search the words spoken inside downloaded episodes (needs P3a's transcripts),
-  suggestions ranked by how alike the shows' descriptions are (on-device model),
-  and charts for other countries.
+- Suggestions ranked by how alike the shows' descriptions are (on-device model),
+  and charts for other countries. (Searching the spoken words is P6a.)
 - Import subscriptions from another app (OPML), a sleep timer, chapters,
   CarPlay. Sending what you play in Storyteller back to Apple Podcasts is not
   possible (no API).

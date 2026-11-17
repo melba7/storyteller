@@ -693,6 +693,35 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
     in a local "Your files" show (`local-files`) that feeds, OPML, the Apple
     Podcasts sync and Discover skip. Rename and delete from the episode menu.
 
+### Features from other podcast apps (Mo's ask, 2026-11-17)
+
+Mo picked these from a list of ideas taken from other podcast apps. Each is
+rebuilt here with nothing copied.
+
+- [ ] **P6a. Search inside episodes** (S to M): search the words spoken in every
+      episode the phone has transcribed (downloads and your own files), as a
+      third choice in the episode search ("Spoken"). A result shows the episode,
+      the time and the line around the words, and a tap plays the episode from
+      that line.
+  - Swift does the search: PodcastKit `PodcastTranscripts` gets the matching
+    rules (case and accents ignored, the words as a phrase first, then all the
+    words in one line; a few hits per episode, a cap in all), tested on Linux.
+    The module reads the finished `<sha256>.transcript.json` files off the main
+    thread. No schema change. Feed transcripts that were never downloaded are
+    not searched.
+  - Done when: a phrase said in a downloaded episode is found, and the tap plays
+    from that line.
+- [ ] **P6b. Hosts, guests and support links** (S): the feed's own
+      `podcast:person` (show and episode) and `podcast:funding` (show) tags,
+      shown in the episode's description: "Support the show" links and the hosts
+      and guests with their pictures and links. An episode's own people replace
+      the show's, as the Podcasting 2.0 spec says.
+  - The feed parser reads the tags (tested on Linux); one schema step keeps them
+    as JSON text (`shows.funding`, `shows.people`, `episodes.people`), filled at
+    the next refresh. Only `http` and `https` links open.
+  - Done when: a feed with these tags shows them in its episodes' descriptions
+    after a refresh, and a feed without them shows nothing new.
+
 ## Later
 
 - Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
