@@ -1,15 +1,15 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useEffect, useState } from "react"
-import { Alert, View } from "react-native"
+import { Alert } from "react-native"
 
-import { Switch } from "@/components/ui/switch"
-import { Text } from "@/components/ui/text"
 import {
   loadNotifyNew,
   notificationPermission,
   requestNotificationPermission,
   saveNotifyNew,
 } from "@/modules/podcasts/notificationsNative"
+
+import { SwitchRow } from "./SettingsGroup"
 
 /** Profile's "Notify me about new episodes" switch. It asks iOS for permission when turned on. */
 export function NotifyRow() {
@@ -51,20 +51,11 @@ export function NotifyRow() {
   }
 
   return (
-    <View className="border-border flex-row items-center gap-3 border-b py-3">
-      <View className="flex-1">
-        <Text className="font-semibold">Notify me about new episodes</Text>
-        <Text className="text-muted-foreground text-sm">
-          One notification for each show, when it has something new.
-        </Text>
-      </View>
-      {on === null ? null : (
-        <Switch
-          accessibilityLabel="Notify me about new episodes"
-          checked={on}
-          onCheckedChange={(value) => void change(value)}
-        />
-      )}
-    </View>
+    <SwitchRow
+      title="Notify me about new episodes"
+      body="One notification for each show, when it has something new."
+      checked={on}
+      onChange={(value) => void change(value)}
+    />
   )
 }

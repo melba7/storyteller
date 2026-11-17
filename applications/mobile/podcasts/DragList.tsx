@@ -26,6 +26,10 @@ interface ListProps {
   label: (id: string, index: number, count: number) => string
   actions?: RowAction[]
   onAction?: (id: string, name: string) => void
+  /** Shown above the rows, inside the scroll view, so a large title can shrink. */
+  header?: ReactNode
+  /** Called when a row is let go after it was moved to a new place. */
+  onDrop?: () => void
 }
 
 /**
@@ -41,16 +45,20 @@ export function DragList({
   label,
   actions = [],
   onAction,
+  header,
+  onDrop,
 }: ListProps) {
   // The row being dragged, where it started, and how far the finger has moved.
   const [dragging, setDragging] = useState<string | null>(null)
   const start = useRef(0)
+  const moved = useRef(false)
   const translation = useSharedValue(0)
   const latest = useRef(ids)
   latest.current = ids
 
   function begin(id: string) {
     start.current = latest.current.indexOf(id)
+    moved.current = false
     setDragging(id)
   }
 
@@ -62,10 +70,15 @@ export function DragList({
       rowHeight,
       latest.current.length,
     )
-    if (from !== to) onChange(moveShow(latest.current, from, to))
+    if (from !== to) {
+      moved.current = true
+      onChange(moveShow(latest.current, from, to))
+    }
   }
 
   function end() {
+    if (moved.current) onDrop?.()
+    moved.current = false
     setDragging(null)
     translation.set(0)
   }
@@ -81,6 +94,7 @@ export function DragList({
       contentContainerClassName="px-safe-or-4"
       contentInsetAdjustmentBehavior="automatic"
     >
+      {header}
       {ids.map((id, index) => (
         <DragRow
           key={id}

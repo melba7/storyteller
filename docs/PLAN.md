@@ -1,7 +1,7 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1 to P5b merged (TestFlight 24.1); P5c
-to P6b in review; bug check fixes and D1 to D5 (design) underway
+Done: 2 | Last cleanup: none | Podcasts: P1 to P6b merged (TestFlight 24.1); the
+bug check fixes and the design (D1 to D5) are built, in review
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -748,13 +748,18 @@ artwork, one main action per screen, fewer controls, motion and haptics, and
 every theme readable. Pocket Casts stays the structure; other apps give patterns
 only. No new npm packages and no new CSS variables.
 
-- [ ] **D1. Native iOS 26 bars** (M to L): `ScreenBar` becomes the native header
+- [x] **D1. Native iOS 26 bars** (M to L): `ScreenBar` becomes the native header
       (large titles on the tab roots, SF Symbol toolbar buttons and menus), the
       tab bar shrinks on scroll, the player opens as a sheet, and the status bar
       follows the Podcasts theme.
   - Done when: `check.sh` passes, Fork CI builds, and on TestFlight every screen
     has the native bar, tab titles shrink on scroll, the player swipes down,
     Profile scrolls, and VoiceOver reads every toolbar button.
+  - Status: built and passing `check.sh`: `ScreenBar` draws `Stack.Title` and
+    `Stack.Toolbar` (large titles on the tab roots, SF Symbol buttons and
+    menus), the tab bar shrinks on scroll, the player is a modal sheet, the
+    status bar follows the theme, and the mini player has skip-ahead. The look
+    and feel wait for TestFlight.
 - [x] **D2. The player** (M to L): a gradient from the artwork colour, page
       pills (Now Playing, Notes, Chapters, Transcript), artwork that shrinks
       when paused, a seek bar that grows under the finger, a five-slot toolbar
@@ -766,23 +771,36 @@ only. No new npm packages and no new CSS variables.
   - Status: built and passing `check.sh` (a test checks 16 colours): gradient,
     page pills as tabs, artwork spring, growing seek bar, five-slot toolbar,
     speed sheet and haptics. The feel and VoiceOver wait for TestFlight.
-- [ ] **D3. Show page, episode rows and the episode card** (L): a wash from the
+- [x] **D3. Show page, episode rows and the episode card** (L): a wash from the
       artwork behind the show header, rows with two trailing controls and
       readable played rows, and an episode card with one main button and an
       action strip.
   - Done when: the header wash, row text and artwork colour tests pass, and on
     TestFlight a show is tinted on its first visit and the card has one main
     button.
-- [ ] **D4. Discover, search and the Podcasts grid** (M): the native search bar
+  - Status: built and passing `check.sh` (tests: header wash in six themes, row
+    text, artwork colour once per show): show page wash, rows with "…" and play
+    (downloads moved to "…"), and a card with one main button and a five-button
+    strip. The look waits for TestFlight.
+- [x] **D4. Discover, search and the Podcasts grid** (M): the native search bar
       (a pasted RSS or Apple link follows the show), hero cards that snap,
       category tiles that grow with the text, and empty states with a next step.
   - Done when: the follow-link tests pass, hero cards snap, and category tiles
     don't clip.
-- [ ] **D5. Up Next, Playlists, Profile and Stats** (M): grouped cards with
+  - Status: built and passing `check.sh` (`isFollowLink` tested): the native
+    search bar on Discover and episode search with "Follow this link", a
+    snapping hero carousel, a category grid with icons, artwork corners by size,
+    and empty states. The look waits for TestFlight.
+- [x] **D5. Up Next, Playlists, Profile and Stats** (M): grouped cards with
       separators, title-case headers, icons on swipe buttons, a bigger "Time
       listened", and an empty state with a next step on every empty screen.
   - Done when: `check.sh` passes and the cards show separators in all six
     themes.
+  - Status: built and passing `check.sh` (progress, playlist line and rule pills
+    tested): Profile in grouped cards under a stats card, Up Next with progress
+    lines and icon swipe buttons, playlist icon tiles and rule pills, a bigger
+    Stats, empty states, and no uppercase headers. The look waits for
+    TestFlight.
 
 ## Later
 

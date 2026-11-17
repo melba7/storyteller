@@ -1,18 +1,18 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ListChecks } from "lucide-react-native"
+import { Stack } from "expo-router"
+import { History as HistoryIcon } from "lucide-react-native"
 import { useMemo } from "react"
 import { ActivityIndicator, Alert, FlatList, View } from "react-native"
 
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { clearHistory } from "@/modules/podcasts/dbEpisodes"
 import { groupByDay } from "@/modules/podcasts/history"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
 
+import { EmptyState } from "./EmptyState"
 import { EpisodeRow } from "./EpisodeRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SelectionBar } from "./SelectionBar"
 import { useShows } from "./hooks"
 import { useHistory } from "./useEpisodeLists"
@@ -65,29 +65,25 @@ export function History() {
     [history.data],
   )
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
         title="Listening history"
         right={
-          episodes.length > 0 ? (
-            <View className="flex-row items-center">
-              <Button
-                variant="ghost"
-                size="icon"
-                accessibilityLabel="Select episodes"
-                onPress={() => selection.begin()}
-              >
-                <Icon as={ListChecks} size={20} className="text-primary" />
-              </Button>
-              <Button
-                variant="ghost"
-                accessibilityLabel="Clear the history"
-                onPress={confirmClear}
-              >
-                <Text className="text-primary">Clear</Text>
-              </Button>
-            </View>
-          ) : undefined
+          <>
+            <Stack.Toolbar.Button
+              icon="checklist"
+              hidden={episodes.length === 0}
+              accessibilityLabel="Select episodes"
+              onPress={() => selection.begin()}
+            />
+            <Stack.Toolbar.Button
+              hidden={episodes.length === 0}
+              accessibilityLabel="Clear the history"
+              onPress={confirmClear}
+            >
+              Clear
+            </Stack.Toolbar.Button>
+          </>
         }
       />
       {selection.on ? (
@@ -98,7 +94,9 @@ export function History() {
         />
       ) : null}
       {history.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
         <FlatList<Item>
           data={items}
@@ -107,10 +105,13 @@ export function History() {
           contentInsetAdjustmentBehavior="automatic"
           extraData={selection.selected}
           ListEmptyComponent={
-            <Text className="text-muted-foreground px-4 py-12 text-center">
-              {history.error ??
-                "Nothing here yet. Episodes you listen to show up here."}
-            </Text>
+            <EmptyState
+              icon={HistoryIcon}
+              title="No history yet"
+              body={
+                history.error ?? "Episodes you listen to show up here, by day."
+              }
+            />
           }
           renderItem={({ item }) => {
             if (item.kind === "day") {
@@ -123,6 +124,7 @@ export function History() {
             const show = showById.get(item.episode.showId)
             return show ? (
               <EpisodeRow
+                artwork
                 episode={item.episode}
                 show={show}
                 selection={selection}

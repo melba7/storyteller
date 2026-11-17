@@ -1,4 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
+import { useHeaderHeight } from "expo-router/react-navigation"
 import { View } from "react-native"
 
 import { Button } from "@/components/ui/button"
@@ -25,7 +26,8 @@ const ACTIONS: { id: BulkAction; title: string }[] = [
 
 /**
  * The bar over a list while episodes are being picked: how many, Select all, the actions
- * menu and Done. `episodes` is every episode in the list.
+ * menu and Done. `episodes` is every episode in the list. It sits above the list, outside
+ * any scroll view, so it starts below the transparent header.
  */
 export function SelectionBar({
   selection,
@@ -36,6 +38,7 @@ export function SelectionBar({
   episodes: readonly StoredEpisode[]
   shows: ReadonlyMap<string, Show>
 }) {
+  const headerHeight = useHeaderHeight()
   const downloads = useDownloadMap()
   const onPhone = new Set(
     Object.values(downloads)
@@ -46,7 +49,10 @@ export function SelectionBar({
     selection.selected.includes(episode.id),
   )
   return (
-    <View className="px-safe-or-4 border-border flex-row items-center gap-1 border-b pb-1">
+    <View
+      className="px-safe-or-4 border-border flex-row items-center gap-1 border-b pb-1"
+      style={{ paddingTop: headerHeight }}
+    >
       <Text className="flex-1 font-semibold">
         {selectionLabel(selection.selected.length)}
       </Text>

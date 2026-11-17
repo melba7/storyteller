@@ -19,7 +19,7 @@ export function EpisodeBookmarks({
   if (bookmarks.length === 0) return null
   return (
     <View className="w-full">
-      <Text variant="h4" className="pb-1">
+      <Text className="pb-1 text-lg font-bold" accessibilityRole="header">
         Bookmarks
       </Text>
       {bookmarks.map((bookmark) => (

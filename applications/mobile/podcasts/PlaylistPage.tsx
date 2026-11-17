@@ -5,7 +5,7 @@ import { Text } from "@/components/ui/text"
 
 import { ManualPlaylist } from "./ManualPlaylist"
 import { PlaylistScreen } from "./PlaylistScreen"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { usePlaylist } from "./usePlaylists"
 
 /** A playlist's page: its rules and episodes if it is smart, its own list if it is by hand. */
@@ -16,14 +16,18 @@ export function PlaylistPage({ id }: { id: string }) {
   }
   if (playlist.data) return <PlaylistScreen id={id} />
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Playlist" />
       {playlist.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          {playlist.error ?? "This playlist isn't there."}
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {playlist.error ?? "This playlist isn't there."}
+          </Text>
+        </BelowBar>
       )}
     </View>
   )

@@ -9,7 +9,8 @@ import {
   archiveEpisodes,
   unarchiveEpisodes,
 } from "@/modules/podcasts/dbSettings"
-import { Podcasts } from "@/modules/podcasts/index"
+import { downloadLook, downloadMenuTitle } from "@/modules/podcasts/downloads"
+import { type DownloadInfo, Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { markPlayed } from "@/modules/podcasts/playerInstance"
@@ -18,12 +19,14 @@ import { isQueued } from "@/modules/podcasts/upNext"
 
 import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { localFileActions } from "./localFileActions"
+import { pressDownload, useDownload } from "./useDownloads"
 import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
 /**
- * The menu on an episode row: Play next and Play last (which also move an episode that is
- * already queued), for a queued one Remove from Up Next, Star, Mark played and Archive (for episodes in the library). Nothing
- * where there is no native player.
+ * The menu on an episode row: Download (or Cancel or Remove download), Play next and Play
+ * last (which also move an episode that is already queued), for a queued one Remove from Up
+ * Next, Star, Mark played and Archive (for episodes in the library). Nothing where there is
+ * no native player.
  */
 export function archiveAction(episode: StoredEpisode) {
   const archived = episode.archived
@@ -68,6 +71,31 @@ export function playedAction(episode: StoredEpisode) {
   }
 }
 
+/**
+ * Download, Cancel download, Download again or Remove download, for what the episode's
+ * download is doing. Null where there is nothing to do: a preview episode, an added file
+ * (its download is its only copy, so it is never removed from here) or no native module.
+ */
+export function downloadAction(
+  episode: StoredEpisode,
+  info: DownloadInfo | undefined,
+) {
+  if (
+    Podcasts === null ||
+    isPreviewId(episode.id) ||
+    isLocalEpisodeId(episode.id)
+  ) {
+    return null
+  }
+  const look = downloadLook(info, episode.title)
+  return {
+    id: "download",
+    title: downloadMenuTitle(look.action),
+    ...(look.action === "delete" ? { attributes: { destructive: true } } : {}),
+    onPress: () => pressDownload(look.action, episode),
+  }
+}
+
 export function EpisodeMenu({
   episode,
   show,
@@ -76,11 +104,13 @@ export function EpisodeMenu({
   show: Show | null
 }) {
   const queue = useUpNext()
+  const download = downloadAction(episode, useDownload(episode.id))
   if (Podcasts === null) return null
   const queued = isQueued(queue, episode.id)
   return (
     <Menu
       actions={[
+        ...(download ? [download] : []),
         {
           id: "next",
           title: "Play next",
@@ -119,6 +149,7 @@ export function EpisodeMenu({
       <Button
         variant="ghost"
         size="icon"
+        className="size-11"
         accessibilityLabel={`More for ${episode.title}`}
       >
         <Icon as={Ellipsis} size={20} className="text-muted-foreground" />

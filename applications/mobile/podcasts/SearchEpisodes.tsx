@@ -1,9 +1,9 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useState } from "react"
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
+import { useCSSVariable } from "uniwind"
 
-import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
 import { searchEpisodes } from "@/modules/podcasts/db"
 import {
@@ -41,19 +41,20 @@ function Segments({
 }) {
   return (
     <View
-      className="bg-secondary flex-row rounded-lg p-1"
+      className="bg-secondary flex-row rounded-full p-1"
       accessibilityRole="tablist"
     >
       {SCOPES.map(({ id, label }) => (
         <Pressable
           key={id}
-          className={`flex-1 items-center rounded-md py-2 ${scope === id ? "bg-background" : ""}`}
+          className={`min-h-10 flex-1 items-center justify-center rounded-full px-2 ${scope === id ? "bg-background" : ""}`}
           accessibilityRole="tab"
           accessibilityState={{ selected: scope === id }}
           onPress={() => onChange(id)}
         >
           <Text
             className={scope === id ? "font-semibold" : "text-muted-foreground"}
+            numberOfLines={1}
           >
             {label}
           </Text>
@@ -99,6 +100,7 @@ const join = (parts: string[]) =>
 
 /** Search for episodes: in the followed shows (on the phone) or in all of Apple's podcasts. */
 export function SearchEpisodes() {
+  const background = useCSSVariable("--color-background") as string
   const router = useRouter()
   const segments = useSegments()
   const [scope, setScope] = useState<Scope>("mine")
@@ -153,20 +155,24 @@ export function SearchEpisodes() {
         }))
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title="Search" />
+      <Stack.SearchBar
+        placeholder="Search for an episode"
+        autoCapitalize="none"
+        autoFocus
+        hideWhenScrolling={false}
+        onChangeText={(event) => setTerm(event.nativeEvent.text)}
+        onCancelButtonPress={() => setTerm("")}
+      />
+      {/* The scope control sits above the results, not in a scroll view, so the header is solid. */}
+      <Stack.Screen
+        options={{
+          headerTransparent: false,
+          headerStyle: { backgroundColor: background },
+        }}
+      />
       <View className="px-safe-or-4 gap-3 pb-2">
-        <Input
-          accessibilityLabel="Search episodes"
-          placeholder="Search for an episode"
-          value={term}
-          onChangeText={setTerm}
-          autoFocus
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-        />
         <Segments scope={scope} onChange={setScope} />
       </View>
       {state.searching ? (

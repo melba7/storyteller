@@ -5,6 +5,7 @@ import { Text } from "@/components/ui/text"
 import { cn } from "@/lib/utils"
 import { THEMES, type ThemeMode } from "@/modules/podcasts/theme"
 
+import { ROW, SettingsGroup } from "./SettingsGroup"
 import { usePodcastsTheme } from "./usePodcastsTheme"
 
 const MODES: { mode: ThemeMode; label: string; note: string }[] = [
@@ -48,7 +49,7 @@ function Swatch({
       <View
         className={cn(
           "h-14 w-14 items-center justify-center rounded-2xl border-2",
-          selected ? "border-primary" : "border-border",
+          selected ? "border-primary" : "border-foreground/10",
         )}
         style={{ backgroundColor: theme.swatch.background }}
       >
@@ -101,49 +102,50 @@ export function AppearanceSection() {
   const { choice, setChoice } = usePodcastsTheme()
   const current = MODES.find((each) => each.mode === choice.mode) ?? MODES[0]!
   return (
-    <View className="border-border gap-3 border-b py-4">
-      <Text className="font-semibold">Appearance</Text>
-      <View className="bg-secondary flex-row rounded-lg p-1">
-        {MODES.map(({ mode, label }) => (
-          <Pressable
-            key={mode}
-            className={cn(
-              "flex-1 items-center rounded-md py-2",
-              choice.mode === mode && "bg-background",
-            )}
-            accessibilityRole="button"
-            accessibilityLabel={label}
-            accessibilityState={{ selected: choice.mode === mode }}
-            onPress={() => setChoice({ mode })}
-          >
-            <Text className="text-sm font-medium">{label}</Text>
-          </Pressable>
-        ))}
+    <SettingsGroup title="Appearance">
+      <View className={`${ROW} gap-3 py-4`}>
+        <View className="bg-foreground/10 flex-row rounded-lg p-1">
+          {MODES.map(({ mode, label }) => (
+            <Pressable
+              key={mode}
+              className={cn(
+                "flex-1 items-center rounded-md py-2",
+                choice.mode === mode && "bg-background",
+              )}
+              accessibilityRole="button"
+              accessibilityLabel={label}
+              accessibilityState={{ selected: choice.mode === mode }}
+              onPress={() => setChoice({ mode })}
+            >
+              <Text className="text-sm font-medium">{label}</Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text className="text-muted-foreground text-sm">{current.note}</Text>
+        {choice.mode === "theme" ? (
+          <SwatchRow
+            dark={null}
+            selected={choice.theme}
+            onPick={(theme) => setChoice({ theme })}
+          />
+        ) : null}
+        {choice.mode === "ios" ? (
+          <>
+            <Text className="text-sm font-medium">When iOS is light</Text>
+            <SwatchRow
+              dark={false}
+              selected={choice.lightTheme}
+              onPick={(lightTheme) => setChoice({ lightTheme })}
+            />
+            <Text className="text-sm font-medium">When iOS is dark</Text>
+            <SwatchRow
+              dark
+              selected={choice.darkTheme}
+              onPick={(darkTheme) => setChoice({ darkTheme })}
+            />
+          </>
+        ) : null}
       </View>
-      <Text className="text-muted-foreground text-sm">{current.note}</Text>
-      {choice.mode === "theme" ? (
-        <SwatchRow
-          dark={null}
-          selected={choice.theme}
-          onPick={(theme) => setChoice({ theme })}
-        />
-      ) : null}
-      {choice.mode === "ios" ? (
-        <>
-          <Text className="text-sm font-medium">When iOS is light</Text>
-          <SwatchRow
-            dark={false}
-            selected={choice.lightTheme}
-            onPick={(lightTheme) => setChoice({ lightTheme })}
-          />
-          <Text className="text-sm font-medium">When iOS is dark</Text>
-          <SwatchRow
-            dark
-            selected={choice.darkTheme}
-            onPick={(darkTheme) => setChoice({ darkTheme })}
-          />
-        </>
-      ) : null}
-    </View>
+    </SettingsGroup>
   )
 }

@@ -34,9 +34,11 @@ export function PlayerScreen() {
     else router.replace("/podcasts")
   }
 
+  // The player is a modal sheet, which already starts below the status bar, so its top needs
+  // no safe-area padding.
   return (
     <View
-      className="pt-safe flex-1"
+      className="flex-1 pt-3"
       style={{ backgroundColor: top, backgroundImage: playerGradient(color) }}
     >
       <View className="px-safe-or-2 flex-row items-center">

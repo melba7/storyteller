@@ -36,7 +36,7 @@ import {
   trimLabel,
 } from "@/modules/podcasts/sound"
 
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useShow } from "./hooks"
 
 const SPEEDS = [0.8, 1, 1.2, 1.5, 1.7, 2, 2.5, 3]
@@ -65,7 +65,7 @@ function Row({
 
 function Heading({ children }: { children: string }) {
   return (
-    <Text className="text-muted-foreground px-1 pt-6 pb-1 text-xs uppercase">
+    <Text className="text-muted-foreground px-1 pt-6 pb-1 text-sm font-semibold">
       {children}
     </Text>
   )
@@ -179,19 +179,23 @@ export function ShowSettingsScreen({ id }: { id: string }) {
   const current = show.data
   if (show.loading) {
     return (
-      <View className="pt-safe bg-background flex-1">
+      <View className="bg-background flex-1">
         <ScreenBar title="Show settings" />
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       </View>
     )
   }
   if (!current) {
     return (
-      <View className="pt-safe bg-background flex-1">
+      <View className="bg-background flex-1">
         <ScreenBar title="Show settings" />
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          {show.error ?? "This show isn't in your library."}
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {show.error ?? "This show isn't in your library."}
+          </Text>
+        </BelowBar>
       </View>
     )
   }
@@ -202,7 +206,7 @@ export function ShowSettingsScreen({ id }: { id: string }) {
     )
   }
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar title={current.title} />
       <ScrollView
         contentContainerClassName="px-safe-or-4 pb-12"

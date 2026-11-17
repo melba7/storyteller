@@ -26,7 +26,7 @@ export function EpisodePeople({
     <View className="w-full gap-4 pt-4">
       {funding.length > 0 ? (
         <View className="gap-2">
-          <Text className="text-lg font-semibold" accessibilityRole="header">
+          <Text className="text-lg font-bold" accessibilityRole="header">
             Support the show
           </Text>
           {funding.map((link) => (
@@ -46,7 +46,7 @@ export function EpisodePeople({
       ) : null}
       {people.length > 0 ? (
         <View className="gap-2">
-          <Text className="text-lg font-semibold" accessibilityRole="header">
+          <Text className="text-lg font-bold" accessibilityRole="header">
             Hosts and guests
           </Text>
           {people.map((person, index) => (

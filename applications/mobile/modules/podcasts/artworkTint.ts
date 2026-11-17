@@ -53,15 +53,36 @@ export function vivid(color: string): string {
   return toHex(rgb.map((value) => max - (max - value) * scale) as Rgb)
 }
 
-/** The WCAG contrast of white text on a "#rrggbb" colour (21 on black; 1 on white). */
-export function contrastWithWhite(color: string): number {
+/** The WCAG relative luminance of a "#rrggbb" colour (0 for black, 1 for white). */
+export function luminanceOf(color: string): number {
   const rgb = parse(color) ?? [0, 0, 0]
   const [r, g, b] = rgb.map((value) => {
     const unit = value / 255
     return unit <= 0.03928 ? unit / 12.92 : ((unit + 0.055) / 1.055) ** 2.4
   }) as Rgb
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-  return 1.05 / (luminance + 0.05)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** The WCAG contrast between two "#rrggbb" colours (1 for equal ones, 21 for black on white). */
+export function contrastBetween(first: string, second: string): number {
+  const a = luminanceOf(first)
+  const b = luminanceOf(second)
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+}
+
+/** The colour `top` laid over `bottom` at this opacity (0 to 1), as "#rrggbb". */
+export function blendOver(top: string, bottom: string, alpha: number): string {
+  const a = parse(top)
+  const b = parse(bottom)
+  if (!a || !b) return bottom
+  return toHex(
+    a.map((value, i) => value * alpha + (b[i] ?? 0) * (1 - alpha)) as Rgb,
+  )
+}
+
+/** The WCAG contrast of white text on a "#rrggbb" colour (21 on black; 1 on white). */
+export function contrastWithWhite(color: string): number {
+  return 1.05 / (luminanceOf(color) + 0.05)
 }
 
 function darken(color: string, share: number): string {

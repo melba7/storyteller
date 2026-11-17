@@ -1,18 +1,10 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import {
-  Bookmark,
-  ChartColumn,
-  ChevronRight,
-  Download,
-  History,
-} from "lucide-react-native"
+import { Bookmark, Download, History } from "lucide-react-native"
 import { useEffect, useState } from "react"
-import { Pressable, ScrollView, View } from "react-native"
+import { ScrollView, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
-import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import {
   type AutomaticSettings,
@@ -32,12 +24,16 @@ import { AppearanceSection } from "./AppearanceSection"
 import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
+import { LinkRow, SettingsGroup, SwitchRow } from "./SettingsGroup"
+import { StatsCard } from "./StatsCard"
 import { useDownloadMap } from "./useDownloads"
+import { useStatusBarStyle } from "./usePodcastsTheme"
 
-/** The Profile tab: Downloads (how many and how much room they take) and Wi-Fi only. */
+/** The Profile tab: your stats, then the settings in titled cards. */
 export function Profile() {
+  const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const map = useDownloadMap()
   const [wifiOnly, setWifi] = useState<boolean | null>(null)
@@ -84,157 +80,89 @@ export function Profile() {
   const summary = downloadsSummary(map)
 
   return (
-    <View className="pt-safe bg-background flex-1">
-      <StatusBar verticalBarBehaviorIOS="disabled" />
+    <View className="bg-background flex-1">
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
+        large
         title="Profile"
-        left={<SectionMenuButton current="podcasts" />}
+        left={
+          <Stack.Toolbar.View>
+            <SectionMenuButton current="podcasts" />
+          </Stack.Toolbar.View>
+        }
       />
       {Podcasts === null ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          Downloads need the iOS app.
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            Downloads need the iOS app.
+          </Text>
+        </BelowBar>
       ) : (
         <ScrollView
           contentContainerClassName="px-safe-or-4 pb-8"
           contentInsetAdjustmentBehavior="automatic"
         >
-          <Pressable
-            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
-            accessibilityRole="button"
-            accessibilityLabel={`Downloads, ${summary}`}
-            onPress={() => router.push("/podcasts/(tabs)/(profile)/downloads")}
-          >
-            <Icon as={Download} size={22} className="text-primary" />
-            <View className="flex-1">
-              <Text className="font-semibold">Downloads</Text>
-              <Text className="text-muted-foreground text-sm">{summary}</Text>
-            </View>
-            <Icon
-              as={ChevronRight}
-              size={20}
-              className="text-muted-foreground"
+          <StatsCard />
+          <SettingsGroup title="Library">
+            <LinkRow
+              icon={Download}
+              title="Downloads"
+              body={summary}
+              label={`Downloads, ${summary}`}
+              onPress={() =>
+                router.push("/podcasts/(tabs)/(profile)/downloads")
+              }
             />
-          </Pressable>
-          <Pressable
-            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
-            accessibilityRole="button"
-            accessibilityLabel="Stats"
-            onPress={() => router.push("/podcasts/(tabs)/(profile)/stats")}
-          >
-            <Icon as={ChartColumn} size={22} className="text-primary" />
-            <View className="flex-1">
-              <Text className="font-semibold">Stats</Text>
-              <Text className="text-muted-foreground text-sm">
-                Time listened and time saved.
-              </Text>
-            </View>
-            <Icon
-              as={ChevronRight}
-              size={20}
-              className="text-muted-foreground"
+            <LinkRow
+              icon={History}
+              title="Listening history"
+              body="What you listened to, by day."
+              label="Listening history"
+              onPress={() => router.push("/podcasts/(tabs)/(profile)/history")}
             />
-          </Pressable>
-          <Pressable
-            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
-            accessibilityRole="button"
-            accessibilityLabel="Listening history"
-            onPress={() => router.push("/podcasts/(tabs)/(profile)/history")}
-          >
-            <Icon as={History} size={22} className="text-primary" />
-            <View className="flex-1">
-              <Text className="font-semibold">Listening history</Text>
-              <Text className="text-muted-foreground text-sm">
-                What you listened to, by day.
-              </Text>
-            </View>
-            <Icon
-              as={ChevronRight}
-              size={20}
-              className="text-muted-foreground"
+            <LinkRow
+              icon={Bookmark}
+              title="Bookmarks"
+              body="Places you marked, in every episode."
+              label="Bookmarks"
+              onPress={() =>
+                router.push("/podcasts/(tabs)/(profile)/bookmarks")
+              }
             />
-          </Pressable>
-          <Pressable
-            className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
-            accessibilityRole="button"
-            accessibilityLabel="Bookmarks"
-            onPress={() => router.push("/podcasts/(tabs)/(profile)/bookmarks")}
-          >
-            <Icon as={Bookmark} size={22} className="text-primary" />
-            <View className="flex-1">
-              <Text className="font-semibold">Bookmarks</Text>
-              <Text className="text-muted-foreground text-sm">
-                Places you marked, in every episode.
-              </Text>
-            </View>
-            <Icon
-              as={ChevronRight}
-              size={20}
-              className="text-muted-foreground"
+          </SettingsGroup>
+          <SettingsGroup title="Downloads">
+            <SwitchRow
+              title="Download only on Wi-Fi"
+              body="Applies to downloads you start from now on."
+              checked={wifiOnly}
+              onChange={change}
             />
-          </Pressable>
-          <View className="border-border flex-row items-center gap-3 border-b py-3">
-            <View className="flex-1">
-              <Text className="font-semibold">Download only on Wi-Fi</Text>
-              <Text className="text-muted-foreground text-sm">
-                Applies to downloads you start from now on.
-              </Text>
-            </View>
-            {wifiOnly === null ? null : (
-              <Switch
-                accessibilityLabel="Download only on Wi-Fi"
-                checked={wifiOnly}
-                onCheckedChange={change}
-              />
-            )}
-          </View>
-          <SettingRow
-            title="Download new episodes"
-            body="New episodes of the shows you follow download by themselves, on Wi-Fi only."
-            checked={automatic?.downloadNew ?? null}
-            onChange={(on) => changeAutomatic({ downloadNew: on })}
-          />
-          <SettingRow
-            title="Delete played downloads after a day"
-            body="A download is removed a day after you played it."
-            checked={automatic?.deletePlayed ?? null}
-            onChange={(on) => changeAutomatic({ deletePlayed: on })}
-          />
-          <NotifyRow />
+            <SwitchRow
+              title="Download new episodes"
+              body="New episodes of the shows you follow download by themselves, on Wi-Fi only."
+              checked={automatic?.downloadNew ?? null}
+              onChange={(on) => changeAutomatic({ downloadNew: on })}
+            />
+            <SwitchRow
+              title="Delete played downloads after a day"
+              body="A download is removed a day after you played it."
+              checked={automatic?.deletePlayed ?? null}
+              onChange={(on) => changeAutomatic({ deletePlayed: on })}
+            />
+            <NotifyRow />
+          </SettingsGroup>
           <PlaybackSection />
           <AppearanceSection />
-          <AddAudioFilesRow />
-          <OpmlSection />
-          <AdSkipSwitches />
+          <SettingsGroup title="Your files">
+            <AddAudioFilesRow />
+          </SettingsGroup>
+          <SettingsGroup title="OPML">
+            <OpmlSection />
+          </SettingsGroup>
+          <SettingsGroup title="Ad skipping">
+            <AdSkipSwitches />
+          </SettingsGroup>
         </ScrollView>
-      )}
-    </View>
-  )
-}
-
-function SettingRow({
-  title,
-  body,
-  checked,
-  onChange,
-}: {
-  title: string
-  body: string
-  checked: boolean | null
-  onChange: (on: boolean) => void
-}) {
-  return (
-    <View className="border-border flex-row items-center gap-3 border-b py-3">
-      <View className="flex-1">
-        <Text className="font-semibold">{title}</Text>
-        <Text className="text-muted-foreground text-sm">{body}</Text>
-      </View>
-      {checked === null ? null : (
-        <Switch
-          accessibilityLabel={title}
-          checked={checked}
-          onCheckedChange={onChange}
-        />
       )}
     </View>
   )

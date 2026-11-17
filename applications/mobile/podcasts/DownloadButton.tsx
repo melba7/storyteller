@@ -23,8 +23,33 @@ interface Props {
     "id" | "showId" | "title" | "audioUrl" | "audioType"
   >
   size?: number
-  /** Also writes what the download is doing beside the button (the episode card). */
-  showStatus?: boolean
+}
+
+/**
+ * What the download is doing, in words: the size or "Downloading 40%", then what the
+ * transcript and the ad scan are doing once the audio is on the phone. Empty when there is
+ * nothing to say, and for an added file.
+ */
+export function useDownloadStatus(episode: Props["episode"]): string {
+  const info = useDownload(episode.id)
+  const transcript = useTranscript(episode.id)
+  const ads = useAdsInfo(episode.id)
+  if (Podcasts === null || isLocalEpisodeId(episode.id)) return ""
+  const look = downloadLook(info, episode.title)
+  // The transcript only matters once the audio is on the phone.
+  const downloaded = info?.state === "downloaded"
+  return withAds(
+    withTranscript(look.status, downloaded ? transcript : undefined),
+    downloaded && transcript?.state === "done" ? ads : undefined,
+  )
+}
+
+/** The status line on the episode card. */
+export function DownloadStatusLine({ episode }: { episode: Props["episode"] }) {
+  const status = useDownloadStatus(episode)
+  return status ? (
+    <Text className="text-muted-foreground text-sm">{status}</Text>
+  ) : null
 }
 
 /**
@@ -32,30 +57,15 @@ interface Props {
  * check mark when done (tap to delete) and an alert mark after a failure (tap to try
  * again). Nothing where the app can't download.
  */
-export function DownloadButton({
-  episode,
-  size = 36,
-  showStatus = false,
-}: Props) {
+export function DownloadButton({ episode, size = 36 }: Props) {
   const info = useDownload(episode.id)
-  const transcript = useTranscript(episode.id)
-  const ads = useAdsInfo(episode.id)
   const primary = useCSSVariable("--color-primary") as string
   // An added file's download is its only copy: no button, so it can't be deleted from here.
   if (Podcasts === null || isLocalEpisodeId(episode.id)) return null
   const look = downloadLook(info, episode.title)
-  // The transcript only matters once the audio is on the phone.
-  const downloaded = info?.state === "downloaded"
-  const status = withAds(
-    withTranscript(look.status, downloaded ? transcript : undefined),
-    downloaded && transcript?.state === "done" ? ads : undefined,
-  )
   const inner = Math.round(size / 2)
   return (
     <View className="flex-row items-center gap-2">
-      {showStatus && status ? (
-        <Text className="text-muted-foreground text-sm">{status}</Text>
-      ) : null}
       <Pressable
         className="items-center justify-center rounded-full active:opacity-60"
         style={{ width: size, height: size }}

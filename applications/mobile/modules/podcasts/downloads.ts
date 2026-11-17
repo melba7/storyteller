@@ -110,6 +110,20 @@ export function downloadLook(
   }
 }
 
+/** The menu item's title for what a tap on the download button would do. */
+export function downloadMenuTitle(action: DownloadAction): string {
+  switch (action) {
+    case "download":
+      return "Download"
+    case "retry":
+      return "Download again"
+    case "cancel":
+      return "Cancel download"
+    case "delete":
+      return "Remove download"
+  }
+}
+
 const UNITS = ["bytes", "KB", "MB", "GB", "TB"]
 
 /** A size the way the phone's settings write it: "340 MB", "1.2 GB" (thousands, not 1024s). */

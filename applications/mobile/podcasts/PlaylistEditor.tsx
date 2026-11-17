@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { randomUUID } from "expo-crypto"
-import { useRouter } from "expo-router"
+import { Stack, useRouter } from "expo-router"
 import { useEffect, useState } from "react"
 import { ActivityIndicator, Alert, ScrollView, View } from "react-native"
 
@@ -36,7 +36,7 @@ import {
   SwitchRow,
   showOptions,
 } from "./PlaylistFields"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useShows } from "./hooks"
 import { usePlaylist } from "./usePlaylists"
 
@@ -78,14 +78,18 @@ export function PlaylistEditor({ id }: { id: string }) {
 
   if (!draft) {
     return (
-      <View className="pt-safe bg-background flex-1">
+      <View className="bg-background flex-1">
         <ScreenBar title={creating ? "New playlist" : "Playlist"} />
         {existing.loading && !creating ? (
-          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+          <BelowBar>
+            <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+          </BelowBar>
         ) : (
-          <Text className="text-muted-foreground px-8 py-12 text-center">
-            {problem ?? existing.error ?? "This playlist isn't there."}
-          </Text>
+          <BelowBar>
+            <Text className="text-muted-foreground px-8 py-12 text-center">
+              {problem ?? existing.error ?? "This playlist isn't there."}
+            </Text>
+          </BelowBar>
         )}
       </View>
     )
@@ -144,18 +148,18 @@ export function PlaylistEditor({ id }: { id: string }) {
   }
 
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
         title={creating ? "New playlist" : "Edit playlist"}
         right={
-          <Button
-            variant="ghost"
+          <Stack.Toolbar.Button
+            variant="done"
             disabled={saving}
             accessibilityLabel="Save the playlist"
             onPress={save}
           >
-            <Text className="text-primary font-semibold">Save</Text>
-          </Button>
+            Save
+          </Stack.Toolbar.Button>
         }
       />
       <ScrollView

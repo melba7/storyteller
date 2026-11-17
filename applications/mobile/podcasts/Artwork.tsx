@@ -7,6 +7,11 @@ import { Icon } from "@/components/ui/icon"
 import { cn } from "@/lib/utils"
 import { LOCAL_ARTWORK } from "@/modules/podcasts/localFiles"
 
+/** The corner that suits a size: small for a row's thumbnail, larger as the picture grows. */
+export function artworkRadius(size: number): string {
+  return size <= 56 ? "rounded-lg" : size <= 140 ? "rounded-xl" : "rounded-2xl"
+}
+
 interface Props {
   uri: string | null
   size: number
@@ -18,7 +23,8 @@ export function Artwork({ uri, size, className }: Props) {
   return (
     <View
       className={cn(
-        "bg-secondary items-center justify-center overflow-hidden rounded-md",
+        "bg-secondary border-foreground/10 items-center justify-center overflow-hidden border",
+        artworkRadius(size),
         className,
       )}
       style={{ width: size, height: size }}
@@ -29,7 +35,7 @@ export function Artwork({ uri, size, className }: Props) {
       ) : uri ? (
         <Image
           source={{ uri }}
-          style={{ width: size, height: size }}
+          style={{ width: "100%", height: "100%" }}
           contentFit="cover"
           accessibilityIgnoresInvertColors
         />

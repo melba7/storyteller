@@ -7,6 +7,7 @@ import {
   isQueued,
   moveBetween,
   orderAfterMove,
+  progressFraction,
   queueItem,
   queueTimeLeft,
   queuedLabel,
@@ -209,5 +210,19 @@ describe("moveBetween", () => {
     expect(moveBetween(before, before)).toBeNull()
     expect(moveBetween(before, ["a", "b", "c"])).toBeNull()
     expect(moveBetween(before, ["d", "c", "b", "a"])).toBeNull()
+  })
+})
+
+describe("progressFraction", () => {
+  it("is the share played, once an episode has started", () => {
+    expect(progressFraction(150, 600)).toBe(0.25)
+  })
+  it("is null before the start, or when the length is unknown", () => {
+    expect(progressFraction(0, 600)).toBeNull()
+    expect(progressFraction(30, null)).toBeNull()
+    expect(progressFraction(30, 0)).toBeNull()
+  })
+  it("stays within the bar", () => {
+    expect(progressFraction(900, 600)).toBe(1)
   })
 })

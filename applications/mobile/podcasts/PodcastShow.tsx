@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { useMemo, useState } from "react"
+import { useHeaderHeight } from "expo-router/react-navigation"
+import { useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -21,15 +22,23 @@ import {
 } from "@/modules/podcasts/episodeList"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { tabBase } from "@/modules/podcasts/routes"
+import { settingsHref, tabBase } from "@/modules/podcasts/routes"
+import { type EpisodeSort } from "@/modules/podcasts/showSettings"
 
 import { EpisodeRow } from "./EpisodeRow"
-import { ScreenBar } from "./ScreenBar"
+import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SelectionBar } from "./SelectionBar"
-import { ShowBarButtons } from "./ShowBarButtons"
+import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
 import { useSelection } from "./useSelection"
+
+const SORT_NAMES: Record<EpisodeSort, string> = {
+  newest: "Newest first",
+  oldest: "Oldest first",
+  shortest: "Shortest first",
+  longest: "Longest first",
+}
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
@@ -39,6 +48,10 @@ export function PodcastShow({ id }: { id: string }) {
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const selection = useSelection()
+  // The bar's title appears once the header's own title has scrolled under the bar.
+  const headerHeight = useHeaderHeight()
+  const titleBottom = useRef<number | null>(null)
+  const [titleInBar, setTitleInBar] = useState(false)
   const items = useMemo(
     () =>
       show.data ? arrangeEpisodes(episodes.data ?? [], show.data.settings) : [],
@@ -92,25 +105,33 @@ export function PodcastShow({ id }: { id: string }) {
 
   const current = show.data
   return (
-    <View className="pt-safe bg-background flex-1">
+    <View className="bg-background flex-1">
       <ScreenBar
-        title={current?.title ?? "Podcast"}
+        title={current ? current.title : "Podcast"}
+        titleHidden={Boolean(current) && !titleInBar}
         right={
-          current ? (
-            <ShowBarButtons
-              show={current}
-              archivedCount={archivedCount(episodes.data ?? [])}
-              onSelect={() => selection.begin()}
-            />
-          ) : undefined
+          current
+            ? showBarItems({
+                show: current,
+                archivedCount: archivedCount(episodes.data ?? []),
+                onSelect: () => selection.begin(),
+                onSettings: () =>
+                  router.push(settingsHref(segments, current.id)),
+                onUnfollow: () => confirmUnsubscribe(current.title),
+              })
+            : undefined
         }
       />
       {show.loading ? (
-        <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        <BelowBar>
+          <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
+        </BelowBar>
       ) : !current ? (
-        <Text className="text-muted-foreground px-8 py-12 text-center">
-          {show.error ?? "This show isn't in your library."}
-        </Text>
+        <BelowBar>
+          <Text className="text-muted-foreground px-8 py-12 text-center">
+            {show.error ?? "This show isn't in your library."}
+          </Text>
+        </BelowBar>
       ) : (
         <>
           {selection.on ? (
@@ -125,15 +146,40 @@ export function PodcastShow({ id }: { id: string }) {
             keyExtractor={(item) => item.key}
             contentContainerClassName="px-safe-or-4"
             contentInsetAdjustmentBehavior="automatic"
+            scrollEventThrottle={32}
+            onScroll={(event) => {
+              // The list starts under the bar (its automatic inset is the header's height), so
+              // the page's top edge below the bar is at the offset plus that height.
+              if (titleBottom.current === null) return
+              setTitleInBar(
+                event.nativeEvent.contentOffset.y + headerHeight >=
+                  titleBottom.current,
+              )
+            }}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={refresh} />
             }
             ListHeaderComponent={
-              <ShowHeader
-                show={current}
-                problem={problem}
-                onUnfollow={() => confirmUnsubscribe(current.title)}
-              />
+              <>
+                <ShowHeader
+                  show={current}
+                  problem={problem}
+                  onUnfollow={() => confirmUnsubscribe(current.title)}
+                  episodeCount={episodes.data ? episodes.data.length : null}
+                  onTitleBottom={(bottom) => (titleBottom.current = bottom)}
+                />
+                <View className="flex-row items-baseline justify-between pt-2 pb-1">
+                  <Text
+                    className="text-xl font-bold"
+                    accessibilityRole="header"
+                  >
+                    Episodes
+                  </Text>
+                  <Text className="text-muted-foreground text-sm">
+                    {SORT_NAMES[current.settings.sort]}
+                  </Text>
+                </View>
+              </>
             }
             ListEmptyComponent={
               episodes.loading ? undefined : (

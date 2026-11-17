@@ -4,12 +4,13 @@ import { View } from "react-native"
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 
+import { ROW } from "./SettingsGroup"
 import { addAudioFiles } from "./addAudioFiles"
 
 /** Profile's "Add audio files": opens the Files app. They show up in "Your files". */
 export function AddAudioFilesRow() {
   return (
-    <View className="border-border gap-2 border-b py-3">
+    <View className={`${ROW} gap-2 py-3`}>
       <Text className="font-semibold">Your own audio files</Text>
       <Text className="text-muted-foreground text-sm">
         Add audio from the Files app. It plays offline, goes in Up Next and is

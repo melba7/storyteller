@@ -1,14 +1,13 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useEffect, useState } from "react"
-import { View } from "react-native"
 
-import { Switch } from "@/components/ui/switch"
-import { Text } from "@/components/ui/text"
 import {
   getAdSkipSettings,
   setAdSkipSettings,
 } from "@/modules/podcasts/adsNative"
 import { type AdSkipSettings } from "@/modules/podcasts/index"
+
+import { SwitchRow } from "./SettingsGroup"
 
 /**
  * The two switches for skipping ads and the hosts' own plugs, both on until turned off. Swift
@@ -42,46 +41,18 @@ export function AdSkipSwitches() {
 
   return (
     <>
-      <Row
+      <SwitchRow
         title="Skip ads"
         body="Skips sponsor reads and other ads in downloaded episodes whose ads were found. It never skips when it is not sure."
         checked={settings?.skipAds ?? null}
         onChange={(on) => change({ skipAds: on })}
       />
-      <Row
+      <SwitchRow
         title="Skip the hosts' own plugs"
         body="Also skips the hosts promoting their own things, such as Patreon or their other shows."
         checked={settings?.skipOwnPlugs ?? null}
         onChange={(on) => change({ skipOwnPlugs: on })}
       />
     </>
-  )
-}
-
-function Row({
-  title,
-  body,
-  checked,
-  onChange,
-}: {
-  title: string
-  body: string
-  checked: boolean | null
-  onChange: (on: boolean) => void
-}) {
-  return (
-    <View className="border-border flex-row items-center gap-3 border-b py-3">
-      <View className="flex-1">
-        <Text className="font-semibold">{title}</Text>
-        <Text className="text-muted-foreground text-sm">{body}</Text>
-      </View>
-      {checked === null ? null : (
-        <Switch
-          accessibilityLabel={title}
-          checked={checked}
-          onCheckedChange={onChange}
-        />
-      )}
-    </View>
   )
 }

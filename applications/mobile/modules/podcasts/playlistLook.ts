@@ -9,6 +9,16 @@ export function episodeCount(count: number): string {
   return count === 1 ? "1 episode" : `${count} episodes`
 }
 
+/** A playlist row's second line: "12 episodes · Unplayed · Starred". The count waits until known. */
+export function playlistLine(
+  count: number | undefined,
+  summary: string,
+): string {
+  return [count === undefined ? "" : episodeCount(count), summary]
+    .filter((part) => part !== "")
+    .join(" · ")
+}
+
 /** What a row of a hand-filled playlist says under its title: the show and the length. */
 export function entryDetails(entry: PlaylistEntry): string {
   const { episode, show } = entry

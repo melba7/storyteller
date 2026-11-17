@@ -12,6 +12,7 @@ import {
   parseSort,
   playlistDownloads,
   playlistQuery,
+  rulePills,
   serializeRules,
 } from "./playlistRules"
 import { addEpisode, addShow, openTestDatabase } from "./testDatabase"
@@ -218,6 +219,18 @@ describe("describeRules", () => {
         }),
       ),
     ).toBe("2 shows · Unplayed · Last 2 weeks · Under 30 min · Starred")
+  })
+})
+
+describe("rulePills", () => {
+  it("has one pill for no rules", () => {
+    expect(rulePills(DEFAULT_RULES)).toEqual(["Every episode"])
+  })
+
+  it("has one pill for each rule, in the order describeRules reads them", () => {
+    expect(
+      rulePills(rules({ played: ["unplayed"], starredOnly: true })),
+    ).toEqual(["Unplayed", "Starred"])
   })
 })
 

@@ -27,11 +27,13 @@ export function AdsFound({
   if (rows.length === 0) return null
   return (
     <View className="w-full gap-1 pt-2">
-      <Text variant="large">Ads found</Text>
+      <Text className="text-lg font-bold" accessibilityRole="header">
+        Ads found
+      </Text>
       {rows.map((row) => (
         <View
           key={row.key}
-          className="border-border flex-row items-center gap-3 border-b py-2"
+          className="border-foreground/10 flex-row items-center gap-3 border-b py-2"
         >
           <View className="flex-1 gap-0.5">
             <Text className="text-sm font-medium">
