@@ -1,0 +1,81 @@
+# Keeps the app in TestFlight from expiring. Apple removes a TestFlight build 90
+# days after it is uploaded, so once a week this checks when the TestFlight
+# workflow last succeeded. If that was 60 or more days ago, it starts a new
+# build, which reaches the phone like any other TestFlight update. A build that
+# fails is tried again the next week, so there are about four tries before the
+# old one expires.
+#
+# GitHub also switches off scheduled workflows in a public repository after 60
+# days with no activity. Each week this switches the scheduled workflows on
+# again, which restarts that count, so this check and the nightly upstream sync
+# keep running while the code sits still. A workflow switched off by hand stays
+# off.
+name: TestFlight refresh
+
+on:
+  schedule:
+    - cron: "29 8 * * 1"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Start a new TestFlight build now, however new the last one is
+        type: boolean
+        default: false
+
+permissions:
+  actions: write
+
+concurrency:
+  group: testflight-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: Refresh TestFlight if needed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      FORCE: ${{ inputs.force || false }}
+      MAX_AGE_DAYS: "60"
+      SCHEDULED: testflight-refresh.yml upstream-sync.yml
+    steps:
+      - name: Keep the scheduled workflows switched on
+        run: |
+          set -euo pipefail
+          for file in $SCHEDULED; do
+            state=$(gh api "repos/$GH_REPO/actions/workflows/$file" --jq .state)
+            if [ "$state" = "disabled_manually" ]; then
+              echo "$file was switched off by hand, so it stays off."
+              continue
+            fi
+            gh api -X PUT "repos/$GH_REPO/actions/workflows/$file/enable" --silent
+            echo "$file is on (it was $state)."
+          done
+
+      - name: Start a TestFlight build if the last one is getting old
+        run: |
+          set -euo pipefail
+          busy=$(gh run list --workflow testflight.yml --branch "$BRANCH" --limit 20 \
+            --json status --jq '[.[] | select(.status != "completed")] | length')
+          if [ "$busy" -gt 0 ]; then
+            echo "A TestFlight build is already queued or running, so nothing was started." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          last=$(gh run list --workflow testflight.yml --branch "$BRANCH" --status success --limit 1 \
+            --json createdAt --jq '.[0].createdAt // ""')
+          if [ -n "$last" ]; then
+            age=$(( ($(date -u +%s) - $(date -u -d "$last" +%s)) / 86400 ))
+            note="The last TestFlight build that worked started $age days ago ($last)."
+          else
+            age=$MAX_AGE_DAYS
+            note="No TestFlight build has worked on $BRANCH yet."
+          fi
+          if [ "$FORCE" = "true" ] || [ "$age" -ge "$MAX_AGE_DAYS" ]; then
+            gh workflow run testflight.yml --ref "$BRANCH"
+            echo "$note Started a new one, so the app stays in TestFlight." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "$note A new one starts once it is $MAX_AGE_DAYS days old." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
