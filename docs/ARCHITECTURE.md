@@ -193,6 +193,11 @@ in `FORK.md`.
 | 2026-11-17 | A show's wash is the artwork colour at the strongest alpha from 0.15 to 0.45 that keeps the theme's text at 4.5:1                          | Readable in every theme                                    |
 | 2026-11-17 | `ensureArtworkColor` (shared by the player and the show page) measures a show's colour once and saves it                                   | Tinted on the first visit                                  |
 | 2026-11-17 | Episode rows have "…" and play only; downloading moved into "…" and the card's action strip, never for previews or own files               | Two controls per row                                       |
+| 2026-11-17 | Search is the native `Stack.SearchBar`; a pasted link shows "Follow this link" (`isFollowLink` in `followLinkText.ts`)                     | One search field, system look                              |
+| 2026-11-17 | Artwork corners follow its size (`artworkRadius`) with a hairline edge; a caller's `className` still wins                                  | Light artwork keeps an edge                                |
+| 2026-11-17 | Hero cards put white text on blurred artwork under 60% black                                                                               | 4.5:1 even on white artwork                                |
+| 2026-11-17 | Profile groups are `SettingsGroup` cards; rows split by `border-foreground/10`, controls in cards use `bg-foreground/10`                   | Dark's border equals its card colour                       |
+| 2026-11-17 | `rulePills` is the one source of a smart playlist's rule words; `DragList` gets `onDrop` for the drop haptic                               | No second copy of the words                                |
 
 ## Known problems
 

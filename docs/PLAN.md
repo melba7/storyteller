@@ -1,7 +1,7 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1 to P5b merged (TestFlight 24.1); P5c
-to P6b in review; bug check fixes and D1 to D5 (design) underway
+Done: 2 | Last cleanup: none | Podcasts: P1 to P6b merged (TestFlight 24.1); the
+bug check fixes and the design (D1 to D5) are built, in review
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -782,16 +782,25 @@ only. No new npm packages and no new CSS variables.
     text, artwork colour once per show): show page wash, rows with "…" and play
     (downloads moved to "…"), and a card with one main button and a five-button
     strip. The look waits for TestFlight.
-- [ ] **D4. Discover, search and the Podcasts grid** (M): the native search bar
+- [x] **D4. Discover, search and the Podcasts grid** (M): the native search bar
       (a pasted RSS or Apple link follows the show), hero cards that snap,
       category tiles that grow with the text, and empty states with a next step.
   - Done when: the follow-link tests pass, hero cards snap, and category tiles
     don't clip.
-- [ ] **D5. Up Next, Playlists, Profile and Stats** (M): grouped cards with
+  - Status: built and passing `check.sh` (`isFollowLink` tested): the native
+    search bar on Discover and episode search with "Follow this link", a
+    snapping hero carousel, a category grid with icons, artwork corners by size,
+    and empty states. The look waits for TestFlight.
+- [x] **D5. Up Next, Playlists, Profile and Stats** (M): grouped cards with
       separators, title-case headers, icons on swipe buttons, a bigger "Time
       listened", and an empty state with a next step on every empty screen.
   - Done when: `check.sh` passes and the cards show separators in all six
     themes.
+  - Status: built and passing `check.sh` (progress, playlist line and rule pills
+    tested): Profile in grouped cards under a stats card, Up Next with progress
+    lines and icon swipe buttons, playlist icon tiles and rule pills, a bigger
+    Stats, empty states, and no uppercase headers. The look waits for
+    TestFlight.
 
 ## Later
 
