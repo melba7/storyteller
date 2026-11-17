@@ -7,7 +7,7 @@
 import { starterStatements } from "./playlists"
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 13
+export const SCHEMA_VERSION = 14
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -179,6 +179,16 @@ const VERSION_13 = [
   "CREATE INDEX bookmarks_episode ON bookmarks (episode_id, position_seconds)",
 ]
 
+/**
+ * Version 14: the feed's hosts, guests and support links (`podcast:person` and
+ * `podcast:funding`) as JSON text, filled at the next refresh.
+ */
+const VERSION_14 = [
+  "ALTER TABLE shows ADD COLUMN funding TEXT",
+  "ALTER TABLE shows ADD COLUMN people TEXT",
+  "ALTER TABLE episodes ADD COLUMN people TEXT",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -194,6 +204,7 @@ const STEPS = [
   VERSION_11,
   VERSION_12,
   VERSION_13,
+  VERSION_14,
 ]
 
 /**

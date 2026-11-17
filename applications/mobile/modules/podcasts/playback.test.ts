@@ -30,6 +30,7 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     number: null,
     transcriptUrl: null,
     transcriptType: null,
+    people: [],
     chaptersUrl: null,
     positionSeconds: 0,
     played: false,
@@ -54,6 +55,8 @@ const show: Show = {
   artworkColor: null,
   ownPosition: null,
   categories: [],
+  funding: [],
+  people: [],
   settings: DEFAULT_SHOW_SETTINGS,
 }
 

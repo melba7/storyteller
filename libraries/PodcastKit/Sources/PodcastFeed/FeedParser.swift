@@ -26,6 +26,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     var audio: (url: URL, type: String, bytes: Int64?)?
     var transcripts: [FeedTranscript] = []
     var chaptersURL: URL?
+    var people: [FeedPerson] = []
   }
 
   private var path: [String] = []
@@ -39,6 +40,10 @@ private final class FeedReader: NSObject, XMLParserDelegate {
   private var link = "", language = "", itunesImage = "", plainImage = ""
   private var topCategories: [String] = [], subCategories: [String] = []
   private var currentTop = ""
+  private var people: [FeedPerson] = []
+  private var funding: [FeedFunding] = []
+  private var personAttributes: [String: String] = [:]
+  private var fundingURL: URL?
 
   func feed() -> PodcastFeed {
     PodcastFeed(
@@ -49,6 +54,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       link: URL(string: link),
       language: language.isEmpty ? nil : language,
       categories: topCategories + subCategories,
+      people: people, funding: funding,
       episodes: episodes)
   }
 
@@ -87,6 +93,10 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       readTranscript(attributes)
     case "rss/channel/item/podcast:chapters":
       readChapters(attributes)
+    case "rss/channel/podcast:person", "rss/channel/item/podcast:person":
+      personAttributes = attributes
+    case "rss/channel/podcast:funding":
+      fundingURL = URL(string: clean(attributes["url"] ?? "")).flatMap(webAddress)
     default:
       break
     }
@@ -124,6 +134,14 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     case "rss/channel/item/description": item?.description = value
     case "rss/channel/item/itunes:summary": item?.summary = value
     case "rss/channel/item/content:encoded": item?.content = value
+    case "rss/channel/podcast:person": addPerson(value, to: &people)
+    case "rss/channel/item/podcast:person":
+      if item != nil { addPerson(value, to: &item!.people) }
+    case "rss/channel/podcast:funding":
+      if let url = fundingURL, funding.count < FeedLimits.funding {
+        funding.append(FeedFunding(url: url, label: value))
+      }
+      fundingURL = nil
     case "rss/channel/item": finishItem()
     default: break
     }
@@ -169,6 +187,27 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     item?.chaptersURL = url
   }
 
+  /// The address when it is http or https, otherwise nil.
+  private func webAddress(_ url: URL) -> URL? {
+    let scheme = url.scheme?.lowercased()
+    return scheme == "http" || scheme == "https" ? url : nil
+  }
+
+  /// Adds the person whose tag just closed. A tag with no name is dropped, and so is any
+  /// beyond the limit.
+  private func addPerson(_ name: String, to list: inout [FeedPerson]) {
+    let attributes = personAttributes
+    personAttributes = [:]
+    guard !name.isEmpty, list.count < FeedLimits.people else { return }
+    let role = clean(attributes["role"] ?? "").lowercased()
+    let group = clean(attributes["group"] ?? "").lowercased()
+    list.append(
+      FeedPerson(
+        name: name, role: role.isEmpty ? "host" : role, group: group.isEmpty ? "cast" : group,
+        imageURL: URL(string: clean(attributes["img"] ?? "")).flatMap(webAddress),
+        link: URL(string: clean(attributes["href"] ?? "")).flatMap(webAddress)))
+  }
+
   private func finishItem() {
     defer { item = nil }
     guard let item, let audio = item.audio else { return }
@@ -187,6 +226,6 @@ private final class FeedReader: NSObject, XMLParserDelegate {
         imageURL: URL(string: item.image).flatMap { item.image.isEmpty ? nil : $0 },
         season: Int(item.season),
         number: Int(item.number),
-        transcripts: item.transcripts, chaptersURL: item.chaptersURL))
+        transcripts: item.transcripts, chaptersURL: item.chaptersURL, people: item.people))
   }
 }
