@@ -94,7 +94,12 @@ export function PlaylistScreen({ id }: { id: string }) {
           renderItem={({ item }) => {
             const show = showById.get(item.showId)
             return show ? (
-              <EpisodeRow episode={item} show={show} selection={selection} />
+              <EpisodeRow
+                artwork
+                episode={item}
+                show={show}
+                selection={selection}
+              />
             ) : null
           }}
         />

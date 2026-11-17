@@ -169,6 +169,7 @@ export function PodcastPreview({
               problem={problem}
               onFollow={follow}
               busy={following}
+              episodeCount={preview.episodes.length}
             />
           }
           ListEmptyComponent={
@@ -178,6 +179,7 @@ export function PodcastPreview({
           }
           renderItem={({ item, index }) => (
             <EpisodeRow
+              artwork
               episode={item}
               show={preview.show}
               openable={false}

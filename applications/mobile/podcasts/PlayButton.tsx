@@ -82,8 +82,11 @@ interface Props {
   ring?: number | null
 }
 
-/** The round play or pause button on an episode row, with a progress ring when asked. */
-export function PlayButton({ episode, show, size = 44, ring = null }: Props) {
+/**
+ * The round play or pause button on an episode row, with a progress ring when asked. The
+ * face is 36 pt and its `hitSlop` keeps the touch target at 44 pt.
+ */
+export function PlayButton({ episode, show, size = 36, ring = null }: Props) {
   const status = useEpisodeStatus(episode.id)
   const onPrimary = useCSSVariable("--color-primary-foreground") as string
   const primary = useCSSVariable("--color-primary") as string
@@ -103,6 +106,7 @@ export function PlayButton({ episode, show, size = 44, ring = null }: Props) {
         size={size}
         status={status}
         onPrimary={onPrimary}
+        primary={primary}
       />
     </View>
   )
@@ -114,17 +118,22 @@ function ButtonFace({
   size,
   status,
   onPrimary,
+  primary,
 }: {
   episode: StoredEpisode
   show: Show | null
   size: number
   status: Status
   onPrimary: string
+  primary: string
 }) {
+  const filled = status !== "idle"
+  const glyph = filled ? onPrimary : primary
   return (
     <Pressable
-      className="bg-primary items-center justify-center rounded-full active:opacity-80"
+      className={`items-center justify-center rounded-full active:opacity-80 ${filled ? "bg-primary" : "bg-primary/15"}`}
       style={{ width: size, height: size }}
+      hitSlop={Math.max(0, (44 - size) / 2)}
       accessibilityRole="button"
       accessibilityLabel={
         status === "playing"
@@ -134,13 +143,13 @@ function ButtonFace({
       onPress={() => pressEpisode(episode, show, status)}
     >
       {status === "buffering" ? (
-        <ActivityIndicator color={onPrimary} accessibilityLabel="Buffering" />
+        <ActivityIndicator color={glyph} accessibilityLabel="Buffering" />
       ) : (
         <Icon
           as={status === "playing" ? Pause : Play}
           size={size / 2}
-          className="text-primary-foreground"
-          fill={onPrimary}
+          className={filled ? "text-primary-foreground" : "text-primary"}
+          fill={glyph}
         />
       )}
     </Pressable>

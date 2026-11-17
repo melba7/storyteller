@@ -6,6 +6,7 @@ import {
   downloadFraction,
   downloadLook,
   downloadsSummary,
+  downloadMenuTitle,
   formatStorage,
   mapFromList,
   sortDownloads,
@@ -209,5 +210,14 @@ describe("sortDownloads", () => {
     const input = [info({ episodeId: "b" }), info({ episodeId: "a" })]
     expect(sortDownloads(input).map((d) => d.episodeId)).toEqual(["a", "b"])
     expect(input.map((d) => d.episodeId)).toEqual(["b", "a"])
+  })
+})
+
+describe("downloadMenuTitle", () => {
+  it("names each action the way the episode menu says it", () => {
+    expect(downloadMenuTitle("download")).toBe("Download")
+    expect(downloadMenuTitle("retry")).toBe("Download again")
+    expect(downloadMenuTitle("cancel")).toBe("Cancel download")
+    expect(downloadMenuTitle("delete")).toBe("Remove download")
   })
 })

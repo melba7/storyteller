@@ -1,3 +1,4 @@
+import { ensureArtworkColor } from "./artworkColor"
 // LOFI-FORK: the podcasts section's player controller (see FORK.md).
 //
 // The app's side of playing: which episode is loaded, what the native player last said, and
@@ -261,11 +262,17 @@ export function createPlayback(deps: PlaybackDeps) {
 
   /** Works out the show's artwork colour once, and keeps it. */
   async function tintFor(show: Show) {
-    if (!deps.native || show.artworkColor || !show.imageUrl) return
-    const color = await deps.native.artworkColor(show.imageUrl)
-    if (!color) return
-    await deps.saveArtworkColor(show.id, color)
-    if (view.show?.id === show.id) {
+    const { native } = deps
+    const color = await ensureArtworkColor(
+      show,
+      native
+        ? {
+            measure: (url) => native.artworkColor(url),
+            save: deps.saveArtworkColor,
+          }
+        : null,
+    )
+    if (color && view.show?.id === show.id && !view.show.artworkColor) {
       set({ show: { ...view.show, artworkColor: color } })
     }
   }

@@ -1,17 +1,17 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Check } from "lucide-react-native"
+import { Check, Share2 } from "lucide-react-native"
 import { useState } from "react"
 import { ActivityIndicator, Pressable, View } from "react-native"
 
-import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import { needsMore } from "@/modules/podcasts/episodeLook"
+import { needsMore, showMeta } from "@/modules/podcasts/episodeLook"
 import { type Show } from "@/modules/podcasts/library"
 import { showShare } from "@/modules/podcasts/share"
 
 import { Artwork } from "./Artwork"
-import { ShareButton } from "./ShareButton"
+import { shareContent } from "./ShareButton"
+import { useArtworkColor, useWashStyle } from "./useWash"
 
 interface Props {
   show: Show
@@ -22,54 +22,107 @@ interface Props {
   onFollow?: () => void
   /** The follow is being saved. */
   busy?: boolean
+  /** How many episodes the show has, for the meta line; null while unknown. */
+  episodeCount?: number | null
 }
 
-/** The top of a show's page: big artwork, title, author, Following, and the description. */
+/** Room above the header that the wash also covers, so it runs behind a transparent bar. */
+const WASH_ABOVE = 300
+/** How far the wash runs below the artwork. */
+const WASH_BELOW = 32
+const ARTWORK = 200
+
+/**
+ * The top of a show's page: a wash from the artwork's colour, the artwork, title, author, a
+ * meta line, Follow or Following beside a share button, and the description.
+ */
 export function ShowHeader({
   show,
   problem,
   onUnfollow,
   onFollow,
   busy = false,
+  episodeCount = null,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const long = needsMore(show.description)
+  // A preview's show isn't in the database, so its colour is measured but not saved.
+  const wash = useWashStyle(useArtworkColor(show, !onFollow))
+  const meta = showMeta(show.categories, episodeCount)
   return (
-    <View className="items-center gap-3 pb-4">
-      <Artwork uri={show.imageUrl} size={200} className="rounded-xl" />
+    <View className="items-center gap-3 pt-2 pb-4">
+      {wash ? (
+        <View
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              top: -WASH_ABOVE,
+              left: -64,
+              right: -64,
+              height: WASH_ABOVE + 8 + ARTWORK + WASH_BELOW,
+            },
+            wash,
+          ]}
+        />
+      ) : null}
+      <View
+        className="rounded-2xl"
+        style={{ boxShadow: "0 8px 24px rgba(0, 0, 0, 0.25)" }}
+      >
+        <Artwork uri={show.imageUrl} size={ARTWORK} className="rounded-2xl" />
+      </View>
       <View className="items-center gap-1">
-        <Text variant="h4" className="text-center">
-          {show.title}
-        </Text>
+        <Text className="text-center text-2xl font-bold">{show.title}</Text>
         {show.author ? (
-          <Text className="text-muted-foreground text-center">
+          <Text className="text-muted-foreground text-center text-base">
             {show.author}
           </Text>
         ) : null}
+        {meta ? (
+          <Text className="text-muted-foreground text-center text-sm">
+            {meta}
+          </Text>
+        ) : null}
       </View>
-      {onFollow ? (
-        <Button
-          accessibilityLabel={`Follow ${show.title}`}
-          disabled={busy}
-          onPress={onFollow}
+      <View className="flex-row items-center gap-3">
+        {onFollow ? (
+          <Pressable
+            className="bg-primary h-11 min-w-32 flex-row items-center justify-center gap-2 rounded-full px-6 active:opacity-80"
+            accessibilityRole="button"
+            accessibilityLabel={`Follow ${show.title}`}
+            disabled={busy}
+            onPress={onFollow}
+          >
+            {busy ? (
+              <ActivityIndicator accessibilityLabel="Following" />
+            ) : (
+              <Text className="text-primary-foreground font-semibold">
+                Follow
+              </Text>
+            )}
+          </Pressable>
+        ) : (
+          // A show in the library: tapping asks to unfollow.
+          <Pressable
+            className="bg-secondary h-11 min-w-32 flex-row items-center justify-center gap-2 rounded-full px-6 active:opacity-80"
+            accessibilityRole="button"
+            accessibilityLabel={`Following ${show.title}. Tap to unfollow`}
+            onPress={onUnfollow}
+          >
+            <Icon as={Check} size={18} className="text-primary" />
+            <Text className="font-semibold">Following</Text>
+          </Pressable>
+        )}
+        <Pressable
+          className="bg-secondary size-11 items-center justify-center rounded-full active:opacity-80"
+          accessibilityRole="button"
+          accessibilityLabel={`Share ${show.title}`}
+          onPress={() => void shareContent(() => showShare(show))}
         >
-          {busy ? <ActivityIndicator /> : <Text>Follow</Text>}
-        </Button>
-      ) : (
-        // A show in the library: tapping asks to unfollow.
-        <Button
-          variant="outline"
-          accessibilityLabel={`Following ${show.title}. Tap to unfollow`}
-          onPress={onUnfollow}
-        >
-          <Icon as={Check} size={18} className="text-primary" />
-          <Text>Following</Text>
-        </Button>
-      )}
-      <ShareButton
-        label={`Share ${show.title}`}
-        build={() => showShare(show)}
-      />
+          <Icon as={Share2} size={20} className="text-primary" />
+        </Pressable>
+      </View>
       {show.description ? (
         <View className="w-full gap-1">
           <Text className="text-sm" numberOfLines={expanded ? undefined : 3}>

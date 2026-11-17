@@ -1,7 +1,15 @@
 // LOFI-FORK: the podcasts section's episode look rules (see FORK.md).
 import { describe, expect, it } from "vitest"
 
-import { needsMore, ringFraction, rowState, splitNotes } from "./episodeLook"
+import {
+  needsMore,
+  playLabel,
+  ringFraction,
+  rowMeta,
+  rowState,
+  showMeta,
+  splitNotes,
+} from "./episodeLook"
 
 const episode = (
   positionSeconds: number,
@@ -112,5 +120,139 @@ describe("needsMore", () => {
   it("is true for several short lines", () => {
     expect(needsMore("a\nb\nc\nd")).toBe(true)
     expect(needsMore("a\nb\nc")).toBe(false)
+  })
+})
+
+describe("rowMeta", () => {
+  const base = { state: "unplayed" as const, length: "45 min", queued: "" }
+
+  it("is just the length for a plain episode", () => {
+    const meta = rowMeta(base)
+    expect(meta).toEqual({
+      glyph: "none",
+      fraction: null,
+      length: "45 min",
+      queued: false,
+      spoken: ["45 min"],
+    })
+  })
+
+  it("says Downloaded, with a check glyph", () => {
+    const meta = rowMeta({
+      ...base,
+      download: { episodeId: "e", state: "downloaded", updatedAt: 0 },
+    })
+    expect(meta.glyph).toBe("downloaded")
+    expect(meta.spoken).toEqual(["Downloaded", "45 min"])
+  })
+
+  it("says Downloading with the percent, and gives the ring's fraction", () => {
+    const meta = rowMeta({
+      ...base,
+      download: {
+        episodeId: "e",
+        state: "downloading",
+        bytes: 400,
+        updatedAt: 0,
+        expected: 1000,
+      },
+    })
+    expect(meta.glyph).toBe("downloading")
+    expect(meta.fraction).toBeCloseTo(0.4)
+    expect(meta.spoken[0]).toBe("Downloading, 40%")
+  })
+
+  it("says Downloading without a percent when the size is unknown", () => {
+    const meta = rowMeta({
+      ...base,
+      download: { episodeId: "e", state: "downloading", updatedAt: 0 },
+    })
+    expect(meta.fraction).toBeNull()
+    expect(meta.spoken[0]).toBe("Downloading")
+  })
+
+  it("says Waiting to download for a queued download", () => {
+    const meta = rowMeta({
+      ...base,
+      download: { episodeId: "e", state: "queued", updatedAt: 0 },
+    })
+    expect(meta.glyph).toBe("downloading")
+    expect(meta.spoken[0]).toBe("Waiting to download")
+  })
+
+  it("flags a failed download", () => {
+    const meta = rowMeta({
+      ...base,
+      download: { episodeId: "e", state: "failed", updatedAt: 0 },
+    })
+    expect(meta.glyph).toBe("failed")
+    expect(meta.spoken[0]).toBe("Download failed")
+  })
+
+  it("shows a check and says Played for a played episode", () => {
+    const meta = rowMeta({ ...base, state: "played", length: "Played" })
+    expect(meta.glyph).toBe("played")
+    expect(meta.spoken).toEqual(["Played"])
+  })
+
+  it("lets a download glyph win over the played check but keeps the word", () => {
+    const meta = rowMeta({
+      state: "played",
+      length: "Played",
+      queued: "",
+      download: { episodeId: "e", state: "downloaded", updatedAt: 0 },
+    })
+    expect(meta.glyph).toBe("downloaded")
+    expect(meta.spoken).toEqual(["Downloaded", "Played"])
+  })
+
+  it("gives the time left, then Up Next in the visible line and in the words", () => {
+    const meta = rowMeta({
+      state: "inProgress",
+      length: "12 min left",
+      queued: "Up Next, number 2",
+    })
+    expect(meta.length).toBe("12 min left")
+    expect(meta.queued).toBe(true)
+    expect(meta.spoken).toEqual(["12 min left", "Up Next, number 2"])
+  })
+
+  it("has no words for an episode of unknown length", () => {
+    expect(rowMeta({ ...base, length: "" }).spoken).toEqual([])
+  })
+})
+
+describe("showMeta", () => {
+  it("joins the first top-level category and the episode count", () => {
+    expect(showMeta(["Comedy › Improv", "Comedy"], 214)).toBe(
+      "Comedy · 214 episodes",
+    )
+  })
+  it("says 1 episode for one", () => {
+    expect(showMeta(["News"], 1)).toBe("News · 1 episode")
+  })
+  it("leaves out what it doesn't know", () => {
+    expect(showMeta([], 3)).toBe("3 episodes")
+    expect(showMeta(["Arts"], null)).toBe("Arts")
+    expect(showMeta([], null)).toBe("")
+  })
+  it("falls back to a sub-category when that's all there is", () => {
+    expect(showMeta(["Arts › Books"], null)).toBe("Arts › Books")
+  })
+})
+
+describe("playLabel", () => {
+  it("says Play for an episode not started, or played", () => {
+    expect(playLabel(episode(0, 600), false)).toBe("Play")
+    expect(playLabel(episode(300, 600, true), false)).toBe("Play")
+  })
+  it("says Resume with the time left for one in progress", () => {
+    expect(playLabel(episode(1920, 3840), false)).toBe("Resume · 32 min left")
+  })
+  it("says Resume alone when the length is unknown", () => {
+    expect(playLabel(episode(120, null), false)).toBe("Resume")
+  })
+  it("says Pause while it plays", () => {
+    expect(playLabel(episode(1920, 3840), true)).toBe("Pause")
   })
 })

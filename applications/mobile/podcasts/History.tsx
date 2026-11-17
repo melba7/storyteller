@@ -119,6 +119,7 @@ export function History() {
             const show = showById.get(item.episode.showId)
             return show ? (
               <EpisodeRow
+                artwork
                 episode={item.episode}
                 show={show}
                 selection={selection}
