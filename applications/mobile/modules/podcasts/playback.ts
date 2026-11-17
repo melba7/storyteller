@@ -83,8 +83,15 @@ export interface PlaybackDeps {
   clearInterval(handle: unknown): void
   /** The listener's "mark played when this many seconds are left" (0 or missing: off). */
   playedWithin?(): number
-  /** Called when a different episode starts to play (not on a resume), for what must follow it. */
-  beforePlay?(episode: StoredEpisode): void
+  /**
+   * Called when a different episode starts to play (not on a resume). The episode loads when
+   * it resolves, so it may wait (for a download). `abandoned()` turns true when a newer play
+   * took over; then the episode is not loaded.
+   */
+  beforePlay?(
+    episode: StoredEpisode,
+    abandoned: () => boolean,
+  ): Promise<void> | void
   /** Reports a failure that has no screen to show it (saving the place). */
   report?(cause: unknown): void
 }
@@ -131,6 +138,8 @@ export function createPlayback(deps: PlaybackDeps) {
   let markedPlayed = false
   /** The id the native player knows the loaded episode by (a followed preview keeps its old one). */
   let nativeId: string | null = null
+  /** Counts the plays that load an episode, so one that waited can see it was replaced. */
+  let playTurn = 0
   /** Every Up Next item seen lately: Swift drops one from its queue before it announces it. */
   const knownItems = new Map<string, UpNextItem>()
 
@@ -323,18 +332,22 @@ export function createPlayback(deps: PlaybackDeps) {
     }
     listen()
     if (view.episode?.id === episode.id && view.loaded) {
+      playTurn++
       if (!view.isPlaying) await run(() => native().play())
       return
     }
+    const turn = ++playTurn
+    try {
+      await deps.beforePlay?.(episode, () => turn !== playTurn)
+    } catch (cause) {
+      deps.report?.(cause)
+    }
+    // A newer play pressed while this one waited wins.
+    if (turn !== playTurn) return
     if (view.episode && view.loaded) persist(view.position)
     markedEarly = false
     markedPlayed = false
     nativeId = episode.id
-    try {
-      deps.beforePlay?.(episode)
-    } catch (cause) {
-      deps.report?.(cause)
-    }
     set({
       episode,
       show,

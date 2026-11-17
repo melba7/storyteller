@@ -226,10 +226,41 @@ describe("playEpisode", () => {
     const { playback, deps, state } = setup()
     await playback.playEpisode(episode(), show)
     expect(deps.beforePlay).toHaveBeenCalledTimes(1)
-    expect(deps.beforePlay).toHaveBeenCalledWith(episode())
+    expect(deps.beforePlay).toHaveBeenCalledWith(
+      episode(),
+      expect.any(Function),
+    )
     state(5, false)
     await playback.playEpisode(episode(), show)
     expect(deps.beforePlay).toHaveBeenCalledTimes(1)
+  })
+
+  it("loads only after beforePlay is done, and a newer play wins over one that waits", async () => {
+    const { playback, native, deps } = setup()
+    let release: () => void = () => {}
+    deps.beforePlay.mockImplementationOnce(
+      () => new Promise<void>((done) => (release = done)),
+    )
+    const first = playback.playEpisode(episode({ id: "e1" }), show)
+    await Promise.resolve()
+    expect(native.load).not.toHaveBeenCalled()
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    expect(native.load).toHaveBeenCalledTimes(1)
+    release()
+    await first
+    expect(native.load).toHaveBeenCalledTimes(1)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeId: "e2" }),
+    )
+    const abandoned = deps.beforePlay.mock.calls[0]?.[1]
+    expect(abandoned?.()).toBe(true)
+  })
+
+  it("loads anyway when beforePlay fails", async () => {
+    const { playback, native, deps } = setup()
+    deps.beforePlay.mockRejectedValueOnce(new Error("no"))
+    await playback.playEpisode(episode(), show)
+    expect(native.load).toHaveBeenCalledTimes(1)
   })
 
   it("shows the start of a played episode as zero", async () => {
