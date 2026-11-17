@@ -5,6 +5,7 @@ import { View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable"
 
+import { GroupedSection, groupedScreenClass } from "@/apple-look/GroupedList"
 import { FontLoader } from "@/components/FontLoader"
 import { LoadingView } from "@/components/LoadingView"
 import {
@@ -33,7 +34,7 @@ export default function CustomFontListScreen() {
   const customFonts = preferences?.customFonts ?? []
 
   return (
-    <View className="android:pt-safe w-full flex-1">
+    <View className={`android:pt-safe w-full flex-1 ${groupedScreenClass}`}>
       <View className="mb-2 w-full flex-row items-center px-4 pt-3">
         <Button
           accessibilityLabel="Close custom fonts"
@@ -46,18 +47,19 @@ export default function CustomFontListScreen() {
           <Icon as={ChevronDown} size={24} />
         </Button>
       </View>
-      <Text variant="h2" className="mx-6 mb-8 text-center">
+      <Text variant="h2" className="mx-4 mb-2 border-b-0 text-[28px] font-bold">
         Custom fonts
       </Text>
-      <ScrollView className="mx-6 flex-1">
+      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-8">
         <FontLoader />
+        <GroupedSection separatorInset={16}>
         {customFonts.map((font, index) => (
           <Swipeable
             key={font.name}
             renderRightActions={() => (
               <Button
                 accessibilityLabel={`Delete custom font ${font.name}`}
-                className="align-center h-full w-20 justify-center rounded-l-none bg-red-500 sm:h-full"
+                className="align-center h-full w-20 justify-center rounded-none sm:h-full"
                 variant="destructive"
                 onPress={() => {
                   if (preferences?.typography.fontFamily === font.name) {
@@ -79,10 +81,10 @@ export default function CustomFontListScreen() {
             )}
           >
             <Accordion type="single" collapsible>
-              <AccordionItem value="item-1" className="bg-background">
+              <AccordionItem value="item-1" className="bg-card border-b-0 px-4">
                 <AccordionTrigger>
                   <Text
-                    className="text-lg select-none"
+                    className="text-[17px] select-none"
                     style={{ fontFamily: font.name }}
                   >
                     {font.name}
@@ -90,7 +92,7 @@ export default function CustomFontListScreen() {
                 </AccordionTrigger>
                 <AccordionContent>
                   <Text
-                    className="text-sm select-none"
+                    className="text-[15px] select-none"
                     style={{ fontFamily: font.name }}
                   >
                     The quick brown fox jumps over the lazy dog.
@@ -100,6 +102,7 @@ export default function CustomFontListScreen() {
             </Accordion>
           </Swipeable>
         ))}
+        </GroupedSection>
       </ScrollView>
     </View>
   )

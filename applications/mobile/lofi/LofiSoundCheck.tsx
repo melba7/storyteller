@@ -8,6 +8,7 @@ import { useKeepAwake } from "expo-keep-awake"
 import { useEffect, useRef, useState } from "react"
 import { AppState, Share, View } from "react-native"
 
+import { GroupedRow, GroupedSection } from "@/apple-look/GroupedList"
 import { Button } from "@/components/ui/button"
 import { Text } from "@/components/ui/text"
 import { logger } from "@/logger"
@@ -144,50 +145,55 @@ export function LofiSoundCheck({ atmosphere }: Props) {
   if (state && ["jumping", "listening", "asking"].includes(phase)) {
     const stop = state.stops[state.index]
     return (
-      <View className="w-full gap-3">
+      <>
         <KeepAwake />
-        <Text maxFontSizeMultiplier={1.5} className="text-lg">
-          Sound check, {state.index + 1} of {state.stops.length}
-        </Text>
-        {stop && <Text variant="muted">{stopLabel(stop)}</Text>}
-        {phase === "jumping" && <Text>Finding the spot…</Text>}
-        {phase === "listening" && (
-          <Text>
-            {stop?.cueIndex === undefined
-              ? `Listening… ${state.secondsLeft} s`
-              : "Listening… the sound comes after a few seconds"}
-          </Text>
-        )}
-        {phase === "asking" && stop && (
-          <View className="w-full gap-2">
-            <Text>{stopQuestion(stop)}</Text>
-            {SOUND_CHECK_ANSWERS.map(({ value, label, hint }) => (
+        <GroupedSection
+          title={`Sound check, ${state.index + 1} of ${state.stops.length}`}
+        >
+          <GroupedRow
+            title={
+              phase === "jumping"
+                ? "Finding the spot…"
+                : phase === "listening"
+                  ? stop?.cueIndex === undefined
+                    ? `Listening… ${state.secondsLeft} s`
+                    : "Listening… the sound comes after a few seconds"
+                  : stop
+                    ? stopQuestion(stop)
+                    : undefined
+            }
+            subtitle={stop ? stopLabel(stop) : undefined}
+          />
+          {phase === "asking" && stop
+            ? SOUND_CHECK_ANSWERS.map(({ value, label, hint }) => (
+                <GroupedRow
+                  key={value}
+                  accessibilityLabel={`${label}: ${hint}`}
+                  title={label}
+                  subtitle={hint}
+                  hideChevron
+                  onPress={() => void check.answer(value)}
+                />
+              ))
+            : null}
+          {phase === "asking" && stop ? (
+            <GroupedRow className="py-1">
               <Button
-                key={value}
-                accessibilityLabel={`${label}: ${hint}`}
-                variant="secondary"
+                variant="ghost"
                 size="sm"
-                className="w-full justify-start"
-                onPress={() => void check.answer(value)}
+                onPress={() => void check.playAgain()}
               >
-                <Text>
-                  {label}: {hint}
-                </Text>
+                <Text>Play it again</Text>
               </Button>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => void check.playAgain()}
-            >
-              <Text>Play it again</Text>
+            </GroupedRow>
+          ) : null}
+          <GroupedRow className="py-1">
+            <Button variant="ghost" size="sm" onPress={() => void check.stop()}>
+              <Text>Stop the sound check</Text>
             </Button>
-          </View>
-        )}
-        <Button variant="ghost" size="sm" onPress={() => void check.stop()}>
-          <Text>Stop the sound check</Text>
-        </Button>
-      </View>
+          </GroupedRow>
+        </GroupedSection>
+      </>
     )
   }
 
@@ -196,56 +202,64 @@ export function LofiSoundCheck({ atmosphere }: Props) {
     atmosphere.status?.atmosphere.source === "standIns" ||
     atmosphere.status?.atmosphere.source === "mixed"
   const message = state?.message ?? reason
+  const notes = [
+    phase === "restoring" ? "Putting your place back…" : null,
+    message,
+    standIns && !reason
+      ? "Some sounds are stand-ins, not recordings, so they may sound off."
+      : null,
+  ].filter((note): note is string => !!note)
   return (
-    <View className="w-full gap-2">
-      <View className="w-full flex-row items-center justify-between gap-4">
-        <View className="shrink gap-1">
-          <Text maxFontSizeMultiplier={1.5}>Sound check</Text>
-          <Text variant="muted">
-            About 3 minutes: a few spots you have already heard, or from the
-            book&apos;s opening if you are not far in, then a question for each.
-            Your place is kept.
-          </Text>
-        </View>
-        <Button
-          accessibilityLabel="Start the sound check"
-          variant="secondary"
-          size="sm"
-          disabled={
-            phase === "starting" ||
-            phase === "restoring" ||
-            reason !== null ||
-            !bookUuid
-          }
-          onPress={() => {
-            if (bookUuid) void check.start(bookUuid)
-          }}
-        >
-          <Text>{phase === "starting" ? "Starting…" : "Start"}</Text>
-        </Button>
-      </View>
-      {phase === "restoring" && (
-        <Text variant="muted">Putting your place back…</Text>
-      )}
-      {message && <Text variant="muted">{message}</Text>}
-      {standIns && !reason && (
-        <Text variant="muted">
-          Some sounds are stand-ins, not recordings, so they may sound off.
-        </Text>
-      )}
-      {phase === "done" && (
-        <Text>Thanks, that&apos;s the sound check done.</Text>
-      )}
-      {lastResults && (
-        <Button
-          accessibilityLabel="Share the sound check results"
-          variant="ghost"
-          size="sm"
-          onPress={() => void Share.share({ message: lastResults })}
-        >
-          <Text>Share results</Text>
-        </Button>
-      )}
-    </View>
+    <GroupedSection
+      footer={
+        notes.length > 0 ? (
+          <View className="gap-1">
+            {notes.map((note) => (
+              <Text key={note} className="text-muted-foreground text-[13px]">
+                {note}
+              </Text>
+            ))}
+          </View>
+        ) : undefined
+      }
+    >
+      <GroupedRow
+        title="Sound check"
+        subtitle="About 3 minutes: a few spots you have already heard, or from the book's opening if you are not far in, then a question for each. Your place is kept."
+        trailing={
+          <Button
+            accessibilityLabel="Start the sound check"
+            variant="secondary"
+            size="sm"
+            disabled={
+              phase === "starting" ||
+              phase === "restoring" ||
+              reason !== null ||
+              !bookUuid
+            }
+            onPress={() => {
+              if (bookUuid) void check.start(bookUuid)
+            }}
+          >
+            <Text>{phase === "starting" ? "Starting…" : "Start"}</Text>
+          </Button>
+        }
+      />
+      {phase === "done" ? (
+        <GroupedRow title="Thanks, that's the sound check done." />
+      ) : null}
+      {lastResults ? (
+        <GroupedRow className="py-1">
+          <Button
+            accessibilityLabel="Share the sound check results"
+            variant="ghost"
+            size="sm"
+            onPress={() => void Share.share({ message: lastResults })}
+          >
+            <Text>Share results</Text>
+          </Button>
+        </GroupedRow>
+      ) : null}
+    </GroupedSection>
   )
 }

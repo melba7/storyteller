@@ -2,6 +2,7 @@ import { useGlobalSearchParams } from "expo-router"
 import { View } from "react-native"
 import { ScrollView } from "react-native-gesture-handler"
 
+import { groupedScreenClass } from "@/apple-look/GroupedList"
 import { ReadingSettings } from "@/components/ReadingSettings"
 import {
   readerFormSheetBottomPadding,
@@ -27,7 +28,7 @@ export default function ReadingSettingsScreen() {
 
   return (
     <View
-      className="bg-background overflow-hidden"
+      className={`${groupedScreenClass} overflow-hidden`}
       style={{ height, marginBottom: -bottomInset }}
     >
       <View
@@ -38,7 +39,7 @@ export default function ReadingSettingsScreen() {
       </View>
       <ScrollView
         style={{ height: scrollHeight }}
-        contentContainerClassName="px-6 pb-20"
+        contentContainerClassName="px-4 pb-20"
       >
         <ReadingSettings {...(uuid ? { bookUuid: uuid } : {})} />
       </ScrollView>

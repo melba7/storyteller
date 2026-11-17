@@ -81,7 +81,7 @@ export function TrackLisk({
     <ScrollView
       ref={ref}
       className="flex-1"
-      contentContainerClassName="px-2 pt-2"
+      contentContainerClassName="pt-1"
       contentContainerStyle={{ paddingBottom }}
       onLayout={() => {
         if (!ref.current) return
@@ -125,16 +125,10 @@ function Sublist({
           {...(link === currentTocItem && {
             ref: currentItemRef,
           })}
-          className="py-0.5"
         >
           <Button
-            variant={link === currentTocItem ? "secondary" : "ghost"}
-            className={cn(
-              "h-auto justify-start rounded-md border border-transparent px-3 py-3 sm:h-auto",
-              {
-                "border-border bg-secondary": link === currentTocItem,
-              },
-            )}
+            variant="ghost"
+            className="min-h-11 h-auto justify-start rounded-none px-4 py-2.5 sm:h-auto"
             onPress={async () => {
               if (currentTocItem === link) return
               const [relativeUri, startPositionString] = link.href.split("#t=")
@@ -148,8 +142,16 @@ function Sublist({
               onClose?.()
             }}
           >
-            <Text className="text-sm font-bold">{link.title}</Text>
+            <Text
+              className={cn(
+                "text-[17px] font-normal",
+                link === currentTocItem && "text-primary font-semibold",
+              )}
+            >
+              {link.title}
+            </Text>
           </Button>
+          <View className="bg-border ml-4 h-px" />
           <Sublist
             listing={link.children ?? []}
             currentTocItem={currentTocItem}

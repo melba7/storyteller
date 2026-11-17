@@ -73,7 +73,11 @@ export function CustomThemeEditor({
         style={{ backgroundColor: background }}
         contentContainerClassName="gap-4 pb-safe px-6"
       >
-        <Text variant="h2" style={{ color: foreground }}>
+        <Text
+          variant="h2"
+          className="border-b-0 text-[28px] font-bold"
+          style={{ color: foreground }}
+        >
           Custom theme
         </Text>
         <ButtonGroup value={isDark} onChange={setIsDark}>
@@ -84,7 +88,7 @@ export function CustomThemeEditor({
             <Text style={!isDark && { color: foreground }}>Dark</Text>
           </ButtonGroupButton>
         </ButtonGroup>
-        <Text className="text-lg" style={{ color: foreground }}>
+        <Text className="text-[17px]" style={{ color: foreground }}>
           Theme name
         </Text>
         <Input
@@ -94,7 +98,7 @@ export function CustomThemeEditor({
           style={{ color: foreground }}
         />
         {isDuplicateName && (
-          <Text className="text-sm" style={{ color: foreground }}>
+          <Text className="text-[13px]" style={{ color: foreground }}>
             A theme named “{trimmedName}” already exists. Choose a different
             name.
           </Text>

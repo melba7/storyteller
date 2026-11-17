@@ -69,7 +69,7 @@ export function TableOfContents({
     <ScrollView
       ref={ref}
       className="flex-1"
-      contentContainerClassName="px-2 pt-2"
+      contentContainerClassName="pt-1"
       contentContainerStyle={{ paddingBottom }}
       onLayout={() => {
         if (!ref.current) return
@@ -116,7 +116,6 @@ function TableOfContentsLink({
       collapsable={false}
       key={link.href}
       ref={isCurrent ? ref : undefined}
-      className="py-0.5"
     >
       <Button
         variant="ghost"
@@ -135,14 +134,19 @@ function TableOfContentsLink({
           onPress?.()
         }}
         className={cn(
-          "h-auto justify-start rounded-md border border-transparent px-3 py-3 sm:h-auto",
-          {
-            "border-border bg-secondary": isCurrent,
-          },
+          "min-h-11 h-auto justify-start rounded-none px-4 py-2.5 sm:h-auto",
         )}
       >
-        <Text className="text-sm font-bold">{link.title}</Text>
+        <Text
+          className={cn(
+            "text-[17px] font-normal",
+            isCurrent && "text-primary font-semibold",
+          )}
+        >
+          {link.title}
+        </Text>
       </Button>
+      <View className="bg-border ml-4 h-px" />
       {link.children?.map((child) => (
         <View key={child.href} className="pl-4">
           <TableOfContentsLink

@@ -66,7 +66,7 @@ function AlertDialogContent({
       <AlertDialogOverlay>
         <AlertDialogPrimitive.Content
           className={cn(
-            "border-border bg-background z-50 flex w-full max-w-full flex-col gap-4 rounded-lg border p-6 shadow-lg shadow-black/5 sm:max-w-lg",
+            "bg-popover z-50 flex w-full max-w-full flex-col gap-4 rounded-[20px] p-6 shadow-lg shadow-black/10 sm:max-w-lg",
             Platform.select({
               web: "animate-in fade-in-0 zoom-in-95 duration-200",
             }),
@@ -106,7 +106,7 @@ function AlertDialogTitle({
   React.RefAttributes<AlertDialogPrimitive.TitleRef>) {
   return (
     <AlertDialogPrimitive.Title
-      className={cn("text-foreground text-lg font-semibold", className)}
+      className={cn("text-foreground text-[17px] font-semibold", className)}
       {...props}
     />
   )
@@ -119,7 +119,7 @@ function AlertDialogDescription({
   React.RefAttributes<AlertDialogPrimitive.DescriptionRef>) {
   return (
     <AlertDialogPrimitive.Description
-      className={cn("text-muted-foreground text-sm", className)}
+      className={cn("text-muted-foreground text-[15px]", className)}
       {...props}
     />
   )
@@ -147,10 +147,10 @@ function AlertDialogCancel({
   React.RefAttributes<AlertDialogPrimitive.CancelRef>) {
   return (
     <TextClassContext.Provider
-      value={buttonTextVariants({ className, variant: "outline" })}
+      value={buttonTextVariants({ className, variant: "secondary" })}
     >
       <AlertDialogPrimitive.Cancel
-        className={cn(buttonVariants({ variant: "outline" }), className)}
+        className={cn(buttonVariants({ variant: "secondary" }), className)}
         {...props}
       />
     </TextClassContext.Provider>

@@ -111,13 +111,13 @@ export function LofiAtmosphereToolbarItem({
             }}
           />
           <View
-            className="bg-background border-border rounded-t-2xl border-t px-6"
+            className="bg-secondary dark:bg-background border-border rounded-t-[26px] border-t px-4"
             style={{ paddingBottom: insets.bottom + 16 }}
           >
             <View className="h-6 items-center justify-center">
               <View className="bg-muted-foreground/40 h-1 w-12 rounded-full" />
             </View>
-            <View className="gap-5">
+            <View>
               <LofiAtmosphereControls atmosphere={atmosphere} />
               <LofiSoundCheck atmosphere={atmosphere} />
             </View>

@@ -5,11 +5,12 @@ import {
   useContext,
   useMemo,
 } from "react"
-import { View } from "react-native"
+import { Pressable, View } from "react-native"
 
 import { cn } from "@/lib/utils"
 
-import { Button, type ButtonProps } from "./button"
+import { type ButtonProps } from "./button"
+import { TextClassContext } from "./text"
 
 type ButtonGroupContextValue = {
   onPress: (value: unknown) => void
@@ -45,7 +46,7 @@ export function ButtonGroup<Value>({
 
   return (
     <ButtonGroupContext.Provider value={contextValue}>
-      <View className="flex-row">
+      <View className="bg-accent flex-row self-start rounded-full p-0.5">
         {children.map((child, i) => {
           if (children.length === 1) return child
           if (i === 0 && children.length > 1) {
@@ -72,26 +73,39 @@ export function ButtonGroup<Value>({
 
 export function ButtonGroupButton<Value>({
   value,
-  neighbors,
+  // The neighbours are no longer needed: segments are all capsules in a track.
+  neighbors: _neighbors,
+  variant: _variant,
+  size,
+  className,
   ...props
 }: ButtonProps & { value: Value; neighbors?: "left" | "right" | "both" }) {
   const { onPress, currentValue } = useContext(ButtonGroupContext)
+  const selected = currentValue === value
   return (
-    <Button
-      {...props}
-      accessibilityState={{
-        ...props.accessibilityState,
-        selected: currentValue === value,
-      }}
-      className={cn({
-        "bg-transparent": currentValue !== value,
-        "rounded-tr-none rounded-br-none":
-          neighbors === "right" || neighbors === "both",
-        "rounded-tl-none rounded-bl-none":
-          neighbors === "left" || neighbors === "both",
-      })}
-      onPress={() => onPress(value)}
-      variant={currentValue === value ? "default" : "secondary"}
-    />
+    <TextClassContext.Provider
+      value={cn(
+        "text-[13px] font-medium",
+        selected ? "text-foreground" : "text-foreground/80",
+      )}
+    >
+      <Pressable
+        accessibilityRole="button"
+        role="button"
+        {...props}
+        accessibilityState={{
+          ...props.accessibilityState,
+          selected,
+        }}
+        className={cn(
+          "min-h-8 items-center justify-center rounded-full px-3",
+          size === "sm" && "min-h-7 px-2.5",
+          selected && "bg-background dark:bg-ring shadow-sm shadow-black/15",
+          props.disabled && "opacity-50",
+          className,
+        )}
+        onPress={() => onPress(value)}
+      />
+    </TextClassContext.Provider>
   )
 }
