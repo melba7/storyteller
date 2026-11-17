@@ -65,13 +65,17 @@ export function Stats() {
           contentContainerClassName="px-safe-or-4 pb-8"
           contentInsetAdjustmentBehavior="automatic"
         >
-          <View className="border-border border-b py-4">
+          <View className="py-4">
             <Text className="text-muted-foreground text-sm">Time listened</Text>
-            <Text variant="h3">{formatDuration(stats.listened)}</Text>
+            <Text className="text-4xl font-bold tabular-nums">
+              {formatDuration(stats.listened)}
+            </Text>
           </View>
-          <View className="border-border border-b py-4">
+          <View className="bg-secondary rounded-3xl p-4">
             <Text className="text-muted-foreground text-sm">Time saved</Text>
-            <Text variant="h3">{formatDuration(totalSaved(stats))}</Text>
+            <Text className="text-2xl font-bold tabular-nums">
+              {formatDuration(totalSaved(stats))}
+            </Text>
             {savedRows(stats).map((row) => (
               <View key={row.key} className="flex-row justify-between pt-2">
                 <Text>{row.label}</Text>
@@ -81,7 +85,7 @@ export function Stats() {
               </View>
             ))}
           </View>
-          <View className="py-4">
+          <View className="pt-6 pb-4">
             <Text className="font-semibold">Last 30 days</Text>
             <View
               className="mt-3 flex-row items-end gap-0.5"
@@ -91,7 +95,7 @@ export function Stats() {
               {days.map((day) => (
                 <View
                   key={day.key}
-                  className="bg-primary flex-1 rounded-t-sm"
+                  className="bg-primary flex-1 rounded-t-md"
                   style={{ height: Math.max(day.height * BAR_AREA, 1) }}
                   accessibilityLabel={`${day.label}, ${formatDuration(day.seconds)}`}
                 />

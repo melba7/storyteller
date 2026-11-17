@@ -216,6 +216,11 @@ export function describeRules(
   rules: PlaylistRules,
   showCount?: number,
 ): string {
+  return rulePills(rules, showCount).join(" · ")
+}
+
+/** The same words, one for each rule, to show as pills; "Every episode" when there are none. */
+export function rulePills(rules: PlaylistRules, showCount?: number): string[] {
   const parts: string[] = []
   if (rules.showIds !== null) {
     const count = showCount ?? rules.showIds.length
@@ -239,7 +244,7 @@ export function describeRules(
     )
   }
   if (rules.starredOnly) parts.push("Starred")
-  return parts.length === 0 ? "Every episode" : parts.join(" · ")
+  return parts.length === 0 ? ["Every episode"] : parts
 }
 
 // MARK: Auto-download

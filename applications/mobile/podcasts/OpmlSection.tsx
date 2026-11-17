@@ -8,6 +8,8 @@ import { readableError } from "@/modules/podcasts/nativeError"
 import { exportOpmlFile, importOpmlFile } from "@/modules/podcasts/opmlFiles"
 import { progressLine, summaryLine } from "@/modules/podcasts/opmlImport"
 
+import { ROW } from "./SettingsGroup"
+
 /** How many failed shows are named before "and 3 more". */
 const NAMED_FAILURES = 5
 
@@ -56,7 +58,7 @@ export function OpmlSection() {
 
   const busy = progress !== null
   return (
-    <View className="border-border gap-2 border-b py-3">
+    <View className={`${ROW} gap-2 py-3`}>
       <Text className="font-semibold">Your shows as a file</Text>
       <Text className="text-muted-foreground text-sm">
         An OPML file moves your shows to or from another podcast app.

@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { type StoredEpisode } from "@/modules/podcasts/library"
-import { describeRules } from "@/modules/podcasts/playlistRules"
+import { rulePills } from "@/modules/podcasts/playlistRules"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
@@ -80,9 +80,20 @@ export function PlaylistScreen({ id }: { id: string }) {
           contentInsetAdjustmentBehavior="automatic"
           extraData={selection.selected}
           ListHeaderComponent={
-            <Text className="text-muted-foreground py-2 text-sm">
-              {describeRules(current.rules)}
-            </Text>
+            <View
+              className="flex-row flex-wrap gap-2 py-2"
+              accessible
+              accessibilityLabel={rulePills(current.rules).join(", ")}
+            >
+              {rulePills(current.rules).map((pill) => (
+                <View
+                  key={pill}
+                  className="bg-foreground/10 rounded-full px-3 py-1"
+                >
+                  <Text className="text-sm">{pill}</Text>
+                </View>
+              ))}
+            </View>
           }
           ListEmptyComponent={
             episodes.loading ? undefined : (

@@ -127,3 +127,15 @@ export function moveBetween(
   }
   return null
 }
+
+/** How much of an episode is played, 0 to 1, for the line under a row; null until it has started. */
+export function progressFraction(
+  position: number,
+  duration: number | null | undefined,
+): number | null {
+  if (duration === null || duration === undefined || !(duration > 0)) {
+    return null
+  }
+  if (!(position > 0)) return null
+  return Math.min(1, position / duration)
+}

@@ -65,7 +65,7 @@ function Row({
 
 function Heading({ children }: { children: string }) {
   return (
-    <Text className="text-muted-foreground px-1 pt-6 pb-1 text-xs uppercase">
+    <Text className="text-muted-foreground px-1 pt-6 pb-1 text-sm font-semibold">
       {children}
     </Text>
   )

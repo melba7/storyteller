@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { Ellipsis } from "lucide-react-native"
+import { Download, Ellipsis } from "lucide-react-native"
 import { useMemo } from "react"
 import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
 
@@ -25,6 +25,7 @@ import { withTranscript } from "@/modules/podcasts/transcripts"
 
 import { Artwork } from "./Artwork"
 import { DownloadButton } from "./DownloadButton"
+import { EmptyState } from "./EmptyState"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisodesByIds, useShows } from "./hooks"
 import { useAdsInfo } from "./useAds"
@@ -68,10 +69,11 @@ export function Downloads() {
           episodes.loading && ids.length > 0 ? (
             <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
           ) : (
-            <Text className="text-muted-foreground px-8 py-12 text-center">
-              No downloads yet. Tap the arrow on an episode to keep it on your
-              phone.
-            </Text>
+            <EmptyState
+              icon={Download}
+              title="No downloads yet"
+              body="Tap the arrow on an episode to keep it on your phone."
+            />
           )
         }
         renderItem={({ item }) => {

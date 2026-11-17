@@ -1,5 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack } from "expo-router"
+import { History as HistoryIcon } from "lucide-react-native"
 import { useMemo } from "react"
 import { ActivityIndicator, Alert, FlatList, View } from "react-native"
 
@@ -9,6 +10,7 @@ import { groupByDay } from "@/modules/podcasts/history"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
 
+import { EmptyState } from "./EmptyState"
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SelectionBar } from "./SelectionBar"
@@ -103,10 +105,13 @@ export function History() {
           contentInsetAdjustmentBehavior="automatic"
           extraData={selection.selected}
           ListEmptyComponent={
-            <Text className="text-muted-foreground px-4 py-12 text-center">
-              {history.error ??
-                "Nothing here yet. Episodes you listen to show up here."}
-            </Text>
+            <EmptyState
+              icon={HistoryIcon}
+              title="No history yet"
+              body={
+                history.error ?? "Episodes you listen to show up here, by day."
+              }
+            />
           }
           renderItem={({ item }) => {
             if (item.kind === "day") {

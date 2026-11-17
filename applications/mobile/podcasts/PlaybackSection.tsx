@@ -1,7 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Pressable, View } from "react-native"
 
-import { Switch } from "@/components/ui/switch"
 import { Text } from "@/components/ui/text"
 import {
   HEADPHONE_NEXT_CHOICES,
@@ -20,6 +19,7 @@ import {
   trimLabel,
 } from "@/modules/podcasts/sound"
 
+import { ROW, SettingsGroup, SwitchRow } from "./SettingsGroup"
 import {
   updatePlaybackSettings,
   usePlaybackSettings,
@@ -29,10 +29,7 @@ import {
 export function PlaybackSection() {
   const settings = usePlaybackSettings()
   return (
-    <View>
-      <Text className="text-muted-foreground pt-6 pb-1 text-sm font-semibold uppercase">
-        Playback
-      </Text>
+    <SettingsGroup title="Playback">
       <Choices
         title="Skip back"
         choices={SKIP_CHOICES}
@@ -80,22 +77,15 @@ export function PlaybackSection() {
         label={trimLabel}
         onChoose={(trimSilence) => updatePlaybackSettings({ trimSilence })}
       />
-      <View className="border-border flex-row items-center gap-3 border-b py-3">
-        <View className="flex-1">
-          <Text className="font-semibold">Go back after a long pause</Text>
-          <Text className="text-muted-foreground text-sm">
-            3 seconds after a 5-minute pause, 10 seconds after an hour.
-          </Text>
-        </View>
-        <Switch
-          accessibilityLabel="Go back after a long pause"
-          checked={settings.rewindAfterPause}
-          onCheckedChange={(rewindAfterPause) =>
-            updatePlaybackSettings({ rewindAfterPause })
-          }
-        />
-      </View>
-    </View>
+      <SwitchRow
+        title="Go back after a long pause"
+        body="3 seconds after a 5-minute pause, 10 seconds after an hour."
+        checked={settings.rewindAfterPause}
+        onChange={(rewindAfterPause) =>
+          updatePlaybackSettings({ rewindAfterPause })
+        }
+      />
+    </SettingsGroup>
   )
 }
 
@@ -115,7 +105,7 @@ function Choices<T extends string | number>({
   onChoose: (choice: T) => void
 }) {
   return (
-    <View className="border-border gap-2 border-b py-3">
+    <View className={`${ROW} gap-2 py-3`}>
       <Text className="font-semibold">{title}</Text>
       {body ? (
         <Text className="text-muted-foreground text-sm">{body}</Text>
@@ -125,7 +115,7 @@ function Choices<T extends string | number>({
           <Pressable
             key={choice}
             className={`min-h-11 justify-center rounded-full px-4 ${
-              choice === selected ? "bg-primary" : "bg-secondary"
+              choice === selected ? "bg-primary" : "bg-foreground/10"
             }`}
             accessibilityRole="button"
             accessibilityLabel={`${title}, ${label(choice)}`}

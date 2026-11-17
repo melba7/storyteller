@@ -1,6 +1,12 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
+import {
+  ArrowDownToLine,
+  ArrowUpToLine,
+  ListEnd,
+  Trash2,
+} from "lucide-react-native"
 import { useMemo } from "react"
 import { Pressable, View } from "react-native"
 import Swipeable, {
@@ -8,16 +14,24 @@ import Swipeable, {
 } from "react-native-gesture-handler/ReanimatedSwipeable"
 
 import { Button } from "@/components/ui/button"
+import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { Podcasts, type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
 import { episodeHref } from "@/modules/podcasts/routes"
-import { moveBetween, rowLabel, upNextSummary } from "@/modules/podcasts/upNext"
+import {
+  moveBetween,
+  progressFraction,
+  rowLabel,
+  upNextSummary,
+} from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
+import { EmptyState } from "./EmptyState"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
+import { pick } from "./haptics"
 import { useEpisodesByIds } from "./hooks"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import {
@@ -29,6 +43,7 @@ import {
 } from "./useUpNext"
 
 const ROW_HEIGHT = 76
+const ART = 56
 
 const ACTIONS: RowAction[] = [
   { name: "playNext", label: "Play next" },
@@ -43,6 +58,7 @@ const ACTIONS: RowAction[] = [
  */
 export function UpNext() {
   const statusBarStyle = useStatusBarStyle()
+  const router = useRouter()
   const queue = useUpNext()
   const byId = useMemo(
     () => new Map(queue.map((item) => [item.id, item])),
@@ -63,6 +79,7 @@ export function UpNext() {
   function act(id: string, name: string) {
     const item = byId.get(id)
     if (!item) return
+    pick()
     if (name === "playNext") moveToEnd(item, "next")
     else if (name === "playLast") moveToEnd(item, "last")
     else if (name === "remove") removeQueued(id)
@@ -91,16 +108,22 @@ export function UpNext() {
       />
       {Podcasts === null ? (
         <BelowBar>
-          <Message
+          <EmptyState
+            icon={ListEnd}
             title="Up Next needs the iOS app"
             body="This version of the app can't play podcasts."
           />
         </BelowBar>
       ) : queue.length === 0 ? (
         <BelowBar>
-          <Message
+          <EmptyState
+            icon={ListEnd}
             title="Nothing in Up Next"
             body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
+            action={{
+              label: "Find an episode",
+              onPress: () => router.navigate("/podcasts"),
+            }}
           />
         </BelowBar>
       ) : (
@@ -117,6 +140,7 @@ export function UpNext() {
             ids={ids}
             rowHeight={ROW_HEIGHT}
             onChange={reorder}
+            onDrop={pick}
             label={(id, index, count) => {
               const item = byId.get(id)
               return item ? rowLabel(item, index, count) : ""
@@ -143,19 +167,23 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
     item.duration && item.duration > item.position
       ? formatDuration(item.duration - item.position)
       : ""
+  const progress = progressFraction(item.position, item.duration)
   const details = [item.showTitle, left === "" ? "" : `${left} left`]
     .filter((part) => part !== "")
     .join(" · ")
 
   function playNext(methods: SwipeableMethods) {
+    pick()
     methods.close()
     moveToEnd(item, "next")
   }
   function playLast(methods: SwipeableMethods) {
+    pick()
     methods.close()
     moveToEnd(item, "last")
   }
   function remove(methods: SwipeableMethods) {
+    pick()
     methods.close()
     removeQueued(item.id)
   }
@@ -165,18 +193,28 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
       renderLeftActions={(_progress, _translation, methods) => (
         <View className="flex-row">
           <Button
-            className="h-full w-20 rounded-none"
+            className="h-full w-20 flex-col gap-1 rounded-none"
             accessibilityLabel={`Play ${item.title} next`}
             onPress={() => playNext(methods)}
           >
+            <Icon
+              as={ArrowUpToLine}
+              size={20}
+              className="text-primary-foreground"
+            />
             <Text className="text-xs">Play next</Text>
           </Button>
           <Button
             variant="secondary"
-            className="h-full w-20 rounded-none"
+            className="h-full w-20 flex-col gap-1 rounded-none"
             accessibilityLabel={`Play ${item.title} last`}
             onPress={() => playLast(methods)}
           >
+            <Icon
+              as={ArrowDownToLine}
+              size={20}
+              className="text-secondary-foreground"
+            />
             <Text className="text-xs">Play last</Text>
           </Button>
         </View>
@@ -184,10 +222,11 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
       renderRightActions={(_progress, _translation, methods) => (
         <Button
           variant="destructive"
-          className="h-full w-20 rounded-none"
+          className="h-full w-20 flex-col gap-1 rounded-none"
           accessibilityLabel={`Remove ${item.title} from Up Next`}
           onPress={() => remove(methods)}
         >
+          <Icon as={Trash2} size={20} className="text-white" />
           <Text className="text-xs">Remove</Text>
         </Button>
       )}
@@ -199,7 +238,11 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
         disabled={!openable}
         onPress={() => router.push(episodeHref(segments, item.id))}
       >
-        <Artwork uri={item.artworkUrl ?? null} size={52} />
+        <Artwork
+          uri={item.artworkUrl ?? null}
+          size={ART}
+          className="rounded-lg"
+        />
         <View className="flex-1 gap-1">
           <Text className="font-semibold" numberOfLines={2}>
             {item.title}
@@ -209,17 +252,16 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
               {details}
             </Text>
           ) : null}
+          {progress === null ? null : (
+            <View className="bg-foreground/10 h-0.5 overflow-hidden rounded-full">
+              <View
+                className="bg-primary h-0.5"
+                style={{ width: `${Math.round(progress * 100)}%` }}
+              />
+            </View>
+          )}
         </View>
       </Pressable>
     </Swipeable>
-  )
-}
-
-function Message({ title, body }: { title: string; body: string }) {
-  return (
-    <View className="items-center gap-2 px-8 py-12">
-      <Text className="text-center font-semibold">{title}</Text>
-      <Text className="text-muted-foreground text-center text-sm">{body}</Text>
-    </View>
   )
 }

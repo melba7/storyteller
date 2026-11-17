@@ -1,11 +1,12 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
+import { Bookmark as BookmarkIcon } from "lucide-react-native"
 import { useMemo } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
-import { Text } from "@/components/ui/text"
 import { type Bookmark } from "@/modules/podcasts/bookmarks"
 
 import { BookmarkRow, playBookmark } from "./BookmarkRow"
+import { EmptyState } from "./EmptyState"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { useEpisodesByIds, useShows } from "./hooks"
 import { useAllBookmarks } from "./useBookmarks"
@@ -38,10 +39,14 @@ export function Bookmarks() {
           contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
           ListEmptyComponent={
-            <Text className="text-muted-foreground px-4 py-12 text-center">
-              {bookmarks.error ??
-                "No bookmarks yet. Tap the bookmark button in the player to mark a place."}
-            </Text>
+            <EmptyState
+              icon={BookmarkIcon}
+              title="No bookmarks yet"
+              body={
+                bookmarks.error ??
+                "Tap the bookmark button in the player to mark a place."
+              }
+            />
           }
           renderItem={({ item }) => {
             const episode = episodeById.get(item.episodeId)
