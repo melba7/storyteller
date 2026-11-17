@@ -261,6 +261,7 @@ once reviewed and green.
     show's page and the episode card look and work as described.
   - Files: `podcasts/` (show page, episode card, progress ring),
     `app/(root)/podcasts/` (the card's route).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
 
 - [ ] **P1c3. Your own order** (part 3 of 3)
   - A fourth order for the Podcasts tab: your own, set by dragging artwork in

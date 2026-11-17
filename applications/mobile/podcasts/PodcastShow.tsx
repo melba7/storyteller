@@ -1,33 +1,23 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { EllipsisVertical } from "lucide-react-native"
 import { useState } from "react"
 import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   RefreshControl,
   View,
 } from "react-native"
 
-import { Button } from "@/components/ui/button"
-import { Icon } from "@/components/ui/icon"
-import { Menu } from "@/components/ui/menu"
 import { Text } from "@/components/ui/text"
 import { refreshShow, unsubscribe } from "@/modules/podcasts/db"
-import {
-  type Show,
-  type StoredEpisode,
-  formatEpisodeDate,
-  formatEpisodeLength,
-} from "@/modules/podcasts/library"
+import { type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { episodeHref, tabBase } from "@/modules/podcasts/routes"
+import { tabBase } from "@/modules/podcasts/routes"
 
-import { Artwork } from "./Artwork"
-import { PlayButton } from "./PlayButton"
+import { EpisodeRow } from "./EpisodeRow"
 import { ScreenBar } from "./ScreenBar"
+import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
 
 export function PodcastShow({ id }: { id: string }) {
@@ -77,35 +67,7 @@ export function PodcastShow({ id }: { id: string }) {
   const current = show.data
   return (
     <View className="pt-safe bg-background flex-1">
-      <ScreenBar
-        title={current?.title ?? "Podcast"}
-        right={
-          current ? (
-            <Menu
-              actions={[
-                {
-                  id: "unsubscribe",
-                  title: "Unsubscribe",
-                  attributes: { destructive: true },
-                  onPress: () => confirmUnsubscribe(current.title),
-                },
-              ]}
-            >
-              <Button
-                variant="ghost"
-                size="icon"
-                accessibilityLabel="Show options"
-              >
-                <Icon
-                  as={EllipsisVertical}
-                  size={24}
-                  className="text-primary"
-                />
-              </Button>
-            </Menu>
-          ) : null
-        }
-      />
+      <ScreenBar title={current?.title ?? "Podcast"} />
       {show.loading ? (
         <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
       ) : !current ? (
@@ -121,7 +83,13 @@ export function PodcastShow({ id }: { id: string }) {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
-          ListHeaderComponent={<Header show={current} problem={problem} />}
+          ListHeaderComponent={
+            <ShowHeader
+              show={current}
+              problem={problem}
+              onUnfollow={() => confirmUnsubscribe(current.title)}
+            />
+          }
           ListEmptyComponent={
             episodes.loading ? undefined : (
               <Text className="text-muted-foreground py-6 text-center text-sm">
@@ -134,78 +102,6 @@ export function PodcastShow({ id }: { id: string }) {
           )}
         />
       )}
-    </View>
-  )
-}
-
-function Header({ show, problem }: { show: Show; problem: string | null }) {
-  const [expanded, setExpanded] = useState(false)
-  return (
-    <View className="gap-3 pb-4">
-      <View className="flex-row items-center gap-4">
-        <Artwork uri={show.imageUrl} size={112} />
-        <View className="flex-1">
-          <Text className="text-lg font-semibold">{show.title}</Text>
-          {show.author ? (
-            <Text className="text-muted-foreground">{show.author}</Text>
-          ) : null}
-        </View>
-      </View>
-      {show.description ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            expanded
-              ? "Show less of the description"
-              : "Show all of the description"
-          }
-          onPress={() => setExpanded((value) => !value)}
-        >
-          <Text className="text-sm" numberOfLines={expanded ? undefined : 4}>
-            {show.description}
-          </Text>
-        </Pressable>
-      ) : null}
-      {problem ? (
-        <Text className="text-destructive text-sm" accessibilityRole="alert">
-          {problem}
-        </Text>
-      ) : null}
-    </View>
-  )
-}
-
-function EpisodeRow({ episode, show }: { episode: StoredEpisode; show: Show }) {
-  const router = useRouter()
-  const segments = useSegments()
-  const details = [
-    formatEpisodeDate(episode.publishedAt),
-    formatEpisodeLength(episode),
-  ]
-    .filter((part) => part !== "")
-    .join(" · ")
-  return (
-    <View
-      className={`border-border flex-row items-center gap-3 border-b py-3 ${
-        episode.played ? "opacity-50" : ""
-      }`}
-    >
-      <Pressable
-        className="active:bg-secondary flex-1 gap-1 rounded-md"
-        accessibilityRole="button"
-        accessibilityLabel={
-          details ? `${episode.title}, ${details}` : episode.title
-        }
-        onPress={() => router.push(episodeHref(segments, episode.id))}
-      >
-        <Text className="font-semibold" numberOfLines={3}>
-          {episode.title}
-        </Text>
-        {details ? (
-          <Text className="text-muted-foreground text-sm">{details}</Text>
-        ) : null}
-      </Pressable>
-      <PlayButton episode={episode} show={show} />
     </View>
   )
 }
