@@ -36,8 +36,8 @@ in `FORK.md`.
 | `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`        | Lets a playing podcast own the lock screen; the book's remote handlers ask it first                                           |
 | `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader (`PodcastFeed`), player rules (`PodcastPlayback`), tests, podspecs                    |
 | `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
-| `applications/mobile/podcasts/`                                          | React UI: side menu, library, add, show, episode and player screens, mini player                                              |
-| `applications/mobile/app/(root)/podcasts/`                               | The routes for those screens (the player is a pushed screen)                                                                  |
+| `applications/mobile/podcasts/`                                          | React UI: side menu, library grid, discover, show, episode and player screens, mini player                                    |
+| `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover), one stack per tab, the player pushed                                              |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
@@ -110,6 +110,7 @@ in `FORK.md`.
 | 2026-11-16 | PodcastKit is its own Swift package, not a target of LofiScoreKit                                                                          | Podcasts and sounds change separately; its tests run alone |
 | 2026-11-16 | Apple Podcasts is followed one way only: share links in Add, and an hourly Mac job that reads a copy of its library file                   | iOS gives other apps no access; Mo's choice                |
 | 2026-11-16 | Explore uses Apple's free charts; "For you" goes by the categories in the followed shows' feeds (P1d)                                      | Apple has no public "similar shows" list; Mo's choice      |
+| 2026-11-17 | Native tabs in the Podcasts section; the mini player sits in the bar's accessory. Profile joins with P2a                                   | Mo's ask: the Pocket Casts layout, inside Podcasts         |
 | 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
 | 2026-11-17 | The podcast player is one Swift `AVPlayer`; a playing podcast owns the lock screen through `LofiRemoteHandoff`                             | The book's handlers stay registered and stand aside        |
 

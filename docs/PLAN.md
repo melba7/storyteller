@@ -247,6 +247,7 @@ once reviewed and green.
   - Files: `app/(root)/podcasts/` (the tab and stack layouts and routes),
     `podcasts/` (grid, Discover, mini player), `modules/podcasts/library.ts` and
     `db.ts` (orders and counts, with tests).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI.
 
 - [ ] **P1c2. A show's page and the episode card** (part 2 of 3)
   - A show's page: a large header (artwork, title, author, Follow or Following,

@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter } from "expo-router"
+import { useRouter, useSegments } from "expo-router"
 import { EllipsisVertical } from "lucide-react-native"
 import { useState } from "react"
 import {
@@ -23,9 +23,9 @@ import {
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { episodeHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
-import { MiniPlayer } from "./MiniPlayer"
 import { PlayButton } from "./PlayButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisodes, useShow } from "./hooks"
@@ -111,7 +111,8 @@ export function PodcastShow({ id }: { id: string }) {
         <FlatList<StoredEpisode>
           data={episodes.data ?? []}
           keyExtractor={(episode) => episode.id}
-          contentContainerClassName="px-safe-or-4 pb-safe"
+          contentContainerClassName="px-safe-or-4"
+          contentInsetAdjustmentBehavior="automatic"
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
@@ -128,7 +129,6 @@ export function PodcastShow({ id }: { id: string }) {
           )}
         />
       )}
-      <MiniPlayer />
     </View>
   )
 }
@@ -172,6 +172,7 @@ function Header({ show, problem }: { show: Show; problem: string | null }) {
 
 function EpisodeRow({ episode, show }: { episode: StoredEpisode; show: Show }) {
   const router = useRouter()
+  const segments = useSegments()
   const details = [
     formatEpisodeDate(episode.publishedAt),
     formatEpisodeLength(episode),
@@ -190,12 +191,7 @@ function EpisodeRow({ episode, show }: { episode: StoredEpisode; show: Show }) {
         accessibilityLabel={
           details ? `${episode.title}, ${details}` : episode.title
         }
-        onPress={() =>
-          router.push({
-            pathname: "/podcasts/episode/[id]",
-            params: { id: episode.id },
-          })
-        }
+        onPress={() => router.push(episodeHref(segments, episode.id))}
       >
         <Text className="font-semibold" numberOfLines={3}>
           {episode.title}

@@ -7,7 +7,6 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { formatDuration, formatEpisodeDate } from "@/modules/podcasts/library"
 
-import { MiniPlayer } from "./MiniPlayer"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { ScreenBar } from "./ScreenBar"
 import { useEpisode, useShow } from "./hooks"
@@ -37,7 +36,10 @@ export function PodcastEpisode({ id }: { id: string }) {
           {episode.error ?? "This episode isn't in your library."}
         </Text>
       ) : (
-        <ScrollView contentContainerClassName="px-safe-or-4 pb-safe gap-3">
+        <ScrollView
+          contentContainerClassName="px-safe-or-4 gap-3"
+          contentInsetAdjustmentBehavior="automatic"
+        >
           <Text variant="h4">{current.title}</Text>
           {show.data ? (
             <Text className="text-muted-foreground">{show.data.title}</Text>
@@ -70,7 +72,6 @@ export function PodcastEpisode({ id }: { id: string }) {
           </Text>
         </ScrollView>
       )}
-      <MiniPlayer />
     </View>
   )
 }

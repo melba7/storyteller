@@ -159,10 +159,10 @@ support pages (November 2026).
 
 - A bottom tab bar inside the Podcasts section: Podcasts and Discover, then
   Profile (P2a), Up Next (P2b) and Playlists (P5d), each when it has something
-  in it. The mini player sits above the tabs.
-  expo-router's native tabs (in the app already) give iOS 26's glass tab bar; if
-  they can't sit inside the section, the bar is drawn in React. The side menu
-  button stays, to get back to Books.
+  in it. The mini player sits above the tabs. expo-router's native tabs (in the
+  app already) give iOS 26's glass tab bar; if they can't sit inside the
+  section, the bar is drawn in React. The side menu button stays, to get back to
+  Books.
 - Podcasts: a grid of artwork with a badge for unplayed episodes (large grid,
   small grid or list), sortable, with drag to reorder.
 - A show's page: a large header, then episode rows with a play button that shows
