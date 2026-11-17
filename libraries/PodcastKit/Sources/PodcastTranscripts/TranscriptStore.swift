@@ -40,6 +40,17 @@ public struct TranscriptStore: Sendable {
     return String(data: data, encoding: .utf8)
   }
 
+  /// The lines of the words transcribed so far, as the JSON of a transcript without its words
+  /// (the app reads its `lines`), or nil when there is no partial file or no word in it.
+  public func partialJSON() -> String? {
+    guard let partial = loadPartial(), !partial.words.isEmpty else { return nil }
+    let transcript = Transcript(
+      identity: partial.identity, duration: partial.duration,
+      lines: LineRule.lines(from: partial.words), words: [])
+    guard let data = try? Self.encoder.encode(transcript) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
   /// Saves the finished transcript and removes the partial file.
   public func finish(_ transcript: Transcript) throws {
     try Self.encoder.encode(transcript).write(to: transcriptURL, options: .atomic)

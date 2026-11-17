@@ -67,6 +67,41 @@ export function deviceSource(
   return { kind: "none", reason: transcriptStatus(device) }
 }
 
+export type DeviceChoice =
+  | { kind: "finished" }
+  /** Still being made: the lines saved so far may be shown. `empty` is for when there are none. */
+  | { kind: "partial"; percent: number | null; empty: string }
+  | { kind: "none"; reason: string }
+
+/** The phone's own transcript: finished, being made (with its percent) or not there. */
+export function deviceChoice(device: TranscriptInfo | undefined): DeviceChoice {
+  if (device?.state === "done") return { kind: "finished" }
+  if (device?.state === "waiting" || device?.state === "transcribing") {
+    const percent =
+      device.state === "transcribing" && device.percent !== undefined
+        ? Math.max(0, Math.min(100, Math.floor(device.percent)))
+        : null
+    return {
+      kind: "partial",
+      percent,
+      empty:
+        device.state === "waiting"
+          ? transcriptStatus(device)
+          : `${percent === null ? "Transcribing" : `Transcribing, ${percent}%`}. The first lines appear in a minute or so.`,
+    }
+  }
+  const none = deviceSource(device)
+  return {
+    kind: "none",
+    reason: none.kind === "none" ? none.reason : "",
+  }
+}
+
+/** The quiet line under the lines of a transcript that is still being made. */
+export function partialFooter(percent: number | null): string {
+  return `${percent === null ? "Transcribing" : `Transcribing, ${percent}%`}. More lines appear as it goes.`
+}
+
 /** A fetched transcript is kept this long. */
 export const TRANSCRIPT_CACHE_MS = 7 * 24 * 60 * 60 * 1000
 

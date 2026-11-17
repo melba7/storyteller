@@ -82,6 +82,13 @@ final class PodcastTranscriber: @unchecked Sendable {
     return files.transcriptJSON()
   }
 
+  /// The lines transcribed so far, as the JSON of a transcript (its `lines`), or nil.
+  func partialJSON(_ episodeId: String) -> String? {
+    guard let downloads = PodcastDownloader.shared.store, let files = files(for: episodeId, in: downloads)
+    else { return nil }
+    return files.partialJSON()
+  }
+
   // MARK: Looking at the downloads
 
   private func files(for episodeId: String, in downloads: DownloadStore) -> TranscriptStore? {

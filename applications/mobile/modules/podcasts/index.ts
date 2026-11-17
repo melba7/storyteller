@@ -349,6 +349,8 @@ type PodcastsNativeModule = {
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
   getTranscript(episodeId: string): Promise<string | null>
+  /** The lines of a transcript still being made, as JSON text like `getTranscript`'s, or null. */
+  getPartialTranscript(episodeId: string): Promise<string | null>
   /** Where the words are said in the finished transcripts (see transcriptSearch.ts). */
   searchTranscripts(query: string): Promise<SpokenHit[]>
   /** Where each transcribed episode's ad finding is. */

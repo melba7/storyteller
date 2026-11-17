@@ -13,6 +13,13 @@ export async function getTranscript(episodeId: string): Promise<string | null> {
   return (await Podcasts?.getTranscript(episodeId)) ?? null
 }
 
+/** The lines made so far of a transcript that is not finished, as JSON text, or null. */
+export async function getPartialTranscript(
+  episodeId: string,
+): Promise<string | null> {
+  return (await Podcasts?.getPartialTranscript(episodeId)) ?? null
+}
+
 /** Where the words are said in every transcribed episode (at most a few per episode). */
 export async function searchTranscripts(query: string): Promise<SpokenHit[]> {
   return (await Podcasts?.searchTranscripts(query)) ?? []

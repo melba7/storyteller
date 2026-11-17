@@ -15,11 +15,13 @@ import {
   TextInput,
   View,
 } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
+import { partialFooter } from "@/modules/podcasts/transcriptChoice"
 import { type TranscriptLine } from "@/modules/podcasts/transcriptFormats"
 import {
   lineAt,
@@ -67,17 +69,28 @@ export function TranscriptView({ episode }: Props) {
       </View>
     )
   }
-  return <Lines lines={state.lines} episode={episode} />
+  return (
+    <Lines
+      lines={state.lines}
+      episode={episode}
+      partial={state.partial ?? null}
+    />
+  )
 }
 
 function Lines({
   lines,
   episode,
+  partial,
 }: {
   lines: TranscriptLine[]
   episode: StoredEpisode
+  /** The transcript is still being made: its percent (null when not known). */
+  partial: { percent: number | null } | null
 }) {
   const view = usePlayer()
+  // The buttons sit above the home indicator, and the last line scrolls clear of them.
+  const bottomGap = useSafeAreaInsets().bottom + 12
   const listRef = useRef<FlatList<TranscriptLine>>(null)
   const [following, setFollowing] = useState(true)
   const [query, setQuery] = useState("")
@@ -101,14 +114,18 @@ function Lines({
   }, [following, playing, scrollTo])
 
   // A new search starts at its first match, and looking at a match stops the following.
+  // New lines arriving while it is transcribed do not move the view or the chosen match.
+  const searched = useRef(query)
   useEffect(() => {
+    if (searched.current === query) return
+    searched.current = query
     const first = matches[0] ?? null
     setCurrent(first)
     if (first !== null) {
       setFollowing(false)
       scrollTo(first)
     }
-  }, [matches, scrollTo])
+  }, [matches, query, scrollTo])
 
   function step(direction: 1 | -1) {
     const next = stepMatch(matches, current, direction)
@@ -197,7 +214,18 @@ function Lines({
         data={lines}
         extraData={[playing, current, matchSet]}
         keyExtractor={(_, index) => String(index)}
-        contentContainerClassName="px-safe-or-4 pb-24"
+        contentContainerClassName="px-safe-or-4"
+        contentContainerStyle={{ paddingBottom: bottomGap + 72 }}
+        ListFooterComponent={
+          partial ? (
+            <Text
+              className="px-2 pt-4 text-center text-sm text-white/60"
+              accessibilityLiveRegion="polite"
+            >
+              {partialFooter(partial.percent)}
+            </Text>
+          ) : undefined
+        }
         onScrollBeginDrag={() => setFollowing(false)}
         onScrollToIndexFailed={(info) => {
           // The row is not drawn yet: go near it, then try again.
@@ -219,7 +247,10 @@ function Lines({
         )}
       />
 
-      <View className="absolute inset-x-0 bottom-0 flex-row items-center justify-between px-4 pb-4">
+      <View
+        className="absolute inset-x-0 bottom-0 flex-row items-center justify-between px-4"
+        style={{ paddingBottom: bottomGap }}
+      >
         {!following && playingHere ? (
           <Pressable
             className="rounded-full bg-white px-4 py-2 active:opacity-80"

@@ -7,6 +7,7 @@
 import { cacheGet, cachePut } from "./dbFeeds"
 import type { TranscriptInfo } from "./index"
 import {
+  deviceChoice,
   deviceSource,
   transcriptCacheFresh,
   transcriptCacheKey,
@@ -18,10 +19,15 @@ import {
   parseTranscript,
 } from "./transcriptFormats"
 import { deviceLines } from "./transcriptLines"
-import { getTranscript } from "./transcriptsNative"
+import { getPartialTranscript, getTranscript } from "./transcriptsNative"
 
 export type TranscriptResult =
-  | { lines: TranscriptLine[]; source: "feed" | "device" }
+  | {
+      lines: TranscriptLine[]
+      source: "feed" | "device"
+      /** The phone's transcript is still being made: its percent, or null when not known. */
+      partial?: { percent: number | null }
+    }
   | { lines: null; reason: string }
 
 /** A transcript file bigger than this is not read. */
@@ -73,6 +79,19 @@ async function fromDevice(episodeId: string): Promise<TranscriptLine[] | null> {
   return json === null ? null : deviceLines(json)
 }
 
+/** The lines saved so far of a transcript being made, or the reason there are none yet. */
+async function fromPartial(
+  episodeId: string,
+  percent: number | null,
+  empty: string,
+): Promise<TranscriptResult> {
+  const json = await getPartialTranscript(episodeId).catch(() => null)
+  const lines = json === null ? null : deviceLines(json)
+  return lines
+    ? { lines, source: "device", partial: { percent } }
+    : { lines: null, reason: empty }
+}
+
 /**
  * The transcript to show for an episode, or why there is none. The feed's comes first; when
  * it can't be loaded or read, the phone's own is used if there is one, else the reason
@@ -99,6 +118,12 @@ export async function loadTranscript(episode: {
           ? cause.message
           : "The transcript couldn't be opened."
     }
+  }
+  const choice = deviceChoice(episode.device)
+  if (choice.kind === "partial") {
+    const partial = await fromPartial(episode.id, choice.percent, choice.empty)
+    if (partial.lines || reason === null) return partial
+    return { lines: null, reason }
   }
   const device = deviceSource(episode.device)
   if (device.kind === "device") {

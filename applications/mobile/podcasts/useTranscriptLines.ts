@@ -16,7 +16,7 @@ export type TranscriptState =
 /**
 
  * The transcript of an episode, loaded when the screen using it opens and again when the
- * phone's own transcript changes state (it may have just finished). Mount it once per
+ * phone's own transcript changes state or percent (it may have grown or just finished). Mount it once per
  * episode (give the screen the episode's id as its key).
  */
 export function useTranscriptLines(
@@ -25,6 +25,9 @@ export function useTranscriptLines(
   const device = useTranscript(episode.id)
   const [state, setState] = useState<TranscriptState>({ status: "loading" })
   const deviceState = device?.state ?? null
+  // While it is transcribing, the percent changes once per saved piece: read the lines again.
+  const percent =
+    device?.state === "transcribing" ? (device.percent ?? null) : null
   useEffect(() => {
     let live = true
     loadTranscript({
@@ -49,8 +52,14 @@ export function useTranscriptLines(
     return () => {
       live = false
     }
-    // The device transcript matters through its state (done or not), not every percent.
+    // The device transcript matters through its state and, while transcribing, its percent.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [episode.id, episode.transcriptUrl, episode.transcriptType, deviceState])
+  }, [
+    episode.id,
+    episode.transcriptUrl,
+    episode.transcriptType,
+    deviceState,
+    percent,
+  ])
   return state
 }

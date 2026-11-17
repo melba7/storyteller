@@ -5,7 +5,9 @@ import type { TranscriptInfo } from "./index"
 import {
   TRANSCRIPT_CACHE_MS,
   chooseTranscript,
+  deviceChoice,
   deviceSource,
+  partialFooter,
   transcriptCacheFresh,
   transcriptSource,
 } from "./transcriptChoice"
@@ -216,5 +218,62 @@ describe("deviceLines", () => {
     expect(deviceLines("{}")).toBeNull()
     expect(deviceLines('{"lines": []}')).toBeNull()
     expect(deviceLines("null")).toBeNull()
+  })
+})
+
+describe("deviceChoice", () => {
+  const info = (
+    state: TranscriptInfo["state"],
+    extra = {},
+  ): TranscriptInfo => ({ episodeId: "e", state, ...extra })
+
+  it("is finished when the transcript is done", () => {
+    expect(deviceChoice(info("done"))).toEqual({ kind: "finished" })
+  })
+  it("is partial while transcribing, with the percent and the words for no lines yet", () => {
+    expect(deviceChoice(info("transcribing", { percent: 40.7 }))).toEqual({
+      kind: "partial",
+      percent: 40,
+      empty: "Transcribing, 40%. The first lines appear in a minute or so.",
+    })
+  })
+  it("is partial while waiting, since a paused episode keeps its saved lines", () => {
+    expect(deviceChoice(info("waiting"))).toEqual({
+      kind: "partial",
+      percent: null,
+      empty: "Waiting to transcribe",
+    })
+  })
+  it("says why there is none otherwise", () => {
+    expect(deviceChoice(info("failed", { reason: "Out of space" }))).toEqual({
+      kind: "none",
+      reason: "Out of space",
+    })
+    expect(deviceChoice(undefined)).toEqual({
+      kind: "none",
+      reason: "No transcript yet. Download the episode to make one.",
+    })
+  })
+})
+
+describe("partialFooter", () => {
+  it("names the percent", () => {
+    expect(partialFooter(40)).toBe(
+      "Transcribing, 40%. More lines appear as it goes.",
+    )
+    expect(partialFooter(null)).toBe(
+      "Transcribing. More lines appear as it goes.",
+    )
+  })
+})
+
+describe("deviceLines of a transcript still being made", () => {
+  it("reads the lines built from the words so far", () => {
+    const json = JSON.stringify({
+      version: 1,
+      words: [],
+      lines: [{ start: 0, end: 4, text: "So far." }],
+    })
+    expect(deviceLines(json)).toEqual([{ start: 0, end: 4, text: "So far." }])
   })
 })
