@@ -22,7 +22,9 @@ final class PodcastPlayer {
   let lockScreen = PodcastLockScreen()
   private var episodeId: String?
   private var knownDuration: Double?
-  private var speed = Speed.normal
+  var speed = Speed.normal
+  /// The show's settings for the loaded episode (PodcastPlayer+ShowSettings.swift).
+  var showState = ShowPlaybackState()
   /// What the listener asked for: playing, even while the stream is still buffering.
   var wantsToPlay = false
   private var timeObserver: Any?
@@ -57,6 +59,8 @@ final class PodcastPlayer {
     var autoplay: Bool
     /// The feed's audio type, kept for Up Next.
     var type = ""
+    /// The show, for its settings.
+    var showId: String?
   }
 
   /// The listener chose this episode. The one playing goes back to the top of Up Next.
@@ -74,12 +78,13 @@ final class PodcastPlayer {
     current = QueueItem(
       id: episode.id, url: episode.url.absoluteString, type: episode.type, title: episode.title,
       showTitle: episode.showTitle, artworkUrl: episode.artworkUrl, duration: episode.duration,
-      position: episode.savedPosition)
+      position: episode.savedPosition, showId: episode.showId)
     wantsToPlay = false
     player.pause()
     removeItemObservers()
     episodeId = episode.id
     knownDuration = episode.duration
+    applyShowSettings(forShow: episode.showId)
 
     do {
       let session = AVAudioSession.sharedInstance()
@@ -98,8 +103,9 @@ final class PodcastPlayer {
     lockScreen.setEpisode(
       title: episode.title, showTitle: episode.showTitle, artworkUrl: episode.artworkUrl)
 
-    let start = ResumeRule.start(
-      savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played)
+    let start = ShowRules.start(
+      savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played,
+      intro: showState.settings.introSeconds)
     if start > 0 {
       player.seek(
         to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
@@ -153,6 +159,7 @@ final class PodcastPlayer {
   @discardableResult
   func setRate(_ rate: Double) -> Double {
     speed = Speed.clamped(rate)
+    noteListenerSpeed()
     player.defaultRate = Float(speed.value)
     if player.timeControlStatus != .paused { player.rate = Float(speed.value) }
     publish()
@@ -168,7 +175,7 @@ final class PodcastPlayer {
     return seconds.isFinite ? max(0, seconds) : 0
   }
 
-  private var currentDuration: Double? {
+  var currentDuration: Double? {
     if let seconds = player.currentItem?.duration.seconds, seconds.isFinite, seconds > 0 {
       return seconds
     }
@@ -240,6 +247,7 @@ final class PodcastPlayer {
 
   private func tick() {
     ticks += 1
+    endAtOutroIfReached()
     // The lock screen card keeps its own clock, so it is rewritten only now and then.
     publish(refreshCard: ticks % 10 == 0)
   }
@@ -269,7 +277,7 @@ final class PodcastPlayer {
     publish()
   }
 
-  private func ended() {
+  func ended() {
     wantsToPlay = false
     currentEnded = true
     let duration = currentDuration ?? position

@@ -4,6 +4,7 @@
 // download, which played downloads to delete, how often to refresh while the app is open, and
 // the two settings. Reading feeds and the native calls are in automaticRun.ts.
 import type { FetchedEpisode } from "./library"
+import { type AutoUpNext } from "./showSettings"
 
 // MARK: Settings
 
@@ -85,15 +86,18 @@ export function newEpisodes(
  * Which of the episodes a refresh just added to download: the newest of each show, and
  * nothing when the setting is off. Only newly added episodes count, so an episode the
  * listener deleted (it is not new any more) is never fetched again. An undated episode is
- * older than any dated one.
+ * older than any dated one. A show whose own switch is off (`downloads`, show id to value;
+ * a show not in it counts as on) downloads nothing.
  */
 export function episodesToDownload(
   added: readonly NewEpisode[],
   settings: AutomaticSettings,
+  downloads: ReadonlyMap<string, boolean> = new Map(),
 ): NewEpisode[] {
   if (!settings.downloadNew) return []
   const newest = new Map<string, NewEpisode>()
   for (const episode of added) {
+    if (downloads.get(episode.showId) === false) continue
     const best = newest.get(episode.showId)
     if (
       !best ||
@@ -103,6 +107,33 @@ export function episodesToDownload(
     }
   }
   return [...newest.values()]
+}
+
+/**
+ * The new episodes to put in Up Next, in the order to add them, each with where it goes.
+ * `modes` is show id to the show's setting (a show not in it is off). Adding to the top puts
+ * each one first, so the newest goes in first and the oldest new episode ends up on top;
+ * adding to the bottom goes oldest first, so the oldest ends up first of the new ones.
+ */
+export function episodesForUpNext(
+  added: readonly NewEpisode[],
+  modes: ReadonlyMap<string, AutoUpNext>,
+): { episode: NewEpisode; place: "next" | "last" }[] {
+  const byDate = (a: NewEpisode, b: NewEpisode) =>
+    (a.publishedAt ?? -Infinity) === (b.publishedAt ?? -Infinity)
+      ? 0
+      : (a.publishedAt ?? -Infinity) < (b.publishedAt ?? -Infinity)
+        ? -1
+        : 1
+  const oldestFirst = [...added].sort(byDate)
+  const top = oldestFirst
+    .filter((episode) => modes.get(episode.showId) === "top")
+    .reverse()
+    .map((episode) => ({ episode, place: "next" as const }))
+  const bottom = oldestFirst
+    .filter((episode) => modes.get(episode.showId) === "bottom")
+    .map((episode) => ({ episode, place: "last" as const }))
+  return [...top, ...bottom]
 }
 
 // MARK: Played downloads

@@ -22,6 +22,7 @@ struct PlaybackLoadOptions: Record {
   @Field var played: Bool = false
   @Field var autoplay: Bool = true
   @Field var audioType: String = ""
+  @Field var showId: String?
 }
 
 /// An episode to put in Up Next.
@@ -34,6 +35,7 @@ struct UpNextItemOptions: Record {
   @Field var artworkUrl: String?
   @Field var duration: Double?
   @Field var position: Double = 0
+  @Field var showId: String?
 }
 
 public final class PodcastsModule: Module {
@@ -82,7 +84,7 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType)
+        type: options.audioType, showId: options.showId)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -126,7 +128,7 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position)
+        position: item.position, showId: item.showId)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -171,6 +173,16 @@ public final class PodcastsModule: Module {
     }
     AsyncFunction("setWifiOnly") { (on: Bool) in DownloadSettings.wifiOnly = on }
     AsyncFunction("getWifiOnly") { () -> Bool in DownloadSettings.wifiOnly }
+
+    // MARK: Show settings
+
+    // Saves the settings of every show the player must know with the screen locked (speed,
+    // intro, outro, skip switches) as one JSON object keyed by show id.
+    AsyncFunction("writeShowSettings") { (json: String) throws in
+      guard ShowSettingsStore.write(json: json) else {
+        throw PodcastFetchError(message: "The show settings could not be saved.")
+      }
+    }
 
     // MARK: Transcripts
 

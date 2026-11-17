@@ -576,10 +576,15 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
 - [ ] **P5a. Per-show settings** (S): skip the first and last N seconds of every
       episode (intros and outros), the show's own speed, auto-download on or
       off, and add new episodes to Up Next (top, bottom or off).
+  - Status: built and passing `check.sh` (schema version 6); not yet compiled in
+    CI or run on a phone. Not built: the time-saved counter (not trivial).
 - [ ] **P5b. Archive and tidy** (S): archive and unarchive episodes, archive by
       itself after playing or after N days, keep only the newest N episodes,
       sort episodes (newest, oldest, shortest, longest), group by season, and
       show or hide archived episodes.
+  - Status: built and passing `check.sh` (schema version 7); not yet compiled in
+    CI or run on a phone. The sort and group choice is kept in `shows` columns,
+    not AsyncStorage.
 - [ ] **P5c. Star, history and bulk actions** (M): star episodes, mark played or
       unplayed, a listening history in Profile, and multi-select with bulk
       actions (download, mark played, archive, star, add to Up Next).

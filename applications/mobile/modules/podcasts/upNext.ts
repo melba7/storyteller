@@ -17,6 +17,7 @@ export function queueItem(
 ): UpNextItem {
   return {
     id: episode.id,
+    showId: episode.showId,
     url: episode.audioUrl,
     type: episode.audioType,
     title: episode.title,

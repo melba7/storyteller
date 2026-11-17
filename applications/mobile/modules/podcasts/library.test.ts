@@ -15,6 +15,7 @@ import {
   showFromRow,
   sortEpisodes,
 } from "./library"
+import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 function show(overrides: Partial<Show> = {}): Show {
   return {
@@ -31,6 +32,7 @@ function show(overrides: Partial<Show> = {}): Show {
     artworkColor: null,
     ownPosition: null,
     categories: [],
+    settings: DEFAULT_SHOW_SETTINGS,
     ...overrides,
   }
 }
@@ -68,6 +70,7 @@ function stored(
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,
+    archived: false,
     ...overrides,
   }
 }
@@ -249,6 +252,7 @@ describe("rows", () => {
       positionSeconds: 0,
       played: false,
       lastPlayedAt: null,
+      archived: false,
     })
   })
 

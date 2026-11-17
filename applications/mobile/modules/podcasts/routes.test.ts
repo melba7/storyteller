@@ -5,6 +5,7 @@ import {
   categoryHref,
   episodeHref,
   previewHref,
+  settingsHref,
   showHref,
   tabBase,
 } from "./routes"
@@ -47,6 +48,17 @@ describe("show and episode links", () => {
       pathname: "/podcasts/(tabs)/(discover)/episode/[id]",
       params: { id: "e1" },
     })
+  })
+})
+
+describe("settingsHref", () => {
+  it("stays in the tab you are in", () => {
+    expect(settingsHref(["(tabs)", "(profile)", "show", "[id]"], "s1")).toEqual(
+      {
+        pathname: "/podcasts/(tabs)/(profile)/show-settings/[id]",
+        params: { id: "s1" },
+      },
+    )
   })
 })
 

@@ -256,6 +256,7 @@ export function createPlayback(deps: PlaybackDeps) {
     await run(() =>
       native().load({
         episodeId: episode.id,
+        showId: episode.showId,
         url: episode.audioUrl,
         title: episode.title,
         showTitle: show?.title ?? "",

@@ -88,7 +88,9 @@ in `FORK.md`.
   category names (`shows.categories`, a JSON list: each top-level name, then
   "Top › Sub" ones; shows followed before get them at their next refresh) and a
   `cache` table (key, value, saved at) that keeps Apple's chart answers for a
-  day.
+  day. Version 6 (P5a) adds the show settings on `shows` (skip intro and outro,
+  speed, download, Up Next, notify, ads, plugs) and version 7 (P5b) adds
+  `episodes.archived` and the archive and view columns.
 
 ## Decisions log
 
@@ -135,6 +137,10 @@ in `FORK.md`.
 | 2026-11-17 | `podcasts.db` is at schema version 5: each episode keeps one feed transcript (`transcript_url`, `transcript_type`), chosen by type         | JSON, then WebVTT, SRT, HTML; plain text skipped           |
 | 2026-11-17 | Transcript readers are written for the fork; only Transcriptator's time reading is adapted (MIT, in `FORK.md`)                             | Its HTML reader needs a package this app lacks             |
 | 2026-11-17 | The transcript shown is the feed's when it has one, else the phone's own, else the reason; the feed's file is cached for a week            | Works while streaming; a bad file falls back               |
+| 2026-11-17 | `podcasts.db` is at schema version 7: per-show settings are columns on `shows` (v6), archive and the show page's view are columns (v7)     | The view is kept per show in the DB, not AsyncStorage      |
+| 2026-11-17 | The Swift player reads `Podcasts/show-settings.json`, written by JS in full at startup and on every change; `showId` rides on queue items  | Intro, outro and speed work with the screen locked         |
+| 2026-11-17 | A show's own speed is temporary: the player's chosen speed comes back for a show with none; the outro ends the episode so Up Next goes on  | Listener's speed is not overwritten                        |
+| 2026-11-17 | Archiving deletes the download and sets `episodes.archived`; rules run in `runAutomatic` and skip the loaded episode and Up Next           | Pure rules in `archive.ts`; search and badges skip it      |
 
 ## Known problems
 

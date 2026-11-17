@@ -4,6 +4,7 @@
 // refreshed feed into the stored episodes, sorting, and how dates and lengths read.
 // Nothing here touches the database (db.ts does) or the screen.
 import type { PodcastFeedEpisode } from "./index"
+import { type ShowSettings, showSettingsFromRow } from "./showSettings"
 import { chooseTranscript } from "./transcriptChoice"
 
 export type Show = {
@@ -27,6 +28,8 @@ export type Show = {
    * until the feed has been read since categories were added.
    */
   categories: string[]
+  /** The show's own settings (skips, speed, new episodes, archiving, the page's view). */
+  settings: ShowSettings
 }
 
 /** An episode as the feed gives it (what the Swift side returns). */
@@ -56,6 +59,8 @@ export type StoredEpisode = FetchedEpisode & {
   played: boolean
   /** Milliseconds since 1970, or null when it was never played. */
   lastPlayedAt: number | null
+  /** Put away: hidden on the show page unless asked for, and its download is deleted. */
+  archived: boolean
 }
 
 // MARK: Refreshing
@@ -246,6 +251,7 @@ export function showFromRow(row: Row): Show {
     artworkColor: strOrNull(row["artwork_color"]),
     ownPosition: numOrNull(row["own_position"]),
     categories: categoriesFromJson(row["categories"]),
+    settings: showSettingsFromRow(row),
   }
 }
 
@@ -269,5 +275,6 @@ export function episodeFromRow(row: Row): StoredEpisode {
     positionSeconds: Math.max(0, numOrNull(row["position_seconds"]) ?? 0),
     played: row["played"] === 1 || row["played"] === true,
     lastPlayedAt: numOrNull(row["last_played_at"]),
+    archived: row["archived"] === 1 || row["archived"] === true,
   }
 }

@@ -69,7 +69,7 @@ export async function listShows(): Promise<Show[]> {
 
 /**
  * Per show: when its newest dated episode came out, whether that episode is played, and how
- * many unplayed episodes came out at or after the show was followed. Episodes with no date
+ * many unplayed, unarchived episodes came out at or after the show was followed. Episodes with no date
  * never count as newer. One query for the whole library, for ordering and badges.
  */
 export async function listShowActivity(): Promise<ActivityByShow> {
@@ -79,7 +79,8 @@ export async function listShowActivity(): Promise<ActivityByShow> {
        (SELECT n.played FROM episodes n
          WHERE n.show_id = s.id AND n.published_at IS NOT NULL
          ORDER BY n.published_at DESC LIMIT 1) AS newest_played,
-       COUNT(CASE WHEN e.played = 0 AND e.published_at >= s.added_at THEN 1 END)
+       COUNT(CASE WHEN e.played = 0 AND e.archived = 0
+         AND e.published_at >= s.added_at THEN 1 END)
          AS unplayed_since
      FROM shows s LEFT JOIN episodes e ON e.show_id = s.id
      GROUP BY s.id`,

@@ -9,6 +9,7 @@ import {
   createPlayback,
 } from "./playback"
 import { showsMiniPlayer } from "./playbackRules"
+import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 // MARK: Controller
 
@@ -32,6 +33,7 @@ function episode(overrides: Partial<StoredEpisode> = {}): StoredEpisode {
     positionSeconds: 0,
     played: false,
     lastPlayedAt: null,
+    archived: false,
     ...overrides,
   }
 }
@@ -50,6 +52,7 @@ const show: Show = {
   artworkColor: null,
   ownPosition: null,
   categories: [],
+  settings: DEFAULT_SHOW_SETTINGS,
 }
 
 function setup(last: StoredEpisode | null = null) {
@@ -151,6 +154,7 @@ describe("playEpisode", () => {
     await playback.playEpisode(episode({ positionSeconds: 120 }), show)
     expect(native.load).toHaveBeenCalledWith({
       episodeId: "e1",
+      showId: "s1",
       url: "https://cdn.example.com/1.mp3",
       title: "Episode one",
       showTitle: "The Show",

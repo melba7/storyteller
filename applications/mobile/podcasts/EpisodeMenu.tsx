@@ -4,6 +4,10 @@ import { Ellipsis } from "lucide-react-native"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Menu } from "@/components/ui/menu"
+import {
+  archiveEpisodes,
+  unarchiveEpisodes,
+} from "@/modules/podcasts/dbSettings"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isQueued } from "@/modules/podcasts/upNext"
@@ -12,9 +16,25 @@ import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
 /**
  * The menu on an episode row: Play next and Play last (which also move an episode that is
- * already queued) and, for a queued one, Remove from Up Next. Nothing where there is no
- * native player.
+ * already queued), for a queued one Remove from Up Next, and Archive or Unarchive. Nothing
+ * where there is no native player.
  */
+export function archiveAction(episode: StoredEpisode) {
+  const archived = episode.archived
+  return {
+    id: "archive",
+    title: archived ? "Unarchive" : "Archive",
+    onPress: () => {
+      const done = archived
+        ? unarchiveEpisodes([episode.id])
+        : archiveEpisodes([episode.id])
+      done.catch((cause: unknown) =>
+        console.warn("Couldn't change the episode's archive", cause),
+      )
+    },
+  }
+}
+
 export function EpisodeMenu({
   episode,
   show,
@@ -48,6 +68,7 @@ export function EpisodeMenu({
               },
             ]
           : []),
+        archiveAction(episode),
       ]}
     >
       <Button

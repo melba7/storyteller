@@ -35,7 +35,7 @@ export function localSearchQuery(
   const inTitle = patterns.map(() => `e.title ${LIKE}`)
   const sql = `SELECT e.*, s.title AS show_title, s.image_url AS show_image_url
     FROM episodes e JOIN shows s ON s.id = e.show_id
-    WHERE ${anywhere.join(" AND ")}
+    WHERE e.archived = 0 AND ${anywhere.join(" AND ")}
     ORDER BY (${inTitle.join(" AND ")}) DESC,
       e.published_at IS NULL, e.published_at DESC, e.id
     LIMIT ?`

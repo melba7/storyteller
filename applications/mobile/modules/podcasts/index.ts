@@ -51,6 +51,8 @@ export type PlaybackState = {
 
 export type PlaybackLoadOptions = {
   episodeId: string
+  /** The show, so the player can apply the show's own settings. */
+  showId?: string | null
   url: string
   title: string
   showTitle: string
@@ -118,6 +120,8 @@ export type TranscriptChange =
 /** An episode in Up Next, with what the player needs to start it without JavaScript. */
 export type UpNextItem = {
   id: string
+  /** The show, for its settings; missing in a queue saved before per-show settings. */
+  showId?: string | null
   url: string
   /** The feed's audio type. */
   type: string
@@ -167,6 +171,9 @@ type PodcastsNativeModule = {
   getPlaybackState(): Promise<PlaybackState>
   /** The main colour of the picture as "#rrggbb", or null when it can't be read. */
   artworkColor(url: string): Promise<string | null>
+
+  /** Saves every show's playback settings (JSON, show id to settings) for the player. */
+  writeShowSettings(json: string): Promise<void>
 
   listUpNext(): Promise<UpNextItem[]>
   /** Puts an episode at the top ("next") or the bottom ("last"). One already queued moves. */

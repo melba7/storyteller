@@ -14,10 +14,13 @@ public struct QueueItem: Sendable, Equatable, Codable {
   public var duration: Double?
   /// Where the listener left off, in seconds.
   public var position: Double
+  /// The show the episode belongs to, for the show's settings (speed, intro, outro). Files
+  /// saved before this existed have none.
+  public var showId: String?
 
   public init(
     id: String, url: String, type: String = "", title: String, showTitle: String = "",
-    artworkUrl: String? = nil, duration: Double? = nil, position: Double = 0
+    artworkUrl: String? = nil, duration: Double? = nil, position: Double = 0, showId: String? = nil
   ) {
     self.id = id
     self.url = url
@@ -27,6 +30,7 @@ public struct QueueItem: Sendable, Equatable, Codable {
     self.artworkUrl = artworkUrl
     self.duration = duration
     self.position = position
+    self.showId = showId
   }
 }
 

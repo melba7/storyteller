@@ -8,6 +8,7 @@ import {
   FOREGROUND_GAP_MS,
   type NewEpisode,
   downloadsToDelete,
+  episodesForUpNext,
   episodesToDownload,
   newEpisodes,
   parseSettings,
@@ -70,6 +71,15 @@ describe("episodesToDownload", () => {
         DEFAULT_SETTINGS,
       ).map((e) => e.id),
     ).toEqual(["u1"])
+  })
+
+  it("skips a show whose own switch is off", () => {
+    const picked = episodesToDownload(
+      [added("a1", "A", 1), added("b1", "B", 1)],
+      DEFAULT_SETTINGS,
+      new Map([["A", false]]),
+    )
+    expect(picked.map((e) => e.id)).toEqual(["b1"])
   })
 
   it("keeps what the download needs", () => {
@@ -210,5 +220,45 @@ describe("settings", () => {
       deletePlayed: true,
     })
     expect(parseSettings('{"downloadNew":"yes"}')).toEqual(DEFAULT_SETTINGS)
+  })
+})
+
+describe("episodesForUpNext", () => {
+  const modes = new Map<string, "off" | "top" | "bottom">([
+    ["A", "top"],
+    ["B", "bottom"],
+    ["C", "off"],
+  ])
+
+  it("adds nothing for a show that is off or not listed", () => {
+    expect(
+      episodesForUpNext([added("c1", "C", 1), added("d1", "D", 1)], modes),
+    ).toEqual([])
+  })
+
+  it("adds to the top newest first, so the oldest new episode ends up on top", () => {
+    const picked = episodesForUpNext(
+      [added("a1", "A", 100), added("a2", "A", 300), added("a3", "A", 200)],
+      modes,
+    )
+    expect(picked.map((p) => p.episode.id)).toEqual(["a2", "a3", "a1"])
+    expect(picked.every((p) => p.place === "next")).toBe(true)
+  })
+
+  it("adds to the bottom oldest first", () => {
+    const picked = episodesForUpNext(
+      [added("b2", "B", 300), added("b1", "B", 100), added("bu", "B", null)],
+      modes,
+    )
+    expect(picked.map((p) => p.episode.id)).toEqual(["bu", "b1", "b2"])
+    expect(picked.every((p) => p.place === "last")).toBe(true)
+  })
+
+  it("does the top ones before the bottom ones", () => {
+    const picked = episodesForUpNext(
+      [added("b1", "B", 1), added("a1", "A", 2)],
+      modes,
+    )
+    expect(picked.map((p) => p.place)).toEqual(["next", "last"])
   })
 })

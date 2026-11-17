@@ -147,6 +147,7 @@ describe("queueItem", () => {
     positionSeconds: 300,
     played: false,
     lastPlayedAt: null,
+    archived: false,
   } as StoredEpisode
   const show = {
     id: "s1",
@@ -157,6 +158,7 @@ describe("queueItem", () => {
   it("carries what the player needs to start it", () => {
     expect(queueItem(episode, show)).toEqual({
       id: "e1",
+      showId: "s1",
       url: "https://cdn.example.com/1.mp3",
       type: "audio/mpeg",
       title: "One",
