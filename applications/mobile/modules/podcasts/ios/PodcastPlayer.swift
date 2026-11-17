@@ -124,6 +124,9 @@ final class PodcastPlayer {
         savedPosition: episode.savedPosition, duration: episode.duration,
         played: episode.played, intro: showState.settings.introSeconds))
     adSkipping.begin(episode.id, startingAt: start)
+    // The episode that plays is transcribed and checked for ads before the others.
+    PodcastTranscriber.shared.prefer(episode.id)
+    PodcastAdFinder.shared.prefer(episode.id)
     sound.begin(episode.id, startingAt: start)
     beginChapters(episode, startingAt: start)
     publish()

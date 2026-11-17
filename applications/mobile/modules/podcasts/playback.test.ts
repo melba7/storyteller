@@ -90,6 +90,7 @@ function setup(last: StoredEpisode | null = null) {
     }),
     clearInterval: vi.fn(),
     playedWithin: vi.fn(() => 0),
+    beforePlay: vi.fn(),
   } satisfies PlaybackDeps
   const playback = createPlayback(deps)
   const state = (
@@ -219,6 +220,16 @@ describe("playEpisode", () => {
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)
     expect(playback.getView().isBuffering).toBe(true)
+  })
+
+  it("tells beforePlay about an episode that starts, not about a resume", async () => {
+    const { playback, deps, state } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(deps.beforePlay).toHaveBeenCalledTimes(1)
+    expect(deps.beforePlay).toHaveBeenCalledWith(episode())
+    state(5, false)
+    await playback.playEpisode(episode(), show)
+    expect(deps.beforePlay).toHaveBeenCalledTimes(1)
   })
 
   it("shows the start of a played episode as zero", async () => {

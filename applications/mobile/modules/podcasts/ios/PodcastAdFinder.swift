@@ -22,6 +22,8 @@ final class PodcastAdFinder: @unchecked Sendable {
   private var sink: ((String, [String: Any]) -> Void)?
   private var statuses: [String: AdsStatus] = [:]
   private var waiting: [String] = []
+  /// The episode that is loaded in the player: it goes first, and the one at work makes way.
+  private var urgent: String?
   private var failures: [String: String] = [:]
   private var retryScheduled = false
   var worker: Task<Void, Never>?
@@ -130,6 +132,27 @@ final class PodcastAdFinder: @unchecked Sendable {
 
   // MARK: Working
 
+  /// The episode the player has loaded, or nil: it is worked on first. Called when the player
+  /// loads an episode and when it unloads.
+  func prefer(_ id: String?) {
+    lock.withLock { urgent = id }
+    kick()
+  }
+
+  /// Takes the next episode off the queue: the urgent one when it waits, otherwise the first.
+  private func takeNext() -> String? {
+    lock.withLock {
+      guard let id = QueueOrder.next(waiting: waiting, urgent: urgent) else { return nil }
+      waiting.removeAll { $0 == id }
+      return id
+    }
+  }
+
+  /// Whether another episode is urgent and waiting, so the one at work should stop.
+  private func makesWayForUrgent(_ id: String) -> Bool {
+    lock.withLock { QueueOrder.shouldStop(working: id, waiting: waiting, urgent: urgent) }
+  }
+
   var allowedNow: Bool {
     lock.withLock {
       AdsRules.mayRun(appActive: appActive, playing: playing, inBackgroundTask: inBackgroundTask)
@@ -143,14 +166,16 @@ final class PodcastAdFinder: @unchecked Sendable {
       guard worker == nil, !waiting.isEmpty,
         AdsRules.mayRun(appActive: appActive, playing: playing, inBackgroundTask: inBackgroundTask)
       else { return false }
-      worker = Task.detached(priority: .utility) { [self] in await drain() }
+      var priority = TaskPriority.utility
+      if let urgent, waiting.contains(urgent) { priority = .userInitiated }
+      worker = Task.detached(priority: priority) { [self] in await drain() }
       return true
     }
     if !started && hasWork { askForBackgroundTime() }
   }
 
   private func drain() async {
-    while allowedNow, let id = lock.withLock({ waiting.isEmpty ? nil : waiting.removeFirst() }) {
+    while allowedNow, let id = takeNext() {
       await find(id)
     }
     lock.withLock { worker = nil }
@@ -158,7 +183,7 @@ final class PodcastAdFinder: @unchecked Sendable {
   }
 
   private func mayContinue(_ id: String) -> Bool {
-    allowedNow && PodcastDownloader.shared.store?.entry(for: id) != nil
+    allowedNow && !makesWayForUrgent(id) && PodcastDownloader.shared.store?.entry(for: id) != nil
   }
 
   private func find(_ id: String) async {
@@ -209,7 +234,11 @@ final class PodcastAdFinder: @unchecked Sendable {
   /// Back to the front of the queue; its download may be gone.
   private func pause(_ id: String) {
     guard PodcastDownloader.shared.store?.entry(for: id) != nil else { return removed(id) }
-    lock.withLock { if !waiting.contains(id) { waiting.insert(id, at: 0) } }
+    lock.withLock {
+      if !waiting.contains(id) {
+        waiting.insert(id, at: QueueOrder.insertIndex(waiting: waiting, urgent: urgent))
+      }
+    }
     set(id, .waiting)
   }
 }

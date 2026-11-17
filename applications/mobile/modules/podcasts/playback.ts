@@ -83,6 +83,8 @@ export interface PlaybackDeps {
   clearInterval(handle: unknown): void
   /** The listener's "mark played when this many seconds are left" (0 or missing: off). */
   playedWithin?(): number
+  /** Called when a different episode starts to play (not on a resume), for what must follow it. */
+  beforePlay?(episode: StoredEpisode): void
   /** Reports a failure that has no screen to show it (saving the place). */
   report?(cause: unknown): void
 }
@@ -328,6 +330,11 @@ export function createPlayback(deps: PlaybackDeps) {
     markedEarly = false
     markedPlayed = false
     nativeId = episode.id
+    try {
+      deps.beforePlay?.(episode)
+    } catch (cause) {
+      deps.report?.(cause)
+    }
     set({
       episode,
       show,

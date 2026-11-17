@@ -9,6 +9,7 @@ import {
   downloadMenuTitle,
   formatStorage,
   mapFromList,
+  shouldDownloadOnPlay,
   sortDownloads,
   storageOf,
 } from "./downloads"
@@ -219,5 +220,38 @@ describe("downloadMenuTitle", () => {
     expect(downloadMenuTitle("retry")).toBe("Download again")
     expect(downloadMenuTitle("cancel")).toBe("Cancel download")
     expect(downloadMenuTitle("delete")).toBe("Remove download")
+  })
+})
+
+describe("shouldDownloadOnPlay", () => {
+  const stream = { id: "e1" }
+
+  it("downloads a streamed episode when Skip ads is on and nothing is downloaded", () => {
+    expect(shouldDownloadOnPlay(stream, undefined, true)).toBe(true)
+  })
+  it("downloads again one whose download failed", () => {
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ episodeId: "e1", state: "failed" }),
+        true,
+      ),
+    ).toBe(true)
+  })
+  it("leaves one that is queued, downloading or downloaded alone", () => {
+    for (const state of ["queued", "downloading", "downloaded"] as const) {
+      expect(
+        shouldDownloadOnPlay(stream, info({ episodeId: "e1", state }), true),
+      ).toBe(false)
+    }
+  })
+  it("does nothing when Skip ads is off", () => {
+    expect(shouldDownloadOnPlay(stream, undefined, false)).toBe(false)
+  })
+  it("does nothing for an added file or a preview", () => {
+    expect(shouldDownloadOnPlay({ id: "file-1" }, undefined, true)).toBe(false)
+    expect(shouldDownloadOnPlay({ id: "preview:s:1" }, undefined, true)).toBe(
+      false,
+    )
   })
 })
