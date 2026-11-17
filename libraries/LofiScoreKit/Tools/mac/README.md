@@ -42,3 +42,6 @@ The rest: `make-atmosphere.sh` and `make-tracks.sh` (one book at a time, with
 `Docs/MoodDetection.md`). To measure the scorer itself rather than a book, run
 `lofi-atmosphere eval` from the clone (see "Scoring accuracy" in
 `Docs/Atmosphere.md`).
+
+The Apple Podcasts follow sync lives in `libraries/PodcastKit/Tools/mac/` (see
+its README).

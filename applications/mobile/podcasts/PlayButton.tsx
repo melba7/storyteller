@@ -33,7 +33,7 @@ const RING_WIDTH = 3
 const RING_GAP = 2
 
 /** A ring around the button: a faint track and the listened part on top, from the top. */
-function ProgressRing({
+export function ProgressRing({
   fraction,
   size,
   color,

@@ -12,6 +12,7 @@ import {
 import { Platform } from "react-native"
 
 import { notifyLibraryChanged } from "./changes"
+import { deleteDownloads } from "./downloadsNative"
 import {
   type Show,
   type StoredEpisode,
@@ -22,6 +23,7 @@ import {
 import { type ActivityByShow } from "./libraryView"
 import { migrationStatements } from "./schema"
 import { type EpisodeHit, hitFromRow, localSearchQuery } from "./search"
+import { removeManyFromUpNext } from "./upNextNative"
 
 let opened: Promise<DB> | null = null
 
@@ -119,6 +121,18 @@ export async function listEpisodes(showId: string): Promise<StoredEpisode[]> {
   return sortEpisodes(found.map(episodeFromRow))
 }
 
+/** The episodes with these ids that are in the library. Ids the library lacks are left out. */
+export async function listEpisodesByIds(
+  ids: readonly string[],
+): Promise<StoredEpisode[]> {
+  if (ids.length === 0) return []
+  const marks = ids.map(() => "?").join(", ")
+  const found = await rows(`SELECT * FROM episodes WHERE id IN (${marks})`, [
+    ...ids,
+  ])
+  return found.map(episodeFromRow)
+}
+
 export async function getEpisode(id: string): Promise<StoredEpisode | null> {
   const found = await rows("SELECT * FROM episodes WHERE id = ?", [id])
   return found[0] ? episodeFromRow(found[0]) : null
@@ -168,9 +182,18 @@ export async function saveArtworkColor(
   notifyLibraryChanged()
 }
 
-/** Removes the show and its episodes from the library. */
+/**
+ * Removes the show and its episodes from the library, and the episodes' downloads and
+ * places in Up Next. The
+ * downloads go first: if one can't be removed the show stays, so no file is left behind
+ * that nothing points to.
+ */
 export async function unsubscribe(id: string): Promise<void> {
   const db = await database()
+  const found = await rows("SELECT id FROM episodes WHERE show_id = ?", [id])
+  const ids = found.map((row) => String(row["id"]))
+  await deleteDownloads(ids)
+  await removeManyFromUpNext(ids)
   await db.transaction(async (tx) => {
     await tx.execute("DELETE FROM episodes WHERE show_id = ?", [id])
     await tx.execute("DELETE FROM shows WHERE id = ?", [id])

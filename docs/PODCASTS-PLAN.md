@@ -273,9 +273,14 @@ setting picks the detector, and each result is saved under the detector's id.
   their other shows). Line numbers map back to word times, so the model never
   has to copy timestamps.
 - **Clean-up** (pure Swift, tested on Linux): join answers from overlapping
-  pieces, merge ads less than 5 seconds apart, drop anything under 10 seconds,
-  do not skip anything over 5 minutes (likely a mistake), and move each edge to
-  the nearest pause between words.
+  pieces, merge ads with less than 12 seconds of speech between them (one ad
+  break, at most 5 minutes in all), drop anything under 10 seconds, do not skip
+  anything over 5 minutes (likely a mistake), carry an ad's end on while the
+  next lines still read as the ad (its sponsor's name, a web address or a promo
+  code), and move each edge to the nearest pause between words. The 12 seconds
+  and the carried end come from MinusPod (see "Open-source code we use").
+- **How sure**: the model says how sure it is. Sure ads are skipped; unsure ones
+  are only listed in "Ads found" with a play button; guesses are dropped.
 - **When unsure, do not skip.** A missed ad costs a tap on "skip 30 s"; a wrong
   skip loses part of the show.
 - **Two switches**: "Skip ads" and "Skip the hosts' own plugs", both on by
@@ -318,6 +323,27 @@ avoids this entirely by reimplementing the features and copying nothing. If a
 file is ever copied, it stays a separate file with its MPL header and is listed
 in `FORK.md`. The screens follow Pocket Casts' layout (Mo's ask), but its name,
 logo, icons, artwork and theme names are not used.
+
+## Open-source code we use (Mo's ask, 2026-11-17)
+
+Checked for licences that fit this MIT app and TestFlight. Code is copied in
+(vendored) with its licence notice and listed in `FORK.md`, instead of adding
+packages, so upstream's `package.json` and `yarn.lock` stay untouched.
+
+| What                                                                      | Licence    | Used in | What it saves                                                                                                        |
+| ------------------------------------------------------------------------- | ---------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| [MinusPod](https://github.com/ttlequals0/MinusPod)                        | MIT        | P4a-P4c | Tried rules for ad finding: windows with overlap, joining an ad break, carrying the end on, how sure to be to skip   |
+| [Podly](https://github.com/jdrbc/podly_pure_podcasts)                     | MIT        | P4a     | A second reference for transcript-then-model ad finding (its prompts, read before writing ours)                      |
+| [Transcriptator](https://github.com/stevencrader/transcriptator)          | MIT        | P3c     | Readers for SRT, WebVTT, HTML and JSON podcast transcripts, with speakers; copied in if it needs no other packages   |
+| [OutcastID3](https://github.com/CrunchyBagel/OutcastID3)                  | MIT        | P5g     | Chapter tags (CHAP, CTOC) in MP3 files; M4A chapters come from Apple's own AVFoundation                              |
+| [swift-audio-marker](https://github.com/atelier-socle/swift-audio-marker) | Apache 2.0 | P5g     | The alternative for chapters: MP3, M4A and Podcasting 2.0 JSON chapters with artwork, but iOS 17+ and no Linux tests |
+
+Already covered, so nothing is added: feeds (PodcastKit's own reader is built),
+background downloads (URLSession), swipe rows and dragging
+(`react-native-gesture-handler` and `react-native-reanimated` are in the app),
+and transcription (Apple's `SpeechTranscriber`, free; WhisperKit, MIT, stays in
+"Later" in case it disappoints). Pocket Casts (MPL 2.0) and AntennaPod (GPL 3)
+stay references only. No open database of podcast ad times was found.
 
 ## Risks
 

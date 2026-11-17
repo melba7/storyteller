@@ -30,6 +30,12 @@ final class PodcastPlayer {
   private var itemObservation: NSKeyValueObservation?
   private var itemObservers: [NSObjectProtocol] = []
   var watchingBook = false
+  /// Up Next: the episodes after this one (see PodcastPlayer+UpNext.swift).
+  var queue = UpNextQueue.load(from: UpNextFile.url)
+  /// The episode loaded now, as a queue item, so it can go back to the queue.
+  var current: QueueItem?
+  /// The loaded episode played to its end.
+  var currentEnded = false
   private var ticks = 0
 
   private init() {
@@ -49,10 +55,26 @@ final class PodcastPlayer {
     var duration: Double?
     var played: Bool
     var autoplay: Bool
+    /// The feed's audio type, kept for Up Next.
+    var type = ""
   }
 
+  /// The listener chose this episode. The one playing goes back to the top of Up Next.
   func load(_ episode: Episode) {
+    queue.startedFromList(episode.id, previous: playingItem(), previousFinished: currentEnded)
+    saveQueue()
+    emitQueue()
+    begin(episode)
+  }
+
+  /// Loads an episode and, unless told not to, starts it.
+  func begin(_ episode: Episode) {
     watchTheBook()
+    currentEnded = false
+    current = QueueItem(
+      id: episode.id, url: episode.url.absoluteString, type: episode.type, title: episode.title,
+      showTitle: episode.showTitle, artworkUrl: episode.artworkUrl, duration: episode.duration,
+      position: episode.savedPosition)
     wantsToPlay = false
     player.pause()
     removeItemObservers()
@@ -66,7 +88,8 @@ final class PodcastPlayer {
       emitError(episode.id, "The audio session couldn't start: \(error.localizedDescription)")
     }
 
-    let item = AVPlayerItem(url: episode.url)
+    // A downloaded episode plays from its file; any other streams from its address.
+    let item = AVPlayerItem(url: PodcastDownloader.shared.localFile(for: episode.id) ?? episode.url)
     // Keeps voices natural at any speed.
     item.audioTimePitchAlgorithm = .timeDomain
     player.defaultRate = Float(speed.value)
@@ -140,7 +163,7 @@ final class PodcastPlayer {
 
   // MARK: Reading the player
 
-  private var position: Double {
+  var position: Double {
     let seconds = player.currentTime().seconds
     return seconds.isFinite ? max(0, seconds) : 0
   }
@@ -223,6 +246,8 @@ final class PodcastPlayer {
 
   private func playStateChanged() {
     if player.timeControlStatus == .playing { takeTheLockScreen() }
+    // Transcribing may run while a podcast plays, which keeps the app alive.
+    PodcastTranscriber.shared.playbackChanged(isPlaying: player.timeControlStatus == .playing)
     publish()
   }
 
@@ -246,10 +271,13 @@ final class PodcastPlayer {
 
   private func ended() {
     wantsToPlay = false
+    currentEnded = true
     let duration = currentDuration ?? position
     sink?(
       "onPlaybackEnded",
       ["episodeId": episodeId ?? "", "position": duration, "duration": duration, "played": true])
+    // The next queued episode starts here in Swift, so it also starts with the screen locked.
+    if startNextInQueue() { return }
     publish(positionOverride: duration)
   }
 

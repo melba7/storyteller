@@ -344,6 +344,25 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertFalse(wantedAfter)
     }
 
+    func testALinkedFolderFileIsReadOnlyWhileTheFolderIsLinked() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
+        try write(Data([0]), to: "Linked/Atmosphere/Rain/rain.m4a")
+        try write(Data("{}".utf8), to: "Linked/Podcasts/apple-podcasts.json")
+
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        let unlinked = await host.readLinkedFile("Podcasts/apple-podcasts.json")
+        XCTAssertNil(unlinked, "no folder is linked")
+        _ = try await host.linkSoundsFolder(folder.appendingPathComponent("Linked"))
+        let linked = await host.readLinkedFile("Podcasts/apple-podcasts.json")
+        XCTAssertEqual(linked, Data("{}".utf8))
+        let missing = await host.readLinkedFile("Podcasts/none.json")
+        XCTAssertNil(missing)
+        await host.unlinkSoundsFolder()
+        let after = await host.readLinkedFile("Podcasts/apple-podcasts.json")
+        XCTAssertNil(after)
+    }
+
     func testALinkedFolderBringsAScoreToTheOpenBook() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook(scored: false)

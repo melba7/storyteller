@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The fork's one check command: fork rules, tool tests, typecheck, lint, format,
-# mobile tests and the Swift tests of LofiScoreKit and PodcastKit. Prints only failures and a summary.
+# mobile tests, the Apple Podcasts export tests (python3) and the Swift tests of LofiScoreKit and
+# PodcastKit. Prints only failures and a summary.
 # The iOS simulator build runs only in Fork CI (it needs a Mac): push a branch for it.
 # Usage: tools/fork/check.sh [--no-swift]
 set -u
@@ -38,6 +39,7 @@ step typecheck yarn tsc --build applications/mobile
 step lint yarn oxlint "${FORK_JS[@]}"
 step format yarn oxfmt --check "${FORMAT[@]}"
 step mobile-tests yarn test:mobile
+step apple-podcasts-tests python3 -m unittest discover -s libraries/PodcastKit/Tools/mac
 
 if [ "${1:-}" != "--no-swift" ]; then
   if command -v swift >/dev/null 2>&1; then

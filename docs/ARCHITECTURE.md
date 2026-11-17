@@ -34,10 +34,10 @@ in `FORK.md`.
 | `applications/mobile/lofi/`                                              | React UI: toolbar button, panel, settings, reader follow                                                                      |
 | `applications/mobile/modules/readium/ios/LofiNarratorBridge.swift`       | Hooks on upstream's audiobook player                                                                                          |
 | `applications/mobile/modules/readium/ios/LofiRemoteHandoff.swift`        | Lets a playing podcast own the lock screen; the book's remote handlers ask it first                                           |
-| `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader (`PodcastFeed`), player rules (`PodcastPlayback`), tests, podspecs                    |
+| `libraries/PodcastKit/`                                                  | Swift package for podcasts: feed reader, player rules, downloads, tests, podspecs                                             |
 | `applications/mobile/modules/podcasts/`                                  | Expo module that fetches feeds and plays episodes (Swift), plus the library in `podcasts.db`, directory search and rules (JS) |
 | `applications/mobile/podcasts/`                                          | React UI: side menu, library grid, discover, show, episode and player screens, mini player                                    |
-| `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover), one stack per tab, the player pushed                                              |
+| `applications/mobile/app/(root)/podcasts/`                               | The routes: a tab bar (Podcasts, Discover, Up Next, Profile), a stack per tab, the player pushed                              |
 | `applications/web/src/app/api/v2/books/[bookId]/lofi-score/`             | `GET`/`PUT` the book's score                                                                                                  |
 | `tools/fork/`                                                            | Fork checks, sync scripts, `check.sh`                                                                                         |
 | `shelved/lofi-music/`                                                    | The shelved music, not built                                                                                                  |
@@ -121,6 +121,17 @@ in `FORK.md`.
 | 2026-11-17 | An episode opens as a form sheet in the tab's stack, not a full screen; links in notes come from a tested splitter                         | Mo's ask: the episode card; no new package                 |
 | 2026-11-17 | The Podcasts section follows Pocket Casts' layout and features, rebuilt here; no code, name, icons or artwork copied                       | Mo's ask                                                   |
 | 2026-11-17 | The podcast player is one Swift `AVPlayer`; a playing podcast owns the lock screen through `LofiRemoteHandoff`                             | The book's handlers stay registered and stand aside        |
+| 2026-11-17 | Downloads: one background URLSession made at launch; Swift files each download and writes the index first                                  | Finishes with the app closed, even when iOS relaunches it  |
+| 2026-11-17 | A swipe-away stops downloads until the app opens; then they resume or start again. Wi-Fi only is native                                    | iOS never relaunches a swiped-away app; no stray data use  |
+| 2026-11-17 | Up Next is a queue of the episodes after the current one, kept in Swift and saved to `Podcasts/up-next.json`                               | The next one starts when one ends, screen locked or not    |
+| 2026-11-17 | Playing from a list puts the episode that was playing back at the top of Up Next, unless it had finished                                   | Pocket Casts' rule (Mo's ask); nothing is lost             |
+| 2026-11-17 | Background refresh runs in JS through `expo-background-task` (defined from `store/store.ts`); no new Swift task                            | Reuses the refresh code; iOS picks when it runs            |
+| 2026-11-17 | Automatic downloads are the newest new episode per show and always wait for Wi-Fi, whatever the switch says                                | No surprise data use; a deleted episode is not new again   |
+| 2026-11-17 | The Mac writes the Apple Podcasts follow list to a JSON file in the linked sounds folder; the phone reads it                               | One way; a seen list stops an unsubscribed show returning  |
+| 2026-11-17 | A transcript is saved per audio file as `<sha256>.transcript.json`, with lines and words, the locale and the recogniser                    | Goes with the download; a new file is transcribed again    |
+| 2026-11-17 | Transcribing goes in pieces of 5 minutes; a partial file is saved after each, and a restart begins 2 s before it                           | Overlap words are dropped, so none is doubled              |
+| 2026-11-17 | The Speech code (SpeechAnalyzer, iOS 26) is one small target behind `canImport(Speech)`; the rest is tested on Linux                       | Only Fork CI compiles it; tests use a fake recogniser      |
+| 2026-11-17 | Transcribing runs while the app is open or a podcast plays, and in a background task `<bundle id>.podcastTranscribe`                       | iOS picks the time; the task resumes from the partial file |
 
 ## Known problems
 

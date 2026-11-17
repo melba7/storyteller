@@ -6,14 +6,14 @@ import { ActivityIndicator, Pressable, ScrollView, View } from "react-native"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Text } from "@/components/ui/text"
-import { subscribe } from "@/modules/podcasts/dbFeeds"
 import {
   type DirectoryShow,
   searchDirectory,
 } from "@/modules/podcasts/directory"
+import { followLink } from "@/modules/podcasts/followLink"
 import { Podcasts } from "@/modules/podcasts/index"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { previewHref, showHref } from "@/modules/podcasts/routes"
+import { episodeHref, previewHref, showHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
 import { DiscoverBrowse } from "./DiscoverBrowse"
@@ -64,14 +64,16 @@ export function Discover() {
     return () => clearTimeout(timer)
   }, [term])
 
-  async function add(feed: string, busyKey: string) {
+  async function add(input: string, busyKey: string) {
     if (adding) return
     setAdding(busyKey)
     setAddError(null)
     try {
-      const show = await subscribe(feed)
-      // Back from the show returns here, to Discover.
+      const { show, episodeId } = await followLink(input)
+      // Back from the show returns here, to Discover. An Apple link to an episode opens its
+      // card over the show.
       router.push(showHref(segments, show.id))
+      if (episodeId) router.push(episodeHref(segments, episodeId))
       setAdding(null)
     } catch (cause) {
       setAddError(readableError(cause))
@@ -149,10 +151,10 @@ export function Discover() {
           </Pressable>
         ))}
 
-        <Text className="mt-4 font-semibold">Paste an RSS link</Text>
+        <Text className="mt-4 font-semibold">Paste a link</Text>
         <Input
-          accessibilityLabel="RSS link"
-          placeholder="https://example.com/feed.xml"
+          accessibilityLabel="RSS or Apple Podcasts link"
+          placeholder="RSS or Apple Podcasts link"
           value={link}
           onChangeText={setLink}
           autoCapitalize="none"

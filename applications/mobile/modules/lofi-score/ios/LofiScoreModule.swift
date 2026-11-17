@@ -171,6 +171,14 @@ public final class LofiScoreModule: Module {
       await LofiScoreRuntime.shared.host.atmosphereCredits()
     }
 
+    // The text of one small file below the linked sounds folder (for instance
+    // "Podcasts/apple-podcasts.json"), or null when no folder is linked or the file is not
+    // there, not downloaded yet or not text.
+    AsyncFunction("readLinkedFolderFile") { (path: String) async -> String? in
+      guard let data = await LofiScoreRuntime.shared.host.readLinkedFile(path) else { return nil }
+      return String(data: data, encoding: .utf8)
+    }
+
     AsyncFunction("removeImportedSounds") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.removeImportedSounds()

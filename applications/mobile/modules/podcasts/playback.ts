@@ -5,6 +5,7 @@
 // here (when the place is saved, when an episode counts as played) are tested without it.
 // playerInstance.ts wires it to the real module and database.
 import type {
+  PlaybackAdvanced,
   PlaybackEnded,
   PlaybackError,
   PlaybackLoadOptions,
@@ -73,6 +74,7 @@ export interface PlaybackDeps {
   saveArtworkColor(showId: string, color: string): Promise<void>
   lastPlayedEpisode(): Promise<StoredEpisode | null>
   getShow(id: string): Promise<Show | null>
+  getEpisode(id: string): Promise<StoredEpisode | null>
   setInterval(callback: () => void, ms: number): unknown
   clearInterval(handle: unknown): void
   /** Reports a failure that has no screen to show it (saving the place). */
@@ -135,6 +137,32 @@ export function createPlayback(deps: PlaybackDeps) {
     syncTimer()
   }
 
+  /** Swift started the next queued episode (the one before ended): follow along. */
+  async function onAdvanced(event: PlaybackAdvanced) {
+    try {
+      const episode = await deps.getEpisode(event.episodeId)
+      if (!episode) return
+      const show = await deps.getShow(episode.showId)
+      set({
+        episode,
+        show,
+        loaded: true,
+        position: resumeStart(
+          episode.positionSeconds,
+          episode.durationSeconds,
+          false,
+        ),
+        duration: episode.durationSeconds,
+        isPlaying: false,
+        isBuffering: true,
+        error: null,
+      })
+      if (show) tintFor(show).catch(() => {})
+    } catch (cause) {
+      deps.report?.(cause)
+    }
+  }
+
   function onError(event: PlaybackError) {
     if (event.episodeId !== view.episode?.id) return
     set({ error: event.message, isPlaying: false, isBuffering: false })
@@ -147,6 +175,9 @@ export function createPlayback(deps: PlaybackDeps) {
     deps.native.addListener("onPlaybackState", onState)
     deps.native.addListener("onPlaybackEnded", onEnded)
     deps.native.addListener("onPlaybackError", onError)
+    deps.native.addListener("onPlaybackAdvanced", (event) => {
+      void onAdvanced(event)
+    })
   }
 
   /** Works out the show's artwork colour once, and keeps it. */
@@ -233,6 +264,7 @@ export function createPlayback(deps: PlaybackDeps) {
         duration: episode.durationSeconds,
         played: episode.played,
         autoplay: true,
+        audioType: episode.audioType,
       }),
     )
     if (show) tintFor(show).catch(() => {})

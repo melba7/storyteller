@@ -370,6 +370,20 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         }
     }
 
+    /// One small file from the linked folder (``LinkedFolderFile``), or nil when no folder is
+    /// linked, the folder or file is gone, or the file is not downloaded yet.
+    public func readLinkedFile(_ path: String) async -> Data? {
+        let bookmark = await onQueue { [self] in settings.linkedFolderBookmark }
+        guard let bookmark else { return nil }
+        let resolve = environment.resolveBookmark
+        return await withCheckedContinuation { continuation in
+            work.async {
+                guard let folder = try? resolve(bookmark) else { return continuation.resume(returning: nil) }
+                continuation.resume(returning: LinkedFolderFile.read(path, in: folder))
+            }
+        }
+    }
+
     /// Copies whatever is new in the linked sounds folder (``SoundsFolderImport/sync(_:into:fileManager:)``)
     /// and reloads what it touched: the sounds, or the open book's text when a score for it
     /// may have arrived. Nil when no folder is linked. Errors (the folder gone, iCloud not

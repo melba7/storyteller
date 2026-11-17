@@ -348,6 +348,12 @@ once reviewed and green.
     episode downloaded with the app closed plays in airplane mode.
   - Files: `modules/podcasts/ios` (downloads), `PodcastKit` (file store),
     `podcasts/` (buttons, storage used).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. After
+    a swipe-away in the app switcher the downloads continue the next time the
+    app opens, because iOS stops them until then; left or locked, they carry on
+    by themselves. Wi-Fi only is off by default. Not tried on a phone yet: a
+    download with the app closed, a swipe-away and resume, airplane-mode
+    playback.
 
 - [ ] **P2b. Up Next**
   - Add to Up Next, play next, reorder and remove. The queue lives in Swift, so
@@ -360,6 +366,11 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight
     the next episode starts by itself with the phone locked.
   - Files: `PodcastKit` (queue), `modules/podcasts/ios`, `podcasts/`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    queue is saved by Swift in `Application Support/Podcasts/up-next.json`; when
+    an episode ends Swift starts the next one itself and JS follows along
+    (`onPlaybackAdvanced`). Not tried on a phone yet: the next episode with the
+    screen locked, swipe actions and drag to reorder.
 
 - [ ] **P2c. New episodes by themselves**
   - Feeds refresh when the app opens and in a background refresh task. Each show
@@ -371,6 +382,16 @@ once reviewed and green.
   - Files: `modules/podcasts/ios` (background task, like
     `LofiBackgroundImport.swift`), `fork.config.ts` (task id, background fetch),
     `podcasts/` (settings).
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. It
+    ran as JavaScript, not Swift: `modules/podcasts/background.ts` defines an
+    `expo-background-task` task (imported from `store/store.ts`, a second marker
+    there) and refreshes when the app comes to the front, at most every 30
+    minutes. New episodes download by themselves (newest per show, on Wi-Fi
+    only, whatever the Wi-Fi switch says); played downloads go a day after they
+    were played, never the one loaded in the player. Both are switches in
+    Profile, on by default. iOS decides when the background task runs (often
+    overnight), so "a new episode appears without opening the app" can only be
+    checked over a night.
 
 - [ ] **P2d. Apple Podcasts share links** (Mo's choice, 2026-11-16)
   - Add also takes a link copied from Apple Podcasts
@@ -383,6 +404,12 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight a
     link shared from Apple Podcasts adds that show.
   - Files: `modules/podcasts/directory.ts` (+ test), `podcasts/AddPodcast.tsx`.
+  - Status: built and passing `check.sh`; waiting for the iOS build in CI. The
+    link field in Discover takes an Apple Podcasts link or an RSS link ("Paste a
+    link"). A link with `?i=` opens that episode's card over the show when the
+    feed has it (matched through Apple's episode lookup), else the show. No
+    "paste from clipboard" button: `expo-clipboard` is not an app dependency,
+    and the brief said to skip it then.
 
 - [ ] **P2e. Follow Apple Podcasts from the Mac** (Mo's choice, 2026-11-16)
   - One way only, from Apple Podcasts to Storyteller. An hourly launchd job on
@@ -410,6 +437,15 @@ once reviewed and green.
     installer, `.command` files, README), `modules/podcasts` (reading the file,
     with tests), `LofiScoreHost` or `modules/lofi-score` (handing over the
     linked folder), `tools/fork/check.sh` (the Python tests).
+  - Status: built and passing `check.sh`; the Mac job has not run on a real Mac
+    and the iOS build has not run yet. Mo's one-time Mac step: double-click
+    `Install Apple Podcasts sync.command` in `libraries/PodcastKit/Tools/mac/`
+    and allow the macOS prompt (or add `/bin/bash` to Full Disk Access; the
+    README says where). The names of Apple's tables and columns come from other
+    tools that read the same file, not from Mo's Mac, so the first run is the
+    real test: if Apple's format differs, the script says which name is missing.
+    The phone reads the file on every app open and in the background refresh;
+    the first read subscribes to everything followed but downloads nothing.
 
 - [ ] **P3a. Transcribe downloaded episodes**
   - After a download, `SpeechTranscriber` (with time ranges) writes the episode
@@ -425,6 +461,15 @@ once reviewed and green.
     transcribed (the time it takes is written down here).
   - Files: `PodcastKit` (transcript model, speech target), `modules/podcasts`,
     `podcasts/` (row status), `PodcastKit/Tools/mac`.
+  - Status: built and passing `check.sh`; the Apple-only part has never been
+    compiled (Fork CI's macOS and iOS builds are its first compile) and nothing
+    has run on a Mac or iPhone. Transcribing runs in pieces of 5 minutes, one
+    episode at a time, while the app is open or a podcast plays; it needs iOS 26
+    (older iOS says "Needs iOS 26"). Rows say "Transcribing 40%", "Transcript
+    ready" or the reason. `Transcribe an episode.command` in
+    `libraries/PodcastKit/Tools/mac` does one file on a Mac. How long an
+    hour-long episode takes on the phone is not measured: that needs TestFlight,
+    and the number goes here once Mo has it.
 
 - [ ] **P3b. Transcribe with the app closed**
   - A background processing task carries on unfinished transcription and resumes
@@ -434,6 +479,15 @@ once reviewed and green.
   - Done when: check.sh passes, the iOS build passes in CI, and on TestFlight an
     episode downloaded before bed is transcribed by morning.
   - Files: `modules/podcasts/ios`, `fork.config.ts` (task id).
+  - Status: built with P3a, passing `check.sh` and not yet run on a phone. The
+    resume rules are tested on Linux with a fake recogniser (a stop after any
+    piece, a restart 2 s before the saved time, a broken partial file starting
+    over). The app asks iOS for the background task
+    `<bundle id>.podcastTranscribe` when it goes to the background with work
+    left; iOS decides when it runs (often overnight, on the charger), so
+    "transcribed by morning" is for Mo to check on TestFlight. When iOS ends a
+    turn, the piece in progress is finished and saved first, so a very slow
+    piece can still be cut off by iOS; only that piece is lost.
 
 - [ ] **P3c. Moving transcript** (Mo's ask, 2026-11-17; replaces the old P5p)
   - Like the books' read-along: the player shows the episode's transcript. It
@@ -449,15 +503,15 @@ once reviewed and green.
     the transcript follows a playing episode and a tap on a line plays from
     there.
   - Files: `PodcastKit` (the feed's `podcast:transcript` tag),
-    `modules/podcasts` (transcript readers, with tests), `podcasts/` (the
-    transcript in the player).
+    `modules/podcasts` (transcript readers, with tests, adapted from
+    Transcriptator, MIT), `podcasts/` (the transcript in the player).
 
 - [ ] **P4a. Find ads** (engine)
   - The `AdDetector` interface, the chunker (pieces to the detector's token
     budget, 2 minutes of overlap), the on-device detector (Foundation Models,
     numbered lines in, line ranges out, each marked an ad or the hosts' own
-    plug), the clean-up rules and the `<sha256>.ads.<detector>.json` file, as in
-    `docs/PODCASTS-PLAN.md`.
+    plug, with how sure it is), the clean-up rules (adapted from MinusPod, MIT)
+    and the `<sha256>.ads.<detector>.json` file, as in `docs/PODCASTS-PLAN.md`.
   - A Mac `.command` finds the ads in a transcribed episode and prints them
     (needs Apple Intelligence on the Mac).
   - Test first: Linux tests with a fake detector: pieces fit the budget and
@@ -525,8 +579,8 @@ medium, L a big lift. Details and what is left out, with the reasons, are in
       the end.
 - [ ] **P5g. Chapters** (M to L): chapters from the feed (`podcast:chapters`),
       from M4A files (Apple's own reader) and from MP3 files (ID3 chapter tags,
-      read in Swift), a chapter list in the player, previous and next chapter,
-      chapter artwork, and skipping a chapter.
+      read with OutcastID3, MIT, copied in), a chapter list in the player,
+      previous and next chapter, chapter artwork, and skipping a chapter.
 - [ ] **P5h. Bookmarks** (S to M): a bookmark at the place playing now, with a
       title you can edit, from the player and as a headphone action; listed per
       episode and in Profile; tap to play from there.

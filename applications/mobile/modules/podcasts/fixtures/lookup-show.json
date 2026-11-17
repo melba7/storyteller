@@ -1,0 +1,14 @@
+{
+  "resultCount": 1,
+  "results": [
+    {
+      "wrapperType": "track",
+      "kind": "podcast",
+      "collectionId": 1535809341,
+      "collectionName": "Space Talk",
+      "artistName": "Ada Host",
+      "feedUrl": "https://feeds.example.com/space-talk",
+      "artworkUrl600": "https://img/600.jpg"
+    }
+  ]
+}
