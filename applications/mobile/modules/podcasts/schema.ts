@@ -7,7 +7,7 @@
 import { starterStatements } from "./playlists"
 
 /** The version a finished `podcasts.db` has (SQLite's `PRAGMA user_version`). */
-export const SCHEMA_VERSION = 9
+export const SCHEMA_VERSION = 10
 
 const VERSION_1 = [
   `CREATE TABLE shows (
@@ -133,6 +133,24 @@ const VERSION_9 = [
   ...starterStatements(),
 ]
 
+/**
+ * Version 10: playlists you fill by hand. `kind` is "smart" (rules) or "manual". An item
+ * keeps a snapshot of its episode and show, so it plays even when the show isn't followed
+ * (or is unfollowed later); `episode_id` is the library's id when it has one, else a preview id.
+ */
+const VERSION_10 = [
+  "ALTER TABLE playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'smart'",
+  `CREATE TABLE playlist_items (
+    playlist_id TEXT NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    episode_id TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    snapshot TEXT NOT NULL,
+    added_at INTEGER NOT NULL,
+    PRIMARY KEY (playlist_id, episode_id)
+  )`,
+  "CREATE INDEX playlist_items_order ON playlist_items (playlist_id, position)",
+]
+
 /** The steps in order: the one at index 0 takes a file from version 0 to 1. */
 const STEPS = [
   VERSION_1,
@@ -144,6 +162,7 @@ const STEPS = [
   VERSION_7,
   VERSION_8,
   VERSION_9,
+  VERSION_10,
 ]
 
 /**

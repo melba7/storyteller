@@ -3,10 +3,13 @@ import { useMemo } from "react"
 
 import {
   getPlaylist,
+  itemCounts,
+  listEntries,
   listPlaylists,
   smartEpisodes,
 } from "@/modules/podcasts/dbPlaylists"
 import { type StoredEpisode } from "@/modules/podcasts/library"
+import { type PlaylistEntry } from "@/modules/podcasts/manualPlaylist"
 import {
   filterDownloaded,
   serializeRules,
@@ -47,4 +50,17 @@ export function useSmartEpisodes(
     return filterDownloaded(found.data, playlist.rules, onPhone)
   }, [found.data, playlist, map])
   return { ...found, data }
+}
+
+/** A hand-filled playlist's episodes, in order. */
+export function useEntries(playlistId: string): Query<PlaylistEntry[]> {
+  return useLibraryQuery(
+    () => listEntries(playlistId),
+    `playlist-entries:${playlistId}`,
+  )
+}
+
+/** How many items each hand-filled playlist holds, by playlist id. */
+export function useItemCounts(): Query<Map<string, number>> {
+  return useLibraryQuery(itemCounts, "playlist-item-counts")
 }

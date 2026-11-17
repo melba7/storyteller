@@ -22,8 +22,8 @@ describe("migrationStatements", () => {
     expect(statements.at(-1)).toBe(`PRAGMA user_version = ${SCHEMA_VERSION}`)
   })
 
-  it("is at version 9", () => {
-    expect(SCHEMA_VERSION).toBe(9)
+  it("is at version 10", () => {
+    expect(SCHEMA_VERSION).toBe(10)
   })
 
   it("upgrades a version 1 file in place by only adding columns", () => {
@@ -127,6 +127,20 @@ describe("migrationStatements", () => {
       { id: "starter-new-releases", title: "New Releases", position: 0 },
       { id: "starter-in-progress", title: "In Progress", position: 1 },
       { id: "starter-starred", title: "Starred", position: 2 },
+    ])
+  })
+
+  it("version 10 adds hand-filled playlists and keeps the existing ones smart", () => {
+    const statements = stepFrom(9)
+    expect(statements).toContain(
+      "ALTER TABLE playlists ADD COLUMN kind TEXT NOT NULL DEFAULT 'smart'",
+    )
+    expect(
+      statements.some((s) => s.includes("CREATE TABLE playlist_items")),
+    ).toBe(true)
+    const db = openTestDatabase()
+    expect(db.prepare("SELECT DISTINCT kind FROM playlists").all()).toEqual([
+      { kind: "smart" },
     ])
   })
 

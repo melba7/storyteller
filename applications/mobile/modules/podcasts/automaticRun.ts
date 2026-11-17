@@ -55,7 +55,9 @@ async function startNew(added: Added, settings: AutomaticSettings) {
  * is already on the phone, on its way or failed is left alone.
  */
 async function downloadForPlaylists(now: number) {
-  const playlists = (await listPlaylists()).filter((p) => p.autoDownload)
+  const playlists = (await listPlaylists()).filter(
+    (p) => p.kind === "smart" && p.autoDownload,
+  )
   if (playlists.length === 0) return
   const infos = await listDownloads()
   const known = new Set(infos.map((info) => info.episodeId))

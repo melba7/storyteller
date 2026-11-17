@@ -1,12 +1,13 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { Star } from "lucide-react-native"
+import { ListPlus, Star } from "lucide-react-native"
 import { Pressable } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
 import { setStarred } from "@/modules/podcasts/dbEpisodes"
-import { usePlayerValue } from "@/modules/podcasts/playerInstance"
+import { player, usePlayerValue } from "@/modules/podcasts/playerInstance"
 import { isPreviewId } from "@/modules/podcasts/preview"
 
+import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { useEpisode } from "./hooks"
 
 /**
@@ -15,8 +16,30 @@ import { useEpisode } from "./hooks"
  */
 export function LibraryButtons() {
   const id = usePlayerValue((view) => view.episode?.id ?? "")
-  if (id === "" || isPreviewId(id)) return null
-  return <StarButton id={id} />
+  if (id === "") return null
+  return (
+    <>
+      {isPreviewId(id) ? null : <StarButton id={id} />}
+      <PlaylistButton />
+    </>
+  )
+}
+
+/** Add what is playing to one of your own playlists, whether or not its show is followed. */
+function PlaylistButton() {
+  return (
+    <Pressable
+      className="size-11 items-center justify-center rounded-full bg-white/15 active:bg-white/25"
+      accessibilityRole="button"
+      accessibilityLabel="Add this episode to a playlist"
+      onPress={() => {
+        const { episode, show } = player.getView()
+        if (episode) void chooseAndAddToPlaylist(episode, show)
+      }}
+    >
+      <Icon as={ListPlus} size={22} className="text-white" />
+    </Pressable>
+  )
 }
 
 function StarButton({ id }: { id: string }) {

@@ -11,8 +11,12 @@ import {
   serializeRules,
 } from "./playlistRules"
 
+export type PlaylistKind = "smart" | "manual"
+
 export type Playlist = {
   id: string
+  /** Smart: filled by its rules. Manual: filled by hand. */
+  kind: PlaylistKind
   title: string
   /** Where it sits in the list, 0 for the first. */
   position: number
@@ -65,6 +69,7 @@ type Row = Record<string, unknown>
 export function playlistFromRow(row: Row): Playlist {
   return {
     id: String(row["id"] ?? ""),
+    kind: row["kind"] === "manual" ? "manual" : "smart",
     title: String(row["title"] ?? ""),
     position: Number(row["position"] ?? 0),
     rules: parseRules(row["rules"]),
@@ -74,14 +79,16 @@ export function playlistFromRow(row: Row): Playlist {
   }
 }
 
-/** A new, empty smart playlist for the editor to fill in. */
+/** A new, empty playlist: a smart one for the editor to fill in, or one to fill by hand. */
 export function newPlaylist(
   id: string,
   position: number,
   now: number,
+  kind: PlaylistKind = "smart",
 ): Playlist {
   return {
     id,
+    kind,
     title: "",
     position,
     rules: DEFAULT_RULES,

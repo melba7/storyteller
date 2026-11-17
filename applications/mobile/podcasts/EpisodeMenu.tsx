@@ -14,6 +14,7 @@ import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { isQueued } from "@/modules/podcasts/upNext"
 
+import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
 
 /**
@@ -97,6 +98,11 @@ export function EpisodeMenu({
               },
             ]
           : []),
+        {
+          id: "playlist",
+          title: "Add to playlist",
+          onPress: () => void chooseAndAddToPlaylist(episode, show),
+        },
         ...(isPreviewId(episode.id)
           ? []
           : [

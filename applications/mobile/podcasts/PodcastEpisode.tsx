@@ -23,6 +23,7 @@ import { LinkedNotes } from "./LinkedNotes"
 import { pressEpisode, useEpisodeStatus } from "./PlayButton"
 import { QueueButtons } from "./QueueButtons"
 import { ShareButton } from "./ShareButton"
+import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { useEpisode, useShow } from "./hooks"
 
 /** The episode card, shown as a sheet: artwork, details, a big play button and the notes. */
@@ -105,7 +106,7 @@ export function PodcastEpisode({ id }: { id: string }) {
       </Button>
       <QueueButtons episode={current} show={show.data ?? null} />
       <DownloadButton episode={current} size={44} showStatus />
-      <View className="flex-row items-center gap-2">
+      <View className="flex-row flex-wrap items-center justify-center gap-2">
         <Button
           variant="ghost"
           accessibilityLabel={`${current.starredAt === null ? "Star" : "Unstar"} ${current.title}`}
@@ -123,6 +124,15 @@ export function PodcastEpisode({ id }: { id: string }) {
             fill={current.starredAt === null ? "none" : "currentColor"}
           />
           <Text>{current.starredAt === null ? "Star" : "Starred"}</Text>
+        </Button>
+        <Button
+          variant="ghost"
+          accessibilityLabel={`Add ${current.title} to a playlist`}
+          onPress={() =>
+            void chooseAndAddToPlaylist(current, show.data ?? null)
+          }
+        >
+          <Text>Add to playlist</Text>
         </Button>
         <Button
           variant="ghost"

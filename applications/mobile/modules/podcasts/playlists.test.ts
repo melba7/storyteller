@@ -70,6 +70,7 @@ describe("saving a playlist", () => {
       "shortest",
       1,
       mine.createdAt,
+      "smart",
     )
     const saved = list(db).at(-1)
     expect(saved).toEqual({ ...mine, sort: "shortest" })
@@ -87,6 +88,7 @@ describe("saving a playlist", () => {
       "oldest",
       1,
       5,
+      "manual",
     )
     const after = list(db)[1]
     expect(after).toMatchObject({
@@ -96,6 +98,8 @@ describe("saving a playlist", () => {
       sort: "oldest",
       autoDownload: true,
       createdAt: before.createdAt,
+      // A playlist keeps the kind it was made with.
+      kind: "smart",
     })
     expect(after?.rules.starredOnly).toBe(true)
   })

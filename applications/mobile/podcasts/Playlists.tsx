@@ -2,17 +2,25 @@
 import { useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { ChevronRight, Plus } from "lucide-react-native"
-import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  View,
+} from "react-native"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { episodeCount } from "@/modules/podcasts/playlistLook"
 import { describeRules } from "@/modules/podcasts/playlistRules"
 import { type Playlist } from "@/modules/podcasts/playlists"
 
 import { ScreenBar } from "./ScreenBar"
 import { SectionMenuButton } from "./SectionMenu"
-import { usePlaylists, useSmartEpisodes } from "./usePlaylists"
+import { askNewPlaylist } from "./addToPlaylist"
+import { useItemCounts, usePlaylists, useSmartEpisodes } from "./usePlaylists"
 
 /** The Playlists tab: the smart playlists, each with how many episodes it holds now. */
 export function Playlists() {
@@ -30,10 +38,28 @@ export function Playlists() {
             size="icon"
             accessibilityLabel="New playlist"
             onPress={() =>
-              router.push({
-                pathname: "/podcasts/(tabs)/(playlists)/playlist-edit/[id]",
-                params: { id: "new" },
-              })
+              Alert.alert("New playlist", undefined, [
+                {
+                  text: "Smart playlist, from rules",
+                  onPress: () =>
+                    router.push({
+                      pathname:
+                        "/podcasts/(tabs)/(playlists)/playlist-edit/[id]",
+                      params: { id: "new" },
+                    }),
+                },
+                {
+                  text: "Playlist I fill myself",
+                  onPress: () =>
+                    askNewPlaylist((id) =>
+                      router.push({
+                        pathname: "/podcasts/(tabs)/(playlists)/playlist/[id]",
+                        params: { id },
+                      }),
+                    ),
+                },
+                { text: "Cancel", style: "cancel" },
+              ])
             }
           >
             <Icon as={Plus} size={22} className="text-primary" />
@@ -63,10 +89,13 @@ export function Playlists() {
 
 function PlaylistRow({ playlist }: { playlist: Playlist }) {
   const router = useRouter()
-  const count = useSmartEpisodes(playlist).data?.length
-  const summary = describeRules(playlist.rules)
-  const label =
-    count === undefined ? "" : count === 1 ? "1 episode" : `${count} episodes`
+  const manual = playlist.kind === "manual"
+  // A smart playlist is read through its rules, a hand-filled one counted.
+  const smartCount = useSmartEpisodes(manual ? null : playlist).data?.length
+  const counts = useItemCounts().data
+  const count = manual ? (counts?.get(playlist.id) ?? 0) : smartCount
+  const summary = manual ? "Filled by you" : describeRules(playlist.rules)
+  const label = count === undefined ? "" : episodeCount(count)
   return (
     <Pressable
       className="border-border active:bg-secondary flex-row items-center gap-3 border-b py-4"
