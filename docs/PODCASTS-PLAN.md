@@ -282,10 +282,12 @@ setting picks the detector, and each result is saved under the detector's id.
   next lines still read as the ad (its sponsor's name, a web address or a promo
   code), and move each edge to the nearest pause between words. The 12 seconds
   and the carried end come from MinusPod (see "Open-source code we use").
-- **How sure**: the model says how sure it is. Sure ads are skipped; unsure ones
-  are only listed in "Ads found" with a play button; guesses are dropped.
-- **When unsure, do not skip.** A missed ad costs a tap on "skip 30 s"; a wrong
-  skip loses part of the show.
+- **How sure**: the model says how sure it is. Sure and unsure ads are both
+  skipped, and "Ads found" marks the unsure ones "Not sure"; guesses are
+  dropped.
+- **Unsure ads are skipped too, with Undo** (Mo, 2026-11-18, after build 29.1
+  marked an ad only as unsure). Undo on the "Skipped ad" note plays it, and an
+  undone ad is not skipped again.
 - **Two switches**: "Skip ads" and "Skip the hosts' own plugs", both on by
   default (Mo, 2026-11-16), in Settings and per show.
 
@@ -437,8 +439,8 @@ mode refuses `swift run`.
    before you listen and storage stays small.
 5. **What counts as an ad?** Sponsor reads and promos for other shows are
    skipped. Mo's answer: the hosts' own plugs (Patreon, merch, their other
-   shows) are skipped too, under their own switch, separate from ads. When the
-   model is unsure, it does not skip.
+   shows) are skipped too, under their own switch, separate from ads. Unsure ads
+   are skipped too, with Undo (Mo, 2026-11-18).
 
 Assumed: the podcasts are in English (other languages the recogniser and model
 support can follow), and Apple Intelligence is on on the phone.

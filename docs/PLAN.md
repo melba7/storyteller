@@ -4,8 +4,9 @@ Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
 Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
 (B2) merged in PR #48 (TestFlight 29.1, with the Books look) | Books look: B1 to
-B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 done, C1 to
-C8 built (PR #51, iOS build pending), C9 and C12 in progress, Spotify dropped
+B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 to C9 and
+C12 done, Spotify dropped; Mo's 29.1 bugs fixed; ad skipping I0 to I2 and the
+iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1023,25 +1024,59 @@ TestFlight build.
       reach Apple's or Spotify's hosts, so a probe workflow does. Results in
       `docs/PODCASTS-PLAN.md` ("Chart sources checked"): sharp covers and Top
       Episodes yes, Spotify no.
-- [ ] **C1. A rule that picks a sharp picture address** (S): size buckets and
+- [x] **C1. A rule that picks a sharp picture address** (S): size buckets and
       Apple's image size rewrite, the original as a fallback.
-- [ ] **C2. Covers use the rule** (S): `Artwork` loads the sharp address first.
-- [ ] **C3. Featured cards filled by their cover** (S): the cover edge to edge
+- [x] **C2. Covers use the rule** (S): `Artwork` loads the sharp address first.
+- [x] **C3. Featured cards filled by their cover** (S): the cover edge to edge
       with its title on a fade, no small square in a coloured box.
-- [ ] **C4. Charts in groups, with yesterday's list as a fallback** (M).
-- [ ] **C5. Which lists, in which order** (S).
-- [ ] **C6. Shelves that draw only what is near the screen** (S), with a loading
+- [x] **C4. Charts in groups, with yesterday's list as a fallback** (M).
+- [x] **C5. Which lists, in which order** (S).
+- [x] **C6. Shelves that draw only what is near the screen** (S), with a loading
       shelf.
-- [ ] **C7. Home gets the lists** (M): Top Shows and eight "Top in ..." shelves,
+- [x] **C7. Home gets the lists** (M): Top Shows and eight "Top in ..." shelves,
       then the categories.
-- [ ] **C8. New gets every category as a shelf** (S).
-- [ ] **C9. Top Episodes** (M), if C0 says the source works.
+- [x] **C8. New gets every category as a shelf** (S).
+- [x] **C9. Top Episodes** (M), if C0 says the source works.
 - ~~C10. Spotify's chart, read and matched~~ and ~~C11. "Top on Spotify"~~:
   dropped, because Spotify's chart service failed on its own side in both probe
   runs (`docs/PODCASTS-LISTS-PLAN.md`, decision 4).
-- [ ] **C12. Docs and the Opus check** (S).
+- [x] **C12. Docs and the Opus check** (S).
   - Done when (each): the first test from the plan fails then passes, `check.sh`
     passes, and for screens the iOS build passes in CI.
+
+### Mo's 29.1 bugs, ad skipping and the iPhone Duo (2026-11-18)
+
+Mo, trying build 29.1: the player's "..." menu was cut off, a tap on the play
+bar crashed the app, Bloomberg Businessweek's transcript was out of time, and
+ads were never skipped ("the third time"); an ad was marked only after it
+played. Then: skip unsure ads too (with Undo), skip a stream's ads "even in the
+first 5 seconds", and full support for the foldable iPhone Duo. Fable reviewed
+every part; Sonnet built; Opus checked.
+
+- [x] **Menu, play bar and transcript**: the menu has at most 10 rows (Share,
+      Chapters and Bookmarks are submenus); the seek bar's helper is a worklet
+      (a test now checks every worklet file); the phone's transcript wins over a
+      feed's when it is done or covers the playhead.
+- [x] **Ads found sooner**: work starts at download, playing episode first;
+      pieces of 60, 120, then 300 s; a growing partial pass; unsure ads skipped
+      with Undo; a status line in the player; a refused piece no longer blocks
+      an episode; a Mac check (`Check ad skipping on an episode.command`).
+- [x] **I0. Mac timing and two-download probe**: `podcast-ads --head` runs the
+      phone's stream path; "Compare two downloads" has a one-click "Test my
+      shows".
+- [x] **I1. Heads first, and leave an ad already playing**: every episode's
+      first 3 minutes before any rest; an ad found while it plays is left when 3
+      s or more remain.
+- [x] **I2. A stream's first minutes checked while it downloads**: cuts at MP3
+      frames in 30 s steps, quick text rules, a prewarmed model at 60 s.
+- [ ] **I3. Spot inserted ads with a second quick download** (Mo said yes, once
+      the Mac test proves it): waits on Mo's "Test my shows" result.
+- [x] **iPhone Duo, landscape and small phones**: pages size from the window and
+      the safe-area insets; wide grids get more columns without a remount; the
+      player sits side by side when short and wide, with a whole cover on the
+      Duo's centred sheet; sheets turn with the phone.
+  - Needs Mo's phone or the Duo simulator: first-skip timing on a stream, the
+    fold and unfold, and how SpeechTranscriber writes web addresses.
 
 ## Later
 

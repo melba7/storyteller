@@ -78,3 +78,11 @@ One line per lesson.
   moves to the JS side with `scheduleOnRN`. Otherwise a release build crashes on
   touch (`SeekBar` and `barFraction`, 2026-11-18).
   `modules/podcasts/worklets.test.ts` now checks this.
+- Moving Swift code into an extension file (`PodcastAdFinder+Queue.swift`)
+  breaks any call to a `private` member of the main file, and only Mac CI
+  compiles the iOS module. Grep the moved code for the main file's `private`
+  members before pushing (2026-11-18, found by Fable's review).
+- `SpeechAnalyzer.finalize(through:)` waits until the analyzer has consumed
+  audio up to that time. Finalize through the audio really fed (the decoder and
+  rate converter keep a few milliseconds back), and put a time limit on each
+  step (2026-11-18).
