@@ -40,6 +40,7 @@ the app is not added again.
 - `Transcribe an episode.command`: see the next section.
 - `Find ads in an episode.command`: see the section after it.
 - `Check ad skipping on an episode.command`: see "Check ad skipping".
+- `Check ad edges on an episode.command`: see "Check ad edges".
 - `Time the first minute of an episode.command` and
   `Compare two downloads of an episode.command`: see "How fast can the first ads
   be found".
@@ -131,6 +132,61 @@ It needs macOS 26 with Apple Intelligence turned on and Xcode 26, like the two
 tools above. It counts only the work on this Mac, not the download. The phone is
 slower than a Mac, so a Mac that only just keeps ahead means a phone that falls
 behind.
+
+## Check ad edges
+
+`Check ad edges on an episode.command` finds out where each ad skip starts and
+ends, and why it is where it is. Use it on an episode where a skip went too far
+or started late. It asks for an audio file, transcribes it, finds the ads with
+the same Swift code the app uses, and runs PodcastKit's `podcast-ads --edges`.
+The result is saved next to the file as `<file name>.ad-edges.txt`.
+
+For each ad it prints:
+
+- the times, the kind, how sure the model is and the advertiser;
+- the lines the model named, as line numbers with their times;
+- the lines taken off the end because the hosts said the show was back, and the
+  lines carried onto the end because they still sold something;
+- how many seconds each step moved the start and the end: trimming or carrying,
+  then the landing (a quarter second before the next word);
+- the two lines before and the three lines after each edge, with their times and
+  words, so you can read where the skip really lands.
+
+After the ads it prints what the transcript's word times look like: the share of
+neighbouring words with a gap of 0.3 s or more, and the share where one word
+ends exactly where the next starts. If nearly every word ends where the next
+starts, the transcript hides the pauses, and a skip cannot find a pause to land
+in. It also prints the average words and seconds in a line.
+
+For an MP3 file it adds what Apple's player does with the file. Apple's player
+finds a time by jumping to the same share of the file's bytes, which is right
+only when every frame is the same size (one steady bitrate). It prints how many
+frames there are at each bitrate, whether the bitrate is steady, the worst seek
+error that jump would make (0 s on a steady file), the places where the encoding
+changes for good (often where an ad was spliced in), and the length the player
+is given next to the decoded length.
+
+How to run it:
+
+1. In Finder, double-click `Check ad edges on an episode.command`.
+2. Choose the episode. The first run builds the tool (about a minute) and may
+   download Apple's speech model. An hour-long episode takes a few minutes.
+3. Send back the saved `.ad-edges.txt`. Do this for 3 episodes where a skip went
+   too far.
+
+To compare the skips with ads you marked by hand, put a text file named
+`<file name>.truth.txt` next to the episode, with one ad on each line as two
+times (`12:30 13:45`; `1:02:03` and `12:30.5` work too; lines that start with
+`#` are left out). The result then also says, for each marked ad, how many
+seconds early or late the start and the end are, the mean and the worst
+overshoot (a skip that lands after the ad's real end), the ads that were missed
+and the ads that were not ads.
+
+It needs macOS 26 with Apple Intelligence turned on and Xcode 26, like the other
+ad tools. With a transcript file (`<hash>.transcript.json`) and Terminal,
+`swift run -c release podcast-ads --edges <file>` still prints the transcript's
+numbers on a system without Apple Intelligence, and says that the rest is left
+out.
 
 ## How fast can the first ads be found
 

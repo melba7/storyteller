@@ -3,6 +3,7 @@
 //   swift run -c release podcast-ads [--locale en-US] <episode.transcript.json | audio file>
 //   swift run -c release podcast-ads --play [--locale en-US] <audio file>
 //   swift run -c release podcast-ads --head 90 --timings [--locale en-US] <audio file>
+//   swift run -c release podcast-ads --edges [--truth <file>] [--locale en-US] <transcript or audio>
 //   swift run -c release podcast-ads --probe <episode address>
 //
 // Prints each ad with its times, kind, advertiser, how sure the model is and its first words,
@@ -13,9 +14,13 @@
 // --head N --timings (an MP3 file) it runs the first N seconds down the path a stream takes
 // on the phone (the head transcriber, cuts of the file's first bytes, the text rules after each
 // step of 15, 30, 60 s and so on, the model at 30, 60, 120 and 180 s), twice in one process
-// (cold, then warm), and prints the time of each step. With --probe it downloads the first 3 MB
-// of an episode address twice as two different listeners and prints where the two copies differ
-// (no speech or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
+// (cold, then warm), and prints the time of each step. With --edges it prints, for each ad,
+// what the model said and what each clean-up step did to the ends, the lines around each edge,
+// what the transcript's word times look like and, for an MP3 file, how exact the player's
+// seeks are (Edges.swift); with --truth (a file of hand-marked ads, one "12:30 13:45" to a
+// line) it also compares the two. With --probe it downloads the first 3 MB of an episode
+// address twice as two different listeners and prints where the two copies differ (no speech
+// or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
 // is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
 // still work there.
 import Foundation
@@ -102,13 +107,32 @@ if let at = arguments.firstIndex(of: "--play") {
   play = true
   arguments.remove(at: at)
 }
+var edges = false
+if let at = arguments.firstIndex(of: "--edges") {
+  edges = true
+  arguments.remove(at: at)
+}
+var truthFile: URL?
+if let at = arguments.firstIndex(of: "--truth") {
+  guard arguments.indices.contains(at + 1) else { fail("--truth needs a file of marked ads") }
+  truthFile = URL(fileURLWithPath: arguments[at + 1])
+  arguments.removeSubrange(at...at + 1)
+}
 guard arguments.count == 1 else {
   fail(
-    "Usage: podcast-ads [--play | --head 90 --timings] [--locale en-US] <episode.transcript.json or audio file>\n       podcast-ads --probe <episode address>"
+    "Usage: podcast-ads [--play | --head 90 --timings | --edges [--truth <file>]] [--locale en-US] <episode.transcript.json or audio file>\n       podcast-ads --probe <episode address>"
   )
 }
 let input = URL(fileURLWithPath: arguments[0])
 guard FileManager.default.fileExists(atPath: input.path) else { fail("No file at \(input.path)") }
+if truthFile != nil, !edges { fail("--truth is used with --edges.") }
+if let truthFile, !FileManager.default.fileExists(atPath: truthFile.path) {
+  fail("No file at \(truthFile.path)")
+}
+if edges {
+  // The transcript's own numbers need no model, so this runs before the model is looked for.
+  exit(await Edges.run(input: input, truthFile: truthFile, locale: locale))
+}
 guard let detector = AppleAds.makeDetector() else { fail("Needs macOS 26 (and Xcode 26 to build).") }
 if let reason = AppleAds.unavailable() { fail("Cannot find ads now: \(reason.reason).") }
 

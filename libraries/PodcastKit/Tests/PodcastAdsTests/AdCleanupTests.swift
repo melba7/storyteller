@@ -312,6 +312,71 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(AdCleanup.run(ranges: [range(1, 1), range(3, 3)], transcript: transcript).count, 1)
   }
 
+  // MARK: The trace
+
+  func testExplainSaysOneLineWasCarriedAndNamesIt() throws {
+    var texts = talk(30)
+    texts[5] = "go to acme dot com"
+    let trace = try XCTUnwrap(
+      AdCleanup.explain(ranges: [range(3, 5)], transcript: makeTranscript(texts)).first)
+    XCTAssertEqual(trace.firstLine, 3)
+    XCTAssertEqual(trace.lastLine, 5)
+    XCTAssertEqual(trace.carried.map(\.number), [6])
+    XCTAssertEqual(trace.carried.first?.text, "go to acme dot com")
+    XCTAssertEqual(trace.carried.first?.start, 50)
+    XCTAssertTrue(trace.trimmed.isEmpty)
+    XCTAssertEqual(trace.answers, 1)
+    XCTAssertEqual(trace.ad.start, 19.75, accuracy: 0.01)
+    XCTAssertEqual(trace.ad.end, 59.75, accuracy: 0.01)
+  }
+
+  func testExplainNamesTheLinesTheShowIsBackTrimmedOff() throws {
+    var texts = talk(30)
+    texts[4] = "and we're back"
+    texts[5] = "So where were we"
+    let trace = try XCTUnwrap(
+      AdCleanup.explain(ranges: [range(3, 6)], transcript: makeTranscript(texts)).first)
+    XCTAssertEqual(trace.lastLine, 6, "the model's own last line")
+    XCTAssertEqual(trace.trimmed.map(\.number), [5, 6])
+    XCTAssertTrue(trace.carried.isEmpty)
+    XCTAssertEqual(trace.ad.end, 39.75, accuracy: 0.01)
+  }
+
+  func testExplainCountsTheAnswersJoinedIntoOneAd() throws {
+    let traces = AdCleanup.explain(
+      ranges: [range(3, 8, .unsure), range(6, 12, .sure), range(30, 33)], transcript: plain)
+    XCTAssertEqual(traces.map(\.answers), [2, 1])
+    XCTAssertEqual(traces[0].firstLine, 3)
+    XCTAssertEqual(traces[0].lastLine, 12)
+  }
+
+  func testExplainShowsTwoLinesBeforeAndThreeAfterEachEdge() throws {
+    let trace = try XCTUnwrap(AdCleanup.explain(ranges: [range(3, 5)], transcript: plain).first)
+    XCTAssertEqual(trace.aroundStart.before.map(\.number), [1, 2])
+    XCTAssertEqual(trace.aroundStart.after.map(\.number), [3, 4, 5])
+    XCTAssertEqual(trace.aroundEnd.before.map(\.number), [4, 5])
+    XCTAssertEqual(trace.aroundEnd.after.map(\.number), [6, 7, 8])
+    XCTAssertEqual(trace.aroundEnd.after.first?.text, "plain talk number 6 here")
+    XCTAssertEqual(trace.aroundEnd.after.first?.start, 50)
+    let top = try XCTUnwrap(AdCleanup.explain(ranges: [range(1, 3)], transcript: plain).first)
+    XCTAssertTrue(top.aroundStart.before.isEmpty)
+    let bottom = try XCTUnwrap(AdCleanup.explain(ranges: [range(58, 60)], transcript: plain).first)
+    XCTAssertTrue(bottom.aroundEnd.after.isEmpty)
+  }
+
+  func testRunGivesTheAdsExplainDoes() {
+    var texts = talk(60)
+    texts[5] = "go to acme dot com"
+    texts[24] = "welcome back to the show"
+    let transcript = makeTranscript(texts)
+    let ranges = [
+      range(3, 5), range(10, 14, .unsure), range(20, 25), range(40, 43, .guess), range(4, 7),
+    ]
+    XCTAssertEqual(
+      AdCleanup.run(ranges: ranges, transcript: transcript),
+      AdCleanup.explain(ranges: ranges, transcript: transcript).map(\.ad))
+  }
+
   // MARK: Where the player lands
 
   /// A transcript from hand-placed lines and words (start, end, text), for the tests that need

@@ -35,12 +35,18 @@ public enum AdRules {
 
 public enum AdCleanup {
   /// The ads in an episode from all the detector's answers for its pieces. Steps: guesses and
-  /// answers that name no real lines are dropped; each end is carried on while the next lines
-  /// still read as the ad; line numbers become times; overlapping answers (an ad across a cut)
-  /// are joined into one, and so are ads of one kind with little speech between them; edges
-  /// land a quarter second before the next word (`AdLanding`); what is too short or too long is
-  /// dropped.
+  /// answers that name no real lines are dropped; the model's last lines are trimmed when the
+  /// show is back, and an end is carried on while the next lines still read as the ad; line
+  /// numbers become times; overlapping answers (an ad across a cut) are joined into one, and so
+  /// are sure ads of one break; edges land a quarter second before the next word (`AdLanding`);
+  /// what is too short or too long is dropped.
   public static func run(ranges: [AdRange], transcript: Transcript) -> [FoundAd] {
+    explain(ranges: ranges, transcript: transcript).map(\.ad)
+  }
+
+  /// The same ads as `run`, each with how it came about: the model's lines, the lines trimmed
+  /// and carried, the answers joined and the lines around each edge.
+  public static func explain(ranges: [AdRange], transcript: Transcript) -> [AdTrace] {
     let lines = transcript.lines
     guard !lines.isEmpty else { return [] }
 
@@ -52,28 +58,39 @@ public enum AdCleanup {
       // An ad that ends with the show coming back is cut short and nothing is carried; an ad the
       // model is unsure of is never carried.
       var end = trimmedEnd(first: first, last: last, advertiser: range.advertiser, lines: lines)
-      if end == last, range.confidence == .sure {
+      let trimmed = last - end
+      if trimmed == 0, range.confidence == .sure {
         end = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
       }
       spans.append(
         Span(
           start: lines[first - 1].start, end: lines[end - 1].end, kind: range.kind,
-          advertiser: range.advertiser, confidence: range.confidence))
+          advertiser: range.advertiser, confidence: range.confidence, first: first, last: last,
+          trimmed: trimmed, carried: end - last, answers: 1))
     }
 
     let words = transcript.words
-    var ads: [FoundAd] = []
+    var traces: [AdTrace] = []
     for span in merge(spans, lines: lines, words: words) {
       let landed = AdLanding.edges(start: span.start, end: span.end, words: words)
       let start = max(0, landed.start)
       let end = min(transcript.duration > 0 ? transcript.duration : .infinity, landed.end)
       guard end - start >= AdRules.minLength, end - start <= AdRules.maxLength else { continue }
-      ads.append(
-        FoundAd(
-          start: start, end: end, kind: span.kind, advertiser: span.advertiser,
-          confidence: span.confidence, firstWords: opening(of: span, words: words)))
+      let ad = FoundAd(
+        start: start, end: end, kind: span.kind, advertiser: span.advertiser,
+        confidence: span.confidence, firstWords: opening(of: span, words: words))
+      func numbered(_ numbers: ClosedRange<Int>) -> [NumberedLine] {
+        numbers.map { NumberedLine(number: $0, line: lines[$0 - 1]) }
+      }
+      traces.append(
+        AdTrace(
+          ad: ad, firstLine: span.first, lastLine: span.last,
+          trimmed: span.trimmed > 0 ? numbered((span.last - span.trimmed + 1)...span.last) : [],
+          carried: span.carried > 0 ? numbered((span.last + 1)...(span.last + span.carried)) : [],
+          answers: span.answers, aroundStart: EdgeContext(at: start, lines: lines),
+          aroundEnd: EdgeContext(at: end, lines: lines)))
     }
-    return ads
+    return traces
   }
 
   private struct Span {
@@ -82,7 +99,22 @@ public enum AdCleanup {
     var kind: AdKind
     var advertiser: String
     var confidence: AdConfidence
+    /// The model's first and last line (of the answer that ends latest), the lines trimmed off
+    /// its end or carried after it, and how many answers this span joins.
+    var first: Int
+    var last: Int
+    var trimmed: Int
+    var carried: Int
+    var answers: Int
     var length: Double { end - start }
+
+    /// Takes over the end of `other`, an answer that ends later.
+    mutating func takeEnd(of other: Span) {
+      end = other.end
+      last = other.last
+      trimmed = other.trimmed
+      carried = other.carried
+    }
   }
 
   /// The last line number of an ad after carrying it on: while the line after it sells (see
@@ -135,10 +167,13 @@ public enum AdCleanup {
           last.advertiser = span.advertiser
         }
         last.confidence = max(last.confidence, span.confidence)
-        last.end = max(last.end, span.end)
+        if span.end > last.end { last.takeEnd(of: span) }
+        last.first = min(last.first, span.first)
+        last.answers += span.answers
         result.append(last)
       } else if isOneBreak(last, span, lines: lines, words: words) {
-        last.end = span.end
+        last.takeEnd(of: span)
+        last.answers += span.answers
         if last.advertiser.isEmpty { last.advertiser = span.advertiser }
         result.append(last)
       } else {
