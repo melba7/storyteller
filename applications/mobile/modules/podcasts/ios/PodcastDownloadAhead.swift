@@ -37,6 +37,16 @@ final class PodcastDownloadAhead {
     }
   }
 
+  /// An episode starts to play or load: it is the listener's from here on, so its download (if it
+  /// was fetched ahead) is no longer marked and is never dropped for leaving Up Next. The player
+  /// calls this the moment it begins an episode, because the look below waits a few seconds, and
+  /// an episode paused and put aside, or the app closed, within them would lose its file.
+  func handOver(_ episodeId: String) {
+    do { try PodcastDownloader.shared.store?.clearAhead(episodeId: episodeId) } catch {
+      NSLog("Podcasts: an ahead download could not be handed over to the listener: \(error)")
+    }
+  }
+
   /// Asks the rule what to do now and does it.
   private func look() {
     let player = PodcastPlayer.shared
@@ -50,11 +60,7 @@ final class PodcastDownloadAhead {
       playingId: player.current?.id, entries: store.entries(), started: started,
       onWiFi: PodcastNetwork.shared.onWiFi)
 
-    for id in plan.adopt {
-      do { try store.clearAhead(episodeId: id) } catch {
-        NSLog("Podcasts: an ahead download could not be handed over to the listener: \(error)")
-      }
-    }
+    for id in plan.adopt { handOver(id) }
     for id in plan.drop {
       do { try downloader.remove(episodeId: id) } catch {
         NSLog("Podcasts: an ahead download could not be removed: \(error)")

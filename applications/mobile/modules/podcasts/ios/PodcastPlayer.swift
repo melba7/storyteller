@@ -106,6 +106,8 @@ final class PodcastPlayer {
 
   /// Loads an episode and, unless told not to, starts it.
   func begin(_ episode: Episode) {
+    // At once, not with the look at Up Next a few seconds from now (see PodcastDownloadAhead).
+    PodcastDownloadAhead.shared.handOver(episode.id)
     cancelStartHold()
     watchTheBook()
     currentEnded = false
