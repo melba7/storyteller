@@ -204,29 +204,47 @@ fix. It changes nothing in the app.
 How to run it:
 
 1. In Finder, double-click `Compare two episodes of a show.command`.
-2. Choose the first episode (an MP3 file), then a second, different episode of
-   the same show. Pick two that open with the same kind of ad.
-3. Wait a minute. The first run builds the tool. The result is saved as
-   `ad-shared-<name of the first file>-<time>.txt` in `~/Storyteller Lofi/logs`,
-   and Finder shows it.
-4. Do this for two episodes of each of 3 shows and send back the 3 files.
+2. Click **Compare my shows (recommended)**. You need no files: it reads the
+   shows you follow in Apple Podcasts (from the Apple Podcasts sync; if that
+   file is missing it says to double-click `Sync Apple Podcasts now.command`
+   first), takes up to 3 of them from different hosting services, finds the two
+   newest episodes of each in the show's feed, and downloads only the first 20
+   MB of each, one at a time with a pause between them: 6 downloads, about 120
+   MB in all. The start of an episode is where pre-roll ads sit, so that is
+   enough; ads later in an episode are not looked at. The downloads go to a
+   temporary folder that is deleted when it is done.
+3. Wait a few minutes. The first run builds the tool. The report is saved as
+   `ad-shared-shows-<time>.txt` in `~/Storyteller Lofi/logs`, and Finder shows
+   it. Send that one file back.
 
-It needs no Apple Intelligence and no network, only Xcode 26. It reads the two
-files and keeps nothing.
+To use two MP3 files you already have, click **Two files I choose** instead,
+then pick the first episode and a second, different episode of the same show
+(two that open with the same kind of ad). The result is saved as
+`ad-shared-<name of the first file>-<time>.txt` in the same folder.
 
-The report first says how long each file is and how often its bit reservoir
-restarts. An MP3 frame can borrow room from the frames before it; the pointer
-that says how far back is the "main data begin" number. A piece of audio that
-was encoded on its own starts with nothing to borrow, so a frame with the number
-0 that follows 50 or more frames with a number above 0 is called a reservoir
-reset, and may be where a spot was joined in. It then lists each stretch of 3 s
-or more that is the same bytes in both files, as a "run". The two files need not
-hold it at the same time; a spot may open one episode and sit in the middle of
-the other. A stretch has to hold 20 different frames, so digital silence is not
-a run. For each run it gives the times in both files and says whether a reset or
-a change of encoding sits within 2 frames of the start and of the end. The
-summary counts the runs of 10 s or more that have one at both ends, and says in
-plain words what the result means.
+A publisher sees each of the 6 downloads as a listener who stopped after the
+first minutes, so run it once, not in a loop.
+
+It needs no Apple Intelligence, only Xcode 26. It keeps no audio.
+
+The report for the shows has one section for each show, with the two addresses
+it downloaded, how much of each it kept, and then the result below. It ends with
+a table, one line per show: the host, how many runs there are, the longest one,
+and how many runs have a reset or a change of encoding at both ends, in the
+first and in the second episode. Each section holds the result for its two
+files. That result first says how long each file is and how often its bit
+reservoir restarts. An MP3 frame can borrow room from the frames before it; the
+pointer that says how far back is the "main data begin" number. A piece of audio
+that was encoded on its own starts with nothing to borrow, so a frame with the
+number 0 that follows 50 or more frames with a number above 0 is called a
+reservoir reset, and may be where a spot was joined in. It then lists each
+stretch of 3 s or more that is the same bytes in both files, as a "run". The two
+files need not hold it at the same time; a spot may open one episode and sit in
+the middle of the other. A stretch has to hold 20 different frames, so digital
+silence is not a run. For each run it gives the times in both files and says
+whether a reset or a change of encoding sits within 2 frames of the start and of
+the end. The summary counts the runs of 10 s or more that have one at both ends,
+and says in plain words what the result means.
 
 How to read it: a run of 10 s or more that you recognise as an ad when you
 listen at its time, with a reset or a change at both ends, means the host copies
