@@ -149,6 +149,7 @@ extension PodcastPlayer {
   func chapterSeeked(to position: Double) {
     let state = ChapterState.shared
     state.skipper.seeked(to: position, in: state.chapters)
+    sleepSeeked(to: position)
   }
 
   /// Called with every tick of the clock: jumps over a skipped chapter that playback reached.

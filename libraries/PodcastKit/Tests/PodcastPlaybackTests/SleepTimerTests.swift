@@ -101,6 +101,42 @@ final class SleepTimerTests: XCTestCase {
     XCTAssertNil(SleepTimer.endOfChapter(endingAt: -1))
   }
 
+  func testAJumpByThePlayerOverTheChaptersEndStillStops() throws {
+    // An ad skip or a skipped chapter moves the playhead without the listener: the timer was
+    // asked to stop at the end of the chapter, so it stops, however far the jump went.
+    let timer = try XCTUnwrap(SleepTimer.endOfChapter(endingAt: 600))
+    XCTAssertEqual(timer.chapterAction(at: 300, listenerSeeked: false), .none)
+    XCTAssertEqual(timer.chapterAction(at: 599.6, listenerSeeked: false), .pause)
+    XCTAssertEqual(timer.chapterAction(at: 601, listenerSeeked: false), .pause)
+    XCTAssertEqual(timer.chapterAction(at: 640, listenerSeeked: false), .pause)
+    XCTAssertEqual(timer.chapterAction(at: 5400, listenerSeeked: false), .pause)
+  }
+
+  func testAListenersSeekPastTheEndLetsTheTimerGo() throws {
+    let timer = try XCTUnwrap(SleepTimer.endOfChapter(endingAt: 600))
+    XCTAssertEqual(timer.chapterAction(at: 300, listenerSeeked: true), .none)
+    XCTAssertEqual(timer.chapterAction(at: 599.6, listenerSeeked: true), .pause)
+    XCTAssertEqual(timer.chapterAction(at: 640, listenerSeeked: true), .cancel)
+  }
+
+  func testAListenersSeekJustPastTheEndStillStops() throws {
+    // Within the 3 seconds after the end, a seek lands where the timer pauses it, as before.
+    let timer = try XCTUnwrap(SleepTimer.endOfChapter(endingAt: 600))
+    XCTAssertEqual(timer.chapterAction(at: 603, listenerSeeked: true), .pause)
+    XCTAssertEqual(timer.chapterAction(at: 603.1, listenerSeeked: true), .cancel)
+  }
+
+  func testOnlyAChapterTimerHasAChapterAction() throws {
+    let countdown = try XCTUnwrap(SleepTimer.countdown(minutes: 5, from: 0))
+    for listenerSeeked in [false, true] {
+      XCTAssertEqual(
+        SleepTimer.endOfEpisode.chapterAction(at: 5000, listenerSeeked: listenerSeeked), .none)
+      XCTAssertEqual(countdown.chapterAction(at: 5000, listenerSeeked: listenerSeeked), .none)
+      let chapter = try XCTUnwrap(SleepTimer.endOfChapter(endingAt: 600))
+      XCTAssertEqual(chapter.chapterAction(at: .nan, listenerSeeked: listenerSeeked), .none)
+    }
+  }
+
   func testOwnTimeIsWholeMinutesFromOneToTwelveHours() {
     XCTAssertEqual(SleepTimer.customMinutes("20"), 20)
     XCTAssertEqual(SleepTimer.customMinutes(" 90 "), 90)
