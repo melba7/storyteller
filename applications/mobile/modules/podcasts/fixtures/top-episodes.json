@@ -1,0 +1,66 @@
+{
+  "feed": {
+    "title": "Trending Episodes",
+    "id": "https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcast-episodes.json",
+    "author": {
+      "name": "Apple",
+      "url": "https://www.apple.com/"
+    },
+    "links": [
+      {
+        "self": "https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcast-episodes.json"
+      }
+    ],
+    "copyright": "Copyright © 2026 Apple Inc. All rights reserved.",
+    "country": "us",
+    "icon": "https://www.apple.com/favicon.ico",
+    "updated": "Wed, 18 Nov 2026 01:37:43 +0000",
+    "results": [
+      {
+        "artistName": "Audiochuck",
+        "id": "1000801585453",
+        "name": "MISSING: Lisa Jameson",
+        "kind": "podcast-episodes",
+        "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/c6/ec/29/c6ec29af-813b-5217-cd48-ffa104027cba/mza_15532232243413673045.jpeg/100x100bb.png",
+        "genres": [
+          {
+            "genreId": "1488",
+            "name": "True Crime",
+            "url": "https://itunes.apple.com/us/genre/id1488"
+          }
+        ],
+        "url": "https://podcasts.apple.com/us/podcast/missing-lisa-jameson/id1322200189?i=1000801585453"
+      },
+      {
+        "artistName": "Barstool Sports",
+        "id": "1000802201557",
+        "name": "NFL Week 10, Fastest 2 Minutes, Niners And Bengals Roll, Vikings Are Back With Kirk, Hank's Sad Pancakes + Who's Back Of The Week",
+        "kind": "podcast-episodes",
+        "contentAdvisoryRating": "Explict",
+        "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts221/v4/e2/83/96/e2839650-4ecb-ae86-8eae-bec0ff4485e4/mza_8583579246637128994.jpg/100x100bb.png",
+        "genres": [
+          {
+            "name": "Football"
+          }
+        ],
+        "url": "https://podcasts.apple.com/us/podcast/nfl-week-10-fastest-2-minutes-niners-and-bengals-roll/id1089022756?i=1000802201557"
+      },
+      {
+        "artistName": "The Ringer",
+        "id": "1000802201223",
+        "name": "Bill and Sal’s Pity Party, Burrow’s MVP Party, President Cousins, and Guess the Lines With Cousin Sal",
+        "kind": "podcast-episodes",
+        "contentAdvisoryRating": "Explict",
+        "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Podcasts211/v4/cc/80/7a/cc807ada-eefc-d962-fb19-514a729249ce/mza_4622982796810028676.jpg/100x100bb.png",
+        "genres": [
+          {
+            "genreId": "1545",
+            "name": "Sports",
+            "url": "https://itunes.apple.com/us/genre/id1545"
+          }
+        ],
+        "url": "https://podcasts.apple.com/us/podcast/bill-and-sals-pity-party-burrows-mvp-party-president/id1043699613?i=1000802201223"
+      }
+    ]
+  }
+}

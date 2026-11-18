@@ -8,17 +8,26 @@ import {
   loadChartGroups,
 } from "@/modules/podcasts/chartBatch"
 import { cacheGet, cachePut } from "@/modules/podcasts/dbFeeds"
+import {
+  EPISODES_CHART,
+  type EpisodesState,
+  type EpisodesUpdate,
+  applyEpisodesEvent,
+  loadTopEpisodes,
+} from "@/modules/podcasts/topEpisodes"
 
 const store = { cacheGet, cachePut }
 const LOADING: ListState = { status: "loading" }
 
-export type ChartListStates = Record<string, ListState>
+/** A show list's state, or the episode list's (it holds `episodes` where the others hold `shows`). */
+export type ChartListStates = Record<string, ListState | EpisodesState>
 
 /**
  * Loads the chart lists with these ids and holds each one's state. Nothing starts until
  * `enabled` (Home and New wait for the followed shows, because they decide the order). Two
  * pages asking for the same list together fetch it once: `loadChartGroups` shares one
- * in-flight promise per list. `retry()` asks again; lists that are fresh cost no request.
+ * in-flight promise per list. The episode list (`EPISODES_CHART`) has its own loader and
+ * its state sits among the others. `retry()` asks again; lists that are fresh cost no request.
  */
 export function useChartLists(ids: string[], enabled: boolean) {
   const key = ids.join(",")
@@ -41,10 +50,28 @@ export function useChartLists(ids: string[], enabled: boolean) {
       if (!current) return
       setStates((before) => ({
         ...before,
-        [id]: applyListEvent(before[id] ?? LOADING, update),
+        [id]: applyListEvent((before[id] ?? LOADING) as ListState, update),
       }))
     }
-    loadChartGroups(key.split(","), store, onList).catch(() => {})
+    const all = key.split(",")
+    const onEpisodes = (update: EpisodesUpdate) => {
+      if (!current) return
+      setStates((before) => ({
+        ...before,
+        [EPISODES_CHART]: applyEpisodesEvent(
+          (before[EPISODES_CHART] ?? LOADING) as EpisodesState,
+          update,
+        ),
+      }))
+    }
+    if (all.includes(EPISODES_CHART)) {
+      loadTopEpisodes(store, onEpisodes).catch(() => {})
+    }
+    loadChartGroups(
+      all.filter((id) => id !== EPISODES_CHART),
+      store,
+      (id, update) => onList(id, update),
+    ).catch(() => {})
     return () => {
       current = false
     }

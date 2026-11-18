@@ -153,3 +153,28 @@ export function shelfTileSize(windowWidth: number): number {
 export function shelfHeight(tileSize: number, ranked: boolean): number {
   return tileSize + SHELF_TEXT_GAP + (ranked ? 3 : 2) * SHELF_LINE_HEIGHT
 }
+
+/** Rows in one page of the episode shelf, and the side of a row's cover. */
+export const EPISODE_ROWS = 3
+export const EPISODE_COVER = 60
+/** One episode row: the cover with 8 pt above and below. Three lines of 20 pt text fit in it. */
+export const EPISODE_ROW_HEIGHT = EPISODE_COVER + 16
+/** How much of the next page shows beside the current one. */
+export const EPISODE_PEEK = 28
+
+/** The width of one page of episode rows: the window less the gutter, the gap and the peek. */
+export function episodeColumnWidth(windowWidth: number): number {
+  return Math.max(0, windowWidth - SHELF_GUTTER - SHELF_GAP - EPISODE_PEEK)
+}
+
+/** The height of the episode shelf, which its loading shelf shares. */
+export const EPISODE_SHELF_HEIGHT = EPISODE_ROWS * EPISODE_ROW_HEIGHT
+
+/** Splits a list into pages of `EPISODE_ROWS`; the last page may be shorter. */
+export function pagesOfRows<T>(items: readonly T[]): T[][] {
+  const pages: T[][] = []
+  for (let i = 0; i < items.length; i += EPISODE_ROWS) {
+    pages.push(items.slice(i, i + EPISODE_ROWS))
+  }
+  return pages
+}

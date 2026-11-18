@@ -81,18 +81,26 @@ export const arrangeHref = page("arrange")
 
 /**
  * A show read from its feed without saving it, in the tab you are in. A search result also
- * names its episode (guid, audio address) so the preview can point at it.
+ * names its episode (guid, audio address, title) so the preview can point at it.
  */
 export function previewHref(
   segments: readonly string[],
   feedUrl: string,
-  episode: { guid?: string | null; audioUrl?: string | null } = {},
+  episode: {
+    guid?: string | null
+    audioUrl?: string | null
+    title?: string | null
+  } = {},
 ) {
-  const params: { feed: string; guid?: string; audio?: string } = {
-    feed: feedUrl,
-  }
+  const params: {
+    feed: string
+    guid?: string
+    audio?: string
+    title?: string
+  } = { feed: feedUrl }
   if (episode.guid) params.guid = episode.guid
   if (episode.audioUrl) params.audio = episode.audioUrl
+  if (episode.title) params.title = episode.title
   return { pathname: `${tabBase(segments)}/preview`, params }
 }
 

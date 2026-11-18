@@ -108,6 +108,12 @@ describe("preview and category links", () => {
     ).toEqual({ feed: "u" })
   })
 
+  it("passes the episode title for a chart that has no guid or audio", () => {
+    expect(
+      previewHref(["(tabs)", "(home)"], "u", { title: "Episode One" }).params,
+    ).toEqual({ feed: "u", title: "Episode One" })
+  })
+
   it("open a category's chart in New, or in Search when you are there", () => {
     expect(categoryHref("1321")).toEqual({
       pathname: "/podcasts/(tabs)/(new)/category/[id]",

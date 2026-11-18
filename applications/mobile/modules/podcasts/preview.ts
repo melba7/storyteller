@@ -66,10 +66,19 @@ export function previewFromFeed(
   }
 }
 
-/** What a search result knows about its episode: the feed's guid and the audio address. */
+/**
+ * What a search result or chart knows about its episode: the feed's guid, the audio address
+ * and, for the charts that have neither, the title.
+ */
 export type EpisodeTarget = {
   guid?: string | null | undefined
   audioUrl?: string | null | undefined
+  title?: string | null | undefined
+}
+
+/** A title trimmed, with runs of spaces made one and in lower case. */
+function titleKey(title: string): string {
+  return title.trim().replace(/\s+/g, " ").toLowerCase()
 }
 
 /** An audio address without its scheme, query and trailing slash, in lower case. */
@@ -84,10 +93,11 @@ function audioKey(url: string): string {
 
 /**
  * The place in the preview's list of the episode a search result meant: by the feed's guid,
- * or else by the audio address. -1 when the feed has no such episode, or none was named.
+ * else by the audio address, else by the title when exactly one episode has it. -1 when the
+ * feed has no such episode, or none was named.
  */
 export function findEpisodeIndex(
-  episodes: Pick<StoredEpisode, "guid" | "audioUrl">[],
+  episodes: (Pick<StoredEpisode, "guid" | "audioUrl"> & { title?: string })[],
   target: EpisodeTarget,
 ): number {
   if (target.guid) {
@@ -96,8 +106,16 @@ export function findEpisodeIndex(
   }
   if (target.audioUrl) {
     const wanted = audioKey(target.audioUrl)
-    if (wanted !== "")
-      return episodes.findIndex((e) => audioKey(e.audioUrl) === wanted)
+    const byAudio =
+      wanted === ""
+        ? -1
+        : episodes.findIndex((e) => audioKey(e.audioUrl) === wanted)
+    if (byAudio >= 0) return byAudio
   }
-  return -1
+  const wanted = titleKey(target.title ?? "")
+  if (wanted === "") return -1
+  const matches = episodes.flatMap((e, index) =>
+    titleKey(e.title ?? "") === wanted ? [index] : [],
+  )
+  return matches.length === 1 ? matches[0]! : -1
 }

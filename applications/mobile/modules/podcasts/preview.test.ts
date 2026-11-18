@@ -120,6 +120,40 @@ describe("findEpisodeIndex", () => {
     ).toBe(1)
   })
 
+  it("falls back to the title when guid and audio found nothing", () => {
+    const titled = [
+      { guid: "a", audioUrl: "https://cdn.test/one.mp3", title: "Episode One" },
+      { guid: "b", audioUrl: "https://cdn.test/two.mp3", title: "Episode Two" },
+    ]
+    expect(
+      findEpisodeIndex(titled, {
+        guid: "zzz",
+        audioUrl: "https://other.test/x.mp3",
+        title: "  episode   TWO ",
+      }),
+    ).toBe(1)
+    expect(findEpisodeIndex(titled, { title: "Episode One" })).toBe(0)
+  })
+
+  it("prefers a guid or audio match over the title", () => {
+    const titled = [
+      { guid: "a", audioUrl: "https://cdn.test/one.mp3", title: "Same" },
+      { guid: "b", audioUrl: "https://cdn.test/two.mp3", title: "Other" },
+    ]
+    expect(findEpisodeIndex(titled, { guid: "b", title: "Same" })).toBe(1)
+  })
+
+  it("does not guess by title when two episodes share it, or none does", () => {
+    const twins = [
+      { guid: "a", audioUrl: "x", title: "Same" },
+      { guid: "b", audioUrl: "y", title: "same " },
+      { guid: "c", audioUrl: "z", title: "Other" },
+    ]
+    expect(findEpisodeIndex(twins, { title: "Same" })).toBe(-1)
+    expect(findEpisodeIndex(twins, { title: "Missing" })).toBe(-1)
+    expect(findEpisodeIndex(twins, { title: "   " })).toBe(-1)
+  })
+
   it("is -1 when the feed has no such episode or none was named", () => {
     expect(
       findEpisodeIndex(list, {

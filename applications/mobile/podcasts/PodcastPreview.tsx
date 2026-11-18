@@ -74,11 +74,13 @@ export function PodcastPreview({
   }, [])
   const list = useRef<FlatList<StoredEpisode>>(null)
   const scrolled = useRef(false)
-  const { guid, audioUrl } = episode
+  const { guid, audioUrl, title } = episode
   const target = useMemo(
     () =>
-      preview ? findEpisodeIndex(preview.episodes, { guid, audioUrl }) : -1,
-    [preview, guid, audioUrl],
+      preview
+        ? findEpisodeIndex(preview.episodes, { guid, audioUrl, title })
+        : -1,
+    [preview, guid, audioUrl, title],
   )
 
   useEffect(() => {

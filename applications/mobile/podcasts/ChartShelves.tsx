@@ -7,6 +7,7 @@ import { type ChartListPlan } from "@/modules/podcasts/chartLists"
 import { categoryHref } from "@/modules/podcasts/routes"
 
 import { useOpenPreview } from "./ChartRow"
+import { EpisodeChartShelf, EpisodeShelfSkeleton } from "./EpisodeChartShelf"
 import { SectionHeader } from "./SectionHeader"
 import { ShelfSkeleton } from "./ShelfSkeleton"
 import { ShowShelf } from "./ShowShelf"
@@ -15,7 +16,8 @@ import { type ChartListStates } from "./useChartLists"
 /**
  * The chart lists of a page, one after the other: its heading (the chevron opens the ranked
  * page), then a skeleton of the shelf's exact height while it loads, or the ranked first
- * shows. A missing list draws nothing, heading included. When every list is missing the page
+ * shows. "Top Episodes" has its own compact shelf and no chevron, as it has no ranked page.
+ * A missing list draws nothing, heading included. When every list is missing the page
  * shows one quiet line.
  */
 export function ChartShelves({
@@ -45,13 +47,27 @@ export function ChartShelves({
       {lists.map((list) => {
         const state = states[list.id]
         if (state?.status === "missing") return null
+        if (list.kind === "episodes") {
+          return (
+            <View key={list.id}>
+              <SectionHeader title={list.title} />
+              {state?.status === "ready" && "episodes" in state ? (
+                <EpisodeChartShelf
+                  episodes={state.episodes.slice(0, list.shelf)}
+                />
+              ) : (
+                <EpisodeShelfSkeleton />
+              )}
+            </View>
+          )
+        }
         return (
           <View key={list.id}>
             <SectionHeader
               title={list.title}
               onPress={() => router.push(categoryHref(list.id, segments))}
             />
-            {state?.status === "ready" ? (
+            {state?.status === "ready" && "shows" in state ? (
               <ShowShelf
                 shows={state.shows.slice(0, list.shelf).map((show, index) => ({
                   key: show.appleId,

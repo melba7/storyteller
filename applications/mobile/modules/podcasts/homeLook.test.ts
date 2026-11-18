@@ -7,6 +7,10 @@ import {
   agoLabel,
   cardLine,
   cardPalette,
+  EPISODE_ROW_HEIGHT,
+  EPISODE_SHELF_HEIGHT,
+  episodeColumnWidth,
+  pagesOfRows,
   plainText,
   SHELF_LINE_HEIGHT,
   SHELF_TEXT_GAP,
@@ -194,5 +198,25 @@ describe("the shelf's measures", () => {
     const plain = shelfHeight(177, false)
     expect(plain).toBe(177 + SHELF_TEXT_GAP + 2 * SHELF_LINE_HEIGHT)
     expect(shelfHeight(177, true)).toBe(plain + SHELF_LINE_HEIGHT)
+  })
+})
+
+describe("the episode shelf's measures", () => {
+  it("makes a page as wide as the window less the gutter, the gap and a peek", () => {
+    expect(episodeColumnWidth(400)).toBe(400 - 16 - 12 - 28)
+    expect(episodeColumnWidth(10)).toBe(0)
+  })
+
+  it("is three rows tall, and a row holds its 60 pt cover and 3 lines of text", () => {
+    expect(EPISODE_ROW_HEIGHT).toBe(76)
+    expect(EPISODE_SHELF_HEIGHT).toBe(3 * 76)
+  })
+
+  it("splits thirty episodes into ten pages of three", () => {
+    const pages = pagesOfRows(Array.from({ length: 30 }, (_, i) => i))
+    expect(pages).toHaveLength(10)
+    expect(pages[0]).toEqual([0, 1, 2])
+    expect(pagesOfRows([1, 2, 3, 4]).map((p) => p.length)).toEqual([3, 1])
+    expect(pagesOfRows([])).toEqual([])
   })
 })

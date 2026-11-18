@@ -3,11 +3,20 @@ import { type FollowedShow, pickForYou } from "./categories"
 //
 // Pure functions. Home and New ask the same planner, so they can't drift apart.
 import { CHART_CATEGORIES, TOP_CHART } from "./charts"
+import { EPISODES_CHART, EPISODE_COUNT } from "./topEpisodes"
 
 export type ChartListPage = "home" | "new"
 
-/** One list on a page: its chart id, its heading and how many shows its shelf draws. */
-export type ChartListPlan = { id: string; title: string; shelf: number }
+/**
+ * One list on a page: its chart id, its heading, how many items its shelf draws and its
+ * kind: a ranked shelf of shows, or the compact shelf of episodes.
+ */
+export type ChartListPlan = {
+  id: string
+  title: string
+  shelf: number
+  kind: "shows" | "episodes"
+}
 
 /** How many shows a shelf draws (the "See All" page has all 50). */
 export const SHELF_SIZE = 20
@@ -42,7 +51,7 @@ export const POPULAR_ORDER: readonly string[] = [
 ]
 
 /**
- * The lists for a page: "Top Shows", then "Top in <name>" for the categories of the
+ * The lists for a page: "Top Shows", "Top Episodes", then "Top in <name>" for the categories of the
  * followed shows (most common first, up to four), then the popularity order, no repeats.
  * `omit` leaves chart ids out and keeps the order of the rest.
  */
@@ -59,13 +68,20 @@ export function planChartLists(
   const categories = page === "home" ? ids.slice(0, HOME_CATEGORIES) : ids
 
   const lists: ChartListPlan[] = [
-    { id: TOP_CHART, title: "Top Shows", shelf: SHELF_SIZE },
+    { id: TOP_CHART, title: "Top Shows", shelf: SHELF_SIZE, kind: "shows" },
+    {
+      id: EPISODES_CHART,
+      title: "Top Episodes",
+      shelf: EPISODE_COUNT,
+      kind: "episodes",
+    },
   ]
   for (const id of categories) {
     lists.push({
       id,
       title: `Top in ${names.get(id) ?? id}`,
       shelf: SHELF_SIZE,
+      kind: "shows",
     })
   }
   return lists.filter((list) => !omit.includes(list.id))
