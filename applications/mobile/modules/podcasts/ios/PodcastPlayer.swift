@@ -179,7 +179,8 @@ final class PodcastPlayer {
   func startPlaying() {
     wantsToPlay = true
     try? AVAudioSession.sharedInstance().setActive(true)
-    // A finished episode starts over.
+    // A finished episode starts over. This reads the clock, not `place`: a resume past the feed's
+    // length is a seek on its way, and it must not start over.
     if let duration = currentDuration, position >= duration - 0.5 { seek(to: 0) }
     rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
@@ -244,7 +245,7 @@ final class PodcastPlayer {
   }
 
   func skip(by seconds: Double) {
-    seek(to: Skip.target(from: position, by: seconds, duration: currentDuration))
+    seek(to: Skip.target(from: place, by: seconds, duration: currentDuration))
   }
 
   /// Sets the speed (clamped to 0.5x to 3x in tenths) and returns the speed now in use.
@@ -258,13 +259,20 @@ final class PodcastPlayer {
     return speed.value
   }
 
-  func state() -> [String: Any] { stateObject(position: position) }
+  func state() -> [String: Any] { stateObject(position: place) }
 
   // MARK: Reading the player
 
   var position: Double {
     let seconds = player.currentTime().seconds
     return seconds.isFinite ? max(0, seconds) : 0
+  }
+
+  /// Where the episode is for the listener: where a seek that is on its way is going, else the
+  /// clock. Used for what is shown, saved and skipped from. Ads, silence, chapters, the sleep
+  /// timer and the statistics decide about audio that is heard, so they read `position`.
+  var place: Double {
+    Playhead.place(reported: position, seekPending: seekPending, seekTarget: seekTarget)
   }
 
   var currentDuration: Double? {
@@ -290,7 +298,7 @@ final class PodcastPlayer {
   }
 
   func publish(positionOverride: Double? = nil, refreshCard: Bool = true) {
-    let place = positionOverride ?? position
+    let place = positionOverride ?? self.place
     sink?("onPlaybackState", stateObject(position: place))
     guard refreshCard else { return }
     lockScreen.update(

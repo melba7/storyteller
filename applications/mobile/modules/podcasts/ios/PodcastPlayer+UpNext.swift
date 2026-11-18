@@ -25,7 +25,7 @@ extension PodcastPlayer {
     guard var item = current, wantsToPlay || player.timeControlStatus == .playing else {
       return nil
     }
-    item.position = position
+    item.position = place
     return item
   }
 
