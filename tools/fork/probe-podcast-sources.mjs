@@ -14,7 +14,9 @@
  */
 import { pathToFileURL } from "node:url"
 
-const TIMEOUT_MS = 20_000
+const TIMEOUT_MS = 30_000
+const TRIES = 3
+const PAUSE_MS = 1500
 const BROWSER_UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 " +
   "(KHTML, like Gecko) Version/17.0 Safari/605.1.15"
@@ -85,29 +87,40 @@ export function trimToThree(value) {
 
 // ---- Network helpers ----
 
-/** Fetches with a timeout. Never throws: failures come back as `{ error }`. */
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+/**
+ * Fetches with a timeout, trying up to three times with a short pause when the
+ * request fails or the server answers 429 or 5xx. Never throws: a failure comes
+ * back as `{ error }`, and a last bad answer comes back as the answer.
+ */
 async function get(url, headers = {}) {
-  try {
-    const res = await fetch(url, {
-      headers,
-      redirect: "follow",
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    })
-    const bytes = new Uint8Array(await res.arrayBuffer())
-    return {
-      url,
-      status: res.status,
-      type: res.headers.get("content-type") ?? "",
-      bytes,
-    }
-  } catch (err) {
-    const cause = err?.cause?.code ?? err?.cause?.message ?? ""
-    return {
-      url,
-      error:
-        `unreachable: ${err?.name ?? "Error"} ${err?.message ?? ""} ${cause}`.trim(),
+  let last
+  for (let attempt = 1; attempt <= TRIES; attempt++) {
+    if (attempt > 1) await sleep(PAUSE_MS)
+    try {
+      const res = await fetch(url, {
+        headers,
+        redirect: "follow",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      })
+      const bytes = new Uint8Array(await res.arrayBuffer())
+      last = {
+        url,
+        status: res.status,
+        type: res.headers.get("content-type") ?? "",
+        bytes,
+        attempt,
+      }
+      if (res.status !== 429 && res.status < 500) return last
+    } catch (err) {
+      const cause = err?.cause?.code ?? err?.cause?.message ?? ""
+      const message =
+        `${err?.name ?? "Error"} ${err?.message ?? ""} ${cause}`.trim()
+      last = { url, error: `unreachable: ${message} (after ${attempt} tries)` }
     }
   }
+  return last
 }
 
 /** Fetches JSON. Adds `json` when the body parses and `text` when it doesn't. */
@@ -131,9 +144,25 @@ function describe(r) {
   return `status ${r.status}, ${r.type || "no content type"}, ${r.bytes.length} bytes`
 }
 
+/** The same data with every `showDescription` cut to 80 characters. */
+function cutDescriptions(value) {
+  if (Array.isArray(value)) return value.map(cutDescriptions)
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([k, v]) => [
+        k,
+        k === "showDescription" && typeof v === "string"
+          ? v.slice(0, 80)
+          : cutDescriptions(v),
+      ]),
+    )
+  }
+  return value
+}
+
 function fixture(name, data) {
   line(`----- BEGIN FIXTURE ${name} -----`)
-  line(JSON.stringify(trimToThree(data), null, 2))
+  line(JSON.stringify(cutDescriptions(trimToThree(data)), null, 2))
   line(`----- END FIXTURE ${name} -----`)
 }
 
@@ -154,18 +183,20 @@ function spotifyList(json) {
 
 // ---- The four questions ----
 
-async function questionCovers() {
+async function questionCovers(fallbackCover) {
   line("== 1. Apple cover sizes ==")
   const chart = await getJson(`${APPLE_CHART}/50/podcasts.json`)
   const results = chart.json?.feed?.results ?? []
-  const cover = results.find(
-    (e) => typeof e.artworkUrl100 === "string",
-  )?.artworkUrl100
+  const cover =
+    results.find((e) => typeof e.artworkUrl100 === "string")?.artworkUrl100 ??
+    fallbackCover
   if (!cover) {
     line(`  overall chart gave no cover address (${describe(chart)})`)
     return false
   }
-  line(`  cover address: ${cover}`)
+  line(
+    `  cover address: ${cover}${results.length ? "" : " (from the top-100 chart)"}`,
+  )
   const base = cover.replace(/\/[^/]*$/, "")
   const forms = ["100x100bb.png", "640x640bb.jpg", "1280x1280bb.jpg"]
   const rows = []
@@ -190,13 +221,24 @@ async function questionCovers() {
   return big?.status === 200 && big.pixels?.width >= 600 && huge?.status === 200
 }
 
-async function questionEpisodes() {
+async function questionEpisodes(overallResults) {
   line("== 2. Apple top episodes ==")
-  const chart = await getJson(`${APPLE_CHART}/50/podcast-episodes.json`)
-  line(`  chart: ${describe(chart)}`)
-  const results = chart.json?.feed?.results
-  if (!Array.isArray(results) || results.length === 0) return false
-  line(`  entries: ${results.length}, fields: ${fieldsOf(results).join(", ")}`)
+  let chart
+  for (const name of ["podcast-episodes", "podcast-episode"]) {
+    const r = await getJson(`${APPLE_CHART}/50/${name}.json`)
+    line(`  ${name}.json: ${describe(r)}`)
+    if (
+      !chart &&
+      Array.isArray(r.json?.feed?.results) &&
+      r.json.feed.results.length > 0
+    ) {
+      chart = { name, ...r }
+    }
+  }
+  if (!chart) return false
+  const results = chart.json.feed.results
+  line(`  answering address: ${chart.name}.json, ${results.length} entries`)
+  line(`  fields: ${fieldsOf(results).join(", ")}`)
   fixture("apple-top-episodes", chart.json)
   const ids = results
     .slice(0, 3)
@@ -212,11 +254,17 @@ async function questionEpisodes() {
       `https://itunes.apple.com/lookup?id=${ids.join(",")}`,
     ],
   ]
-  // The show id is the number after /id in an episode's page address.
-  const showIds = results
+  // The show id is the number after /id in an episode's page address; when the
+  // entries carry none, use the first shows of the overall chart instead.
+  let showIds = results
     .slice(0, 3)
     .map((e) => /\/id(\d+)/.exec(e.url ?? "")?.[1])
     .filter(Boolean)
+  if (!showIds.length)
+    showIds = overallResults
+      .slice(0, 3)
+      .map((e) => e.id)
+      .filter(Boolean)
   if (showIds.length) {
     tries.push([
       "show-lookup",
@@ -245,37 +293,86 @@ async function questionEpisodes() {
   return answered
 }
 
-/** Looks for chart addresses on Spotify's own page, in case the plan's guess is off. */
-async function spotifyPageAddresses() {
+/** Prints about 300 characters around each match of `needle` (at most `max`). */
+function printContexts(source, text, needle, max = 6) {
+  let from = 0
+  for (let n = 0; n < max; n++) {
+    const at = text.indexOf(needle, from)
+    if (at < 0) return
+    const around = text
+      .slice(Math.max(0, at - 150), at + 150)
+      .replace(/\s+/g, " ")
+    line(`  [${source}] around "${needle}": ${around}`)
+    from = at + needle.length
+  }
+}
+
+/**
+ * Reads Spotify's charts page and its scripts and prints how the chart address
+ * and its query are built. Returns the extra query names and category names found.
+ */
+async function spotifyPageClues() {
+  const clues = { params: new Set(), categories: [] }
   const page = await get(`${SPOTIFY}/`, { "User-Agent": BROWSER_UA })
   if (page.error) {
     line(`  charts page: ${page.error}`)
-    return
+    return clues
   }
   const html = new TextDecoder().decode(page.bytes)
-  const scripts = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)]
+  const srcs = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)]
     .map((m) => m[1])
-    .slice(0, 8)
-  const found = new Set(html.match(/\/?api\/[A-Za-z0-9_/.?=&-]+/g) ?? [])
-  for (const src of scripts) {
-    const url = new URL(src, SPOTIFY).href
-    const js = await get(url, { "User-Agent": BROWSER_UA })
-    if (js.error) continue
-    const text = new TextDecoder().decode(js.bytes)
-    for (const m of text.match(/\/?api\/charts[A-Za-z0-9_/.?=&-]*/g) ?? [])
-      found.add(m)
-  }
-  line(`  charts page: ${describe(page)}, ${scripts.length} scripts read`)
+    .slice(0, 25)
   line(
-    `  addresses found there: ${[...found].slice(0, 15).join(" ") || "none"}`,
+    `  charts page: ${describe(page)}, ${srcs.length} scripts: ${srcs.join(" ")}`,
   )
+  const sources = [["page", html]]
+  for (const src of srcs) {
+    const js = await get(new URL(src, SPOTIFY).href, {
+      "User-Agent": BROWSER_UA,
+    })
+    if (!js.error) sources.push([src, new TextDecoder().decode(js.bytes)])
+  }
+  for (const [source, text] of sources) {
+    printContexts(source, text, "api/charts")
+    printContexts(source, text, "region=")
+    for (const m of text.matchAll(/[?&]([a-zA-Z_]+)=/g)) {
+      if (m[1] !== "region") clues.params.add(m[1])
+    }
+    for (const m of text.matchAll(
+      /categor(?:y|ies)["']?\s*[:=]\s*\[?\s*["']([A-Za-z0-9_-]+)["']/gi,
+    )) {
+      clues.categories.push(m[1])
+    }
+  }
+  line(
+    `  other query names seen: ${[...clues.params].slice(0, 20).join(", ") || "none"}`,
+  )
+  line(
+    `  category names seen: ${clues.categories.slice(0, 10).join(", ") || "none"}`,
+  )
+  return clues
+}
+
+async function trySpotify(name, query) {
+  const url = `${SPOTIFY}/api/charts/${name}?${query}`
+  const r = await getJson(url, {
+    "User-Agent": BROWSER_UA,
+    Accept: "application/json",
+  })
+  const list = spotifyList(r.json)
+  const body =
+    r.error || r.status === 200
+      ? ""
+      : `, body: ${JSON.stringify(new TextDecoder().decode(r.bytes))}`
+  line(`  ${name}?${query}: ${describe(r)}, ${list.length} entries${body}`)
+  return { r, list }
 }
 
 async function questionSpotify() {
   line("== 3. Spotify charts ==")
-  const names = ["top", "trending", "top_episodes"]
   const outcome = {}
-  for (const name of names) {
+  const failed = []
+  for (const name of ["top", "trending", "top_episodes"]) {
     const url = `${SPOTIFY}/api/charts/${name}?region=us`
     const plain = await getJson(url)
     let used = "plain"
@@ -288,6 +385,11 @@ async function questionSpotify() {
       })
       used = "browser User-Agent"
       line(`  ${name} browser-like: ${describe(r)}`)
+      if (!r.error && r.status !== 200) {
+        line(
+          `  ${name} body: ${JSON.stringify(new TextDecoder().decode(r.bytes))}`,
+        )
+      }
     }
     const list = spotifyList(r.json)
     line(
@@ -295,8 +397,27 @@ async function questionSpotify() {
     )
     if (r.json) fixture(`spotify-${name}`, r.json)
     outcome[name] = list.length > 0 ? used : null
+    if (!outcome[name]) failed.push(name)
   }
-  if (!outcome.top) await spotifyPageAddresses()
+  if (failed.length) {
+    const clues = await spotifyPageClues()
+    const queries = []
+    for (const p of [...clues.params].slice(0, 5)) {
+      for (const v of ["all", "top"]) queries.push(`region=us&${p}=${v}`)
+    }
+    const cats = ["all", "top", ...clues.categories.slice(0, 1)]
+    for (const c of cats) queries.push(`region=us&category=${c}`)
+    for (const name of failed) {
+      for (const query of queries) {
+        const { r, list } = await trySpotify(name, query)
+        if (list.length) {
+          outcome[name] = `?${query}`
+          fixture(`spotify-${name}`, r.json)
+          break
+        }
+      }
+    }
+  }
   line(`  how each answered: ${JSON.stringify(outcome)}`)
   return outcome
 }
@@ -314,7 +435,11 @@ async function questionOverallAndGenres() {
   const subs = root?.subgenres ? Object.keys(root.subgenres).length : 0
   line(`  genre tree: ${describe(tree)}, ${subs} sub-genres under 26`)
   if (tree.json) fixture("apple-genre-tree", tree.json)
-  return { chart: count >= 100, tree: subs > 0 }
+  const results = chart.json?.feed?.results ?? []
+  const cover = results.find(
+    (e) => typeof e.artworkUrl100 === "string",
+  )?.artworkUrl100
+  return { chart: count >= 100, tree: subs > 0, results, cover }
 }
 
 async function main() {
@@ -325,10 +450,10 @@ async function main() {
     )
     return
   }
-  const covers = await questionCovers()
-  const episodes = await questionEpisodes()
-  const spotify = await questionSpotify()
   const overall = await questionOverallAndGenres()
+  const covers = await questionCovers(overall.cover)
+  const episodes = await questionEpisodes(overall.results)
+  const spotify = await questionSpotify()
   const yes = (b) => (b ? "YES" : "NO")
   line()
   line("== Summary ==")
