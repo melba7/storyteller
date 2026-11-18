@@ -345,6 +345,14 @@ Mode, no registered device and no certificates: the archive is built unsigned,
 and Xcode signs it during the upload with a distribution certificate that Apple
 keeps (cloud signing), using an App Store Connect API key.
 
+`.github/workflows/testflight-refresh.yml` keeps the app from expiring when the
+code sits still. Once a week it checks when the TestFlight workflow last
+succeeded and, once that is 60 days ago, starts a new build. It also switches
+the scheduled workflows on again each week, because GitHub turns them off in a
+public repository after 60 days without activity. To get a fresh build at once,
+run it from the Actions tab with "force" ticked. Keep Automatic Updates on for
+the app in the TestFlight app, so each new build installs by itself.
+
 Until the secrets below exist, a push only reports which ones are missing, and a
 run started by hand from the Actions tab builds the App Store archive without
 signing or uploading it, which shows the build itself works.
