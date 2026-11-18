@@ -39,6 +39,7 @@ the app is not added again.
 - `Sync Apple Podcasts now.command` runs one sync in a window.
 - `Transcribe an episode.command`: see the next section.
 - `Find ads in an episode.command`: see the section after it.
+- `Check ad skipping on an episode.command`: see "Check ad skipping".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -84,8 +85,9 @@ code the app uses (Apple's on-device model through PodcastKit's `podcast-ads`),
 and saves the list next to the file as `<file name>.ads.txt`. An audio file is
 transcribed first, as above. Each line is one ad: its start and end, its length,
 its kind (an ad, or the hosts' own plug), how sure the model is, the advertiser
-and its first words. The app skips only the sure ones. Use it to check what the
-detector finds in an episode without a new build of the app.
+and its first words. The app skips the sure and the unsure ones (Undo takes a
+skip back). Use it to check what the detector finds in an episode without a new
+build of the app.
 
 It needs macOS 26 with Apple Intelligence turned on (System Settings, Apple
 Intelligence & Siri) and Xcode 26. The first run builds the tool (about a
@@ -93,6 +95,39 @@ minute). Each piece of about ten minutes takes the model a few seconds, so an
 hour-long episode takes a minute or so. If Apple Intelligence is off, or its
 model is still downloading, the tool says so and stops. On a Mac without macOS
 26 it only says so.
+
+## Check ad skipping on an episode
+
+`Check ad skipping on an episode.command` asks for an audio file and finds out
+whether ad skipping would keep ahead of you. It does what the phone does for an
+episode that is playing: it transcribes the file piece by piece (the first
+pieces are short, so the first lines come within seconds), looks for ads after
+each piece, and times every step on this Mac. It runs PodcastKit's
+`podcast-ads --play`, and saves the result next to the file as
+`<file name>.ad-check.txt`.
+
+For each ad it prints where the ad is, how sure the model is, how long the work
+had been going when the ad was first known, when a listener who pressed play at
+0:00 at normal speed would reach it, and SKIPPED or NOT SKIPPED. An ad counts as
+skipped when it was known before the playhead got there. The skips before it are
+counted, because each one moves you ahead. The end says how long transcribing
+and the model took, and how many times faster than real time the whole thing
+ran. Above 1 means the work keeps ahead of someone listening.
+
+How to run it:
+
+1. In Finder, double-click `Check ad skipping on an episode.command`. (Auto mode
+   on the Mac refuses `swift run`, so this is the way to run it.)
+2. Choose an episode in the dialog. Pick one with ads in the first minutes, like
+   a pre-roll.
+3. Wait. The first run builds the tool (about a minute) and may download Apple's
+   speech model. An hour-long episode takes a few minutes.
+4. Read the list. If ads are NOT SKIPPED, send the saved `.ad-check.txt` along.
+
+It needs macOS 26 with Apple Intelligence turned on and Xcode 26, like the two
+tools above. It counts only the work on this Mac, not the download. The phone is
+slower than a Mac, so a Mac that only just keeps ahead means a phone that falls
+behind.
 
 ## Tests
 

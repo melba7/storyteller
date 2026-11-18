@@ -1,10 +1,13 @@
 // LOFI-FORK: finds the ads in one episode on a Mac with the same code the app uses (see FORK.md).
 //
 //   swift run -c release podcast-ads [--locale en-US] <episode.transcript.json | audio file>
+//   swift run -c release podcast-ads --play [--locale en-US] <audio file>
 //
 // Prints each ad with its times, kind, advertiser, how sure the model is and its first words,
 // to the standard output, and progress to the standard error. An audio file is transcribed
-// first (as podcast-transcribe does). Needs macOS 26 with Apple Intelligence on. Where there
+// first (as podcast-transcribe does). With --play it does what the phone does for an episode
+// that is playing (a transcript piece, then a partial ad pass, and so on), times each step, and
+// says for each ad whether a listener who pressed play at 0:00 would have had it skipped. Needs macOS 26 with Apple Intelligence on. Where there
 // is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
 // still work there.
 import Foundation
@@ -27,6 +30,39 @@ func fail(_ message: String) -> Never {
   exit(1)
 }
 
+/// "12.3 s", or "2 min 5 s" from a minute on.
+func span(_ seconds: Double) -> String {
+  guard seconds >= 60 else { return String(format: "%.1f s", seconds) }
+  return "\(Int(seconds) / 60) min \(Int(seconds) % 60) s"
+}
+
+/// One line for each ad that the player would skip, then the times.
+func printPlay(_ result: PlayCheckResult) {
+  if result.verdicts.isEmpty { print("No ads found.") }
+  for verdict in result.verdicts {
+    let ad = verdict.ad
+    let kind = ad.kind == .ad ? "ad" : "own plug"
+    let who = ad.advertiser.isEmpty ? "" : " \(ad.advertiser)"
+    let outcome =
+      verdict.skipped
+      ? "SKIPPED, known \(span(verdict.lead)) before the playhead got there"
+      : "NOT SKIPPED, known \(span(-verdict.lead)) after the playhead passed"
+    print(
+      "[\(clock(ad.start)) - \(clock(ad.end))] \(kind), \(ad.confidence.rawValue)\(who): known after \(span(verdict.knownAt)) of work; playhead there at \(span(verdict.reachedAt)); \(outcome)"
+    )
+  }
+  let skipped = result.verdicts.filter(\.skipped).count
+  print("")
+  print("\(skipped) of \(result.verdicts.count) ads would have been skipped (played from 0:00 at 1x).")
+  print("Transcribing: \(span(result.transcribeSeconds)). Model: \(span(result.modelSeconds)). In all: \(span(result.totalSeconds)).")
+  print(
+    "The episode is \(span(result.duration)) long: \(String(format: "%.1f", result.speed)) times real time (above 1 keeps ahead of a listener)."
+  )
+  if result.refusedPieces > 0 {
+    print("The model refused \(result.refusedPieces) piece(s); they count as having no ads.")
+  }
+}
+
 var arguments = Array(CommandLine.arguments.dropFirst())
 var locale = Locale.current.identifier(.bcp47)
 if let at = arguments.firstIndex(of: "--locale") {
@@ -34,8 +70,13 @@ if let at = arguments.firstIndex(of: "--locale") {
   locale = arguments[at + 1]
   arguments.removeSubrange(at...at + 1)
 }
+var play = false
+if let at = arguments.firstIndex(of: "--play") {
+  play = true
+  arguments.remove(at: at)
+}
 guard arguments.count == 1 else {
-  fail("Usage: podcast-ads [--locale en-US] <episode.transcript.json or audio file>")
+  fail("Usage: podcast-ads [--play] [--locale en-US] <episode.transcript.json or audio file>")
 }
 let input = URL(fileURLWithPath: arguments[0])
 guard FileManager.default.fileExists(atPath: input.path) else { fail("No file at \(input.path)") }
@@ -48,6 +89,19 @@ defer { try? FileManager.default.removeItem(at: work) }
 
 do {
   try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+  if play {
+    guard !input.lastPathComponent.hasSuffix(".transcript.json") else {
+      fail("--play needs an audio file, because it times the transcribing too.")
+    }
+    guard let recogniser = AppleSpeech.makeRecogniser() else { fail("Needs macOS 26 to transcribe.") }
+    let sha = try FileHash.sha256(of: input)
+    let result = try await PlayCheck.run(
+      audio: input, sha256: sha, locale: locale, recogniser: recogniser, detector: detector,
+      store: AdsStore(folder: work, sha256: sha), now: { ProcessInfo.processInfo.systemUptime },
+      progress: { say($0) })
+    printPlay(result)
+    exit(0)
+  }
   let transcript: Transcript
   if input.lastPathComponent.hasSuffix(".transcript.json") {
     transcript = try JSONDecoder().decode(Transcript.self, from: Data(contentsOf: input))
