@@ -70,9 +70,10 @@ public struct AdSkipper: Sendable {
   private var lastSeek: Double?
   private var enteredBySeek: Set<Double> = []
   private var undone: Set<Double> = []
-  /// The ads already left in progress, so a second look at the same file does not jump again
-  /// before the first jump has landed.
-  private var left: Set<Double> = []
+  /// Where the ads left in progress were skipped to (start and end), so a second look at the
+  /// same file does not jump again before the first jump has landed, while an ad that is found
+  /// again longer (cut short at the edge of the first pass) is left once more.
+  private var left: [(start: Double, end: Double)] = []
   private var last: (skip: AdSkip, at: Double)?
 
   /// - Parameter file: the episode's ads file, nil when it has none. Sure and unsure ads that
@@ -107,11 +108,16 @@ public struct AdSkipper: Sendable {
     replace(file: file)
     guard let playhead, playhead.isFinite,
       let ad = ads.first(where: { $0.start <= playhead && playhead < $0.end }),
-      !enteredBySeek.contains(ad.start), !left.contains(ad.start),
+      !enteredBySeek.contains(ad.start), !wasLeft(ad),
       chainEnd(of: ad) - playhead >= Self.leaveMinimum
     else { return nil }
-    left.insert(ad.start)
+    left.append((ad.start, ad.end))
     return makeSkip(ad, duration: duration, now: now)
+  }
+
+  /// Whether a jump out of this ad (or out of one that ended no sooner) was made already.
+  private func wasLeft(_ ad: FoundAd) -> Bool {
+    left.contains { $0.start < ad.end && ad.start < $0.end && $0.end >= ad.end - 0.5 }
   }
 
   /// The ads that will be skipped under the current switches.

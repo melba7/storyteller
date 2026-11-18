@@ -176,7 +176,7 @@ final class AdSkipperTests: XCTestCase {
     XCTAssertNil(skipper.reached(position: 310.2, rate: 1, duration: 1000, now: 0))
   }
 
-  func testAdsFoundWhilePlayingAreSkippedWhenReachedButNotWhenAlreadyInside() {
+  func testAdsFoundWhilePlayingAreSkippedWhenReachedButNotWhenTheListenerSeekedIntoThem() {
     var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
     skipper.seeked(to: 130)
     skipper.replace(file: file([ad(100, 160), ad(300, 360)]))
@@ -332,6 +332,17 @@ final class AdSkipperTests: XCTestCase {
     XCTAssertNil(found([ad(100, 160)], at: 60))
     XCTAssertNil(found([ad(100, 160)], at: 160), "the end of an ad is outside it")
     XCTAssertNil(found([ad(100, 160)], at: nil), "not playing")
+  }
+
+  func testAnAdCutShortAtThePassEdgeIsLeftAgainWhenItIsFoundLonger() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    XCTAssertEqual(
+      skipper.replace(file: file([ad(100, 130)]), playhead: 110, duration: 1000, now: 5)?.target, 130)
+    XCTAssertEqual(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 131, duration: 1000, now: 6)?.target,
+      160, "the longer range holds the playhead where the jump landed")
+    XCTAssertNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 131.1, duration: 1000, now: 6.1))
   }
 
   func testAnAdWithASwitchOffIsNotLeftAndAChainedPlugIsLeftWithIt() {

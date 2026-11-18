@@ -135,6 +135,21 @@ final class PrepStepTests: XCTestCase {
       PrepOrder.shouldYield(working: head, next: PrepStep(id: "p", stage: .rest), playing: "p"))
   }
 
+  func testThePlayingEpisodesRestDoesNotStopForAnotherHeadAndTheOldEpisodeMakesWayForIt() {
+    // V (an earlier episode) still wants its head; U was just started and has its rest to do.
+    let works = [work("v", head: true, rest: false), work("u", head: false, rest: true)]
+    XCTAssertEqual(
+      PrepOrder.nextStep(works, playing: "u", upNext: []), PrepStep(id: "u", stage: .rest))
+    XCTAssertFalse(
+      PrepOrder.shouldYield(
+        working: PrepStep(id: "u", stage: .rest), next: PrepStep(id: "v", stage: .head),
+        playing: "u"))
+    XCTAssertTrue(
+      PrepOrder.shouldYield(
+        working: PrepStep(id: "v", stage: .head), next: PrepStep(id: "u", stage: .rest),
+        playing: "u"), "and V's stopped head is not taken again before U's rest")
+  }
+
   func testTheHeadIsThreeMinutesWhichIsTheFirstTwoTranscriptPieces() {
     XCTAssertEqual(PrepRules.headSeconds, 180)
   }

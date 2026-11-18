@@ -231,6 +231,44 @@ final class AdsRunnerPartialTests: XCTestCase {
     XCTAssertEqual(store.loadProgress(detector: "fake", version: "1").answers.count, 2)
   }
 
+  func testAdsSavedOutsideTheAskedStretchSurviveAPartialRun() async throws {
+    let transcript = makeTranscript(talk(160, ad: 40...47))
+    let store = AdsStore(folder: folder, sha256: sha)
+    let outside = FoundAd(
+      start: 1500, end: 1530, kind: .ad, advertiser: "Other", confidence: .sure, firstWords: "x")
+    let inside = FoundAd(
+      start: 20, end: 40, kind: .ad, advertiser: "Stale", confidence: .sure, firstWords: "y")
+    try store.savePartial(
+      AdsFile(
+        sha256: sha, detector: "fake", detectorVersion: "1", osVersion: "26", duration: 1600,
+        ads: [inside, outside], undone: [UndoneAd(start: 5, end: 9)]))
+    let outcome = try await AdsRunner.runPartial(
+      partial: partial(transcript, lines: 100), detector: detector(Asked()), store: store,
+      osVersion: "26")
+    guard case .finished(let file) = outcome else { return XCTFail("\(outcome)") }
+    XCTAssertTrue(file.ads.contains(outside), "outside the stretch: kept")
+    XCTAssertFalse(file.ads.contains(inside), "inside the stretch: the finder's answers win")
+    XCTAssertEqual(file.ads.count, 2)
+    XCTAssertEqual(file.undone, [UndoneAd(start: 5, end: 9)])
+  }
+
+  func testTheFullRunSavesAPartialFileAfterEachPieceItAsks() async throws {
+    let transcript = makeTranscript(talk(160, ad: 40...47))
+    let all = AdChunker.pieces(of: AdChunker.number(transcript.lines), tokenBudget: 160)
+    let adPiece = try XCTUnwrap(all.firstIndex { $0.lines.contains { $0.number == 42 } })
+    XCTAssertLessThan(adPiece + 1, all.count - 1, "the ad is not in the last piece")
+    let store = AdsStore(folder: folder, sha256: sha)
+    let asked = Asked()
+    let outcome = try await AdsRunner.run(
+      transcript: transcript, detector: detector(asked), store: store, osVersion: "26",
+      shouldContinue: { asked.all.count <= adPiece })
+    XCTAssertEqual(outcome, .stopped)
+    let partial = try XCTUnwrap(store.loadPartial(detector: "fake"))
+    XCTAssertEqual(partial.ads.count, 1, "the ad is there before the run is done")
+    XCTAssertNil(store.load(detector: "fake"))
+    XCTAssertEqual(partial.coveredUntil, all[adPiece].end)
+  }
+
   func testTheFullRunReusesAnswersAndRemovesTheScratchFiles() async throws {
     let transcript = makeTranscript(talk(160, ad: 40...47))
     let store = AdsStore(folder: folder, sha256: sha)

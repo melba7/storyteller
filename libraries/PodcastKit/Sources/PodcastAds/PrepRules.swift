@@ -103,9 +103,10 @@ extension PrepOrder {
 
   /// Whether the episode being worked on stops at its next piece to make way. A rest makes way
   /// for any other episode's head (the heads come first); a head makes way only for the playing
-  /// episode. The same episode's own next stage never makes it stop.
+  /// episode. The same episode's own next stage never makes it stop, and neither does the playing
+  /// episode's work (it is the first in line, so stopping it only starts a loop).
   public static func shouldYield(working: PrepStep, next: PrepStep?, playing: String?) -> Bool {
-    guard let next, next.id != working.id else { return false }
+    guard let next, next.id != working.id, working.id != playing else { return false }
     if working.stage == .rest { return next.stage == .head || next.id == playing }
     return next.id == playing
   }

@@ -208,7 +208,12 @@ final class PodcastAdFinder: @unchecked Sendable {
         transcript: transcript, detector: detector, store: ads,
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         progress: { [weak self] done, total in
-          self?.set(id, .finding(percent: AdsRules.percent(done: done, total: total)))
+          guard let self else { return }
+          set(id, .finding(percent: AdsRules.percent(done: done, total: total)))
+          // Each piece is saved as a partial file: the playing episode skips its ads at once.
+          if lock.withLock({ urgent == id }) {
+            Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+          }
         },
         shouldContinue: { [weak self] in self?.mayContinue(PrepStep(id: id, stage: .rest)) ?? false })
       switch outcome {
@@ -236,6 +241,7 @@ final class PodcastAdFinder: @unchecked Sendable {
     lock.withLock {
       failures.removeAll()
       failureCounts.removeAll()
+      partialFailures.removeAll()
     }
   }
 

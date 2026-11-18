@@ -23,10 +23,20 @@ public enum AdsRunner {
     let pieces = AdChunker.pieces(
       of: AdChunker.number(transcript.lines), tokenBudget: detector.tokenBudget, overlap: overlap)
     progress(0, pieces.count)
+    // Each piece that is asked is saved as a partial file at once, so the player can skip the
+    // ads found so far while the rest is still being asked.
+    let checkpoint: @Sendable ([AdRange], Double) -> Void = { ranges, covered in
+      var partial = AdsFile(
+        sha256: store.sha256, detector: detector.name, detectorVersion: detector.version,
+        osVersion: osVersion, duration: transcript.duration,
+        ads: AdCleanup.run(ranges: ranges, transcript: transcript), coveredUntil: covered)
+      partial.undone = store.loadPartial(detector: detector.name)?.undone ?? []
+      try? store.savePartial(partial)
+    }
     guard
       let result = try await answers(
         for: pieces, growing: nil, detector: detector, store: store, shouldContinue: shouldContinue,
-        progress: progress)
+        progress: progress, checkpoint: checkpoint)
     else { return .stopped }
     var file = AdsFile(
       sha256: store.sha256, detector: detector.name, detectorVersion: detector.version,
@@ -74,7 +84,7 @@ public enum AdsRunner {
     guard
       let result = try await answers(
         for: pieces, growing: growing, detector: detector, store: store,
-        shouldContinue: shouldContinue, progress: { _, _ in })
+        shouldContinue: shouldContinue, progress: { _, _ in }, checkpoint: nil)
     else { return .stopped }
     let covered = max(pieces.last?.end ?? 0, result.growingEnd ?? 0)
     let transcript = Transcript(
@@ -84,7 +94,13 @@ public enum AdsRunner {
       osVersion: osVersion, duration: partial.duration,
       ads: AdCleanup.run(ranges: result.ranges, transcript: transcript), coveredUntil: covered,
       refusedPieces: result.refused > 0 ? result.refused : nil)
-    file.undone = store.loadPartial(detector: detector.name)?.undone ?? []
+    let existing = store.loadPartial(detector: detector.name)
+    file.undone = existing?.undone ?? []
+    // Ads saved by someone else (the stream's first minute) stay when they lie outside the
+    // stretch this run asked about; inside it, this run's answers win.
+    let from = min(pieces.first?.start ?? .infinity, growing?.start ?? .infinity)
+    let kept = (existing?.ads ?? []).filter { $0.end <= from || $0.start >= covered }
+    file.ads = (file.ads + kept).sorted { $0.start < $1.start }
     try store.savePartial(file)
     return .finished(file)
   }
@@ -102,7 +118,8 @@ public enum AdsRunner {
   /// pieces.
   private static func answers(
     for pieces: [TranscriptPiece], growing: TranscriptPiece?, detector: AdDetector,
-    store: AdsStore, shouldContinue: @Sendable () -> Bool, progress: @Sendable (Int, Int) -> Void
+    store: AdsStore, shouldContinue: @Sendable () -> Bool, progress: @Sendable (Int, Int) -> Void,
+    checkpoint: (@Sendable ([AdRange], Double) -> Void)?
   ) async throws -> Answers? {
     var kept = store.loadProgress(detector: detector.name, version: detector.version)
     var result = Answers()
@@ -120,6 +137,7 @@ public enum AdsRunner {
         // The piece is whole now; the answers for its growing versions are no use.
         kept.dropShorter(than: piece)
         try? store.saveProgress(kept)
+        checkpoint?(result.ranges, piece.end)
       }
       progress(index + 1, pieces.count)
     }

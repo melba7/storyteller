@@ -51,7 +51,9 @@ extension PodcastAdFinder {
         AdsRules.mayRun(appActive: appActive, playing: playing, inBackgroundTask: inBackgroundTask)
       else { return false }
       var priority = TaskPriority.utility
-      if let urgent, waiting.contains(urgent) { priority = .userInitiated }
+      if let urgent, waiting.contains(urgent) || partialWanted.contains(urgent) {
+        priority = .userInitiated
+      }
       worker = Task.detached(priority: priority) { [self] in await drain() }
       return true
     }
