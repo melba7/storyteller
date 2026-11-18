@@ -39,6 +39,8 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var waiters: [() -> Void] = []
   private var found: [FoundAd] = []
   private var covered = 0.0
+  /// What the listener undid, kept here because filing the download wipes the stream's file.
+  private var undone: [UndoneAd] = []
   private var detectorVersion = "1"
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
@@ -66,6 +68,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       return true
     }
     guard go else { return }
+    discardEarlierStream()
     task = Task.detached(priority: .userInitiated) { [self] in
       await run()
       scanEnded()
@@ -96,6 +99,33 @@ final class PodcastStreamHead: @unchecked Sendable {
       return waiters
     }
     for wake in release { wake() }
+  }
+
+  /// A stream of this episode that failed part-way leaves its "stream-<episode>" file behind, with
+  /// ads from a request that may have carried other inserted ads. This stream starts clean; only
+  /// what the listener undid is kept.
+  private func discardEarlierStream() {
+    lock.withLock {
+      guard let folder = try? store.folder(for: episodeId) else { return }
+      let ads = AdsStore(folder: folder, sha256: key)
+      absorbUndone(ads.loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+      ads.discardPartial(detector: PodcastAdFinder.detectorName)
+    }
+  }
+
+  /// Adds the undone ads of a file (the caller holds the lock).
+  private func absorbUndone(_ list: [UndoneAd]?) {
+    for item in list ?? [] where !undone.contains(item) { undone.append(item) }
+  }
+
+  /// Reads the Undo list from the stream's file. The loader calls it just before the download is
+  /// filed, which removes the folder with that file.
+  func rememberUndone() {
+    lock.withLock {
+      guard let folder = try? store.folder(for: episodeId) else { return }
+      absorbUndone(
+        AdsStore(folder: folder, sha256: key).loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+    }
   }
 
   /// The file on disk is now this long.
@@ -297,10 +327,15 @@ final class PodcastStreamHead: @unchecked Sendable {
   /// filed, the ad finder may have saved its own), and tells the player when the ads changed.
   private func persist() {
     let changed = lock.withLock { () -> Bool in
-      guard !stopped, let folder = try? store.folder(for: episodeId) else { return false }
+      // The lock is held to the end of the write, so a stop (which deletes the folder after it)
+      // never meets a write; a download that was removed meanwhile has no entry, and nothing
+      // makes its folder again.
+      guard !stopped, store.entry(for: episodeId) != nil, let folder = try? store.folder(for: episodeId)
+      else { return false }
       let ads = AdsStore(folder: folder, sha256: key)
       let name = PodcastAdFinder.detectorName
       let before = ads.loadPartial(detector: name)
+      absorbUndone(before?.undone)
       let merged = AdHeadRules.merge(found + (before?.ads ?? []))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
@@ -308,7 +343,7 @@ final class PodcastStreamHead: @unchecked Sendable {
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         duration: max(before?.duration ?? 0, covered), ads: merged,
         coveredUntil: max(before?.coveredUntil ?? 0, covered), refusedPieces: before?.refusedPieces)
-      file.undone = before?.undone ?? []
+      file.undone = undone
       guard before?.ads != merged else { return false }
       do {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

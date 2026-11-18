@@ -69,7 +69,9 @@ public struct AdSkipper: Sendable {
   /// Where the playhead was put last, and the ads it landed in.
   private var lastSeek: Double?
   private var enteredBySeek: Set<Double> = []
-  private var undone: Set<Double> = []
+  /// What the listener undid in this episode, so far: an ad found again a second later (the
+  /// model's first line, a pause snap) is the same ad.
+  private var undone: [(start: Double, end: Double)] = []
   /// Where the ads left in progress were skipped to (start and end), so a second look at the
   /// same file does not jump again before the first jump has landed, while an ad that is found
   /// again longer (cut short at the edge of the first pass) is left once more.
@@ -121,7 +123,12 @@ public struct AdSkipper: Sendable {
   }
 
   /// The ads that will be skipped under the current switches.
-  public var ads: [FoundAd] { candidates.filter { settings.allows($0.kind) && !undone.contains($0.start) } }
+  public var ads: [FoundAd] { candidates.filter { settings.allows($0.kind) && !isUndone($0) } }
+
+  /// Whether an ad overlaps a stretch the listener undid.
+  private func isUndone(_ ad: FoundAd) -> Bool {
+    undone.contains { $0.start < ad.end && ad.start < $0.end }
+  }
 
   /// Where to set the markers, in seconds, in order.
   public var boundaryTimes: [Double] { ads.map { max(Self.firstBoundary, $0.start) } }
@@ -215,8 +222,7 @@ public struct AdSkipper: Sendable {
   /// one (an ad and then the hosts' plug) can be saved as undone as well.
   public mutating func undoSkip(now: Double) -> AdSkip? {
     guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
-    undone.insert(last.skip.ad.start)
-    for later in last.skip.chained { undone.insert(later.start) }
+    for undid in [last.skip.ad] + last.skip.chained { undone.append((undid.start, undid.end)) }
     self.last = nil
     return last.skip
   }

@@ -351,4 +351,24 @@ final class AdSkipperTests: XCTestCase {
     let skip = found([ad(100, 160), ad(160.2, 190, kind: .ownPlug)], at: 158)
     XCTAssertEqual(skip?.target, 190, "two seconds of the ad and a plug after it: worth leaving")
   }
+
+  func testAnUndoneAdFoundAgainALittleLaterIsStillUndone() {
+    var skipper = skipper([ad(0, 30)])
+    XCTAssertEqual(skipper.reached(position: 0.1, rate: 1, duration: 1000, now: 100)?.ad.start, 0)
+    XCTAssertNotNil(skipper.undo(now: 102))
+    // The file is read again, and the finder has the same ad starting a second later.
+    skipper.replace(file: file([ad(1, 31)]))
+    XCTAssertEqual(skipper.ads, [])
+    XCTAssertEqual(skipper.boundaryTimes, [])
+    // An ad that is clear of it is still skipped.
+    skipper.replace(file: file([ad(1, 31), ad(60, 90)]))
+    XCTAssertEqual(skipper.ads.map(\.start), [60])
+  }
+
+  func testTheSavedUndoneListMatchesByOverlapToo() {
+    let saved = file([], undone: [UndoneAd(start: 0, end: 30)])
+    XCTAssertTrue(saved.isUndone(ad(1, 31)))
+    XCTAssertTrue(saved.isUndone(ad(0.2, 20)))
+    XCTAssertFalse(saved.isUndone(ad(30, 60)))
+  }
 }

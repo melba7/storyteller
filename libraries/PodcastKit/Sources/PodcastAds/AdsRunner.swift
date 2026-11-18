@@ -96,11 +96,12 @@ public enum AdsRunner {
       refusedPieces: result.refused > 0 ? result.refused : nil)
     let existing = store.loadPartial(detector: detector.name)
     file.undone = existing?.undone ?? []
-    // Ads saved by someone else (the stream's first minute) stay when they lie outside the
-    // stretch this run asked about; inside it, this run's answers win.
+    // Ads saved by someone else (the stream's first minute) stay unless they lie wholly inside
+    // the stretch this run asked about, where this run's answers win. One that runs over the
+    // stretch's edge stays, and joins a new answer that it overlaps.
     let from = min(pieces.first?.start ?? .infinity, growing?.start ?? .infinity)
-    let kept = (existing?.ads ?? []).filter { $0.end <= from || $0.start >= covered }
-    file.ads = (file.ads + kept).sorted { $0.start < $1.start }
+    let kept = (existing?.ads ?? []).filter { !($0.start >= from && $0.end <= covered) }
+    file.ads = AdHeadRules.merge(file.ads + kept, touching: -0.001)
     try store.savePartial(file)
     return .finished(file)
   }

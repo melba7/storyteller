@@ -49,9 +49,10 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.refusedPieces = refusedPieces
   }
 
-  /// Whether the listener undid the skip of this ad.
+  /// Whether the listener undid the skip of this ad: the ad starts where an undone one did, or
+  /// overlaps it (the same ad found again a little later, or cut a little differently).
   public func isUndone(_ ad: FoundAd) -> Bool {
-    undone.contains { abs($0.start - ad.start) < 0.5 }
+    undone.contains { abs($0.start - ad.start) < 0.5 || ($0.start < ad.end && ad.start < $0.end) }
   }
 }
 

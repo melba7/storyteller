@@ -302,6 +302,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
         self.releaseBackground()
       }
       do {
+        self.head.rememberUndone()  // filing removes the folder, and the stream's file with it
         let done = try store.installStaged(staged, episodeId: id, fileExtension: ext)
         if case .downloaded(_, let sha, _, _) = done.state {
           self.noteFiled(sha)

@@ -114,4 +114,44 @@ final class AdHeadRulesTests: XCTestCase {
     XCTAssertEqual(merged.first?.confidence, .sure)
     XCTAssertEqual(merged.first?.advertiser, "Ridge")
   }
+
+  func testALeadInAMinuteBeforeAWebAddressIsNotAnAd() {
+    let head = lines([
+      "This episode is sponsored by Acme, more on them later.",
+      "Today my guest is a writer from Dublin.",
+      "She spent ten years as a journalist before her first novel.",
+      "We talk about her childhood by the sea.",
+      "And about how her mother taught her to read.",
+      "Then about the long road to her first publisher.",
+      "Her book is out now, and she has a page at penguin.com.",
+      "Welcome to the show.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: head), [])
+  }
+
+  func testALeadInWithSlowLinesBeforeItsCallToActionIsNotAnAd() {
+    // Two lines apart, but 40 seconds of talk between them.
+    let head = [
+      NumberedLine(number: 1, start: 0, end: 10, text: "Today's sponsor is Acme, more on that soon."),
+      NumberedLine(number: 2, start: 10, end: 45, text: "First a long story about my week away from the city."),
+      NumberedLine(number: 3, start: 45, end: 50, text: "Find out more at acme.com."),
+    ]
+    XCTAssertEqual(AdHeadRules.find(lines: head), [])
+  }
+
+  func testTheBareWordCodeOrSlashAfterAnAddressIsNotAnOffer() {
+    XCTAssertEqual(AdHeadRules.find(lines: lines(["The code is on github.com for anyone to read."])), [])
+    XCTAssertEqual(AdHeadRules.find(lines: lines(["The source code lives at github.com, slash the repo."])), [])
+  }
+
+  func testAPromoCodeNextToACapitalisedOrQuotedWordIsAnOffer() {
+    XCTAssertEqual(
+      AdHeadRules.find(lines: lines(["Visit acme.com and take code SLEEPY at checkout."])).map(\.startLine), [1])
+    XCTAssertEqual(
+      AdHeadRules.find(lines: lines(["Visit acme.com and take the code \"sleepy\" at checkout."])).map(\.startLine), [1])
+    XCTAssertEqual(
+      AdHeadRules.find(lines: lines(["Visit acme.com, promo code sleepy at checkout."])).map(\.startLine), [1])
+    XCTAssertEqual(
+      AdHeadRules.find(lines: lines(["Visit acme.com slash sleepy for details."])).map(\.startLine), [1])
+  }
 }

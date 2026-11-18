@@ -10,16 +10,20 @@
 import Foundation
 
 public enum AdHeadRules {
-  /// How many lines after a lead-in a call to action may come and still belong to the ad.
-  public static let reach = 12
+  /// How many lines after a lead-in a call to action may come and still belong to the ad, and
+  /// how many seconds may lie between the lead-in line's end and that line's start. A longer
+  /// stretch is talk that a lead-in only announced ("more on them later"), which the model
+  /// judges instead.
+  public static let reach = 4
+  public static let reachSeconds = 25.0
   /// Once the call to action is reached, an ad goes on while a signal comes at most this many
   /// lines apart.
   public static let gap = 3
   /// How many lines around a sponsor named in the notes a call to action may be.
   public static let near = 2
 
-  private static func regexes(_ patterns: [String]) -> [NSRegularExpression] {
-    patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
+  private static func regexes(_ patterns: [String], caseInsensitive: Bool = true) -> [NSRegularExpression] {
+    patterns.compactMap { try? NSRegularExpression(pattern: $0, options: caseInsensitive ? [.caseInsensitive] : []) }
   }
 
   /// Words that open a sponsor read.
@@ -31,10 +35,17 @@ public enum AdHeadRules {
     #"\ba word from our\b"#,
   ])
   /// A promo code, an offer, or a web address with a path: a web address alone is not enough.
+  /// The bare word "code" or "slash" is no sign ("the code is on github.com").
   private static let offers = regexes([
-    #"\b(code|slash|promo|coupon)\b"#, #"\b(percent|%) off\b"#, #"\bfree trial\b"#,
+    #"\b(promo|coupon|discount|referral) code\b"#, #"\b(use|enter) (the )?code\b"#,
+    #"\b(percent|%) off\b"#, #"\bfree trial\b"#,
     #"\.(com|net|org|io|co|fm|tv|me|ly|app|shop|store)/\w"#,
+    #"\.(com|net|org|io|co|fm|tv|me|ly|app|shop|store)\s+slash\s+\w"#,
+    #"\bdot (com|net|org|io|co)\s+slash\s+\w"#,
+    #"\bcode\s+["“”'‘’][^"“”'‘’]{2,}["“”'‘’]"#,
   ])
+  /// "code SLEEPY": the word "code" next to an all-caps word (so this list is case sensitive).
+  private static let capitalCodes = regexes([#"\bcode\s+[A-Z][A-Z0-9]{2,}\b"#], caseInsensitive: false)
   /// The hosts' own things.
   private static let ownPlugs = regexes([
     #"\bpatreon\b"#, #"\b(our|the) merch\b"#, #"\bour (newsletter|other (show|podcast))\b"#,
@@ -63,7 +74,9 @@ public enum AdHeadRules {
   }
 
   /// A call to action that is also an offer: enough to mark a line without a lead-in.
-  private static func isOffer(_ text: String) -> Bool { isCallToAction(text) && matches(offers, text) }
+  private static func isOffer(_ text: String) -> Bool {
+    isCallToAction(text) && (matches(offers, text) || matches(capitalCodes, text))
+  }
 
   private static func mentions(_ text: String, any names: [String]) -> Bool {
     names.contains {
@@ -79,7 +92,7 @@ public enum AdHeadRules {
     for (at, line) in lines.enumerated() {
       if isLeadIn(line.text) {
         guard let firstCall = (at..<min(lines.count, at + reach + 1)).first(where: {
-          isCallToAction(lines[$0].text)
+          isCallToAction(lines[$0].text) && lines[$0].start - lines[at].end <= reachSeconds
         })
         else { continue }
         spans.append((at, carried(from: firstCall, in: lines), true))
@@ -136,14 +149,16 @@ public enum AdHeadRules {
 
   /// Ads from several sources (the rules, the model, a file kept earlier) as one list: ads that
   /// overlap or touch become one, the surer confidence and the longer one's kind and name stand.
-  public static func merge(_ ads: [FoundAd]) -> [FoundAd] {
+  /// `touching` is how far apart two ads may be and still join (negative: only ads that overlap
+  /// by more than that).
+  public static func merge(_ ads: [FoundAd], touching: Double = 0.5) -> [FoundAd] {
     var result: [FoundAd] = []
     for ad in ads.sorted(by: { $0.start < $1.start }) {
       guard var last = result.popLast() else {
         result.append(ad)
         continue
       }
-      if ad.start <= last.end + 0.5 {
+      if ad.start <= last.end + touching {
         let longer = ad.duration > last.duration ? ad : last
         last.kind = longer.kind
         last.advertiser = longer.advertiser.isEmpty ? (last.advertiser.isEmpty ? ad.advertiser : last.advertiser) : longer.advertiser

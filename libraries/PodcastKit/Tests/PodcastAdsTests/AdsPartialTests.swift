@@ -109,6 +109,16 @@ final class AdsPartialStoreTests: XCTestCase {
     XCTAssertNil(store.best(detector: "fake")?.coveredUntil)
   }
 
+  func testDiscardingThePartialFileLeavesNothingToJoinWith() throws {
+    let store = AdsStore(folder: folder, sha256: sha)
+    try store.savePartial(file(until: 300))
+    try store.saveProgress(AdProgress(sha256: sha, detector: "fake", detectorVersion: "1"))
+    store.discardPartial(detector: "fake")
+    XCTAssertNil(store.loadPartial(detector: "fake"))
+    XCTAssertEqual(store.loadProgress(detector: "fake", version: "1").answers, [:])
+    store.discardPartial(detector: "fake")  // nothing there: no harm
+  }
+
   func testTheTextTheAppReadsIsTheFinalFileElseThePartialOne() throws {
     let store = AdsStore(folder: folder, sha256: sha)
     XCTAssertNil(store.bestJSON(detector: "fake"))
@@ -250,6 +260,31 @@ final class AdsRunnerPartialTests: XCTestCase {
     XCTAssertFalse(file.ads.contains(inside), "inside the stretch: the finder's answers win")
     XCTAssertEqual(file.ads.count, 2)
     XCTAssertEqual(file.undone, [UndoneAd(start: 5, end: 9)])
+  }
+
+  func testAnAdThatStraddlesTheEndOfTheAskedStretchIsKeptAndMergedWithTheNewAnswer() async throws {
+    let transcript = makeTranscript(talk(160, ad: 40...47))
+    let store = AdsStore(folder: folder, sha256: sha)
+    let first = try await AdsRunner.runPartial(
+      partial: partial(transcript, lines: 100), detector: detector(Asked()), store: store,
+      osVersion: "26")
+    guard case .finished(let base) = first, let covered = base.coveredUntil, let found = base.ads.first
+    else { return XCTFail("\(first)") }
+    // An ad from an earlier look (the stream's head scan) that runs over the end of the stretch.
+    let straddling = FoundAd(
+      start: found.start - 5, end: covered + 20, kind: .ad, advertiser: "Head", confidence: .sure,
+      firstWords: "h")
+    try store.savePartial(
+      AdsFile(
+        sha256: sha, detector: "fake", detectorVersion: "1", osVersion: "26", duration: 1600,
+        ads: [straddling], undone: []))
+    let outcome = try await AdsRunner.runPartial(
+      partial: partial(transcript, lines: 100), detector: detector(Asked()), store: store,
+      osVersion: "26")
+    guard case .finished(let file) = outcome else { return XCTFail("\(outcome)") }
+    XCTAssertEqual(file.ads.count, 1, "the kept ad and the new answer overlap: one ad")
+    XCTAssertEqual(file.ads[0].start, found.start - 5, accuracy: 0.01)
+    XCTAssertEqual(file.ads[0].end, covered + 20, accuracy: 0.01)
   }
 
   func testTheFullRunSavesAPartialFileAfterEachPieceItAsks() async throws {

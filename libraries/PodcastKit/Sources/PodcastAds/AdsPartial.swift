@@ -138,6 +138,12 @@ extension AdsStore {
     return saved
   }
 
+  /// Removes the partial result and the kept answers of this detector, for a name that a new
+  /// run of the same episode reuses (the stream's made-up one).
+  public func discardPartial(detector: String) {
+    for kind in ["partial", "progress"] { try? FileManager.default.removeItem(at: scratchURL(detector, kind)) }
+  }
+
   /// Saves what a partial run found so far, as `<sha256>.ads.<detector>.partial.json`.
   public func savePartial(_ file: AdsFile) throws {
     try Self.encoder.encode(file).write(to: scratchURL(file.detector, "partial"), options: .atomic)
