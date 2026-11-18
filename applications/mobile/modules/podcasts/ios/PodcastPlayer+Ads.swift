@@ -85,10 +85,8 @@ final class PodcastAdSkipping {
   /// trim is saved with the ads and counted; the skipper already uses it.
   func seeked(to position: Double) {
     if let trim = skipper.backSeek(to: position, now: now) {
-      // A stream's ads file is written by its head scan too, so the head takes the trim.
-      if let head = streamHead {
-        head.markTrimmed(trim)
-      } else {
+      // A stream's ads file is written by its head scan too, so the head takes the trim first.
+      if streamHead?.markTrimmed(trim) != true {
         store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
       }
       StatsStore.shared.countAd(.tooFar)
@@ -140,9 +138,7 @@ final class PodcastAdSkipping {
     let ad = skip.ad
     // The ads that were skipped with it (an ad and then the hosts' plug) are undone too.
     for undone in [ad] + skip.chained {
-      if let head = streamHead {
-        head.markUndone(undone)
-      } else {
+      if streamHead?.markUndone(undone) != true {
         store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
       }
     }

@@ -192,6 +192,23 @@ final class ShowOpeningsTests: XCTestCase {
     XCTAssertEqual(openings.opening(for: "show"), opening)
   }
 
+  func testAnOpeningFoundInsideASureAdIsDroppedAtOnce() {
+    var openings = learnedShow()
+    // The pre-roll ad runs on over the opening's words, so finding them there confirms nothing.
+    let covered = (words: talk("cpre", 40) + openingWords + talk("cshow", 200), file: file([ad(0, 28)]))
+    learn(&openings, covered, id: "e3")
+    XCTAssertNil(openings.opening(for: "show"))
+    XCTAssertEqual(openings.shows.first?.misses, 0)
+  }
+
+  func testAnOpeningFoundInsideAnUnsureOrUndoneAdIsKept() {
+    for kept in [file([ad(0, 28, .unsure)]), file([ad(0, 28)], undone: [UndoneAd(start: 0, end: 28)])] {
+      var openings = learnedShow()
+      learn(&openings, (talk("cpre", 40) + openingWords + talk("cshow", 200), kept), id: "e3")
+      XCTAssertEqual(openings.opening(for: "show"), opening, "an ad that may not be one proves nothing")
+    }
+  }
+
   func testThreeNewerEpisodesWithoutItReplaceItWithWhatTheLastTwoShare() {
     var openings = learnedShow()
     let next = "welcome back to the nightly example with sam and dana"

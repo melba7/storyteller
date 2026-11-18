@@ -63,7 +63,14 @@ public struct ShowOpenings: Codable, Sendable, Equatable {
     show.episode = episode
 
     if let opening = show.opening {
-      if ShowOpening.find(opening, in: transcript.words) != nil {
+      let at = ShowOpening.find(opening, in: transcript.words)
+      if let at, Self.insideSureAd(at, file) {
+        // A sure ad covers the opening's words, so they were probably an ad's words all along
+        // (or the ad is wrong): drop the opening at once and learn again from what stays.
+        show.opening = nil
+        show.misses = 0
+        show.heard = []
+      } else if at != nil {
         show.misses = 0
         show.heard = []
       } else {
@@ -89,6 +96,14 @@ public struct ShowOpenings: Codable, Sendable, Equatable {
     shows.removeAll { $0.id == id }
     shows.append(show)
     if shows.count > Self.mostShows { shows.removeFirst(shows.count - Self.mostShows) }
+  }
+
+  /// Whether `time` falls inside an ad of the file that is sure and that the listener kept. An
+  /// opening that starts within a second of the ad's end is a show starting right after its ad.
+  private static func insideSureAd(_ time: Double, _ file: AdsFile) -> Bool {
+    file.ads.contains {
+      $0.confidence == .sure && !file.isUndone($0) && time >= $0.start && time < $0.end - 1
+    }
   }
 
   private static func kept(_ segments: [[String]]) -> [String] {

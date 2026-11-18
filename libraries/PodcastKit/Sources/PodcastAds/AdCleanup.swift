@@ -155,11 +155,13 @@ public enum AdCleanup {
 
   /// The last line number of an ad after carrying it on: while the line after it sells (see
   /// `AdSignals.carriesOn`), it belongs to the ad, for at most `carryLines` lines, and only
-  /// lines that end within `carrySeconds` of the end of the line before them.
+  /// lines that end within `carrySeconds` of the end of the line before them and start within
+  /// `carrySeconds` of the end of the model's last line.
   static func carriedEnd(of last: Int, advertiser: String, lines: [TranscriptLine]) -> Int {
     var end = last
     while end < lines.count, end - last < AdRules.carryLines,
       lines[end].end - lines[end - 1].end <= AdRules.carrySeconds,
+      lines[end].start - lines[last - 1].end <= AdRules.carrySeconds,
       AdSignals.carriesOn(lines[end].text, advertiser: advertiser, after: lines[end - 1].text)
     {
       end += 1

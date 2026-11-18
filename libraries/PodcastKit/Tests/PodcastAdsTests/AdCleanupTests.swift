@@ -247,6 +247,17 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 2)
   }
 
+  func testCarryingOnNeverReachesPastFifteenSecondsOfTheModelsLastLine() {
+    // Each line ends within 15 s of the one before it, but the second starts 20 s after the
+    // model's last line, so the carried stretch would be longer than the rule allows.
+    let lines = [
+      TranscriptLine(start: 0, end: 50, text: "this is brought to you by Acme at acme dot com"),
+      TranscriptLine(start: 52, end: 63, text: "go to acme dot com today"),
+      TranscriptLine(start: 70, end: 75, text: "go to acme dot com"),
+    ]
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 2)
+  }
+
   func testALongLineThatStartsSoonButEndsLateIsNotCarried() {
     // The model's last line ends at 50 s. The next starts 14 s later, so it starts within 15 s,
     // but it runs 16 s and ends 30 s after the ad: host talk that only mentions the site.
