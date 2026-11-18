@@ -39,6 +39,8 @@ export type PlayerView = {
   rate: number
   /** The native player plays the plain address, so no ad is skipped. */
   streamsPlain: boolean
+  /** Play waits a moment for the first look at the start of a stream. */
+  checkingStart: boolean
   error: string | null
 }
 
@@ -52,6 +54,7 @@ export const EMPTY_VIEW: PlayerView = {
   isBuffering: false,
   rate: 1,
   streamsPlain: false,
+  checkingStart: false,
   error: null,
 }
 
@@ -184,6 +187,7 @@ export function createPlayback(deps: PlaybackDeps) {
       isBuffering: state.isBuffering,
       rate: state.rate,
       streamsPlain: state.streamsPlain === true,
+      checkingStart: state.checkingStart === true,
       error: state.isPlaying ? null : view.error,
     })
     if (wasPlaying && !state.isPlaying && !state.isBuffering) {
@@ -367,6 +371,7 @@ export function createPlayback(deps: PlaybackDeps) {
       isPlaying: false,
       isBuffering: true,
       streamsPlain: false,
+      checkingStart: false,
       error: null,
     })
     await run(() =>

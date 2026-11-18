@@ -98,7 +98,12 @@ final class PodcastStreamHead: @unchecked Sendable {
     }
   }
 
+  /// Whether the scan is over (finished, stopped or failed), so it has said all it will say.
+  var hasChecked: Bool { lock.withLock { scanDone } }
+
   private func scanEnded() {
+    let (ads, reached) = lock.withLock { (found, covered) }
+    reportScanEnded(ads: ads, reached: reached)
     let release = lock.withLock { () -> [() -> Void] in
       scanDone = true
       defer { waiters = [] }
@@ -207,6 +212,7 @@ final class PodcastStreamHead: @unchecked Sendable {
     var waitFor: Int64 = 0  // at least this many bytes are waited for
     var modelAds: [FoundAd] = []
     var first = true
+    var told = false  // the player is told once, after the first step
     var steps = HeadSteps(steps: Self.targets)
     while let target = steps.target {
       try Task.checkCancellation()
@@ -279,6 +285,11 @@ final class PodcastStreamHead: @unchecked Sendable {
         episodeId,
         "rules: \(ruleAds.count) ads in \(Int(Date().timeIntervalSince(startedRules) * 1000)) ms")
       save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
+      // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
+      if !told {
+        told = true
+        reportVerdict()
+      }
 
       let warmOne: AdDetector? = detector
       if Self.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {

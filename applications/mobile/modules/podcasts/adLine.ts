@@ -11,6 +11,7 @@ import { transcriptStatus } from "./transcripts"
 
 const READY = "Getting ready to find ads"
 const STREAMING = "Streaming without ad skipping"
+const CHECKING = "Checking the start for ads"
 
 function cannot(reason: string): string {
   return reason === "" ? "Ads can't be found" : `Ads can't be found: ${reason}`
@@ -36,10 +37,15 @@ export function playerAdLine(input: {
   ads?: AdsInfo | undefined
   /** The player plays the plain address, whatever the download says (Swift reports it). */
   streamsPlain?: boolean
+  /** Play is waiting a moment for the first look at the start of a stream (Swift reports it). */
+  checkingStart?: boolean
 }): string {
   const { episodeId, skipAds, download, transcript, ads } = input
   if (!skipAds) return ""
   if (isLocalEpisodeId(episodeId) || isPreviewId(episodeId)) return ""
+  // Play waits for the first look at a stream's start while its download is still arriving,
+  // which would read "Getting ready", so this comes first.
+  if (input.checkingStart === true) return CHECKING
   const noFile = download === undefined || download.state === "failed"
   if (noFile) return STREAMING
   // The download is being prepared, but the item that plays is not that file: nothing is

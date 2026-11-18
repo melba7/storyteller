@@ -60,6 +60,8 @@ extension PodcastPlayer {
   /// listener removed it): the same place plays from the episode's plain address instead.
   func fallBackToStream(from loader: PodcastStreamDownload, reason: StreamFallback) {
     guard streamDownload === loader else { return }
+    // The plain address plays now, with no ads to wait for.
+    cancelStartHold()
     // A seek to the saved place may not have happened yet on an item that never became ready.
     let ready = player.currentItem?.status == .readyToPlay
     let place = ready ? position : max(position, itemStart)

@@ -56,6 +56,8 @@ final class PodcastPlayer {
   var seekPending = false
   /// Counts the seeks, so only the latest one's completion ends the pending state.
   private var seekCount = 0
+  /// Play is waiting a moment for the first look at a stream's start (PodcastPlayer+StartHold).
+  var startHold: PodcastStartHold?
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -101,6 +103,7 @@ final class PodcastPlayer {
 
   /// Loads an episode and, unless told not to, starts it.
   func begin(_ episode: Episode) {
+    cancelStartHold()
     watchTheBook()
     currentEnded = false
     current = QueueItem(
@@ -160,6 +163,13 @@ final class PodcastPlayer {
 
   func play() {
     guard player.currentItem != nil else { return }
+    // A stream nothing is known about may wait a moment first; a second tap ends that wait.
+    if holdTheStart() { return }
+    startPlaying()
+  }
+
+  /// Starts the audio (the rest of Play, once any wait for a stream's first look is over).
+  func startPlaying() {
     wantsToPlay = true
     try? AVAudioSession.sharedInstance().setActive(true)
     // A finished episode starts over.
@@ -175,6 +185,7 @@ final class PodcastPlayer {
   }
 
   func pause() {
+    cancelStartHold()
     wantsToPlay = false
     player.pause()
     publish()
@@ -259,12 +270,14 @@ final class PodcastPlayer {
     var object: [String: Any] = [
       "position": position,
       "isPlaying": player.timeControlStatus == .playing,
-      "isBuffering": wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
+      "isBuffering": startHold != nil
+        || (wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate),
       "rate": speed.value,
       "streamsPlain": playsPlainAddress,
     ]
     if let episodeId { object["episodeId"] = episodeId }
     if let duration = currentDuration { object["duration"] = duration }
+    if startHold != nil { object["checkingStart"] = true }
     return object
   }
 

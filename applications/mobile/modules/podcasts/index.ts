@@ -72,6 +72,11 @@ export type PlaybackState = {
   rate: number
   /** The player plays the episode's plain address, so no ad is skipped. */
   streamsPlain?: boolean
+  /**
+   * Play is waiting a moment (3 seconds at most) for the first look at the start of a stream,
+   * so an ad at 0:00 can be left before it is heard.
+   */
+  checkingStart?: boolean
 }
 
 export type PlaybackLoadOptions = {

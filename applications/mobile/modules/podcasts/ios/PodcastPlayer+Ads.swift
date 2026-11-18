@@ -46,6 +46,12 @@ final class PodcastAdSkipping {
 
   private var now: Double { ProcessInfo.processInfo.systemUptime }
 
+  /// Whether Skip ads is on for the loaded show.
+  var skipsAds: Bool { settings.skipAds }
+
+  /// Whether an ads file was saved for the loaded download (checked, with or without ads).
+  var hasSavedAds: Bool { store?.best(detector: PodcastAdFinder.detectorName) != nil }
+
   /// The listener's switches, with the loaded show's own choices where it has them (P5a).
   private var settings: AdSkipSettings {
     let show = owner.showState.settings
