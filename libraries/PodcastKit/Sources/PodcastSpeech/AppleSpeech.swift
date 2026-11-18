@@ -228,6 +228,32 @@ public protocol HeadTranscribing: AnyObject, Sendable {
       }
     }
 
+    /// Loads the speech model for a language ahead of the first stream: makes an analyzer, has it
+    /// prepare and lets it go. The model stays in memory for the process (the same retention as
+    /// `prepare`), so the next head scan starts warm. Nothing is downloaded: false when the
+    /// language is not supported or its model is not on this device yet.
+    static func warm(locale identifier: String) async -> Bool {
+      guard SpeechTranscriber.isAvailable,
+        let supported = await SpeechTranscriber.supportedLocale(
+          equivalentTo: Locale(identifier: identifier))
+      else { return false }
+      let transcriber = AppleRecogniser.makeTranscriber(supported)
+      do {
+        if try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) != nil {
+          return false
+        }
+        guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+        else { return false }
+        let analyzer = SpeechAnalyzer(
+          modules: [transcriber],
+          options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .processLifetime))
+        try await analyzer.prepareToAnalyze(in: format)
+        return true
+      } catch {
+        return false
+      }
+    }
+
     private func take(_ result: SpeechTranscriber.Result) {
       var found: [TranscriptWord] = []
       for run in result.text.runs {
@@ -296,6 +322,16 @@ public enum AppleSpeech {
       if #available(iOS 26.0, macOS 26.0, *) { return AppleRecogniser() }
     #endif
     return nil
+  }
+
+  /// Loads the speech model for `identifier` now, so a stream's first look does not wait for it.
+  /// True when it is loaded; false when this system has no SpeechAnalyzer, the language is not
+  /// supported or its model is not on the device (it is never downloaded here).
+  public static func warm(locale identifier: String) async -> Bool {
+    #if canImport(Speech) && compiler(>=6.2)
+      if #available(iOS 26.0, macOS 26.0, *) { return await AppleHeadTranscriber.warm(locale: identifier) }
+    #endif
+    return false
   }
 
   /// A transcriber for the first minutes of a stream, or nil when this system has none.

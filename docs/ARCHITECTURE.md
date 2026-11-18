@@ -269,6 +269,32 @@ in `FORK.md`.
 | 2026-11-18 | Podcasts pages size from the window and safe-area insets (`usePageFrame`); nothing is keyed on width or on a device size                   | The iPhone Duo folds and turns without losing the place    |
 | 2026-11-18 | Wide grids are lists of rows with columns doubled from 600 pt; show header picture at most 430 pt and 60% of the height                    | More room on the Duo's inner display, no remount           |
 | 2026-11-18 | The player sits side by side when short and wide, shows a whole cover on a centred sheet, and its sheets turn with the phone               | Landscape and the Duo's centred sheet                      |
+| 2026-11-18 | Skips land 0.25 s before the next word; an ad starts at 0:00 if its first word is in the first 6 s; 0.1 s before an end is the show's      | The old 4 s pause snap could move an end into the show     |
+| 2026-11-18 | Carry-on: at most 2 lines, each within 15 s of the line before and of the model's last line, with a hard signal or name plus cue           | One extra sentence of ad is cheaper than lost show         |
+| 2026-11-18 | The model's last 3 lines are trimmed at a return cue with nothing selling after; an edge line is cut inside at a return cue or lead-in     | A line holds up to 25 words; whole lines kept show words   |
+| 2026-11-18 | Only sure ads of one kind merge: under 4 s of speech, or under 12 s when whole lines between are all filler; at most 300 s                 | The 12 s speech merge swallowed teasers between two ads    |
+| 2026-11-18 | A sure ad with no line that sells is unsure; over 35% of a long transcript, or over 180 s, sure ads need 2 such lines                      | "Sure" was never checked; unsure is never carried          |
+| 2026-11-18 | Spot cues ("terms apply", "download the app") are signals; two within 2 lines, or one beside a call to action, mark an ad                  | Produced spots have no lead-in but do have a legal close   |
+| 2026-11-18 | Sponsor names also come from notes' links and "code X at site"; link names are guesses: whole word, a non-own-plug hard signal on the line | "time.com" must not match "sometimes"                      |
+| 2026-11-18 | `AdCleanup.run` is built on `explain`; `podcast-ads --edges` prints each step's effect and compares with hand-marked ads (`--truth`)       | Measures the ends on Mo's own episodes                     |
+| 2026-11-18 | Shared runs are found by a hash index of MP3 frames (115 frames, 20 different); seams and reservoir resets are listed (Mac tool only)      | Finds spots that are byte-equal in two episodes            |
+| 2026-11-18 | `--truth-from-copies` writes where two downloads differ as truth; "Compare my shows" downloads 20 MB heads into a deleted folder           | Truth with no listening; Mo has no MP3s on his Mac         |
+| 2026-11-18 | Only a finished download opens with `AVURLAssetPreferPreciseDurationAndTimingKey`; a stream does not                                       | On a stream it would hold playback until the file is whole |
+| 2026-11-18 | "Too far" is a trim in the ads file (`trims`, never longer than the ad); the note has "Back 10 s"; three counters are in the stats file    | A file rewrite must not bring the skipped stretch back     |
+| 2026-11-18 | `AdsStore.save` and `savePartial` carry the trims on disk; a trim or Undo on a stream goes through the head under its lock                 | Detectors rewrite the file; filing wipes the stream's      |
+| 2026-11-18 | Quick head rules carry on only through the next line (within 12 s), stop at a return cue; an offer needs a web address or 2nd signal       | Plain talk and stray web addresses were swallowed          |
+| 2026-11-18 | The head scan starts at 15 s; the model runs at 30, 60, 120, 180 s (sure only at 30 s) with a warm session; the speech model loads early   | The first look comes 15 s sooner                           |
+| 2026-11-18 | Ads are remembered by their words (`known-ads.json`, 40 per show, 400, 60 days); a guess ends at most 5 s past what was heard              | Repeats are found at once with word-exact edges            |
+| 2026-11-18 | Play waits up to 3.0 s for a never-checked stream's first look (own timer), never when the app is inactive; a second tap releases it       | A failing scan or a locked screen must not hang playback   |
+| 2026-11-18 | One opening per show is learned from two episodes (`show-openings.json`); in a head it ends a 0:00 ad before it or drops an unsure one     | A wrong opening must not cut a real ad; it only shortens   |
+| 2026-11-18 | An opening found inside a sure ad that was kept is dropped at once, not counted as a match                                                 | A cut that covers the opening kept itself in place         |
+| 2026-11-18 | The next 2 Up Next episodes download ahead (Skip ads, Wi-Fi, not Low Data) as automatic downloads marked `ahead`; once per run             | Heads are checked before play; existing rules still apply  |
+| 2026-11-18 | An `ahead` download that left Up Next unplayed is deleted; the mark goes when the player begins it or the listener asks                    | Nothing else cleans up unplayed automatic downloads        |
+| 2026-11-18 | Chapters named like an ad break, with words that sell inside, are ads from the first selling line; they never lengthen another ad          | Hosts do not move chapters when they insert ads            |
+| 2026-11-18 | `TranscriptDiff` compares our words with the feed's transcript: words it lacks are inserted audio (pure part and a Mac count only)         | The publisher's transcript predates the stitched ads       |
+| 2026-11-18 | The skip log (`skip-log.jsonl`, newest 500 lines) stays on the phone and leaves only by "Send skip log"                                    | To see why a skip was wrong                                |
+| 2026-11-18 | The notes and show link go from the app to the stream head, so the quick rules also look for the sponsors named there                      | Sponsors in the notes are the best clue for a pre-roll     |
+| 2026-11-18 | A split player's two columns get a width and a flex basis; a small cover shows from 100 pt of room; a short sheet is under 640 pt          | The iPhone Duo's folded and open sheets                    |
 
 ## Known problems
 

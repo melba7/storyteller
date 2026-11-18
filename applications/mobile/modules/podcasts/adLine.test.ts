@@ -66,6 +66,47 @@ describe("playerAdLine", () => {
     expect(line(download("downloaded"), ads("noAds"))).toBe(next)
   })
 
+  it("says it is checking the start while Play waits for the first look", () => {
+    const checking = "Checking the start for ads"
+    // The download is still arriving then, which would otherwise read "Getting ready".
+    expect(
+      playerAdLine({
+        ...base,
+        checkingStart: true,
+        download: download("downloading"),
+      }),
+    ).toBe(checking)
+    expect(
+      playerAdLine({ ...base, checkingStart: true, download: undefined }),
+    ).toBe(checking)
+    expect(
+      playerAdLine({
+        ...base,
+        checkingStart: false,
+        download: download("downloading"),
+      }),
+    ).toBe("Getting ready to find ads")
+  })
+
+  it("says nothing about the start while Skip ads is off or for an added file", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        skipAds: false,
+        checkingStart: true,
+        download: download("downloading"),
+      }),
+    ).toBe("")
+    expect(
+      playerAdLine({
+        ...base,
+        episodeId: "file-1",
+        checkingStart: true,
+        download: undefined,
+      }),
+    ).toBe("")
+  })
+
   it("keeps the other lines when the player plays the file", () => {
     expect(
       playerAdLine({

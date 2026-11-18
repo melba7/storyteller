@@ -11,6 +11,7 @@ import AVFoundation
 import Foundation
 import PodcastAds
 import PodcastDownloads
+import PodcastTranscripts
 
 /// The listener's two switches, kept in the app's defaults so the player reads them with no
 /// JavaScript running.
@@ -45,6 +46,18 @@ final class PodcastAdSkipping {
 
   private var now: Double { ProcessInfo.processInfo.systemUptime }
 
+  /// Whether Skip ads is on for the loaded show.
+  var skipsAds: Bool { settings.skipAds }
+
+  /// Whether an ads file was saved for the loaded download (checked, with or without ads).
+  var hasSavedAds: Bool { store?.best(detector: PodcastAdFinder.detectorName) != nil }
+
+  /// The head scan of the stream the loaded episode plays through, while it does.
+  private var streamHead: PodcastStreamHead? {
+    guard let loader = owner.streamDownload, loader.episodeId == episodeId else { return nil }
+    return loader.head
+  }
+
   /// The listener's switches, with the loaded show's own choices where it has them (P5a).
   private var settings: AdSkipSettings {
     let show = owner.showState.settings
@@ -67,8 +80,21 @@ final class PodcastAdSkipping {
     if let skip { jump(skip, from: position) }
   }
 
-  /// The playhead was moved by the listener, a lock screen button or Undo.
-  func seeked(to position: Double) { skipper.seeked(to: position) }
+  /// The playhead was moved by the listener, a lock screen button or Undo. A move back into the
+  /// ad that was just skipped says the skip went too far: that ad ends there from now on. The
+  /// trim is saved with the ads and counted; the skipper already uses it.
+  func seeked(to position: Double) {
+    if let trim = skipper.backSeek(to: position, now: now) {
+      // A stream's ads file is written by its head scan too, so the head takes the trim first.
+      if streamHead?.markTrimmed(trim) != true {
+        store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
+      }
+      StatsStore.shared.countAd(.tooFar)
+      PodcastSkipLogger.shared.trimmed(trim)
+    }
+    PodcastSkipLogger.shared.seeked(to: position, knownAds: skipper.ads)
+    skipper.seeked(to: position)
+  }
 
   /// The ads file or the switches changed (ads were just found, or a switch was turned).
   func refresh() {
@@ -112,9 +138,18 @@ final class PodcastAdSkipping {
     let ad = skip.ad
     // The ads that were skipped with it (an ad and then the hosts' plug) are undone too.
     for undone in [ad] + skip.chained {
-      store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
+      if streamHead?.markUndone(undone) != true {
+        store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
+      }
     }
     StatsStore.shared.undoAdSkip()
+    StatsStore.shared.countAd(.undone)
+    // An ad the listener did not want skipped is forgotten by the memory too, so it is not found
+    // again by its words in the next episode.
+    PodcastKnownAds.shared.forget(
+      episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
+      heard: owner.streamDownload?.head.memory.words ?? [])
+    PodcastSkipLogger.shared.undone()
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -159,6 +194,8 @@ final class PodcastAdSkipping {
     guard let episodeId else { return }
     PodcastTimeline.firstSkip(episodeId)
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
+    StatsStore.shared.countAd(.skipped)
+    PodcastSkipLogger.shared.skipped(skip, episodeId: episodeId)
     owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(

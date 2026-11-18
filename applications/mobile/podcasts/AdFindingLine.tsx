@@ -62,6 +62,9 @@ export function AdFindingLine({
   const streamsPlain = usePlayerValue(
     (view) => view.episode?.id === episode.id && view.streamsPlain,
   )
+  const checkingStart = usePlayerValue(
+    (view) => view.episode?.id === episode.id && view.checkingStart,
+  )
   if (Podcasts === null) return null
   const line = playerAdLine({
     episodeId: episode.id,
@@ -70,6 +73,7 @@ export function AdFindingLine({
     transcript,
     ads,
     streamsPlain,
+    checkingStart,
   })
   if (line === "") return null
   return (

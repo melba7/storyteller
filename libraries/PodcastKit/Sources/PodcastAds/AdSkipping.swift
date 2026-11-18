@@ -62,6 +62,10 @@ public struct AdSkipper: Sendable {
   /// ads skipped along with it) is still ahead. A jump costs about a second of seeking and
   /// re-buffering and the "Skipped ad" note, so a shorter rest is cheaper to hear than to skip.
   public static let leaveMinimum = 3.0
+  /// A skip is found "too far" when the listener goes back into it at most this long after it.
+  public static let tooFarSeconds = 20.0
+  /// ... and at most this far before where the skip landed.
+  public static let tooFarReach = 60.0
 
   /// The sure and unsure ads that were not undone before, whatever the switches say.
   private var candidates: [FoundAd]
@@ -72,6 +76,9 @@ public struct AdSkipper: Sendable {
   /// What the listener undid in this episode, so far: an ad found again a second later (the
   /// model's first line, a pause snap) is the same ad.
   private var undone: [(start: Double, end: Double)] = []
+  /// What the listener found too far in this episode, so far. The file's own trims are read from
+  /// the file; these stay when the file is read again before it holds them.
+  private var trims: [AdTrim] = []
   /// Where the ads left in progress were skipped to (start and end), so a second look at the
   /// same file does not jump again before the first jump has landed, while an ad that is found
   /// again longer (cut short at the edge of the first pass) is left once more.
@@ -83,19 +90,22 @@ public struct AdSkipper: Sendable {
   ///   guesses are never in the file.
   public init(file: AdsFile?, settings: AdSkipSettings) {
     self.settings = settings
-    candidates = Self.candidates(in: file)
+    candidates = Self.candidates(in: file, trims: [])
   }
 
-  private static func candidates(in file: AdsFile?) -> [FoundAd] {
-    (file?.ads ?? []).filter { ad in
-      ad.confidence >= .unsure && file?.isUndone(ad) == false && ad.end > ad.start
-    }.sorted { $0.start < $1.start }
+  /// The ads of the file as they are skipped: cut short by the trims, and without the ones that
+  /// are not worth a skip.
+  private static func candidates(in file: AdsFile?, trims: [AdTrim]) -> [FoundAd] {
+    let allTrims = (file?.trims ?? []) + trims
+    return (file?.ads ?? []).filter { ad in
+      ad.confidence >= .unsure && file?.isUndone(ad) == false
+    }.map { $0.trimmed(by: allTrims) }.filter { $0.end > $0.start }.sorted { $0.start < $1.start }
   }
 
   /// The ads file changed (ads were found while the episode plays). Where the playhead was put
   /// last and what was undone stay, so the new ads are treated as if they had been there.
   public mutating func replace(file: AdsFile?) {
-    candidates = Self.candidates(in: file)
+    candidates = Self.candidates(in: file, trims: trims)
     if let lastSeek { seeked(to: lastSeek) }
   }
 
@@ -135,6 +145,26 @@ public struct AdSkipper: Sendable {
 
   /// The switches changed. What was entered by a seek and what was undone stays.
   public mutating func apply(settings: AdSkipSettings) { self.settings = settings }
+
+  /// The playhead is being moved to `position` by the listener (Back 10 s, the seek bar, a lock
+  /// screen button). When that is at most `tooFarSeconds` after a skip, lands before where the
+  /// skip landed, at most `tooFarReach` seconds before it and inside the skipped stretch, the
+  /// skip went too far: the trim to save, and from now on that ad ends at `position`. Nil
+  /// otherwise (also when the seek would not make the ad any shorter). Call it before
+  /// `seeked(to:)`, so the ad is already shorter when that looks at where the seek landed.
+  @discardableResult
+  public mutating func backSeek(to position: Double, now: Double) -> AdTrim? {
+    guard position.isFinite, let last, now - last.at <= Self.tooFarSeconds,
+      position < last.skip.target, last.skip.target - position <= Self.tooFarReach,
+      let held = ([last.skip.ad] + last.skip.chained).last(where: { $0.start < position })
+    else { return nil }
+    let currentEnd = candidates.first { $0.start == held.start }?.end ?? held.end
+    guard position < currentEnd else { return nil }
+    let trim = AdTrim(adStart: held.start, end: position)
+    trims.append(trim)
+    candidates = candidates.map { $0.trimmed(by: [trim]) }
+    return trim
+  }
 
   /// The playhead was moved to `position`. An ad it lands in is not skipped, so a seek into an
   /// ad (and Undo, and playing from an ad's start in the list) plays it.

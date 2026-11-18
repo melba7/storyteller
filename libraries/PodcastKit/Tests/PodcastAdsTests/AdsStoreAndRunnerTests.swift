@@ -108,8 +108,8 @@ final class AdsRunnerTests: XCTestCase {
       transcript: transcript, detector: ad, store: store, osVersion: "26.0")
     else { return XCTFail("did not finish") }
     XCTAssertEqual(file.ads.count, 1)
-    XCTAssertEqual(file.ads[0].start, 389.5, accuracy: 0.01)
-    XCTAssertEqual(file.ads[0].end, 469.5, accuracy: 0.01)
+    XCTAssertEqual(file.ads[0].start, 389.75, accuracy: 0.01)
+    XCTAssertEqual(file.ads[0].end, 469.75, accuracy: 0.01)
     XCTAssertEqual(store.load(detector: "fake"), file)
     XCTAssertEqual(file.detector, "fake")
     XCTAssertEqual(file.osVersion, "26.0")

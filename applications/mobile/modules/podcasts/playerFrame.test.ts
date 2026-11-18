@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  MIN_ART_AREA,
   actionGap,
   artworkPlan,
   rowHeightFor,
   sheetGutters,
   sideBySide,
+  splitWidths,
   transportSizes,
 } from "./playerFrame"
 
@@ -19,6 +21,17 @@ describe("sideBySide", () => {
   it("is false in portrait and on a tall wide sheet", () => {
     expect(sideBySide({ width: 393, height: 780 })).toBe(false)
     expect(sideBySide({ width: 1024, height: 768 })).toBe(false)
+  })
+  it("is true for the open iPhone Duo's sheet and false for the folded one", () => {
+    expect(sideBySide({ width: 653, height: 587 })).toBe(true)
+    expect(sideBySide({ width: 466, height: 596 })).toBe(false)
+  })
+})
+
+describe("splitWidths", () => {
+  it("gives both halves a whole width that adds up to the sheet", () => {
+    expect(splitWidths(650)).toEqual({ area: 325, controls: 325 })
+    expect(splitWidths(653)).toEqual({ area: 326, controls: 327 })
   })
 })
 
@@ -41,6 +54,18 @@ describe("artworkPlan", () => {
     expect(
       artworkPlan({ ...base, areaHeight: 139, sideBySide: false }).kind,
     ).toBe("hidden")
+  })
+  it("shows a small cover where the folded Duo leaves about 133 pt", () => {
+    expect(
+      artworkPlan({
+        sheetWidth: 466,
+        areaWidth: 466,
+        areaHeight: 133,
+        grabber: 24,
+        minArea: MIN_ART_AREA,
+        sideBySide: false,
+      }),
+    ).toEqual({ kind: "contained", height: 133 })
   })
   it("is a contained square on a wide sheet with little height", () => {
     expect(

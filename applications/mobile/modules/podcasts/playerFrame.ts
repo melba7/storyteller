@@ -5,8 +5,13 @@
 // that are too wide on a 320 pt screen. Pure, and based only on measured sizes, so it holds
 // on any phone, in landscape and on the iPhone Duo folded or open.
 
-/** Under this sheet height a wide sheet is laid out in two columns. */
-const SHORT_SHEET = 500
+/**
+ * Under this sheet height a wide sheet is laid out in two columns. It is 640 so that the open
+ * iPhone Duo's sheet (about 653 by 587 pt) is split too.
+ */
+const SHORT_SHEET = 640
+/** Under this much room above the controls (large text, a folded Duo) the artwork is left out. */
+export const MIN_ART_AREA = 100
 /** A sheet this much wider than the room above its controls shows the artwork as a square. */
 const WIDE_RATIO = 0.75
 
@@ -18,6 +23,18 @@ export function sideBySide(sheet: { width: number; height: number }): boolean {
     sheet.width > sheet.height &&
     sheet.height < SHORT_SHEET
   )
+}
+
+/**
+ * The widths of the two columns of a split sheet. Both are set outright, because left to share
+ * the room by `flex`, the iPhone Duo folded in landscape gave the artwork under a quarter of it.
+ */
+export function splitWidths(sheetWidth: number): {
+  area: number
+  controls: number
+} {
+  const area = Math.floor(sheetWidth / 2)
+  return { area, controls: sheetWidth - area }
 }
 
 export type ArtworkPlan =

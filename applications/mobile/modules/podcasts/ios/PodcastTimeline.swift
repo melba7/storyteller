@@ -23,6 +23,12 @@ enum PodcastTimeline {
     logger.notice("tap +0.00s \(episodeId, privacy: .public)")
   }
 
+  /// Seconds since the tap on Play of this episode, or nil when it was not tapped here (the
+  /// skip log keeps it).
+  static func secondsSinceTap(_ episodeId: String) -> Double? {
+    lock.withLock { taps[episodeId] }.map { Date().timeIntervalSince($0) }
+  }
+
   /// One step of the timeline. Nothing is logged for an episode that was not tapped here.
   static func mark(_ episodeId: String, _ what: String) {
     guard let at = lock.withLock({ taps[episodeId] }) else { return }

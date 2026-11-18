@@ -83,6 +83,9 @@ final class StatsStore: @unchecked Sendable {
     edit { $0.removeSaved(.ads, seconds) }
   }
 
+  /// One more ad skip, undone skip or skip that went too far.
+  func countAd(_ what: AdCount) { edit { $0.countAd(what) } }
+
   var trimSeconds: Double {
     lock.lock()
     defer { lock.unlock() }
@@ -124,6 +127,7 @@ final class StatsStore: @unchecked Sendable {
       "listened": stats.listened, "savedBySpeed": stats.savedBySpeed,
       "savedBySkipping": stats.savedBySkipping, "savedByTrim": stats.savedByTrim,
       "savedByAds": stats.savedByAds, "savedByChapters": stats.savedByChapters,
+      "adSkips": stats.adSkips, "adUndone": stats.adUndone, "adTooFar": stats.adTooFar,
       "days": stats.days,
     ]
   }

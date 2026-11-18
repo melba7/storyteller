@@ -113,6 +113,21 @@ public final class DownloadStore: @unchecked Sendable {
     }
   }
 
+  /// Takes the "ahead" mark off an episode's entry: it is being played, so it is the listener's
+  /// now. Done inside the store's lock, so it cannot undo a progress report that arrives at the
+  /// same time. Returns the entry as it now stands, or nil when it was not marked (or not there).
+  @discardableResult
+  public func clearAhead(episodeId: String) throws -> DownloadEntry? {
+    try lock.withLock {
+      guard let at = index.entries.firstIndex(where: { $0.episodeId == episodeId }),
+        index.entries[at].ahead
+      else { return nil }
+      index.entries[at].ahead = false
+      try save()
+      return index.entries[at]
+    }
+  }
+
   /// Moves the file URLSession finished into `.incoming`, on the same volume, so the move is
   /// a rename. Call it before the delegate method returns.
   public func stage(_ temporary: URL, episodeId: String) throws -> URL {
@@ -165,7 +180,7 @@ public final class DownloadStore: @unchecked Sendable {
       let entry = DownloadEntry(
         episodeId: episodeId, url: previous?.url ?? "", fileExtension: fileExtension,
         state: .downloaded(file: name, sha256: sha256, bytes: bytes, date: date), updatedAt: date,
-        automatic: previous?.automatic ?? false)
+        automatic: previous?.automatic ?? false, ahead: previous?.ahead ?? false)
       replace(entry)
       try save()
       return entry

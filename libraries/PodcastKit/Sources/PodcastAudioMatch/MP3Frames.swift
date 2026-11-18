@@ -10,6 +10,15 @@ public struct MP3Frame: Equatable, Sendable {
   public var duration: Double
   /// A hash of the frame's bytes. Equal bytes, equal hash.
   public var hash: UInt64
+  /// What the frame's header says: bits per second, samples per second and 1 (mono) or 2 channels.
+  public var bitrate: Int
+  public var sampleRate: Int
+  public var channels: Int
+  /// Whether the frame holds an Xing or Info tag. The first frame of a file made by an encoder
+  /// has one; a tag in a later frame is where two files were joined.
+  public var hasInfoTag: Bool
+  /// The bit reservoir pointer in the frame's side information (nil when it cannot be read).
+  public var mainDataBegin: Int?
 }
 
 public struct MP3Parse: Equatable, Sendable {
@@ -35,6 +44,8 @@ public enum MP3Frames {
     var bitrate: Int
     var sampleRate: Int
     var version: Int  // 1 for MPEG-1, 2 for MPEG-2 and 2.5
+    var channels: Int
+    var crc: Bool  // two bytes of checksum follow the header
   }
 
   /// The frame header at `at`, or nil when the four bytes there are not a Layer III header.
@@ -57,7 +68,18 @@ public enum MP3Frames {
     guard length > 4 else { return nil }
     return Header(
       length: length, duration: Double(samples) / Double(sampleRate), bitrate: bitrate,
-      sampleRate: sampleRate, version: mpeg1 ? 1 : 2)
+      sampleRate: sampleRate, version: mpeg1 ? 1 : 2, channels: bytes[at + 3] >> 6 == 3 ? 1 : 2,
+      crc: bytes[at + 1] & 1 == 0)
+  }
+
+  /// Whether the frame at `at` holds an Xing or Info tag: those four letters come right after the
+  /// header, the checksum (if there is one) and the side information.
+  private static func hasInfoTag(_ bytes: [UInt8], _ at: Int, _ head: Header) -> Bool {
+    let sideInfo = head.version == 1 ? (head.channels == 1 ? 17 : 32) : (head.channels == 1 ? 9 : 17)
+    let tag = at + 4 + (head.crc ? 2 : 0) + sideInfo
+    guard tag + 4 <= at + head.length else { return false }
+    let name = bytes[tag..<tag + 4]
+    return name.elementsEqual("Xing".utf8) || name.elementsEqual("Info".utf8)
   }
 
   /// The size of an ID3v2 tag at the start, with its header and footer, or 0.
@@ -100,7 +122,10 @@ public enum MP3Frames {
       result.frames.append(
         MP3Frame(
           offset: at, length: head.length, start: time, duration: head.duration,
-          hash: hash(bytes, at..<at + head.length)))
+          hash: hash(bytes, at..<at + head.length), bitrate: head.bitrate,
+          sampleRate: head.sampleRate, channels: head.channels,
+          hasInfoTag: hasInfoTag(bytes, at, head),
+          mainDataBegin: MP3SideInfo.mainDataBegin(bytes, at: at)))
       time += head.duration
       at += head.length
       synced = true

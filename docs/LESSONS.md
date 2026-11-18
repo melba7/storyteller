@@ -86,3 +86,19 @@ One line per lesson.
   audio up to that time. Finalize through the audio really fed (the decoder and
   rate converter keep a few milliseconds back), and put a time limit on each
   step (2026-11-18).
+- A rule that lowers an ad's confidence (N6: a sure ad with no line that sells
+  becomes unsure) quietly breaks every older test whose fixture had no such
+  line, and the tests that expect two ads can then pass for the wrong reason
+  (unsure ads never merge). Give the fixtures a selling line and re-read each
+  failing test before changing it (2026-11-18).
+- Merge cherry-picks of parallel builders in the order the files depend on each
+  other, and run the whole check on the main checkout: a worktree's typecheck
+  always fails through its symlinks, so it hides real errors (2026-11-18).
+- A flag that means "the first look is done" must be separate from "an ads file
+  exists": a look that finds nothing saves no file (2026-11-18).
+- In React Native, `flex-1` sets a flex basis of 0 and that wins over `width`:
+  give a fixed column both `width` and `flexBasis` (2026-11-18, found by Opus).
+- Read the whole of a reviewer-found list again after the fixes: a fix that
+  changes a function's signature (`StartHold.wanted`, `sponsors`) needs every
+  caller and test checked, because only Mac CI compiles the iOS module
+  (2026-11-18).

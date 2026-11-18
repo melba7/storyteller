@@ -17,15 +17,26 @@ public enum AdHeadRules {
   public static let reach = 4
   public static let reachSeconds = 25.0
   /// Once the call to action is reached, an ad goes on while a signal comes at most this many
-  /// lines apart.
-  public static let gap = 3
-  /// How many lines around a sponsor named in the notes a call to action may be.
+  /// lines apart (1: only the very next line), and the next signal line must start within
+  /// `gapSeconds` of the last one's end. A line with a return cue ends the ad before it.
+  public static let gap = 1
+  public static let gapSeconds = 12.0
+  /// How many lines around a sponsor named in the notes a call to action may be. Also how many
+  /// lines apart two signals may be when a span has neither a lead-in nor such a sponsor.
   public static let near = 2
 
   /// The seconds of audio after which each step of a stream's head scan ends (the phone's steps).
-  public static let steps: [Double] = [30, 60, 90, 120, 150, 180]
+  public static let steps: [Double] = [15, 30, 60, 90, 120, 150, 180]
   /// The steps after which the on-device model is asked.
-  public static let modelSteps: Set<Double> = [60, 180]
+  public static let modelSteps: Set<Double> = [30, 60, 120, 180]
+  /// At this step (and any before it) only the model's sure answers count; an unsure one waits for
+  /// the next model step, when the model has heard more of the ad.
+  public static let sureOnlyStep = 30.0
+
+  /// The model's answer at `step`, as far as it counts.
+  public static func counted(_ answer: [AdRange], atStep step: Double) -> [AdRange] {
+    step <= sureOnlyStep ? answer.filter { $0.confidence == .sure } : answer
+  }
 
   /// The steps for a head of `seconds`: the phone's steps up to it, and the end itself when it
   /// falls between two (a head of 100 seconds ends with a step of 100). Never past the last step.
@@ -40,14 +51,6 @@ public enum AdHeadRules {
     patterns.compactMap { try? NSRegularExpression(pattern: $0, options: caseInsensitive ? [.caseInsensitive] : []) }
   }
 
-  /// Words that open a sponsor read.
-  private static let leadIns = regexes([
-    #"\bbrought to you by\b"#, #"\bsponsored by\b"#, #"\bmade possible by\b"#,
-    #"\bsupport for (this|the|today's)\b.{0,40}\bcomes from\b"#,
-    #"\b(our|today's|this week's|this episode's) sponsors?\b"#,
-    #"\bthis (episode|podcast|show) is (brought|sponsored|supported|made possible)\b"#,
-    #"\ba word from our\b"#,
-  ])
   /// A promo code, an offer, or a web address with a path: a web address alone is not enough.
   /// The bare word "code" or "slash" is no sign ("the code is on github.com").
   private static let offers = regexes([
@@ -70,17 +73,22 @@ public enum AdHeadRules {
     #"(?:brought to you by|sponsored by|support for this \w+ comes from|today's sponsor is)\s+([A-Z][\w'&-]*(?:\s+[A-Z][\w'&-]*){0,2})"#
   ])
 
+  /// A web address, the same two patterns AdSignals counts.
+  private static let webAddresses = regexes([
+    #"\b[a-z0-9][a-z0-9-]*\.(com|net|org|io|co|fm|tv|me|ly|app|dev|shop|store)\b"#,
+    #"\bdot (com|net|org|io|co)\b"#,
+  ])
   private static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
     let whole = NSRange(text.startIndex..., in: text)
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
   }
 
-  private static func isLeadIn(_ text: String) -> Bool { matches(leadIns, text) }
+  private static func isLeadIn(_ text: String) -> Bool { matches(AdSignals.leadIns, text) }
 
   /// A web address, a promo code or an offer, not counting the lead-in's own words.
   private static func isCallToAction(_ text: String) -> Bool {
     var rest = text
-    for lead in leadIns {
+    for lead in AdSignals.leadIns {
       rest = lead.stringByReplacingMatches(
         in: rest, options: [], range: NSRange(rest.startIndex..., in: rest), withTemplate: " ")
     }
@@ -92,64 +100,104 @@ public enum AdHeadRules {
     isCallToAction(text) && (matches(offers, text) || matches(capitalCodes, text))
   }
 
-  private static func mentions(_ text: String, any names: [String]) -> Bool {
-    names.contains {
-      AdSignals.usableName($0)
-        && text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+  /// An offer line that can stand alone as an ad: it also holds a web address, or another
+  /// call to action or a spot cue comes at most `near` lines from it. One offer line in plain
+  /// talk ("that is twenty percent off the usual price") is not enough.
+  private static func hasTwoSignals(_ at: Int, _ lines: [NumberedLine]) -> Bool {
+    matches(webAddresses, lines[at].text)
+      || callNearby(at, lines, includingSelf: false, spotCues: true)
+  }
+
+  private static func mentions(_ text: String, any names: [SponsorName]) -> Bool {
+    names.contains { AdSignals.mentions(text, name: $0.text, wholeWord: $0.fromLink) }
+  }
+
+  /// Whether the line names a sponsor in a way that points to an ad. A name that is only a guess
+  /// from a link counts on a line that also holds a web address, a promo code or an offer that is
+  /// not the hosts' own plug.
+  private static func namesSponsor(_ text: String, _ sponsors: [SponsorName]) -> Bool {
+    sponsors.contains { name in
+      mentions(text, any: [name])
+        && (!name.fromLink || (AdSignals.hardSignal(text) && !matches(ownPlugs, text)))
     }
   }
 
-  /// The sure ads in the lead-in lines of an episode, as the ranges a detector would answer
-  /// (the same clean-up turns them into times). `sponsors` are the names found in the notes.
-  public static func find(lines: [NumberedLine], sponsors: [String] = []) -> [AdRange] {
-    var spans: [(first: Int, last: Int, lead: Bool)] = []  // indexes into `lines`
+  /// The ads in the lead-in lines of an episode, as the ranges a detector would answer (the same
+  /// clean-up turns them into times). `sponsors` are the names found in the notes. All are sure,
+  /// except a span that only holds closing phrases of a produced spot ("download the app",
+  /// "terms apply") and no web address or offer: that one is unsure.
+  public static func find(lines: [NumberedLine], sponsors: [SponsorName] = []) -> [AdRange] {
+    // Indexes into `lines`; `spot` is true while only spot cues made the span.
+    var spans: [(first: Int, last: Int, lead: Bool, spot: Bool)] = []
     for (at, line) in lines.enumerated() {
       if isLeadIn(line.text) {
         guard let firstCall = (at..<min(lines.count, at + reach + 1)).first(where: {
           isCallToAction(lines[$0].text) && lines[$0].start - lines[at].end <= reachSeconds
         })
         else { continue }
-        spans.append((at, carried(from: firstCall, in: lines), true))
-      } else if isOffer(line.text) || (mentions(line.text, any: sponsors) && callNearby(at, lines)) {
-        spans.append((at, carried(from: at, in: lines), false))
+        spans.append((at, carried(from: firstCall, in: lines), true, false))
+      } else if (isOffer(line.text) && hasTwoSignals(at, lines))
+        || (namesSponsor(line.text, sponsors) && callNearby(at, lines))
+      {
+        spans.append((at, carried(from: at, in: lines), false, false))
+      } else if AdSignals.spotCue(line.text),
+        callNearby(at, lines, includingSelf: false, spotCues: true)
+      {
+        spans.append((at, carried(from: at, in: lines), false, true))
       }
     }
-    var joined: [(first: Int, last: Int, lead: Bool)] = []
+    var joined: [(first: Int, last: Int, lead: Bool, spot: Bool)] = []
     for span in spans.sorted(by: { $0.first < $1.first }) {
       if let last = joined.last, span.first <= last.last + 1 {
-        joined[joined.count - 1] = (last.first, max(last.last, span.last), last.lead || span.lead)
+        joined[joined.count - 1] = (
+          last.first, max(last.last, span.last), last.lead || span.lead, last.spot && span.spot
+        )
       } else {
         joined.append(span)
       }
     }
     return joined.map { span in
       let text = lines[span.first...span.last].map(\.text).joined(separator: " ")
-      let plug = !span.lead && !mentions(text, any: sponsors) && matches(ownPlugs, text)
+      // Only a firm name excuses the hosts' own plugs; a guess from a link never does.
+      let firm = sponsors.filter { !$0.fromLink }
+      let plug = !span.lead && !mentions(text, any: firm) && matches(ownPlugs, text)
+      let proved = !span.spot || lines[span.first...span.last].contains { isCallToAction($0.text) }
       return AdRange(
         startLine: lines[span.first].number, endLine: lines[span.last].number,
         advertiser: plug ? "" : advertiser(in: text, sponsors: sponsors),
-        kind: plug ? .ownPlug : .ad, confidence: .sure)
+        kind: plug ? .ownPlug : .ad, confidence: proved ? .sure : .unsure)
     }
   }
 
-  private static func callNearby(_ at: Int, _ lines: [NumberedLine]) -> Bool {
-    (max(0, at - near)...min(lines.count - 1, at + near)).contains { isCallToAction(lines[$0].text) }
+  /// Whether a line within `near` lines of `at` is a call to action (or, with `spotCues`, a
+  /// closing phrase of a produced spot).
+  private static func callNearby(
+    _ at: Int, _ lines: [NumberedLine], includingSelf: Bool = true, spotCues: Bool = false
+  ) -> Bool {
+    (max(0, at - near)...min(lines.count - 1, at + near)).contains {
+      ($0 != at || includingSelf)
+        && (isCallToAction(lines[$0].text) || (spotCues && AdSignals.spotCue(lines[$0].text)))
+    }
   }
 
   /// The index of the last line that still reads as the ad: lines go on being counted while a
-  /// signal comes within `gap` lines of the last one.
+  /// signal comes within `gap` lines of the last one and starts within `gapSeconds` of its end. A
+  /// line with a return cue is never counted, and nothing after it.
   private static func carried(from start: Int, in lines: [NumberedLine]) -> Int {
     var last = start
     var next = start + 1
     while next < lines.count, next - last <= gap {
-      if isCallToAction(lines[next].text) { last = next }
+      if AdSignals.returnCue(lines[next].text) { break }
+      if isCallToAction(lines[next].text), lines[next].start - lines[last].end <= gapSeconds {
+        last = next
+      }
       next += 1
     }
     return last
   }
 
-  private static func advertiser(in text: String, sponsors: [String]) -> String {
-    if let name = sponsors.first(where: { mentions(text, any: [$0]) }) { return name }
+  private static func advertiser(in text: String, sponsors: [SponsorName]) -> String {
+    if let name = sponsors.first(where: { mentions(text, any: [$0]) }) { return name.text }
     let whole = NSRange(text.startIndex..., in: text)
     for pattern in named {
       if let match = pattern.firstMatch(in: text, options: [], range: whole),
@@ -195,10 +243,12 @@ public enum AdHeadRules {
   ])
 
   /// The sponsor names an episode's notes give: after "sponsored by", "brought to you by" or
-  /// "Sponsors:", split at commas and "and". Tags and web addresses are left out.
-  public static func sponsors(inNotes notes: String) -> [String] {
+  /// "Sponsors:", split at commas and "and" (tags and web addresses are left out), and then the
+  /// site of each link with a path or a promo code ("betterhelp.com/show" gives "betterhelp"),
+  /// except the show's own site (`showLink`), social sites, podcast apps and the hosts' own plugs.
+  public static func sponsors(inNotes notes: String, showLink: URL? = nil) -> [SponsorName] {
     let plain = notes.replacingOccurrences(of: "<[^>]+>", with: "\n", options: .regularExpression)
-    var names: [String] = []
+    var names: [SponsorName] = []
     let whole = NSRange(plain.startIndex..., in: plain)
     for pattern in notePatterns {
       for match in pattern.matches(in: plain, options: [], range: whole) {
@@ -208,12 +258,22 @@ public enum AdHeadRules {
         for part in parts {
           let name = part.trimmingCharacters(in: .whitespacesAndNewlines)
           guard AdSignals.usableName(name), name.split(separator: " ").count <= 4,
-            !name.contains("/"), !name.contains("@"), !names.contains(name)
+            !name.contains("/"), !name.contains("@"), !names.contains(where: { $0.text == name })
           else { continue }
-          names.append(name)
+          names.append(SponsorName(name))
         }
       }
     }
+    for name in SponsorNames.fromLinks(in: plain, showLink: showLink)
+    where !names.contains(where: { squashed($0.text) == squashed(name.text) }) {
+      names.append(name)
+    }
     return names
+  }
+
+  /// A name in lower case with only its letters and digits, to tell that "Better Help" and
+  /// "betterhelp" are one name.
+  private static func squashed(_ name: String) -> String {
+    name.lowercased().filter { $0.isLetter || $0.isNumber }
   }
 }

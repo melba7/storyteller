@@ -1,12 +1,14 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // The first minutes of a stream, checked for ads while the rest still downloads. As soon as
-// about 30 seconds of audio are on disk the start of the file is copied to a small file, cut at
+// about 15 seconds of audio are on disk the start of the file is copied to a small file, cut at
 // a whole MP3 frame, and transcribed by an analyzer that was made ready ahead; the copy grows in
-// 30 second steps to about 3 minutes. After each step the text rules (AdHeadRules) run at once,
-// and after the 60 second step the on-device model is asked once, with a session that was asked
-// to prewarm when play started. The ads found are saved as the episode's partial ads file, which
-// the player already reads, and the player is told to read it again.
+// steps (15, 30, 60 seconds, then every 30) to about 3 minutes. After each step the text rules
+// (AdHeadRules) run at once, and after the 30, 60, 120 and 180 second steps the on-device model
+// is asked, with a session that was asked to prewarm when play started and, after each answer,
+// another one for the next time. At the 30 second step only its sure answers count (an unsure
+// one waits for the 60 second step). The ads found are saved as the episode's partial ads file,
+// which the player already reads, and the player is told to read it again.
 //
 // The file is not whole, so there is no SHA-256 to name the ads by. Until the download is filed
 // they are kept under a made-up name ("stream-<episode>"), which `adsStore` gives the player;
@@ -30,18 +32,28 @@ final class PodcastStreamHead: @unchecked Sendable {
   private let store: DownloadStore
   private let lock = NSLock()
   private var language: String?
+  private var sponsors: [SponsorName] = []
   private var source: URL?
   private var key: String
   private var isFiled = false
   private var stopped = false
   private var started = false
   private var scanDone = false
+  /// The first look at the stream's start is done (the 15 second step's rules and the memory of
+  /// ads have answered), whether or not it found an ad. A look that found none leaves no ads file.
+  private var firstLookDone = false
   private var waiters: [() -> Void] = []
   private var found: [FoundAd] = []
   private var covered = 0.0
-  /// What the listener undid, kept here because filing the download wipes the stream's file.
+  /// What the listener undid and trimmed, kept here because filing the download wipes the
+  /// stream's file.
   private var undone: [UndoneAd] = []
+  private var trims: [AdTrim] = []
   private var detectorVersion = "1"
+  /// The ads the phone remembers, found in the words so far (PodcastStreamHead+Memory.swift).
+  let memory = HeadMemory()
+  /// The words the show opens with, found in the words so far (PodcastStreamHead+Opening.swift).
+  let opening = HeadOpening()
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
   private let arrivals: AsyncStream<Int64>
@@ -58,6 +70,9 @@ final class PodcastStreamHead: @unchecked Sendable {
   // MARK: What the download tells us
 
   func setLanguage(_ language: String?) { lock.withLock { self.language = language } }
+
+  /// The advertisers the episode's notes name, which the quick rules also look for.
+  func setSponsors(_ names: [SponsorName]) { lock.withLock { sponsors = names } }
 
   /// The staging file exists: the scan can begin.
   func begin(staged: URL) {
@@ -92,7 +107,14 @@ final class PodcastStreamHead: @unchecked Sendable {
     }
   }
 
+  /// Whether the scan has said what matters for the start: its first look is done (also when it
+  /// found no ad, which saves no file), or it is over (finished, stopped or failed). Play does
+  /// not wait for a stream like that again.
+  var hasChecked: Bool { lock.withLock { firstLookDone || scanDone } }
+
   private func scanEnded() {
+    let (ads, reached) = lock.withLock { (found, covered) }
+    reportScanEnded(ads: ads, reached: reached)
     let release = lock.withLock { () -> [() -> Void] in
       scanDone = true
       defer { waiters = [] }
@@ -103,29 +125,63 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   /// A stream of this episode that failed part-way leaves its "stream-<episode>" file behind, with
   /// ads from a request that may have carried other inserted ads. This stream starts clean; only
-  /// what the listener undid is kept.
+  /// what the listener undid or trimmed is kept.
   private func discardEarlierStream() {
     lock.withLock {
       guard let folder = try? store.folder(for: episodeId) else { return }
       let ads = AdsStore(folder: folder, sha256: key)
-      absorbUndone(ads.loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+      absorbMarks(ads.loadPartial(detector: PodcastAdFinder.detectorName))
       ads.discardPartial(detector: PodcastAdFinder.detectorName)
     }
   }
 
-  /// Adds the undone ads of a file (the caller holds the lock).
-  private func absorbUndone(_ list: [UndoneAd]?) {
-    for item in list ?? [] where !undone.contains(item) { undone.append(item) }
+  /// Adds the undone ads and the trims of a file (the caller holds the lock). For one ad the
+  /// earlier end of a trim stays.
+  private func absorbMarks(_ file: AdsFile?) {
+    for item in file?.undone ?? [] where !undone.contains(item) { undone.append(item) }
+    for trim in file?.trims ?? [] { trims.add(trim) }
   }
 
-  /// Reads the Undo list from the stream's file. The loader calls it just before the download is
-  /// filed, which removes the folder with that file.
+  /// Reads the Undo list and the trims from the stream's file. The loader calls it just before the
+  /// download is filed, which removes the folder with that file.
   func rememberUndone() {
     lock.withLock {
       guard let folder = try? store.folder(for: episodeId) else { return }
-      absorbUndone(
-        AdsStore(folder: folder, sha256: key).loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+      absorbMarks(
+        AdsStore(folder: folder, sha256: key).loadPartial(detector: PodcastAdFinder.detectorName))
     }
+  }
+
+  /// The listener found the skip of an ad too far. The trim goes into the head's own list, so
+  /// every later write of the stream's ads keeps it, and it is written now under the lock the
+  /// scan's own write (`persist`) holds from its read to the end of its write, so neither can
+  /// overwrite the other. The store's call reaches a final ads file too, once there is one. False
+  /// when nothing was written (the stream was stopped or its download is gone): the player then
+  /// writes it into its own store, so a skip the listener marked after a stream failure is kept.
+  func markTrimmed(_ trim: AdTrim) -> Bool {
+    lock.withLock {
+      trims.add(trim)
+      return marksStore()?.markTrimmed(detector: PodcastAdFinder.detectorName, trim) ?? false
+    }
+  }
+
+  /// The listener undid the skip of `ad`: kept and written as `markTrimmed` does it.
+  func markUndone(_ ad: FoundAd) -> Bool {
+    lock.withLock {
+      let item = UndoneAd(start: ad.start, end: ad.end)
+      if !undone.contains(item) { undone.append(item) }
+      return marksStore()?.markUndone(detector: PodcastAdFinder.detectorName, adStart: ad.start)
+        ?? false
+    }
+  }
+
+  /// The store a mark is written to (the caller holds the lock). Nil once the stream was stopped
+  /// or its download removed, so nothing makes the folder again.
+  private func marksStore() -> AdsStore? {
+    guard !stopped, store.entry(for: episodeId) != nil,
+      let folder = try? store.folder(for: episodeId)
+    else { return nil }
+    return AdsStore(folder: folder, sha256: key)
   }
 
   /// The file on disk is now this long.
@@ -172,8 +228,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       return PodcastTimeline.mark(id, "head scan: this phone has no speech recogniser")
     }
     // The model starts loading now, while the speech model does.
-    let detector = AppleAds.makeWarmDetector()
-    detector?.prewarm()
+    let detector = Self.warmDetector()
     lock.withLock { detectorVersion = detector?.version ?? "1" }
     PodcastTimeline.mark(id, "model prewarm asked")
     do {
@@ -200,10 +255,10 @@ final class PodcastStreamHead: @unchecked Sendable {
     var waitFor: Int64 = 0  // at least this many bytes are waited for
     var modelAds: [FoundAd] = []
     var first = true
-    var index = 0
-    while index < Self.targets.count {
+    var told = false  // the player is told once, after the first step
+    var steps = HeadSteps(steps: Self.targets)
+    while let target = steps.target {
       try Task.checkCancellation()
-      let target = Self.targets[index]
       let need = max(Int64(tag) + Int64(target * rate) + 4096, waitFor)
       while available < need, !ended {
         if let next = await iterator.next() { available = next } else { ended = true }
@@ -247,7 +302,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       }
       guard cut.seconds > fed + 1 else {
         if ended { return }
-        index += 1
+        steps.advance()
         continue
       }
       tries = 0
@@ -259,16 +314,30 @@ final class PodcastStreamHead: @unchecked Sendable {
       let words = try await speech.extend(file: temp, from: fed, to: cut.seconds)
       fed = cut.seconds
       PodcastTimeline.mark(episodeId, "head transcript: \(words.count) words to \(Int(fed)) s")
+      SkipLogWords.note(words, for: episodeId)
 
       let lines = LineRule.lines(from: words)
       let transcript = Self.transcript(words: words, lines: lines, duration: fed)
+      // The ads the phone remembers come first; an ad that opens at the end of the words moves
+      // the next step to where it should end.
+      let remembered = memory.look(in: words, episodeId: episodeId)
+      if let jump = remembered.jumpTo { steps.jump(to: jump, reached: fed) }
+      // The show's own opening words, when this show has some: where they start, the show begins.
+      let begun = opening.look(in: words, episodeId: episodeId)
       let startedRules = Date()
-      let ranges = AdHeadRules.find(lines: AdChunker.number(lines))
+      let sponsors = lock.withLock { self.sponsors }
+      let ranges = AdHeadRules.find(lines: AdChunker.number(lines), sponsors: sponsors)
       let ruleAds = AdCleanup.run(ranges: ranges, transcript: transcript)
       PodcastTimeline.mark(
         episodeId,
         "rules: \(ruleAds.count) ads in \(Int(Date().timeIntervalSince(startedRules) * 1000)) ms")
-      save(AdHeadRules.merge(ruleAds + modelAds), covered: fed)
+      save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
+      // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
+      if !told {
+        told = true
+        lock.withLock { firstLookDone = true }
+        if begun { reportShowBegan() } else { reportVerdict() }
+      }
 
       let warmOne: AdDetector? = detector
       if Self.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {
@@ -277,17 +346,28 @@ final class PodcastStreamHead: @unchecked Sendable {
         do {
           let piece = TranscriptPiece(lines: AdChunker.number(lines))
           let answer = try await model.findAds(in: piece)
-          modelAds = AdCleanup.run(ranges: answer, transcript: transcript)
+          // At the first model step only the sure answers count; the next step hears more.
+          modelAds = AdCleanup.run(
+            ranges: AdHeadRules.counted(answer, atStep: target), transcript: transcript)
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
-          save(AdHeadRules.merge(ruleAds + modelAds), covered: fed)
+          save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
         } catch {
           PodcastTimeline.mark(episodeId, "model: no answer (\(error))")
         }
+        // The next model step gets a session that is made and asked to prewarm now.
+        if Self.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }
       }
-      index += 1
+      steps.advance()
     }
+  }
+
+  /// A model session for one request, made now and asked to prewarm. Nil when there is no model.
+  private static func warmDetector() -> PrewarmableAdDetector? {
+    let detector = AppleAds.makeWarmDetector()
+    detector?.prewarm()
+    return detector
   }
 
   private static func transcript(
@@ -317,7 +397,7 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   private func save(_ ads: [FoundAd], covered reached: Double) {
     lock.withLock {
-      found = ads
+      found = opening.shorten(ads)
       covered = max(covered, reached)
     }
     persist()
@@ -335,8 +415,10 @@ final class PodcastStreamHead: @unchecked Sendable {
       let ads = AdsStore(folder: folder, sha256: key)
       let name = PodcastAdFinder.detectorName
       let before = ads.loadPartial(detector: name)
-      absorbUndone(before?.undone)
-      let merged = AdHeadRules.merge(found + (before?.ads ?? []))
+      absorbMarks(before)
+      // The opening is applied last: an earlier step's longer pre-roll is on disk too.
+      let merged = opening.shorten(
+        AdHeadRules.merge(found + memory.withoutOutdated(before?.ads ?? [])))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
         sha256: key, detector: name, detectorVersion: detectorVersion,
@@ -344,6 +426,7 @@ final class PodcastStreamHead: @unchecked Sendable {
         duration: max(before?.duration ?? 0, covered), ads: merged,
         coveredUntil: max(before?.coveredUntil ?? 0, covered), refusedPieces: before?.refusedPieces)
       file.undone = undone
+      file.trims = trims.isEmpty ? nil : trims
       guard before?.ads != merged else { return false }
       do {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

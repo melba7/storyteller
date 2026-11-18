@@ -1,8 +1,8 @@
 #!/bin/bash
 # Double-click in Finder. Asks for an MP3 file and times what the phone must do to check the
 # first minute and a half of a stream, along the phone's own path: the speech analyzer getting
-# ready, the start of the file cut in 30 second steps, each step's transcript, the text rules
-# and the ad model's answer. It runs everything twice in one go (cold, then warm) with
+# ready, the start of the file cut in steps (15, 30, 60, 90 seconds), each step's transcript, the
+# text rules and the ad model's answers. It runs everything twice in one go (cold, then warm) with
 # PodcastKit's podcast-ads --head 90 --timings, and saves the result as
 # "<file name>.head-timings.txt" next to the file. Needs macOS 26 with Apple Intelligence turned
 # on, and Xcode 26. Building takes a minute; the check itself takes under a minute.
@@ -32,8 +32,9 @@ if swift run -c release podcast-ads --head 90 --timings "$FILE" | tee "$OUT.part
   echo "Saved: $OUT"
   echo
   echo "How to read it: each time is seconds since that run started. 'Run 1' is the first time the"
-  echo "app would do this after opening (cold); 'Run 2' is the next time (warm). The last line of a"
-  echo "run, the model's answer at 60 s, is how long a stream's first minute takes to check. Under"
+  echo "app would do this after opening (cold); 'Run 2' is the next time (warm). In the warm run,"
+  echo "'rules at 15 s' should be under 2 s and 'model at 30 s' under 6 s. The last line of a run,"
+  echo "the model's answer at 60 s, is how long a stream's first minute takes to check. Under"
   echo "10 s on this Mac is good. A phone is slower than a Mac, so treat this as the best case."
   open -R "$OUT"
   finish "Done."

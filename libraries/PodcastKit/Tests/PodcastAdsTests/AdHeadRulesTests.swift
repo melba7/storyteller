@@ -156,10 +156,120 @@ final class AdHeadRulesTests: XCTestCase {
   }
 
   func testTheStepsOfAHeadAreThePhonesStepsUpToIt() {
-    XCTAssertEqual(AdHeadRules.steps(upTo: 90), [30, 60, 90])
-    XCTAssertEqual(AdHeadRules.steps(upTo: 100), [30, 60, 90, 100])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 90), [15, 30, 60, 90])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 100), [15, 30, 60, 90, 100])
     XCTAssertEqual(AdHeadRules.steps(upTo: 10), [10])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 20), [15, 20])
     XCTAssertEqual(AdHeadRules.steps(upTo: 600), AdHeadRules.steps)
-    XCTAssertEqual(AdHeadRules.modelSteps, [60, 180])
+    XCTAssertEqual(AdHeadRules.steps, [15, 30, 60, 90, 120, 150, 180])
+    XCTAssertEqual(AdHeadRules.modelSteps, [30, 60, 120, 180])
+  }
+
+  func testTheModelsFirstStepCountsOnlyItsSureAnswers() {
+    let sure = range(2, 4)
+    let unsure = range(6, 8, .unsure)
+    let guess = range(9, 9, .guess)
+    let answer = [sure, unsure, guess]
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 30), [sure])
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 15), [sure])
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 60), answer)
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 180), answer)
+  }
+
+  // MARK: A shorter carry-on and two signals (E4)
+
+  func testPlainTalkAfterALinkEndsTheAdEvenWhenALaterLineHasAWebAddress() {
+    let head = lines([
+      "This episode is brought to you by Acme.",
+      "Find out more at acme.com.",
+      "Plain talk about the week.",
+      "More plain talk about the week.",
+      "Follow us at example.com.",
+    ])
+    let found = AdHeadRules.find(lines: head)
+    XCTAssertEqual(found.map(\.startLine), [1])
+    XCTAssertEqual(found.map(\.endLine), [2])
+  }
+
+  func testASignalLineRightAfterTheLinkIsStillCarried() {
+    let head = lines([
+      "Today's sponsor is Acme.",
+      "Go to acme.com slash show.",
+      "Use code SHOW at checkout.",
+      "Plain talk about the week.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: head).map(\.endLine), [3])
+  }
+
+  func testALineWithAReturnCueEndsTheAdBeforeIt() {
+    let head = lines([
+      "Today's sponsor is Acme.",
+      "Go to acme.com slash show.",
+      "Welcome back, find us at example.com.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: head).map(\.endLine), [2])
+  }
+
+  func testASignalAfterALongPauseIsNotCarried() {
+    let head = [
+      NumberedLine(number: 1, start: 0, end: 8, text: "Brought to you by Acme, go to acme.com slash show."),
+      NumberedLine(number: 2, start: 28, end: 33, text: "More at acme.com."),
+    ]
+    XCTAssertEqual(AdHeadRules.find(lines: head).map(\.endLine), [1])
+    let close = [head[0], NumberedLine(number: 2, start: 18, end: 23, text: "More at acme.com.")]
+    XCTAssertEqual(AdHeadRules.find(lines: close).map(\.endLine), [2])
+  }
+
+  func testAnOfferAloneInPlainTalkIsNotAnAd() {
+    let head = lines([
+      "We got it for a good price.",
+      "That is twenty percent off the usual price.",
+      "Anyway, back to my week.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: head), [])
+    XCTAssertEqual(AdHeadRules.find(lines: lines(["Use code SLEEPY for a free trial."])), [])
+  }
+
+  func testAnOfferWithAWebAddressNearbyIsAnAd() {
+    let head = lines([
+      "Welcome to the show.",
+      "That is twenty percent off the usual price.",
+      "Just go to acme.com slash show.",
+      "Now back to the story.",
+    ])
+    let found = AdHeadRules.find(lines: head)
+    XCTAssertEqual(found.map(\.startLine), [2])
+    XCTAssertEqual(found.map(\.endLine), [3])
+  }
+
+  func testAnOfferWithAWebAddressTwoLinesAwayMarksTheOfferLine() {
+    let head = lines([
+      "Welcome to the show.",
+      "That is twenty percent off the usual price.",
+      "Their formula is great.",
+      "Visit acme.com.",
+      "Now back to the story.",
+    ])
+    let found = AdHeadRules.find(lines: head)
+    XCTAssertEqual(found.map(\.startLine), [2])
+    XCTAssertEqual(found.map(\.endLine), [2])
+    let far = lines([
+      "We got it for a good price.",
+      "That is twenty percent off the usual price.",
+      "Their formula is great.",
+      "They also make a second one.",
+      "Visit acme.com.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: far), [])
+  }
+
+  func testASponsorFromTheNotesStillNeedsOnlyACallNearby() {
+    let head = lines([
+      "Hello everyone.",
+      "A quick word about Athletic Greens.",
+      "Try it at athleticgreens.com.",
+      "Now the news.",
+    ])
+    XCTAssertEqual(AdHeadRules.find(lines: head, sponsors: ["Athletic Greens"]).map(\.startLine), [2])
   }
 }

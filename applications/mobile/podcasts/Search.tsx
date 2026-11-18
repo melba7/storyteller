@@ -114,7 +114,8 @@ export function Search() {
               ) : null}
             </View>
           ) : (
-            <View className="px-safe-or-4 pt-4">
+            // The tiles pad themselves to the page frame: more padding here would not fit them.
+            <View className="pt-4">
               <CategoryTiles />
             </View>
           )

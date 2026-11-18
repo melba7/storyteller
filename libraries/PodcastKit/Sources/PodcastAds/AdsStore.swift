@@ -12,6 +12,47 @@ public struct UndoneAd: Codable, Sendable, Equatable {
   }
 }
 
+/// A skip the listener found too far: they went back into the ad that was just skipped, so from
+/// then on that ad ends where they went back to. A trim only ever shortens an ad.
+public struct AdTrim: Codable, Sendable, Equatable {
+  /// Where the ad started when it was skipped.
+  public var adStart: Double
+  /// Where the ad ends from now on.
+  public var end: Double
+
+  public init(adStart: Double, end: Double) {
+    self.adStart = adStart
+    self.end = end
+  }
+
+  /// Whether this trim is for `ad`: the ad starts where the trimmed one did (a little earlier or
+  /// later is the same ad found again) or runs over that place.
+  func applies(to ad: FoundAd) -> Bool { ad.start - 0.5 <= adStart && adStart < ad.end }
+}
+
+extension Array where Element == AdTrim {
+  /// Adds a trim. For the same ad (a start within half a second of one already here) the earlier
+  /// end stays, so a trim never makes an ad longer. A list that has to move from one file to
+  /// another (the stream's ads, when the download is filed) is carried by adding its trims.
+  public mutating func add(_ trim: AdTrim) {
+    if let index = firstIndex(where: { abs($0.adStart - trim.adStart) < 0.5 }) {
+      self[index].end = Swift.min(self[index].end, trim.end)
+    } else {
+      append(trim)
+    }
+  }
+}
+
+extension FoundAd {
+  /// This ad cut short by the trims that are for it: it ends at the earliest of its own end and
+  /// theirs. An ad is never made longer.
+  func trimmed(by trims: [AdTrim]) -> FoundAd {
+    var ad = self
+    for trim in trims where trim.applies(to: self) { ad.end = min(ad.end, trim.end) }
+    return ad
+  }
+}
+
 /// The finished result of one detector on one file, saved as `<sha256>.ads.<detector>.json`.
 public struct AdsFile: Codable, Sendable, Equatable {
   public static let currentVersion = 1
@@ -31,11 +72,14 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// How many pieces the model refused to read (counted as having no ads). Nil when none, so
   /// the app can tell a clean "no ads" from one with parts unread.
   public var refusedPieces: Int?
+  /// The skips the listener found too far. Nil when there are none (and in a file saved before
+  /// trims existed).
+  public var trims: [AdTrim]?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
-    coveredUntil: Double? = nil, refusedPieces: Int? = nil
+    coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -47,6 +91,14 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.undone = undone
     self.coveredUntil = coveredUntil
     self.refusedPieces = refusedPieces
+    self.trims = trims
+  }
+
+  /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.
+  public mutating func addTrim(_ trim: AdTrim) {
+    var list = trims ?? []
+    list.add(trim)
+    trims = list
   }
 
   /// Whether the listener undid the skip of this ad: the ad starts where an undone one did, or
@@ -81,7 +133,18 @@ public struct AdsStore: Sendable {
   }()
 
   public func save(_ file: AdsFile) throws {
-    try Self.encoder.encode(file).write(to: url(detector: file.detector), options: .atomic)
+    try Self.encoder.encode(carryingTrims(file)).write(
+      to: url(detector: file.detector), options: .atomic)
+  }
+
+  /// `file` with the trims already saved for this detector (in its final or partial file). A
+  /// detector that writes a file does not know them, and the listener's trims must outlive it.
+  func carryingTrims(_ file: AdsFile) -> AdsFile {
+    var carried = file
+    for earlier in [load(detector: file.detector), loadPartial(detector: file.detector)] {
+      for trim in earlier?.trims ?? [] { carried.addTrim(trim) }
+    }
+    return carried
   }
 
   /// The detector's result for this file, or nil when there is none, it cannot be read, or it
@@ -111,6 +174,17 @@ public struct AdsStore: Sendable {
       let ad = file.ads.first(where: { abs($0.start - start) < 0.5 })
     else { return false }
     if !file.isUndone(ad) { file.undone.append(UndoneAd(start: ad.start, end: ad.end)) }
+    return (try? (isFinal ? save(file) : savePartial(file))) != nil
+  }
+
+  /// Records that the listener found the skip of the ad `trim` is for too far, so that ad ends
+  /// at `trim.end` from now on. False when there is no such ad in the file.
+  @discardableResult
+  public func markTrimmed(detector: String, _ trim: AdTrim) -> Bool {
+    let isFinal = load(detector: detector) != nil
+    guard var file = best(detector: detector), file.ads.contains(where: { trim.applies(to: $0) })
+    else { return false }
+    file.addTrim(trim)
     return (try? (isFinal ? save(file) : savePartial(file))) != nil
   }
 }

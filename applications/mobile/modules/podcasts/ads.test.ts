@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 
 import {
   type AdsFile,
+  SKIP_NOTE_BACK_SECONDS,
   SKIP_NOTE_MS,
   adMarks,
   adRows,
@@ -16,6 +17,7 @@ import {
   unavailableReason,
   parseAdsFile,
   skipNote,
+  skipNoteBackLabels,
   skipNoteShown,
   skipNoteText,
   withAds,
@@ -129,6 +131,51 @@ describe("parseAdsFile", () => {
     expect(file?.ads).toHaveLength(1)
   })
 
+  it("cuts an ad short where the listener found the skip too far", () => {
+    const file = parseAdsFile(
+      JSON.stringify({
+        ads: [ad(60, 120), ad(300, 360)],
+        trims: [
+          { adStart: 60, end: 110 },
+          // A trim never makes an ad longer, and one for no ad here is ignored.
+          { adStart: 300, end: 400 },
+          { adStart: 700, end: 710 },
+        ],
+      }),
+    )
+    expect(file?.ads.map((item) => [item.start, item.end])).toEqual([
+      [60, 110],
+      [300, 360],
+    ])
+  })
+
+  it("takes the same ad found a little differently as the trimmed one", () => {
+    const file = parseAdsFile(
+      JSON.stringify({
+        ads: [ad(59.7, 130)],
+        trims: [{ adStart: 60, end: 110 }],
+      }),
+    )
+    expect(file?.ads[0]?.end).toBe(110)
+  })
+
+  it("leaves out an ad that a trim leaves with no length, and bad trims", () => {
+    const file = parseAdsFile(
+      JSON.stringify({
+        ads: [ad(60, 120), ad(300, 360)],
+        trims: [
+          { adStart: 60, end: 60 },
+          null,
+          "x",
+          { adStart: 300 },
+          { adStart: Number.NaN, end: 310 },
+        ],
+      }),
+    )
+    expect(file?.ads.map((item) => item.start)).toEqual([300])
+    expect(file?.ads[0]?.end).toBe(360)
+  })
+
   it("gives null for text that is not an ads file", () => {
     expect(parseAdsFile("not json")).toBeNull()
     expect(parseAdsFile("[]")).toBeNull()
@@ -201,6 +248,20 @@ describe("the note after a skip", () => {
     expect(noteAfterUndo(note, { episodeId: "e1", start: 5 })).toBe(note)
     expect(noteAfterUndo(note, { episodeId: "e2", start: 723 })).toBe(note)
     expect(noteAfterUndo(null, { episodeId: "e1", start: 723 })).toBeNull()
+  })
+})
+
+describe("the note's Back button", () => {
+  it("goes back ten seconds and says so", () => {
+    expect(SKIP_NOTE_BACK_SECONDS).toBe(10)
+    expect(skipNoteBackLabels()).toEqual({
+      text: "Back 10 s",
+      accessibility: "Back 10 seconds, the skip went too far",
+    })
+  })
+
+  it("follows the seconds it is given", () => {
+    expect(skipNoteBackLabels(15).text).toBe("Back 15 s")
   })
 })
 

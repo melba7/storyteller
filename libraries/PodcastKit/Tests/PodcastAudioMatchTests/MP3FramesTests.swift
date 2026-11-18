@@ -76,4 +76,27 @@ final class MP3FramesTests: XCTestCase {
     let result = MP3Frames.parse(Array(Fake.id3(size: 5000).prefix(100)))
     XCTAssertTrue(result.frames.isEmpty)
   }
+
+  func testFramesKnowTheirHeader() {
+    let stereo = MP3Frames.parse(Synth.frame(kbps: 128) + Synth.frame(kbps: 128)).frames[0]
+    XCTAssertEqual(stereo.bitrate, 128_000)
+    XCTAssertEqual(stereo.sampleRate, 44100)
+    XCTAssertEqual(stereo.channels, 2)
+    XCTAssertFalse(stereo.hasInfoTag)
+    let both = Synth.frame(kbps: 64, rate: 48000, mono: true)
+    let mono = MP3Frames.parse(both + both).frames[0]
+    XCTAssertEqual(mono.bitrate, 64_000)
+    XCTAssertEqual(mono.sampleRate, 48000)
+    XCTAssertEqual(mono.channels, 1)
+  }
+
+  func testAnInfoOrXingTagIsNoticed() {
+    for tag in ["Info", "Xing"] {
+      let parse = MP3Frames.parse(Synth.frame(kbps: 128, tag: tag) + Synth.frame(kbps: 128))
+      XCTAssertEqual(parse.frames.map(\.hasInfoTag), [true, false], tag)
+    }
+    let mono = MP3Frames.parse(
+      Synth.frame(kbps: 128, mono: true, tag: "Info") + Synth.frame(kbps: 128, mono: true))
+    XCTAssertTrue(mono.frames[0].hasInfoTag)
+  }
 }

@@ -19,6 +19,7 @@ public final class PodcastsAppDelegateSubscriber: ExpoAppDelegateSubscriber {
     PodcastNotifier.shared.install()
     PodcastAdFinder.registerBackgroundTask()
     PodcastAdFinder.shared.start()
+    PodcastSpeechWarm.shared.start()
     return true
   }
 

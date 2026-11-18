@@ -85,11 +85,15 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   /// Being fetched by the player as the episode plays (PodcastStreamDownload), not by the
   /// background session. It cannot outlive the app, so a relaunch drops it unfinished.
   public var playThrough: Bool
+  /// Fetched ahead because the episode is next in Up Next (see DownloadAhead), and not yet
+  /// started by the listener. Always an automatic download as well. It is cleared once the
+  /// episode plays, and an entry still marked is deleted when its episode leaves Up Next.
+  public var ahead: Bool
 
   public init(
     episodeId: String, url: String, fileExtension: String, state: DownloadState,
     updatedAt: Date = Date(), automatic: Bool = false, plainURL: String? = nil,
-    playThrough: Bool = false
+    playThrough: Bool = false, ahead: Bool = false
   ) {
     self.episodeId = episodeId
     self.url = url
@@ -99,6 +103,7 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
     self.automatic = automatic
     self.plainURL = plainURL
     self.playThrough = playThrough
+    self.ahead = ahead
   }
 
   /// Switches to the original http address, once: the entry keeps no second chance after.
@@ -109,12 +114,13 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   }
 
   private enum Keys: String, CodingKey {
-    case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL, playThrough
+    case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL, playThrough, ahead
   }
 
   /// An index written before automatic downloads has no `automatic` (it means false), and one
   /// written before the plain http fallback has no `plainURL` (it means none), and one written
-  /// before play-through downloads has no `playThrough` (it means false).
+  /// before play-through downloads has no `playThrough` (it means false), and one written before
+  /// downloads ahead has no `ahead` (it means false).
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
     self.init(
@@ -125,7 +131,8 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
       updatedAt: try c.decode(Date.self, forKey: .updatedAt),
       automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false,
       plainURL: try c.decodeIfPresent(String.self, forKey: .plainURL),
-      playThrough: try c.decodeIfPresent(Bool.self, forKey: .playThrough) ?? false)
+      playThrough: try c.decodeIfPresent(Bool.self, forKey: .playThrough) ?? false,
+      ahead: try c.decodeIfPresent(Bool.self, forKey: .ahead) ?? false)
   }
 }
 

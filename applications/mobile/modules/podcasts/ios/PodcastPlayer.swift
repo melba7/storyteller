@@ -8,6 +8,7 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import PodcastAds
 import PodcastPlayback
 import Readium
 
@@ -53,8 +54,12 @@ final class PodcastPlayer {
   /// it does (for a resume on a stream, until the bytes up to the place have arrived), so an ad
   /// is not left from it (PodcastPlayer+Ads.swift).
   var seekPending = false
+  /// Where the latest seek is going, which is where the episode is as soon as it lands.
+  var seekTarget = 0.0
   /// Counts the seeks, so only the latest one's completion ends the pending state.
   private var seekCount = 0
+  /// Play is waiting a moment for the first look at a stream's start (PodcastPlayer+StartHold).
+  var startHold: PodcastStartHold?
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -85,6 +90,9 @@ final class PodcastPlayer {
     var playThroughDownload = false
     /// The feed's language, for the transcript of an episode that starts downloading here.
     var language: String?
+    /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
+    var notes: String?
+    var showLink: String?
     /// The address to keep in Up Next when `url` is a local file (an episode started from the
     /// queue plays its download), so the item can go back to the queue and be fetched again.
     var queueURL: String?
@@ -100,6 +108,9 @@ final class PodcastPlayer {
 
   /// Loads an episode and, unless told not to, starts it.
   func begin(_ episode: Episode) {
+    // At once, not with the look at Up Next a few seconds from now (see PodcastDownloadAhead).
+    PodcastDownloadAhead.shared.handOver(episode.id)
+    cancelStartHold()
     watchTheBook()
     currentEnded = false
     current = QueueItem(
@@ -113,6 +124,8 @@ final class PodcastPlayer {
     episodeId = episode.id
     knownDuration = episode.duration
     applyShowSettings(forShow: episode.showId)
+    // The ads of this episode are remembered under its show (PodcastKnownAds).
+    EpisodeShows.shared.remember(episode.showId, for: episode.id)
 
     do {
       let session = AVAudioSession.sharedInstance()
@@ -157,6 +170,13 @@ final class PodcastPlayer {
 
   func play() {
     guard player.currentItem != nil else { return }
+    // A stream nothing is known about may wait a moment first; a second tap ends that wait.
+    if holdTheStart() { return }
+    startPlaying()
+  }
+
+  /// Starts the audio (the rest of Play, once any wait for a stream's first look is over).
+  func startPlaying() {
     wantsToPlay = true
     try? AVAudioSession.sharedInstance().setActive(true)
     // A finished episode starts over.
@@ -172,6 +192,7 @@ final class PodcastPlayer {
   }
 
   func pause() {
+    cancelStartHold()
     wantsToPlay = false
     player.pause()
     publish()
@@ -200,6 +221,7 @@ final class PodcastPlayer {
     seekCount += 1
     let count = seekCount
     seekPending = true
+    seekTarget = seconds
     player.seek(
       to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero
@@ -256,12 +278,14 @@ final class PodcastPlayer {
     var object: [String: Any] = [
       "position": position,
       "isPlaying": player.timeControlStatus == .playing,
-      "isBuffering": wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
+      "isBuffering": startHold != nil
+        || (wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate),
       "rate": speed.value,
       "streamsPlain": playsPlainAddress,
     ]
     if let episodeId { object["episodeId"] = episodeId }
     if let duration = currentDuration { object["duration"] = duration }
+    if startHold != nil { object["checkingStart"] = true }
     return object
   }
 

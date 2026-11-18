@@ -116,12 +116,19 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
 
   // MARK: Asking
 
-  func download(episodeId: String, url: String, type: String, automatic: Bool) throws {
+  /// `ahead` marks an automatic download of what is next in Up Next (PodcastDownloadAhead).
+  func download(episodeId: String, url: String, type: String, automatic: Bool, ahead: Bool = false)
+    throws
+  {
     guard let store else { throw PodcastFetchError(message: "Downloads are not available.") }
     _ = try store.folder(for: episodeId)
     guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
       scheme == "http" || scheme == "https", given.host != nil
     else { throw PodcastFetchError(message: "This episode has no downloadable link.") }
+    // A download the listener asks for is theirs, also when the app is already fetching this
+    // episode ahead (or has fetched it): the mark comes off before any early return below, so the
+    // file is kept when the episode leaves Up Next. A new entry made below starts unmarked.
+    if !automatic { try store.clearAhead(episodeId: episodeId) }
     // https is tried first. A feed that only serves http gets its original address back once,
     // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS
@@ -137,7 +144,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     let entry = DownloadEntry(
       episodeId: episodeId, url: address.absoluteString,
       fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued,
-      automatic: automatic, plainURL: plain)
+      automatic: automatic, plainURL: plain, ahead: ahead)
     try store.put(entry)
     emit(entry)
     begin(entry)
@@ -195,6 +202,8 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
       automatic: entry.automatic, setting: DownloadSettings.wifiOnly)
     request.allowsCellularAccess = !wifiOnly
     request.allowsExpensiveNetworkAccess = !wifiOnly
+    // What is fetched ahead, unasked, also waits while Low Data Mode is on (the others do not).
+    if entry.ahead { request.allowsConstrainedNetworkAccess = false }
     launch(session.downloadTask(with: request), for: entry.episodeId)
   }
 

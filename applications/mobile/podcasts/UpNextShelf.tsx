@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ScrollView } from "react-native"
+import { ScrollView, useWindowDimensions } from "react-native"
 
 import { type ShelfEntry } from "@/modules/podcasts/home"
 import { type Show } from "@/modules/podcasts/library"
@@ -22,7 +22,8 @@ export function UpNextShelf({
   showById: ReadonlyMap<string, Show>
 }) {
   const frame = usePageFrame()
-  const { width, height } = upNextCardSize(frame.width)
+  const window = useWindowDimensions()
+  const { width, height } = upNextCardSize(frame.width, window.height)
   const now = Date.now()
   return (
     <ScrollView

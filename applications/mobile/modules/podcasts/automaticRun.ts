@@ -188,6 +188,7 @@ async function deletePlayed(now: number, settings: AutomaticSettings) {
     now,
     player.getView().episode?.id ?? null,
     settings,
+    new Set((await listUpNext()).map((item) => item.id)),
   )
   for (const id of ids) {
     try {

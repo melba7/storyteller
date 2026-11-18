@@ -9,6 +9,10 @@ export type Stats = {
   savedByTrim: number
   savedByAds: number
   savedByChapters: number
+  /** How many ads were skipped, and how many of those skips were undone or found too far. */
+  adSkips: number
+  adUndone: number
+  adTooFar: number
   days: Record<string, number>
 }
 
@@ -46,6 +50,13 @@ function good(value: unknown): number {
     : 0
 }
 
+/** A count: a whole number above zero. */
+function goodCount(value: unknown): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0
+    ? value
+    : 0
+}
+
 /** Reads the native stats; anything that is not a good number is 0. */
 export function readStats(raw: unknown): Stats {
   const object = (raw && typeof raw === "object" ? raw : {}) as Partial<
@@ -65,6 +76,9 @@ export function readStats(raw: unknown): Stats {
     savedByTrim: good(object.savedByTrim),
     savedByAds: good(object.savedByAds),
     savedByChapters: good(object.savedByChapters),
+    adSkips: goodCount(object.adSkips),
+    adUndone: goodCount(object.adUndone),
+    adTooFar: goodCount(object.adTooFar),
     days,
   }
 }

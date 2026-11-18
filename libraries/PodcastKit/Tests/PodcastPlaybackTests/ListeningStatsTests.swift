@@ -97,6 +97,35 @@ final class ListeningStatsTests: XCTestCase {
     XCTAssertEqual(first.saved(.speed), 2)
   }
 
+  func testTheAdCountsStartAtZeroAndEachGoesUpByOne() {
+    var stats = ListeningStats()
+    XCTAssertEqual([stats.adSkips, stats.adUndone, stats.adTooFar], [0, 0, 0])
+    stats.countAd(.skipped)
+    stats.countAd(.skipped)
+    stats.countAd(.undone)
+    stats.countAd(.tooFar)
+    XCTAssertEqual([stats.adSkips, stats.adUndone, stats.adTooFar], [2, 1, 1])
+  }
+
+  func testTheAdCountsMergeAndRoundTrip() throws {
+    var stats = ListeningStats()
+    stats.countAd(.skipped)
+    stats.countAd(.tooFar)
+    var other = ListeningStats()
+    other.countAd(.skipped)
+    other.countAd(.undone)
+    stats.merge(other, today: date(), calendar: calendar)
+    XCTAssertEqual([stats.adSkips, stats.adUndone, stats.adTooFar], [2, 1, 1])
+    XCTAssertEqual(ListeningStats.decode(try stats.encoded()), stats)
+  }
+
+  func testStatsSavedBeforeTheAdCountsReadAsZeroAndBadCountsAreDropped() {
+    let old = ListeningStats.decode(Data(#"{"listened": 5}"#.utf8))
+    XCTAssertEqual([old.adSkips, old.adUndone, old.adTooFar], [0, 0, 0])
+    let bad = ListeningStats.decode(Data(#"{"adSkips": -3, "adUndone": 2.5, "adTooFar": 4}"#.utf8))
+    XCTAssertEqual([bad.adSkips, bad.adUndone, bad.adTooFar], [0, 0, 4])
+  }
+
   func testItRoundTripsThroughJSON() throws {
     var stats = ListeningStats()
     stats.addListened(61.5, at: date(), calendar: calendar)

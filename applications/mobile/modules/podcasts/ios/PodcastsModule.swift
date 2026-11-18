@@ -29,6 +29,9 @@ struct PlaybackLoadOptions: Record {
   @Field var playThroughDownload: Bool = false
   /// The feed's language, for the transcript of the download that plays.
   @Field var language: String?
+  /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
+  @Field var notes: String?
+  @Field var showLink: String?
 }
 
 /// An episode to put in Up Next.
@@ -96,7 +99,8 @@ public final class PodcastsModule: Module {
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
         type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
-        playThroughDownload: options.playThroughDownload, language: options.language)
+        playThroughDownload: options.playThroughDownload, language: options.language,
+        notes: options.notes, showLink: options.showLink)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -144,6 +148,7 @@ public final class PodcastsModule: Module {
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
         position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
         language: item.language)
+      EpisodeShows.shared.remember(item.showId, for: item.id)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -312,6 +317,9 @@ public final class PodcastsModule: Module {
     // The listening stats, counted here so they count with the screen locked.
     AsyncFunction("getStats") { () -> [String: Any] in StatsStore.shared.object() }
     AsyncFunction("resetStats") { () in StatsStore.shared.reset() }
+
+    // A copy of the skip log for the share sheet. Nothing is sent from here.
+    AsyncFunction("exportSkipLog") { () -> String? in SkipLogFile.copyForSharing()?.absoluteString }
 
     // MARK: Transcripts
 

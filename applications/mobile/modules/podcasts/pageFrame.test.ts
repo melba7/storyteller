@@ -80,6 +80,21 @@ describe("upNextCardSize", () => {
     expect(upNextCardSize(852)).toEqual({ width: 300, height: 402 })
     expect(upNextCardSize(1024).width).toBe(300)
   })
+
+  it("leaves the cards of a tall phone as they are", () => {
+    expect(upNextCardSize(390, 844)).toEqual({ width: 257, height: 344 })
+    expect(upNextCardSize(430, 932)).toEqual({ width: 284, height: 381 })
+    expect(upNextCardSize(375, 667)).toEqual({ width: 248, height: 332 })
+  })
+
+  it("keeps a card above the mini player on a short window, such as the folded Duo", () => {
+    // 466 x 678 pt: the card would be 402 tall, so its buttons sat under the mini player.
+    expect(upNextCardSize(466, 678)).toEqual({ width: 263, height: 353 })
+  })
+
+  it("never makes a card smaller than 300 tall, even in landscape", () => {
+    expect(upNextCardSize(852, 393)).toEqual({ width: 224, height: 300 })
+  })
 })
 
 describe("categoryColumns", () => {

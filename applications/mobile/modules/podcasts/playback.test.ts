@@ -110,6 +110,33 @@ function setup(last: StoredEpisode | null = null) {
   return { playback, native, deps, handlers, ticks, state }
 }
 
+describe("the wait before a stream starts", () => {
+  it("shows while Swift checks the start, and ends when it says so", async () => {
+    const { playback, state } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(playback.getView().checkingStart).toBe(false)
+    state(0, false, { isBuffering: true, checkingStart: true })
+    expect(playback.getView()).toMatchObject({
+      checkingStart: true,
+      isBuffering: true,
+      isPlaying: false,
+    })
+    state(0.4, true)
+    expect(playback.getView()).toMatchObject({
+      checkingStart: false,
+      isPlaying: true,
+    })
+  })
+
+  it("is not kept for the next episode that loads", async () => {
+    const { playback, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true, checkingStart: true })
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    expect(playback.getView().checkingStart).toBe(false)
+  })
+})
+
 describe("an episode that Swift starts from Up Next", () => {
   it("becomes the loaded episode, with its show", async () => {
     const next = episode({
@@ -218,6 +245,8 @@ describe("playEpisode", () => {
       chaptersUrl: null,
       playThroughDownload: false,
       language: null,
+      notes: "",
+      showLink: null,
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)

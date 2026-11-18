@@ -72,6 +72,11 @@ export type PlaybackState = {
   rate: number
   /** The player plays the episode's plain address, so no ad is skipped. */
   streamsPlain?: boolean
+  /**
+   * Play is waiting a moment (3 seconds at most) for the first look at the start of a stream,
+   * so an ad at 0:00 can be left before it is heard.
+   */
+  checkingStart?: boolean
 }
 
 export type PlaybackLoadOptions = {
@@ -99,6 +104,9 @@ export type PlaybackLoadOptions = {
   playThroughDownload?: boolean
   /** The feed's language, for the transcript of the download that plays. */
   language?: string | null
+  /** The episode's notes and the show's web page: sponsors named there help the ad rules. */
+  notes?: string | null
+  showLink?: string | null
 }
 
 /** The episode played to its end. */
@@ -389,6 +397,11 @@ type PodcastsNativeModule = {
   getStats(): Promise<Record<string, unknown>>
   /** Clears the listening stats. */
   resetStats(): Promise<void>
+  /**
+   * A copy of the skip log (one line of JSON for each ad skip) that the share sheet can read, as
+   * a file address, or null when no skip is logged yet. Nothing is sent by this call.
+   */
+  exportSkipLog(): Promise<string | null>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>

@@ -146,7 +146,8 @@ extension AdsStore {
 
   /// Saves what a partial run found so far, as `<sha256>.ads.<detector>.partial.json`.
   public func savePartial(_ file: AdsFile) throws {
-    try Self.encoder.encode(file).write(to: scratchURL(file.detector, "partial"), options: .atomic)
+    try Self.encoder.encode(carryingTrims(file)).write(
+      to: scratchURL(file.detector, "partial"), options: .atomic)
   }
 
   /// The partial result, or nil as for `load`.
