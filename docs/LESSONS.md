@@ -73,3 +73,8 @@ One line per lesson.
 - A restyle of a shared component reaches every screen that uses it: the Books
   look's wider `Button` padding wrapped the Podcasts swipe actions' labels.
   After merging such a change, check the other section's uses (2026-11-17).
+- A worklet (gesture callback, `useAnimatedStyle`) may call only worklets: a
+  helper imported from another file needs the `"worklet"` directive, or the call
+  moves to the JS side with `scheduleOnRN`. Otherwise a release build crashes on
+  touch (`SeekBar` and `barFraction`, 2026-11-18).
+  `modules/podcasts/worklets.test.ts` now checks this.
