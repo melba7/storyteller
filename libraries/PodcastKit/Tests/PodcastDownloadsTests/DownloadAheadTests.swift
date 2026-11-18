@@ -21,9 +21,10 @@ final class DownloadAheadTests: XCTestCase {
 
   private func plan(
     _ upNext: [DownloadAhead.Item], playing: String? = "now", entries: [DownloadEntry] = [],
-    onWiFi: Bool = true
+    started: Set<String> = [], onWiFi: Bool = true
   ) -> DownloadAhead.Plan {
-    DownloadAhead.plan(upNext: upNext, playingId: playing, entries: entries, onWiFi: onWiFi)
+    DownloadAhead.plan(
+      upNext: upNext, playingId: playing, entries: entries, started: started, onWiFi: onWiFi)
   }
 
   private let four = ["a", "b", "c", "d"]
@@ -105,6 +106,27 @@ final class DownloadAheadTests: XCTestCase {
   func testTheListenersOwnDownloadsDoNotUseUpTheRoom() {
     let own = [entry("a", filed, automatic: false), entry("b", filed, automatic: true)]
     XCTAssertEqual(plan(four.map { item($0) }, entries: own).start, ["c", "d"])
+  }
+
+  // MARK: Never started twice
+
+  func testAnEpisodeStartedAheadBeforeIsNotStartedAgainAndKeepsItsPlace() {
+    // Its file was deleted by the listener, so it has no entry. It is not fetched again, and it
+    // still counts as one of the two, so the third episode in line is not fetched in its place.
+    XCTAssertEqual(plan(four.map { item($0) }, started: ["a"]).start, ["b"])
+    XCTAssertEqual(plan(four.map { item($0) }, started: ["a", "b"]).start, [])
+    XCTAssertEqual(plan(four.map { item($0) }, started: ["b"]).start, ["a"])
+  }
+
+  func testAStartedEpisodeCountsOnceWithItsEntry() {
+    let kept = [entry("a", filed, ahead: true)]
+    XCTAssertEqual(plan(four.map { item($0) }, entries: kept, started: ["a"]).start, ["b"])
+  }
+
+  func testAStartedEpisodeThatLeftUpNextOrIsPlayingTakesUpNoRoom() {
+    XCTAssertEqual(plan(four.map { item($0) }, started: ["x", "now"]).start, ["a", "b"])
+    // It comes back later: it is still not fetched again.
+    XCTAssertEqual(plan([item("x")] + four.map { item($0) }, started: ["x"]).start, ["a"])
   }
 
   // MARK: Ahead downloads that are played or no longer wanted

@@ -215,6 +215,20 @@ describe("downloadsToDelete", () => {
     ).toEqual(["b"])
   })
 
+  it("keeps a played download that is in Up Next", () => {
+    // Played and put back in Up Next: the download ahead would only fetch it again.
+    const queued = new Set(["a"])
+    expect(
+      downloadsToDelete(
+        [ep("a", true, now - 5 * DAY_MS), ep("b", true, now - 5 * DAY_MS)],
+        now,
+        null,
+        on,
+        queued,
+      ),
+    ).toEqual(["b"])
+  })
+
   it("keeps a played download with no last-played time", () => {
     expect(downloadsToDelete([ep("a", true, null)], now, null, on)).toEqual([])
   })

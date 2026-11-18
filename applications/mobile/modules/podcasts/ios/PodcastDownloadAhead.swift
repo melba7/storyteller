@@ -20,6 +20,10 @@ final class PodcastDownloadAhead {
   private static let settleSeconds = 3.0
 
   private var pending: Task<Void, Never>?
+  /// Every episode started ahead since the app was opened. One in it is not started again until
+  /// the app is opened anew, so a file the listener deleted, or one taken back and then queued
+  /// again, is not fetched over and over (50 to 100 MB each time).
+  private var started = Set<String>()
 
   private init() {}
 
@@ -43,7 +47,8 @@ final class PodcastDownloadAhead {
       upNext: queued.map {
         DownloadAhead.Item(id: $0.id, url: $0.url, skipAds: player.skipAds(forShow: $0.showId))
       },
-      playingId: player.current?.id, entries: store.entries(), onWiFi: PodcastNetwork.shared.onWiFi)
+      playingId: player.current?.id, entries: store.entries(), started: started,
+      onWiFi: PodcastNetwork.shared.onWiFi)
 
     for id in plan.adopt {
       do { try store.clearAhead(episodeId: id) } catch {
@@ -57,6 +62,8 @@ final class PodcastDownloadAhead {
     }
     for id in plan.start {
       guard let item = queued.first(where: { $0.id == id }) else { continue }
+      // Noted before the try, so an episode that cannot be fetched is not asked for again.
+      started.insert(id)
       // The language is noted before the download can finish, as when the app asks for one.
       PodcastTranscriber.shared.noteLanguage(item.language, for: id)
       do {

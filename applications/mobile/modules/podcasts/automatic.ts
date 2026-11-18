@@ -210,13 +210,15 @@ export type DownloadedEpisode = {
 
 /**
  * Which downloads to delete: played ones whose last listen was more than a day ago. An
- * episode with no last-played time is kept, and so is the one loaded in the player.
+ * episode with no last-played time is kept, and so is the one loaded in the player and any
+ * in Up Next (`queuedIds`): one put back there would be fetched ahead again (50 to 100 MB).
  */
 export function downloadsToDelete(
   episodes: readonly DownloadedEpisode[],
   now: number,
   loadedId: string | null,
   settings: AutomaticSettings,
+  queuedIds: ReadonlySet<string> = new Set(),
 ): string[] {
   if (!settings.deletePlayed) return []
   return episodes
@@ -225,6 +227,7 @@ export function downloadsToDelete(
         !isLocalEpisodeId(episode.id) &&
         episode.played &&
         episode.id !== loadedId &&
+        !queuedIds.has(episode.id) &&
         episode.lastPlayedAt !== null &&
         now - episode.lastPlayedAt > DAY_MS,
     )

@@ -46,15 +46,19 @@ public enum DownloadAhead {
   }
 
   /// The plan for this moment. `upNext` is the queue after the playing episode, in order.
-  /// Nothing starts off Wi-Fi, but the other two still happen, so a switch of network or of
-  /// "Skip ads" never leaves files behind.
+  /// `started` is every episode this run of the app has already started ahead. Nothing starts
+  /// off Wi-Fi, but the other two still happen, so a switch of network or of "Skip ads" never
+  /// leaves files behind.
   ///
   /// The next episodes of Up Next that can be fetched, have "Skip ads" on and have no download
   /// of any kind (finished, moving, failed, the listener's own) start, but never so many that more
-  /// than `count` ahead downloads exist at once. An ahead download that failed does not count and
-  /// is not tried again by this rule: the listener can tap it.
+  /// than `count` ahead downloads exist at once. An episode in `started` is never started again,
+  /// even when its file is gone (the listener deleted it), and while it is still in Up Next it
+  /// keeps its place among the two, so the third in line is not fetched in its stead. An ahead
+  /// download that failed is not tried again by this rule: the listener can tap it.
   public static func plan(
-    upNext: [Item], playingId: String?, entries: [DownloadEntry], onWiFi: Bool
+    upNext: [Item], playingId: String?, entries: [DownloadEntry], started: Set<String>,
+    onWiFi: Bool
   ) -> Plan {
     let queued = Set(upNext.map(\.id))
     let marked = entries.filter(\.ahead)
@@ -64,13 +68,16 @@ public enum DownloadAhead {
       .map(\.episodeId)
     guard onWiFi else { return plan }
 
-    let alive = marked.filter { entry in
-      queued.contains(entry.episodeId) && entry.episodeId != playingId && !isFailed(entry)
-    }
-    var room = max(0, count - alive.count)
+    var taken = Set(
+      marked.filter { entry in
+        queued.contains(entry.episodeId) && entry.episodeId != playingId && !isFailed(entry)
+      }.map(\.episodeId))
+    taken.formUnion(started.filter { queued.contains($0) && $0 != playingId })
+    var room = max(0, count - taken.count)
     var have = Set(entries.map(\.episodeId))
     for item in upNext where room > 0 {
-      guard item.id != playingId, item.skipAds, canFetch(item), have.insert(item.id).inserted
+      guard item.id != playingId, !started.contains(item.id), item.skipAds, canFetch(item),
+        have.insert(item.id).inserted
       else { continue }
       plan.start.append(item.id)
       room -= 1
