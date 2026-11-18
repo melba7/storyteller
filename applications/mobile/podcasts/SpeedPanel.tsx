@@ -5,6 +5,7 @@ import { Modal, Pressable, View } from "react-native"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { speedLabel, stepSpeed } from "@/modules/podcasts/playbackRules"
+import { ALL_ORIENTATIONS } from "@/modules/podcasts/playerFrame"
 
 const PRESETS = [1, 1.2, 1.5, 2]
 
@@ -27,6 +28,7 @@ export function SpeedSheet({
       visible={visible}
       transparent
       animationType="slide"
+      supportedOrientations={ALL_ORIENTATIONS}
       onRequestClose={onClose}
     >
       <View className="flex-1 justify-end">
@@ -36,7 +38,7 @@ export function SpeedSheet({
           accessibilityLabel="Close the speed choices"
           onPress={onClose}
         />
-        <View className="bg-background pb-safe-offset-3 gap-4 rounded-t-3xl px-6 pt-5">
+        <View className="bg-background pb-safe-offset-3 px-safe-or-6 gap-4 rounded-t-3xl pt-5">
           <Text className="text-lg font-semibold">Playback speed</Text>
           <SpeedPanel {...panel} />
         </View>

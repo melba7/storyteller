@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { cn } from "@/lib/utils"
+import { ALL_ORIENTATIONS } from "@/modules/podcasts/playerFrame"
 
 export type Section = "books" | "podcasts"
 
@@ -96,6 +97,7 @@ export function SectionMenuButton({ current }: Props) {
         visible={mounted}
         transparent
         animationType="none"
+        supportedOrientations={ALL_ORIENTATIONS}
         onRequestClose={() => close()}
       >
         <View className="flex-1">

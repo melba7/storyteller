@@ -1,12 +1,13 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter } from "expo-router"
 import { useMemo, useState } from "react"
-import { ActivityIndicator, View } from "react-native"
+import { ActivityIndicator, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { saveOwnOrder } from "@/modules/podcasts/db"
 import { sortShows } from "@/modules/podcasts/libraryView"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { rowHeightFor } from "@/modules/podcasts/playerFrame"
 
 import { Artwork } from "./Artwork"
 import { DragList } from "./DragList"
@@ -22,6 +23,7 @@ const ROW_HEIGHT = 64
  * and switches the library to "Your order". Cancel changes nothing.
  */
 export function ArrangeShows() {
+  const { fontScale } = useWindowDimensions()
   const router = useRouter()
   const shows = useShows()
   const activity = useShowActivity()
@@ -75,7 +77,7 @@ export function ArrangeShows() {
             ) : null
           }
           ids={ids}
-          rowHeight={ROW_HEIGHT}
+          rowHeight={rowHeightFor(ROW_HEIGHT, fontScale)}
           onChange={setOrder}
           label={(id, index, count) =>
             `${byId.get(id)?.title ?? ""}, place ${index + 1} of ${count}`
@@ -86,7 +88,11 @@ export function ArrangeShows() {
             return (
               <View className="flex-row items-center gap-3">
                 <Artwork uri={show.imageUrl} size={48} />
-                <Text className="flex-1 font-semibold" numberOfLines={2}>
+                <Text
+                  className="flex-1 font-semibold"
+                  numberOfLines={2}
+                  maxFontSizeMultiplier={1.5}
+                >
                   {show.title}
                 </Text>
               </View>

@@ -2,7 +2,13 @@
 import { Stack, useRouter, useSegments } from "expo-router"
 import { Play } from "lucide-react-native"
 import { useEffect, useRef, useState } from "react"
-import { ActivityIndicator, Alert, Pressable, View } from "react-native"
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  View,
+  useWindowDimensions,
+} from "react-native"
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable"
@@ -18,6 +24,7 @@ import {
 } from "@/modules/podcasts/dbPlaylists"
 import { type PlaylistEntry } from "@/modules/podcasts/manualPlaylist"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { rowHeightFor } from "@/modules/podcasts/playerFrame"
 import {
   entryDetails,
   entryLabel,
@@ -46,6 +53,7 @@ function tell(title: string, cause: unknown) {
  * swipe left to remove it, and Play all. Rename and delete are in the menu.
  */
 export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
+  const { fontScale } = useWindowDimensions()
   const router = useRouter()
   const segments = useSegments()
   const entries = useEntries(playlist.id)
@@ -164,7 +172,7 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
             </View>
           }
           ids={ids}
-          rowHeight={ROW_HEIGHT}
+          rowHeight={rowHeightFor(ROW_HEIGHT, fontScale)}
           onChange={reorder}
           label={(id, index, count) => {
             const entry = byId.get(id)
@@ -266,11 +274,19 @@ function EntryRow({
         >
           <Artwork uri={episode.imageUrl ?? show?.imageUrl ?? null} size={52} />
           <View className="flex-1 gap-1">
-            <Text className="font-semibold" numberOfLines={2}>
+            <Text
+              className="font-semibold"
+              numberOfLines={2}
+              maxFontSizeMultiplier={1.5}
+            >
               {episode.title}
             </Text>
             {details ? (
-              <Text className="text-muted-foreground text-sm" numberOfLines={1}>
+              <Text
+                className="text-muted-foreground text-sm"
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.5}
+              >
                 {details}
               </Text>
             ) : null}

@@ -82,10 +82,15 @@ export function MiniPlayerContent() {
             <Text
               className={compact ? "text-sm font-bold" : "font-bold"}
               numberOfLines={1}
+              maxFontSizeMultiplier={1.15}
             >
               {episode.title}
             </Text>
-            <Text className={compact ? "text-xs" : "text-sm"} numberOfLines={1}>
+            <Text
+              className={compact ? "text-xs" : "text-sm"}
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.15}
+            >
               {view.error ??
                 (note ? skipNoteText(note) : miniSubtitle(episode.publishedAt))}
             </Text>
@@ -98,7 +103,12 @@ export function MiniPlayerContent() {
             accessibilityLabel="Undo the ad skip"
             onPress={pressUndo}
           >
-            <Text className="text-sm font-semibold">Undo</Text>
+            <Text
+              className="text-sm font-semibold"
+              maxFontSizeMultiplier={1.15}
+            >
+              Undo
+            </Text>
           </Pressable>
         ) : null}
         <Pressable

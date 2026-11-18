@@ -7,6 +7,7 @@ import { type SFSymbol } from "sf-symbols-typescript"
 import { Text } from "@/components/ui/text"
 import { speedLabel } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
+import { transportSizes } from "@/modules/podcasts/playerFrame"
 import { player, type usePlayer } from "@/modules/podcasts/playerInstance"
 import { skipSymbol } from "@/modules/podcasts/playerLook"
 
@@ -29,9 +30,15 @@ export function PlayerTransport({
   const sheet = useSheet()
   const { skipBack, skipForward } = usePlaybackSettings()
   const [showSpeed, setShowSpeed] = useState(false)
+  // The row's own width, so a 320 pt screen gets smaller boxes instead of an overflowing row.
+  const [rowWidth, setRowWidth] = useState<number | null>(null)
+  const sizes = transportSizes(rowWidth)
   return (
-    <View className="w-full flex-row items-center justify-between">
-      <View className="w-12 items-start">
+    <View
+      className="w-full flex-row items-center justify-between"
+      onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
+    >
+      <View className="items-start" style={{ width: sizes.side }}>
         <Pressable
           className="h-11 min-w-11 justify-center active:opacity-60"
           accessibilityRole="button"
@@ -42,6 +49,7 @@ export function PlayerTransport({
             className="text-lg font-semibold"
             style={{ fontVariant: ["tabular-nums"], color: sheet.tint }}
             numberOfLines={1}
+            maxFontSizeMultiplier={1.3}
           >
             {speedLabel(view.rate).replace("x", "×").replace(".0", "")}
           </Text>
@@ -51,6 +59,7 @@ export function PlayerTransport({
         label={skipLabel("back", skipBack)}
         symbol={skipSymbol("back", skipBack)}
         seconds={skipBack}
+        box={sizes.skip}
         icon={RotateCcw}
         onPress={() => {
           tap()
@@ -58,7 +67,8 @@ export function PlayerTransport({
         }}
       />
       <Pressable
-        className="size-20 items-center justify-center active:opacity-60"
+        className="items-center justify-center active:opacity-60"
+        style={{ width: sizes.play, height: sizes.play }}
         accessibilityRole="button"
         accessibilityLabel={view.isPlaying ? "Pause" : "Play"}
         onPress={() => {
@@ -82,13 +92,14 @@ export function PlayerTransport({
         label={skipLabel("ahead", skipForward)}
         symbol={skipSymbol("ahead", skipForward)}
         seconds={skipForward}
+        box={sizes.skip}
         icon={RotateCw}
         onPress={() => {
           tap()
           void player.skip(skipForward)
         }}
       />
-      <View className="w-12 items-end">
+      <View className="items-end" style={{ width: sizes.side }}>
         <SleepTimerButton />
       </View>
       <SpeedSheet
@@ -105,19 +116,23 @@ function SkipButton({
   label,
   symbol,
   seconds,
+  box,
   icon,
   onPress,
 }: {
   label: string
   symbol: SFSymbol
   seconds: number
+  /** The side of the touch box. */
+  box: number
   icon: typeof RotateCcw
   onPress: () => void
 }) {
   const sheet = useSheet()
   return (
     <Pressable
-      className="size-14 items-center justify-center active:opacity-60"
+      className="items-center justify-center active:opacity-60"
+      style={{ width: box, height: box }}
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}

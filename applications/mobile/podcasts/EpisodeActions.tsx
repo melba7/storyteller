@@ -7,6 +7,7 @@ import {
   Share,
   type LucideIcon,
 } from "lucide-react-native"
+import { useState } from "react"
 import { Pressable, View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
@@ -14,6 +15,7 @@ import { Menu } from "@/components/ui/menu"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
+import { actionGap } from "@/modules/podcasts/playerFrame"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeShare } from "@/modules/podcasts/share"
 import { isQueued, queuedLabel } from "@/modules/podcasts/upNext"
@@ -71,8 +73,17 @@ export function EpisodeActions({
   const queued = isQueued(queue, episode.id)
   const star = starAction(episode)
   const library = !isPreviewId(episode.id)
+  const hasDownload = Podcasts !== null && !isLocalEpisodeId(episode.id)
+  // The round buttons are 48 pt: on a 320 pt screen five of them need a gap under 16.
+  const [rowWidth, setRowWidth] = useState<number | null>(null)
+  const count =
+    2 + (library ? 1 : 0) + (hasDownload ? 1 : 0) + (Podcasts === null ? 0 : 1)
   return (
-    <View className="w-full flex-row items-center justify-center gap-4">
+    <View
+      className="w-full flex-row items-center justify-center"
+      style={{ gap: actionGap(rowWidth, count) }}
+      onLayout={(event) => setRowWidth(event.nativeEvent.layout.width)}
+    >
       {library ? (
         <Face
           icon={Bookmark}
@@ -81,11 +92,11 @@ export function EpisodeActions({
           onPress={star.onPress}
         />
       ) : null}
-      {Podcasts === null || isLocalEpisodeId(episode.id) ? null : (
+      {hasDownload ? (
         <View className={FACE}>
           <DownloadButton episode={episode} size={48} tone="onColor" />
         </View>
-      )}
+      ) : null}
       {Podcasts === null ? null : (
         <Menu
           actions={[

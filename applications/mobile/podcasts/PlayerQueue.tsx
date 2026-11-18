@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { Trash2 } from "lucide-react-native"
 import { useMemo } from "react"
-import { Alert, Pressable, View } from "react-native"
+import { Alert, Pressable, View, useWindowDimensions } from "react-native"
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable"
@@ -13,6 +13,7 @@ import { getEpisode, getShow } from "@/modules/podcasts/db"
 import { type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
+import { rowHeightFor } from "@/modules/podcasts/playerFrame"
 import { player } from "@/modules/podcasts/playerInstance"
 import { moveBetween } from "@/modules/podcasts/upNext"
 
@@ -41,6 +42,7 @@ function details(item: UpNextItem): string {
  * handles, swiped left to remove, and a Clear button. It shares its data with the Up Next page.
  */
 export function PlayerQueue() {
+  const { fontScale } = useWindowDimensions()
   const sheet = useSheet()
   const queue = useUpNext()
   const byId = useMemo(
@@ -85,7 +87,7 @@ export function PlayerQueue() {
           <DragList
             onSheet={{ line: sheet.rest, grip: sheet.muted }}
             ids={ids}
-            rowHeight={ROW_HEIGHT}
+            rowHeight={rowHeightFor(ROW_HEIGHT, fontScale)}
             onChange={reorder}
             onDrop={pick}
             label={(id, index, count) => {
@@ -169,6 +171,7 @@ function QueueRow({ item }: { item: UpNextItem }) {
             className="font-semibold"
             style={{ color: sheet.ink }}
             numberOfLines={2}
+            maxFontSizeMultiplier={1.5}
           >
             {item.title}
           </Text>
@@ -177,6 +180,7 @@ function QueueRow({ item }: { item: UpNextItem }) {
               className="text-sm"
               style={{ color: sheet.muted }}
               numberOfLines={1}
+              maxFontSizeMultiplier={1.5}
             >
               {line}
             </Text>

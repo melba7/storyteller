@@ -34,12 +34,17 @@ export function PlayerNowPlaying({
   chapters,
   onPanel,
   onShow,
+  left,
+  right,
 }: {
   view: ReturnType<typeof usePlayer>
   chapters: readonly PodcastChapter[]
   onPanel: (panel: PlayerPanel) => void
   /** Go to the show and close the player. */
   onShow: () => void
+  /** The space left and right of the controls, clear of the safe-area insets. */
+  left: number
+  right: number
 }) {
   const sheet = useSheet()
   const { episode, show } = view
@@ -49,7 +54,10 @@ export function PlayerNowPlaying({
   const date = dateWords(episode.publishedAt)
 
   return (
-    <View className="w-full gap-3 px-8 pt-3">
+    <View
+      className="w-full gap-3 pt-3"
+      style={{ paddingLeft: left, paddingRight: right }}
+    >
       <View>
         {date === "" ? null : (
           <Text

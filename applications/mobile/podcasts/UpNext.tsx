@@ -8,7 +8,7 @@ import {
   Trash2,
 } from "lucide-react-native"
 import { useMemo } from "react"
-import { Pressable, View } from "react-native"
+import { Pressable, View, useWindowDimensions } from "react-native"
 import Swipeable, {
   type SwipeableMethods,
 } from "react-native-gesture-handler/ReanimatedSwipeable"
@@ -18,6 +18,7 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { Podcasts, type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
+import { rowHeightFor } from "@/modules/podcasts/playerFrame"
 import { SEARCH_HREF, episodeHref } from "@/modules/podcasts/routes"
 import {
   moveBetween,
@@ -59,6 +60,7 @@ const ACTIONS: RowAction[] = [
  * and Play last, left for Remove. Tapping a row opens the episode.
  */
 export function UpNext() {
+  const { fontScale } = useWindowDimensions()
   const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const queue = useUpNext()
@@ -159,7 +161,7 @@ export function UpNext() {
             ) : null
           }
           ids={ids}
-          rowHeight={ROW_HEIGHT}
+          rowHeight={rowHeightFor(ROW_HEIGHT, fontScale)}
           onChange={reorder}
           onDrop={pick}
           label={(id, index, count) => {
@@ -280,11 +282,19 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
           className="rounded-lg"
         />
         <View className="flex-1 gap-1">
-          <Text className="font-semibold" numberOfLines={2}>
+          <Text
+            className="font-semibold"
+            numberOfLines={2}
+            maxFontSizeMultiplier={1.5}
+          >
             {item.title}
           </Text>
           {details ? (
-            <Text className="text-muted-foreground text-sm" numberOfLines={1}>
+            <Text
+              className="text-muted-foreground text-sm"
+              numberOfLines={1}
+              maxFontSizeMultiplier={1.5}
+            >
               {details}
             </Text>
           ) : null}
