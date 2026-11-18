@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import { FlatList, View, useWindowDimensions } from "react-native"
+import { FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import {
@@ -9,7 +9,6 @@ import {
   EPISODE_ROW_HEIGHT,
   EPISODE_SHELF_HEIGHT,
   SHELF_GAP,
-  SHELF_GUTTER,
   episodeColumnWidth,
   pagesOfRows,
 } from "@/modules/podcasts/homeLook"
@@ -18,6 +17,7 @@ import { type ChartEpisode } from "@/modules/podcasts/topEpisodes"
 
 import { Artwork } from "./Artwork"
 import { PressableScale } from "./PressableScale"
+import { usePageFrame } from "./usePageFrame"
 
 type Ranked = { episode: ChartEpisode; rank: number }
 
@@ -41,8 +41,8 @@ export function EpisodeChartShelf({
 }) {
   const router = useRouter()
   const segments = useSegments()
-  const { width: window } = useWindowDimensions()
-  const width = episodeColumnWidth(window)
+  const frame = usePageFrame()
+  const width = episodeColumnWidth(frame.width)
   const pages = pagesOfRows(
     episodes.map((episode, index): Ranked => ({ episode, rank: index + 1 })),
   )
@@ -55,11 +55,14 @@ export function EpisodeChartShelf({
       decelerationRate="fast"
       snapToInterval={width + SHELF_GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: SHELF_GUTTER }}
+      contentContainerStyle={{
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
+      }}
       ItemSeparatorComponent={() => <View style={{ width: SHELF_GAP }} />}
       getItemLayout={(_, index) => ({
         length: width,
-        offset: SHELF_GUTTER + index * (width + SHELF_GAP),
+        offset: frame.left + index * (width + SHELF_GAP),
         index,
       })}
       initialNumToRender={2}
@@ -125,16 +128,16 @@ export function EpisodeChartShelf({
 
 /** The loading shelf: grey rows of the real shelf's exact height. Hidden from VoiceOver. */
 export function EpisodeShelfSkeleton() {
-  const { width: window } = useWindowDimensions()
+  const frame = usePageFrame()
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
         height: EPISODE_SHELF_HEIGHT,
-        width: episodeColumnWidth(window) + SHELF_GUTTER,
+        width: episodeColumnWidth(frame.width) + frame.left,
         overflow: "hidden",
-        paddingLeft: SHELF_GUTTER,
+        paddingLeft: frame.left,
       }}
     >
       {Array.from({ length: EPISODE_ROWS }, (_, i) => (

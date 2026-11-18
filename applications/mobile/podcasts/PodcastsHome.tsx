@@ -3,13 +3,7 @@ import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { Podcast } from "lucide-react-native"
 import { useMemo } from "react"
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  View,
-  useWindowDimensions,
-} from "react-native"
+import { ActivityIndicator, FlatList, RefreshControl, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { Podcasts } from "@/modules/podcasts/index"
@@ -21,20 +15,16 @@ import {
   badgeCount,
   sortShows,
 } from "@/modules/podcasts/libraryView"
+import { chunkRows, gridColumns } from "@/modules/podcasts/pageFrame"
 import { SEARCH_HREF, arrangeHref, showHref } from "@/modules/podcasts/routes"
 
 import { EmptyState } from "./EmptyState"
-import {
-  GRID_GAP,
-  GRID_GUTTER,
-  ShowCell,
-  ShowRow,
-  cellSize,
-} from "./LibraryShows"
+import { GRID_GAP, ShowCell, ShowRow, cellSize } from "./LibraryShows"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
 import { useLibraryView } from "./useLibraryView"
+import { usePageFrame } from "./usePageFrame"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import { useRefreshShows } from "./useRefreshShows"
 
@@ -105,7 +95,7 @@ export function PodcastsHome() {
   const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const segments = useSegments()
-  const { width } = useWindowDimensions()
+  const frame = usePageFrame()
   const shows = useShows()
   const activity = useShowActivity()
   const { view, change } = useLibraryView()
@@ -120,20 +110,32 @@ export function PodcastsHome() {
 
   const arranged = (shows.data ?? []).some((s) => s.ownPosition !== null)
   const openArrange = () => router.push(arrangeHref(segments))
-  const columns = LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3
-  const size = cellSize(width, columns)
+  // The usual columns for the layout, doubled on a wide window. The rows are laid out here, as
+  // one-column list items, so a fold, an unfold or a new layout never remounts the list and
+  // the scroll position stays.
+  const columns = gridColumns(
+    LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3,
+    frame.width,
+  )
+  const size = cellSize(frame.width, columns)
   const isList = view?.layout === "list"
+  const rows = useMemo(() => chunkRows(sorted, columns), [sorted, columns])
 
-  function renderShow({ item }: { item: Show }) {
+  function renderShow(item: Show) {
     const props = {
       show: item,
       count: badgeCount(found?.[item.id], item.addedAt),
       onPress: () => router.push(showHref(segments, item.id)),
     }
     return isList ? (
-      <ShowRow {...props} />
+      <ShowRow key={item.id} {...props} />
     ) : (
-      <ShowCell {...props} size={size} href={showHref(segments, item.id)} />
+      <ShowCell
+        key={item.id}
+        {...props}
+        size={size}
+        href={showHref(segments, item.id)}
+      />
     )
   }
 
@@ -155,20 +157,17 @@ export function PodcastsHome() {
           <Message title="The library couldn't be read" body={shows.error} />
         </BelowBar>
       ) : (
-        <FlatList<Show>
-          // A different column count needs a fresh list.
-          key={`columns-${columns}`}
+        <FlatList<Show[]>
           className="bg-background flex-1"
-          data={sorted}
-          numColumns={columns}
-          keyExtractor={(show) => show.id}
+          data={rows}
+          keyExtractor={(row) => row[0]!.id}
           contentInsetAdjustmentBehavior="automatic"
-          contentContainerStyle={
-            isList
-              ? { paddingHorizontal: GRID_GUTTER, flexGrow: 1 }
-              : { paddingHorizontal: GRID_GUTTER, paddingTop: 4, flexGrow: 1 }
-          }
-          columnWrapperStyle={isList ? undefined : { gap: GRID_GAP }}
+          contentContainerStyle={{
+            paddingLeft: frame.left,
+            paddingRight: frame.right,
+            paddingTop: isList ? 0 : 4,
+            flexGrow: 1,
+          }}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
@@ -197,7 +196,15 @@ export function PodcastsHome() {
               }}
             />
           }
-          renderItem={renderShow}
+          renderItem={({ item: row }) =>
+            isList ? (
+              renderShow(row[0]!)
+            ) : (
+              <View style={{ flexDirection: "row", gap: GRID_GAP }}>
+                {row.map(renderShow)}
+              </View>
+            )
+          }
         />
       )}
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />

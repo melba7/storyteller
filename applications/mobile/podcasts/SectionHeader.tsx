@@ -26,7 +26,7 @@ export function SectionHeader({
   if (!onPress) {
     return (
       <View
-        className="flex-row items-center gap-1 px-4 pt-7 pb-3"
+        className="px-safe-or-4 flex-row items-center gap-1 pt-7 pb-3"
         accessible
         accessibilityRole="header"
         accessibilityLabel={title}
@@ -37,7 +37,7 @@ export function SectionHeader({
   }
   return (
     <Pressable
-      className="flex-row items-center gap-1 px-4 pt-7 pb-3"
+      className="px-safe-or-4 flex-row items-center gap-1 pt-7 pb-3"
       accessibilityRole="header"
       accessibilityLabel={title}
       onPress={onPress}

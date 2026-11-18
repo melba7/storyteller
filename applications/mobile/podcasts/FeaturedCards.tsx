@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ScrollView, View, useWindowDimensions } from "react-native"
+import { ScrollView, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { HEADER_FALLBACK } from "@/modules/podcasts/artworkTint"
@@ -12,9 +12,9 @@ import { cardPalette } from "@/modules/podcasts/homeLook"
 import { Artwork } from "./Artwork"
 import { useOpenPreview } from "./ChartRow"
 import { PressableScale } from "./PressableScale"
+import { usePageFrame } from "./usePageFrame"
 import { useArtworkColor } from "./useWash"
 
-const GUTTER = 16
 const GAP = 12
 /** The share of the square, at the bottom, that fades into the cover's colour. */
 const FADE = 0.55
@@ -107,8 +107,8 @@ function Card({ card, size }: { card: FeaturedCard; size: number }) {
  * and the author. The next card peeks in at the right.
  */
 export function FeaturedCards({ cards }: { cards: readonly FeaturedCard[] }) {
-  const { width: window } = useWindowDimensions()
-  const width = featuredCardSize(window)
+  const frame = usePageFrame()
+  const width = featuredCardSize(frame.width)
   return (
     <ScrollView
       horizontal
@@ -116,7 +116,11 @@ export function FeaturedCards({ cards }: { cards: readonly FeaturedCard[] }) {
       decelerationRate="fast"
       snapToInterval={width + GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: GUTTER, gap: GAP }}
+      contentContainerStyle={{
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
+        gap: GAP,
+      }}
     >
       {cards.map((card) => (
         <Card key={card.show.appleId} card={card} size={width} />

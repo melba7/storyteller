@@ -3,6 +3,7 @@ import { View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { type Show } from "@/modules/podcasts/library"
+import { gridCellSize } from "@/modules/podcasts/pageFrame"
 import { type RecentShow, updatedLabel } from "@/modules/podcasts/rooms"
 import { type PodcastHref } from "@/modules/podcasts/routes"
 
@@ -10,9 +11,9 @@ import { Artwork } from "./Artwork"
 import { PressableScale } from "./PressableScale"
 import { ZoomLink } from "./ZoomLink"
 
-/** The side of a cell in a two-column grid with 16 pt gutters and 12 pt between the columns. */
-export function recentCellSize(windowWidth: number): number {
-  return Math.max(1, Math.floor((windowWidth - 32 - 12) / 2))
+/** The side of a cell in the grid, from the page frame's width and its number of columns. */
+export function recentCellSize(layoutWidth: number, columns: number): number {
+  return gridCellSize(layoutWidth, columns)
 }
 
 /**

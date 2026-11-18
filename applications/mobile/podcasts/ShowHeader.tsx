@@ -21,6 +21,7 @@ import {
   updateFrequency,
 } from "@/modules/podcasts/episodeRowLook"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
+import { showHeaderSide } from "@/modules/podcasts/pageFrame"
 
 import { Artwork } from "./Artwork"
 import { HeaderCapsule } from "./HeaderCapsule"
@@ -121,7 +122,10 @@ export function ShowHeader({
   episodes = null,
   onTitleBottom,
 }: Props) {
-  const { width } = useWindowDimensions()
+  const { width, height } = useWindowDimensions()
+  // The picture is a square as wide as the window on a phone in portrait; on a wide or low
+  // window it is capped, so the episodes stay in reach. The colour fills the rest of the width.
+  const side = showHeaderSide(width, height)
   const headerHeight = useHeaderHeight()
   const [expanded, setExpanded] = useState(false)
   const description = useMemo(
@@ -143,8 +147,8 @@ export function ShowHeader({
   )
 
   useEffect(() => {
-    onTitleBottom?.(width - headerHeight)
-  }, [onTitleBottom, width, headerHeight])
+    onTitleBottom?.(side - headerHeight)
+  }, [onTitleBottom, side, headerHeight])
 
   return (
     // The list's automatic inset puts the first row below the bar: pull the picture up under it.
@@ -161,55 +165,57 @@ export function ShowHeader({
           backgroundColor: background,
         }}
       />
-      <View style={{ width, height: width }}>
-        {/* Only the picture is the header for VoiceOver: the buttons below stay reachable. */}
-        <View
-          accessible
-          accessibilityRole="header"
-          accessibilityLabel={show.title}
-        >
-          <Link.AppleZoomTarget>
-            <Artwork
-              uri={show.imageUrl}
-              size={width}
-              className="rounded-none border-0"
-            />
-          </Link.AppleZoomTarget>
-        </View>
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: width * 0.3,
-            backgroundImage: `linear-gradient(180deg, transparent, ${background})`,
-          }}
-        />
-        <View className="absolute right-0 bottom-3 left-0 flex-row items-center justify-center gap-3">
-          <PlayCapsuleWhite
-            show={show}
-            episodes={list}
-            preview={preview}
-            color={background}
+      <View style={{ width, height: side, alignItems: "center" }}>
+        <View style={{ width: side, height: side }}>
+          {/* Only the picture is the header for VoiceOver: the buttons below stay reachable. */}
+          <View
+            accessible
+            accessibilityRole="header"
+            accessibilityLabel={show.title}
+          >
+            <Link.AppleZoomTarget>
+              <Artwork
+                uri={show.imageUrl}
+                size={side}
+                className="rounded-none border-0"
+              />
+            </Link.AppleZoomTarget>
+          </View>
+          <View
+            pointerEvents="none"
+            style={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: side * 0.3,
+              backgroundImage: `linear-gradient(180deg, transparent, ${background})`,
+            }}
           />
-          {onFollow ? (
-            <GlassCircle
-              label={`Follow ${show.title}`}
-              busy={busy}
-              onPress={onFollow}
-            >
-              <Icon as={Plus} size={26} className="text-white" />
-            </GlassCircle>
-          ) : (
-            <GlassCircle
-              label={`Following ${show.title}. Tap to unfollow`}
-              onPress={onUnfollow}
-            >
-              <Icon as={Check} size={26} className="text-white" />
-            </GlassCircle>
-          )}
+          <View className="absolute right-0 bottom-3 left-0 flex-row items-center justify-center gap-3">
+            <PlayCapsuleWhite
+              show={show}
+              episodes={list}
+              preview={preview}
+              color={background}
+            />
+            {onFollow ? (
+              <GlassCircle
+                label={`Follow ${show.title}`}
+                busy={busy}
+                onPress={onFollow}
+              >
+                <Icon as={Plus} size={26} className="text-white" />
+              </GlassCircle>
+            ) : (
+              <GlassCircle
+                label={`Following ${show.title}. Tap to unfollow`}
+                onPress={onUnfollow}
+              >
+                <Icon as={Check} size={26} className="text-white" />
+              </GlassCircle>
+            )}
+          </View>
         </View>
       </View>
       <View className="px-safe-or-4 gap-3 pt-4 pb-5">

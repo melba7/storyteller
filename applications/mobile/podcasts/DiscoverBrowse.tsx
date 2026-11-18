@@ -79,7 +79,7 @@ export function DiscoverBrowse() {
             accessibilityLabel="Loading the top chart"
           />
         ) : top.error ? (
-          <Text className="text-destructive px-4 pt-4 text-sm">
+          <Text className="text-destructive px-safe-or-4 pt-4 text-sm">
             {top.error}
           </Text>
         ) : null}
@@ -113,7 +113,7 @@ export function DiscoverBrowse() {
                 router.push(categoryHref(suggestion.category.id, segments))
               }
             />
-            <Text className="text-muted-foreground -mt-2 mb-3 px-4 text-base">
+            <Text className="text-muted-foreground px-safe-or-4 -mt-2 mb-3 text-base">
               {index === 0 ? `${suggestion.category.name}. ` : ""}Because you
               follow {suggestion.because}
             </Text>
@@ -132,9 +132,7 @@ export function DiscoverBrowse() {
         <ChartShelves lists={lists} states={charts.states} />
 
         <SectionHeader title="Categories" />
-        <View className="px-4">
-          <CategoryTiles />
-        </View>
+        <CategoryTiles />
       </View>
     </ScrollView>
   )

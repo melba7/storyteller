@@ -27,7 +27,7 @@ export function LibraryRow({
   const shown = count === null || count === undefined ? "" : String(count)
   return (
     <Pressable
-      className="active:bg-foreground/5 flex-row items-center px-4"
+      className="active:bg-foreground/5 px-safe-or-4 flex-row items-center"
       accessibilityRole="button"
       accessibilityLabel={label ?? (shown ? `${title}, ${shown}` : title)}
       onPress={onPress}

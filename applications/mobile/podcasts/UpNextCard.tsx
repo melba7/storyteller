@@ -26,12 +26,6 @@ import { PressableScale } from "./PressableScale"
 import { useDownload } from "./useDownloads"
 import { useArtworkColor } from "./useWash"
 
-/** A card's width and height for a window width: two thirds across, a third taller than wide. */
-export function cardSize(windowWidth: number) {
-  const width = Math.round(windowWidth * 0.66)
-  return { width, height: Math.round(width * 1.34) }
-}
-
 /** Room kept under the words for the buttons row: its 40 pt, the 14 pt margin and a 12 pt gap. */
 const CONTROLS_ROOM = 66
 

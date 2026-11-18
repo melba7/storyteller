@@ -4,6 +4,7 @@ import { Pressable, View } from "react-native"
 import { Text } from "@/components/ui/text"
 import { type Show } from "@/modules/podcasts/library"
 import { badgeLabel } from "@/modules/podcasts/libraryView"
+import { gridCellSize } from "@/modules/podcasts/pageFrame"
 import { type PodcastHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
@@ -14,10 +15,9 @@ import { ZoomLink } from "./ZoomLink"
 export const GRID_GUTTER = 16
 export const GRID_GAP = 12
 
-/** The side of one grid cell, from the window width and the number of columns. */
-export function cellSize(windowWidth: number, columns: number): number {
-  const room = windowWidth - GRID_GUTTER * 2 - GRID_GAP * (columns - 1)
-  return Math.max(1, Math.floor(room / columns))
+/** The side of one grid cell, from the page frame's width and the number of columns. */
+export function cellSize(layoutWidth: number, columns: number): number {
+  return gridCellSize(layoutWidth, columns)
 }
 
 function label(show: Show, count: number): string {

@@ -37,7 +37,7 @@ export function ChartShelves({
     lists.every((list) => stateOf(list.id) === "missing")
   ) {
     return (
-      <Text className="text-muted-foreground px-4 pt-7 text-base">
+      <Text className="text-muted-foreground px-safe-or-4 pt-7 text-base">
         Couldn&apos;t load the charts. Pull down to try again.
       </Text>
     )

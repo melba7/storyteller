@@ -1,9 +1,8 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { PixelRatio, View, useWindowDimensions } from "react-native"
+import { PixelRatio, View } from "react-native"
 
 import {
   SHELF_GAP,
-  SHELF_GUTTER,
   SHELF_LINE_HEIGHT,
   SHELF_TEXT_GAP,
   shelfHeight,
@@ -11,14 +10,16 @@ import {
   shelfTileSize,
 } from "@/modules/podcasts/homeLook"
 
+import { usePageFrame } from "./usePageFrame"
+
 /**
  * A loading shelf: three grey rounded squares with two grey bars under each, exactly as tall
  * as a real `ShowShelf` (`ranked` adds the rank line), so the page does not jump when the
  * shows arrive. It is hidden from VoiceOver.
  */
 export function ShelfSkeleton({ ranked = false }: { ranked?: boolean }) {
-  const { width: window } = useWindowDimensions()
-  const size = shelfTileSize(window)
+  const frame = usePageFrame()
+  const size = shelfTileSize(frame.width)
   const textLines = ranked ? 3 : 2
   const scale = shelfTextScale(PixelRatio.getFontScale())
   return (
@@ -29,7 +30,8 @@ export function ShelfSkeleton({ ranked = false }: { ranked?: boolean }) {
         height: shelfHeight(size, ranked, scale),
         flexDirection: "row",
         overflow: "hidden",
-        paddingHorizontal: SHELF_GUTTER,
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
         gap: SHELF_GAP,
       }}
     >

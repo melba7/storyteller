@@ -23,14 +23,16 @@ import {
   Trophy,
   Users,
 } from "lucide-react-native"
-import { View, useWindowDimensions } from "react-native"
+import { View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { categoryColors } from "@/modules/podcasts/categoryColors"
 import { CHART_CATEGORIES } from "@/modules/podcasts/charts"
+import { categoryColumns } from "@/modules/podcasts/pageFrame"
 import { categoryHref } from "@/modules/podcasts/routes"
 
 import { PressableScale } from "./PressableScale"
+import { usePageFrame } from "./usePageFrame"
 
 /** One icon per Apple category id. A category without one gets the podcast icon. */
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -56,20 +58,30 @@ const CATEGORY_ICONS: Record<string, LucideIcon> = {
 }
 
 const GRID_GAP = 12
+/** The category name stays whole at large text sizes; the tile's height is fixed. */
+const NAME_MAX_SCALE = 1.2
 const TILE_RATIO = 0.6
 
 /**
- * The categories as a two-column grid of tiles inside the screen's 16 pt gutters: a gradient
+ * The categories as a grid of tiles (two columns on a phone, more on a wide window) inside the
+ * page's gutters, which are 16 pt or the safe-area inset: a gradient
  * of the category's colour, its name in bold white at the bottom left and a large symbol in
  * a lighter shade at the top right. Each opens the category's chart.
  */
 export function CategoryTiles() {
   const router = useRouter()
   const segments = useSegments()
-  const { width } = useWindowDimensions()
-  const tile = Math.max(1, Math.floor((width - 32 - GRID_GAP) / 2))
+  const { left, right, width } = usePageFrame()
+  const columns = categoryColumns(width)
+  const tile = Math.max(
+    1,
+    Math.floor((width - 32 - GRID_GAP * (columns - 1)) / columns),
+  )
   return (
-    <View className="flex-row flex-wrap" style={{ gap: GRID_GAP }}>
+    <View
+      className="flex-row flex-wrap"
+      style={{ gap: GRID_GAP, paddingLeft: left, paddingRight: right }}
+    >
       {CHART_CATEGORIES.map((category) => {
         const { from, to, symbol } = categoryColors(category.id)
         const Symbol = CATEGORY_ICONS[category.id] ?? Podcast
@@ -97,6 +109,7 @@ export function CategoryTiles() {
                 />
               </View>
               <Text
+                maxFontSizeMultiplier={NAME_MAX_SCALE}
                 className="text-xl leading-6 font-bold text-white"
                 numberOfLines={2}
               >

@@ -1,10 +1,9 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { FlatList, PixelRatio, View, useWindowDimensions } from "react-native"
+import { FlatList, PixelRatio, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import {
   SHELF_GAP,
-  SHELF_GUTTER,
   SHELF_MAX_TEXT_SCALE,
   shelfHeight,
   shelfTextScale,
@@ -15,6 +14,7 @@ import { type PodcastHref } from "@/modules/podcasts/routes"
 import { Artwork } from "./Artwork"
 import { PressableScale } from "./PressableScale"
 import { ZoomLink } from "./ZoomLink"
+import { usePageFrame } from "./usePageFrame"
 
 export type ShelfShow = {
   key: string
@@ -36,8 +36,8 @@ export type ShelfShow = {
  * length keeps the snapping exact.
  */
 export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
-  const { width: window } = useWindowDimensions()
-  const size = shelfTileSize(window)
+  const frame = usePageFrame()
+  const size = shelfTileSize(frame.width)
   // The texts grow with the system text size, up to 1.2 times; the height follows, and is the
   // loading shelf's height, so the page does not jump when the shows arrive.
   const ranked = shows.some((show) => show.rank !== undefined)
@@ -56,11 +56,14 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
       decelerationRate="fast"
       snapToInterval={size + SHELF_GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: SHELF_GUTTER }}
+      contentContainerStyle={{
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
+      }}
       ItemSeparatorComponent={() => <View style={{ width: SHELF_GAP }} />}
       getItemLayout={(_, index) => ({
         length: size,
-        offset: SHELF_GUTTER + index * (size + SHELF_GAP),
+        offset: frame.left + index * (size + SHELF_GAP),
         index,
       })}
       initialNumToRender={3}

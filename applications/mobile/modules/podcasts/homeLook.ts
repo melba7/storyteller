@@ -179,9 +179,18 @@ export const EPISODE_ROW_HEIGHT = EPISODE_COVER + 16
 /** How much of the next page shows beside the current one. */
 export const EPISODE_PEEK = 28
 
-/** The width of one page of episode rows: the window less the gutter, the gap and the peek. */
+/** The most a page of episode rows measures, so a wide window shows more than one page. */
+export const EPISODE_COLUMN_MAX = 400
+
+/**
+ * The width of one page of episode rows: the window less the gutter, the gap and the peek, up
+ * to 400.
+ */
 export function episodeColumnWidth(windowWidth: number): number {
-  return Math.max(0, windowWidth - SHELF_GUTTER - SHELF_GAP - EPISODE_PEEK)
+  return Math.min(
+    EPISODE_COLUMN_MAX,
+    Math.max(0, windowWidth - SHELF_GUTTER - SHELF_GAP - EPISODE_PEEK),
+  )
 }
 
 /** The height of the episode shelf, which its loading shelf shares. */

@@ -220,6 +220,12 @@ describe("the episode shelf's measures", () => {
     expect(episodeColumnWidth(10)).toBe(0)
   })
 
+  it("caps a page at 400 pt, so a wide window shows a second page beside the first", () => {
+    expect(episodeColumnWidth(430)).toBe(430 - 16 - 12 - 28)
+    expect(episodeColumnWidth(852)).toBe(400)
+    expect(episodeColumnWidth(1024)).toBe(400)
+  })
+
   it("is three rows tall, and a row holds its 60 pt cover and 3 lines of text", () => {
     expect(EPISODE_ROW_HEIGHT).toBe(76)
     expect(EPISODE_SHELF_HEIGHT).toBe(3 * 76)

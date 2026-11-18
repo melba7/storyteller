@@ -33,6 +33,7 @@ import {
   useUpNextShelf,
   useYouMightLike,
 } from "./useHome"
+import { usePageFrame } from "./usePageFrame"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import { useRefreshShows } from "./useRefreshShows"
 
@@ -43,6 +44,7 @@ import { useRefreshShows } from "./useRefreshShows"
  */
 export function Home() {
   const statusBarStyle = useStatusBarStyle()
+  const frame = usePageFrame()
   const router = useRouter()
   const segments = useSegments()
   const openPreview = useOpenPreview()
@@ -81,7 +83,10 @@ export function Home() {
         }
       >
         {refresh.problem ? (
-          <View className="bg-destructive/10 mx-4 mt-2 rounded-xl p-3">
+          <View
+            className="bg-destructive/10 mt-2 rounded-xl p-3"
+            style={{ marginLeft: frame.left, marginRight: frame.right }}
+          >
             <Text
               className="text-destructive text-sm"
               accessibilityRole="alert"
@@ -146,9 +151,7 @@ export function Home() {
         ) : null}
         <ChartShelves lists={lists} states={charts.states} />
         <SectionHeader title="Browse Categories" />
-        <View className="px-4">
-          <CategoryTiles />
-        </View>
+        <CategoryTiles />
       </ScrollView>
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
