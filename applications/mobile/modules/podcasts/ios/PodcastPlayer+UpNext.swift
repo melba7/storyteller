@@ -58,7 +58,7 @@ extension PodcastPlayer {
   }
 
   /// Whether ads are skipped for a show: its own choice where it has one, else the listener's.
-  private func skipAds(forShow showId: String?) -> Bool {
+  func skipAds(forShow showId: String?) -> Bool {
     let own = showId.flatMap { ShowSettingsFile.load(from: ShowSettingsStore.url)[$0] }?.skipAds
     return own ?? AdSkipDefaults.settings.skipAds
   }
@@ -100,8 +100,12 @@ extension PodcastPlayer {
     }
   }
 
+  /// Tells JavaScript the queue. Every change of the queue ends here, including an episode
+  /// starting from the list or from the queue, so this is also where what is next is looked at
+  /// for a download ahead (PodcastDownloadAhead.swift waits a few seconds first).
   func emitQueue() {
     sink?("onUpNextChange", ["items": upNextObjects()])
+    PodcastDownloadAhead.shared.changed()
   }
 
   static func object(_ item: QueueItem) -> [String: Any] {

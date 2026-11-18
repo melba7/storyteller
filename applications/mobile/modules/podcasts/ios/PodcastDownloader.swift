@@ -116,7 +116,10 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
 
   // MARK: Asking
 
-  func download(episodeId: String, url: String, type: String, automatic: Bool) throws {
+  /// `ahead` marks an automatic download of what is next in Up Next (PodcastDownloadAhead).
+  func download(episodeId: String, url: String, type: String, automatic: Bool, ahead: Bool = false)
+    throws
+  {
     guard let store else { throw PodcastFetchError(message: "Downloads are not available.") }
     _ = try store.folder(for: episodeId)
     guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
@@ -137,7 +140,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     let entry = DownloadEntry(
       episodeId: episodeId, url: address.absoluteString,
       fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued,
-      automatic: automatic, plainURL: plain)
+      automatic: automatic, plainURL: plain, ahead: ahead)
     try store.put(entry)
     emit(entry)
     begin(entry)

@@ -89,6 +89,50 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertTrue(try finish(store, "a").automatic)
   }
 
+  func testTheAheadFlagSurvivesARestartAndFinishingAndAnOldIndexMeansFalse() throws {
+    let store = try DownloadStore(root: root)
+    var ahead = entry("a", .queued)
+    ahead.automatic = true
+    ahead.ahead = true
+    try store.put(ahead)
+    try store.put(entry("b", .queued))
+    let reopened = try DownloadStore(root: root)
+    XCTAssertEqual(reopened.entry(for: "a")?.ahead, true)
+    XCTAssertEqual(reopened.entry(for: "b")?.ahead, false)
+    XCTAssertTrue(try finish(reopened, "a").ahead)
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "a")?.ahead, true)
+
+    // An index from before the flag existed.
+    let old = """
+      {"version":1,"entries":[{"episodeId":"c","url":"https://x.example/c.mp3",\
+      "fileExtension":"mp3","state":{"kind":"queued"},"updatedAt":"2026-11-17T10:00:00Z",\
+      "automatic":true}]}
+      """
+    try Data(old.utf8).write(to: root.appendingPathComponent("index.json"))
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "c")?.ahead, false)
+  }
+
+  func testClearingTheAheadFlagChangesNothingElse() throws {
+    let store = try DownloadStore(root: root)
+    var ahead = entry("a", .queued)
+    ahead.automatic = true
+    ahead.ahead = true
+    try store.put(ahead)
+    try store.put(entry("b", .queued))
+    let done = try finish(store, "a")
+
+    let cleared = try store.clearAhead(episodeId: "a")
+    XCTAssertEqual(cleared?.ahead, false)
+    var expected = done
+    expected.ahead = false
+    XCTAssertEqual(cleared, expected)
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "a"), expected)
+    // One that is not ahead, or not there, is left alone.
+    XCTAssertNil(try store.clearAhead(episodeId: "b"))
+    XCTAssertNil(try store.clearAhead(episodeId: "nope"))
+    XCTAssertEqual(store.entry(for: "b")?.ahead, false)
+  }
+
   func testAnIndexThatCannotBeReadIsSetAsideAndTheStoreStartsEmpty() throws {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     try Data("not json".utf8).write(to: root.appendingPathComponent("index.json"))
