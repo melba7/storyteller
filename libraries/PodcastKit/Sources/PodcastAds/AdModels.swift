@@ -9,8 +9,8 @@ public enum AdKind: String, Codable, Sendable, Equatable {
   case ownPlug
 }
 
-/// How sure the detector is. Sure ads are skipped, unsure ones are only listed and guesses are
-/// dropped by the clean-up.
+/// How sure the detector is. Sure and unsure ads are skipped (the listener can undo a skip) and
+/// guesses are dropped by the clean-up.
 public enum AdConfidence: String, Codable, Sendable, Equatable, Comparable {
   case guess
   case unsure

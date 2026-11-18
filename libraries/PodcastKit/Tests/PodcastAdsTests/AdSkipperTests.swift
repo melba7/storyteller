@@ -130,13 +130,20 @@ final class AdSkipperTests: XCTestCase {
 
   // MARK: What is skipped
 
-  func testOnlySureAdsAreSkipped() {
+  func testSureAndUnsureAdsAreSkippedButNotGuesses() {
     let skipper = skipper([ad(100, 160, .unsure), ad(200, 260, .guess), ad(300, 360, .sure)])
-    XCTAssertEqual(skipper.ads.map(\.start), [300])
+    XCTAssertEqual(skipper.ads.map(\.start), [100, 300])
   }
 
-  func testAnUnsureAdIsNotSkippedWhenReached() {
+  func testAnUnsureAdIsSkippedWhenReached() {
     var skipper = skipper([ad(100, 160, .unsure)])
+    XCTAssertEqual(skipper.boundaryTimes, [100])
+    XCTAssertEqual(skipper.reached(position: 100.1, rate: 1, duration: 1000, now: 0)?.target, 160)
+  }
+
+  func testAnUndoneUnsureAdIsNotSkippedAgain() {
+    let undone = [UndoneAd(start: 100, end: 160)]
+    var skipper = skipper([ad(100, 160, .unsure)], undone: undone)
     XCTAssertTrue(skipper.boundaryTimes.isEmpty)
     XCTAssertNil(skipper.reached(position: 100.1, rate: 1, duration: 1000, now: 0))
   }

@@ -59,7 +59,7 @@ public struct AdSkipper: Sendable {
   /// An ad that starts this close to where the one before ends is skipped with it.
   static let chainGap = 0.5
 
-  /// The ads sure enough to skip and not undone before, whatever the switches say.
+  /// The sure and unsure ads that were not undone before, whatever the switches say.
   private var candidates: [FoundAd]
   public private(set) var settings: AdSkipSettings
   /// Where the playhead was put last, and the ads it landed in.
@@ -68,8 +68,9 @@ public struct AdSkipper: Sendable {
   private var undone: Set<Double> = []
   private var last: (skip: AdSkip, at: Double)?
 
-  /// - Parameter file: the episode's ads file, nil when it has none. Only sure ads that the
-  ///   listener did not undo before are ever skipped; unsure ones are only listed.
+  /// - Parameter file: the episode's ads file, nil when it has none. Sure and unsure ads that
+  ///   the listener did not undo before are skipped (Undo takes a wrong skip back for good);
+  ///   guesses are never in the file.
   public init(file: AdsFile?, settings: AdSkipSettings) {
     self.settings = settings
     candidates = Self.candidates(in: file)
@@ -77,7 +78,7 @@ public struct AdSkipper: Sendable {
 
   private static func candidates(in file: AdsFile?) -> [FoundAd] {
     (file?.ads ?? []).filter { ad in
-      ad.confidence == .sure && file?.isUndone(ad) == false && ad.end > ad.start
+      ad.confidence >= .unsure && file?.isUndone(ad) == false && ad.end > ad.start
     }.sorted { $0.start < $1.start }
   }
 
