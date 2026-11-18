@@ -23,6 +23,14 @@ final class EpisodeShowsTests: XCTestCase {
     XCTAssertEqual(again.show(for: "ep2"), "show-b")
   }
 
+  func testTheNotesAreSavedEvenWhenTheirFolderDoesNotExistYet() throws {
+    let nested = url.deletingLastPathComponent().appendingPathComponent("new/Podcasts")
+      .appendingPathComponent("episode-shows.json")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: nested.deletingLastPathComponent().path))
+    EpisodeShows(url: nested).remember("show-a", for: "ep1")
+    XCTAssertEqual(EpisodeShows(url: nested).show(for: "ep1"), "show-a")
+  }
+
   func testAMissingOrEmptyShowLeavesWhatWasNoted() {
     let shows = EpisodeShows(url: url)
     shows.remember("show-a", for: "ep1")

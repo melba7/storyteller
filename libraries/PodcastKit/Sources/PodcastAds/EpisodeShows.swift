@@ -43,6 +43,9 @@ public final class EpisodeShows: @unchecked Sendable {
       notes.removeAll { $0.episode == episodeId }
       notes.append(Note(episode: episodeId, show: show))
       if notes.count > Self.most { notes.removeFirst(notes.count - Self.most) }
+      // The folder may not exist yet (the first note of a new install), as in KnownAds.save.
+      try? FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
       if let data = try? JSONEncoder().encode(notes) { try? data.write(to: url, options: .atomic) }
     }
   }
