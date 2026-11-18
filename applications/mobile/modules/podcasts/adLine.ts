@@ -3,7 +3,7 @@
 // The one quiet line in the player that says how ad finding is going for the episode that
 // plays. Plain rules over what Swift reports; the texts of the ads and the transcript come
 // from ads.ts and transcripts.ts.
-import { adsStatus } from "./ads"
+import { AD_CHECK_PAUSED, SEARCH_STOPPED, adsStatus } from "./ads"
 import type { AdsInfo, DownloadInfo, TranscriptInfo } from "./index"
 import { isLocalEpisodeId } from "./localFiles"
 import { isPreviewId } from "./preview"
@@ -12,13 +12,6 @@ import { transcriptStatus } from "./transcripts"
 const READY = "Getting ready to find ads"
 const STREAMING = "Streaming without ad skipping"
 const CHECKING = "Checking the start for ads"
-/** A failure of this episode's own search: it is asked again by itself, so nothing is wrong. */
-const PAUSED = "Ad check paused. Trying again soon"
-/**
- * How the words for such a failure start (`PodcastAdFinder.reason(for:)` in Swift). The rest
- * of them is for the log, not for a line that has room for one row.
- */
-const SEARCH_STOPPED = "Finding ads stopped:"
 
 function cannot(reason: string): string {
   return reason === "" ? "Ads can't be found" : `Ads can't be found: ${reason}`
@@ -63,7 +56,7 @@ export function playerAdLine(input: {
   if (ads?.state === "unavailable") {
     const reason = ads.reason ?? ""
     // The reasons that belong to the phone ("Apple Intelligence is off") keep their words.
-    return reason.startsWith(SEARCH_STOPPED) ? PAUSED : cannot(reason)
+    return reason.startsWith(SEARCH_STOPPED) ? AD_CHECK_PAUSED : cannot(reason)
   }
   if (ads?.state === "found" || ads?.state === "noAds") return adsStatus(ads)
   if (transcript?.state === "unsupported" || transcript?.state === "failed") {

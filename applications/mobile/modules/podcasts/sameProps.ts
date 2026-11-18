@@ -65,13 +65,29 @@ export function saysTimeAgo(publishedAt: number | null, now: number): boolean {
 }
 
 /**
- * For the memo of an episode row: the props are the same, and the row does not say how long
- * ago its episode came out (it draws with its list while that is still counting).
+ * Whether an episode's date words may be out of date on a row drawn earlier: it is under two
+ * days old. The words are "23h ago" for the first day and a date after it, but a row is
+ * compared only when new props arrive, so one drawn at 23 h 50 m would keep "23h ago" for hours
+ * past its 24th if this stopped at one day. A second day makes the window longer than the time
+ * such a label can stay stale.
+ */
+export function mayHaveOldDateWords(
+  publishedAt: number | null,
+  now: number,
+): boolean {
+  return saysTimeAgo(publishedAt, now) || saysTimeAgo(publishedAt, now - DAY_MS)
+}
+
+/**
+ * For the memo of an episode row: the props are the same, and the row's date words cannot be
+ * out of date (a new episode draws with its list while that is still counting, and for a day
+ * after, until the words have turned into a date).
  */
 export function sameRowProps<
   P extends { episode: { publishedAt: number | null } },
 >(before: P, after: P, now: number = Date.now()): boolean {
   return (
-    !saysTimeAgo(after.episode.publishedAt, now) && sameProps(before, after)
+    !mayHaveOldDateWords(after.episode.publishedAt, now) &&
+    sameProps(before, after)
   )
 }

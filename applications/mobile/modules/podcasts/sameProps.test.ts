@@ -265,6 +265,33 @@ describe("the row says how long ago an episode came out", () => {
     expect(sameRowProps(fresh, copy(fresh), NOW)).toBe(false)
   })
 
+  it("keeps drawing a row for a second day, when its words have just turned into a date", () => {
+    // The row was drawn at 23 h 50 m and said "23h ago". The list reads again a minute after the
+    // episode turned 24 h old: the words are now a date, so the row must be drawn again.
+    const turned = {
+      episode: episode({ publishedAt: NOW - 24 * HOUR - 60_000 }),
+      show: show(),
+    }
+    expect(sameRowProps(turned, copy(turned), NOW)).toBe(false)
+    const lateInTheSecondDay = {
+      episode: episode({ publishedAt: NOW - 47 * HOUR }),
+      show: show(),
+    }
+    expect(
+      sameRowProps(lateInTheSecondDay, copy(lateInTheSecondDay), NOW),
+    ).toBe(false)
+  })
+
+  it("leaves a row alone from the third day on", () => {
+    for (const age of [48 * HOUR, 72 * HOUR]) {
+      const old = {
+        episode: episode({ publishedAt: NOW - age }),
+        show: show(),
+      }
+      expect(sameRowProps(old, copy(old), NOW), `${age} ms old`).toBe(true)
+    }
+  })
+
   it("still tells a changed old row apart", () => {
     const old = { episode: episode({ publishedAt: 1_000 }), show: show() }
     const played = {

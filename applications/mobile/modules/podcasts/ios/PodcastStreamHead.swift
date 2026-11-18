@@ -237,7 +237,8 @@ final class PodcastStreamHead: @unchecked Sendable {
       try await scan(speech, detector)
     } catch is CancellationError {
     } catch {
-      PodcastTimeline.mark(id, "head scan ended: \(error)")
+      // The error's type name and case name for the diary, not its words.
+      PodcastTimeline.mark(id, "head scan ended: \(AdDiary.note(for: error))")
     }
     await speech.finish()
   }

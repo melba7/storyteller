@@ -5,8 +5,8 @@ way a listener does: open Podcasts, play an episode, tap the small player, swipe
 the big player down. They are how the player bug (the page that shows twice and
 then cannot be opened) and the "needs several taps" bug are checked without a
 phone. The tool is [Maestro](https://docs.maestro.dev). It drives the finished
-app from outside, so nothing is added to the app and `package.json` does not
-change.
+app from outside, so nothing is added to the app. Building the app for it does
+touch `applications/mobile/package.json` for a while; see "Run it on Mo's Mac".
 
 ## The four flows
 
@@ -99,6 +99,15 @@ identity, no `APP_VARIANT`), runs `pod install` and builds the Release app for
 this Mac's chip into `~/Storyteller Lofi/ui-checks-build`, so the next build is
 incremental. Its log is `build.log` in the results folder.
 
+The first step of the build, `scripts/pre-install.mjs`, rewrites
+`applications/mobile/package.json`: it drops the `@storyteller-platform/web`
+devDependency and the final newline. So `run.sh` copies the file to
+`package.json.before-build` in the results folder before the build and puts it
+back when the script ends, whether the build worked or not (also after Ctrl-C).
+`git status` shows nothing for it afterwards. If the Mac loses power or the
+window is force-quit in the middle of a build, the file stays changed: put it
+back with `git checkout applications/mobile/package.json`.
+
 It saves everything in `~/Storyteller Lofi/logs/ui-checks-<time>/`, outside the
 repository:
 
@@ -183,8 +192,10 @@ kept for 14 days, and the summary is on the run's page.
 checks that every command is one Maestro's documentation lists, that every
 subflow that is called exists, that an id is one of the three above, that every
 id step has its labels step, that the scripts are executable and have no syntax
-error, and that the folder holds no audio, key or `.env` file. It does not run
-Maestro. Only a Mac can do that.
+error, and that the folder holds no audio, key or `.env` file. It also runs
+`run.sh --build` in a made-up checkout with stand-ins for the build tools, and
+checks that `package.json` is put back whether the build works or fails. It does
+not run Maestro. Only a Mac can do that.
 
 ## What was checked against Maestro's documentation
 

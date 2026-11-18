@@ -136,10 +136,26 @@ fi
 SIM_LABEL="$(xcrun simctl list devices available | grep "$UDID" | head -n 1 | sed 's/^ *//; s/ ([0-9A-Fa-f-]*).*$//')"
 
 # --- The app ------------------------------------------------------------------------------
+# The build's first step (pre-install.mjs) rewrites applications/mobile/package.json in place: it
+# drops the web devDependency and the final newline. The file is copied to the results folder
+# before the build and put back when the script ends, whether the build worked or not (an EXIT
+# trap also runs after Ctrl-C), so a checkout is not left changed.
+MANIFEST=""
+MANIFEST_COPY=""
+# shellcheck disable=SC2329  # It is called by the EXIT trap that build_app sets.
+restore_manifest() {
+  [ -n "$MANIFEST_COPY" ] && [ -f "$MANIFEST_COPY" ] && cp -p "$MANIFEST_COPY" "$MANIFEST"
+  return 0
+}
+
 build_app() {
   say "Building the Release app for the simulator. The log is $RESULTS/build.log."
   say "The first build takes longer (20 to 40 minutes); a later one takes about 4 minutes."
   local mobile="$REPO/applications/mobile"
+  MANIFEST="$mobile/package.json"
+  MANIFEST_COPY="$RESULTS/package.json.before-build"
+  cp -p "$MANIFEST" "$MANIFEST_COPY" || stop "Could not save a copy of $MANIFEST before the build." 2
+  trap restore_manifest EXIT
   (
     set -e
     cd "$REPO"

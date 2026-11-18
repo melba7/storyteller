@@ -6,7 +6,19 @@
 // Run: node --test 'tools/fork/ui-checks/*.test.mjs'
 import assert from "node:assert/strict"
 import { spawnSync } from "node:child_process"
-import { existsSync, readFileSync, readdirSync, statSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs"
+import { tmpdir } from "node:os"
 import { dirname, extname, join, relative, resolve } from "node:path"
 import { test } from "node:test"
 import { fileURLToPath } from "node:url"
@@ -168,6 +180,97 @@ test("run.sh knows the same flows as the folder", () => {
   assert.ok(line, "run.sh has no ALL_FLOWS line")
   assert.deepEqual(line[1].split(" "), FLOWS)
 })
+
+/**
+ * Runs run.sh --build in a made-up checkout where every tool is a stub. The stub for pre-install
+ * rewrites package.json the way the real script does, and the `yarn` stub fails when told to.
+ */
+function runBuild(yarnFails) {
+  // The folder `scratchPath()` in libraries/fs would give (this file does not depend on it).
+  const scratch =
+    // oxlint-disable-next-line storyteller/no-tmpdir
+    process.env["STORYTELLER_SCRATCH_DIR"] || tmpdir()
+  const root = mkdtempSync(join(scratch, "ui-checks-build-"))
+  try {
+    const checkout = join(root, "repo")
+    const mobile = join(checkout, "applications/mobile")
+    // run.sh puts this folder (the one Maestro's installer uses) first on the PATH.
+    const bin = join(root, ".maestro/bin")
+    const results = join(root, "results")
+    mkdirSync(join(checkout, "tools/fork/ui-checks"), { recursive: true })
+    mkdirSync(join(checkout, "tools/fork"), { recursive: true })
+    mkdirSync(join(mobile, "scripts"), { recursive: true })
+    mkdirSync(join(mobile, "ios/App.xcworkspace"), { recursive: true })
+    mkdirSync(bin, { recursive: true })
+    copyFileSync(
+      join(here, "run.sh"),
+      join(checkout, "tools/fork/ui-checks/run.sh"),
+    )
+    const original =
+      '{\n  "name": "mobile",\n  "devDependencies": {\n    "@storyteller-platform/web": "workspace:*"\n  }\n}\n'
+    writeFileSync(join(mobile, "package.json"), original)
+    const stub = (path, body) => {
+      writeFileSync(path, `#!/bin/sh\n${body}\n`)
+      chmodSync(path, 0o755)
+    }
+    stub(join(mobile, "scripts/pre-install.mjs"), `printf '{}' > package.json`)
+    stub(
+      join(bin, "xcrun"),
+      `printf '%s\\n' '== Devices ==' '-- iOS 26.0 --' '    iPhone 17 Pro (AAAAAAAA-0000-0000-0000-000000000000) (Shutdown)'`,
+    )
+    stub(join(bin, "maestro"), "exit 0")
+    for (const name of ["corepack", "pod", "ruby", "xcodebuild"]) {
+      stub(join(bin, name), "exit 0")
+    }
+    // The build sees the rewritten package.json, then fails or goes on.
+    stub(
+      join(bin, "yarn"),
+      `cp "${join(mobile, "package.json")}" "${join(root, "seen.json")}"\n${yarnFails ? "exit 1" : "exit 0"}`,
+    )
+    const run = spawnSync(
+      "bash",
+      [
+        join(checkout, "tools/fork/ui-checks/run.sh"),
+        "--build",
+        "--results",
+        results,
+      ],
+      {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          HOME: root,
+          PATH: `${bin}:${process.env.PATH}`,
+        },
+      },
+    )
+    return {
+      original,
+      run,
+      after: readFileSync(join(mobile, "package.json"), "utf8"),
+      seen: readFileSync(join(root, "seen.json"), "utf8"),
+      kept: existsSync(results) && readdirSync(results),
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+for (const [what, yarnFails] of [
+  ["a build that works", false],
+  ["a build that fails", true],
+]) {
+  test(`run.sh puts package.json back after ${what}`, () => {
+    const { original, run, after, seen, kept } = runBuild(yarnFails)
+    // The build did change the file, so the check below means something.
+    assert.notEqual(seen, original, run.stdout + run.stderr)
+    assert.equal(after, original, run.stdout + run.stderr)
+    // Both runs end early (no app to check), so the exit code is "could not run".
+    assert.equal(run.status, 2, run.stdout + run.stderr)
+    // The copy of the file is kept in the results folder.
+    assert.ok(kept && kept.includes("package.json.before-build"), String(kept))
+  })
+}
 
 test("the folder holds no audio, keys or .env files", () => {
   for (const file of allFiles(here)) {
