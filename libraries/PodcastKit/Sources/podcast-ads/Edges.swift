@@ -4,9 +4,11 @@
 // The trace comes from AdCleanup.explain on the answers the model gave for each piece, so it is
 // what the app does. With an MP3 file it also checks the file's frames for the kind of bitrate
 // that makes Apple's player seek to the wrong place (PodcastAudioMatch.SeekDrift), and compares
-// the duration the player is given (the app does not set the precise-timing option) with the
-// decoded one. The transcript's word times are described too, and that part needs no model, so
-// it works for a transcript file where there is no Apple Intelligence.
+// the duration the player is given with the decoded one. The duration is read without the
+// precise-timing option, as the app opens a stream; a downloaded file is opened with
+// AVURLAssetPreferPreciseDurationAndTimingKey (E5a), which makes iOS read the frame table. The
+// transcript's word times are described too, and that part needs no model, so it works for a
+// transcript file where there is no Apple Intelligence.
 import Foundation
 import PodcastAds
 import PodcastAdsOnDevice
