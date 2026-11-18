@@ -102,3 +102,15 @@ One line per lesson.
   changes a function's signature (`StartHold.wanted`, `sponsors`) needs every
   caller and test checked, because only Mac CI compiles the iOS module
   (2026-11-18).
+- Only a Mac compiles `modules/podcasts/ios`. Before pushing, grep each new or
+  changed file there for PodcastKit type names whose module it does not import:
+  `AdHeadRules` without `import PodcastAds` broke the first archive of build
+  31.1 (2026-11-18, found on Mo's Mac after GitHub's Macs were full).
+- Apple's model errors change between iOS versions: classify an unknown error by
+  type, case and a short word list instead of catching only the types we know,
+  or one new error stops a whole pass (2026-11-18).
+- Read the native sheet code before wiring navigation events: a cancelled swipe
+  sends `gestureCancel`, not `transitionEnd` (2026-11-18, found by Sonnet and
+  confirmed by Opus).
+- `yarn oxfmt` on one file does not sort imports, but `check.sh` formats
+  directories and does: run it on the directories (2026-11-18).
