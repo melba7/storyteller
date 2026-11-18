@@ -5,7 +5,9 @@
 // the 500-line cap, the file's text) are `SkipWatch` and `SkipLog` in PodcastAds. The file stays
 // on the phone and nothing is sent by this code: it only makes a copy in the caches folder when
 // the listener taps "Send skip log" in Profile, for the share sheet. The words come from the
-// episode's transcript, so the file is never committed.
+// episode's transcript, so the file is never committed. The ad finder's diary (`AdDiary` in
+// PodcastAds, `ad-diary.jsonl` beside the log) is written here too, on the same queue, and its
+// lines join the copy that is sent. It holds no words of the episode.
 
 import Foundation
 import PodcastAds
@@ -119,15 +121,47 @@ enum SkipLogFile {
     }
   }
 
+  /// The ad finder's diary, beside the skip log.
+  static var diaryURL: URL {
+    SkipLogFile.url.deletingLastPathComponent().appendingPathComponent(AdDiary.fileName)
+  }
+
+  private static func read(_ file: URL) -> String {
+    (try? String(contentsOf: file, encoding: .utf8)) ?? ""
+  }
+
+  /// Adds one line to the ad finder's diary and keeps the newest 500. It is written on the skip
+  /// log's queue, so a mark never makes the caller wait (the main thread calls it too). A step
+  /// that says what the last line says is not written again.
+  static func appendDiary(_ episodeId: String, _ what: String) {
+    let line = AdDiary.line(at: Date().timeIntervalSince1970, episodeId: episodeId, what: what)
+    queue.async {
+      let file = SkipLogFile.diaryURL
+      let before = SkipLogFile.read(file)
+      let text = AdDiary.appending(line, to: before)
+      guard text != AdDiary.trimmed(before) else { return }
+      do {
+        try FileManager.default.createDirectory(
+          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(text.utf8).write(to: file, options: .atomic)
+      } catch {
+        NSLog("Podcasts: the ad diary could not be saved: \(error)")
+      }
+    }
+  }
+
   /// A copy of the log in the caches folder, for the share sheet (the sharing code reads only
-  /// the app's own document and caches folders). Nil when nothing is logged yet.
+  /// the app's own document and caches folders). It holds the skip lines and then the ad
+  /// finder's diary lines. Nil when nothing is logged yet.
   static func copyForSharing() -> URL? {
     queue.sync { () -> URL? in
-      guard let data = try? Data(contentsOf: SkipLogFile.url), !data.isEmpty else { return nil }
+      let text = AdDiary.shared(
+        skipLog: SkipLogFile.read(SkipLogFile.url), diary: SkipLogFile.read(SkipLogFile.diaryURL))
+      guard !text.isEmpty else { return nil }
       let copy = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("skip-log.jsonl")
       do {
-        try data.write(to: copy, options: .atomic)
+        try Data(text.utf8).write(to: copy, options: .atomic)
         return copy
       } catch {
         NSLog("Podcasts: the skip log could not be copied: \(error)")

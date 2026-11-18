@@ -354,7 +354,8 @@ final class PodcastStreamHead: @unchecked Sendable {
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
           save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
         } catch {
-          PodcastTimeline.mark(episodeId, "model: no answer (\(error))")
+          // The error's type name and case name for the diary, not its words.
+          PodcastTimeline.mark(episodeId, "model: no answer (\(AdDiary.note(for: error)))")
         }
         // The next model step gets a session that is made and asked to prewarm now.
         if Self.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }

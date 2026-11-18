@@ -202,6 +202,7 @@ final class PodcastAdFinder: @unchecked Sendable {
       let (ads, transcripts) = stores(for: id, in: downloads)
     else { return }
     guard let transcript = transcripts.loadTranscript() else {
+      PodcastTimeline.mark(id, "full pass: the transcript could not be read")
       return fail(id, "The transcript could not be read")
     }
     set(id, .finding(percent: 0))
@@ -211,6 +212,7 @@ final class PodcastAdFinder: @unchecked Sendable {
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         progress: { [weak self] done, total in
           guard let self else { return }
+          if done == 0 { PodcastTimeline.mark(id, "full pass started: \(total) pieces") }
           set(id, .finding(percent: AdsRules.percent(done: done, total: total)))
           // Each piece is saved as a partial file: the playing episode skips its ads at once.
           if lock.withLock({ urgent == id }) {
@@ -224,6 +226,8 @@ final class PodcastAdFinder: @unchecked Sendable {
         // Chapters named like an ad break (with words that sell inside) add to what was found.
         let file = await withChapterAds(id, ads: ads, finished: found, transcript: transcript)
         set(id, AdsRules.finished(file))
+        PodcastTimeline.mark(
+          id, "full pass ended: \(file.ads.count) ads, \(file.refusedPieces ?? 0) pieces refused")
         // The sure ads are remembered by their words, so a repeat is found at once.
         learnRemembered(id, ads: ads, finished: file, transcript: transcript)
         // The words the show opens with are learned from the episode's first minutes.
@@ -231,14 +235,19 @@ final class PodcastAdFinder: @unchecked Sendable {
         // An episode that is playing now starts skipping the new ads.
         Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
       case .stopped:
+        PodcastTimeline.mark(id, "full pass stopped to make way")
         pause(id)
       }
     } catch AdDetectorError.unavailable(let reason) {
+      PodcastTimeline.mark(id, "full pass failed: model unavailable, \(reason.reason)")
       fail(id, reason.reason, retry: reason.passesByItself)
     } catch is CancellationError {
+      PodcastTimeline.mark(id, "full pass cancelled")
       pause(id)
     } catch {
       if downloads.entry(for: id) == nil { return removed(id) }
+      // The error's type name and case name, not its words.
+      PodcastTimeline.mark(id, "full pass failed: \(AdDiary.note(for: error))")
       fail(id, Self.reason(for: error))
     }
   }
@@ -256,6 +265,8 @@ final class PodcastAdFinder: @unchecked Sendable {
   /// Shows why this episode's ads could not be found, and asks again after a growing wait, a
   /// few times (PodcastAdFinder+Retry.swift). `retry` is false when waiting cannot help.
   private func fail(_ id: String, _ reason: String, retry: Bool = true) {
+    PodcastTimeline.mark(
+      id, retry ? "ad finding failed, will try again" : "ad finding failed, will not try again")
     lock.withLock { failures[id] = reason }
     set(id, .notPossible(reason: reason))
     if retry { retryLater(id) }

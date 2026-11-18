@@ -123,6 +123,23 @@ final class AdModelFailureTests: XCTestCase {
     }
   }
 
+  func testAFailureMadeOfAnErrorKeepsItsNamesAtTheEndOfItsText() {
+    guard case .failed(let text) = AdModelFailure.classify(DiaryFakeError.rateLimited("x")) else {
+      return XCTFail("a rate limit is a failure")
+    }
+    let names = AdModelFailure.namesIn(text)
+    XCTAssertEqual(names?.caseName, "rateLimited")
+    XCTAssertEqual(names?.typeName, "PodcastAdsTests.DiaryFakeError")
+    // Text that only looks like names gives none.
+    XCTAssertNil(AdModelFailure.namesIn("Timed out"))
+    XCTAssertNil(AdModelFailure.namesIn("Timed out [model error: some words]"))
+    XCTAssertNil(AdModelFailure.namesIn("Timed out [model error: Module.Type two words]"))
+    // The text that the rules decide on is not changed by them.
+    XCTAssertEqual(
+      AdModelFailure.classify(typeName: modelType, caseName: "timeout", text: "Timed out"),
+      .failed("Timed out"))
+  }
+
   func testTheNamesAreAvailableForTheDiary() {
     let names = AdModelFailure.names(of: PayloadModelError.refusal("why"))
     XCTAssertEqual(names.caseName, "refusal")

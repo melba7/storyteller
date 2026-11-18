@@ -13,12 +13,44 @@ public enum AdModelFailure {
   /// purpose: a wider list would turn a real fault into a "refusal" and hide it.
   static let refusalWords = ["refus", "guardrail", "sensitive"]
 
-  /// The error as one of ours. An `AdDetectorError` comes back unchanged.
+  /// The error as one of ours. An `AdDetectorError` comes back unchanged. A failure that is
+  /// made of the error carries the error's type name and case name at the end of its text
+  /// (`namesIn` reads them), so the ad finder's diary can say what the model threw.
   public static func classify(_ error: Error) -> AdDetectorError {
     if let ours = error as? AdDetectorError { return ours }
     let found = names(of: error)
-    return classify(
+    let result = classify(
       typeName: found.typeName, caseName: found.caseName, text: error.localizedDescription)
+    guard case .failed(let text) = result, isTypeName(found.typeName), isName(found.caseName)
+    else { return result }
+    return .failed("\(text)\(tailStart)\(found.typeName) \(found.caseName)]")
+  }
+
+  private static let tailStart = " [model error: "
+
+  /// The type name and case name that `classify(_:)` put at the end of a failure's text, or nil
+  /// when the text has none (or something that only looks like it).
+  public static func namesIn(_ text: String) -> (typeName: String, caseName: String)? {
+    guard text.hasSuffix("]"), let start = text.range(of: tailStart, options: .backwards) else {
+      return nil
+    }
+    let inside = text[start.upperBound..<text.index(before: text.endIndex)]
+    let parts = inside.split(separator: " ", omittingEmptySubsequences: false)
+    guard parts.count == 2, isTypeName(String(parts[0])), isName(String(parts[1])) else {
+      return nil
+    }
+    return (String(parts[0]), String(parts[1]))
+  }
+
+  /// A type name as `String(reflecting:)` writes it: a module, a dot and the type, in letters,
+  /// digits and underscores.
+  private static func isTypeName(_ text: String) -> Bool {
+    text.first?.isUppercase == true && text.contains(".")
+      && text.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" || $0 == "." }
+  }
+
+  private static func isName(_ text: String) -> Bool {
+    !text.isEmpty && text.allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
   }
 
   /// The error from its names. The case name decides when it is one of the known cases. The

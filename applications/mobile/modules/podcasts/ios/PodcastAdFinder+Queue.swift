@@ -88,6 +88,11 @@ extension PodcastAdFinder {
     guard let partial = transcripts.loadPartial() ?? (isPlaying ? nil : wholeAsPartial(transcripts))
     else { return }
     let step = PrepStep(id: id, stage: .head)
+    // Later passes are noted only when what they say changes (the diary drops a repeat).
+    if ads.loadPartial(detector: Self.detectorName) == nil {
+      PodcastTimeline.mark(
+        id, "first partial pass started: \(isPlaying ? "playing episode" : "head only")")
+    }
     do {
       let outcome = try await AdsRunner.runPartial(
         partial: partial, detector: detector, store: ads,
@@ -95,7 +100,9 @@ extension PodcastAdFinder {
         limit: isPlaying ? nil : PrepRules.headSeconds,
         shouldContinue: { [weak self] in self?.mayContinue(step) ?? false })
       switch outcome {
-      case .finished:
+      case .finished(let found):
+        PodcastTimeline.mark(
+          id, "partial pass: \(found.ads.count) ads, \(found.refusedPieces ?? 0) pieces refused")
         lock.withLock { partialFailures[id] = nil }
         // The ads the phone remembers join what the model found, in the stretch it looked at.
         let head = PrepRules.headSeconds
@@ -106,16 +113,20 @@ extension PodcastAdFinder {
         // The player hears the new ranges of the episode it plays at once.
         if isPlaying { Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() } }
       case .stopped:
+        PodcastTimeline.mark(id, "partial pass stopped to make way")
         // Stopped to make way or because the app left the screen: ask again when it can.
         if !mayContinue(step) { lock.withLock { _ = partialWanted.insert(id) } }
       }
     } catch is CancellationError {
+      PodcastTimeline.mark(id, "partial pass cancelled")
       lock.withLock { _ = partialWanted.insert(id) }
     } catch AdDetectorError.unavailable(let reason) {
+      PodcastTimeline.mark(id, "partial pass failed: model unavailable, \(reason.reason)")
       lock.withLock { partialFailures[id] = reason.reason }
       scan()
     } catch {
       NSLog("Podcasts: ads in the transcript so far could not be checked: \(error)")
+      PodcastTimeline.mark(id, "partial pass failed: \(AdDiary.note(for: error))")
       lock.withLock { partialFailures[id] = Self.reason(for: error) }
       scan()
     }
