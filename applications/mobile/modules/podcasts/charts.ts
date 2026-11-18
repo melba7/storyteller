@@ -213,40 +213,48 @@ export const FETCH_TIMEOUT_MS = 12_000
 
 /**
  * Reads one address as JSON. A network that hangs (a captive Wi-Fi, one bar) would otherwise
- * keep every list waiting for the system's own 60 s limit, group after group.
+ * keep every list waiting for the system's own 60 s limit, group after group. The one limit
+ * covers the answer's headers and its body, so a body that stalls is cut off too.
  */
 export async function getJson(
   url: string,
   fetchFn: FetchFn,
   timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<unknown> {
-  let response: Response
   const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
+  // The timer also rejects, so a fetch or a body that ignores the abort signal can't hang us.
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error("timeout"))
+    }, timeoutMs)
+  })
+  // Whichever of the two loses the race must not become an unhandled rejection.
+  timeout.catch(() => {})
   try {
-    // The timer also rejects, so a fetch that ignores the abort signal can't hang us.
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => {
-        controller.abort()
-        reject(new Error("timeout"))
-      }, timeoutMs)
-    })
-    response = await Promise.race([
-      fetchFn(url, { signal: controller.signal }),
-      timeout,
-    ])
-  } catch {
-    throw new Error("Couldn't reach Apple's charts. Check your connection.")
+    let response: Response
+    try {
+      response = await Promise.race([
+        fetchFn(url, { signal: controller.signal }),
+        timeout,
+      ])
+    } catch {
+      throw new Error("Couldn't reach Apple's charts. Check your connection.")
+    }
+    if (!response.ok) {
+      throw new Error(`Apple's charts answered with status ${response.status}.`)
+    }
+    try {
+      return await Promise.race([response.json() as Promise<unknown>, timeout])
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === "timeout") {
+        throw new Error("Couldn't reach Apple's charts. Check your connection.")
+      }
+      throw new Error("Apple's charts sent an answer that couldn't be read.")
+    }
   } finally {
     clearTimeout(timer)
-  }
-  if (!response.ok) {
-    throw new Error(`Apple's charts answered with status ${response.status}.`)
-  }
-  try {
-    return await response.json()
-  } catch {
-    throw new Error("Apple's charts sent an answer that couldn't be read.")
   }
 }
 

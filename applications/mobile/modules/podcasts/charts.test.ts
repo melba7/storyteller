@@ -325,6 +325,26 @@ describe("getJson's timeout", () => {
     }
   })
 
+  it("rejects when the headers arrive but the body never does", async () => {
+    vi.useFakeTimers()
+    try {
+      const hangingBody = async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: () => new Promise(() => {}),
+        }) as Response
+      const result = getJson("https://x.test/a", hangingBody).then(
+        () => "answered",
+        (error: Error) => error.message,
+      )
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toMatch(/Couldn't reach Apple's charts/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it("lets loadChart fall back on the kept copy when the fetch hangs", async () => {
     vi.useFakeTimers()
     try {

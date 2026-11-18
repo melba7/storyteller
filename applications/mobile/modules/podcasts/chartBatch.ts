@@ -216,3 +216,29 @@ export function startListStates<T extends { status: string }>(
   }
   return next
 }
+
+/** What `useChart` holds for one chart. */
+export type ChartLoad<T> = {
+  chart: string
+  data: T | undefined
+  loading: boolean
+  error: string | null
+}
+
+/**
+ * The state a round of loading one chart starts from. Another chart starts empty and loading.
+ * The same chart keeps what is on screen: its copy, or its error. A round that is not quiet
+ * (the first, a button, pull to refresh) clears the error and shows the spinner when there is
+ * no copy. A quiet one (the screen was returned to) leaves an error on screen until an answer
+ * arrives, so an offline page does not turn into a spinner each time it is returned to.
+ */
+export function startChartLoad<T>(
+  before: ChartLoad<T>,
+  chart: string,
+  quiet: boolean,
+): ChartLoad<T> {
+  if (before.chart !== chart)
+    return { chart, data: undefined, loading: true, error: null }
+  if (quiet && !before.data && before.error) return before
+  return { ...before, loading: !before.data, error: null }
+}

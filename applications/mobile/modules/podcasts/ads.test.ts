@@ -303,6 +303,33 @@ describe("unavailableReason", () => {
     expect(unavailableReason(both)).toBe("The model is downloading")
   })
 
+  it("shows only the phone-wide reasons", () => {
+    for (const reason of [
+      "Apple Intelligence is off",
+      "The model is downloading",
+      "This iPhone can't run Apple Intelligence",
+      "Needs iOS 26",
+      "Apple Intelligence is not available",
+    ]) {
+      expect(
+        unavailableReason(adsMapFromList([info("unavailable", { reason })])),
+      ).toBe(reason)
+    }
+  })
+
+  it("treats any other reason as one episode's failure", () => {
+    for (const reason of [
+      "The transcript could not be read",
+      "The model refused this episode",
+      "Finding ads stopped: The model failed.",
+    ]) {
+      expect(
+        unavailableReason(adsMapFromList([info("unavailable", { reason })])),
+      ).toBeNull()
+    }
+    expect(unavailableReason(adsMapFromList([info("unavailable")]))).toBeNull()
+  })
+
   it("is null when ads can be found", () => {
     expect(unavailableReason(adsMapFromList([info("noAds")]))).toBeNull()
     expect(unavailableReason({})).toBeNull()

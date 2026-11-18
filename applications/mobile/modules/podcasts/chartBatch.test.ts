@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import {
   applyListEvent,
+  startChartLoad,
   startListStates,
   loadChartGroups,
   keptChart,
@@ -304,5 +305,42 @@ describe("startListStates", () => {
       false,
     )
     expect(next).toEqual({ a: missing, b: ready, c: loading })
+  })
+})
+
+describe("startChartLoad", () => {
+  const failed = {
+    chart: "top",
+    data: undefined,
+    loading: false,
+    error: "Couldn't reach Apple's charts.",
+  }
+
+  it("keeps the error on screen when a quiet round starts", () => {
+    expect(startChartLoad(failed, "top", true)).toEqual(failed)
+  })
+
+  it("shows the spinner again when the person asked", () => {
+    expect(startChartLoad(failed, "top", false)).toEqual({
+      chart: "top",
+      data: undefined,
+      loading: true,
+      error: null,
+    })
+  })
+
+  it("keeps a copy on screen either way", () => {
+    const shown = { chart: "top", data: [1], loading: false, error: null }
+    expect(startChartLoad(shown, "top", true)).toEqual(shown)
+    expect(startChartLoad(shown, "top", false)).toEqual(shown)
+  })
+
+  it("starts another chart empty", () => {
+    expect(startChartLoad(failed, "1301", true)).toEqual({
+      chart: "1301",
+      data: undefined,
+      loading: true,
+      error: null,
+    })
   })
 })

@@ -9,7 +9,7 @@ import {
   forYouKey,
   pickForYou,
 } from "@/modules/podcasts/categories"
-import { keptChart } from "@/modules/podcasts/chartBatch"
+import { keptChart, startChartLoad } from "@/modules/podcasts/chartBatch"
 import { type ChartShow, loadChart } from "@/modules/podcasts/charts"
 import { cacheGet, cachePut } from "@/modules/podcasts/dbFeeds"
 import { readableError } from "@/modules/podcasts/nativeError"
@@ -34,15 +34,12 @@ export function useChart(chart: string): Query<ChartShow[]> & {
     loading: true,
     error: null,
   })
-  const [round, setRound] = useState(0)
+  // `quiet` is a round started by returning to the screen: an error stays on screen meanwhile.
+  const [round, setRound] = useState({ n: 0, quiet: false })
   useEffect(() => {
     let current = true
     // Another chart starts empty; a retry of the same chart keeps its copy on screen.
-    setState((before) =>
-      before.chart === chart
-        ? { ...before, loading: !before.data, error: null }
-        : { chart, data: undefined, loading: true, error: null },
-    )
+    setState((before) => startChartLoad(before, chart, round.quiet))
     keptChart(chart, store).then((kept) => {
       if (!current || !kept) return
       setState((before) =>
@@ -73,11 +70,14 @@ export function useChart(chart: string): Query<ChartShow[]> & {
   const opened = useRef(false)
   useFocusEffect(
     useCallback(() => {
-      if (opened.current) setRound((r) => r + 1)
+      if (opened.current) setRound((r) => ({ n: r.n + 1, quiet: true }))
       opened.current = true
     }, []),
   )
-  const retry = useCallback(() => setRound((r) => r + 1), [])
+  const retry = useCallback(
+    () => setRound((r) => ({ n: r.n + 1, quiet: false })),
+    [],
+  )
   if (state.chart !== chart)
     return { data: undefined, loading: true, error: null, retry }
   return { data: state.data, loading: state.loading, error: state.error, retry }

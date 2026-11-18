@@ -71,19 +71,29 @@ export function adsStatus(info: AdsInfo | undefined): string {
   }
 }
 
-/** How the reason of one episode's own failed run starts (PodcastAdFinder+Retry.swift). */
-const EPISODE_FAILURE_PREFIX = "Finding ads stopped"
+/**
+ * The reasons that belong to the phone, as `AdUnavailable.reason` in PodcastAds writes them
+ * (and the Swift that passes them on): Apple Intelligence off, not supported, the model not
+ * ready or downloading, iOS too old, and the system's catch-all. Any other reason is one
+ * episode's own failure ("The transcript could not be read", "Finding ads stopped: ...").
+ */
+const PHONE_REASONS: readonly string[] = [
+  "Apple Intelligence is off",
+  "The model is downloading",
+  "This iPhone can't run Apple Intelligence",
+  "Needs iOS 26",
+  "Apple Intelligence is not available",
+]
 
 /**
  * Why ads can't be found on this phone, when any episode says so ("Apple Intelligence is
- * off"), else null. The reason belongs to the phone, not the episode, so one is enough. One
- * episode's own failure ("Finding ads stopped: ...") is not the phone's reason.
+ * off"), else null. The reason belongs to the phone, not the episode, so one is enough. Only
+ * the phone-wide reasons count; the rest is one episode's failure.
  */
 export function unavailableReason(map: AdsMap): string | null {
   for (const info of Object.values(map)) {
     if (info.state !== "unavailable") continue
-    if (info.reason?.startsWith(EPISODE_FAILURE_PREFIX)) continue
-    return info.reason ?? "Ads can't be found"
+    if (info.reason && PHONE_REASONS.includes(info.reason)) return info.reason
   }
   return null
 }
