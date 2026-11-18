@@ -431,13 +431,29 @@ export function createPlayback(deps: PlaybackDeps) {
     )
   }
 
-  /** Play or pause. An episode only remembered after a restart is loaded first. */
-  async function togglePlayPause() {
+  /**
+   * Plays, and never pauses: for a tap that means "play from here" (a chapter, a transcript
+   * line). An episode only remembered after a restart is loaded first.
+   */
+  async function play() {
     const { episode, show, loaded, isPlaying } = view
     if (!episode) return
     if (!loaded) return playEpisode(episode, show)
-    if (isPlaying) await run(() => native().pause())
-    else await run(() => native().play())
+    if (!isPlaying) await run(() => native().play())
+  }
+
+  /**
+   * Play or pause. A stream that is still loading pauses too, so it does not start by itself
+   * when the network is back. The short wait for a stream's first look is the exception: a
+   * second Play ends that wait.
+   */
+  async function togglePlayPause() {
+    const { loaded, isPlaying, isBuffering, checkingStart } = view
+    if (loaded && (isPlaying || (isBuffering && !checkingStart))) {
+      await run(() => native().pause())
+    } else {
+      await play()
+    }
   }
 
   /** Before the first Play: remembers the place and starts there when the episode loads. */
@@ -538,6 +554,7 @@ export function createPlayback(deps: PlaybackDeps) {
     restoreLast,
     playEpisode,
     playFrom,
+    play,
     togglePlayPause,
     seekTo,
     skip,

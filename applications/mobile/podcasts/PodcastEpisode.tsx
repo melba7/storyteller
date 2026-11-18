@@ -57,7 +57,7 @@ function EpisodeChapters({ episodeId }: { episodeId: string }) {
           accessibilityLabel={`Play chapter ${chapter.title} from ${formatTime(chapter.start)}`}
           onPress={() => {
             void player.seekTo(chapter.start)
-            if (!player.getView().isPlaying) void player.togglePlayPause()
+            void player.play()
           }}
         >
           <Text

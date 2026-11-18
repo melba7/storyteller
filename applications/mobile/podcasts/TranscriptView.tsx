@@ -138,7 +138,7 @@ function Lines({
       return
     }
     await player.seekTo(line.start)
-    if (!view.isPlaying) await player.togglePlayPause()
+    await player.play()
   }
 
   function followAlong() {

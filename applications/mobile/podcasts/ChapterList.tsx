@@ -31,7 +31,7 @@ export function ChapterList({
   function play(chapter: PodcastChapter) {
     pick()
     void player.seekTo(chapter.start)
-    if (!view.isPlaying) void player.togglePlayPause()
+    void player.play()
   }
 
   return (

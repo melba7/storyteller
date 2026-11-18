@@ -607,6 +607,64 @@ describe("controls", () => {
     expect(native.play).toHaveBeenCalled()
   })
 
+  it("a tap while the stream is loading pauses it", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true })
+    expect(playback.getView()).toMatchObject({
+      loaded: true,
+      isPlaying: false,
+      isBuffering: true,
+    })
+    await playback.togglePlayPause()
+    expect(native.pause).toHaveBeenCalledTimes(1)
+    expect(native.play).not.toHaveBeenCalled()
+  })
+
+  it("a tap during the start check lets the episode start", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true, checkingStart: true })
+    await playback.togglePlayPause()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("a tap in the first moments of a new episode still loads it", async () => {
+    const { playback, native } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(playback.getView()).toMatchObject({
+      loaded: false,
+      isBuffering: true,
+    })
+    await playback.togglePlayPause()
+    expect(native.load).toHaveBeenCalledTimes(2)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("play never pauses, also while the stream is loading", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true })
+    await playback.play()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+    state(1, true)
+    await playback.play()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("play loads an episode that was only remembered", async () => {
+    const last = episode({ positionSeconds: 200, lastPlayedAt: 5 })
+    const { playback, native } = setup(last)
+    await playback.restoreLast()
+    await playback.play()
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeId: "e1", savedPosition: 200 }),
+    )
+  })
+
   it("sets the speed to the one the player reports", async () => {
     const { playback, native } = setup()
     native.setRate.mockResolvedValueOnce(1.3)

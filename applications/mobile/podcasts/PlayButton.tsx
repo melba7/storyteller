@@ -29,8 +29,9 @@ export function pressEpisode(
   show: Show | null,
   status: Status,
 ) {
-  if (status === "playing") void player.togglePlayPause()
-  else void player.playEpisode(episode, show)
+  // A loading episode is paused by a tap (see `togglePlayPause`); only an idle one is started.
+  if (status === "idle") void player.playEpisode(episode, show)
+  else void player.togglePlayPause()
 }
 
 const RING_WIDTH = 3
