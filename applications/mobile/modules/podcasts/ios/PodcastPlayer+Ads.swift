@@ -84,10 +84,12 @@ final class PodcastAdSkipping {
     }
     skipper.apply(settings: settings)
     // An ad found while it plays, with the playhead inside it, is left at once (unless the
-    // listener seeked into it, or it was undone).
+    // listener seeked into it, or it was undone). While a seek is on its way the playhead still
+    // reads the old place, so nothing is left then; the seek's landing looks again.
+    let playhead = owner.wantsToPlay && !owner.seekPending ? owner.position : nil
     let leave = skipper.replace(
-      file: store?.best(detector: PodcastAdFinder.detectorName),
-      playhead: owner.wantsToPlay ? owner.position : nil, duration: owner.currentDuration, now: now)
+      file: store?.best(detector: PodcastAdFinder.detectorName), playhead: playhead,
+      duration: owner.currentDuration, now: now)
     setMarkers()
     if let leave { jump(leave) }
     // Silence trimming keeps out of the ads that are skipped, so it reads them again too.
@@ -157,9 +159,7 @@ final class PodcastAdSkipping {
     guard let episodeId else { return }
     PodcastTimeline.firstSkip(episodeId)
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
-    owner.player.seek(
-      to: CMTime(seconds: skip.target, preferredTimescale: 600), toleranceBefore: .zero,
-      toleranceAfter: .zero)
+    owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(
       "onAdSkipped",

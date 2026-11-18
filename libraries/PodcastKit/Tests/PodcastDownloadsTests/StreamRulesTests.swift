@@ -106,18 +106,34 @@ final class StreamThroughDownloadTests: XCTestCase {
     XCTAssertTrue(use())
   }
 
-  func testAnAutomaticDownloadThatHasNotStartedIsNotInTheWay() {
+  func testAnAutomaticDownloadGivesWayWhetherOrNotBytesHaveArrived() {
     let waiting = DownloadEntry(
       episodeId: "a", url: "https://x/a.mp3", fileExtension: "mp3", state: .queued, automatic: true)
-    XCTAssertTrue(StreamThroughDownload.isWaitingAutomatic(waiting))
+    XCTAssertTrue(StreamThroughDownload.givesWay(waiting))
     var started = waiting
     started.state = .downloading(bytes: 0, expected: nil)
-    XCTAssertTrue(StreamThroughDownload.isWaitingAutomatic(started))
+    XCTAssertTrue(StreamThroughDownload.givesWay(started))
+    // Part of the file is on disk, but a plain stream would skip no ad, so it still gives way.
     started.state = .downloading(bytes: 5, expected: 10)
-    XCTAssertFalse(StreamThroughDownload.isWaitingAutomatic(started))
-    var manual = waiting
-    manual.automatic = false
-    XCTAssertFalse(StreamThroughDownload.isWaitingAutomatic(manual))
+    XCTAssertTrue(StreamThroughDownload.givesWay(started))
+  }
+
+  func testADownloadThatIsFiledOrFailedDoesNotGiveWay() {
+    var entry = DownloadEntry(
+      episodeId: "a", url: "https://x/a.mp3", fileExtension: "mp3", state: .queued, automatic: true)
+    entry.state = .downloaded(file: "a.mp3", sha256: "x", bytes: 10, date: Date())
+    XCTAssertFalse(StreamThroughDownload.givesWay(entry))
+    entry.state = .failed(reason: "no")
+    XCTAssertFalse(StreamThroughDownload.givesWay(entry))
+  }
+
+  func testADownloadTheListenerAskedForDoesNotGiveWay() {
+    var manual = DownloadEntry(
+      episodeId: "a", url: "https://x/a.mp3", fileExtension: "mp3", state: .queued,
+      automatic: false)
+    XCTAssertFalse(StreamThroughDownload.givesWay(manual))
+    manual.state = .downloading(bytes: 5, expected: 10)
+    XCTAssertFalse(StreamThroughDownload.givesWay(manual))
   }
 
   func testNotWhenNotAsked() {

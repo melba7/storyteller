@@ -83,14 +83,14 @@ public enum StreamThroughDownload {
 }
 
 extension StreamThroughDownload {
-  /// An automatic download (a new episode, waiting for Wi-Fi) that has not received a byte.
-  /// The listener playing the episode now should not be kept from its own download by it, so
-  /// the player cancels it and plays through a download of its own.
-  public static func isWaitingAutomatic(_ entry: DownloadEntry) -> Bool {
+  /// An automatic download (a new episode) that is still waiting or running. A plain stream
+  /// would skip no ad while it runs, and it only saves the episode for later, so the player
+  /// cancels it and plays through a download of its own, which is the same file made sooner.
+  /// A download the listener asked for is left alone: it is the one they want.
+  public static func givesWay(_ entry: DownloadEntry) -> Bool {
     guard entry.automatic else { return false }
     switch entry.state {
-    case .queued: return true
-    case .downloading(let bytes, _): return bytes == 0
+    case .queued, .downloading: return true
     case .downloaded, .failed: return false
     }
   }
