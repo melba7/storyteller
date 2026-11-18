@@ -15,10 +15,10 @@ final class AdCleanupTests: XCTestCase {
 
   func testLineNumbersBecomeTimes() throws {
     let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 6)], transcript: plain).first)
-    // Line 3 starts at 20 s and line 6 ends at 59 s; the nearest pauses are half a second
-    // outside them.
-    XCTAssertEqual(ad.start, 19.5, accuracy: 0.01)
-    XCTAssertEqual(ad.end, 59.5, accuracy: 0.01)
+    // Line 3 starts at 20 s and line 6 ends at 59 s; the next words start at 20 s and 60 s, and
+    // the edges land a quarter second before them.
+    XCTAssertEqual(ad.start, 19.75, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
     XCTAssertEqual(ad.advertiser, "Acme")
     XCTAssertEqual(ad.kind, .ad)
   }
@@ -39,8 +39,8 @@ final class AdCleanupTests: XCTestCase {
       ranges: [range(3, 8, .unsure), range(6, 12, .sure)], transcript: plain)
     let ad = try XCTUnwrap(ads.first)
     XCTAssertEqual(ads.count, 1)
-    XCTAssertEqual(ad.start, 19.5, accuracy: 0.01)
-    XCTAssertEqual(ad.end, 119.5, accuracy: 0.01)
+    XCTAssertEqual(ad.start, 19.75, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 119.75, accuracy: 0.01)
     XCTAssertEqual(ad.confidence, .sure, "the same ad seen twice keeps the surer answer")
   }
 
@@ -107,7 +107,7 @@ final class AdCleanupTests: XCTestCase {
     let transcript = makeTranscript(texts)
     let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 5)], transcript: transcript).first)
     // Lines 6 and 7 are carried in (line 7 ends at 69 s); line 8 is plain talk.
-    XCTAssertEqual(ad.end, 69.5, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 69.75, accuracy: 0.01)
   }
 
   func testTheSponsorsNameCarriesTheEndOn() throws {
@@ -116,12 +116,12 @@ final class AdCleanupTests: XCTestCase {
     let ad = try XCTUnwrap(
       AdCleanup.run(ranges: [range(3, 5, advertiser: "Quokka")], transcript: makeTranscript(texts))
         .first)
-    XCTAssertEqual(ad.end, 59.5, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
   }
 
   func testPlainTalkAfterTheAdIsNotCarriedIn() throws {
     let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 5)], transcript: plain).first)
-    XCTAssertEqual(ad.end, 49.5, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
   }
 
   func testCarryingOnStopsAfterEightLines() {
@@ -131,36 +131,90 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(carried, 13)
   }
 
-  func testEdgesMoveToTheNearestPauseWithinReach() throws {
-    // Words run without a gap except a 2 s pause from 28 s to 30 s; the answer's line starts
-    // at 31 s, inside the next sentence.
-    let words = (0..<60).map { i -> TranscriptWord in
-      let start = Double(i) + (i >= 28 ? 2 : 0)
-      return TranscriptWord(text: "w\(i)", start: start, end: start + 1)
-    }
-    let lines = [
-      TranscriptLine(start: 0, end: 29, text: "before"), TranscriptLine(start: 31, end: 80, text: "ad"),
-      TranscriptLine(start: 80, end: 100, text: "after"),
-    ]
+  // MARK: Where the player lands
+
+  /// A transcript from hand-placed lines and words (start, end, text), for the tests that need
+  /// exact word times.
+  private func ownTranscript(
+    lines: [(Double, Double, String)], words: [(Double, Double)], duration: Double = 200
+  ) -> Transcript {
     let identity = TranscriptIdentity(
       locale: "en", recogniser: "f", recogniserVersion: "1", osVersion: "26", sha256: "aa")
-    let transcript = Transcript(identity: identity, duration: 100, lines: lines, words: words)
-    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: transcript).first)
-    XCTAssertEqual(ad.start, 29, accuracy: 0.01, "the middle of the pause 28 s to 30 s")
+    return Transcript(
+      identity: identity, duration: duration,
+      lines: lines.map { TranscriptLine(start: $0.0, end: $0.1, text: $0.2) },
+      words: words.enumerated().map {
+        TranscriptWord(text: "w\($0.offset)", start: $0.element.0, end: $0.element.1)
+      })
   }
 
-  func testAnEdgeFarFromAnyPauseStays() throws {
-    let words = (0..<100).map { TranscriptWord(text: "w\($0)", start: Double($0), end: Double($0) + 1) }
-    let lines = [
-      TranscriptLine(start: 0, end: 40, text: "before"), TranscriptLine(start: 40, end: 80, text: "ad"),
-      TranscriptLine(start: 80, end: 100, text: "after"),
-    ]
-    let identity = TranscriptIdentity(
-      locale: "en", recogniser: "f", recogniserVersion: "1", osVersion: "26", sha256: "aa")
-    let transcript = Transcript(identity: identity, duration: 100, lines: lines, words: words)
+  /// One-second words from `from` up to `to`.
+  private func seconds(_ from: Int, _ to: Int) -> [(Double, Double)] {
+    (from..<to).map { (Double($0), Double($0 + 1)) }
+  }
+
+  func testTheLandingIsAQuarterSecondBeforeTheFirstWordAfterTheAd() throws {
+    let transcript = makeTranscript(talk(30))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 5)], transcript: transcript).first)
+    XCTAssertEqual(ad.start, 19.75, accuracy: 0.001)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.001)
+  }
+
+  func testAPauseThreeSecondsIntoTheShowDoesNotPullTheEnd() throws {
+    // The ad's last word is 48.0 to 49.0. The show's words run on from 49.2 to 52.0, then a
+    // pause lasts to 54.0. The old snap moved the end to the middle of that pause, 53.0.
+    let showWords: [(Double, Double)] = [(49.2, 49.9), (49.9, 50.6), (50.6, 51.3), (51.3, 52.0)]
+    let words = seconds(0, 49) + showWords + seconds(54, 80)
+    let transcript = ownTranscript(
+      lines: [(0, 20, "before"), (20, 49, "the ad"), (49.2, 52, "the show"), (54, 80, "more")],
+      words: words)
     let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: transcript).first)
-    XCTAssertEqual(ad.start, 40)
-    XCTAssertEqual(ad.end, 80)
+    XCTAssertEqual(ad.end, 48.95, accuracy: 0.001)
+    XCTAssertEqual(ad.start, 20, accuracy: 0.001, "words run on from the word before, so no margin")
+  }
+
+  func testWordsThatRunOnToTheNextWordStillLeaveAMargin() throws {
+    // The last ad word is 48.0 to 50.0 and the next word starts at 50.0.
+    let words = seconds(0, 48) + [(48.0, 50.0)] + seconds(50, 80)
+    let transcript = ownTranscript(
+      lines: [(0, 20, "before"), (20, 50, "the ad"), (50, 80, "the show")], words: words)
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.001)
+  }
+
+  func testAnAdThatBeginsInTheFirstSixSecondsBeginsAtZero() throws {
+    // An intro word 0.0 to 3.5, a gap, then the ad's first word at 4.0.
+    let early = ownTranscript(
+      lines: [(0, 3.5, "hi"), (4, 40, "the ad"), (40, 80, "the show")],
+      words: [(0, 3.5)] + seconds(4, 80))
+    let first = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: early).first)
+    XCTAssertEqual(first.start, 0)
+  }
+
+  func testAnAdThatBeginsAfterSixSecondsLandsBeforeItsFirstWord() throws {
+    // An intro word 0.0 to 5.5, a gap, then the ad's first word at 7.0.
+    let late = ownTranscript(
+      lines: [(0, 5.5, "hi"), (7, 40, "the ad"), (40, 80, "the show")],
+      words: [(0, 5.5)] + seconds(7, 80))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: late).first)
+    XCTAssertEqual(ad.start, 6.75, accuracy: 0.001)
+  }
+
+  func testAnAdWithNoWordBeforeItBeginsAtZero() throws {
+    // Music for 20 s, then the ad's first word: nothing was said before it.
+    let transcript = ownTranscript(
+      lines: [(20, 60, "the ad"), (60, 100, "the show")], words: seconds(20, 100))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(1, 1)], transcript: transcript).first)
+    XCTAssertEqual(ad.start, 0)
+  }
+
+  func testTheFirstWordsStayTheAdsOwnWhenTheStartMovesToZero() throws {
+    let early = ownTranscript(
+      lines: [(0, 3.5, "hi"), (4, 40, "the ad"), (40, 80, "the show")],
+      words: [(0, 3.5)] + seconds(4, 80))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(2, 2)], transcript: early).first)
+    XCTAssertFalse(ad.firstWords.hasPrefix("w0 "), ad.firstWords)
+    XCTAssertTrue(ad.firstWords.hasPrefix("w1 "), ad.firstWords)
   }
 
   func testAnAdAtTheVeryEndStopsAtTheEndOfTheEpisode() throws {
@@ -180,7 +234,7 @@ final class AdCleanupTests: XCTestCase {
     texts[5] = "visit sleepy.com today"
     let ad = try XCTUnwrap(
       AdCleanup.run(ranges: [range(3, 5, advertiser: "")], transcript: makeTranscript(texts)).first)
-    XCTAssertEqual(ad.end, 59.5, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
   }
 
   func testNoLinesGiveNoAds() {

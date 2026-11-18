@@ -17,8 +17,11 @@ public enum AdRules {
   public static let maxLength = 300.0
   /// How many lines after an ad may still be carried into it.
   public static let carryLines = 8
-  /// An edge moves to a pause at most this far away.
-  public static let snapReach = 4.0
+  /// A skip lands this long before the first word of the show (and starts this long before the
+  /// first word of the ad).
+  public static let landBefore = 0.25
+  /// An ad whose first word starts within this many seconds of the episode's start begins at zero.
+  public static let topOfEpisode = 6.0
   /// A gap between two words counts as a pause from this long.
   public static let pause = 0.3
   /// How many words of the ad's start are kept to recognise it.
@@ -30,7 +33,8 @@ public enum AdCleanup {
   /// answers that name no real lines are dropped; each end is carried on while the next lines
   /// still read as the ad; line numbers become times; overlapping answers (an ad across a cut)
   /// are joined into one, and so are ads of one kind with little speech between them; edges
-  /// move to the nearest pause; what is too short or too long is dropped.
+  /// land a quarter second before the next word (`AdLanding`); what is too short or too long is
+  /// dropped.
   public static func run(ranges: [AdRange], transcript: Transcript) -> [FoundAd] {
     let lines = transcript.lines
     guard !lines.isEmpty else { return [] }
@@ -48,18 +52,15 @@ public enum AdCleanup {
     }
 
     let words = transcript.words
-    let pauses = Pauses(words: words)
     var ads: [FoundAd] = []
-    for var span in merge(spans, words: words) {
-      span.start = max(0, pauses.nearest(to: span.start, reach: AdRules.snapReach) ?? span.start)
-      span.end = min(
-        transcript.duration > 0 ? transcript.duration : .infinity,
-        pauses.nearest(to: span.end, reach: AdRules.snapReach) ?? span.end)
-      guard span.end - span.start >= AdRules.minLength, span.end - span.start <= AdRules.maxLength
-      else { continue }
+    for span in merge(spans, words: words) {
+      let landed = AdLanding.edges(start: span.start, end: span.end, words: words)
+      let start = max(0, landed.start)
+      let end = min(transcript.duration > 0 ? transcript.duration : .infinity, landed.end)
+      guard end - start >= AdRules.minLength, end - start <= AdRules.maxLength else { continue }
       ads.append(
         FoundAd(
-          start: span.start, end: span.end, kind: span.kind, advertiser: span.advertiser,
+          start: start, end: end, kind: span.kind, advertiser: span.advertiser,
           confidence: span.confidence, firstWords: opening(of: span, words: words)))
     }
     return ads
@@ -132,33 +133,5 @@ public enum AdCleanup {
   private static func opening(of span: Span, words: [TranscriptWord]) -> String {
     words.filter { $0.start >= span.start - 0.01 && $0.start < span.end }
       .prefix(AdRules.firstWords).map(\.text).joined(separator: " ")
-  }
-}
-
-/// The pauses between words, as the places an edge may move to.
-struct Pauses {
-  /// The middle of each pause, in order.
-  let middles: [Double]
-
-  init(words: [TranscriptWord], minimum: Double = AdRules.pause) {
-    var found: [Double] = []
-    for (before, after) in zip(words, words.dropFirst()) where after.start - before.end >= minimum {
-      found.append((before.end + after.start) / 2)
-    }
-    middles = found
-  }
-
-  /// The middle of the pause nearest to `time`, if one is within `reach` seconds.
-  func nearest(to time: Double, reach: Double) -> Double? {
-    var low = 0
-    var high = middles.count
-    while low < high {
-      let mid = (low + high) / 2
-      if middles[mid] < time { low = mid + 1 } else { high = mid }
-    }
-    let candidates = [low - 1, low].filter { middles.indices.contains($0) }.map { middles[$0] }
-    let best = candidates.min { abs($0 - time) < abs($1 - time) }
-    guard let best, abs(best - time) <= reach else { return nil }
-    return best
   }
 }
