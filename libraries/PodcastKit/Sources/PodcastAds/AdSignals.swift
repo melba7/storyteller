@@ -5,7 +5,7 @@
 import Foundation
 
 public enum AdSignals {
-  private static func regexes(_ patterns: [String]) -> [NSRegularExpression] {
+  static func regexes(_ patterns: [String]) -> [NSRegularExpression] {
     patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
   }
 
@@ -44,7 +44,7 @@ public enum AdSignals {
     #"\ba word from\b"#, #"\bsupport for\b"#, #"\bsponsors?\b"#, #"\balso brought\b"#,
   ])
 
-  private static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
+  static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
     let whole = NSRange(text.startIndex..., in: text)
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
   }
@@ -58,12 +58,9 @@ public enum AdSignals {
     return name.count >= 3 && !emptyNames.contains(name)
   }
 
-  /// Whether the line says the advertiser's name.
+  /// Whether the line says the advertiser's name (see `mentions`).
   public static func namesAdvertiser(_ text: String, advertiser: String) -> Bool {
-    usableName(advertiser)
-      && text.range(
-        of: advertiser.trimmingCharacters(in: .whitespacesAndNewlines),
-        options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    mentions(text, name: advertiser)
   }
 
   /// A web address, a promo code or an offer, or "brought to you by": proof that the line sells.

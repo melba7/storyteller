@@ -116,10 +116,7 @@ public enum AdHeadRules {
   }
 
   private static func mentions(_ text: String, any names: [String]) -> Bool {
-    names.contains {
-      AdSignals.usableName($0)
-        && text.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-    }
+    names.contains { AdSignals.mentions(text, name: $0) }
   }
 
   /// The sure ads in the lead-in lines of an episode, as the ranges a detector would answer
@@ -228,8 +225,10 @@ public enum AdHeadRules {
   ])
 
   /// The sponsor names an episode's notes give: after "sponsored by", "brought to you by" or
-  /// "Sponsors:", split at commas and "and". Tags and web addresses are left out.
-  public static func sponsors(inNotes notes: String) -> [String] {
+  /// "Sponsors:", split at commas and "and" (tags and web addresses are left out), and then the
+  /// site of each link with a path or a promo code ("betterhelp.com/show" gives "betterhelp"),
+  /// except the show's own site (`showLink`), social sites, podcast apps and the hosts' own plugs.
+  public static func sponsors(inNotes notes: String, showLink: URL? = nil) -> [String] {
     let plain = notes.replacingOccurrences(of: "<[^>]+>", with: "\n", options: .regularExpression)
     var names: [String] = []
     let whole = NSRange(plain.startIndex..., in: plain)
@@ -247,6 +246,16 @@ public enum AdHeadRules {
         }
       }
     }
+    for name in SponsorNames.fromLinks(in: plain, showLink: showLink)
+    where !names.contains(where: { squashed($0) == squashed(name) }) {
+      names.append(name)
+    }
     return names
+  }
+
+  /// A name in lower case with only its letters and digits, to tell that "Better Help" and
+  /// "betterhelp" are one name.
+  private static func squashed(_ name: String) -> String {
+    name.lowercased().filter { $0.isLetter || $0.isNumber }
   }
 }

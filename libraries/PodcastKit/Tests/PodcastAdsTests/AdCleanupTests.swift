@@ -206,6 +206,16 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(whole.end, 49.75, accuracy: 0.01)
   }
 
+  func testTheSponsorsNameCarriesTheEndOnWhateverTheRecogniserSpacedIt() throws {
+    var texts = texts(30, line6: "Better Help makes it simple")
+    texts[3] = "go to better help dot com"
+    let ad = try XCTUnwrap(
+      AdCleanup.run(
+        ranges: [range(3, 5, advertiser: "BetterHelp")], transcript: makeTranscript(texts)
+      ).first)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
+  }
+
   func testCarryingOnStopsAfterTwoLines() {
     let texts = [String](repeating: "go to acme dot com", count: 40)
     let carried = AdCleanup.carriedEnd(

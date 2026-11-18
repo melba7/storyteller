@@ -78,4 +78,35 @@ final class AdSignalsTests: XCTestCase {
     XCTAssertFalse(AdSignals.namesAdvertiser("anything", advertiser: ""))
     XCTAssertTrue(AdSignals.namesAdvertiser("we love QUOKKA", advertiser: "Quokka"))
   }
+
+  // MARK: A name, whatever the spaces and the word "dot" (N2)
+
+  func testANameIsFoundWhateverTheSpacesAndTheWordDot() {
+    XCTAssertTrue(AdSignals.mentions("visit better help dot com slash show", name: "betterhelp"))
+    XCTAssertTrue(AdSignals.mentions("Better Help makes therapy simple", name: "BetterHelp"))
+    XCTAssertTrue(AdSignals.mentions("go to betterhelp.com slash show", name: "Better Help"))
+    XCTAssertTrue(AdSignals.mentions("athletic greens dot com", name: "Athletic Greens"))
+    XCTAssertTrue(AdSignals.mentions("athleticgreens dot com", name: "Athletic Greens"))
+    XCTAssertTrue(AdSignals.mentions("we love Quokka's mattress", name: "Quokka"))
+    XCTAssertTrue(AdSignals.mentions("try QUOKKA today", name: "quokka"))
+    XCTAssertTrue(AdSignals.mentions("better-help is great", name: "better-help"))
+    XCTAssertTrue(AdSignals.mentions("go to better help dot com", name: "better-help"))
+  }
+
+  func testWordsThatOnlyRunTogetherByChanceAreNotAName() {
+    XCTAssertFalse(AdSignals.mentions("a bitter help to nobody", name: "betterhelp"))
+    XCTAssertFalse(AdSignals.mentions("the zoo moves at night", name: "Zoom"))
+    XCTAssertFalse(AdSignals.mentions("the mat is wet", name: "them"))
+  }
+
+  func testAnUnusableNameIsNeverMentioned() {
+    XCTAssertFalse(AdSignals.mentions("the sponsor said so", name: "sponsor"))
+    XCTAssertFalse(AdSignals.mentions("anything", name: ""))
+    XCTAssertFalse(AdSignals.mentions("anything at all", name: "  "))
+  }
+
+  func testTheAdvertiserIsNamedWhateverTheSpaces() {
+    XCTAssertTrue(AdSignals.namesAdvertiser("visit better help dot com", advertiser: "BetterHelp"))
+    XCTAssertTrue(AdSignals.carriesOn("Better Help makes it simple", advertiser: "BetterHelp"))
+  }
 }
