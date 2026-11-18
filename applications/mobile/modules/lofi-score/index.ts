@@ -97,6 +97,12 @@ export type LofiAtmosphereStatus = {
   lastError?: string
 }
 
+/** What reading a small file from the linked sounds folder found. */
+export type LinkedFileRead =
+  | { status: "found"; text: string }
+  | { status: "notLinked" | "folderGone" | "missing" | "notDownloaded" }
+  | { status: "unreadable"; message: string }
+
 export type LofiLinkedFolder = {
   name: string
   /** Seconds since 1970, when the folder was last looked at. */
@@ -240,6 +246,8 @@ type LofiScoreNativeModule = {
    * is missing, not downloaded from iCloud yet, or not text.
    */
   readLinkedFolderFile(path: string): Promise<string | null>
+  /** The same read, saying why there is nothing when there is nothing. */
+  readLinkedFolderFileStatus(path: string): Promise<LinkedFileRead>
   /** Deletes the imported sounds and forgets the linked folder. */
   removeImportedSounds(): Promise<LofiStatus>
   setAtmosphereEnabled(enabled: boolean): Promise<LofiStatus>

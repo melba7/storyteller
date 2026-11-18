@@ -62,6 +62,40 @@ export type NewEpisode = {
 }
 
 /**
+ * New episodes kept until they have been followed up (downloaded, queued, announced), so a
+ * run that is cut short does not lose them. An unreadable value is empty.
+ */
+export function parseFollowUps(saved: string | null): NewEpisode[] {
+  if (saved === null) return []
+  try {
+    const data: unknown = JSON.parse(saved)
+    if (!Array.isArray(data)) return []
+    return data.filter(
+      (item): item is NewEpisode =>
+        typeof item === "object" &&
+        item !== null &&
+        typeof (item as NewEpisode).id === "string" &&
+        typeof (item as NewEpisode).showId === "string" &&
+        typeof (item as NewEpisode).audioUrl === "string" &&
+        typeof (item as NewEpisode).audioType === "string" &&
+        ((item as NewEpisode).publishedAt === null ||
+          typeof (item as NewEpisode).publishedAt === "number"),
+    )
+  } catch {
+    return []
+  }
+}
+
+/** The kept episodes with these added, each once. */
+export function mergeFollowUps(
+  kept: readonly NewEpisode[],
+  added: readonly NewEpisode[],
+): NewEpisode[] {
+  const known = new Set(kept.map((episode) => episode.id))
+  return [...kept, ...added.filter((episode) => !known.has(episode.id))]
+}
+
+/**
  * The episodes a refresh inserted that count as new, with the ids they were saved under. An
  * episode is new only when it came out after the newest episode stored before the refresh, so
  * old episodes a feed gains (changed guids, a longer feed) are not. A show with nothing stored

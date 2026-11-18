@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { Stack, useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
+import { StatusBar } from "expo-status-bar"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
@@ -18,9 +19,11 @@ import {
   previewFromFeed,
 } from "@/modules/podcasts/preview"
 import { showHref } from "@/modules/podcasts/routes"
+import { showShare } from "@/modules/podcasts/share"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
+import { shareContent } from "./ShareButton"
 import { ShowHeader } from "./ShowHeader"
 import { useShows } from "./hooks"
 
@@ -54,6 +57,9 @@ export function PodcastPreview({
   const [error, setError] = useState<string | null>(null)
   const [following, setFollowing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  // The bar's title appears once the picture at the top has scrolled under the bar.
+  const titleBottom = useRef<number | null>(null)
+  const [titleInBar, setTitleInBar] = useState(false)
   const left = useRef(false)
   // Following only moves on to the show's page while this page is still the one on screen.
   const isFocused = useIsFocused()
@@ -104,16 +110,16 @@ export function PodcastPreview({
   // Scrolls to the episode a search result meant, once the list is there.
   useEffect(() => {
     if (target < 0 || scrolled.current) return
-    scrolled.current = true
-    const timer = setTimeout(
-      () =>
-        list.current?.scrollToIndex({
-          index: target,
-          animated: true,
-          viewOffset: headerHeight,
-        }),
-      100,
-    )
+    // Marked done only when it runs: a header height change in between clears this timer, and
+    // the next run sets a new one.
+    const timer = setTimeout(() => {
+      scrolled.current = true
+      list.current?.scrollToIndex({
+        index: target,
+        animated: true,
+        viewOffset: headerHeight,
+      })
+    }, 100)
     return () => clearTimeout(timer)
   }, [target, headerHeight])
 
@@ -145,8 +151,7 @@ export function PodcastPreview({
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title={preview?.show.title ?? "Podcast"} />
+    <>
       {error ? (
         <BelowBar>
           <Text className="text-destructive px-8 py-12 text-center">
@@ -160,6 +165,7 @@ export function PodcastPreview({
       ) : (
         <FlatList<StoredEpisode>
           ref={list}
+          className="bg-background flex-1"
           onScrollToIndexFailed={({ averageItemLength, index }) => {
             // The row isn't drawn yet: go roughly there, then to the row itself.
             list.current?.scrollToOffset({
@@ -178,33 +184,81 @@ export function PodcastPreview({
           }}
           data={preview.episodes}
           keyExtractor={(episode) => episode.id}
-          contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={32}
+          onScroll={(event) => {
+            if (titleBottom.current === null) return
+            setTitleInBar(
+              event.nativeEvent.contentOffset.y + headerHeight >=
+                titleBottom.current,
+            )
+          }}
           ListHeaderComponent={
-            <ShowHeader
-              show={preview.show}
-              problem={problem}
-              onFollow={follow}
-              busy={following}
-              episodeCount={preview.episodes.length}
-            />
+            <>
+              <ShowHeader
+                show={preview.show}
+                problem={problem}
+                onFollow={follow}
+                busy={following}
+                episodes={preview.episodes}
+                onTitleBottom={(bottom) => (titleBottom.current = bottom)}
+              />
+              <Text
+                className="px-safe-or-4 pt-5 pb-2 text-[26px] font-bold"
+                accessibilityRole="header"
+              >
+                Episodes
+              </Text>
+            </>
           }
           ListEmptyComponent={
-            <Text className="text-muted-foreground py-6 text-center text-sm">
+            <Text className="text-muted-foreground px-safe-or-4 py-6 text-center text-sm">
               This feed has no episodes yet.
             </Text>
           }
           renderItem={({ item, index }) => (
-            <EpisodeRow
-              artwork
-              episode={item}
-              show={preview.show}
-              openable={false}
-              highlighted={index === target}
-            />
+            <View className="px-safe-or-4">
+              <EpisodeRow
+                artwork
+                episode={item}
+                show={preview.show}
+                openable={false}
+                highlighted={index === target}
+              />
+            </View>
           )}
         />
       )}
-    </View>
+      {/* White clock and battery while the coloured header is under the bar. */}
+      {preview && !titleInBar ? (
+        <StatusBar style="light" verticalBarBehaviorIOS="disabled" />
+      ) : null}
+      <ScreenBar
+        title={preview?.show.title ?? "Podcast"}
+        titleHidden={Boolean(preview) && !titleInBar}
+        right={
+          preview ? (
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              accessibilityLabel="More for this show"
+            >
+              <Stack.Toolbar.MenuAction
+                icon="plus.circle"
+                disabled={following}
+                onPress={() => void follow()}
+              >
+                Follow
+              </Stack.Toolbar.MenuAction>
+              <Stack.Toolbar.MenuAction
+                icon="square.and.arrow.up"
+                onPress={() => void shareContent(() => showShare(preview.show))}
+              >
+                Share
+              </Stack.Toolbar.MenuAction>
+            </Stack.Toolbar.Menu>
+          ) : undefined
+        }
+      />
+    </>
   )
 }

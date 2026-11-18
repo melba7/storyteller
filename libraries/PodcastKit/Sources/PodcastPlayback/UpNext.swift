@@ -20,11 +20,14 @@ public struct QueueItem: Sendable, Equatable, Codable {
   /// The feed's JSON chapters file, so chapters work for the next episode with no JavaScript.
   /// Files saved before this existed have none.
   public var chaptersUrl: String?
+  /// The show's language, so the next episode is transcribed in it when it plays through its
+  /// own download. Files saved before this existed have none.
+  public var language: String?
 
   public init(
     id: String, url: String, type: String = "", title: String, showTitle: String = "",
     artworkUrl: String? = nil, duration: Double? = nil, position: Double = 0, showId: String? = nil,
-    chaptersUrl: String? = nil
+    chaptersUrl: String? = nil, language: String? = nil
   ) {
     self.id = id
     self.url = url
@@ -36,6 +39,7 @@ public struct QueueItem: Sendable, Equatable, Codable {
     self.position = position
     self.showId = showId
     self.chaptersUrl = chaptersUrl
+    self.language = language
   }
 }
 

@@ -1,12 +1,16 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Pause, Play } from "lucide-react-native"
+import { Check, Pause, Play } from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
 import Svg, { Circle } from "react-native-svg"
 import { useCSSVariable } from "uniwind"
 
 import { Icon } from "@/components/ui/icon"
+import { Text } from "@/components/ui/text"
+import { capsuleLook } from "@/modules/podcasts/episodeRowLook"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { player, usePlayerValue } from "@/modules/podcasts/playerInstance"
+
+import { PressableScale } from "./PressableScale"
 
 /** What an episode's play button shows. */
 type Status = "idle" | "playing" | "buffering"
@@ -153,5 +157,71 @@ function ButtonFace({
         />
       )}
     </Pressable>
+  )
+}
+
+/**
+ * Apple's capsule on a row: a light grey pill with a purple play (or pause) symbol and the
+ * length or time left in bold purple, a short bar in it for a started episode, "Played" with a
+ * check for a played one. Tapping plays or pauses.
+ */
+export function PlayCapsule({
+  episode,
+  show,
+}: {
+  episode: StoredEpisode
+  show: Show | null
+}) {
+  const status = useEpisodeStatus(episode.id)
+  const look = capsuleLook(episode)
+  const primary = useCSSVariable("--color-primary") as string
+  const secondary = useCSSVariable("--color-secondary") as string
+  const playing = status === "playing"
+  return (
+    <PressableScale
+      style={{
+        minHeight: 32,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 6,
+        borderRadius: 999,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        backgroundColor: secondary,
+      }}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={[
+        `${playing ? "Pause" : "Play"} ${episode.title}`,
+        look.spoken,
+      ]
+        .filter((part) => part !== "")
+        .join(", ")}
+      onPress={() => pressEpisode(episode, show, status)}
+    >
+      {status === "buffering" ? (
+        <ActivityIndicator color={primary} size="small" />
+      ) : episode.played && !playing ? (
+        <Icon as={Check} size={16} className="text-primary" />
+      ) : (
+        <Icon
+          as={playing ? Pause : Play}
+          size={16}
+          className="text-primary"
+          fill={primary}
+        />
+      )}
+      {look.progress === null ? null : (
+        <View className="bg-primary/25 h-1 w-8 overflow-hidden rounded-full">
+          <View
+            className="bg-primary h-1 rounded-full"
+            style={{ width: `${Math.round(look.progress * 100)}%` }}
+          />
+        </View>
+      )}
+      {look.label ? (
+        <Text className="text-primary text-[15px] font-bold">{look.label}</Text>
+      ) : null}
+    </PressableScale>
   )
 }

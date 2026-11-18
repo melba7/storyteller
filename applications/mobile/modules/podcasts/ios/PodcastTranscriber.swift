@@ -18,6 +18,8 @@ final class PodcastTranscriber: @unchecked Sendable {
   private var sink: ((String, [String: Any]) -> Void)?
   private var statuses: [String: TranscriptStatus] = [:]
   private var waiting: [String] = []
+  /// The episode that is loaded in the player: it goes first, and the one at work makes way.
+  private var urgent: String?
   var worker: Task<Void, Never>?
   /// The app is on the screen, a podcast is playing, or iOS gave a background turn.
   var appActive = false
@@ -40,9 +42,10 @@ final class PodcastTranscriber: @unchecked Sendable {
 
   // MARK: What the app tells us
 
-  /// The language an episode is to be transcribed in, noted when its download starts.
+  /// The language an episode is to be transcribed in, noted when its download starts. A start
+  /// that does not know the language leaves the one already noted.
   func noteLanguage(_ language: String?, for episodeId: String) {
-    languages?.note(language, for: episodeId)
+    languages?.remember(language, for: episodeId)
   }
 
   /// A download was installed: transcribe it.
@@ -78,6 +81,13 @@ final class PodcastTranscriber: @unchecked Sendable {
     guard let downloads = PodcastDownloader.shared.store, let files = files(for: episodeId, in: downloads)
     else { return nil }
     return files.transcriptJSON()
+  }
+
+  /// The lines transcribed so far, as the JSON of a transcript (its `lines`), or nil.
+  func partialJSON(_ episodeId: String) -> String? {
+    guard let downloads = PodcastDownloader.shared.store, let files = files(for: episodeId, in: downloads)
+    else { return nil }
+    return files.partialJSON()
   }
 
   // MARK: Looking at the downloads
@@ -132,6 +142,27 @@ final class PodcastTranscriber: @unchecked Sendable {
 
   // MARK: Working
 
+  /// The episode the player has loaded, or nil: it is worked on first. Called when the player
+  /// loads an episode and when it unloads.
+  func prefer(_ id: String?) {
+    lock.withLock { urgent = id }
+    kick()
+  }
+
+  /// Takes the next episode off the queue: the urgent one when it waits, otherwise the first.
+  private func takeNext() -> String? {
+    lock.withLock {
+      guard let id = QueueOrder.next(waiting: waiting, urgent: urgent) else { return nil }
+      waiting.removeAll { $0 == id }
+      return id
+    }
+  }
+
+  /// Whether another episode is urgent and waiting, so the one at work should stop.
+  private func makesWayForUrgent(_ id: String) -> Bool {
+    lock.withLock { QueueOrder.shouldStop(working: id, waiting: waiting, urgent: urgent) }
+  }
+
   var allowedNow: Bool { lock.withLock { appActive || playing || inBackgroundTask } }
   var hasWork: Bool { lock.withLock { !waiting.isEmpty } }
 
@@ -141,14 +172,16 @@ final class PodcastTranscriber: @unchecked Sendable {
       guard worker == nil, !waiting.isEmpty, appActive || playing || inBackgroundTask else {
         return false
       }
-      worker = Task.detached(priority: .utility) { [self] in await drain() }
+      var priority = TaskPriority.utility
+      if let urgent, waiting.contains(urgent) { priority = .userInitiated }
+      worker = Task.detached(priority: priority) { [self] in await drain() }
       return true
     }
     if !started && hasWork { askForBackgroundTime() }
   }
 
   private func drain() async {
-    while allowedNow, let id = lock.withLock({ waiting.isEmpty ? nil : waiting.removeFirst() }) {
+    while allowedNow, let id = takeNext() {
       await transcribe(id)
     }
     lock.withLock { worker = nil }
@@ -157,7 +190,13 @@ final class PodcastTranscriber: @unchecked Sendable {
 
   /// Whether the episode may go on with its next piece.
   private func mayContinue(_ id: String) -> Bool {
-    allowedNow && PodcastDownloader.shared.store?.entry(for: id) != nil
+    allowedNow && !makesWayForUrgent(id) && PodcastDownloader.shared.store?.entry(for: id) != nil
+  }
+
+  /// A piece of the playing episode is saved: its ads can be looked for now.
+  private func tellAdFinder(_ id: String) {
+    guard lock.withLock({ urgent == id }) else { return }
+    PodcastAdFinder.shared.transcriptGrew(id)
   }
 
   private func transcribe(_ id: String) async {
@@ -173,7 +212,10 @@ final class PodcastTranscriber: @unchecked Sendable {
       let outcome = try await TranscriptRunner.run(
         audio: files.folder.appendingPathComponent(file), sha256: files.sha256, locale: locale,
         recogniser: recogniser, store: files,
-        progress: { [weak self] percent in self?.set(id, .transcribing(percent: percent)) },
+        progress: { [weak self] percent in
+          self?.set(id, .transcribing(percent: percent))
+          self?.tellAdFinder(id)
+        },
         shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
       switch outcome {
       case .finished:
@@ -200,7 +242,11 @@ final class PodcastTranscriber: @unchecked Sendable {
   /// Back to the front of the queue, with its partial file saved; its download may be gone.
   private func pause(_ id: String) {
     guard PodcastDownloader.shared.store?.entry(for: id) != nil else { return removed(id) }
-    lock.withLock { if !waiting.contains(id) { waiting.insert(id, at: 0) } }
+    lock.withLock {
+      if !waiting.contains(id) {
+        waiting.insert(id, at: QueueOrder.insertIndex(waiting: waiting, urgent: urgent))
+      }
+    }
     set(id, .waiting)
   }
 }

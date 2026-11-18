@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
+import { StatusBar } from "expo-status-bar"
 import { useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
@@ -20,25 +21,23 @@ import {
   arrangeEpisodes,
   episodesInView,
 } from "@/modules/podcasts/episodeList"
+import {
+  type EpisodeFilter,
+  filterEpisodes,
+} from "@/modules/podcasts/episodeRowLook"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { readableError } from "@/modules/podcasts/nativeError"
 import { settingsHref, tabBase } from "@/modules/podcasts/routes"
-import { type EpisodeSort } from "@/modules/podcasts/showSettings"
 
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
+import { SectionHeader } from "./SectionHeader"
 import { SelectionBar } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
+import { useDownloadMap } from "./useDownloads"
 import { useSelection } from "./useSelection"
-
-const SORT_NAMES: Record<EpisodeSort, string> = {
-  newest: "Newest first",
-  oldest: "Oldest first",
-  shortest: "Shortest first",
-  longest: "Longest first",
-}
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
@@ -47,16 +46,30 @@ export function PodcastShow({ id }: { id: string }) {
   const episodes = useEpisodes(id)
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
+  const [filter, setFilter] = useState<EpisodeFilter>("all")
+  const downloads = useDownloadMap()
   const selection = useSelection()
   // The bar's title appears once the header's own title has scrolled under the bar.
   const headerHeight = useHeaderHeight()
   const titleBottom = useRef<number | null>(null)
   const [titleInBar, setTitleInBar] = useState(false)
-  const items = useMemo(
-    () =>
-      show.data ? arrangeEpisodes(episodes.data ?? [], show.data.settings) : [],
-    [episodes.data, show.data],
-  )
+  const items = useMemo(() => {
+    if (!show.data) return []
+    const downloaded = new Set(
+      Object.values(downloads)
+        .filter((info) => info.state === "downloaded")
+        .map((info) => info.episodeId),
+    )
+    // The Archived filter has to see the archived episodes the view hides.
+    const view =
+      filter === "archived"
+        ? { ...show.data.settings, showArchived: true }
+        : show.data.settings
+    return arrangeEpisodes(
+      filterEpisodes(episodes.data ?? [], filter, downloaded),
+      view,
+    )
+  }, [episodes.data, show.data, filter, downloads])
   const shows = useMemo(
     () => new Map(show.data ? [[show.data.id, show.data]] : []),
     [show.data],
@@ -105,23 +118,7 @@ export function PodcastShow({ id }: { id: string }) {
 
   const current = show.data
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title={current ? current.title : "Podcast"}
-        titleHidden={Boolean(current) && !titleInBar}
-        right={
-          current
-            ? showBarItems({
-                show: current,
-                archivedCount: archivedCount(episodes.data ?? []),
-                onSelect: () => selection.begin(),
-                onSettings: () =>
-                  router.push(settingsHref(segments, current.id)),
-                onUnfollow: () => confirmUnsubscribe(current.title),
-              })
-            : undefined
-        }
-      />
+    <>
       {show.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -133,78 +130,99 @@ export function PodcastShow({ id }: { id: string }) {
           </Text>
         </BelowBar>
       ) : (
-        <>
-          {selection.on ? (
-            <SelectionBar
-              selection={selection}
-              episodes={episodesInView(items)}
-              shows={shows}
-            />
-          ) : null}
-          <FlatList<EpisodeListItem>
-            data={items}
-            keyExtractor={(item) => item.key}
-            contentContainerClassName="px-safe-or-4"
-            contentInsetAdjustmentBehavior="automatic"
-            scrollEventThrottle={32}
-            onScroll={(event) => {
-              // The list starts under the bar (its automatic inset is the header's height), so
-              // the page's top edge below the bar is at the offset plus that height.
-              if (titleBottom.current === null) return
-              setTitleInBar(
-                event.nativeEvent.contentOffset.y + headerHeight >=
-                  titleBottom.current,
-              )
-            }}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} />
-            }
-            ListHeaderComponent={
-              <>
-                <ShowHeader
-                  show={current}
-                  problem={problem}
-                  onUnfollow={() => confirmUnsubscribe(current.title)}
-                  episodeCount={episodes.data ? episodes.data.length : null}
-                  onTitleBottom={(bottom) => (titleBottom.current = bottom)}
-                />
-                <View className="flex-row items-baseline justify-between pt-2 pb-1">
-                  <Text
-                    className="text-xl font-bold"
-                    accessibilityRole="header"
-                  >
-                    Episodes
-                  </Text>
-                  <Text className="text-muted-foreground text-sm">
-                    {SORT_NAMES[current.settings.sort]}
-                  </Text>
-                </View>
-              </>
-            }
-            ListEmptyComponent={
-              episodes.loading ? undefined : (
-                <Text className="text-muted-foreground py-6 text-center text-sm">
-                  {episodes.error ?? "This feed has no episodes yet."}
-                </Text>
-              )
-            }
-            renderItem={({ item }) =>
-              item.kind === "header" ? (
-                <Text variant="h4" className="pt-4 pb-1">
-                  {item.title}
-                </Text>
-              ) : (
+        <FlatList<EpisodeListItem>
+          className="bg-background flex-1"
+          data={items}
+          keyExtractor={(item) => item.key}
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEventThrottle={32}
+          onScroll={(event) => {
+            // The list starts under the bar (its automatic inset is the header's height), so
+            // the page's top edge below the bar is at the offset plus that height.
+            if (titleBottom.current === null) return
+            setTitleInBar(
+              event.nativeEvent.contentOffset.y + headerHeight >=
+                titleBottom.current,
+            )
+          }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} />
+          }
+          ListHeaderComponent={
+            <>
+              <ShowHeader
+                show={current}
+                problem={problem}
+                onUnfollow={() => confirmUnsubscribe(current.title)}
+                episodes={episodes.data}
+                onTitleBottom={(bottom) => (titleBottom.current = bottom)}
+              />
+              <SectionHeader title="Episodes" />
+            </>
+          }
+          ListEmptyComponent={
+            episodes.loading ? (
+              <ActivityIndicator
+                className="mt-8"
+                accessibilityLabel="Loading episodes"
+              />
+            ) : (
+              <Text className="text-muted-foreground px-safe-or-4 py-6 text-center text-sm">
+                {episodes.error ??
+                  (filter === "all"
+                    ? "This feed has no episodes yet."
+                    : "No episodes match this filter.")}
+              </Text>
+            )
+          }
+          renderItem={({ item }) =>
+            item.kind === "header" ? (
+              <Text variant="h4" className="px-safe-or-4 pt-4 pb-1">
+                {item.title}
+              </Text>
+            ) : (
+              <View className="px-safe-or-4">
                 <EpisodeRow
                   episode={item.episode}
                   show={current}
                   selection={selection}
+                  here={{ show: true }}
                 />
-              )
-            }
-            extraData={selection.selected}
-          />
-        </>
+              </View>
+            )
+          }
+          extraData={selection.selected}
+        />
       )}
-    </View>
+      {/* White clock and battery while the coloured header is under the bar. */}
+      {current && !titleInBar ? (
+        <StatusBar style="light" verticalBarBehaviorIOS="disabled" />
+      ) : null}
+      <ScreenBar
+        title={current ? current.title : "Podcast"}
+        titleHidden={Boolean(current) && !titleInBar}
+        right={
+          current
+            ? showBarItems({
+                show: current,
+                archivedCount: archivedCount(episodes.data ?? []),
+                filter,
+                onFilter: setFilter,
+                onSelect: () => selection.begin(),
+                onSettings: () =>
+                  router.push(settingsHref(segments, current.id)),
+                onUnfollow: () => confirmUnsubscribe(current.title),
+              })
+            : undefined
+        }
+      />
+      {selection.on ? (
+        <SelectionBar
+          selection={selection}
+          episodes={episodesInView(items)}
+          shows={shows}
+        />
+      ) : null}
+    </>
   )
 }

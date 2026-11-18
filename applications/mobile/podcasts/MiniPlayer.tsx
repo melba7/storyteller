@@ -3,14 +3,13 @@ import { useRouter } from "expo-router"
 import { NativeTabs } from "expo-router/native-tabs"
 import { Pause, Play, RotateCw } from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
+import { useCSSVariable } from "uniwind"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { skipNoteText } from "@/modules/podcasts/ads"
 import {
   miniPlayerLabel,
   showsMiniPlayer,
-  timeLeft,
 } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
 import {
@@ -19,9 +18,11 @@ import {
   usePlayerValue,
   useRestoreLastEpisode,
 } from "@/modules/podcasts/playerInstance"
-import { progressFraction } from "@/modules/podcasts/playerLook"
+import { skipSymbol } from "@/modules/podcasts/playerLook"
+import { miniSubtitle } from "@/modules/podcasts/playerSheet"
 
 import { Artwork } from "./Artwork"
+import { SFIcon } from "./SFIcon"
 import { tap } from "./haptics"
 import { usePlaybackSettings } from "./usePlaybackSettings"
 import { pressUndo, useSkipNote } from "./useSkipNote"
@@ -36,9 +37,16 @@ export function useHasMiniPlayer(): boolean {
 }
 
 /**
- * What sits in the tab bar's accessory: the artwork, the title and a play button. Tap it to
- * open the full-screen player. The full row also says the time left; the compact one (shown
- * when the tab bar is minimized) leaves it out.
+ * What sits in the tab bar's accessory: small rounded artwork, the title in bold with the
+ * episode's date under it in the plain text colour, a play button and skip forward. Tap it to
+ * open the full-screen player. The compact row (shown when the tab bar is minimized) keeps the
+ * two lines at a smaller size and leaves skip forward out. A long title ends in "..." because
+ * the accessory is glass, so there is no known colour for a fade to end in.
+ *
+ * The player still slides up as a modal. Link.AppleZoom zooms only from a Link's own trigger
+ * into a pushed screen of the same navigator, and the accessory is drawn by the native tab bar
+ * outside the stack, so there is no trigger to zoom from (and it can't be tried without a
+ * device).
  */
 export function MiniPlayerContent() {
   const router = useRouter()
@@ -46,12 +54,15 @@ export function MiniPlayerContent() {
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
   const note = useSkipNote()
   const { skipForward } = usePlaybackSettings()
+  // The symbols take the title's colour; left out, iOS would draw them in its own label colour,
+  // which is the wrong one under a fixed dark or light Appearance.
+  const ink = useCSSVariable("--color-foreground") as string
   const { episode, show } = view
   if (!episode) return null
 
   return (
     <View className="flex-1 justify-center">
-      <View className="flex-row items-center gap-3 px-4">
+      <View className="flex-row items-center gap-3 px-[9px]">
         <Pressable
           className="flex-1 flex-row items-center gap-3"
           accessibilityRole="button"
@@ -64,24 +75,20 @@ export function MiniPlayerContent() {
         >
           <Artwork
             uri={episode.imageUrl ?? show?.imageUrl ?? null}
-            size={compact ? 32 : 40}
-            className="rounded-lg"
+            size={compact ? 30 : 40}
+            className="rounded-lg border-0"
           />
           <View className="flex-1">
             <Text
-              className={compact ? "text-sm font-semibold" : "font-semibold"}
+              className={compact ? "text-sm font-bold" : "font-bold"}
               numberOfLines={1}
             >
               {episode.title}
             </Text>
-            {compact ? null : (
-              <Text className="text-muted-foreground text-sm" numberOfLines={1}>
-                {view.error ??
-                  (note
-                    ? skipNoteText(note)
-                    : timeLeft(view.position, view.duration))}
-              </Text>
-            )}
+            <Text className={compact ? "text-xs" : "text-sm"} numberOfLines={1}>
+              {view.error ??
+                (note ? skipNoteText(note) : miniSubtitle(episode.publishedAt))}
+            </Text>
           </View>
         </Pressable>
         {note ? (
@@ -106,10 +113,12 @@ export function MiniPlayerContent() {
           {view.isBuffering ? (
             <ActivityIndicator accessibilityLabel="Buffering" />
           ) : (
-            <Icon
-              as={view.isPlaying ? Pause : Play}
+            <SFIcon
+              name={view.isPlaying ? "pause.fill" : "play.fill"}
               size={compact ? 22 : 26}
-              fill="currentColor"
+              color={ink}
+              fallback={view.isPlaying ? Pause : Play}
+              filled
             />
           )}
         </Pressable>
@@ -123,23 +132,16 @@ export function MiniPlayerContent() {
               void player.skip(skipForward)
             }}
           >
-            <Icon as={RotateCw} size={30} strokeWidth={1.5} />
-            <Text className="absolute text-[10px] font-bold">
-              {skipForward}
-            </Text>
+            <SFIcon
+              name={skipSymbol("ahead", skipForward)}
+              size={28}
+              color={ink}
+              fallback={RotateCw}
+              badge={skipForward}
+            />
           </Pressable>
         )}
       </View>
-      {compact ? null : (
-        <View className="bg-foreground/10 absolute right-4 bottom-0 left-4 h-0.5 rounded-full">
-          <View
-            className="bg-primary h-0.5 rounded-full"
-            style={{
-              width: `${progressFraction(view.position, view.duration) * 100}%`,
-            }}
-          />
-        </View>
-      )}
     </View>
   )
 }

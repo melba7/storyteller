@@ -1,12 +1,5 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import {
-  ChevronDown,
-  ChevronUp,
-  Pause,
-  Play,
-  Search,
-  X,
-} from "lucide-react-native"
+import { ChevronDown, ChevronUp, Search, X } from "lucide-react-native"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
@@ -20,6 +13,7 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { type StoredEpisode } from "@/modules/podcasts/library"
 import { player, usePlayer } from "@/modules/podcasts/playerInstance"
+import { partialFooter } from "@/modules/podcasts/transcriptChoice"
 import { type TranscriptLine } from "@/modules/podcasts/transcriptFormats"
 import {
   lineAt,
@@ -29,6 +23,7 @@ import {
   stepMatch,
 } from "@/modules/podcasts/transcriptLines"
 
+import { useSheet } from "./playerSheetContext"
 import { useTranscriptLines } from "./useTranscriptLines"
 
 /** Where the playing line sits when the list follows along: about a third from the top. */
@@ -44,12 +39,13 @@ interface Props {
  * stops the following until "Follow along" is pressed, and a search field finds words.
  */
 export function TranscriptView({ episode }: Props) {
+  const sheet = useSheet()
   const state = useTranscriptLines(episode)
   if (state.status === "loading") {
     return (
       <View className="flex-1 items-center justify-center">
         <ActivityIndicator
-          color="#ffffff"
+          color={sheet.ink}
           accessibilityLabel="Loading the transcript"
         />
       </View>
@@ -59,7 +55,8 @@ export function TranscriptView({ episode }: Props) {
     return (
       <View className="flex-1 items-center justify-center px-8">
         <Text
-          className="text-center text-base text-white/80"
+          className="text-center text-base"
+          style={{ color: sheet.tint }}
           accessibilityRole="alert"
         >
           {state.reason}
@@ -67,17 +64,29 @@ export function TranscriptView({ episode }: Props) {
       </View>
     )
   }
-  return <Lines lines={state.lines} episode={episode} />
+  return (
+    <Lines
+      lines={state.lines}
+      episode={episode}
+      partial={state.partial ?? null}
+    />
+  )
 }
 
 function Lines({
   lines,
   episode,
+  partial,
 }: {
   lines: TranscriptLine[]
   episode: StoredEpisode
+  /** The transcript is still being made: its percent (null when not known). */
+  partial: { percent: number | null } | null
 }) {
   const view = usePlayer()
+  const sheet = useSheet()
+  // The "Follow along" button sits at the bottom, and the last line scrolls clear of it.
+  const bottomGap = 12
   const listRef = useRef<FlatList<TranscriptLine>>(null)
   const [following, setFollowing] = useState(true)
   const [query, setQuery] = useState("")
@@ -101,14 +110,18 @@ function Lines({
   }, [following, playing, scrollTo])
 
   // A new search starts at its first match, and looking at a match stops the following.
+  // New lines arriving while it is transcribed do not move the view or the chosen match.
+  const searched = useRef(query)
   useEffect(() => {
+    if (searched.current === query) return
+    searched.current = query
     const first = matches[0] ?? null
     setCurrent(first)
     if (first !== null) {
       setFollowing(false)
       scrollTo(first)
     }
-  }, [matches, scrollTo])
+  }, [matches, query, scrollTo])
 
   function step(direction: 1 | -1) {
     const next = stepMatch(matches, current, direction)
@@ -136,12 +149,16 @@ function Lines({
   return (
     <View className="flex-1">
       <View className="flex-row items-center gap-2 px-4 pb-2">
-        <View className="flex-1 flex-row items-center gap-2 rounded-full bg-white/15 px-3">
-          <Icon as={Search} size={16} className="text-white/70" />
+        <View
+          className="flex-1 flex-row items-center gap-2 rounded-full px-3"
+          style={{ backgroundColor: sheet.rest }}
+        >
+          <Icon as={Search} size={16} color={sheet.muted} />
           <TextInput
-            className="min-h-10 flex-1 text-base text-white"
+            className="min-h-10 flex-1 text-base"
+            style={{ color: sheet.ink }}
             placeholder="Search the transcript"
-            placeholderTextColor="rgba(255,255,255,0.5)"
+            placeholderTextColor={sheet.muted}
             value={query}
             onChangeText={setQuery}
             returnKeyType="search"
@@ -156,14 +173,15 @@ function Lines({
               onPress={() => setQuery("")}
               hitSlop={8}
             >
-              <Icon as={X} size={16} className="text-white/70" />
+              <Icon as={X} size={16} color={sheet.muted} />
             </Pressable>
           ) : null}
         </View>
         {query.trim() !== "" ? (
           <>
             <Text
-              className="min-w-12 text-center text-sm text-white/70"
+              className="min-w-12 text-center text-sm"
+              style={{ color: sheet.muted }}
               accessibilityLiveRegion="polite"
             >
               {matches.length === 0
@@ -177,7 +195,7 @@ function Lines({
               disabled={matches.length === 0}
               onPress={() => step(-1)}
             >
-              <Icon as={ChevronUp} size={24} className="text-white" />
+              <Icon as={ChevronUp} size={24} color={sheet.ink} />
             </Pressable>
             <Pressable
               className="size-10 items-center justify-center active:opacity-60"
@@ -186,7 +204,7 @@ function Lines({
               disabled={matches.length === 0}
               onPress={() => step(1)}
             >
-              <Icon as={ChevronDown} size={24} className="text-white" />
+              <Icon as={ChevronDown} size={24} color={sheet.ink} />
             </Pressable>
           </>
         ) : null}
@@ -197,7 +215,19 @@ function Lines({
         data={lines}
         extraData={[playing, current, matchSet]}
         keyExtractor={(_, index) => String(index)}
-        contentContainerClassName="px-safe-or-4 pb-24"
+        contentContainerClassName="px-safe-or-4"
+        contentContainerStyle={{ paddingBottom: bottomGap + 56 }}
+        ListFooterComponent={
+          partial ? (
+            <Text
+              className="px-2 pt-4 text-center text-sm"
+              style={{ color: sheet.muted }}
+              accessibilityLiveRegion="polite"
+            >
+              {partialFooter(partial.percent)}
+            </Text>
+          ) : undefined
+        }
         onScrollBeginDrag={() => setFollowing(false)}
         onScrollToIndexFailed={(info) => {
           // The row is not drawn yet: go near it, then try again.
@@ -219,32 +249,25 @@ function Lines({
         )}
       />
 
-      <View className="absolute inset-x-0 bottom-0 flex-row items-center justify-between px-4 pb-4">
+      <View
+        className="absolute inset-x-0 bottom-0 flex-row items-center justify-between px-4"
+        style={{ paddingBottom: bottomGap }}
+      >
         {!following && playingHere ? (
           <Pressable
-            className="rounded-full bg-white px-4 py-2 active:opacity-80"
+            className="rounded-full px-4 py-2 active:opacity-80"
+            style={{ backgroundColor: sheet.ink }}
             accessibilityRole="button"
             accessibilityLabel="Follow along"
             onPress={followAlong}
           >
-            <Text className="font-semibold text-black">Follow along</Text>
+            <Text className="font-semibold" style={{ color: sheet.top }}>
+              Follow along
+            </Text>
           </Pressable>
         ) : (
           <View />
         )}
-        <Pressable
-          className="size-14 items-center justify-center rounded-full bg-white active:opacity-80"
-          accessibilityRole="button"
-          accessibilityLabel={playingHere && view.isPlaying ? "Pause" : "Play"}
-          onPress={() => void player.togglePlayPause()}
-        >
-          <Icon
-            as={playingHere && view.isPlaying ? Pause : Play}
-            size={26}
-            className="text-black"
-            fill="#000000"
-          />
-        </Pressable>
       </View>
     </View>
   )
@@ -265,15 +288,19 @@ const Row = memo(function Row({
   focused: boolean
   onPress: () => void
 }) {
+  const sheet = useSheet()
   return (
     <View>
       {showSpeaker ? (
-        <Text className="pt-4 pb-1 text-sm font-semibold text-white/60">
+        <Text
+          className="pt-4 pb-1 text-sm font-semibold"
+          style={{ color: sheet.muted }}
+        >
           {line.speaker}
         </Text>
       ) : null}
       <Pressable
-        className={`rounded-lg px-2 py-2 active:bg-white/10 ${
+        className={`rounded-lg px-2 py-2 active:opacity-70 ${
           focused ? "bg-yellow-300/40" : matched ? "bg-yellow-300/20" : ""
         }`}
         accessibilityRole="button"
@@ -283,9 +310,8 @@ const Row = memo(function Row({
         onPress={onPress}
       >
         <Text
-          className={`text-lg leading-7 ${
-            active ? "font-semibold text-white" : "text-white/55"
-          }`}
+          className={`text-lg leading-7 ${active ? "font-semibold" : ""}`}
+          style={{ color: active ? sheet.ink : sheet.muted }}
         >
           {line.text}
         </Text>

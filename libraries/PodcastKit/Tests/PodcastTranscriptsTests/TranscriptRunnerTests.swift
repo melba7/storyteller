@@ -165,6 +165,19 @@ final class TranscriptRunnerTests: XCTestCase {
     XCTAssertEqual(store.status(), .notSupported(reason: "Language not supported"))
   }
 
+  func testAMissingLanguageNeverErasesOneThatWasNoted() {
+    let url = folder.appendingPathComponent("languages.json")
+    let notes = TranscriptLanguages(url: url)
+    notes.remember("de", for: "e1")
+    notes.remember(nil, for: "e1")
+    notes.remember("", for: "e1")
+    XCTAssertEqual(TranscriptLanguages(url: url).language(for: "e1"), "de")
+    notes.remember("fr", for: "e1")
+    XCTAssertEqual(notes.language(for: "e1"), "fr")
+    notes.remember(nil, for: "e2")
+    XCTAssertNil(notes.language(for: "e2"))
+  }
+
   func testLanguagesAreKeptAndPruned() {
     let url = folder.appendingPathComponent("languages.json")
     let notes = TranscriptLanguages(url: url)

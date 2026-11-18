@@ -2,7 +2,7 @@
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { Podcast } from "lucide-react-native"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import {
   ActivityIndicator,
   FlatList,
@@ -12,8 +12,6 @@ import {
 } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { followUpNew } from "@/modules/podcasts/automaticRun"
-import { refreshAllShows } from "@/modules/podcasts/dbFeeds"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type Show } from "@/modules/podcasts/library"
 import {
@@ -23,8 +21,7 @@ import {
   badgeCount,
   sortShows,
 } from "@/modules/podcasts/libraryView"
-import { readableError } from "@/modules/podcasts/nativeError"
-import { showHref } from "@/modules/podcasts/routes"
+import { SEARCH_HREF, arrangeHref, showHref } from "@/modules/podcasts/routes"
 
 import { EmptyState } from "./EmptyState"
 import {
@@ -35,11 +32,11 @@ import {
   cellSize,
 } from "./LibraryShows"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SectionMenuButton } from "./SectionMenu"
 import { addAudioFiles } from "./addAudioFiles"
 import { useShowActivity, useShows } from "./hooks"
 import { useLibraryView } from "./useLibraryView"
 import { useStatusBarStyle } from "./usePodcastsTheme"
+import { useRefreshShows } from "./useRefreshShows"
 
 const LAYOUTS: { id: LibraryLayout; title: string; columns: number }[] = [
   { id: "large", title: "Large grid", columns: 3 },
@@ -112,8 +109,7 @@ export function PodcastsHome() {
   const shows = useShows()
   const activity = useShowActivity()
   const { view, change } = useLibraryView()
-  const [refreshing, setRefreshing] = useState(false)
-  const [refreshProblem, setRefreshProblem] = useState<string | null>(null)
+  const { refreshing, problem: refreshProblem, refresh } = useRefreshShows()
 
   // If the activity query fails, no badges show and the newest-episode order falls back to name.
   const found = activity.data
@@ -122,24 +118,8 @@ export function PodcastsHome() {
     [shows.data, view, found],
   )
 
-  async function refresh() {
-    setRefreshing(true)
-    setRefreshProblem(null)
-    try {
-      const { failed, added } = await refreshAllShows()
-      await followUpNew(added)
-      if (failed.length > 0) {
-        setRefreshProblem(`Couldn't refresh ${failed.join(", ")}.`)
-      }
-    } catch (cause) {
-      setRefreshProblem(readableError(cause))
-    } finally {
-      setRefreshing(false)
-    }
-  }
-
   const arranged = (shows.data ?? []).some((s) => s.ownPosition !== null)
-  const openArrange = () => router.push("/podcasts/arrange")
+  const openArrange = () => router.push(arrangeHref(segments))
   const columns = LAYOUTS.find((l) => l.id === view?.layout)?.columns ?? 3
   const size = cellSize(width, columns)
   const isList = view?.layout === "list"
@@ -150,42 +130,15 @@ export function PodcastsHome() {
       count: badgeCount(found?.[item.id], item.addedAt),
       onPress: () => router.push(showHref(segments, item.id)),
     }
-    return isList ? <ShowRow {...props} /> : <ShowCell {...props} size={size} />
+    return isList ? (
+      <ShowRow {...props} />
+    ) : (
+      <ShowCell {...props} size={size} href={showHref(segments, item.id)} />
+    )
   }
 
   return (
-    <View className="bg-background flex-1">
-      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
-      <ScreenBar
-        large
-        title="Podcasts"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
-        right={
-          <>
-            <Stack.Toolbar.Button
-              icon="magnifyingglass"
-              accessibilityLabel="Search episodes"
-              onPress={() => router.push("/podcasts/search")}
-            />
-            <Stack.Toolbar.Button
-              icon="plus"
-              accessibilityLabel="Find a podcast to add"
-              onPress={() => router.navigate("/podcasts/discover")}
-            />
-            <Stack.Toolbar.Menu
-              icon="ellipsis"
-              hidden={!view}
-              accessibilityLabel="Layout and order"
-            >
-              {view ? menuItems(view, change, openArrange, arranged) : null}
-            </Stack.Toolbar.Menu>
-          </>
-        }
-      />
+    <>
       {Podcasts === null ? (
         <BelowBar>
           <Message
@@ -205,6 +158,7 @@ export function PodcastsHome() {
         <FlatList<Show>
           // A different column count needs a fresh list.
           key={`columns-${columns}`}
+          className="bg-background flex-1"
           data={sorted}
           numColumns={columns}
           keyExtractor={(show) => show.id}
@@ -219,16 +173,18 @@ export function PodcastsHome() {
             <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
           ListHeaderComponent={
-            refreshProblem ? (
-              <View className="bg-destructive/10 mb-3 rounded-xl p-3">
-                <Text
-                  className="text-destructive text-sm"
-                  accessibilityRole="alert"
-                >
-                  {refreshProblem}
-                </Text>
-              </View>
-            ) : undefined
+            <>
+              {refreshProblem ? (
+                <View className="bg-destructive/10 mb-3 rounded-xl p-3">
+                  <Text
+                    className="text-destructive text-sm"
+                    accessibilityRole="alert"
+                  >
+                    {refreshProblem}
+                  </Text>
+                </View>
+              ) : null}
+            </>
           }
           ListEmptyComponent={
             <EmptyState
@@ -237,14 +193,35 @@ export function PodcastsHome() {
               body="Search for a show, or paste its RSS or Apple Podcasts link."
               action={{
                 label: "Find a podcast",
-                onPress: () => router.navigate("/podcasts/discover"),
+                onPress: () => router.navigate(SEARCH_HREF),
               }}
             />
           }
           renderItem={renderShow}
         />
       )}
-    </View>
+      <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
+      <ScreenBar
+        large
+        title="Shows"
+        right={
+          <>
+            <Stack.Toolbar.Button
+              icon="plus"
+              accessibilityLabel="Find a podcast to add"
+              onPress={() => router.navigate(SEARCH_HREF)}
+            />
+            <Stack.Toolbar.Menu
+              icon="ellipsis"
+              hidden={!view}
+              accessibilityLabel="Layout and order"
+            >
+              {view ? menuItems(view, change, openArrange, arranged) : null}
+            </Stack.Toolbar.Menu>
+          </>
+        }
+      />
+    </>
   )
 }
 

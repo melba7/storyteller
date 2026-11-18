@@ -7,6 +7,7 @@ import {
   playerBackground,
   positionAt,
   progressFraction,
+  skipSymbol,
 } from "./playerLook"
 
 describe("playerBackground", () => {
@@ -56,5 +57,17 @@ describe("the seek bar", () => {
     expect(progressFraction(150, 600)).toBe(0.25)
     expect(progressFraction(900, 600)).toBe(1)
     expect(progressFraction(10, null)).toBe(0)
+  })
+})
+
+describe("skipSymbol", () => {
+  it("is the numbered symbol for the lengths that have one", () => {
+    expect(skipSymbol("back", 15)).toBe("gobackward.15")
+    expect(skipSymbol("ahead", 30)).toBe("goforward.30")
+    expect(skipSymbol("ahead", 90)).toBe("goforward.90")
+  })
+  it("is the plain arrow for any other length", () => {
+    expect(skipSymbol("back", 20)).toBe("gobackward")
+    expect(skipSymbol("ahead", 0)).toBe("goforward")
   })
 })

@@ -1,8 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { Stack, useRouter, useSegments } from "expo-router"
-import { useState } from "react"
-import { ActivityIndicator, FlatList, Pressable, View } from "react-native"
-import { useCSSVariable } from "uniwind"
+import { useRouter, useSegments } from "expo-router"
+import { Pressable, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { searchEpisodes } from "@/modules/podcasts/db"
@@ -11,6 +9,7 @@ import {
   searchDirectoryEpisodes,
 } from "@/modules/podcasts/directory"
 import {
+  type StoredEpisode,
   formatDuration,
   formatEpisodeDate,
   formatEpisodeLength,
@@ -20,19 +19,18 @@ import { type EpisodeHit } from "@/modules/podcasts/search"
 import { searchSpoken } from "@/modules/podcasts/spokenSearch"
 
 import { Artwork } from "./Artwork"
-import { ScreenBar } from "./ScreenBar"
-import { SpokenResults } from "./SpokenResults"
 import { useDebouncedSearch } from "./useDebouncedSearch"
 
-type Scope = "mine" | "all" | "spoken"
+export type Scope = "mine" | "all" | "spoken"
 
 const SCOPES: { id: Scope; label: string }[] = [
-  { id: "mine", label: "Your shows" },
   { id: "all", label: "All podcasts" },
+  { id: "mine", label: "Your shows" },
   { id: "spoken", label: "Spoken" },
 ]
 
-function Segments({
+/** The scopes under the search bar as capsule chips: All podcasts, Your shows, Spoken. */
+export function ScopeControl({
   scope,
   onChange,
 }: {
@@ -40,31 +38,36 @@ function Segments({
   onChange: (scope: Scope) => void
 }) {
   return (
-    <View
-      className="bg-secondary flex-row rounded-full p-1"
-      accessibilityRole="tablist"
-    >
-      {SCOPES.map(({ id, label }) => (
-        <Pressable
-          key={id}
-          className={`min-h-10 flex-1 items-center justify-center rounded-full px-2 ${scope === id ? "bg-background" : ""}`}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: scope === id }}
-          onPress={() => onChange(id)}
-        >
-          <Text
-            className={scope === id ? "font-semibold" : "text-muted-foreground"}
-            numberOfLines={1}
+    <View className="flex-row flex-wrap gap-2" accessibilityRole="tablist">
+      {SCOPES.map(({ id, label }) => {
+        const selected = scope === id
+        return (
+          <Pressable
+            key={id}
+            className={`min-h-9 items-center justify-center rounded-full px-4 ${selected ? "bg-primary" : "bg-secondary"}`}
+            accessibilityRole="tab"
+            accessibilityState={{ selected }}
+            onPress={() => onChange(id)}
           >
-            {label}
-          </Text>
-        </Pressable>
-      ))}
+            <Text
+              className={
+                selected
+                  ? "text-primary-foreground font-semibold"
+                  : "font-semibold"
+              }
+              numberOfLines={1}
+            >
+              {label}
+            </Text>
+          </Pressable>
+        )
+      })}
     </View>
   )
 }
 
-function ResultRow({
+/** One episode result: its picture, title and a grey line. */
+export function ResultRow({
   title,
   line,
   imageUrl,
@@ -82,9 +85,9 @@ function ResultRow({
       accessibilityLabel={`${title}, ${line}`}
       onPress={onPress}
     >
-      <Artwork uri={imageUrl} size={56} />
+      <Artwork uri={imageUrl} size={60} />
       <View className="flex-1">
-        <Text className="font-semibold" numberOfLines={2}>
+        <Text className="text-base font-bold" numberOfLines={2}>
           {title}
         </Text>
         <Text className="text-muted-foreground text-sm" numberOfLines={2}>
@@ -98,13 +101,23 @@ function ResultRow({
 const join = (parts: string[]) =>
   parts.filter((part) => part !== "").join(" · ")
 
-/** Search for episodes: in the followed shows (on the phone) or in all of Apple's podcasts. */
-export function SearchEpisodes() {
-  const background = useCSSVariable("--color-background") as string
+export type EpisodeRowData = {
+  key: string
+  /** The library episode behind a "Your shows" hit, which is drawn as a full episode row. */
+  episode?: StoredEpisode
+  title: string
+  line: string
+  imageUrl: string | null
+  open: () => void
+}
+
+/**
+ * Episode search for the words typed: in the followed shows (on the phone), in all of Apple's
+ * podcasts, or in the words spoken inside downloaded episodes. Only the chosen scope searches.
+ */
+export function useEpisodeSearch(scope: Scope, term: string) {
   const router = useRouter()
   const segments = useSegments()
-  const [scope, setScope] = useState<Scope>("mine")
-  const [term, setTerm] = useState("")
   const mine = useDebouncedSearch<EpisodeHit>(
     scope === "mine" ? term : "",
     searchEpisodes,
@@ -120,13 +133,11 @@ export function SearchEpisodes() {
     searchSpoken,
     400,
   )
-  const state = scope === "mine" ? mine : scope === "all" ? all : spoken
-  const typed = term.trim() !== ""
-
-  const rows =
+  const rows: EpisodeRowData[] =
     scope === "mine"
       ? mine.results.map(({ episode, showTitle, showImageUrl }) => ({
           key: episode.id,
+          episode,
           title: episode.title,
           line: join([
             showTitle,
@@ -136,79 +147,25 @@ export function SearchEpisodes() {
           imageUrl: episode.imageUrl ?? showImageUrl,
           open: () => router.push(episodeHref(segments, episode.id)),
         }))
-      : all.results.map((found) => ({
-          key: found.id,
-          title: found.title,
-          line: join([
-            found.showTitle,
-            formatEpisodeDate(found.publishedAt),
-            formatDuration(found.durationSeconds),
-          ]),
-          imageUrl: found.imageUrl,
-          open: () =>
-            router.push(
-              previewHref(segments, found.feedUrl, {
-                guid: found.guid,
-                audioUrl: found.audioUrl,
-              }),
-            ),
-        }))
-
-  return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Search" />
-      <Stack.SearchBar
-        placeholder="Search for an episode"
-        autoCapitalize="none"
-        autoFocus
-        hideWhenScrolling={false}
-        onChangeText={(event) => setTerm(event.nativeEvent.text)}
-        onCancelButtonPress={() => setTerm("")}
-      />
-      {/* The scope control sits above the results, not in a scroll view, so the header is solid. */}
-      <Stack.Screen
-        options={{
-          headerTransparent: false,
-          headerStyle: { backgroundColor: background },
-        }}
-      />
-      <View className="px-safe-or-4 gap-3 pb-2">
-        <Segments scope={scope} onChange={setScope} />
-      </View>
-      {state.searching ? (
-        <ActivityIndicator className="mt-4" accessibilityLabel="Searching" />
-      ) : state.error ? (
-        <Text className="text-destructive px-8 py-6 text-center text-sm">
-          {state.error}
-        </Text>
-      ) : scope !== "spoken" && typed && rows.length === 0 ? (
-        <Text className="text-muted-foreground px-8 py-6 text-center text-sm">
-          No episodes found.
-        </Text>
-      ) : null}
-      {scope === "spoken" ? (
-        <SpokenResults
-          results={spoken.results}
-          typed={typed}
-          waiting={spoken.searching || spoken.error !== null}
-        />
-      ) : (
-        <FlatList
-          data={rows}
-          keyExtractor={(row) => row.key}
-          contentContainerClassName="px-safe-or-4 gap-3 pb-6"
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          renderItem={({ item }) => (
-            <ResultRow
-              title={item.title}
-              line={item.line}
-              imageUrl={item.imageUrl}
-              onPress={item.open}
-            />
-          )}
-        />
-      )}
-    </View>
-  )
+      : scope === "all"
+        ? all.results.map((found) => ({
+            key: found.id,
+            title: found.title,
+            line: join([
+              found.showTitle,
+              formatEpisodeDate(found.publishedAt),
+              formatDuration(found.durationSeconds),
+            ]),
+            imageUrl: found.imageUrl,
+            open: () =>
+              router.push(
+                previewHref(segments, found.feedUrl, {
+                  guid: found.guid,
+                  audioUrl: found.audioUrl,
+                }),
+              ),
+          }))
+        : []
+  const state = scope === "mine" ? mine : scope === "all" ? all : spoken
+  return { rows, spoken: spoken.results, state }
 }

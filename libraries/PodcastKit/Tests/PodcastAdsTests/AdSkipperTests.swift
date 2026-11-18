@@ -229,6 +229,15 @@ final class AdSkipperTests: XCTestCase {
     XCTAssertTrue(skipper.ads.isEmpty)
   }
 
+  func testUndoCanGiveBackTheWholeSkipSoAChainedAdIsSavedToo() {
+    var skipper = skipper([ad(100, 160), ad(160.2, 190, kind: .ownPlug)])
+    XCTAssertNotNil(skipper.reached(position: 100.1, rate: 1, duration: 1000, now: 10))
+    let skip = skipper.undoSkip(now: 11)
+    XCTAssertEqual(skip?.ad, ad(100, 160))
+    XCTAssertEqual(skip?.chained.map(\.start), [160.2])
+    XCTAssertNil(skipper.undoSkip(now: 12))
+  }
+
   func testUndoComesTooLateAfterTheNoteIsGone() {
     var skipper = skipper([ad(100, 160)])
     _ = skipper.reached(position: 100.1, rate: 1, duration: 1000, now: 10)

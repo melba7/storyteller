@@ -4,7 +4,8 @@
 // observer at each ad's start and jumps to the ad's end when playback crosses it, so it works
 // with the screen locked and no JavaScript. The rules (which ads, not after a seek, Undo) are
 // `AdSkipper` in PodcastAds. A streamed episode is never skipped, because a stream can carry
-// other ads than the download that was checked.
+// other ads than the download that was checked. An episode that plays through its own download
+// (PodcastStreamDownload) is the same file, so its ads are skipped once the download is filed.
 
 import AVFoundation
 import Foundation
@@ -56,14 +57,9 @@ final class PodcastAdSkipping {
   func begin(_ id: String, startingAt position: Double) {
     removeMarkers()
     episodeId = id
-    store = nil
     skipper = AdSkipper(file: nil, settings: settings)
-    if let downloads = PodcastDownloader.shared.store, let entry = downloads.entry(for: id),
-      case .downloaded(_, let sha, _, _) = entry.state, let folder = try? downloads.folder(for: id)
-    {
-      store = AdsStore(folder: folder, sha256: sha)
-      skipper.replace(file: store?.load(detector: PodcastAdFinder.detectorName))
-    }
+    store = Self.downloadedStore(id)
+    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
     // The start is the app's choice, not a seek by the listener, so an ad that begins later is
     // still skipped, and one that holds the start is skipped now.
     let skip = skipper.started(at: position, duration: owner.currentDuration, now: now)
@@ -76,16 +72,40 @@ final class PodcastAdSkipping {
 
   /// The ads file or the switches changed (ads were just found, or a switch was turned).
   func refresh() {
-    guard episodeId != nil else { return }
+    guard let episodeId else { return }
+    // An episode playing through its own download has a store once the download is filed, but
+    // only for the file this download filed: another download of the episode (with other ads
+    // inserted) is not the audio that is heard.
+    if store == nil, let loader = owner.streamDownload, loader.episodeId == episodeId,
+      let sha = loader.filedSha
+    {
+      store = Self.downloadedStore(episodeId, sha256: sha)
+    }
     skipper.apply(settings: settings)
-    skipper.replace(file: store?.load(detector: PodcastAdFinder.detectorName))
+    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
     setMarkers()
+    // Silence trimming keeps out of the ads that are skipped, so it reads them again too.
+    owner.sound.refresh()
+  }
+
+  /// The ads store of a downloaded episode, or nil while it is not downloaded. With `sha256`,
+  /// only when the download is that file.
+  private static func downloadedStore(_ id: String, sha256 expected: String? = nil) -> AdsStore? {
+    guard let downloads = PodcastDownloader.shared.store, let entry = downloads.entry(for: id),
+      case .downloaded(_, let sha, _, _) = entry.state, expected == nil || expected == sha,
+      let folder = try? downloads.folder(for: id)
+    else { return nil }
+    return AdsStore(folder: folder, sha256: sha)
   }
 
   /// The listener tapped Undo on the note. False when there is nothing to undo any more.
   func undo() -> Bool {
-    guard let ad = skipper.undo(now: now), let episodeId else { return false }
-    store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: ad.start)
+    guard let skip = skipper.undoSkip(now: now), let episodeId else { return false }
+    let ad = skip.ad
+    // The ads that were skipped with it (an ad and then the hosts' plug) are undone too.
+    for undone in [ad] + skip.chained {
+      store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
+    }
     StatsStore.shared.undoAdSkip()
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }

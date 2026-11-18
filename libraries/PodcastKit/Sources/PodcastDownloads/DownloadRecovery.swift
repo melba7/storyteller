@@ -13,6 +13,9 @@ public struct DownloadFailure: Sendable, Equatable {
   /// `URLError.backgroundTaskCancelledReason` was `.userForceQuitApplication`: the listener
   /// swiped the app away and iOS stopped the transfer.
   public var forceQuit: Bool
+  /// iOS stopped the transfer itself (`URLError.backgroundTaskCancelledReason` had any value:
+  /// a swipe-away, Background App Refresh turned off, or too few resources).
+  public var stoppedByIOS: Bool
   /// The phone had no room for the file.
   public var diskFull: Bool
   /// How many times this download has already been retried after a dropped connection.
@@ -20,12 +23,14 @@ public struct DownloadFailure: Sendable, Equatable {
 
   public init(
     urlErrorCode: Int? = nil, httpStatus: Int? = nil, hasResumeData: Bool = false,
-    forceQuit: Bool = false, diskFull: Bool = false, attempts: Int = 0
+    forceQuit: Bool = false, stoppedByIOS: Bool = false, diskFull: Bool = false,
+    attempts: Int = 0
   ) {
     self.urlErrorCode = urlErrorCode
     self.httpStatus = httpStatus
     self.hasResumeData = hasResumeData
     self.forceQuit = forceQuit
+    self.stoppedByIOS = stoppedByIOS || forceQuit
     self.diskFull = diskFull
     self.attempts = attempts
   }
@@ -48,6 +53,36 @@ public enum DownloadRecovery {
   /// no internet, DNS trouble.
   private static let transient: Set<Int> = [-1001, -1003, -1004, -1005, -1006, -1009]
 
+  /// Whether the background session's report of a stopped task is not about the entry's own
+  /// download and must change nothing. A play-through entry is fed by the player, never by the
+  /// background session, so any report is from an older task (the automatic download the player
+  /// cancelled to take over). A cancel the app asked for (-999, and not iOS stopping the
+  /// transfer for any reason) is a download the app already removed or replaced.
+  public static func ignoresCompletion(_ failure: DownloadFailure, playThrough: Bool) -> Bool {
+    if playThrough { return true }
+    return failure.urlErrorCode == -999 && !failure.stoppedByIOS
+  }
+
+  /// Whether a URLError code is a connection that dropped or is not there for now.
+  public static func isDroppedConnection(_ code: Int) -> Bool { transient.contains(code) }
+
+  /// URLError codes for an https address that could not be reached or trusted: secure
+  /// connection failed, the server certificate was bad, dated, untrusted or from an unknown
+  /// root, cannot find or connect to the host.
+  private static let httpsUnreachable: Set<Int> = [-1200, -1201, -1202, -1203, -1204, -1003, -1004]
+
+  /// Whether a download that was upgraded from plain http should try the original http
+  /// address, because https could not connect or its certificate was refused. The server
+  /// answering anything, or the user or the phone stopping the download, never counts.
+  public static func shouldFallBackToPlainHTTP(_ failure: DownloadFailure, plainURL: String?)
+    -> Bool
+  {
+    guard plainURL != nil, failure.httpStatus == nil, !failure.forceQuit, !failure.diskFull,
+      let code = failure.urlErrorCode
+    else { return false }
+    return httpsUnreachable.contains(code)
+  }
+
   /// Whether to resume, start again or give up. A swipe-away always carries on (resuming
   /// when iOS left resume data), and the state stays "downloading" meanwhile. Real errors,
   /// such as the server saying 404 or a full phone, fail with a reason the listener can read.
@@ -67,5 +102,14 @@ public enum DownloadRecovery {
       return failure.hasResumeData ? .resume : .restart
     }
     return .fail("The download failed, tap to try again")
+  }
+
+  /// The words for a download that stopped and will not be carried on, for a download that has
+  /// no resume or restart (one played while it arrives). A dropped connection reads as one.
+  public static func reason(for failure: DownloadFailure) -> String {
+    switch decide(failure) {
+    case .fail(let reason): return reason
+    case .resume, .restart: return "No connection, tap to try again"
+    }
   }
 }

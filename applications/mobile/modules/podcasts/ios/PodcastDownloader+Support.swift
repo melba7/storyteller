@@ -27,6 +27,7 @@ extension DownloadFailure {
       httpStatus: (response as? HTTPURLResponse)?.statusCode,
       hasResumeData: urlError?.downloadTaskResumeData != nil,
       forceQuit: urlError?.backgroundTaskCancelledReason == .userForceQuitApplication,
+      stoppedByIOS: urlError?.backgroundTaskCancelledReason != nil,
       diskFull: Self.isDiskFull(error),
       attempts: attempts)
   }
@@ -50,6 +51,7 @@ enum DownloadJSON {
     var object: [String: Any] = [
       "episodeId": entry.episodeId,
       "updatedAt": entry.updatedAt.timeIntervalSince1970 * 1000,
+      "automatic": entry.automatic,
     ]
     switch entry.state {
     case .queued:

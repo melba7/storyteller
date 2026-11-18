@@ -2,7 +2,10 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  HEADER_FALLBACK,
+  contrastBetween,
   gradientEnds,
+  headerColors,
   playerGradient,
   vivid,
   contrastWithWhite,
@@ -86,5 +89,19 @@ describe("playerGradient", () => {
     expect(playerGradient("#3366cc")).toBe(
       `linear-gradient(180deg, ${top}, ${bottom})`,
     )
+  })
+})
+
+describe("headerColors", () => {
+  it("keeps white text readable and the tint lighter than the background", () => {
+    for (const color of ["#2e7d6b", "#f5d90a", "#ffffff", "#101010", null]) {
+      const { background, tint } = headerColors(color)
+      expect(contrastWithWhite(background)).toBeGreaterThanOrEqual(4.5)
+      expect(contrastBetween(tint, background)).toBeGreaterThan(3)
+    }
+  })
+
+  it("uses a plain dark grey without a colour", () => {
+    expect(headerColors(null).background).toBe(HEADER_FALLBACK)
   })
 })

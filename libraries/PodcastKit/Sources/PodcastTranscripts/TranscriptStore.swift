@@ -40,6 +40,17 @@ public struct TranscriptStore: Sendable {
     return String(data: data, encoding: .utf8)
   }
 
+  /// The lines of the words transcribed so far, as the JSON of a transcript without its words
+  /// (the app reads its `lines`), or nil when there is no partial file or no word in it.
+  public func partialJSON() -> String? {
+    guard let partial = loadPartial(), !partial.words.isEmpty else { return nil }
+    let transcript = Transcript(
+      identity: partial.identity, duration: partial.duration,
+      lines: LineRule.lines(from: partial.words), words: [])
+    guard let data = try? Self.encoder.encode(transcript) else { return nil }
+    return String(data: data, encoding: .utf8)
+  }
+
   /// Saves the finished transcript and removes the partial file.
   public func finish(_ transcript: Transcript) throws {
     try Self.encoder.encode(transcript).write(to: transcriptURL, options: .atomic)
@@ -105,6 +116,13 @@ public final class TranscriptLanguages: @unchecked Sendable {
       if let language, !language.isEmpty { languages[episodeId] = language } else { languages[episodeId] = nil }
       save()
     }
+  }
+
+  /// Notes a language that is known, and leaves what was noted alone when there is none, so a
+  /// start that does not know the show's language never erases the one a download was given.
+  public func remember(_ language: String?, for episodeId: String) {
+    guard let language, !language.isEmpty else { return }
+    note(language, for: episodeId)
   }
 
   /// Forgets the episodes that are not in `keep` (their downloads are gone).

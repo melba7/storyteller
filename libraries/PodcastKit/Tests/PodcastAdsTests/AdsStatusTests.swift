@@ -14,11 +14,26 @@ final class AdsStatusTests: XCTestCase {
   }
 
   private func status(
-    file: AdsFile? = nil, finding: Int? = nil, unavailable: AdUnavailable? = nil,
-    failure: String? = nil
+    file: AdsFile? = nil, partial: AdsFile? = nil, finding: Int? = nil,
+    unavailable: AdUnavailable? = nil, failure: String? = nil
   ) -> AdsStatus {
     AdsRules.status(
-      file: file, detectorVersion: "1", finding: finding, unavailable: unavailable, failure: failure)
+      file: file, partial: partial, detectorVersion: "1", finding: finding, unavailable: unavailable,
+      failure: failure)
+  }
+
+  func testAnEpisodeWithOnlyAPartialResultShowsItsAdsAndIsStillQueuedForTheFullPass() {
+    let partial = status(partial: file(ads: 2))
+    XCTAssertEqual(partial, .partialFound(count: 2))
+    XCTAssertTrue(AdsRules.wantsRun(partial))
+    // The final file wins, and a partial result with no ads or of another version says nothing.
+    XCTAssertEqual(status(file: file(ads: 3), partial: file(ads: 2)), .found(count: 3))
+    XCTAssertEqual(status(partial: file(ads: 0)), .waiting)
+    XCTAssertEqual(status(partial: file(ads: 2, version: "0")), .waiting)
+    XCTAssertEqual(status(partial: file(ads: 2), finding: 10), .finding(percent: 10))
+    let failed = status(partial: file(ads: 2), failure: "Finding ads stopped")
+    XCTAssertEqual(failed, .notPossible(reason: "Finding ads stopped"))
+    XCTAssertFalse(AdsRules.wantsRun(failed))
   }
 
   func testAFreshEpisodeWaits() {

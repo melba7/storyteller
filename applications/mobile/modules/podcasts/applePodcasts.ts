@@ -83,9 +83,11 @@ export function planFollows(
   file: AppleExport,
   seen: readonly string[],
   libraryFeeds: readonly string[],
+  libraryTitles: readonly string[] = [],
 ): FollowPlan {
   const seenKeys = new Set(seen)
   const library = new Set(libraryFeeds.map(feedKey))
+  const titles = new Set(libraryTitles.map(titleKey))
   const next = new Set(seenKeys)
   const subscribe: AppleShow[] = []
   const queued = new Set<string>()
@@ -93,13 +95,72 @@ export function planFollows(
     const key = feedKey(show.feed)
     if (isLocalFeedUrl(show.feed)) continue
     if (seenKeys.has(key) || queued.has(key)) continue
-    if (library.has(key)) next.add(key)
+    // A show the listener unsubscribed from stays dropped under another address too.
+    if (show.title !== null && seenKeys.has(titleSeenKey(show.title))) continue
+    // The same show under another address (a feed that moved, or the other app's export)
+    // is the show the listener already has, or chose to drop.
+    const title = show.title === null ? "" : titleKey(show.title)
+    if (library.has(key) || (title !== "" && titles.has(title))) next.add(key)
     else {
       queued.add(key)
       subscribe.push(show)
     }
   }
   return { subscribe, seen: [...next] }
+}
+
+function titleKey(title: string): string {
+  return title.trim().toLowerCase()
+}
+
+function titleSeenKey(title: string): string {
+  return `title:${titleKey(title)}`
+}
+
+/**
+ * The seen list with this feed's key added (an unsubscribed show is not added again), and
+ * its title's, so the same show under another address in the file is not added either.
+ */
+export function withSeen(
+  seen: readonly string[],
+  feed: string,
+  title: string | null = null,
+): string[] {
+  const keys = [feedKey(feed)]
+  if (title !== null && titleKey(title) !== "") keys.push(titleSeenKey(title))
+  return [...new Set([...seen, ...keys])]
+}
+
+/**
+ * The file with each finished episode of a show the library has under another address pointed
+ * at the library's address (matched by the show's title in the file), so the episodes finished
+ * in Apple Podcasts are marked played for it. A feed key that matches is left alone.
+ */
+export function withLibraryFeeds(
+  file: AppleExport,
+  library: readonly { feedUrl: string; title?: string }[],
+): AppleExport {
+  const shows = feedShows(library)
+  const known = new Set(shows.map((show) => feedKey(show.feedUrl)))
+  const byTitle = new Map<string, string>()
+  for (const show of shows) {
+    const title = titleKey(show.title ?? "")
+    if (title !== "" && !byTitle.has(title)) byTitle.set(title, show.feedUrl)
+  }
+  const titleOf = new Map<string, string>()
+  for (const show of file.shows) {
+    if (show.title !== null)
+      titleOf.set(feedKey(show.feed), titleKey(show.title))
+  }
+  return {
+    ...file,
+    finished: file.finished.map((item) => {
+      const key = feedKey(item.feed)
+      if (known.has(key)) return item
+      const match = byTitle.get(titleOf.get(key) ?? "")
+      return match === undefined ? item : { ...item, feed: match }
+    }),
+  }
 }
 
 export type PlayedInShow = { showId: string; guids: string[] }
@@ -128,7 +189,7 @@ export function planPlayed(
 }
 
 /** The key of one finished episode, for the applied list. */
-function appliedKey(feed: string, guid: string): string {
+export function appliedKey(feed: string, guid: string): string {
   return `${feedKey(feed)}\n${guid}`
 }
 
@@ -136,28 +197,63 @@ function appliedKey(feed: string, guid: string): string {
  * The finished episodes to mark played that were not marked before. `applied` holds the pairs
  * (show feed, guid) done on earlier runs, so an episode the listener marked unplayed since
  * stays unplayed. Pairs of shows not in the library yet are not applied, so they count when
- * the show arrives. The new applied list keeps only pairs still in the file, so it stays small.
+ * the show arrives. A pair for an episode the phone does not have yet (`hasEpisode` says no)
+ * is not applied either: it is `pending`, marked when the feed brings the episode (see
+ * `pendingGuids`) and by a later run if it is there by then. The new applied list keeps only
+ * pairs still in the file, so it stays small.
  */
 export function planPlayedOnce(
   file: AppleExport,
   library: readonly { id: string; feedUrl: string }[],
   applied: readonly string[],
-): { plays: PlayedInShow[]; applied: string[] } {
+  hasEpisode: (feed: string, guid: string) => boolean = () => true,
+): { plays: PlayedInShow[]; applied: string[]; pending: string[] } {
   const done = new Set(applied)
   const inLibrary = new Set(feedShows(library).map((s) => feedKey(s.feedUrl)))
   const fresh: AppleFinished[] = []
   const next = new Set<string>()
+  const pending: string[] = []
   for (const item of file.finished) {
     const key = appliedKey(item.feed, item.guid)
     if (done.has(key)) next.add(key)
     else if (inLibrary.has(feedKey(item.feed))) {
-      next.add(key)
-      fresh.push(item)
+      if (hasEpisode(item.feed, item.guid)) {
+        next.add(key)
+        fresh.push(item)
+      } else if (!pending.includes(key)) pending.push(key)
     }
   }
   return {
     plays: planPlayed({ shows: [], finished: fresh }, library),
     applied: [...next],
+    pending,
+  }
+}
+
+/** The guids of this show's finished episodes the phone did not have yet. */
+export function pendingGuids(
+  pending: readonly string[],
+  feed: string,
+): Set<string> {
+  const prefix = `${feedKey(feed)}\n`
+  return new Set(
+    pending
+      .filter((key) => key.startsWith(prefix))
+      .map((key) => key.slice(prefix.length)),
+  )
+}
+
+/** Episodes that arrived and were marked played: no longer pending, now applied. */
+export function settleArrival(
+  pending: readonly string[],
+  applied: readonly string[],
+  feed: string,
+  guids: readonly string[],
+): { pending: string[]; applied: string[] } {
+  const keys = new Set(guids.map((guid) => appliedKey(feed, guid)))
+  return {
+    pending: pending.filter((key) => !keys.has(key)),
+    applied: [...new Set([...applied, ...keys])],
   }
 }
 
@@ -180,5 +276,35 @@ export function parseSeen(saved: string | null): string[] {
       : []
   } catch {
     return []
+  }
+}
+
+const RETRY_FAILED_MS = 24 * 3_600_000
+
+/** The shows to try now: one that failed to subscribe is tried again after a day, not at every open. */
+export function dueShows(
+  shows: readonly AppleShow[],
+  failedAt: Readonly<Record<string, number>>,
+  now: number,
+): AppleShow[] {
+  return shows.filter((show) => {
+    const failed = failedAt[feedKey(show.feed)]
+    return failed === undefined || now - failed >= RETRY_FAILED_MS
+  })
+}
+
+/** The failure times as kept in AsyncStorage, by feed key; unreadable means none. */
+export function parseFailures(saved: string | null): Record<string, number> {
+  if (saved === null) return {}
+  try {
+    const data: unknown = JSON.parse(saved)
+    if (!isRecord(data)) return {}
+    return Object.fromEntries(
+      Object.entries(data).filter(
+        (entry): entry is [string, number] => typeof entry[1] === "number",
+      ),
+    )
+  } catch {
+    return {}
   }
 }

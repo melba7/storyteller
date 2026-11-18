@@ -8,21 +8,17 @@ import {
   CircleCheck,
   Star,
 } from "lucide-react-native"
+import { useMemo } from "react"
 import { Pressable, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
-import {
-  type RowMeta,
-  ringFraction,
-  rowMeta,
-  rowState,
-} from "@/modules/podcasts/episodeLook"
+import { type RowMeta, rowMeta, rowState } from "@/modules/podcasts/episodeLook"
+import { dateLineParts, stripHtml } from "@/modules/podcasts/episodeRowLook"
 import {
   type Show,
   type StoredEpisode,
-  formatEpisodeDate,
   formatEpisodeLength,
 } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
@@ -32,7 +28,7 @@ import { queuedLabel } from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
 import { EpisodeMenu } from "./EpisodeMenu"
-import { PlayButton, ProgressRing } from "./PlayButton"
+import { PlayCapsule, ProgressRing } from "./PlayButton"
 import { useDownload } from "./useDownloads"
 import { type Selection } from "./useSelection"
 import { useUpNext } from "./useUpNext"
@@ -43,11 +39,11 @@ function MetaGlyph({ meta }: { meta: RowMeta }) {
   switch (meta.glyph) {
     case "none":
       return null
-    case "played":
-      return <Icon as={Check} size={14} className="text-muted-foreground" />
+    case "played": // The capsule says "Played".
+      return null
     case "downloaded":
       return (
-        <Icon as={CircleCheck} size={14} className="text-muted-foreground" />
+        <Icon as={CircleCheck} size={16} className="text-muted-foreground" />
       )
     case "failed":
       return <Icon as={CircleAlert} size={14} className="text-destructive" />
@@ -62,11 +58,14 @@ function MetaGlyph({ meta }: { meta: RowMeta }) {
   }
 }
 
+const ARTWORK = 96
+
 /**
- * One episode on a list: date and star, title, a meta line (download glyph, length or time
- * left, "Up Next"), the "..." menu and a play button whose ring shows how much was heard. A
- * played episode is muted, has no ring and says "Played". The download button lives in the
- * menu.
+ * One episode on a list, Apple's way: a grey date line (with the season and episode, "Played"
+ * and "Up Next" when they apply), the title in bold, a grey description, the artwork at the
+ * right, and a bottom row with the play capsule, a download symbol and the "..." menu. A
+ * played episode's title is muted. Swipe actions come from the list; a long press starts
+ * multi-select.
  */
 export function EpisodeRow({
   episode,
@@ -74,7 +73,8 @@ export function EpisodeRow({
   openable = true,
   highlighted = false,
   selection,
-  artwork = false,
+  artwork = true,
+  here,
 }: {
   episode: StoredEpisode
   show: Show
@@ -84,13 +84,14 @@ export function EpisodeRow({
   highlighted?: boolean
   /** The list's multi-select. While it is on, a tap picks the row instead of opening it. */
   selection?: Selection
-  /** Shows the episode's picture (or its show's) at the start of the row. */
+  /** Shows the episode's picture (or its show's) at the right; on by default. */
   artwork?: boolean
+  /** The page the list is on (a show's), so the "..." menu leaves out going to it. */
+  here?: { show?: boolean }
 }) {
   const router = useRouter()
   const segments = useSegments()
   const state = rowState(episode)
-  const date = formatEpisodeDate(episode.publishedAt)
   const length = formatEpisodeLength(episode)
   const queued = queuedLabel(useUpNext(), episode.id)
   // An added file's download is its only copy, and a preview episode has none.
@@ -103,92 +104,107 @@ export function EpisodeRow({
   const played = state === "played"
   const picking = selection?.on === true
   const picked = picking && selection.selected.includes(episode.id)
+  const dateParts = dateLineParts(episode, Date.now())
+  const description = useMemo(() => stripHtml(episode.notes), [episode.notes])
+  const spokenDate = dateParts.join(", ")
   return (
     <View
-      className={`border-foreground/10 flex-row items-center gap-3 border-b py-3 ${highlighted ? "bg-secondary rounded-md px-2" : ""}`}
+      className={`border-foreground/10 flex-row gap-3 border-b py-3 ${highlighted ? "bg-secondary rounded-md px-2" : ""}`}
     >
       {picking ? (
-        <Icon
-          as={picked ? Check : Circle}
-          size={24}
-          className={picked ? "text-primary" : "text-muted-foreground"}
-        />
-      ) : null}
-      {artwork ? (
-        <View style={{ opacity: played ? 0.6 : 1 }}>
-          <Artwork
-            uri={episode.imageUrl ?? show.imageUrl}
-            size={56}
-            className="rounded-lg"
+        <View className="pt-1">
+          <Icon
+            as={picked ? Check : Circle}
+            size={24}
+            className={picked ? "text-primary" : "text-muted-foreground"}
           />
         </View>
       ) : null}
-      <Pressable
-        className="active:bg-secondary flex-1 gap-1 rounded-md"
-        accessibilityRole={picking ? "checkbox" : "button"}
-        accessibilityState={picking ? { checked: picked } : {}}
-        accessibilityLabel={[
-          episode.title,
-          date,
-          ...meta.spoken,
-          episode.starredAt === null ? "" : "Starred",
-        ]
-          .filter((part) => part !== "")
-          .join(", ")}
-        disabled={!openable && !picking}
-        onPress={() =>
-          picking
-            ? selection.toggle(episode.id)
-            : router.push(episodeHref(segments, episode.id))
-        }
-        onLongPress={
-          selection && openable && !picking
-            ? () => selection.begin(episode.id)
-            : undefined
-        }
-      >
-        {date || episode.starredAt !== null ? (
-          <View className="flex-row items-center gap-1">
-            {episode.starredAt === null ? null : (
-              <Icon
-                as={Star}
-                size={12}
-                className="text-primary"
-                fill="currentColor"
-              />
-            )}
-            <Text className="text-muted-foreground text-xs">{date}</Text>
-          </View>
-        ) : null}
-        <Text
-          className={`font-semibold ${played ? "text-muted-foreground" : ""}`}
-          numberOfLines={2}
+      <View className="flex-1 gap-2">
+        <Pressable
+          className="active:bg-secondary flex-row gap-3 rounded-md"
+          accessibilityRole={picking ? "checkbox" : "button"}
+          accessibilityState={picking ? { checked: picked } : {}}
+          accessibilityLabel={[
+            episode.title,
+            spokenDate,
+            ...meta.spoken,
+            episode.starredAt === null ? "" : "Saved",
+          ]
+            .filter((part) => part !== "")
+            .join(", ")}
+          disabled={!openable && !picking}
+          onPress={() =>
+            picking
+              ? selection.toggle(episode.id)
+              : router.push(episodeHref(segments, episode.id))
+          }
+          onLongPress={
+            selection && openable && !picking
+              ? () => selection.begin(episode.id)
+              : undefined
+          }
         >
-          {episode.title}
-        </Text>
-        {meta.glyph !== "none" || length || queued ? (
-          <View className="flex-row items-center gap-1">
-            <MetaGlyph meta={meta} />
-            <Text className="text-muted-foreground flex-shrink text-sm">
-              {length}
-              {length && queued ? " · " : ""}
-              {queued ? (
-                <Text className="text-primary text-sm">Up Next</Text>
-              ) : null}
+          <View className="flex-1 gap-1">
+            <View className="flex-row items-center gap-1">
+              {episode.starredAt === null ? null : (
+                <Icon
+                  as={Star}
+                  size={12}
+                  className="text-primary"
+                  fill="currentColor"
+                />
+              )}
+              <Text
+                className="text-muted-foreground flex-shrink text-[15px] font-semibold"
+                numberOfLines={1}
+              >
+                {dateParts.join(" \u00b7 ")}
+                {queued ? (
+                  <Text className="text-primary text-[15px] font-semibold">
+                    {dateParts.length > 0 ? " \u00b7 " : ""}Up Next
+                  </Text>
+                ) : null}
+              </Text>
+            </View>
+            <Text
+              className={`text-[17px] leading-[22px] font-bold ${played ? "text-muted-foreground" : ""}`}
+              numberOfLines={4}
+            >
+              {episode.title}
             </Text>
+            {description ? (
+              <Text
+                className="text-muted-foreground text-[15px] leading-5"
+                numberOfLines={2}
+              >
+                {description}
+              </Text>
+            ) : null}
           </View>
-        ) : null}
-      </Pressable>
-      {picking ? null : (
-        <>
-          <EpisodeMenu episode={episode} show={show} />
-          <PlayButton
-            episode={episode}
-            show={show}
-            ring={ringFraction(episode)}
-          />
-        </>
-      )}
+          {artwork ? (
+            <View style={{ opacity: played ? 0.6 : 1 }}>
+              <Artwork
+                uri={episode.imageUrl ?? show.imageUrl}
+                size={ARTWORK}
+                className="rounded-lg"
+              />
+            </View>
+          ) : null}
+        </Pressable>
+        {picking ? null : (
+          <View className="flex-row items-center gap-3">
+            <PlayCapsule episode={episode} show={show} />
+            <MetaGlyph meta={meta} />
+            <View className="flex-1" />
+            <EpisodeMenu
+              episode={episode}
+              show={show}
+              {...(here ? { here } : {})}
+            />
+          </View>
+        )}
+      </View>
     </View>
   )
 }

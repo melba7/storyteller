@@ -18,9 +18,10 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { Podcasts, type UpNextItem } from "@/modules/podcasts/index"
 import { formatDuration } from "@/modules/podcasts/library"
-import { episodeHref } from "@/modules/podcasts/routes"
+import { SEARCH_HREF, episodeHref } from "@/modules/podcasts/routes"
 import {
   moveBetween,
+  outsideQueue,
   progressFraction,
   rowLabel,
   upNextSummary,
@@ -29,10 +30,11 @@ import {
 import { Artwork } from "./Artwork"
 import { DragList, type RowAction } from "./DragList"
 import { EmptyState } from "./EmptyState"
+import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SectionMenuButton } from "./SectionMenu"
 import { pick } from "./haptics"
-import { useEpisodesByIds } from "./hooks"
+import { useEpisodesByIds, useShows } from "./hooks"
+import { useUpNextShelf } from "./useHome"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import {
   confirmClear,
@@ -52,7 +54,7 @@ const ACTIONS: RowAction[] = [
 ]
 
 /**
- * The Up Next tab: the episodes that play after the current one, in order. Drag a row by its
+ * The Up Next page (Home's "Up Next >" and Library's Up Next row): the episodes that play after the current one, in order. Drag a row by its
  * handle (or use VoiceOver's Move up and Move down) to reorder; swipe right for Play next
  * and Play last, left for Remove. Tapping a row opens the episode.
  */
@@ -66,6 +68,16 @@ export function UpNext() {
   )
   const ids = useMemo(() => queue.map((item) => item.id), [queue])
   const episodes = useEpisodesByIds(ids)
+  const shelfAll = useUpNextShelf().data
+  const shelf = useMemo(
+    () => outsideQueue(shelfAll ?? [], queue),
+    [shelfAll, queue],
+  )
+  const shows = useShows()
+  const showById = useMemo(
+    () => new Map((shows.data ?? []).map((show) => [show.id, show])),
+    [shows.data],
+  )
   const inLibrary = useMemo(
     () => new Set((episodes.data ?? []).map((episode) => episode.id)),
     [episodes.data],
@@ -86,16 +98,88 @@ export function UpNext() {
   }
 
   return (
-    <View className="bg-background flex-1">
+    <>
+      {Podcasts === null ? (
+        <BelowBar>
+          <EmptyState
+            icon={ListEnd}
+            title="Up Next needs the iOS app"
+            body="This version of the app can't play podcasts."
+          />
+        </BelowBar>
+      ) : queue.length === 0 && shelf.length === 0 ? (
+        <BelowBar>
+          <EmptyState
+            icon={ListEnd}
+            title="Nothing in Up Next"
+            body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
+            action={{
+              label: "Find an episode",
+              onPress: () => router.navigate(SEARCH_HREF),
+            }}
+          />
+        </BelowBar>
+      ) : (
+        <DragList
+          header={
+            <View className="gap-1 pt-2 pb-2">
+              <Text className="text-2xl font-bold" accessibilityRole="header">
+                Playing Next
+              </Text>
+              <Text
+                className="text-muted-foreground text-sm"
+                accessibilityLabel={
+                  queue.length === 0 ? undefined : upNextSummary(queue)
+                }
+              >
+                {queue.length === 0
+                  ? "Nothing queued. Choose Play Next or Play Last from an episode's menu."
+                  : upNextSummary(queue)}
+              </Text>
+            </View>
+          }
+          footer={
+            shelf.length > 0 ? (
+              <View className="pt-6 pb-6">
+                <Text className="text-2xl font-bold" accessibilityRole="header">
+                  Next from your shows
+                </Text>
+                {shelf.map(({ episode }) => {
+                  const show = showById.get(episode.showId)
+                  return show ? (
+                    <EpisodeRow
+                      key={episode.id}
+                      artwork
+                      episode={episode}
+                      show={show}
+                    />
+                  ) : null
+                })}
+              </View>
+            ) : null
+          }
+          ids={ids}
+          rowHeight={ROW_HEIGHT}
+          onChange={reorder}
+          onDrop={pick}
+          label={(id, index, count) => {
+            const item = byId.get(id)
+            return item ? rowLabel(item, index, count) : ""
+          }}
+          actions={ACTIONS}
+          onAction={act}
+          renderContent={(id) => {
+            const item = byId.get(id)
+            return item ? (
+              <QueueRow item={item} openable={inLibrary.has(id)} />
+            ) : null
+          }}
+        />
+      )}
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar
         large
         title="Up Next"
-        left={
-          <Stack.Toolbar.View>
-            <SectionMenuButton current="podcasts" />
-          </Stack.Toolbar.View>
-        }
         right={
           <Stack.Toolbar.Button
             hidden={queue.length === 0}
@@ -106,57 +190,7 @@ export function UpNext() {
           </Stack.Toolbar.Button>
         }
       />
-      {Podcasts === null ? (
-        <BelowBar>
-          <EmptyState
-            icon={ListEnd}
-            title="Up Next needs the iOS app"
-            body="This version of the app can't play podcasts."
-          />
-        </BelowBar>
-      ) : queue.length === 0 ? (
-        <BelowBar>
-          <EmptyState
-            icon={ListEnd}
-            title="Nothing in Up Next"
-            body="Tap the three dots on an episode, or open it, and choose Play next or Play last. The next episode then starts by itself when the current one ends."
-            action={{
-              label: "Find an episode",
-              onPress: () => router.navigate("/podcasts"),
-            }}
-          />
-        </BelowBar>
-      ) : (
-        <>
-          <DragList
-            header={
-              <Text
-                className="text-muted-foreground py-2 text-sm"
-                accessibilityLabel={upNextSummary(queue)}
-              >
-                {upNextSummary(queue)}
-              </Text>
-            }
-            ids={ids}
-            rowHeight={ROW_HEIGHT}
-            onChange={reorder}
-            onDrop={pick}
-            label={(id, index, count) => {
-              const item = byId.get(id)
-              return item ? rowLabel(item, index, count) : ""
-            }}
-            actions={ACTIONS}
-            onAction={act}
-            renderContent={(id) => {
-              const item = byId.get(id)
-              return item ? (
-                <QueueRow item={item} openable={inLibrary.has(id)} />
-              ) : null
-            }}
-          />
-        </>
-      )}
-    </View>
+    </>
   )
 }
 
@@ -190,10 +224,12 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
 
   return (
     <Swipeable
+      // The swipe actions are 80 points wide, so they keep a small padding of their own (the
+      // shared Button's is too wide for "Play next") and a solid background behind the row.
       renderLeftActions={(_progress, _translation, methods) => (
         <View className="flex-row">
           <Button
-            className="h-full w-20 flex-col gap-1 rounded-none"
+            className="h-full w-20 flex-col gap-1 rounded-none px-1"
             accessibilityLabel={`Play ${item.title} next`}
             onPress={() => playNext(methods)}
           >
@@ -206,7 +242,7 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
           </Button>
           <Button
             variant="secondary"
-            className="h-full w-20 flex-col gap-1 rounded-none"
+            className="bg-secondary h-full w-20 flex-col gap-1 rounded-none px-1"
             accessibilityLabel={`Play ${item.title} last`}
             onPress={() => playLast(methods)}
           >
@@ -215,14 +251,14 @@ function QueueRow({ item, openable }: { item: UpNextItem; openable: boolean }) {
               size={20}
               className="text-secondary-foreground"
             />
-            <Text className="text-xs">Play last</Text>
+            <Text className="text-secondary-foreground text-xs">Play last</Text>
           </Button>
         </View>
       )}
       renderRightActions={(_progress, _translation, methods) => (
         <Button
           variant="destructive"
-          className="h-full w-20 flex-col gap-1 rounded-none"
+          className="h-full w-20 flex-col gap-1 rounded-none px-1"
           accessibilityLabel={`Remove ${item.title} from Up Next`}
           onPress={() => remove(methods)}
         >

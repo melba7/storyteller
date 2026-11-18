@@ -37,6 +37,10 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   private var active = Set<String>()
   private var throttles: [Int: ProgressThrottle] = [:]
   private var retries: [String: Int] = [:]
+  /// Episodes the player is fetching as they play (PodcastStreamDownload), each with what stops
+  /// that. The background session knows nothing about them, so this keeps clean-up and a second
+  /// download from treating their entries as its own.
+  private var playThrough: [String: @Sendable () -> Void] = [:]
   private var backgroundCompletion: (() -> Void)?
 
   private override init() {
@@ -88,11 +92,16 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Applies the restart rule: downloads that lost their task fail, queued ones start again.
   private func settle() {
     guard let store else { return }
-    let live = lock.withLock { active }
+    let live = lock.withLock { active.union(playThrough.keys) }
     let before = store.entries()
     guard let restart = try? store.reconcile(liveEpisodeIds: live) else { return }
     for entry in before {
-      if let now = store.entry(for: entry.episodeId), now.state != entry.state { emit(now) }
+      guard let now = store.entry(for: entry.episodeId) else {
+        // An unfinished play-through download left by a kill: it is gone, not "Stopped".
+        if entry.playThrough { emitRemoved(entry.episodeId) }
+        continue
+      }
+      if now.state != entry.state { emit(now) }
     }
     for entry in restart { begin(entry) }
   }
@@ -113,8 +122,12 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
       scheme == "http" || scheme == "https", given.host != nil
     else { throw PodcastFetchError(message: "This episode has no downloadable link.") }
-    // A background download can't use plain http, which iOS blocks (error -1022).
+    // https is tried first. A feed that only serves http gets its original address back once,
+    // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS
+    let plain = scheme == "http" ? given.absoluteString : nil
+    // The player is already fetching it as the episode plays.
+    if lock.withLock({ playThrough[episodeId] != nil }) { return }
     if let existing = store.entry(for: episodeId) {
       if existing.state.isActive, lock.withLock({ active.contains(episodeId) }) { return }
       if case .downloaded = existing.state, store.localFile(for: episodeId) != nil { return }
@@ -124,7 +137,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     let entry = DownloadEntry(
       episodeId: episodeId, url: address.absoluteString,
       fileExtension: DownloadFile.fileExtension(type: type, url: address), state: .queued,
-      automatic: automatic)
+      automatic: automatic, plainURL: plain)
     try store.put(entry)
     emit(entry)
     begin(entry)
@@ -140,6 +153,9 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Stops any task for the episode and removes its folder, files and entry.
   func remove(episodeId: String) throws {
     guard let store else { return }
+    // A download the player is feeding stops too, and the player plays the plain address.
+    let stopLoader = lock.withLock { playThrough[episodeId] }
+    stopLoader?()
     _ = try store.delete(episodeId: episodeId)
     lock.withLock { active.remove(episodeId); retries[episodeId] = nil }
     session?.getAllTasks { tasks in
@@ -150,6 +166,23 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   }
 
   func localFile(for episodeId: String) -> URL? { store?.localFile(for: episodeId) }
+
+  // MARK: Play-through downloads
+
+  /// The player started fetching this episode as it plays. `stop` is called when the listener
+  /// removes or cancels the download meanwhile.
+  func registerPlayThrough(_ episodeId: String, stop: @escaping @Sendable () -> Void) {
+    lock.withLock { playThrough[episodeId] = stop }
+  }
+
+  /// The player's fetch of this episode is over (filed, failed, stopped or given up).
+  func unregisterPlayThrough(_ episodeId: String) {
+    lock.withLock { _ = playThrough.removeValue(forKey: episodeId) }
+  }
+
+  func isPlayThrough(_ episodeId: String) -> Bool {
+    lock.withLock { playThrough[episodeId] != nil }
+  }
 
   /// Begins a task for the entry's address. Wi-Fi only is read now, per request.
   private func begin(_ entry: DownloadEntry) {
@@ -211,18 +244,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     }
     do {
       let staged = try store.stage(location, episodeId: id)
-      let hash: String
-      let bytes: Int64
-      do {
-        hash = try FileHash.sha256(of: staged)
-        bytes = (try FileManager.default.attributesOfItem(atPath: staged.path)[.size] as? Int64) ?? 0
-      } catch {
-        try? FileManager.default.removeItem(at: staged)
-        throw error
-      }
-      let done = try store.install(
-        episodeId: id, staged: staged, sha256: hash, fileExtension: entry.fileExtension, bytes: bytes,
-        requireEntry: true)
+      let done = try store.installStaged(staged, episodeId: id, fileExtension: entry.fileExtension)
       finished(id, taskIdentifier: downloadTask.taskIdentifier)
       emit(done)
       PodcastTranscriber.shared.downloaded(id)
@@ -239,9 +261,13 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     lock.withLock { _ = throttles.removeValue(forKey: task.taskIdentifier) }
     guard let error, let id = task.taskDescription, let store else { return }
     // Removed by the listener (their cancel is an error too): nothing left to keep.
-    guard store.entry(for: id) != nil else { return finished(id, taskIdentifier: task.taskIdentifier) }
+    guard let entry = store.entry(for: id) else {
+      return finished(id, taskIdentifier: task.taskIdentifier)
+    }
     let attempts = lock.withLock { retries[id] ?? 0 }
     let failure = DownloadFailure(error: error, response: task.response, attempts: attempts)
+    // The cancelled automatic download the player replaced reports late, beside the new entry.
+    if DownloadRecovery.ignoresCompletion(failure, playThrough: entry.playThrough) { return }
     recover(id, failure, resumeData: failure.hasResumeData ? (error as? URLError)?.downloadTaskResumeData : nil)
   }
 
@@ -259,6 +285,15 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
   /// Does what DownloadRecovery says: carry on from the resume data, start again, or fail.
   private func recover(_ id: String, _ failure: DownloadFailure, resumeData: Data? = nil) {
     guard let store, let entry = store.entry(for: id) else { return }
+    if DownloadRecovery.shouldFallBackToPlainHTTP(failure, plainURL: entry.plainURL) {
+      var plain = entry
+      plain.fallBackToPlainHTTP()
+      plain.updatedAt = Date()
+      try? store.put(plain)
+      lock.withLock { retries[id] = nil }
+      reactivate(plain)
+      return begin(plain)
+    }
     switch DownloadRecovery.decide(failure) {
     case .resume:
       count(retry: failure, id)
@@ -312,7 +347,7 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     send?("onDownloadChange", DownloadJSON.object(entry))
   }
 
-  private func emitRemoved(_ id: String) {
+  func emitRemoved(_ id: String) {
     let send = lock.withLock { sink }
     send?("onDownloadChange", ["episodeId": id, "state": "none"])
   }

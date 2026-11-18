@@ -2,6 +2,10 @@
 import { Stack } from "expo-router"
 
 import { saveShowSettings } from "@/modules/podcasts/dbSettings"
+import {
+  EPISODE_FILTERS,
+  type EpisodeFilter,
+} from "@/modules/podcasts/episodeRowLook"
 import { type Show } from "@/modules/podcasts/library"
 import { isLocalFeedUrl } from "@/modules/podcasts/localFiles"
 import { showShare } from "@/modules/podcasts/share"
@@ -19,6 +23,9 @@ const SORTS: { id: EpisodeSort; title: string }[] = [
 interface Options {
   show: Show
   archivedCount: number
+  /** Which episodes the page lists now, and the way to change that. */
+  filter: EpisodeFilter
+  onFilter: (filter: EpisodeFilter) => void
   /** Starts picking several episodes. */
   onSelect: () => void
   /** Opens the show's settings. */
@@ -28,7 +35,8 @@ interface Options {
 }
 
 /**
- * The show page's native toolbar items: a sort menu (how the episodes are ordered and grouped,
+ * The show page's native toolbar items, one glass group at the right: a filter menu (Unplayed,
+ * All Episodes, Downloaded, Saved, Archived), a sort menu (how the episodes are ordered and grouped,
  * kept per show) and a "…" menu with Select episodes, Share, Settings and Unfollow. It returns
  * the items themselves, not a component, because a toolbar finds its items by their type among
  * its direct children.
@@ -36,6 +44,8 @@ interface Options {
 export function showBarItems({
   show,
   archivedCount,
+  filter,
+  onFilter,
   onSelect,
   onSettings,
   onUnfollow,
@@ -47,6 +57,21 @@ export function showBarItems({
     )
   }
   return [
+    <Stack.Toolbar.Menu
+      key="filter"
+      icon="line.3.horizontal.decrease"
+      accessibilityLabel="Filter episodes"
+    >
+      {EPISODE_FILTERS.map((entry) => (
+        <Stack.Toolbar.MenuAction
+          key={entry.id}
+          isOn={filter === entry.id}
+          onPress={() => onFilter(entry.id)}
+        >
+          {entry.title}
+        </Stack.Toolbar.MenuAction>
+      ))}
+    </Stack.Toolbar.Menu>,
     <Stack.Toolbar.Menu
       key="sort"
       icon="arrow.up.arrow.down"

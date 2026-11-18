@@ -4,11 +4,14 @@ import { describe, expect, it } from "vitest"
 import {
   applyChange,
   downloadFraction,
+  downloadedCount,
   downloadLook,
   downloadsSummary,
   downloadMenuTitle,
   formatStorage,
   mapFromList,
+  shouldDownloadOnPlay,
+  skipAdsFor,
   sortDownloads,
   storageOf,
 } from "./downloads"
@@ -219,5 +222,88 @@ describe("downloadMenuTitle", () => {
     expect(downloadMenuTitle("retry")).toBe("Download again")
     expect(downloadMenuTitle("cancel")).toBe("Cancel download")
     expect(downloadMenuTitle("delete")).toBe("Remove download")
+  })
+})
+
+describe("shouldDownloadOnPlay", () => {
+  const stream = { id: "e1" }
+
+  it("downloads a streamed episode when Skip ads is on and nothing is downloaded", () => {
+    expect(shouldDownloadOnPlay(stream, undefined, true)).toBe(true)
+  })
+  it("downloads again one whose download failed", () => {
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ episodeId: "e1", state: "failed" }),
+        true,
+      ),
+    ).toBe(true)
+  })
+  it("leaves one that is queued, downloading or downloaded alone", () => {
+    for (const state of ["queued", "downloading", "downloaded"] as const) {
+      expect(
+        shouldDownloadOnPlay(stream, info({ episodeId: "e1", state }), true),
+      ).toBe(false)
+    }
+  })
+  it("plays through its own download when the automatic one has not started", () => {
+    const waiting = { episodeId: "e1", automatic: true }
+    expect(
+      shouldDownloadOnPlay(stream, info({ ...waiting, state: "queued" }), true),
+    ).toBe(true)
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ ...waiting, state: "downloading", bytes: 0 }),
+        true,
+      ),
+    ).toBe(true)
+    // Once bytes have arrived, or when the listener asked for it, it is left alone.
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ ...waiting, state: "downloading", bytes: 5 }),
+        true,
+      ),
+    ).toBe(false)
+    expect(
+      shouldDownloadOnPlay(
+        stream,
+        info({ episodeId: "e1", automatic: false, state: "queued" }),
+        true,
+      ),
+    ).toBe(false)
+  })
+  it("does nothing when Skip ads is off", () => {
+    expect(shouldDownloadOnPlay(stream, undefined, false)).toBe(false)
+  })
+  it("does nothing for an added file or a preview", () => {
+    expect(shouldDownloadOnPlay({ id: "file-1" }, undefined, true)).toBe(false)
+    expect(shouldDownloadOnPlay({ id: "preview:s:1" }, undefined, true)).toBe(
+      false,
+    )
+  })
+})
+
+describe("skipAdsFor", () => {
+  it("takes the show's own choice when it has one, else the main switch", () => {
+    expect(skipAdsFor(true, false)).toBe(true)
+    expect(skipAdsFor(false, true)).toBe(false)
+    expect(skipAdsFor(null, true)).toBe(true)
+    expect(skipAdsFor(undefined, false)).toBe(false)
+  })
+})
+
+describe("downloadedCount", () => {
+  it("counts finished and moving downloads, not failed ones", () => {
+    const map = mapFromList([
+      info({ episodeId: "a", state: "downloaded" }),
+      info({ episodeId: "b", state: "downloading" }),
+      info({ episodeId: "c", state: "queued" }),
+      info({ episodeId: "d", state: "failed" }),
+    ])
+    expect(downloadedCount(map)).toBe(3)
+    expect(downloadedCount({})).toBe(0)
   })
 })

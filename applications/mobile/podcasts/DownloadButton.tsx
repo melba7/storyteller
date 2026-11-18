@@ -23,6 +23,10 @@ interface Props {
     "id" | "showId" | "title" | "audioUrl" | "audioType"
   >
   size?: number
+  /** "onColor" draws everything in white, for a button on a coloured surface. */
+  tone?: "default" | "onColor"
+  /** With "onColor": the ink to draw in instead of white (a card whose colour is light). */
+  ink?: string
 }
 
 /**
@@ -52,14 +56,24 @@ export function DownloadStatusLine({ episode }: { episode: Props["episode"] }) {
   ) : null
 }
 
+const WHITE = "#ffffff"
+
 /**
  * The download button: an arrow to download, a ring while downloading (tap to cancel), a
  * check mark when done (tap to delete) and an alert mark after a failure (tap to try
  * again). Nothing where the app can't download.
  */
-export function DownloadButton({ episode, size = 36 }: Props) {
+export function DownloadButton({
+  episode,
+  size = 36,
+  tone = "default",
+  ink = WHITE,
+}: Props) {
   const info = useDownload(episode.id)
-  const primary = useCSSVariable("--color-primary") as string
+  const themePrimary = useCSSVariable("--color-primary") as string
+  const onColor = tone === "onColor"
+  const primary = onColor ? ink : themePrimary
+  const spinner = onColor ? ink : undefined
   // An added file's download is its only copy: no button, so it can't be deleted from here.
   if (Podcasts === null || isLocalEpisodeId(episode.id)) return null
   const look = downloadLook(info, episode.title)
@@ -77,15 +91,23 @@ export function DownloadButton({ episode, size = 36 }: Props) {
           <Icon
             as={ArrowDownToLine}
             size={inner + 2}
-            className="text-muted-foreground"
+            {...(onColor
+              ? { color: ink }
+              : { className: "text-muted-foreground" })}
           />
         ) : null}
         {look.icon === "waiting" ? (
-          <ActivityIndicator accessibilityLabel="Waiting to download" />
+          <ActivityIndicator
+            color={spinner}
+            accessibilityLabel="Waiting to download"
+          />
         ) : null}
         {look.icon === "progress" ? (
           look.fraction === null ? (
-            <ActivityIndicator accessibilityLabel="Downloading" />
+            <ActivityIndicator
+              color={spinner}
+              accessibilityLabel="Downloading"
+            />
           ) : (
             <>
               <ProgressRing
@@ -93,19 +115,29 @@ export function DownloadButton({ episode, size = 36 }: Props) {
                 size={size - 4}
                 color={primary}
               />
-              <Icon as={X} size={inner - 2} className="text-primary" />
+              <Icon
+                as={X}
+                size={inner - 2}
+                {...(onColor ? { color: ink } : { className: "text-primary" })}
+              />
             </>
           )
         ) : null}
         {look.icon === "done" ? (
           <View
-            className="bg-primary items-center justify-center rounded-full"
-            style={{ width: inner + 6, height: inner + 6 }}
+            className={`items-center justify-center rounded-full ${onColor ? "border-2" : "bg-primary"}`}
+            style={{
+              width: inner + 6,
+              height: inner + 6,
+              borderColor: onColor ? ink : undefined,
+            }}
           >
             <Icon
               as={Check}
               size={inner - 2}
-              className="text-primary-foreground"
+              {...(onColor
+                ? { color: ink }
+                : { className: "text-primary-foreground" })}
             />
           </View>
         ) : null}
@@ -113,7 +145,7 @@ export function DownloadButton({ episode, size = 36 }: Props) {
           <Icon
             as={CircleAlert}
             size={inner + 4}
-            className="text-destructive"
+            {...(onColor ? { color: ink } : { className: "text-destructive" })}
           />
         ) : null}
       </Pressable>

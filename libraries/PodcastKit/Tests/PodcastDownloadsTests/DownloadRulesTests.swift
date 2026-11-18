@@ -79,6 +79,21 @@ final class RelaunchTests: XCTestCase {
     XCTAssertEqual(Relaunch.action(for: .failed(reason: "no"), taskIsAlive: false), .keep)
   }
 
+  func testAnUnfinishedPlayThroughDownloadIsDroppedAtLaunchNotShownAsStopped() {
+    XCTAssertEqual(
+      Relaunch.action(for: .downloading(bytes: 5, expected: 10), taskIsAlive: false, playThrough: true),
+      .drop)
+    XCTAssertEqual(Relaunch.action(for: .queued, taskIsAlive: false, playThrough: true), .drop)
+    // One the player is still feeding (it registered itself) is left alone.
+    XCTAssertEqual(
+      Relaunch.action(for: .downloading(bytes: 5, expected: 10), taskIsAlive: true, playThrough: true),
+      .keep)
+    let done = DownloadState.downloaded(file: "f.mp3", sha256: "x", bytes: 1, date: Date())
+    XCTAssertEqual(Relaunch.action(for: done, taskIsAlive: false, playThrough: true), .keep)
+    XCTAssertEqual(
+      Relaunch.action(for: .failed(reason: "no"), taskIsAlive: false, playThrough: true), .keep)
+  }
+
   func testThePlanCoversEveryEntry() {
     let plan = Relaunch.plan(
       entries: [
@@ -188,6 +203,46 @@ final class DownloadRecoveryTests: XCTestCase {
   }
 }
 
+final class PlainHTTPFallbackTests: XCTestCase {
+  private let plain = "http://feeds.example/ep.mp3"
+
+  func testAnHTTPSConnectionOrCertificateFailureFallsBackToTheOriginalAddress() {
+    for code in [-1200, -1201, -1202, -1203, -1204, -1004, -1003] {
+      XCTAssertTrue(
+        DownloadRecovery.shouldFallBackToPlainHTTP(
+          DownloadFailure(urlErrorCode: code), plainURL: plain), "code \(code)")
+    }
+  }
+
+  func testWithoutAnOriginalHTTPAddressThereIsNothingToFallBackTo() {
+    XCTAssertFalse(
+      DownloadRecovery.shouldFallBackToPlainHTTP(DownloadFailure(urlErrorCode: -1200), plainURL: nil))
+  }
+
+  func testOtherFailuresDoNotFallBack() {
+    for failure in [
+      DownloadFailure(urlErrorCode: -1001), DownloadFailure(urlErrorCode: -1009),
+      DownloadFailure(urlErrorCode: -999, forceQuit: true), DownloadFailure(httpStatus: 404),
+      DownloadFailure(urlErrorCode: -1200, httpStatus: 500), DownloadFailure(diskFull: true),
+      DownloadFailure(),
+    ] {
+      XCTAssertFalse(
+        DownloadRecovery.shouldFallBackToPlainHTTP(failure, plainURL: plain), "\(failure)")
+    }
+  }
+
+  func testWhenThePlainAddressIsTriedItsKeptNoMore() {
+    var entry = DownloadEntry(
+      episodeId: "a", url: "https://feeds.example/ep.mp3", fileExtension: "mp3", state: .queued,
+      plainURL: plain)
+    entry.fallBackToPlainHTTP()
+    XCTAssertEqual(entry.url, plain)
+    XCTAssertNil(entry.plainURL)
+    entry.fallBackToPlainHTTP()
+    XCTAssertEqual(entry.url, plain)
+  }
+}
+
 final class NetworkPolicyTests: XCTestCase {
   func testAutomaticDownloadsAlwaysWaitForWifi() {
     XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: true, setting: false))
@@ -197,5 +252,36 @@ final class NetworkPolicyTests: XCTestCase {
   func testTheListenersDownloadsFollowTheSwitch() {
     XCTAssertFalse(NetworkPolicy.wifiOnly(automatic: false, setting: false))
     XCTAssertTrue(NetworkPolicy.wifiOnly(automatic: false, setting: true))
+  }
+}
+
+final class DownloadCompletionIgnoredTests: XCTestCase {
+  func testAnythingFromAnOlderTaskOfAPlayThroughEntryIsIgnored() {
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -999), playThrough: true))
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -1005), playThrough: true))
+  }
+
+  func testACancelTheAppAskedForIsIgnoredForANormalDownload() {
+    XCTAssertTrue(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -999), playThrough: false))
+  }
+
+  func testACancelByIOSForAnotherReasonIsStillReported() {
+    // Background App Refresh turned off, or iOS short of resources: not the app's own cancel.
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(
+        DownloadFailure(urlErrorCode: -999, stoppedByIOS: true), playThrough: false))
+  }
+
+  func testASwipeAwayAndRealFailuresAreStillReported() {
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(
+        DownloadFailure(urlErrorCode: -999, forceQuit: true), playThrough: false))
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(urlErrorCode: -1005), playThrough: false))
+    XCTAssertFalse(
+      DownloadRecovery.ignoresCompletion(DownloadFailure(httpStatus: 404), playThrough: false))
   }
 }

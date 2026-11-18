@@ -22,13 +22,13 @@ export const THEMES: readonly PodcastTheme[] = [
     id: "light",
     name: "Light",
     dark: false,
-    swatch: { background: "#ffffff", accent: "#b84d0f" },
+    swatch: { background: "#ffffff", accent: "#9b42f5" },
   },
   {
     id: "dark",
     name: "Dark",
     dark: true,
-    swatch: { background: "#0a0a0a", accent: "#ef7f3e" },
+    swatch: { background: "#000000", accent: "#b57bff" },
   },
   {
     id: "pod-black",

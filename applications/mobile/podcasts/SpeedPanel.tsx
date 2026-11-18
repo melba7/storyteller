@@ -15,7 +15,7 @@ interface Props {
 
 /**
  * The speed choices in a bottom sheet, like the sleep timer's, so the player page behind it
- * doesn't move. The sheet is dark whatever the theme, like the player.
+ * doesn't move. The sheet follows the theme, like the sleep timer's.
  */
 export function SpeedSheet({
   visible,
@@ -36,10 +36,8 @@ export function SpeedSheet({
           accessibilityLabel="Close the speed choices"
           onPress={onClose}
         />
-        <View className="pb-safe gap-4 rounded-t-3xl bg-neutral-900 px-6 pt-5 pb-6">
-          <Text className="text-lg font-semibold text-white">
-            Playback speed
-          </Text>
+        <View className="bg-background pb-safe-offset-3 gap-4 rounded-t-3xl px-6 pt-5">
+          <Text className="text-lg font-semibold">Playback speed</Text>
           <SpeedPanel {...panel} />
         </View>
       </View>
@@ -53,27 +51,27 @@ export function SpeedPanel({ rate, onChange }: Props) {
     <View className="gap-4">
       <View className="flex-row items-center justify-between">
         <Pressable
-          className="size-11 items-center justify-center rounded-full bg-white/15 active:bg-white/25"
+          className="bg-secondary size-11 items-center justify-center rounded-full active:opacity-60"
           accessibilityRole="button"
           accessibilityLabel="Slower"
           onPress={() => onChange(stepSpeed(rate, -1))}
         >
-          <Icon as={Minus} size={20} className="text-white" />
+          <Icon as={Minus} size={20} className="text-foreground" />
         </Pressable>
         <Text
-          className="text-3xl font-semibold text-white"
+          className="text-3xl font-semibold"
           style={{ fontVariant: ["tabular-nums"] }}
           accessibilityLabel={`Speed ${speedLabel(rate)}`}
         >
           {speedLabel(rate)}
         </Text>
         <Pressable
-          className="size-11 items-center justify-center rounded-full bg-white/15 active:bg-white/25"
+          className="bg-secondary size-11 items-center justify-center rounded-full active:opacity-60"
           accessibilityRole="button"
           accessibilityLabel="Faster"
           onPress={() => onChange(stepSpeed(rate, 1))}
         >
-          <Icon as={Plus} size={20} className="text-white" />
+          <Icon as={Plus} size={20} className="text-foreground" />
         </Pressable>
       </View>
       <View className="flex-row justify-between gap-2">
@@ -81,7 +79,7 @@ export function SpeedPanel({ rate, onChange }: Props) {
           <Pressable
             key={preset}
             className={`min-h-11 flex-1 items-center justify-center rounded-full py-2 ${
-              rate === preset ? "bg-white" : "bg-white/15 active:bg-white/25"
+              rate === preset ? "bg-primary" : "bg-secondary active:opacity-60"
             }`}
             accessibilityRole="button"
             accessibilityLabel={`Speed ${speedLabel(preset)}`}
@@ -90,7 +88,7 @@ export function SpeedPanel({ rate, onChange }: Props) {
           >
             <Text
               className={
-                rate === preset ? "font-semibold text-black" : "text-white"
+                rate === preset ? "text-primary-foreground font-semibold" : ""
               }
               numberOfLines={1}
             >

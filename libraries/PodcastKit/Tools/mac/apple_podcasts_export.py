@@ -8,6 +8,13 @@ is ever written to them. Standard library only (macOS's own python3 is enough).
 Apple's library is a Core Data file with no documentation, so the table and column names
 below are what other people's tools found by reading it; they are all in this one place. If
 Apple renames one, the run stops and says which.
+
+An episode counts as finished when its play state says played and there is a sign that you
+really listened: it was played to the end at least once, you marked it as played by hand, or
+it has a last-played date that did not come from Apple marking a followed show's back
+catalogue as played. Without such a sign a played state alone is not enough, because Apple
+sets it on every old episode when you follow a show. An older library that only has the
+"has been played" flag counts that flag.
 """
 import argparse
 import json
@@ -36,9 +43,21 @@ EPISODES = "ZMTEPISODE"
 REQUIRED = {
     # The key episodes point at, the feed address and 1 for a show you follow.
     SHOWS: ["Z_PK", "ZFEEDURL", "ZSUBSCRIBED"],
-    # The show it belongs to (a Z_PK of ZMTPODCAST), the feed's own id, and 1 once played.
-    EPISODES: ["ZPODCAST", "ZGUID", "ZHASBEENPLAYED"],
+    # The show it belongs to (a Z_PK of ZMTPODCAST) and the feed's own id.
+    EPISODES: ["ZPODCAST", "ZGUID"],
 }
+# An episode table must also have at least one of these: the play state (0 played, 1 in
+# progress, 2 unplayed) or the older flag that is 1 once played.
+EPISODE_PLAY_STATE = "ZPLAYSTATE"
+EPISODE_PLAYED_FLAG = "ZHASBEENPLAYED"
+# Used when present, to tell a listened episode from one Apple marked as played: how many
+# times it was played, when you marked it by hand, when it was last played, and where the
+# play state came from (6 is Apple marking a followed show's back catalogue).
+EPISODE_PLAY_COUNT = "ZPLAYCOUNT"
+EPISODE_MARKED_DATE = "ZLASTUSERMARKEDASPLAYEDDATE"
+EPISODE_LAST_PLAYED_DATE = "ZLASTDATEPLAYED"
+EPISODE_PLAY_STATE_SOURCE = "ZPLAYSTATESOURCE"
+BACK_CATALOGUE_SOURCE = 6
 # Used when present: the show's newest feed address (a feed that moved) and its name.
 SHOW_UPDATED_FEED = "ZUPDATEDFEEDURL"
 SHOW_TITLE = "ZTITLE"
@@ -110,12 +129,42 @@ def check_format(conn):
         for column in wanted:
             if column not in have:
                 missing.append("column %s.%s" % (table, column))
+    episode_columns = _columns(conn, EPISODES)
+    if episode_columns and not ({EPISODE_PLAY_STATE, EPISODE_PLAYED_FLAG} & episode_columns):
+        missing.append("column %s.%s or %s.%s" % (EPISODES, EPISODE_PLAY_STATE, EPISODES, EPISODE_PLAYED_FLAG))
     if missing:
         raise FormatChanged(
             "Apple Podcasts' library has changed: missing %s. "
             "The export needs updating (names are in apple_podcasts_export.py)."
             % ", ".join(missing)
         )
+
+
+def finished_condition(have):
+    """The SQL test for a finished episode (table alias e), from the columns that exist."""
+    parts = []
+    if EPISODE_PLAY_STATE in have:
+        listened = []
+        if EPISODE_PLAY_COUNT in have:
+            listened.append("e.%s > 0" % EPISODE_PLAY_COUNT)
+        if EPISODE_MARKED_DATE in have:
+            listened.append("e.%s > 0" % EPISODE_MARKED_DATE)
+        if EPISODE_LAST_PLAYED_DATE in have:
+            played = "e.%s > 0" % EPISODE_LAST_PLAYED_DATE
+            if EPISODE_PLAY_STATE_SOURCE in have:
+                played = "(%s AND COALESCE(e.%s, 0) <> %d)" % (
+                    played,
+                    EPISODE_PLAY_STATE_SOURCE,
+                    BACK_CATALOGUE_SOURCE,
+                )
+            listened.append(played)
+        if listened:
+            parts.append("(e.%s = 0 AND (%s))" % (EPISODE_PLAY_STATE, " OR ".join(listened)))
+    # Only an older library, with no play state, goes by the flag: if a macOS update filled it
+    # for the back catalogue, every old episode would go to the phone as finished.
+    if EPISODE_PLAYED_FLAG in have and EPISODE_PLAY_STATE not in have:
+        parts.append("e.%s = 1" % EPISODE_PLAYED_FLAG)
+    return " OR ".join(parts) if parts else "0"
 
 
 def _clean(value):
@@ -127,7 +176,10 @@ def read_library(conn):
 
     shows: [{"feed": address, "title": name}] for shows with ZSUBSCRIBED = 1.
     finished: [{"feed": the show's address, "guid": the episode's id}] for episodes of those
-    shows with ZHASBEENPLAYED = 1. A show you unfollowed is left out with its episodes.
+    shows that you really finished: the play state is played and the episode was played at
+    least once, marked as played by you, or last played at a time that was not Apple marking
+    the back catalogue (or, in an older library with no play state, ZHASBEENPLAYED = 1). A show you unfollowed
+    is left out with its episodes.
     """
     check_format(conn)
     have = _columns(conn, SHOWS)
@@ -154,8 +206,8 @@ def read_library(conn):
     finished = []
     done = set()
     episode_rows = conn.execute(
-        "SELECT e.ZPODCAST, e.ZGUID FROM %s e WHERE e.ZHASBEENPLAYED = 1 ORDER BY e.rowid"
-        % EPISODES
+        "SELECT e.ZPODCAST, e.ZGUID FROM %s e WHERE %s ORDER BY e.rowid"
+        % (EPISODES, finished_condition(_columns(conn, EPISODES)))
     ).fetchall()
     for show_key, guid in episode_rows:
         feed = feed_of.get(show_key)
@@ -165,6 +217,16 @@ def read_library(conn):
         done.add((feed, guid))
         finished.append({"feed": feed, "guid": guid})
     return shows, finished
+
+
+class WriteFailed(Exception):
+    """The export could not be written into `folder` (an OSError, such as macOS refusing access
+    to the iCloud copy), apart from errors reading Apple's library."""
+
+    def __init__(self, folder, cause):
+        super().__init__("%s: %s" % (folder, cause))
+        self.folder = folder
+        self.cause = cause
 
 
 def export(source, folders, now=None):
@@ -186,8 +248,11 @@ def export(source, folders, now=None):
     for folder in folders:
         if not os.path.isdir(folder):
             continue
-        if write_document(folder, shows, finished, now):
-            written.append(folder)
+        try:
+            if write_document(folder, shows, finished, now):
+                written.append(folder)
+        except OSError as error:
+            raise WriteFailed(folder, error)
     return shows, finished, written
 
 
@@ -247,6 +312,13 @@ ACCESS_HELP = (
 )
 
 
+WRITE_HELP = (
+    "macOS did not let this write into that folder. Give the program that runs this access to "
+    "iCloud Drive (System Settings > Privacy & Security > Files & Folders, or Full Disk Access "
+    "> +, press Cmd-Shift-G, type /bin/bash, add it and switch it on)."
+)
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--source", default=os.path.expanduser(LIBRARY))
@@ -262,6 +334,13 @@ def main(argv=None):
     except FormatChanged as error:
         print(str(error), file=sys.stderr)
         return 3
+    except WriteFailed as failed:
+        print(
+            "Could not write the export into %s: %s. If it is the iCloud copy: %s"
+            % (failed.folder, failed.cause, WRITE_HELP),
+            file=sys.stderr,
+        )
+        return 2
     except (PermissionError, sqlite3.OperationalError) as error:
         if not os.path.exists(args.source):
             print("Apple Podcasts' library is not at %s (is Apple Podcasts set up on this Mac?)" % args.source, file=sys.stderr)
@@ -269,7 +348,7 @@ def main(argv=None):
             print("%s (%s)" % (ACCESS_HELP, error), file=sys.stderr)
         return 2
     except OSError as error:
-        print("Could not write the export: %s. If it is the iCloud copy: %s" % (error, ACCESS_HELP), file=sys.stderr)
+        print("Could not read Apple Podcasts' library: %s. %s" % (error, ACCESS_HELP), file=sys.stderr)
         return 2
     print(
         "%d followed shows, %d finished episodes; %s"

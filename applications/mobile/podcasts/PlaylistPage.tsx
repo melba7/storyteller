@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ActivityIndicator, View } from "react-native"
+import { ActivityIndicator } from "react-native"
 
 import { Text } from "@/components/ui/text"
 
@@ -16,8 +16,7 @@ export function PlaylistPage({ id }: { id: string }) {
   }
   if (playlist.data) return <PlaylistScreen id={id} />
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Playlist" />
+    <>
       {playlist.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -29,6 +28,7 @@ export function PlaylistPage({ id }: { id: string }) {
           </Text>
         </BelowBar>
       )}
-    </View>
+      <ScreenBar title="Playlist" />
+    </>
   )
 }

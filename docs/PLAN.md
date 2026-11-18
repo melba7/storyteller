@@ -1,8 +1,10 @@
 # Plan
 
-Done: 2 | Last cleanup: none | Podcasts: P1 to P6b merged (TestFlight 24.1); the
-bug check fixes and the design (D1 to D5) are built, in review | Books look: B1
-to B7 built, B8 (look check) next
+Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
+(D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
+Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
+(B2) done in PR #48, which goes to TestFlight in one build with the Books look |
+Books look: B1 to B7 merged (PR #49), B8 (look check) next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -472,6 +474,10 @@ once reviewed and green.
     real test: if Apple's format differs, the script says which name is missing.
     The phone reads the file on every app open and in the background refresh;
     the first read subscribes to everything followed but downloads nothing.
+    First real run on Mo's Mac (2026-11-17): 64 followed shows, but 0 finished
+    episodes, because `ZHASBEENPLAYED` is empty in today's library. Finished
+    episodes now come from `ZPLAYSTATE` with a sign of listening. The phone did
+    not add the shows within a few minutes; that is being looked into.
 
 - [ ] **P3a. Transcribe downloaded episodes**
   - After a download, `SpeechTranscriber` (with time ranges) writes the episode
@@ -827,6 +833,182 @@ only. No new npm packages and no new CSS variables.
     Stats, empty states, and no uppercase headers. The look waits for
     TestFlight.
 
+### Mo's first try of build 27.1 (2026-11-17)
+
+Mo: "the ad skip doesn't seem to work. There is no place to see downloaded
+podcasts. The transcript takes way too long. There seem to be interface glitches
+like the top bar covering parts of text. Doesn't look like a modern app." What
+the code shows: Downloads exists but only under Profile; episodes are
+transcribed one at a time in download order, the one playing does not go first,
+nothing shows until the whole episode is done, and ads are looked for only after
+that, so a fresh download is usually past its ads before they are known.
+
+- [x] **R1. Downloaded episodes in the Library** (S): a "Downloaded" row at the
+      top of the Library (with how many) opens the downloads list inside the
+      Library tab; Profile keeps its row.
+  - Done when: `check.sh` passes and the row opens the list without switching
+    tabs.
+  - Status: built. The downloads list is a shared route (`downloadsHref`), so it
+    opens in the tab you are in; the Library's "Downloaded" row sits above the
+    shows and Profile uses the same link. The look waits for TestFlight.
+- [x] **R2. The playing episode first** (M): the transcriber and the ad finder
+      put the playing episode at the front of their queues and pause another
+      episode at its next piece; playing an episode that is not downloaded
+      starts its download when "Skip ads" is on, so it can be transcribed.
+  - Done when: `check.sh` passes (queue order tested in PodcastKit), and the iOS
+    build passes in CI.
+  - Status: built (QueueOrder in PodcastKit, tested): the episode loaded in the
+    player goes first in the transcript and ad queues, and the one at work stops
+    at its next piece. Waiting for the iOS build in CI.
+- [x] **R3. Lines as they are transcribed** (M): the transcript shows the lines
+      saved so far with "Transcribing, N%" under them and grows after each
+      five-minute piece, instead of a wait for the whole episode.
+  - Done when: `check.sh` passes and the iOS build passes in CI.
+  - Status: built: the transcript shows the saved lines with "Transcribing, N%"
+    under them and reads again after each piece; its buttons sit above the home
+    indicator. Waiting for the iOS build in CI.
+- [x] **R2b. Play waits for the download** (M, Mo's card, recommended option):
+      with Skip ads on, playing an episode that is not downloaded downloads it
+      first and plays the file; it streams when the download fails, nothing
+      arrives under Wi-Fi only, a minute passes, or the listener taps "Stream
+      now". A card in the mini player's place shows the percent.
+  - Done when: `check.sh` passes (the wait rules tested) and the iOS build
+    passes in CI.
+  - Status: built, then replaced by R8 in the same pull request (Mo wanted ads
+    skipped while streaming): the wait, its card and the polling are removed.
+- [x] **R8. Skip ads while streaming: play the download as it arrives** (L, Mo
+      2026-11-17: "If you can find a way to skip ads while streaming would be
+      better"): with Skip ads on, an episode that is not downloaded starts at
+      once from its own download as the bytes arrive (an
+      `AVAssetResourceLoaderDelegate` that feeds the player from a foreground
+      download of the episode's address and waits for bytes not there yet), so
+      what is heard is the exact file that is then saved, transcribed and
+      checked for ads. It replaces R2b's wait; with Wi-Fi only on and no Wi-Fi
+      the episode streams as before.
+  - Test first: PodcastKit rules for which byte ranges can be answered now,
+    content length and type from the response, and handing the finished file to
+    the download store (same sha256 and folder as a normal download).
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    a new episode starts at once with Skip ads on and appears in Downloaded when
+    its bytes are all in.
+  - Status: built (rules in PodcastKit's StreamRules, tested): a custom-scheme
+    asset fed by `PodcastStreamDownload` from one foreground download into the
+    staging folder, shown in Downloads with progress and filed like any download
+    when whole, then transcribed and checked. Up Next plays the same way. A seek
+    past the bytes so far waits for them; ads before the first finished piece
+    are heard. Waiting for the iOS build in CI and TestFlight.
+- [x] **R4. Ads found as the transcript grows** (L): the ad finder works on the
+      playing episode's transcript after each five-minute piece instead of after
+      the whole episode. Pieces that end before the transcript's edge are asked
+      once (the chunking is greedy, so a prefix gives the same pieces); their
+      answers are kept in a progress file, a partial ads file covers what is
+      done, the player skips from it, and the final run reuses the answers.
+  - Test first: PodcastKit tests that pieces from a prefix match the full
+    transcript's pieces up to the edge, that kept answers are reused, and that
+    the partial file only covers finished pieces.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    a mid-roll in a just-started episode is skipped.
+  - Status: built (15 PodcastKit tests): after each saved piece of the playing
+    episode its finished pieces are asked, answers kept in a progress file, a
+    partial ads file feeds the player, and the full pass reuses the answers.
+    Another episode's full pass makes way. Waiting for CI and TestFlight.
+- [x] **R5. The top bar over text, and controls off the edge** (M): Mo's
+      screenshots (Profile scrolled, the player's transcript) show the large
+      title staying large over the content, the page pills running off the right
+      edge, and the transcript's buttons under the home indicator. Every
+      screen's list or scroll view becomes the screen's first child (no wrapping
+      View, the bar and status bar after it), so iOS tracks it: the large title
+      shrinks and the bar blurs what passes under it. The player's pills fit the
+      width, and every control pinned to the bottom sits above the home
+      indicator. Then a pass over every Podcasts screen for the same faults.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    the Profile title shrinks on scroll and nothing is clipped in the player.
+  - Status: built: every Podcasts screen but episode search returns its list
+    first, the stack draws the theme background, the selection bar is drawn over
+    the list with a spacer, the player pills share the width, and bottom
+    controls use the safe inset plus 12. Waiting for CI and TestFlight.
+- [x] **R7. Feeds and episodes over plain http** (S): 12 of Mo's 64 shows failed
+      with "only works over plain http". The app allows plain http (like other
+      podcast apps), keeps trying https first, and a download whose https
+      address fails falls back to the feed's http address. Marketplace's 403 is
+      looked at separately.
+  - Done when: `check.sh` passes, the iOS build passes in CI, and on TestFlight
+    the Bloomberg feeds subscribe.
+  - Status: built: plain http is allowed, https is still tried first, and a
+    download keeps the feed's http address (optional `plainURL`, older indexes
+    read fine) to try once if https cannot connect. Marketplace's 403 is not
+    looked at yet.
+- [x] **R6. A more modern look**: Mo named Apple Podcasts; it became the
+      redesign below (A1 to A6).
+
+### The Apple Podcasts look (Mo's ask, 2026-11-17)
+
+Mo: "Redesign the whole thing to look like apple podcast app with all the
+features we have. Same animations, look and everything." Plan, structure and
+look in `docs/PODCASTS-APPLE-DESIGN.md`, from Mo's screenshots (kept in the
+project files, not the repository). One pull request with R1 to R8, one
+TestFlight build.
+
+- [x] **B2. Second bug check of the whole Podcasts section** (Mo's ask): Opus
+      reads the Swift side and the data and logic side; Sonnet fixes what holds
+      up; the screens are checked after the redesign (A6).
+  - Done when: every finding is fixed or noted with a reason, `check.sh` passes
+    and the iOS build passes in CI.
+  - Status: S1 to S8 and D1 to D16 fixed 2026-11-17 (ATS, resuming and falling
+    back play-through, the downloader knowing about it, Up Next language, the
+    Apple follow list read with retries and a status row in Profile, pending
+    Apple-played episodes, serial subscribe); Fable 5.2 reviews the fixes.
+- [x] **A1. Tabs and rooms** (L): Home, New, Library and Search (the system
+      search tab); the account button and Profile as a sheet; the Library list
+      and Recently Updated; Shows as its own screen; the Up Next page with the
+      queue; nothing lost from the old Profile, Playlists and Up Next tabs.
+  - Done when: `check.sh` passes, route tests cover every tab's home screen and
+    the shared detail routes, and the iOS build passes in CI.
+  - Status: built 2026-11-17 (four tabs, one shared route group
+    `(home,new,library,search)`, Profile at `/podcasts/account`, Library rows
+    with counts); `check.sh` passes; the iOS build in CI is still to run.
+- [x] **A2. Home** (L): the Up Next cards (in progress, then the newest unplayed
+      episode per show), the shared episode "…" menu, Your Top Shows, You Might
+      Like, Saved and Latest Episodes.
+  - Done when: the shelf's SQL and order are tested and `check.sh` passes.
+  - Status: built 2026-11-17; the card's "…" is white and tints its menu with
+    the card's colour. Top Shows rank by recent plays (the stats keep no time
+    per show).
+- [x] **A3. Rows, show page and episode page** (L) in Apple's look, with the
+      purple accent and the system font.
+  - Done when: `check.sh` passes; the look is checked on TestFlight.
+  - Status: built 2026-11-17 (rows, native menu with Save and Share on top, show
+    and episode headers in the artwork's colour, zoom targets); the purple and
+    the system font come from the app-wide theme of the Books restyle.
+- [x] **A4. Player and mini player** (L): the screenshot's layout, the queue and
+      transcript in place of the artwork, the "…" menu, the zoom from the mini
+      player where it works.
+  - Done when: `check.sh` passes and nothing the old player did is lost.
+  - Status: built 2026-11-17 (sheet in the artwork's colour, volume slider as a
+    second native module, six panels in place of the artwork). No zoom from the
+    mini player: it lives in the tab bar's accessory, outside the stack.
+- [x] **A5. Search and New** (M): category tiles, scopes, featured cards and
+      ranked Top Shows.
+  - Done when: `check.sh` passes.
+  - Status: built 2026-11-17 (paging featured cards, ranked Top Shows, For You
+    shelves, gradient category tiles, scope chips, a shared `SectionHeader`).
+- [x] **A6. Look and motion check** (M): every screen against the screenshots in
+      each theme, animations with Reduce Motion, VoiceOver and large text.
+  - Done when: the Opus check's findings are fixed and `check.sh` passes.
+  - Status: the check found 27 items (L1 to L27, 2026-11-17); all fixed but the
+    mini player's title fade (the glass has no colour to fade into) and the
+    episode artwork's zoom (no tile opens an episode). Fable 5.2's final check
+    of the whole pull request (Mo, 2026-11-17) found no serious issue and seven
+    smaller ones, all fixed, plus the player's full-width artwork, SF Symbol
+    buttons and a thick volume bar. A last Fable check of those fixes and of
+    main's Books look merged in found six small issues, all fixed: the mini
+    player's symbols in the theme's colour, the player artwork as wide as the
+    iPad sheet, a fingertip-wide clear thumb on the volume bar, the "Episodes"
+    heading for VoiceOver, the Light and Dark swatches in the new colours, and
+    the swipe actions' padding and colours under the new buttons. Left for a
+    device: pulling down on a show page opened by the zoom may close it instead
+    of refreshing, and dragging the volume bar.
+
 ## Later
 
 - Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
@@ -839,6 +1021,8 @@ only. No new npm packages and no new CSS variables.
   yet."
 - Podcasts: the trimmer reads the ads only when an episode loads, so ads found
   while it plays are not avoided until the next load.
+- Podcasts: since the Books look, Appearance's Dark and Extra Dark are both
+  black and differ only in their accent colour.
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
 - Podcasts: `savePlayback` notifies the library on every 15 s save, so open

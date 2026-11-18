@@ -89,6 +89,14 @@ export type PlaybackLoadOptions = {
   audioType: string
   /** The feed's JSON chapters file, for the chapters of an episode that is not downloaded. */
   chaptersUrl?: string | null
+  /**
+   * Play from the episode's own download as its bytes arrive (Skip ads is on and the episode
+   * is not downloaded), so what is heard is the file that is saved and checked for ads. The
+   * player may still stream, for example with Wi-Fi only on and no Wi-Fi.
+   */
+  playThroughDownload?: boolean
+  /** The feed's language, for the transcript of the download that plays. */
+  language?: string | null
 }
 
 /** The episode played to its end. */
@@ -120,6 +128,8 @@ export type DownloadInfo = {
   date?: number
   /** Plain words for a failed download. */
   reason?: string
+  /** Asked for by the app by itself (a new episode), not by the listener. */
+  automatic?: boolean
   /** Milliseconds since 1970. */
   updatedAt: number
 }
@@ -199,6 +209,8 @@ export type UpNextItem = {
   position: number
   /** The feed's JSON chapters file; missing in a queue saved before chapters. */
   chaptersUrl?: string | null
+  /** The show's language, for the transcript; missing in a queue saved before this. */
+  language?: string | null
 }
 
 /** The queue changed. `items` is the whole queue, in play order. */
@@ -349,6 +361,8 @@ type PodcastsNativeModule = {
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
   getTranscript(episodeId: string): Promise<string | null>
+  /** The lines of a transcript still being made, as JSON text like `getTranscript`'s, or null. */
+  getPartialTranscript(episodeId: string): Promise<string | null>
   /** Where the words are said in the finished transcripts (see transcriptSearch.ts). */
   searchTranscripts(query: string): Promise<SpokenHit[]>
   /** Where each transcribed episode's ad finding is. */

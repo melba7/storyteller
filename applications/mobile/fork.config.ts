@@ -131,11 +131,19 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
   const modes = (plist["UIBackgroundModes"] as string[] | undefined) ?? []
   const tasks =
     (plist["BGTaskSchedulerPermittedIdentifiers"] as string[] | undefined) ?? []
-  // Many podcast hosts serve episodes over plain http, which iOS blocks unless the app
-  // allows it for media. This is a plist key, not an entitlement.
-  const transport =
-    (plist["NSAppTransportSecurity"] as Record<string, unknown> | undefined) ??
-    {}
+  // Podcast feeds and episodes come from any host, and some still serve only plain http,
+  // which iOS blocks unless the app allows it. Other podcast apps allow it too. The app
+  // still tries https first. These are plist keys, not entitlements. Apple ignores
+  // NSAllowsArbitraryLoads when any of the three keys below is present, so they
+  // are dropped, whoever added them.
+  const {
+    NSAllowsArbitraryLoadsForMedia: _media,
+    NSAllowsArbitraryLoadsInWebContent: _web,
+    NSAllowsLocalNetworking: _local,
+    ...transport
+  } = (plist["NSAppTransportSecurity"] as
+    | Record<string, unknown>
+    | undefined) ?? {}
   const ios: NonNullable<ExpoConfig["ios"]> = {
     ...config.ios,
     bundleIdentifier: appId,
@@ -153,7 +161,7 @@ export function applyForkIdentity(config: ExpoConfig): ExpoConfig {
       LofiScoreSoundEdition: soundEdition(),
       NSAppTransportSecurity: {
         ...transport,
-        NSAllowsArbitraryLoadsForMedia: true,
+        NSAllowsArbitraryLoads: true,
       },
     },
   }

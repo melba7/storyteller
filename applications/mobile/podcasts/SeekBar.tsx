@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { useEffect, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import { View } from "react-native"
 import { Gesture, GestureDetector } from "react-native-gesture-handler"
 import Animated, {
@@ -24,6 +24,7 @@ import {
 } from "@/modules/podcasts/playerLook"
 
 import { pick } from "./haptics"
+import { useSheet } from "./playerSheetContext"
 
 interface Props {
   position: number
@@ -32,22 +33,28 @@ interface Props {
   onSeek: (seconds: number) => void
   /** Where the ads are, as shares of the bar. */
   marks?: readonly AdMark[]
+  /** Shown between the two times (the chapter playing). */
+  center?: ReactNode
 }
 
-const THUMB_MAX = 20
-const THUMB_REST = 14
-const TRACK_REST = 4
-const TRACK_TOUCHED = 8
+const TRACK_REST = 7
+const TRACK_TOUCHED = 16
 const GROW_MS = 150
 
 /**
- * The seek bar: time played on the left, time left on the right. Drag it or tap anywhere on
- * it. While a finger is down the bar shows the finger's place, and the track and thumb grow;
- * the player only moves when it lifts.
+ * The seek bar, a thick rounded bar: time played on the left, time left on the right (and the
+ * chapter between them). Drag it or tap anywhere on it. While a finger is down the bar shows
+ * the finger's place and grows; the player only moves when it lifts.
  */
-export function SeekBar({ position, duration, onSeek, marks = [] }: Props) {
+export function SeekBar({
+  position,
+  duration,
+  onSeek,
+  marks = [],
+  center,
+}: Props) {
+  const sheet = useSheet()
   const width = useSharedValue(1)
-  const [trackWidth, setTrackWidth] = useState(0)
   // The place under the finger, from 0 to 1, or null when nobody is touching the bar.
   const [touch, setTouch] = useState<number | null>(null)
   const known = duration !== null && duration > 0
@@ -62,10 +69,6 @@ export function SeekBar({ position, duration, onSeek, marks = [] }: Props) {
   const trackStyle = useAnimatedStyle(() => ({
     height: TRACK_REST + (TRACK_TOUCHED - TRACK_REST) * grow.get(),
   }))
-  const thumbStyle = useAnimatedStyle(() => {
-    const size = THUMB_REST + (THUMB_MAX - THUMB_REST) * grow.get()
-    return { width: size, height: size }
-  })
 
   function move(fraction: number) {
     setTouch(fraction)
@@ -127,16 +130,18 @@ export function SeekBar({ position, duration, onSeek, marks = [] }: Props) {
           }}
           onLayout={(event) => {
             width.set(event.nativeEvent.layout.width)
-            setTrackWidth(event.nativeEvent.layout.width)
           }}
         >
           <Animated.View
-            className="overflow-hidden rounded-full bg-white/25"
-            style={trackStyle}
+            className="overflow-hidden rounded-full"
+            style={[trackStyle, { backgroundColor: sheet.rest }]}
           >
             <View
-              className="h-full rounded-full bg-white"
-              style={{ width: `${fraction * 100}%` }}
+              className="h-full rounded-full"
+              style={{
+                width: `${fraction * 100}%`,
+                backgroundColor: sheet.fill,
+              }}
             />
             {marks.map((mark) => (
               <View
@@ -146,40 +151,31 @@ export function SeekBar({ position, duration, onSeek, marks = [] }: Props) {
                     ? "absolute h-full bg-amber-300"
                     : "absolute h-full bg-amber-300/40"
                 }
+                // An outline in the sheet's ink keeps the mark visible on a yellow or light sheet.
                 style={{
+                  borderWidth: 1,
+                  borderColor: sheet.ink,
                   left: `${mark.left * 100}%`,
                   width: `${Math.max(mark.width * 100, 0.6)}%`,
                 }}
               />
             ))}
           </Animated.View>
-          <View
-            className="absolute items-center justify-center"
-            style={{
-              width: THUMB_MAX,
-              height: THUMB_MAX,
-              left: Math.max(0, fraction * trackWidth - THUMB_MAX / 2),
-            }}
-          >
-            <Animated.View
-              className="rounded-full bg-white"
-              style={thumbStyle}
-            />
-          </View>
         </View>
       </GestureDetector>
-      <View className="flex-row justify-between">
+      <View className="flex-row items-center justify-between gap-3">
         <Text
-          className="text-sm text-white/70"
-          style={{ fontVariant: ["tabular-nums"] }}
+          className="text-sm font-semibold"
+          style={{ fontVariant: ["tabular-nums"], color: sheet.muted }}
         >
           {formatTime(shown)}
         </Text>
+        {center ?? <View className="flex-1" />}
         <Text
-          className="text-sm text-white/70"
-          style={{ fontVariant: ["tabular-nums"] }}
+          className="text-sm font-semibold"
+          style={{ fontVariant: ["tabular-nums"], color: sheet.muted }}
         >
-          {timeLeft(shown, duration)}
+          {timeLeft(shown, duration).replace("-", "\u2212")}
         </Text>
       </View>
     </View>

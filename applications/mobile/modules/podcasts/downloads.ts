@@ -5,6 +5,8 @@
 // The wrappers over the native module are in downloadsNative.ts, so tests can import this
 // file without the native module.
 import type { DownloadChange, DownloadInfo } from "./index"
+import { isLocalEpisodeId } from "./localFiles"
+import { isPreviewId } from "./preview"
 
 /** What the screens know about downloads, by episode id. */
 export type DownloadMap = Readonly<Record<string, DownloadInfo>>
@@ -164,10 +166,44 @@ export function sortDownloads(list: readonly DownloadInfo[]): DownloadInfo[] {
   )
 }
 
+/** How many downloads Library's "Downloaded" row counts: every one but a failed one. */
+export function downloadedCount(map: DownloadMap): number {
+  return Object.values(map).filter((info) => info.state !== "failed").length
+}
+
 /** "3 episodes, 1.2 GB" for the Profile row; "No downloads" when there are none. */
 export function downloadsSummary(map: DownloadMap): string {
   const count = Object.keys(map).length
   if (count === 0) return "No downloads"
   const noun = count === 1 ? "episode" : "episodes"
   return `${count} ${noun}, ${formatStorage(storageOf(map))}`
+}
+
+/** Whether ads are skipped for a show: its own choice where it has one, else the main switch. */
+export function skipAdsFor(
+  show: boolean | null | undefined,
+  main: boolean,
+): boolean {
+  return show ?? main
+}
+
+/**
+ * Whether playing this episode should start its download: "Skip ads" is on, the episode is a
+ * feed episode (not an added file or a preview) and it is not downloaded, queued or on its way.
+ * A failed download is tried again, and so is a new episode's automatic one that has not
+ * received a byte (it waits for Wi-Fi; the player cancels it and plays through its own).
+ */
+export function shouldDownloadOnPlay(
+  episode: { id: string },
+  download: DownloadInfo | undefined,
+  skipAds: boolean,
+): boolean {
+  if (!skipAds) return false
+  if (isLocalEpisodeId(episode.id) || isPreviewId(episode.id)) return false
+  if (download === undefined || download.state === "failed") return true
+  if (download.automatic !== true) return false
+  return (
+    download.state === "queued" ||
+    (download.state === "downloading" && (download.bytes ?? 0) === 0)
+  )
 }

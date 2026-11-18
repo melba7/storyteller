@@ -40,13 +40,18 @@ public enum DownloadFile {
     "mp3", "m4a", "m4b", "mp4", "aac", "ogg", "opus", "wav", "flac", "aif", "aiff", "webm", "caf",
   ]
 
+  /// The extension for a MIME type this app knows, ignoring case and any parameters.
+  public static func knownExtension(forType type: String?) -> String? {
+    guard let kind = (type ?? "").split(separator: ";").first.map({
+      $0.trimmingCharacters(in: .whitespaces).lowercased()
+    }) else { return nil }
+    return byType[kind]
+  }
+
   /// The file extension for an episode: from the enclosure's type, else from the address's
   /// path, else "mp3" (by far the most common).
   public static func fileExtension(type: String?, url: URL?) -> String {
-    let kind = (type ?? "").split(separator: ";").first.map {
-      $0.trimmingCharacters(in: .whitespaces).lowercased()
-    }
-    if let kind, let ext = byType[kind] { return ext }
+    if let ext = knownExtension(forType: type) { return ext }
     if let ext = url?.pathExtension.lowercased(), known.contains(ext) { return ext }
     return "mp3"
   }
@@ -64,6 +69,9 @@ public enum RelaunchAction: Sendable, Equatable {
   /// Start the download again from the beginning.
   case restart
   case fail(String)
+  /// Forget it, with its folder: a download the player fed as the episode played, which the
+  /// listener never asked for and which is no use unfinished.
+  case drop
 }
 
 public enum Relaunch {
@@ -74,8 +82,13 @@ public enum Relaunch {
   /// download that was moving but lost its task (the listener force-quit the app, which
   /// cancels background downloads) is marked failed, so a phone on mobile data does not
   /// start a big download by itself. One that was only queued has lost nothing, so it
-  /// restarts.
-  public static func action(for state: DownloadState, taskIsAlive: Bool) -> RelaunchAction {
+  /// restarts. An unfinished play-through download is dropped when the player is not feeding
+  /// it (`taskIsAlive` is then false); the player registers itself, so one that is still
+  /// playing is kept.
+  public static func action(for state: DownloadState, taskIsAlive: Bool, playThrough: Bool = false)
+    -> RelaunchAction
+  {
+    if playThrough, state.isActive { return taskIsAlive ? .keep : .drop }
     switch state {
     case .downloaded, .failed: return .keep
     case .queued: return taskIsAlive ? .keep : .restart
@@ -90,7 +103,8 @@ public enum Relaunch {
     var actions: [String: RelaunchAction] = [:]
     for entry in entries {
       actions[entry.episodeId] = action(
-        for: entry.state, taskIsAlive: liveEpisodeIds.contains(entry.episodeId))
+        for: entry.state, taskIsAlive: liveEpisodeIds.contains(entry.episodeId),
+        playThrough: entry.playThrough)
     }
     return actions
   }

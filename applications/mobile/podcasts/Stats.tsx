@@ -52,8 +52,7 @@ export function Stats() {
 
   const days = lastDays(stats.days, new Date())
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar title="Stats" />
+    <>
       {Podcasts === null ? (
         <BelowBar>
           <Text className="text-muted-foreground px-8 py-12 text-center">
@@ -62,6 +61,7 @@ export function Stats() {
         </BelowBar>
       ) : (
         <ScrollView
+          className="bg-background flex-1"
           contentContainerClassName="px-safe-or-4 pb-8"
           contentInsetAdjustmentBehavior="automatic"
         >
@@ -121,6 +121,7 @@ export function Stats() {
           </Button>
         </ScrollView>
       )}
-    </View>
+      <ScreenBar title="Stats" />
+    </>
   )
 }

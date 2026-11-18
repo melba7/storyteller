@@ -363,6 +363,21 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertNil(after)
     }
 
+    func testReadingALinkedFileSaysWhyThereIsNothing() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
+        try write(Data([0]), to: "Linked/Atmosphere/Rain/rain.m4a")
+        try write(Data("{}".utf8), to: "Linked/Podcasts/apple-podcasts.json")
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        let unlinked = await host.fetchLinkedFile("Podcasts/apple-podcasts.json")
+        XCTAssertEqual(unlinked, .notLinked)
+        _ = try await host.linkSoundsFolder(folder.appendingPathComponent("Linked"))
+        let found = await host.fetchLinkedFile("Podcasts/apple-podcasts.json")
+        XCTAssertEqual(found, .found(Data("{}".utf8)))
+        let missing = await host.fetchLinkedFile("Podcasts/none.json")
+        XCTAssertEqual(missing, .missing)
+    }
+
     func testALinkedFolderBringsAScoreToTheOpenBook() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook(scored: false)

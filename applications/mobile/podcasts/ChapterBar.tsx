@@ -1,17 +1,17 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { SkipBack, SkipForward } from "lucide-react-native"
-import { Pressable, View } from "react-native"
+import { Pressable } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { currentChapterIndex } from "@/modules/podcasts/chapters"
 import type { PodcastChapter } from "@/modules/podcasts/index"
 
-import { pick } from "./haptics"
-import { chapterActions } from "./useChapters"
+import { useSheet } from "./playerSheetContext"
 
-/** Under the seek bar: the chapter playing, with buttons for the previous and next chapter. */
-export function ChapterBar({
+/**
+ * The chapter playing, centred between the scrubber's two times. A tap opens the chapter list;
+ * the previous and next chapter are in the "..." menu. Nothing for an episode without chapters.
+ */
+export function ChapterTitle({
   chapters,
   position,
   onOpen,
@@ -20,46 +20,24 @@ export function ChapterBar({
   position: number
   onOpen: () => void
 }) {
+  const sheet = useSheet()
   if (chapters.length === 0) return null
   const index = currentChapterIndex(chapters, position)
   const title = index === null ? "Chapters" : (chapters[index]?.title ?? "")
   return (
-    <View className="w-full flex-row items-center gap-2">
-      <Pressable
-        className="size-11 items-center justify-center active:opacity-60"
-        accessibilityRole="button"
-        accessibilityLabel="Previous chapter"
-        onPress={() => {
-          pick()
-          chapterActions.previous()
-        }}
+    <Pressable
+      className="min-h-11 flex-1 justify-center active:opacity-60"
+      accessibilityRole="button"
+      accessibilityLabel={`Chapter ${title}. Show all chapters`}
+      onPress={onOpen}
+    >
+      <Text
+        className="text-center text-sm font-semibold"
+        style={{ color: sheet.tint }}
+        numberOfLines={1}
       >
-        <Icon as={SkipBack} size={24} className="text-white" />
-      </Pressable>
-      <Pressable
-        className="min-h-11 flex-1 justify-center active:opacity-70"
-        accessibilityRole="button"
-        accessibilityLabel={`Chapter ${title}. Show all chapters`}
-        onPress={onOpen}
-      >
-        <Text
-          className="text-center text-sm font-semibold text-white"
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
-      </Pressable>
-      <Pressable
-        className="size-11 items-center justify-center active:opacity-60"
-        accessibilityRole="button"
-        accessibilityLabel="Next chapter"
-        onPress={() => {
-          pick()
-          chapterActions.next()
-        }}
-      >
-        <Icon as={SkipForward} size={24} className="text-white" />
-      </Pressable>
-    </View>
+        {title}
+      </Text>
+    </Pressable>
   )
 }

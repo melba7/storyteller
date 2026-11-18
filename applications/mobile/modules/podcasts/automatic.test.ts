@@ -15,6 +15,8 @@ import {
   parseSettings,
   refreshDue,
   serializeSettings,
+  mergeFollowUps,
+  parseFollowUps,
 } from "./automatic"
 import type { FetchedEpisode } from "./library"
 
@@ -297,5 +299,31 @@ describe("episodesForUpNext", () => {
       modes,
     )
     expect(picked.map((p) => p.place)).toEqual(["next", "last"])
+  })
+})
+
+describe("follow-ups kept between runs", () => {
+  const one = (id: string) => ({
+    id,
+    showId: "s1",
+    publishedAt: 5,
+    audioUrl: `https://x/${id}.mp3`,
+    audioType: "audio/mpeg",
+  })
+
+  it("reads what was kept and shrugs off bad data", () => {
+    expect(parseFollowUps(JSON.stringify([one("a"), { id: 3 }, "x"]))).toEqual([
+      one("a"),
+    ])
+    expect(parseFollowUps("nope")).toEqual([])
+    expect(parseFollowUps(null)).toEqual([])
+    expect(parseFollowUps('{"a":1}')).toEqual([])
+  })
+
+  it("adds new episodes to the kept ones once each", () => {
+    expect(mergeFollowUps([one("a")], [one("a"), one("b")])).toEqual([
+      one("a"),
+      one("b"),
+    ])
   })
 })

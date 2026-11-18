@@ -26,6 +26,12 @@ final class AirPlayRouteView: ExpoView {
     picker.frame = bounds
   }
 
+  /// True on a light sheet, so the button is dark; false (the start) is the white one.
+  func setLight(_ light: Bool) {
+    picker.tintColor = light ? .black : .white
+    picker.activeTintColor = light ? .black : .white
+  }
+
   /// What VoiceOver says for the button.
   func setLabel(_ label: String) {
     picker.accessibilityLabel = label

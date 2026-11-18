@@ -3,7 +3,6 @@ import { Moon } from "lucide-react-native"
 import { useState } from "react"
 import { Modal, Pressable, TextInput, View } from "react-native"
 
-import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import {
@@ -16,11 +15,14 @@ import {
   sleepSecondsLeft,
 } from "@/modules/podcasts/sleepTimer"
 
+import { SFIcon } from "./SFIcon"
+import { useSheet } from "./playerSheetContext"
 import { useChapters } from "./useChapters"
 import { sleepTimer, useNow, useSleepTimer } from "./useSleepTimer"
 
-/** The moon slot in the player's toolbar: opens the sleep timer choices and shows the time left in its place. */
+/** The moon in the player's transport row: opens the sleep timer choices and shows the time left in its place. */
 export function SleepTimerButton() {
+  const sheet = useSheet()
   const state = useSleepTimer()
   const view = usePlayer()
   const chapters = useChapters(view.episode?.id ?? "")
@@ -38,17 +40,22 @@ export function SleepTimerButton() {
   return (
     <>
       <Pressable
-        className="h-11 min-w-11 items-center justify-center rounded-full px-2 active:bg-white/15"
+        className="h-11 min-w-11 items-center justify-center rounded-full px-2 active:opacity-60"
         accessibilityRole="button"
         accessibilityLabel={sleepButtonLabel(left, state)}
         onPress={() => setOpen(true)}
       >
         {text === "" ? (
-          <Icon as={Moon} size={22} className="text-white" />
+          <SFIcon
+            name="moon.zzz.fill"
+            size={24}
+            color={sheet.tint}
+            fallback={Moon}
+          />
         ) : (
           <Text
-            className="text-sm font-semibold text-white"
-            style={{ fontVariant: ["tabular-nums"] }}
+            className="text-sm font-semibold"
+            style={{ fontVariant: ["tabular-nums"], color: sheet.tint }}
             numberOfLines={1}
           >
             {text}
@@ -99,7 +106,7 @@ function SleepSheet({
         accessibilityLabel="Close the sleep timer"
         onPress={onClose}
       />
-      <View className="bg-background pb-safe gap-1 rounded-t-3xl px-6 pt-5 pb-6">
+      <View className="bg-background pb-safe-offset-3 gap-1 rounded-t-3xl px-6 pt-5">
         <Text className="pb-2 text-lg font-semibold">Sleep timer</Text>
         {SLEEP_PRESET_MINUTES.map((minutes) => (
           <Choice

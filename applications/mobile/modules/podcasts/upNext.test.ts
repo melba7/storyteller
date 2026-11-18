@@ -7,6 +7,7 @@ import {
   isQueued,
   moveBetween,
   orderAfterMove,
+  outsideQueue,
   progressFraction,
   queueItem,
   queueTimeLeft,
@@ -170,7 +171,11 @@ describe("queueItem", () => {
       duration: 1000,
       position: 300,
       chaptersUrl: null,
+      language: null,
     })
+  })
+  it("carries the show's language, so the next episode is transcribed in it", () => {
+    expect(queueItem(episode, { ...show, language: "de" }).language).toBe("de")
   })
   it("carries the chapters address", () => {
     const chaptered = { ...episode, chaptersUrl: "https://x.test/c.json" }
@@ -224,5 +229,16 @@ describe("progressFraction", () => {
   })
   it("stays within the bar", () => {
     expect(progressFraction(900, 600)).toBe(1)
+  })
+})
+
+describe("outsideQueue", () => {
+  const entries = [{ episode: { id: "a" } }, { episode: { id: "b" } }]
+  const queue = [{ id: "b" }] as UpNextItem[]
+  it("leaves out the episodes already queued", () => {
+    expect(outsideQueue(entries, queue)).toEqual([{ episode: { id: "a" } }])
+  })
+  it("keeps everything when nothing is queued", () => {
+    expect(outsideQueue(entries, [])).toEqual(entries)
   })
 })

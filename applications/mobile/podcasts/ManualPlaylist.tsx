@@ -24,7 +24,7 @@ import {
   episodeCount,
 } from "@/modules/podcasts/playlistLook"
 import { type Playlist } from "@/modules/podcasts/playlists"
-import { previewHref, episodeHref } from "@/modules/podcasts/routes"
+import { episodeHref, previewHref, tabBase } from "@/modules/podcasts/routes"
 import { moveBetween } from "@/modules/podcasts/upNext"
 
 import { Artwork } from "./Artwork"
@@ -47,6 +47,7 @@ function tell(title: string, cause: unknown) {
  */
 export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   const router = useRouter()
+  const segments = useSegments()
   const entries = useEntries(playlist.id)
   const list = entries.data ?? []
   // The order shown while it is dragged, until the saved order catches up.
@@ -118,7 +119,7 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
           style: "destructive",
           onPress: () => {
             deletePlaylist(playlist.id).then(
-              () => router.dismissTo("/podcasts/(tabs)/(playlists)"),
+              () => router.dismissTo(tabBase(segments)),
               (cause: unknown) => tell("Couldn't delete the playlist", cause),
             )
           },
@@ -128,27 +129,7 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
   }
 
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title={playlist.title}
-        right={
-          <Stack.Toolbar.Menu
-            icon="ellipsis"
-            accessibilityLabel="More for this playlist"
-          >
-            <Stack.Toolbar.MenuAction icon="pencil" onPress={rename}>
-              Rename
-            </Stack.Toolbar.MenuAction>
-            <Stack.Toolbar.MenuAction
-              icon="trash"
-              destructive
-              onPress={confirmDelete}
-            >
-              Delete playlist
-            </Stack.Toolbar.MenuAction>
-          </Stack.Toolbar.Menu>
-        }
-      />
+    <>
       {entries.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
@@ -201,7 +182,27 @@ export function ManualPlaylist({ playlist }: { playlist: Playlist }) {
           }}
         />
       )}
-    </View>
+      <ScreenBar
+        title={playlist.title}
+        right={
+          <Stack.Toolbar.Menu
+            icon="ellipsis"
+            accessibilityLabel="More for this playlist"
+          >
+            <Stack.Toolbar.MenuAction icon="pencil" onPress={rename}>
+              Rename
+            </Stack.Toolbar.MenuAction>
+            <Stack.Toolbar.MenuAction
+              icon="trash"
+              destructive
+              onPress={confirmDelete}
+            >
+              Delete playlist
+            </Stack.Toolbar.MenuAction>
+          </Stack.Toolbar.Menu>
+        }
+      />
+    </>
   )
 }
 
@@ -244,7 +245,7 @@ function EntryRow({
       ) => (
         <Button
           variant="destructive"
-          className="h-full w-20 rounded-none"
+          className="h-full w-20 rounded-none px-1"
           accessibilityLabel={`Remove ${episode.title} from the playlist`}
           onPress={() => {
             methods.close()

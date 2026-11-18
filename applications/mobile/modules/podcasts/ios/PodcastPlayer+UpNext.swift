@@ -48,8 +48,19 @@ extension PodcastPlayer {
         id: next.id, url: source, title: next.title, showTitle: next.showTitle,
         artworkUrl: next.artworkUrl, savedPosition: next.position, duration: next.duration,
         played: false, autoplay: true, type: next.type, showId: next.showId,
-        chaptersUrl: next.chaptersUrl))
+        chaptersUrl: next.chaptersUrl,
+        // As the app asks when the listener plays an episode: through its own download while
+        // Skip ads is on for the show (its own choice, else the listener's), so its ads can be
+        // skipped (PodcastPlayer+Stream.swift checks the rest).
+        playThroughDownload: skipAds(forShow: next.showId), language: next.language,
+        queueURL: next.url))
     return true
+  }
+
+  /// Whether ads are skipped for a show: its own choice where it has one, else the listener's.
+  private func skipAds(forShow showId: String?) -> Bool {
+    let own = showId.flatMap { ShowSettingsFile.load(from: ShowSettingsStore.url)[$0] }?.skipAds
+    return own ?? AdSkipDefaults.settings.skipAds
   }
 
   // MARK: Changing the queue
@@ -102,6 +113,7 @@ extension PodcastPlayer {
     if let duration = item.duration { object["duration"] = duration }
     if let showId = item.showId { object["showId"] = showId }
     if let chapters = item.chaptersUrl { object["chaptersUrl"] = chapters }
+    if let language = item.language { object["language"] = language }
     return object
   }
 }

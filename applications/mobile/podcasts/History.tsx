@@ -2,7 +2,7 @@
 import { Stack } from "expo-router"
 import { History as HistoryIcon } from "lucide-react-native"
 import { useMemo } from "react"
-import { ActivityIndicator, Alert, FlatList, View } from "react-native"
+import { ActivityIndicator, Alert, FlatList } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { clearHistory } from "@/modules/podcasts/dbEpisodes"
@@ -13,7 +13,7 @@ import { readableError } from "@/modules/podcasts/nativeError"
 import { EmptyState } from "./EmptyState"
 import { EpisodeRow } from "./EpisodeRow"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SelectionBar } from "./SelectionBar"
+import { SelectionBar, SelectionSpacer } from "./SelectionBar"
 import { useShows } from "./hooks"
 import { useHistory } from "./useEpisodeLists"
 import { useSelection } from "./useSelection"
@@ -65,45 +65,20 @@ export function History() {
     [history.data],
   )
   return (
-    <View className="bg-background flex-1">
-      <ScreenBar
-        title="Listening history"
-        right={
-          <>
-            <Stack.Toolbar.Button
-              icon="checklist"
-              hidden={episodes.length === 0}
-              accessibilityLabel="Select episodes"
-              onPress={() => selection.begin()}
-            />
-            <Stack.Toolbar.Button
-              hidden={episodes.length === 0}
-              accessibilityLabel="Clear the history"
-              onPress={confirmClear}
-            >
-              Clear
-            </Stack.Toolbar.Button>
-          </>
-        }
-      />
-      {selection.on ? (
-        <SelectionBar
-          selection={selection}
-          episodes={episodes}
-          shows={showById}
-        />
-      ) : null}
+    <>
       {history.loading ? (
         <BelowBar>
           <ActivityIndicator className="mt-8" accessibilityLabel="Loading" />
         </BelowBar>
       ) : (
         <FlatList<Item>
+          className="bg-background flex-1"
           data={items}
           keyExtractor={(item) => item.key}
           contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
           extraData={selection.selected}
+          ListHeaderComponent={selection.on ? <SelectionSpacer /> : undefined}
           ListEmptyComponent={
             <EmptyState
               icon={HistoryIcon}
@@ -133,6 +108,34 @@ export function History() {
           }}
         />
       )}
-    </View>
+      <ScreenBar
+        large
+        title="History"
+        right={
+          <>
+            <Stack.Toolbar.Button
+              icon="checklist"
+              hidden={episodes.length === 0}
+              accessibilityLabel="Select episodes"
+              onPress={() => selection.begin()}
+            />
+            <Stack.Toolbar.Button
+              hidden={episodes.length === 0}
+              accessibilityLabel="Clear the history"
+              onPress={confirmClear}
+            >
+              Clear
+            </Stack.Toolbar.Button>
+          </>
+        }
+      />
+      {selection.on ? (
+        <SelectionBar
+          selection={selection}
+          episodes={episodes}
+          shows={showById}
+        />
+      ) : null}
+    </>
   )
 }

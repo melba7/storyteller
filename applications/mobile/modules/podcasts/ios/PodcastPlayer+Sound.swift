@@ -158,9 +158,9 @@ final class PodcastSound {
     }
   }
 
-  /// The sure ads, which the ad skipping owns.
+  /// The sure ads, which the ad skipping owns: the final file's, else the partial one's.
   private func avoidedStretches() -> [ClosedRange<Double>] {
-    guard let file = adsStore?.load(detector: PodcastAdFinder.detectorName) else { return [] }
+    guard let file = adsStore?.best(detector: PodcastAdFinder.detectorName) else { return [] }
     return file.ads.filter { $0.confidence == .sure && $0.end > $0.start }
       .map { $0.start...$0.end }
   }

@@ -70,6 +70,17 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(try DownloadStore(root: root).entry(for: "c")?.automatic, false)
   }
 
+  func testThePlainAddressSurvivesARestartAndAnOldIndexHasNone() throws {
+    let store = try DownloadStore(root: root)
+    var withPlain = entry("a", .queued)
+    withPlain.plainURL = "http://x.example/a.mp3"
+    try store.put(withPlain)
+    try store.put(entry("b", .queued))
+    let reopened = try DownloadStore(root: root)
+    XCTAssertEqual(reopened.entry(for: "a")?.plainURL, "http://x.example/a.mp3")
+    XCTAssertNil(reopened.entry(for: "b")?.plainURL)
+  }
+
   func testFinishingKeepsTheAutomaticFlag() throws {
     let store = try DownloadStore(root: root)
     var auto = entry("a", .queued)
@@ -118,6 +129,39 @@ final class DownloadStoreTests: XCTestCase {
     // The change is on disk.
     XCTAssertEqual(
       try DownloadStore(root: root).entry(for: "lost")?.state, .failed(reason: "Stopped, tap to try again"))
+  }
+
+  func testRelaunchDropsAnUnfinishedPlayThroughDownloadWithItsFolder() throws {
+    let store = try DownloadStore(root: root)
+    var heard = entry("heard", .downloading(bytes: 1, expected: 9))
+    heard.playThrough = true
+    try store.put(heard)
+    var feeding = entry("feeding", .downloading(bytes: 1, expected: 9))
+    feeding.playThrough = true
+    try store.put(feeding)
+    let folder = try store.folder(for: "heard")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+    let restart = try store.reconcile(liveEpisodeIds: ["feeding"])
+    XCTAssertEqual(restart, [])
+    XCTAssertNil(store.entry(for: "heard"))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: folder.path))
+    XCTAssertEqual(store.entry(for: "feeding")?.state, .downloading(bytes: 1, expected: 9))
+    XCTAssertNil(try DownloadStore(root: root).entry(for: "heard"))
+  }
+
+  func testTheMarkSurvivesTheIndexAndAnOldIndexMeansNone() throws {
+    let store = try DownloadStore(root: root)
+    var marked = entry("a", .queued)
+    marked.playThrough = true
+    try store.put(marked)
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "a")?.playThrough, true)
+    let old = """
+      {"episodeId":"b","url":"https://x/b.mp3","fileExtension":"mp3","state":{"kind":"queued"},\
+      "updatedAt":"2030-01-01T00:00:00Z"}
+      """
+    let decoded = try JSONDecoder.iso.decode(DownloadEntry.self, from: Data(old.utf8))
+    XCTAssertFalse(decoded.playThrough)
   }
 
   // MARK: Files
@@ -248,5 +292,13 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(store.storageUsed(), 12)
     try store.delete(episodeId: "a")
     XCTAssertEqual(store.storageUsed(), 7)
+  }
+}
+
+extension JSONDecoder {
+  fileprivate static var iso: JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .iso8601
+    return decoder
   }
 }

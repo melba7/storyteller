@@ -106,11 +106,13 @@ describe("soundEdition", () => {
         `${forkIdentity.appId}.podcastAds`,
       ],
       LofiScoreSoundEdition: soundEdition(),
-      NSAppTransportSecurity: { NSAllowsArbitraryLoadsForMedia: true },
+      NSAppTransportSecurity: {
+        NSAllowsArbitraryLoads: true,
+      },
     })
   })
 
-  it("lets episodes play over plain http and keeps upstream's transport keys", () => {
+  it("lets feeds and episodes load over plain http and drops the keys that make iOS ignore that", () => {
     const config = applyForkIdentity({
       name: "Storyteller",
       slug: "storyteller",
@@ -119,13 +121,15 @@ describe("soundEdition", () => {
           NSAppTransportSecurity: {
             NSAllowsLocalNetworking: true,
             NSAllowsArbitraryLoadsForMedia: false,
+            NSAllowsArbitraryLoadsInWebContent: true,
+            NSExceptionDomains: { "example.com": {} },
           },
         },
       },
     })
     expect(config.ios?.infoPlist?.["NSAppTransportSecurity"]).toEqual({
-      NSAllowsLocalNetworking: true,
-      NSAllowsArbitraryLoadsForMedia: true,
+      NSExceptionDomains: { "example.com": {} },
+      NSAllowsArbitraryLoads: true,
     })
   })
 

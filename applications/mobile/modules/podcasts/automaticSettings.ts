@@ -7,6 +7,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage"
 import {
   type AutomaticSettings,
   DEFAULT_SETTINGS,
+  type NewEpisode,
+  parseFollowUps,
   parseSettings,
   serializeSettings,
 } from "./automatic"
@@ -41,5 +43,24 @@ export async function saveLastRun(at: number): Promise<void> {
     await AsyncStorage.setItem(LAST_RUN_KEY, String(at))
   } catch {
     // The next opening refreshes again; nothing else depends on it.
+  }
+}
+
+const FOLLOW_UPS_KEY = "podcasts.automatic.followUps"
+
+/** New episodes found by a run that has not followed them up yet. */
+export async function loadFollowUps(): Promise<NewEpisode[]> {
+  try {
+    return parseFollowUps(await AsyncStorage.getItem(FOLLOW_UPS_KEY))
+  } catch {
+    return []
+  }
+}
+
+export async function saveFollowUps(episodes: readonly NewEpisode[]) {
+  try {
+    await AsyncStorage.setItem(FOLLOW_UPS_KEY, JSON.stringify(episodes))
+  } catch (cause) {
+    console.warn("Couldn't keep the new episodes for later", cause)
   }
 }

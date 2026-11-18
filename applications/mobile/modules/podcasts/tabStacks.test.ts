@@ -84,10 +84,39 @@ function firstScreen(tab: string): string | undefined {
 
 describe("the podcasts tabs", () => {
   it("open on their own home screen, never on a shared screen", () => {
-    expect(firstScreen("(library)")).toBe("index")
-    expect(firstScreen("(discover)")).toBe("discover")
-    expect(firstScreen("(upnext)")).toBe("index")
-    expect(firstScreen("(profile)")).toBe("index")
-    expect(firstScreen("(playlists)")).toBe("index")
+    for (const tab of ["(home)", "(new)", "(library)", "(search)"]) {
+      expect(firstScreen(tab)).toBe("index")
+    }
+  })
+})
+
+describe("the shared screens", () => {
+  it("are in every tab's stack, and the account sheet is its own stack", () => {
+    const root = appRoutes()
+    const names = (tab: string) =>
+      findGroup(root, tab)?.children.map((child) => child.route)
+    const shared = [
+      "show/[id]",
+      "episode/[id]",
+      "preview",
+      "show-settings/[id]",
+      "downloads",
+      "playlist/[id]",
+      "playlist-edit/[id]",
+      "history",
+      "bookmarks",
+      "up-next",
+      "saved",
+      "latest",
+      "shows",
+      "arrange",
+      "category/[id]",
+    ]
+    for (const tab of ["(home)", "(new)", "(library)", "(search)"]) {
+      expect(names(tab)).toEqual(expect.arrayContaining(shared))
+    }
+    expect(findGroup(root, "account")?.children.map((c) => c.route)).toEqual(
+      expect.arrayContaining(["index", "stats"]),
+    )
   })
 })

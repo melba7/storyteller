@@ -4,9 +4,11 @@ import { Pressable, View } from "react-native"
 import { Text } from "@/components/ui/text"
 import { type Show } from "@/modules/podcasts/library"
 import { badgeLabel } from "@/modules/podcasts/libraryView"
+import { type PodcastHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
 import { PressableScale } from "./PressableScale"
+import { ZoomLink } from "./ZoomLink"
 
 /** The grids' gutter around the cells and the gap between them, in points. */
 export const GRID_GUTTER = 16
@@ -50,18 +52,24 @@ export function ShowCell({
   count,
   size,
   onPress,
-}: Props & { size: number }) {
-  return (
+  href,
+}: Props & {
+  size: number
+  /** Where the show's page is: the tile then zooms into it. */
+  href?: PodcastHref
+}) {
+  const tile = (
     <PressableScale
       style={{ width: size, marginBottom: GRID_GAP }}
       accessibilityRole="button"
       accessibilityLabel={label(show, count)}
-      onPress={onPress}
+      {...(href ? {} : { onPress })}
     >
       <Artwork uri={show.imageUrl} size={size} />
       <Badge count={count} className="absolute -top-1.5 -right-1.5" />
     </PressableScale>
   )
+  return href ? <ZoomLink href={href}>{tile}</ZoomLink> : tile
 }
 
 /** One show in the list: a row with the count at the right end. */

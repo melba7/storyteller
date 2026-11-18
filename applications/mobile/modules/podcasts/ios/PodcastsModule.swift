@@ -25,6 +25,10 @@ struct PlaybackLoadOptions: Record {
   @Field var audioType: String = ""
   @Field var showId: String?
   @Field var chaptersUrl: String?
+  /// Play from the episode's own download as it arrives (Skip ads is on and it is not downloaded).
+  @Field var playThroughDownload: Bool = false
+  /// The feed's language, for the transcript of the download that plays.
+  @Field var language: String?
 }
 
 /// An episode to put in Up Next.
@@ -39,6 +43,7 @@ struct UpNextItemOptions: Record {
   @Field var position: Double = 0
   @Field var showId: String?
   @Field var chaptersUrl: String?
+  @Field var language: String?
 }
 
 public final class PodcastsModule: Module {
@@ -90,7 +95,8 @@ public final class PodcastsModule: Module {
         id: options.episodeId, url: url, title: options.title, showTitle: options.showTitle,
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
-        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl)
+        type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
+        playThroughDownload: options.playThroughDownload, language: options.language)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -136,7 +142,8 @@ public final class PodcastsModule: Module {
       let queued = QueueItem(
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
-        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl)
+        position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
+        language: item.language)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in
@@ -173,6 +180,7 @@ public final class PodcastsModule: Module {
     // The system's AirPlay button, for the player (see AirPlayRouteView).
     View(AirPlayRouteView.self) {
       Prop("label") { (view: AirPlayRouteView, label: String) in view.setLabel(label) }
+      Prop("light") { (view: AirPlayRouteView, light: Bool) in view.setLight(light) }
     }
 
     // MARK: Playback settings
@@ -311,6 +319,10 @@ public final class PodcastsModule: Module {
     AsyncFunction("listTranscripts") { () -> [[String: Any]] in PodcastTranscriber.shared.all() }
     AsyncFunction("getTranscript") { (episodeId: String) -> String? in
       PodcastTranscriber.shared.transcriptJSON(episodeId)
+    }
+    // The lines of a transcript that is still being made, as JSON, or nil.
+    AsyncFunction("getPartialTranscript") { (episodeId: String) -> String? in
+      PodcastTranscriber.shared.partialJSON(episodeId)
     }
     // The words said in every finished transcript: hits with the episode, time and line.
     AsyncFunction("searchTranscripts") { (query: String) async -> [[String: Any]] in
