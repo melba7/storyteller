@@ -11,6 +11,7 @@
 import AVFoundation
 import Foundation
 import PodcastAds
+import UIKit
 
 /// One wait: the rules of StartHold and the timer that always ends it.
 @MainActor
@@ -73,7 +74,12 @@ extension PodcastPlayer {
       skipAds: adSkipping.skipsAds, playsOwnDownload: !playsPlainAddress,
       startsAt: seekPending ? itemStart : position,
       // A scan that is over has said what it has: the same wait would never be answered.
-      hasSavedAds: adSkipping.hasSavedAds || loader.head.hasChecked, showStartsClean: startsClean)
+      hasSavedAds: adSkipping.hasSavedAds || loader.head.hasChecked, showStartsClean: startsClean,
+      // With the screen locked or the app away, iOS may suspend the app before the 3 second timer
+      // fires, and an episode that never starts is worse than one that plays its first ad. That
+      // is the case when the next episode of Up Next starts by itself and for Play on the lock
+      // screen.
+      appActive: UIApplication.shared.applicationState == .active)
     guard wanted else { return false }
     let hold = PodcastStartHold(episodeId: id) { [weak self] reason in self?.startHoldOver(reason) }
     startHold = hold

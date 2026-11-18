@@ -6,14 +6,14 @@ import XCTest
 final class StartHoldTests: XCTestCase {
   private func wanted(
     skipAds: Bool = true, ownDownload: Bool = true, startsAt: Double = 0, savedAds: Bool = false,
-    startsClean: Bool = false
+    startsClean: Bool = false, appActive: Bool = true
   ) -> Bool {
     StartHold.wanted(
       skipAds: skipAds, playsOwnDownload: ownDownload, startsAt: startsAt, hasSavedAds: savedAds,
-      showStartsClean: startsClean)
+      showStartsClean: startsClean, appActive: appActive)
   }
 
-  func testTheWaitIsWantedOnlyWhenAllFiveThingsHold() {
+  func testTheWaitIsWantedOnlyWhenAllSixThingsHold() {
     XCTAssertTrue(wanted())
     XCTAssertFalse(wanted(skipAds: false), "Skip ads is off")
     XCTAssertFalse(wanted(ownDownload: false), "a plain address or a file, not its own download")
@@ -21,6 +21,9 @@ final class StartHoldTests: XCTestCase {
     XCTAssertFalse(wanted(startsAt: 600))
     XCTAssertFalse(wanted(savedAds: true), "it was checked before")
     XCTAssertFalse(wanted(startsClean: true), "the show starts clean")
+    XCTAssertFalse(
+      wanted(appActive: false),
+      "the screen is locked or the app is away: iOS may suspend it before the timer fires")
   }
 
   func testAnEpisodeThatStartsInsideTheFirstSecondIsStillHeld() {

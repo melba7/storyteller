@@ -30,12 +30,15 @@ public struct StartHold: Equatable, Sendable {
 
   /// Whether Play should wait: Skip ads is on, the episode plays through its own download (a
   /// stream that is saved as it plays), it starts under a second, nothing is saved for it yet,
-  /// and the show is not known to start clean.
+  /// the show is not known to start clean, and the app is in front. With the screen locked or the
+  /// app away, iOS may suspend the app before the timer fires, and the episode would stay silent
+  /// until the app is opened: then it starts at once, whatever the ad scan says.
   public static func wanted(
     skipAds: Bool, playsOwnDownload: Bool, startsAt: Double, hasSavedAds: Bool,
-    showStartsClean: Bool
+    showStartsClean: Bool, appActive: Bool
   ) -> Bool {
     skipAds && playsOwnDownload && startsAt < startsUnder && !hasSavedAds && !showStartsClean
+      && appActive
   }
 
   /// Why the wait is over, nil while it goes on. Once set it never changes: the first reason
