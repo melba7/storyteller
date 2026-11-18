@@ -55,6 +55,13 @@ describe("readStats", () => {
     expect(stats.savedByAds).toBe(40)
     expect(stats.days).toEqual({ "2026-11-17": 60 })
   })
+  it("reads the three ad counts as whole numbers", () => {
+    const stats = readStats({ adSkips: 20, adUndone: 2, adTooFar: 1 })
+    expect([stats.adSkips, stats.adUndone, stats.adTooFar]).toEqual([20, 2, 1])
+    const bad = readStats({ adSkips: -1, adUndone: 2.5, adTooFar: "3" })
+    expect([bad.adSkips, bad.adUndone, bad.adTooFar]).toEqual([0, 0, 0])
+    expect(readStats(null).adSkips).toBe(0)
+  })
   it("turns anything else into zeros", () => {
     expect(readStats(null).listened).toBe(0)
     const stats = readStats({ listened: "x", savedByTrim: -1, days: [1, 2] })

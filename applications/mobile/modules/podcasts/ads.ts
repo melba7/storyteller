@@ -119,6 +119,7 @@ export type FoundAd = {
 }
 
 export type AdsFile = {
+  /** The ads as they are skipped: already cut short by the listener's trims. */
   ads: FoundAd[]
   /** The ads whose skip the listener took back. */
   undone: { start: number; end: number }[]
@@ -155,6 +156,33 @@ function readAd(value: unknown): FoundAd | null {
   }
 }
 
+type Trim = { adStart: number; end: number }
+
+/** The trims of an ads file: where the listener found a skip too far. Bad entries are left out. */
+function readTrims(value: unknown): Trim[] {
+  if (!Array.isArray(value)) return []
+  return (value as unknown[]).flatMap((entry) => {
+    const item = entry as Record<string, unknown> | null
+    return item && isNumber(item["adStart"]) && isNumber(item["end"])
+      ? [{ adStart: item["adStart"], end: item["end"] }]
+      : []
+  })
+}
+
+/**
+ * The ad cut short by the trims that are for it (as `AdTrim` in PodcastAds does): a trim is for
+ * the ad that starts where it did, or runs over that place. An ad is never made longer; null
+ * when a trim leaves it with no length.
+ */
+function trimmedAd(ad: FoundAd, trims: readonly Trim[]): FoundAd | null {
+  let end = ad.end
+  for (const trim of trims) {
+    if (ad.start - 0.5 <= trim.adStart && trim.adStart < ad.end)
+      end = Math.min(end, trim.end)
+  }
+  return end > ad.start ? { ...ad, end } : null
+}
+
 /** The ads file as Swift saved it, or null when it cannot be read. Bad entries are left out. */
 export function parseAdsFile(json: string): AdsFile | null {
   let value: unknown
@@ -166,9 +194,11 @@ export function parseAdsFile(json: string): AdsFile | null {
   if (typeof value !== "object" || value === null) return null
   const file = value as Record<string, unknown>
   if (!Array.isArray(file["ads"])) return null
+  const trims = readTrims(file["trims"])
   const ads = (file["ads"] as unknown[])
     .map(readAd)
     .filter((ad): ad is FoundAd => ad !== null)
+    .flatMap((ad) => trimmedAd(ad, trims) ?? [])
     .sort((a, b) => a.start - b.start)
   const undone = Array.isArray(file["undone"])
     ? (file["undone"] as unknown[]).flatMap((entry) => {
@@ -274,6 +304,20 @@ export function skipNote(event: AdSkipped, now: number): SkipNote {
     start: event.start,
     length: event.length,
     shownAt: now,
+  }
+}
+
+/** How far the note's "Back" button goes back. */
+export const SKIP_NOTE_BACK_SECONDS = 10
+
+/** What the note's "Back" button says, and what a screen reader says for it. */
+export function skipNoteBackLabels(seconds: number = SKIP_NOTE_BACK_SECONDS): {
+  text: string
+  accessibility: string
+} {
+  return {
+    text: `Back ${seconds} s`,
+    accessibility: `Back ${seconds} seconds, the skip went too far`,
   }
 }
 

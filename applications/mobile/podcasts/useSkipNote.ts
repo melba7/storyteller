@@ -7,8 +7,10 @@ import {
   noteAfterUndo,
   skipNote,
 } from "@/modules/podcasts/ads"
-import { undoAdSkip } from "@/modules/podcasts/adsNative"
+import { backAfterSkip, undoAdSkip } from "@/modules/podcasts/adsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+
+import { adsEdited } from "./useAds"
 
 // The "Skipped ad" note: set by Swift's onAdSkipped, gone after six seconds or when the skip
 // is undone. One copy is shared by every screen that shows it.
@@ -55,5 +57,16 @@ export function pressUndo() {
       if (!done) publish(null)
     },
     (cause: unknown) => console.warn("Couldn't undo the skip", cause),
+  )
+}
+
+/** Back 10 s: the skip went too far. Swift saves the trim, the note goes, ad lists read again. */
+export function pressBack() {
+  backAfterSkip().then(
+    () => {
+      publish(null)
+      adsEdited()
+    },
+    (cause: unknown) => console.warn("Couldn't go back after the skip", cause),
   )
 }

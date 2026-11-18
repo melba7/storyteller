@@ -3,6 +3,12 @@
 // `Podcasts/stats.json` and shows them in Profile. Days are the phone's local days.
 import Foundation
 
+/// What the ad counters count: a skip the player made, one the listener undid (it was no ad), and
+/// one the listener found too far (they went back into the ad).
+public enum AdCount: Sendable {
+  case skipped, undone, tooFar
+}
+
 /// The five ways listening takes less time than the audio is long.
 public enum StatsCategory: String, CaseIterable, Sendable {
   case speed, skipping, trim, ads, chapters
@@ -22,6 +28,11 @@ public struct ListeningStats: Codable, Sendable, Equatable {
   /// Seconds of ads the player skipped, minus the skips that were undone.
   public private(set) var savedByAds = 0.0
   public private(set) var savedByChapters = 0.0
+  /// How many ads the player skipped, and how many of those skips the listener undid or found
+  /// too far. They say how well ad skipping goes.
+  public private(set) var adSkips = 0
+  public private(set) var adUndone = 0
+  public private(set) var adTooFar = 0
   /// Seconds listened per local day, keyed "yyyy-MM-dd".
   public private(set) var days: [String: Double] = [:]
 
@@ -58,6 +69,14 @@ public struct ListeningStats: Codable, Sendable, Equatable {
     set(category, saved(category) + seconds)
   }
 
+  public mutating func countAd(_ what: AdCount) {
+    switch what {
+    case .skipped: adSkips += 1
+    case .undone: adUndone += 1
+    case .tooFar: adTooFar += 1
+    }
+  }
+
   /// Takes a saving back (an ad skip that was undone). It never goes below zero.
   public mutating func removeSaved(_ category: StatsCategory, _ seconds: Double) {
     guard Self.usable(seconds) else { return }
@@ -80,6 +99,9 @@ public struct ListeningStats: Codable, Sendable, Equatable {
   ) {
     listened += other.listened
     for category in StatsCategory.allCases { addSaved(category, other.saved(category)) }
+    adSkips += other.adSkips
+    adUndone += other.adUndone
+    adTooFar += other.adTooFar
     for (day, seconds) in other.days { days[day, default: 0] += seconds }
     prune(today: today, calendar: calendar)
   }
@@ -130,6 +152,7 @@ public struct ListeningStats: Codable, Sendable, Equatable {
 
   private enum Keys: String, CodingKey {
     case listened, savedBySpeed, savedBySkipping, savedByTrim, savedByAds, savedByChapters, days
+    case adSkips, adUndone, adTooFar
   }
 
   public init(from decoder: Decoder) throws {
@@ -144,6 +167,11 @@ public struct ListeningStats: Codable, Sendable, Equatable {
     savedByTrim = number(.savedByTrim)
     savedByAds = number(.savedByAds)
     savedByChapters = number(.savedByChapters)
+    // A count is a whole number of zero or more; anything else is dropped.
+    func count(_ key: Keys) -> Int { max(0, (try? c.decodeIfPresent(Int.self, forKey: key)) ?? 0) }
+    adSkips = count(.adSkips)
+    adUndone = count(.adUndone)
+    adTooFar = count(.adTooFar)
     let saved = (try? c.decodeIfPresent([String: Double].self, forKey: .days)) ?? [:]
     days = saved.filter { Self.isDayKey($0.key) && Self.usable($0.value) }
   }

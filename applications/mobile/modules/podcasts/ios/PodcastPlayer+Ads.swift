@@ -67,8 +67,16 @@ final class PodcastAdSkipping {
     if let skip { jump(skip, from: position) }
   }
 
-  /// The playhead was moved by the listener, a lock screen button or Undo.
-  func seeked(to position: Double) { skipper.seeked(to: position) }
+  /// The playhead was moved by the listener, a lock screen button or Undo. A move back into the
+  /// ad that was just skipped says the skip went too far: that ad ends there from now on. The
+  /// trim is saved with the ads and counted; the skipper already uses it.
+  func seeked(to position: Double) {
+    if let trim = skipper.backSeek(to: position, now: now) {
+      store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
+      StatsStore.shared.countAd(.tooFar)
+    }
+    skipper.seeked(to: position)
+  }
 
   /// The ads file or the switches changed (ads were just found, or a switch was turned).
   func refresh() {
@@ -115,6 +123,7 @@ final class PodcastAdSkipping {
       store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
     }
     StatsStore.shared.undoAdSkip()
+    StatsStore.shared.countAd(.undone)
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -159,6 +168,7 @@ final class PodcastAdSkipping {
     guard let episodeId else { return }
     PodcastTimeline.firstSkip(episodeId)
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
+    StatsStore.shared.countAd(.skipped)
     owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(

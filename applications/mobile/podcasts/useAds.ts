@@ -18,7 +18,8 @@ import { type AdsInfo, Podcasts } from "@/modules/podcasts/index"
 // What the screens know about ad finding: read once from Swift, then kept fresh by its
 // onAdsChange event. One copy is shared by every screen.
 let current: AdsMap = {}
-// Counts the skips the listener undid, so a list of ads reads its file again.
+// Counts the changes the listener made to the saved ads (a skip undone, an ad trimmed), so a
+// list of ads reads its file again.
 let undoneCount = 0
 let started = false
 const listeners = new Set<() => void>()
@@ -35,10 +36,7 @@ function start() {
   Podcasts.addListener("onAdsChange", (change) =>
     publish(applyAdsChange(current, change)),
   )
-  Podcasts.addListener("onAdUndone", () => {
-    undoneCount += 1
-    publish(current)
-  })
+  Podcasts.addListener("onAdUndone", adsEdited)
   listAds().then(
     (list) => publish({ ...adsMapFromList(list), ...current }),
     (cause: unknown) => {
@@ -46,6 +44,12 @@ function start() {
       console.warn("Couldn't read the ad states", cause)
     },
   )
+}
+
+/** The listener changed the saved ads (a skip undone, an ad trimmed): lists read them again. */
+export function adsEdited() {
+  undoneCount += 1
+  publish(current)
 }
 
 function subscribe(listener: () => void): () => void {

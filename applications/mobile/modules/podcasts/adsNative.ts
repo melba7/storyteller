@@ -2,6 +2,7 @@
 //
 // Thin wrappers over the native module's ad functions. Not imported by any test, because the
 // native module is not there; the rules are in ads.ts.
+import { SKIP_NOTE_BACK_SECONDS } from "./ads"
 import { type AdSkipSettings, type AdsInfo, Podcasts } from "./index"
 
 export async function listAds(): Promise<AdsInfo[]> {
@@ -42,4 +43,12 @@ export async function setAdSkipSettings(
 /** Undoes the skip that was just made. False when it is too late (or there is nothing). */
 export async function undoAdSkip(): Promise<boolean> {
   return (await Podcasts?.undoAdSkip()) ?? false
+}
+
+/**
+ * Goes back a few seconds after a skip that went too far. The player saves a trim when that
+ * lands inside the ad that was just skipped, so the ad ends there from then on.
+ */
+export async function backAfterSkip(): Promise<void> {
+  await Podcasts?.skipBy(-SKIP_NOTE_BACK_SECONDS)
 }
