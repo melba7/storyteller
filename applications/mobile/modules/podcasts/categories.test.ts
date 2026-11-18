@@ -5,6 +5,7 @@ import {
   type FollowedShow,
   buildForYou,
   chartCategoryFor,
+  forYouKey,
   forYouOmit,
   isFollowed,
   pickForYou,
@@ -180,5 +181,26 @@ describe("forYouOmit", () => {
   it("gives only the categories For You drew once it has loaded", () => {
     expect(forYouOmit(picks, drawn, true)).toEqual(["1321"])
     expect(forYouOmit(picks, [], true)).toEqual([])
+  })
+})
+
+describe("forYouKey", () => {
+  const a = followed("A", ["Comedy"])
+  const b = followed("B", ["Comedy"])
+
+  it("stays the same for a new array of the same shows, whatever the order", () => {
+    const one = forYouKey(pickForYou([a, b]), [a, b])
+    const two = forYouKey(pickForYou([{ ...b }, { ...a }]), [
+      { ...b },
+      { ...a },
+    ])
+    expect(two).toBe(one)
+  })
+
+  it("changes when a show is followed or a pick changes", () => {
+    const c = followed("C", ["News"])
+    expect(forYouKey(pickForYou([a, b, c]), [a, b, c])).not.toBe(
+      forYouKey(pickForYou([a, b]), [a, b]),
+    )
   })
 })

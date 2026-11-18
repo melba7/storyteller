@@ -49,6 +49,11 @@ describe("featuredCards", () => {
 })
 
 describe("featuredCardSize", () => {
+  it("stops at 400 pt, so an iPad or a landscape phone draws no huge square", () => {
+    expect(featuredCardSize(1024)).toBe(400)
+    expect(featuredCardSize(428)).toBe(372)
+  })
+
   it("is the window minus gutter, gap and peek", () => {
     expect(featuredCardSize(393)).toBe(337)
   })

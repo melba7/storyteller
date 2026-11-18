@@ -7,6 +7,7 @@ import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { useIsFocused } from "@/hooks/useIsFocused"
+import { listEpisodes } from "@/modules/podcasts/db"
 import { fetchFeed, subscribe } from "@/modules/podcasts/dbFeeds"
 import { normalizeFeedUrl } from "@/modules/podcasts/feedUrl"
 import { type StoredEpisode } from "@/modules/podcasts/library"
@@ -16,9 +17,10 @@ import {
   type EpisodeTarget,
   type Preview,
   findEpisodeIndex,
+  matchEpisodeId,
   previewFromFeed,
 } from "@/modules/podcasts/preview"
-import { showHref } from "@/modules/podcasts/routes"
+import { episodeHref, showHref } from "@/modules/podcasts/routes"
 import { showShare } from "@/modules/podcasts/share"
 
 import { EpisodeRow } from "./EpisodeRow"
@@ -125,14 +127,30 @@ export function PodcastPreview({
     return () => clearTimeout(timer)
   }, [target, headerHeight])
 
-  // Replaces this page with the show's own, once, when the show is in the library.
+  // Replaces this page with the show's own, once, when the show is in the library. An episode
+  // this page was opened for (a Top Episodes row) goes to the library's page for that episode,
+  // when there is one; otherwise to the show's page.
   useEffect(() => {
-    if (followed && isFocused && !left.current) {
-      left.current = true
-      adoptFollowedPreview(followed.id).catch(() => {})
-      router.replace(showHref(segments, followed.id))
+    if (!followed || !isFocused || left.current) return
+    left.current = true
+    adoptFollowedPreview(followed.id).catch(() => {})
+    const named = Boolean(guid || audioUrl || title)
+    const show = showHref(segments, followed.id)
+    if (!named) {
+      router.replace(show)
+      return
     }
-  }, [followed, isFocused, router, segments])
+    listEpisodes(followed.id).then(
+      (episodes) => {
+        if (!mounted.current) return
+        const id = matchEpisodeId(episodes, { guid, audioUrl, title })
+        router.replace(id ? episodeHref(segments, id) : show)
+      },
+      () => {
+        if (mounted.current) router.replace(show)
+      },
+    )
+  }, [followed, isFocused, router, segments, guid, audioUrl, title])
 
   async function follow() {
     if (following) return

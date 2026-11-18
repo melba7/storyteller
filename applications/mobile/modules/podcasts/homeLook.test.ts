@@ -15,6 +15,7 @@ import {
   SHELF_LINE_HEIGHT,
   SHELF_TEXT_GAP,
   shelfHeight,
+  shelfTextScale,
   shelfTileSize,
   timeLeftLabel,
   topShowCaption,
@@ -192,6 +193,18 @@ describe("the shelf's measures", () => {
   it("sizes a tile at 45% of the window, rounded", () => {
     expect(shelfTileSize(393)).toBe(177)
     expect(shelfTileSize(430)).toBe(194)
+  })
+
+  it("stops at 220 pt on a wide window", () => {
+    expect(shelfTileSize(1024)).toBe(220)
+    expect(shelfTileSize(480)).toBe(216)
+  })
+
+  it("grows its text lines with the text scale, at most 1.2 times", () => {
+    expect(shelfTextScale(1)).toBe(1)
+    expect(shelfTextScale(0.8)).toBe(1)
+    expect(shelfTextScale(3)).toBe(1.2)
+    expect(shelfHeight(177, false, 1.2)).toBe(177 + SHELF_TEXT_GAP + 2 * 34)
   })
 
   it("is one line taller when the shelf shows ranks", () => {

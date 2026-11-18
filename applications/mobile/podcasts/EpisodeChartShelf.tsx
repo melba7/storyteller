@@ -22,6 +22,11 @@ import { PressableScale } from "./PressableScale"
 type Ranked = { episode: ChartEpisode; rank: number }
 
 const LINE = { fontSize: 15, lineHeight: 20 }
+/**
+ * The rows are a fixed 76 pt, so their text may grow only to 1.2 times (3 lines of 24 pt fit).
+ * Past that the lines would overlap the next row.
+ */
+const MAX_SCALE = 1.2
 
 /**
  * Apple's episode chart as pages of three ranked rows, side by side, each page a little
@@ -87,16 +92,22 @@ export function EpisodeChartShelf({
                 className="rounded-[8px]"
               />
               <Text
+                maxFontSizeMultiplier={MAX_SCALE}
                 className="w-6 text-center font-bold"
                 style={[LINE, { fontVariant: ["tabular-nums"] }]}
               >
                 {rank}
               </Text>
               <View style={{ flex: 1 }}>
-                <Text numberOfLines={2} style={LINE}>
+                <Text
+                  maxFontSizeMultiplier={MAX_SCALE}
+                  numberOfLines={2}
+                  style={LINE}
+                >
                   {episode.title}
                 </Text>
                 <Text
+                  maxFontSizeMultiplier={MAX_SCALE}
                   className="text-muted-foreground"
                   numberOfLines={1}
                   style={LINE}

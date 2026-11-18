@@ -22,10 +22,21 @@ export async function getAdSkipSettings(): Promise<AdSkipSettings> {
   )
 }
 
+const settingsListeners = new Set<() => void>()
+
+/** Calls `listener` after the Skip ads settings are saved; returns the way to stop. */
+export function onAdSkipSettingsChanged(listener: () => void): () => void {
+  settingsListeners.add(listener)
+  return () => {
+    settingsListeners.delete(listener)
+  }
+}
+
 export async function setAdSkipSettings(
   settings: AdSkipSettings,
 ): Promise<void> {
   await Podcasts?.setAdSkipSettings(settings.skipAds, settings.skipOwnPlugs)
+  settingsListeners.forEach((listener) => listener())
 }
 
 /** Undoes the skip that was just made. False when it is too late (or there is nothing). */

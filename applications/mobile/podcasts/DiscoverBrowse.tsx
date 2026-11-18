@@ -63,7 +63,13 @@ export function DiscoverBrowse() {
       contentContainerStyle={{ paddingBottom: 24 }}
       contentInsetAdjustmentBehavior="automatic"
       refreshControl={
-        <RefreshControl refreshing={false} onRefresh={charts.retry} />
+        <RefreshControl
+          refreshing={false}
+          onRefresh={() => {
+            charts.retry()
+            top.retry()
+          }}
+        />
       }
     >
       <View className="pt-2">

@@ -3,7 +3,10 @@ import { useEffect, useState } from "react"
 
 import { Text } from "@/components/ui/text"
 import { playerAdLine } from "@/modules/podcasts/adLine"
-import { getAdSkipSettings } from "@/modules/podcasts/adsNative"
+import {
+  getAdSkipSettings,
+  onAdSkipSettingsChanged,
+} from "@/modules/podcasts/adsNative"
 import { skipAdsFor } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import type { Show, StoredEpisode } from "@/modules/podcasts/library"
@@ -13,19 +16,28 @@ import { useAdsInfo } from "./useAds"
 import { useDownload } from "./useDownloads"
 import { useTranscript } from "./useTranscripts"
 
-/** The Skip ads switch for this show, read again when the episode changes. */
+// The last value read, so the line is drawn right away when the player opens and does not
+// push the artwork and controls down a moment later.
+let lastMain = false
+
+/** The Skip ads switch for this show, read again when the episode or the setting changes. */
 function useSkipAds(show: Show | null, episodeId: string): boolean {
-  const [main, setMain] = useState(false)
+  const [main, setMain] = useState(lastMain)
+  const [round, setRound] = useState(0)
+  useEffect(() => onAdSkipSettingsChanged(() => setRound((r) => r + 1)), [])
   useEffect(() => {
     let live = true
     getAdSkipSettings().then(
-      (value) => live && setMain(value.skipAds),
+      (value) => {
+        lastMain = value.skipAds
+        if (live) setMain(value.skipAds)
+      },
       () => {},
     )
     return () => {
       live = false
     }
-  }, [episodeId])
+  }, [episodeId, round])
   return skipAdsFor(show?.settings.skipAds, main)
 }
 

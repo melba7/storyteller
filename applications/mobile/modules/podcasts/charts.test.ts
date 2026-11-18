@@ -11,6 +11,7 @@ import {
   CHART_CATEGORIES,
   TOP_CHART,
   type ChartDeps,
+  getJson,
   loadChart,
   parseCategoryChart,
   parseLookup,
@@ -304,5 +305,51 @@ describe("parseSavedChart", () => {
     expect(parseSavedChart(JSON.stringify(shows))).toEqual(shows)
     expect(parseSavedChart('[{"appleId":"1"}]')).toBeNull()
     expect(parseSavedChart("3")).toBeNull()
+  })
+})
+
+describe("getJson's timeout", () => {
+  const never = () => new Promise<Response>(() => {})
+
+  it("rejects when the network never answers", async () => {
+    vi.useFakeTimers()
+    try {
+      const result = getJson("https://x.test/a", never).then(
+        () => "answered",
+        (error: Error) => error.message,
+      )
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toMatch(/Couldn't reach Apple's charts/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("lets loadChart fall back on the kept copy when the fetch hangs", async () => {
+    vi.useFakeTimers()
+    try {
+      const old = [
+        {
+          appleId: "1",
+          title: "Old",
+          author: "",
+          feedUrl: "https://x.test/f",
+          imageUrl: null,
+        },
+      ]
+      const deps: ChartDeps = {
+        fetchFn: never,
+        cacheGet: async () => ({
+          value: JSON.stringify(old),
+          savedAt: Date.now() - CACHE_MS - 1000,
+        }),
+        cachePut: async () => {},
+      }
+      const result = loadChart("hang-chart", deps)
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toEqual(old)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

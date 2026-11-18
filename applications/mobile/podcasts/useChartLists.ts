@@ -7,6 +7,7 @@ import {
   type ListState,
   applyListEvent,
   loadChartGroups,
+  startListStates,
 } from "@/modules/podcasts/chartBatch"
 import { cacheGet, cachePut } from "@/modules/podcasts/dbFeeds"
 import {
@@ -29,24 +30,22 @@ export type ChartListStates = Record<string, ListState | EpisodesState>
  * pages asking for the same list together fetch it once: `loadChartGroups` shares one
  * in-flight promise per list. The episode list (`EPISODES_CHART`) has its own loader and
  * its state sits among the others. `retry()` asks again (also whenever the tab regains focus); lists that are fresh cost no request.
+ * Coming back to the page retries without skeletons.
  */
 export function useChartLists(ids: string[], enabled: boolean) {
   const key = ids.join(",")
   const [states, setStates] = useState<ChartListStates>({})
-  const [round, setRound] = useState(0)
+  // `skeletons` is false for a retry on focus: missing lists then stay missing meanwhile.
+  const [round, setRound] = useState({ n: 0, skeletons: true })
 
   useEffect(() => {
     if (!enabled || key === "") return
     let current = true
-    // A list that was missing gets another try, so it shows its skeleton again.
-    setStates((before) => {
-      const next: ChartListStates = {}
-      for (const id of key.split(",")) {
-        const old = before[id]
-        next[id] = !old || old.status === "missing" ? LOADING : old
-      }
-      return next
-    })
+    // A list that was missing gets another try; it shows its skeleton again only when the
+    // person asked (pull to refresh), not when the page was merely returned to.
+    setStates((before) =>
+      startListStates(before, key.split(","), round.skeletons),
+    )
     const onList = (id: string, update: ChartListUpdate) => {
       if (!current) return
       setStates((before) => ({
@@ -78,15 +77,22 @@ export function useChartLists(ids: string[], enabled: boolean) {
     }
   }, [key, enabled, round])
 
-  const retry = useCallback(() => setRound((r) => r + 1), [])
+  const retry = useCallback(
+    () => setRound((r) => ({ n: r.n + 1, skeletons: true })),
+    [],
+  )
+  const retryQuietly = useCallback(
+    () => setRound((r) => ({ n: r.n + 1, skeletons: false })),
+    [],
+  )
   // Coming back to the tab asks again, so a list that failed on a bad connection is tried
   // once more; fresh lists cost no request. The first focus is the page opening, which loads.
   const opened = useRef(false)
   useFocusEffect(
     useCallback(() => {
-      if (opened.current) retry()
+      if (opened.current) retryQuietly()
       opened.current = true
-    }, [retry]),
+    }, [retryQuietly]),
   )
   return { states, retry }
 }

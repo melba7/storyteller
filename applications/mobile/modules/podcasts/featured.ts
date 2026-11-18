@@ -34,7 +34,10 @@ const GUTTER = 16
 const GAP = 12
 const PEEK = 28
 
-/** The side of a featured card: the window minus the gutter, the gap and the peek; at least 1. */
+/** The most a featured card measures, so an iPad or a landscape phone draws no huge square. */
+export const FEATURED_MAX = 400
+
+/** The side of a featured card: the window minus the gutter, the gap and the peek, from 1 to 400. */
 export function featuredCardSize(windowWidth: number): number {
-  return Math.max(1, windowWidth - GUTTER - GAP - PEEK)
+  return Math.min(FEATURED_MAX, Math.max(1, windowWidth - GUTTER - GAP - PEEK))
 }

@@ -194,3 +194,25 @@ export function applyListEvent(
   if (shows && shows.length > 0) return { status: "ready", shows }
   return state.status === "ready" ? state : { status: "missing" }
 }
+
+/**
+ * The states a page starts a round of loading from. A new list is loading. A list that was
+ * missing shows its skeleton again only when `skeletons` is set (the first load and pull to
+ * refresh); on a retry from regaining focus it stays missing until an answer arrives, so a
+ * page that is offline does not flicker each time it is returned to.
+ */
+export function startListStates<T extends { status: string }>(
+  before: Record<string, T | ListState>,
+  ids: readonly string[],
+  skeletons: boolean,
+): Record<string, T | ListState> {
+  const next: Record<string, T | ListState> = {}
+  for (const id of ids) {
+    const old = before[id]
+    next[id] =
+      !old || (skeletons && old.status === "missing")
+        ? { status: "loading" }
+        : old
+  }
+  return next
+}

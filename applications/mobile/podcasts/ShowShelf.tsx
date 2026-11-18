@@ -1,10 +1,13 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { FlatList, View, useWindowDimensions } from "react-native"
+import { FlatList, PixelRatio, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import {
   SHELF_GAP,
   SHELF_GUTTER,
+  SHELF_MAX_TEXT_SCALE,
+  shelfHeight,
+  shelfTextScale,
   shelfTileSize,
 } from "@/modules/podcasts/homeLook"
 import { type PodcastHref } from "@/modules/podcasts/routes"
@@ -35,8 +38,17 @@ export type ShelfShow = {
 export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
   const { width: window } = useWindowDimensions()
   const size = shelfTileSize(window)
+  // The texts grow with the system text size, up to 1.2 times; the height follows, and is the
+  // loading shelf's height, so the page does not jump when the shows arrive.
+  const ranked = shows.some((show) => show.rank !== undefined)
+  const height = shelfHeight(
+    size,
+    ranked,
+    shelfTextScale(PixelRatio.getFontScale()),
+  )
   return (
     <FlatList
+      style={{ height, flexGrow: 0 }}
       horizontal
       data={shows}
       keyExtractor={(show) => show.key}
@@ -76,6 +88,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
             <View className="mt-2">
               {show.rank === undefined ? null : (
                 <Text
+                  maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                   className="text-lg font-bold"
                   style={{ fontVariant: ["tabular-nums"] }}
                 >
@@ -83,6 +96,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
                 </Text>
               )}
               <Text
+                maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                 className={`text-lg ${show.rank === undefined ? "font-bold" : ""}`}
                 numberOfLines={1}
               >
@@ -90,6 +104,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
               </Text>
               {show.caption ? (
                 <Text
+                  maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                   className="text-muted-foreground text-lg"
                   numberOfLines={1}
                 >

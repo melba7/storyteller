@@ -119,3 +119,17 @@ export function findEpisodeIndex(
   )
   return matches.length === 1 ? matches[0]! : -1
 }
+
+/**
+ * The id of the library episode that a chart or search result meant, matched like
+ * `findEpisodeIndex` does; null when the library has no such episode or none was named.
+ */
+export function matchEpisodeId(
+  episodes: (Pick<StoredEpisode, "id" | "guid" | "audioUrl"> & {
+    title?: string
+  })[],
+  target: EpisodeTarget,
+): string | null {
+  const index = findEpisodeIndex(episodes, target)
+  return index < 0 ? null : (episodes[index]?.id ?? null)
+}

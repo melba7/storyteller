@@ -2,7 +2,12 @@
 import { describe, expect, it } from "vitest"
 
 import { type PodcastFeedData } from "./index"
-import { findEpisodeIndex, isPreviewId, previewFromFeed } from "./preview"
+import {
+  findEpisodeIndex,
+  isPreviewId,
+  matchEpisodeId,
+  previewFromFeed,
+} from "./preview"
 
 const feed: PodcastFeedData = {
   title: "The Show",
@@ -164,5 +169,25 @@ describe("findEpisodeIndex", () => {
     expect(findEpisodeIndex(list, {})).toBe(-1)
     expect(findEpisodeIndex(list, { guid: null, audioUrl: "" })).toBe(-1)
     expect(findEpisodeIndex([], { guid: "a" })).toBe(-1)
+  })
+})
+
+describe("matchEpisodeId", () => {
+  const library = [
+    { id: "e1", guid: "g1", audioUrl: "https://a/1.mp3", title: "One" },
+    { id: "e2", guid: "g2", audioUrl: "https://a/2.mp3", title: "Two" },
+  ]
+
+  it("finds the library episode by guid, audio address or a single exact title", () => {
+    expect(matchEpisodeId(library, { guid: "g2" })).toBe("e2")
+    expect(matchEpisodeId(library, { audioUrl: "http://a/1.mp3?x=1" })).toBe(
+      "e1",
+    )
+    expect(matchEpisodeId(library, { title: " two " })).toBe("e2")
+  })
+
+  it("is null when none matches or none was named", () => {
+    expect(matchEpisodeId(library, { title: "Three" })).toBeNull()
+    expect(matchEpisodeId(library, {})).toBeNull()
   })
 })

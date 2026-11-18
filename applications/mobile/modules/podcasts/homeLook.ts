@@ -141,17 +141,34 @@ export const SHELF_GAP = 12
 /** The space at each end of a shelf, which lines it up with the page's text. */
 export const SHELF_GUTTER = 16
 
-/** The side of a shelf tile's square artwork: 45% of the window's width, rounded. */
+/** The most a shelf tile's artwork measures, so a wide window draws no huge squares. */
+export const SHELF_TILE_MAX = 220
+
+/** The side of a shelf tile's square artwork: 45% of the window's width, rounded, up to 220. */
 export function shelfTileSize(windowWidth: number): number {
-  return Math.round(windowWidth * 0.45)
+  return Math.min(SHELF_TILE_MAX, Math.round(windowWidth * 0.45))
+}
+
+/** How far the shelf's text may grow with the system text size (its `maxFontSizeMultiplier`). */
+export const SHELF_MAX_TEXT_SCALE = 1.2
+
+/** The text scale a shelf plans for: the system's, but from 1 to `SHELF_MAX_TEXT_SCALE`. */
+export function shelfTextScale(fontScale: number): number {
+  return Math.min(SHELF_MAX_TEXT_SCALE, Math.max(1, fontScale))
 }
 
 /**
  * The height of a shelf: the artwork, the gap, then two lines of text (title and caption),
  * or three when the shelf shows ranks. The loading shelf uses it too, so they always agree.
+ * `textScale` (from `shelfTextScale`) grows the lines as the system text size does.
  */
-export function shelfHeight(tileSize: number, ranked: boolean): number {
-  return tileSize + SHELF_TEXT_GAP + (ranked ? 3 : 2) * SHELF_LINE_HEIGHT
+export function shelfHeight(
+  tileSize: number,
+  ranked: boolean,
+  textScale = 1,
+): number {
+  const line = Math.ceil(SHELF_LINE_HEIGHT * textScale)
+  return tileSize + SHELF_TEXT_GAP + (ranked ? 3 : 2) * line
 }
 
 /** Rows in one page of the episode shelf, and the side of a row's cover. */

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import {
   applyListEvent,
+  startListStates,
   loadChartGroups,
   keptChart,
   type ChartListUpdate,
@@ -279,5 +280,29 @@ describe("applyListEvent", () => {
     expect(applyListEvent(loading, { status: "loaded", shows: [] })).toEqual({
       status: "missing",
     })
+  })
+})
+
+describe("startListStates", () => {
+  const ready: ListState = { status: "ready", shows: [] }
+  const missing: ListState = { status: "missing" }
+  const loading: ListState = { status: "loading" }
+
+  it("turns a missing list back into a skeleton on pull to refresh and the first load", () => {
+    const next = startListStates(
+      { a: missing, b: ready },
+      ["a", "b", "c"],
+      true,
+    )
+    expect(next).toEqual({ a: loading, b: ready, c: loading })
+  })
+
+  it("keeps a missing list missing on a focus retry, so the page does not flicker", () => {
+    const next = startListStates(
+      { a: missing, b: ready },
+      ["a", "b", "c"],
+      false,
+    )
+    expect(next).toEqual({ a: missing, b: ready, c: loading })
   })
 })

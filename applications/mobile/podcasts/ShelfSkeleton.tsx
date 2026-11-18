@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { View, useWindowDimensions } from "react-native"
+import { PixelRatio, View, useWindowDimensions } from "react-native"
 
 import {
   SHELF_GAP,
@@ -7,6 +7,7 @@ import {
   SHELF_LINE_HEIGHT,
   SHELF_TEXT_GAP,
   shelfHeight,
+  shelfTextScale,
   shelfTileSize,
 } from "@/modules/podcasts/homeLook"
 
@@ -19,12 +20,13 @@ export function ShelfSkeleton({ ranked = false }: { ranked?: boolean }) {
   const { width: window } = useWindowDimensions()
   const size = shelfTileSize(window)
   const textLines = ranked ? 3 : 2
+  const scale = shelfTextScale(PixelRatio.getFontScale())
   return (
     <View
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={{
-        height: shelfHeight(size, ranked),
+        height: shelfHeight(size, ranked, scale),
         flexDirection: "row",
         overflow: "hidden",
         paddingHorizontal: SHELF_GUTTER,
@@ -40,7 +42,7 @@ export function ShelfSkeleton({ ranked = false }: { ranked?: boolean }) {
           <View
             style={{
               marginTop: SHELF_TEXT_GAP,
-              height: textLines * SHELF_LINE_HEIGHT,
+              height: textLines * Math.ceil(SHELF_LINE_HEIGHT * scale),
               justifyContent: "flex-end",
               gap: 8,
             }}

@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest"
  * Remote Function", which a release build reports as a crash. A plain function has to be passed
  * to `scheduleOnRN` instead, or the helper needs the "worklet" directive. This test compiles
  * the fork's podcasts files with the real worklets plugin and fails when a worklet calls a
- * function imported from a fork file that is not itself a worklet. Imports from packages are
+ * function imported from a fork file, or declared in the same file, that is not itself a worklet. Imports from packages are
  * trusted (`scheduleOnRN`, `withTiming` and the like are worklet-safe).
  */
 
@@ -78,7 +78,33 @@ function exportsWorklet(file: string, name: string): boolean {
   return found ?? true
 }
 
-/** The imported fork functions that the worklets in this source call without being worklets. */
+// The names of functions declared anywhere in this source that lack the "worklet" directive.
+function plainFunctionsIn(source: string): Set<string> {
+  const names = new Set<string>()
+  const isPlain = (fn: {
+    body?: { directives?: { value: { value: string } }[] }
+  }) => !fn.body?.directives?.some((d) => d.value.value === "worklet")
+  walk(parser.parse(source, PARSE).program.body, (node) => {
+    if (node.type === "FunctionDeclaration" && node.id && isPlain(node)) {
+      names.add(node.id.name)
+    }
+    if (
+      node.type === "VariableDeclarator" &&
+      node.id.type === "Identifier" &&
+      (node.init?.type === "ArrowFunctionExpression" ||
+        node.init?.type === "FunctionExpression") &&
+      isPlain(node.init)
+    ) {
+      names.add(node.id.name)
+    }
+  })
+  return names
+}
+
+/**
+ * The functions that the worklets in this source call without being worklets: functions
+ * imported from a fork file, and plain functions declared in this same file.
+ */
 export function badWorkletCalls(source: string, filename: string): string[] {
   const imports = new Map<string, { file: string; name: string }>()
   walk(parser.parse(source, PARSE).program.body, (node) => {
@@ -94,6 +120,7 @@ export function badWorkletCalls(source: string, filename: string): string[] {
       }
     }
   })
+  const local = plainFunctionsIn(source)
   const out = babel.transformSync(source, {
     filename,
     cwd: ROOT,
@@ -122,19 +149,27 @@ export function badWorkletCalls(source: string, filename: string): string[] {
         }
       })
       for (const name of called) {
-        const from = captured.has(name) ? imports.get(name) : undefined
+        if (!captured.has(name)) continue
+        const from = imports.get(name)
         if (from && !exportsWorklet(from.file, from.name)) bad.add(name)
+        if (!from && local.has(name)) bad.add(name)
       }
     },
   )
   return [...bad].sort()
 }
 
+// Every source file under a folder, in its sub-folders too (tests and fixtures left out).
 function forkFiles(folder: string): string[] {
-  const dir = join(ROOT, folder)
-  return readdirSync(dir)
-    .filter((f) => /\.tsx?$/.test(f) && !f.endsWith(".test.ts"))
-    .map((f) => join(dir, f))
+  return readdirSync(join(ROOT, folder), { recursive: true, encoding: "utf8" })
+    .filter(
+      (f) =>
+        /\.tsx?$/.test(f) &&
+        !/\.test\.tsx?$/.test(f) &&
+        !f.split(/[\\/]/).includes("fixtures") &&
+        !f.split(/[\\/]/).includes("node_modules"),
+    )
+    .map((f) => join(ROOT, folder, f))
 }
 
 describe("worklets call only worklets", () => {
@@ -169,6 +204,26 @@ describe("worklets call only worklets", () => {
     expect(
       badWorkletCalls(wrap("scheduleOnRN(print, positionAt(e.x, 1))"), here),
     ).toEqual(["positionAt"])
+  })
+
+  it("catches a worklet that calls a plain function declared in the same file", () => {
+    const source = `import { Gesture } from "react-native-gesture-handler"
+     function helper(x: number) { return x * 2 }
+     export const pan = Gesture.Pan().onEnd((e) => {
+       "worklet"
+       helper(e.x)
+     })`
+    expect(badWorkletCalls(source, here)).toEqual(["helper"])
+  })
+
+  it("allows a same-file function that has the worklet directive", () => {
+    const source = `import { Gesture } from "react-native-gesture-handler"
+     function helper(x: number) { "worklet"; return x * 2 }
+     export const pan = Gesture.Pan().onEnd((e) => {
+       "worklet"
+       helper(e.x)
+     })`
+    expect(badWorkletCalls(source, here)).toEqual([])
   })
 
   it("allows scheduleOnRN and a plain function that is only passed along", () => {

@@ -203,14 +203,42 @@ export function parseSavedChart(value: string): ChartShow[] | null {
 
 // MARK: Fetching
 
-export type FetchFn = (url: string) => Promise<Response>
+export type FetchFn = (
+  url: string,
+  init?: { signal?: AbortSignal },
+) => Promise<Response>
 
-export async function getJson(url: string, fetchFn: FetchFn): Promise<unknown> {
+/** How long one request may take before the chart is treated as unreachable. */
+export const FETCH_TIMEOUT_MS = 12_000
+
+/**
+ * Reads one address as JSON. A network that hangs (a captive Wi-Fi, one bar) would otherwise
+ * keep every list waiting for the system's own 60 s limit, group after group.
+ */
+export async function getJson(
+  url: string,
+  fetchFn: FetchFn,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<unknown> {
   let response: Response
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    response = await fetchFn(url)
+    // The timer also rejects, so a fetch that ignores the abort signal can't hang us.
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort()
+        reject(new Error("timeout"))
+      }, timeoutMs)
+    })
+    response = await Promise.race([
+      fetchFn(url, { signal: controller.signal }),
+      timeout,
+    ])
   } catch {
     throw new Error("Couldn't reach Apple's charts. Check your connection.")
+  } finally {
+    clearTimeout(timer)
   }
   if (!response.ok) {
     throw new Error(`Apple's charts answered with status ${response.status}.`)
