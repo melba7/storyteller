@@ -8,7 +8,6 @@ export const SKIP_BACK_SECONDS = 10
 export const SKIP_AHEAD_SECONDS = 45
 export const SAVE_EVERY_MS = 15_000
 const PLAYED_WITHIN_SECONDS = 5
-const RESTART_WITHIN_SECONDS = 10
 
 /** "0:05", "12:34", "1:02:03". Not a number or negative reads as "0:00". */
 export function formatTime(seconds: number): string {
@@ -57,16 +56,18 @@ export function clampSpeed(rate: number): number {
   return Math.min(3, Math.max(0.5, Math.round(rate * 10) / 10))
 }
 
-/** 0 for a played episode or one with under 10 seconds left; otherwise the saved place. */
+/**
+ * 0 for a played episode or a place that is not a usable number; otherwise the saved place,
+ * never later. The length does not decide: a feed's length is often shorter than the real
+ * audio, and the listener's place past it must not be thrown away. The length stays in the
+ * signature (unused), like Swift's `ResumeRule.start`, so no caller changes.
+ */
 export function resumeStart(
   saved: number,
-  duration: number | null,
+  _duration: number | null,
   played: boolean,
 ): number {
   if (played || !Number.isFinite(saved) || saved <= 0) return 0
-  if (duration !== null && duration > 0) {
-    if (saved >= duration || duration - saved < RESTART_WITHIN_SECONDS) return 0
-  }
   return saved
 }
 

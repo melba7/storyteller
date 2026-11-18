@@ -24,16 +24,19 @@ public enum Skip {
 
 /// Where an episode starts when it is loaded.
 public enum ResumeRule {
-  /// An episode with fewer seconds than this left starts over.
+  /// An intro that reaches within this many seconds of the end of an episode is not skipped
+  /// (see `ShowRules.start`).
   public static let nearEnd = 10.0
 
-  /// 0 when the episode was played, was left within 10 seconds of its end, or the saved
-  /// place is at or past the end or not a usable number; otherwise the saved place.
+  /// 0 when the episode was played or the saved place is not a usable number; otherwise the
+  /// saved place, never later.
+  ///
+  /// The length does not decide. A feed's length is often shorter than the real audio (ads
+  /// are inserted, or the feed is wrong), and an episode stopped past that length, or in its
+  /// last seconds, used to start again at 0:00. An episode stopped at its real end is already
+  /// marked played, which starts it over. `duration` stays in the signature so no caller changes.
   public static func start(savedPosition: Double, duration: Double?, played: Bool) -> Double {
     if played || !savedPosition.isFinite || savedPosition <= 0 { return 0 }
-    if let duration, duration.isFinite, duration > 0 {
-      if savedPosition >= duration || duration - savedPosition < nearEnd { return 0 }
-    }
     return savedPosition
   }
 }

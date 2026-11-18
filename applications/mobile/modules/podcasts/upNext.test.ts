@@ -181,10 +181,12 @@ describe("queueItem", () => {
     const chaptered = { ...episode, chaptersUrl: "https://x.test/c.json" }
     expect(queueItem(chaptered, show).chaptersUrl).toBe("https://x.test/c.json")
   })
-  it("starts a played or nearly finished episode over", () => {
+  // The rule changed with Mo's OK (S14). This test used to expect 0 for 995 of the feed's
+  // length: only the played mark starts an episode over now, the feed's length does not.
+  it("starts a played episode over and resumes a nearly finished one", () => {
     expect(queueItem({ ...episode, played: true }, show).position).toBe(0)
     expect(queueItem({ ...episode, positionSeconds: 995 }, show).position).toBe(
-      0,
+      995,
     )
   })
   it("copes with a show that is not in the library", () => {
