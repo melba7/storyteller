@@ -14,7 +14,13 @@ extension PodcastPlayer {
     streamDownload = nil
     playsPlainAddress = false
     if let file = PodcastDownloader.shared.localFile(for: episode.id) {
-      return AVPlayerItem(url: file)
+      // The precise option makes iOS read the file's frame table when it opens it, so a seek
+      // (an ad skip) lands where it should also on a file whose bitrate changes. Without it,
+      // iOS guesses the byte from the average bitrate. The stream that is still being fetched
+      // (below) cannot have it: that would wait for the whole file.
+      let asset = AVURLAsset(
+        url: file, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
+      return AVPlayerItem(asset: asset)
     }
     let entry = PodcastDownloader.shared.store?.entry(for: episode.id)
     // A new episode's automatic download that is waiting or still running gives way to a
