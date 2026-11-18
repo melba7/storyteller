@@ -667,3 +667,9 @@ first page. C9 to C11 are extras that depend on what C0 finds.
    as an artifact), so the builders can copy fixtures from the log.
 3. **Merging:** Mo's standing OK covers merging the Podcasts pull request once
    it is checked and green; this round goes out as one TestFlight build.
+4. **Spotify dropped (2026-11-18):** C0's second run found Spotify's chart
+   service failing on its own side ("no healthy upstream" and "Internal Server
+   Error" for `top` and `top_episodes` in both runs; `trending` answered only
+   some of the time and lists little-known risers). C10 and C11 are left out; Mo
+   was told. Apple's Top Episodes (C9) goes ahead, joined through a lookup of
+   its shows' ids.

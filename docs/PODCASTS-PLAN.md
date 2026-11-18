@@ -353,6 +353,27 @@ wording are used (credited in `FORK.md`), and only Transcriptator's time reading
 was adapted. OutcastID3 could not be fetched, so the MP3 chapter reader was
 written from the ID3 spec in PodcastKit `PodcastChapters`.
 
+## Chart sources checked (2026-11-18)
+
+The cloud container can't reach Apple's or Spotify's hosts, so
+`tools/fork/probe-podcast-sources.mjs` checks them from a GitHub runner
+(workflow "Podcast sources probe", run on a `claude/**` push that changes the
+script). Its second run, on 2026-11-18, found:
+
+1. **Cover sizes: yes.** Rewriting a chart cover's last segment from
+   `100x100bb.png` to `640x640bb.jpg` or `1280x1280bb.jpg` returns a real JPEG
+   at that size (36 KB and 100 KB).
+2. **Top episodes: yes, through the show.**
+   `.../podcasts/top/50/podcast-episodes.json` answers with 50 entries (the
+   singular `podcast-episode.json` is a 404). A lookup of the episode ids gives
+   nothing, but each entry's link carries its show's id, and a lookup of the
+   show ids gives the feed link. So a row opens its show, and the episode is
+   found in the feed by its title.
+3. **Spotify: no.** `top` and `top_episodes` answered "no healthy upstream"
+   (503) or "Internal Server Error" (500), plain or browser-like, in both runs;
+   `trending` answered only some of the time. Spotify is left out of this round.
+4. **Overall chart with 100 entries and the genre tree: yes.**
+
 ## Risks
 
 | Risk                                                                                       | What the plan does                                                                                                                                                                                                                 |

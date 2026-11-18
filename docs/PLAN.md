@@ -4,8 +4,8 @@ Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
 Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
 (B2) merged in PR #48 (TestFlight 29.1, with the Books look) | Books look: B1 to
-B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 to C12
-planned (Mo's ask after 29.1)
+B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 done, C1 to
+C8 built (PR #51, iOS build pending), C9 and C12 in progress, Spotify dropped
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1019,8 +1019,10 @@ Apple Podcasts ... a bunch of different lists"). Fable planned it in
 first test and risks); Sonnet builds, Opus checks. One pull request, one
 TestFlight build.
 
-- [ ] **C0. Check the real addresses from a GitHub runner** (S): the cloud can't
-      reach Apple's or Spotify's hosts, so a probe workflow does.
+- [x] **C0. Check the real addresses from a GitHub runner** (S): the cloud can't
+      reach Apple's or Spotify's hosts, so a probe workflow does. Results in
+      `docs/PODCASTS-PLAN.md` ("Chart sources checked"): sharp covers and Top
+      Episodes yes, Spotify no.
 - [ ] **C1. A rule that picks a sharp picture address** (S): size buckets and
       Apple's image size rewrite, the original as a fallback.
 - [ ] **C2. Covers use the rule** (S): `Artwork` loads the sharp address first.
@@ -1034,8 +1036,9 @@ TestFlight build.
       then the categories.
 - [ ] **C8. New gets every category as a shelf** (S).
 - [ ] **C9. Top Episodes** (M), if C0 says the source works.
-- [ ] **C10. Spotify's chart, read and matched** (M), if C0 says it answers.
-- [ ] **C11. "Top on Spotify" on the page** (M).
+- ~~C10. Spotify's chart, read and matched~~ and ~~C11. "Top on Spotify"~~:
+  dropped, because Spotify's chart service failed on its own side in both probe
+  runs (`docs/PODCASTS-LISTS-PLAN.md`, decision 4).
 - [ ] **C12. Docs and the Opus check** (S).
   - Done when (each): the first test from the plan fails then passes, `check.sh`
     passes, and for screens the iOS build passes in CI.
