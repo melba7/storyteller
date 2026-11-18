@@ -49,6 +49,8 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var detectorVersion = "1"
   /// The ads the phone remembers, found in the words so far (PodcastStreamHead+Memory.swift).
   let memory = HeadMemory()
+  /// The words the show opens with, found in the words so far (PodcastStreamHead+Opening.swift).
+  let opening = HeadOpening()
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
   private let arrivals: AsyncStream<Int64>
@@ -283,6 +285,8 @@ final class PodcastStreamHead: @unchecked Sendable {
       // the next step to where it should end.
       let remembered = memory.look(in: words, episodeId: episodeId)
       if let jump = remembered.jumpTo { steps.jump(to: jump, reached: fed) }
+      // The show's own opening words, when this show has some: where they start, the show begins.
+      let begun = opening.look(in: words, episodeId: episodeId)
       let startedRules = Date()
       let sponsors = lock.withLock { self.sponsors }
       let ranges = AdHeadRules.find(lines: AdChunker.number(lines), sponsors: sponsors)
@@ -294,7 +298,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
       if !told {
         told = true
-        reportVerdict()
+        if begun { reportShowBegan() } else { reportVerdict() }
       }
 
       let warmOne: AdDetector? = detector
@@ -355,7 +359,7 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   private func save(_ ads: [FoundAd], covered reached: Double) {
     lock.withLock {
-      found = ads
+      found = opening.shorten(ads)
       covered = max(covered, reached)
     }
     persist()
@@ -374,7 +378,9 @@ final class PodcastStreamHead: @unchecked Sendable {
       let name = PodcastAdFinder.detectorName
       let before = ads.loadPartial(detector: name)
       absorbMarks(before)
-      let merged = AdHeadRules.merge(found + memory.withoutOutdated(before?.ads ?? []))
+      // The opening is applied last: an earlier step's longer pre-roll is on disk too.
+      let merged = opening.shorten(
+        AdHeadRules.merge(found + memory.withoutOutdated(before?.ads ?? [])))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
         sha256: key, detector: name, detectorVersion: detectorVersion,

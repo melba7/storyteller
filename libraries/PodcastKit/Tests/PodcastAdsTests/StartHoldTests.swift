@@ -54,6 +54,18 @@ final class StartHoldTests: XCTestCase {
     XCTAssertEqual(hold.scanEnded(), .scanEnded, "the scan failed or was over before a verdict")
   }
 
+  func testTheShowBeginningReleasesTheWaitAndOnlyTheFirstReasonCounts() {
+    var hold = StartHold()
+    XCTAssertEqual(hold.showBegan(), .showBegan, "the head scan heard the show's opening words")
+    XCTAssertEqual(hold.released, .showBegan)
+    XCTAssertNil(hold.verdict())
+    XCTAssertNil(hold.tick(elapsed: 3.0))
+    var verdict = StartHold()
+    XCTAssertEqual(verdict.verdict(), .verdict)
+    XCTAssertNil(verdict.showBegan(), "a wait that is over is not released again")
+    XCTAssertEqual(verdict.released, .verdict)
+  }
+
   func testASecondTapOnPlayReleasesTheWaitAtOnce() {
     var hold = StartHold()
     XCTAssertEqual(hold.tappedAgain(), .secondTap)

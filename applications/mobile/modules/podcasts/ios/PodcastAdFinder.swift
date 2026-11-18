@@ -224,6 +224,8 @@ final class PodcastAdFinder: @unchecked Sendable {
         set(id, AdsRules.finished(file))
         // The sure ads are remembered by their words, so a repeat is found at once.
         learnRemembered(id, ads: ads, finished: file, transcript: transcript)
+        // The words the show opens with are learned from the episode's first minutes.
+        learnOpening(id, ads: ads, finished: file, transcript: transcript)
         // An episode that is playing now starts skipping the new ads.
         Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
       case .stopped:

@@ -17,6 +17,9 @@ public struct StartHold: Equatable, Sendable {
   public enum Release: Equatable, Sendable {
     /// The first step's rules and the memory of ads have answered.
     case verdict
+    /// The head scan heard the show's own opening words (`ShowOpening`): the show has begun, so
+    /// whatever is before them was the pre-roll, and the first look has seen it.
+    case showBegan
     /// The head scan ended (also when it failed) before it answered.
     case scanEnded
     /// `longest` seconds went by.
@@ -42,6 +45,7 @@ public struct StartHold: Equatable, Sendable {
   public init() {}
 
   public mutating func verdict() -> Release? { release(.verdict) }
+  public mutating func showBegan() -> Release? { release(.showBegan) }
   public mutating func scanEnded() -> Release? { release(.scanEnded) }
   public mutating func tappedAgain() -> Release? { release(.secondTap) }
 

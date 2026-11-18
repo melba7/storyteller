@@ -3,10 +3,11 @@
 // A short wait before a never-checked stream starts (PodcastAds' StartHold). When Skip ads is on
 // and an episode plays through its own download from 0:00, with nothing saved for it and a show
 // that is not known to start clean, Play waits for the first of: the head scan's first look
-// (the 15 second step's rules and the memory of ads), the scan ending, 3 seconds from the tap,
-// or a second tap on Play. An ad that holds 0:00 is then left (the player reads the ads before
-// the wait ends), and the audio starts after it. The 3 second timer is the player's own, so
-// nothing the scan does, or fails to do, can keep the audio from starting.
+// (the 15 second step's rules and the memory of ads; also reported when the show's own opening
+// words were heard), the scan ending, 3 seconds from the tap, or a second tap on Play. An ad
+// that holds 0:00 is then left (the player reads the ads before the wait ends), and the audio
+// starts after it. The 3 second timer is the player's own, so nothing the scan does, or fails
+// to do, can keep the audio from starting.
 import AVFoundation
 import Foundation
 import PodcastAds
@@ -38,6 +39,7 @@ final class PodcastStartHold {
   }
 
   func verdict() { finish(hold.verdict()) }
+  func showBegan() { finish(hold.showBegan()) }
   func scanEnded() { finish(hold.scanEnded()) }
   func tappedAgain() { finish(hold.tappedAgain()) }
 
@@ -99,6 +101,14 @@ extension PodcastPlayer {
     guard let hold = startHold, hold.episodeId == episodeId else { return }
     adSkipping.refresh()
     hold.verdict()
+  }
+
+  /// The first look at the stream's start is done and it heard the words the show opens with: the
+  /// show has begun. The ads it found are read first, as for a verdict.
+  func startHoldShowBegan(_ episodeId: String) {
+    guard let hold = startHold, hold.episodeId == episodeId else { return }
+    adSkipping.refresh()
+    hold.showBegan()
   }
 
   /// The head scan of the stream is over.
