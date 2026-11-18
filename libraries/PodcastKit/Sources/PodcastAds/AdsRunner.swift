@@ -133,7 +133,7 @@ public enum AdsRunner {
         take(answer, key: piece.key)
       } else {
         guard shouldContinue(), !Task.isCancelled else { return nil }
-        try await ask(detector, piece, into: &kept)
+        try await ask(detector, piece, into: &kept, splits: refusalSplits)
         take(kept.answers[piece.key] ?? [], key: piece.key)
         // The piece is whole now; the answers for its growing versions are no use.
         kept.dropShorter(than: piece)
@@ -154,7 +154,9 @@ public enum AdsRunner {
         result.growingEnd = older.end
       } else {
         guard shouldContinue(), !Task.isCancelled else { return nil }
-        try await ask(detector, growing, into: &kept)
+        // A growing piece is asked again each time it has grown, so a refusal is not asked in
+        // halves here (that would multiply the questions); once it is whole, it is.
+        try await ask(detector, growing, into: &kept, splits: 0)
         kept.dropShorter(than: growing)
         try? store.saveProgress(kept)
         take(kept.answers[key] ?? [], key: key)
@@ -164,32 +166,48 @@ public enum AdsRunner {
     return result
   }
 
-  /// Asks about a piece (or its halves when it is too long) and keeps the answer under the
-  /// piece's key. A refusal by the model counts as no ads and is noted in `refused`; any other
-  /// failure is thrown, so the piece is asked again next time.
+  /// How many times a refused piece is cut in halves: the piece into two, and each of those
+  /// into two. So a refused piece costs at most six more questions, and a leaf is a quarter of
+  /// the piece.
+  static let refusalSplits = 2
+
+  /// Asks about a piece (or its halves when it is too long or refused) and keeps the answer
+  /// under the piece's key. A piece counts as refused, and is noted in `refused`, only when a
+  /// part of it that could not be cut any further was refused; any other failure is thrown, so
+  /// the piece is asked again next time.
   private static func ask(
-    _ detector: AdDetector, _ piece: TranscriptPiece, into kept: inout AdProgress
+    _ detector: AdDetector, _ piece: TranscriptPiece, into kept: inout AdProgress, splits: Int
   ) async throws {
     var refused = false
-    let answer = try await ask(detector, piece, refused: &refused)
+    let answer = try await ask(detector, piece, refused: &refused, splits: splits)
     kept.answers[piece.key] = answer
     if refused { kept.refused = (kept.refused ?? []) + [piece.key] }
   }
 
+  /// A refused piece is asked again in halves while `splits` allows and the piece holds at
+  /// least `AdChunker.growingMinimum` seconds. The halves keep the line numbers of the whole
+  /// transcript, are asked with the same prompt and are cleaned by the same `AdCleanup`, so an
+  /// ad that the cut runs through can only come out shorter.
   private static func ask(
-    _ detector: AdDetector, _ piece: TranscriptPiece, refused: inout Bool
+    _ detector: AdDetector, _ piece: TranscriptPiece, refused: inout Bool, splits: Int
   ) async throws -> [AdRange] {
     do {
       return try await detector.findAds(in: piece)
     } catch AdDetectorError.refused {
-      refused = true
-      return []
+      guard splits > 0, piece.end - piece.start >= AdChunker.growingMinimum,
+        let (first, second) = AdChunker.split(piece)
+      else {
+        refused = true
+        return []
+      }
+      let before = try await ask(detector, first, refused: &refused, splits: splits - 1)
+      return try await before + ask(detector, second, refused: &refused, splits: splits - 1)
     } catch AdDetectorError.tooLong {
       guard let (first, second) = AdChunker.split(piece) else {
         throw AdDetectorError.failed("A single line does not fit the model.")
       }
-      let before = try await ask(detector, first, refused: &refused)
-      return try await before + ask(detector, second, refused: &refused)
+      let before = try await ask(detector, first, refused: &refused, splits: splits)
+      return try await before + ask(detector, second, refused: &refused, splits: splits)
     }
   }
 }
