@@ -51,10 +51,23 @@ export function showHeaderSide(windowWidth: number, windowHeight: number) {
 /** The most an Up Next card measures across. */
 export const UP_NEXT_MAX = 300
 
-/** An Up Next card for a layout width: two thirds across, a third taller than wide, up to 300. */
-export function upNextCardSize(layoutWidth: number) {
-  const width = Math.min(UP_NEXT_MAX, Math.round(layoutWidth * 0.66))
-  return { width, height: Math.round(width * 1.34) }
+/** The least height an Up Next card is cut down to: its words and buttons need about this. */
+const UP_NEXT_MIN_HEIGHT = 300
+
+/**
+ * An Up Next card for a layout width: two thirds across, a third taller than wide, up to 300
+ * wide. With the window's height, a card is at most about half of it (but never under 300
+ * tall), so on a short window the card's buttons stay above the mini player and tab bar.
+ */
+export function upNextCardSize(layoutWidth: number, windowHeight = Infinity) {
+  let width = Math.min(UP_NEXT_MAX, Math.round(layoutWidth * 0.66))
+  let height = Math.round(width * 1.34)
+  const cap = Math.max(Math.round(windowHeight * 0.52), UP_NEXT_MIN_HEIGHT)
+  if (height > cap) {
+    height = cap
+    width = Math.round(cap / 1.34)
+  }
+  return { width, height }
 }
 
 /** A category tile's width with its 12 pt gap: how many fit across at about 180 pt each. */
