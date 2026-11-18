@@ -538,12 +538,13 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(ad.start, 6.75, accuracy: 0.001)
   }
 
-  func testAnAdWithNoWordBeforeItBeginsAtZero() throws {
-    // Music for 20 s, then the ad's first word: nothing was said before it.
+  func testAnAdWithNoWordBeforeItAndItsFirstWordAfterSixSecondsLandsBeforeIt() throws {
+    // Music for 20 s, then the ad's first word: the music is not the ad's, so the skip lands a
+    // quarter second before that word, not at 0:00.
     let transcript = ownTranscript(
       lines: [(20, 60, "the ad"), (60, 100, "the show")], words: seconds(20, 100))
     let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(1, 1)], transcript: transcript).first)
-    XCTAssertEqual(ad.start, 0)
+    XCTAssertEqual(ad.start, 19.75, accuracy: 0.001)
   }
 
   func testTheFirstWordsStayTheAdsOwnWhenTheStartMovesToZero() throws {

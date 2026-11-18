@@ -1,8 +1,9 @@
 // LOFI-FORK: where the player lands around an ad (see FORK.md).
 //
 // A skip's end lands a quarter second before the first word of the show, and its start a quarter
-// second before the ad's first word, so no word of the show is clipped. An ad that begins in the
-// first seconds of an episode begins at zero (SponsorBlock's rule for a segment at the start).
+// second before the ad's first word, so no word of the show is clipped. An ad whose first word
+// is in the first seconds of an episode begins at zero (SponsorBlock's rule for a segment at the
+// start); one whose first word comes later (theme music or a cold open before it) does not.
 import Foundation
 import PodcastTranscripts
 
@@ -32,12 +33,14 @@ enum AdLanding {
   }
 
   /// With F the first word of the ad and P the word before it: a quarter second before F, but
-  /// not before P ends. Zero when there is no P or F starts in the first seconds of the episode.
+  /// not before P ends. Zero when F starts in the first seconds of the episode. With no P and F
+  /// later (music or a cold open that has no words), a quarter second before F.
   private static func landingStart(_ time: Double, words: [TranscriptWord]) -> Double {
     let at = firstIndex(startingAtOrAfter: time - tolerance, in: words)
     guard at < words.count else { return time }
     let first = words[at]
-    if at == 0 || first.start <= AdRules.topOfEpisode { return 0 }
+    if first.start <= AdRules.topOfEpisode { return 0 }
+    guard at > 0 else { return max(0, first.start - AdRules.landBefore) }
     return min(first.start, max(words[at - 1].end, first.start - AdRules.landBefore))
   }
 
