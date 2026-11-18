@@ -328,6 +328,34 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
   }
 
+  func testTwoAdsWithNoWholeLineBetweenThemNeedUnderFourSecondsOfSpeechToJoin() throws {
+    // The first ad's end is cut inside line 20 (at "we're back") and the second's start inside
+    // line 21 (at "this episode is brought"): no whole line lies between them, and the show's
+    // 10.9 s of talk coming back (6.4 s of line 20, 4.5 s of line 21) is not filler.
+    var texts = talk(40)
+    for line in [17, 18, 19, 22, 23] { texts[line - 1] = "go to acme dot com today" }
+    texts[19] = "acme dot com slash show we're back so today we talk about the history of rome which"
+    texts[20] = "is really fascinating welcome to the show and this episode is brought to you by zeta"
+    let ranges = [range(17, 20), range(21, 23, advertiser: "Zeta")]
+    let ads = AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts))
+    XCTAssertEqual(ads.count, 2)
+    XCTAssertEqual(try XCTUnwrap(ads.first).start, 159.75, accuracy: 0.01)
+    XCTAssertLessThan(try XCTUnwrap(ads.first).end, 193)
+    XCTAssertGreaterThan(try XCTUnwrap(ads.last).start, 204)
+    XCTAssertEqual(try XCTUnwrap(ads.last).end, 229.75, accuracy: 0.01)
+  }
+
+  func testTwoAdsWithNoWholeLineBetweenThemStillJoinOverAShortGap() {
+    // The first end is cut inside line 20, but the talk before line 21 is under four seconds.
+    var texts = talk(40)
+    for line in [17, 18, 19, 22, 23] { texts[line - 1] = "go to acme dot com today" }
+    texts[19] = "acme dot com slash show we're back"
+    texts[20] = "welcome to the show this episode is brought to you by zeta"
+    let ranges = [range(17, 20), range(21, 23, advertiser: "Zeta")]
+    XCTAssertEqual(
+      AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
+  }
+
   func testASureAndAnUnsureAdWithFillerBetweenThemStayTwo() {
     var texts = selling(30, at: [4, 8])
     texts[5] = breakLine

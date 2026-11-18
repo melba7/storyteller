@@ -223,7 +223,7 @@ public enum AdCleanup {
   /// Whether two ads that do not overlap are one ad break. Both must be sure (an unsure ad never
   /// joins a neighbour it does not overlap) and of one kind, and the break at most `mergeCap`
   /// long. Then either less than `mergeSpeech` seconds of speech lie between them, or less than
-  /// `mergeFiller` and every line that lies wholly between them is filler.
+  /// `mergeFiller` and at least one line lies wholly between them and every such line is filler.
   private static func isOneBreak(
     _ first: Span, _ second: Span, lines: [TranscriptLine], words: [TranscriptWord]
   ) -> Bool {
@@ -233,8 +233,11 @@ public enum AdCleanup {
     let between = speech(from: first.end, to: second.start, words: words)
     if between < AdRules.mergeSpeech { return true }
     guard between < AdRules.mergeFiller else { return false }
-    return lines.filter { $0.start >= first.end - 0.01 && $0.end <= second.start + 0.01 }
-      .allSatisfy {
+    // With no whole line between them (the edge cuts left only parts of two lines) there is
+    // nothing to call filler, so only the plain speech rule above can join them.
+    let whole = lines.filter { $0.start >= first.end - 0.01 && $0.end <= second.start + 0.01 }
+    return !whole.isEmpty
+      && whole.allSatisfy {
         AdSignals.hardSignal($0.text) || AdSignals.breakCue($0.text)
           || AdSignals.namesAdvertiser($0.text, advertiser: first.advertiser)
           || AdSignals.namesAdvertiser($0.text, advertiser: second.advertiser)
