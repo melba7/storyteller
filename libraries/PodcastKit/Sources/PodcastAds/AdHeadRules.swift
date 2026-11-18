@@ -17,9 +17,12 @@ public enum AdHeadRules {
   public static let reach = 4
   public static let reachSeconds = 25.0
   /// Once the call to action is reached, an ad goes on while a signal comes at most this many
-  /// lines apart.
-  public static let gap = 3
-  /// How many lines around a sponsor named in the notes a call to action may be.
+  /// lines apart (1: only the very next line), and the next signal line must start within
+  /// `gapSeconds` of the last one's end. A line with a return cue ends the ad before it.
+  public static let gap = 1
+  public static let gapSeconds = 12.0
+  /// How many lines around a sponsor named in the notes a call to action may be. Also how many
+  /// lines apart two signals may be when a span has neither a lead-in nor such a sponsor.
   public static let near = 2
 
   /// The seconds of audio after which each step of a stream's head scan ends (the phone's steps).
@@ -70,6 +73,22 @@ public enum AdHeadRules {
     #"(?:brought to you by|sponsored by|support for this \w+ comes from|today's sponsor is)\s+([A-Z][\w'&-]*(?:\s+[A-Z][\w'&-]*){0,2})"#
   ])
 
+  /// A web address, the same two patterns AdSignals counts.
+  private static let webAddresses = regexes([
+    #"\b[a-z0-9][a-z0-9-]*\.(com|net|org|io|co|fm|tv|me|ly|app|dev|shop|store)\b"#,
+    #"\bdot (com|net|org|io|co)\b"#,
+  ])
+  /// Words with which the hosts come back to the show: the patterns milestone E2 lists for
+  /// AdSignals.returnCue, with either kind of apostrophe.
+  // replace with AdSignals.returnCue when E2 is merged
+  private static let returnCues = regexes([
+    #"\bwelcome back\b"#, #"\b(we['’]re|we are) back\b"#,
+    #"\bback to the (show|episode|conversation|interview)\b"#, #"\blet['’]s get back\b"#,
+    #"\bnow,? back to\b"#, #"\bwhere were we\b"#, #"\bwelcome to\b"#, #"\bi['’]m your host\b"#,
+    #"\bon today['’]s (show|episode)\b"#, #"\bin this episode\b"#, #"\bmy guest today\b"#,
+    #"\bjoining me (today|now)\b"#,
+  ])
+
   private static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
     let whole = NSRange(text.startIndex..., in: text)
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
@@ -92,6 +111,17 @@ public enum AdHeadRules {
     isCallToAction(text) && (matches(offers, text) || matches(capitalCodes, text))
   }
 
+  /// Whether the line has words that bring the hosts back to the show.
+  // replace with AdSignals.returnCue when E2 is merged
+  private static func returnCue(_ text: String) -> Bool { matches(returnCues, text) }
+
+  /// An offer line that can stand alone as an ad: it also holds a web address, or another
+  /// call to action comes at most `near` lines from it. One offer line in plain talk ("that is
+  /// twenty percent off the usual price") is not enough.
+  private static func hasTwoSignals(_ at: Int, _ lines: [NumberedLine]) -> Bool {
+    matches(webAddresses, lines[at].text) || callNearby(at, lines, includingSelf: false)
+  }
+
   private static func mentions(_ text: String, any names: [String]) -> Bool {
     names.contains {
       AdSignals.usableName($0)
@@ -110,7 +140,9 @@ public enum AdHeadRules {
         })
         else { continue }
         spans.append((at, carried(from: firstCall, in: lines), true))
-      } else if isOffer(line.text) || (mentions(line.text, any: sponsors) && callNearby(at, lines)) {
+      } else if (isOffer(line.text) && hasTwoSignals(at, lines))
+        || (mentions(line.text, any: sponsors) && callNearby(at, lines))
+      {
         spans.append((at, carried(from: at, in: lines), false))
       }
     }
@@ -132,17 +164,25 @@ public enum AdHeadRules {
     }
   }
 
-  private static func callNearby(_ at: Int, _ lines: [NumberedLine]) -> Bool {
-    (max(0, at - near)...min(lines.count - 1, at + near)).contains { isCallToAction(lines[$0].text) }
+  private static func callNearby(
+    _ at: Int, _ lines: [NumberedLine], includingSelf: Bool = true
+  ) -> Bool {
+    (max(0, at - near)...min(lines.count - 1, at + near)).contains {
+      ($0 != at || includingSelf) && isCallToAction(lines[$0].text)
+    }
   }
 
   /// The index of the last line that still reads as the ad: lines go on being counted while a
-  /// signal comes within `gap` lines of the last one.
+  /// signal comes within `gap` lines of the last one and starts within `gapSeconds` of its end. A
+  /// line with a return cue is never counted, and nothing after it.
   private static func carried(from start: Int, in lines: [NumberedLine]) -> Int {
     var last = start
     var next = start + 1
     while next < lines.count, next - last <= gap {
-      if isCallToAction(lines[next].text) { last = next }
+      if returnCue(lines[next].text) { break }
+      if isCallToAction(lines[next].text), lines[next].start - lines[last].end <= gapSeconds {
+        last = next
+      }
       next += 1
     }
     return last
