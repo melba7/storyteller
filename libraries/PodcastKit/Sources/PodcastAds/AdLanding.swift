@@ -10,6 +10,10 @@ import PodcastTranscripts
 enum AdLanding {
   /// How far a time may lie before a line's first word and still count as at it.
   private static let tolerance = 0.01
+  /// How far a word may start before an ad's end and still be the show's: Apple's word ends run
+  /// on into the next word, so the ad's last word can end a little after the show's first word
+  /// starts. A word that starts later than this before the end is the ad's.
+  private static let endTolerance = 0.1
 
   /// The edges to skip for an ad that the lines say runs from `start` to `end`. With no words to
   /// go by (a transcript with only lines) the times stay as they are.
@@ -44,10 +48,10 @@ enum AdLanding {
     return min(first.start, max(words[at - 1].end, first.start - AdRules.landBefore))
   }
 
-  /// With L the last word that starts before the end and N the word after it: a quarter second
-  /// before N, but not before L starts. L's own end when there is no N.
+  /// With L the last word that starts before the end (less `endTolerance`) and N the word after
+  /// it: a quarter second before N, but not before L starts. L's own end when there is no N.
   private static func landingEnd(_ time: Double, words: [TranscriptWord]) -> Double {
-    let at = firstIndex(startingAtOrAfter: time, in: words)
+    let at = firstIndex(startingAtOrAfter: time - endTolerance, in: words)
     guard at > 0 else { return time }
     let last = words[at - 1]
     guard at < words.count else { return last.end }

@@ -31,4 +31,22 @@ final class AdLandingTests: XCTestCase {
       accuracy: 0.001, "a word before it: a quarter second before the first word, not before that word ends")
     XCTAssertEqual(AdLanding.edges(start: 6.5, end: 50, words: words([(6.5, 7.5)] + seconds(8, 90))).start, 6.25)
   }
+
+  // MARK: The end keeps off a word that starts just before it
+
+  func testAWordThatStartsJustBeforeTheAdsEndIsTheShowsAndIsNotClipped() {
+    // The ad's last word runs 58.0 to 59.0, and the show's first word starts at 58.95: Apple's
+    // word ends run on into the next word. The end lands a quarter second before that word.
+    let spoken = words(seconds(0, 58) + [(58.0, 59.0), (58.95, 59.4), (59.4, 60.0)] + seconds(60, 80))
+    XCTAssertEqual(AdLanding.edges(start: 20, end: 59, words: spoken).end, 58.7, accuracy: 0.001)
+    // Within the tolerance a start counts as at the end, as it does for a start (0.01 s).
+    let at = words(seconds(0, 58) + [(58.0, 59.0), (58.995, 59.4), (59.4, 60.0)] + seconds(60, 80))
+    XCTAssertEqual(AdLanding.edges(start: 20, end: 59, words: at).end, 58.745, accuracy: 0.001)
+  }
+
+  func testAWordThatStartsWellBeforeTheAdsEndIsTheAds() {
+    // The word 58.8 to 59.4 is the ad's last word: the end lands before the one after it.
+    let spoken = words(seconds(0, 58) + [(58.0, 58.8), (58.8, 59.4), (59.4, 60.0)] + seconds(60, 80))
+    XCTAssertEqual(AdLanding.edges(start: 20, end: 59, words: spoken).end, 59.15, accuracy: 0.001)
+  }
 }
