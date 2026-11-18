@@ -54,6 +54,8 @@ final class PodcastPlayer {
   /// it does (for a resume on a stream, until the bytes up to the place have arrived), so an ad
   /// is not left from it (PodcastPlayer+Ads.swift).
   var seekPending = false
+  /// Where the latest seek is going, which is where the episode is as soon as it lands.
+  var seekTarget = 0.0
   /// Counts the seeks, so only the latest one's completion ends the pending state.
   private var seekCount = 0
   /// Play is waiting a moment for the first look at a stream's start (PodcastPlayer+StartHold).
@@ -219,6 +221,7 @@ final class PodcastPlayer {
     seekCount += 1
     let count = seekCount
     seekPending = true
+    seekTarget = seconds
     player.seek(
       to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero,
       toleranceAfter: .zero

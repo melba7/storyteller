@@ -72,7 +72,9 @@ extension PodcastPlayer {
     let startsClean = show.map { PodcastShowStarts.shared.startsClean(show: $0) } ?? false
     let wanted = StartHold.wanted(
       skipAds: adSkipping.skipsAds, playsOwnDownload: !playsPlainAddress,
-      startsAt: seekPending ? itemStart : position,
+      // While a seek is on its way the playhead still reads the old place, so where it is going
+      // counts: playing from an ad or a chapter later in a paused episode starts there, not at 0.
+      startsAt: seekPending ? seekTarget : position,
       // A stream whose first look is done, or whose scan is over, has said what it has: the same
       // wait would never be answered, also when the look found no ad and so saved no file.
       hasSavedAds: adSkipping.hasSavedAds || loader.head.hasChecked, showStartsClean: startsClean,
