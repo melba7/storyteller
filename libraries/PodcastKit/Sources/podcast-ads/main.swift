@@ -2,12 +2,19 @@
 //
 //   swift run -c release podcast-ads [--locale en-US] <episode.transcript.json | audio file>
 //   swift run -c release podcast-ads --play [--locale en-US] <audio file>
+//   swift run -c release podcast-ads --head 90 --timings [--locale en-US] <audio file>
+//   swift run -c release podcast-ads --probe <episode address>
 //
 // Prints each ad with its times, kind, advertiser, how sure the model is and its first words,
 // to the standard output, and progress to the standard error. An audio file is transcribed
 // first (as podcast-transcribe does). With --play it does what the phone does for an episode
 // that is playing (a transcript piece, then a partial ad pass, and so on), times each step, and
-// says for each ad whether a listener who pressed play at 0:00 would have had it skipped. Needs macOS 26 with Apple Intelligence on. Where there
+// says for each ad whether a listener who pressed play at 0:00 would have had it skipped. With
+// --head N --timings it handles only the first N seconds, twice in one process (cold, then
+// warm), and prints when the speech model was ready, the first words came, the head transcript
+// was done and the model first answered. With --probe it downloads the first 3 MB of an episode
+// address twice as two different listeners and prints where the two copies differ (no
+// speech or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
 // is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
 // still work there.
 import Foundation
@@ -70,13 +77,34 @@ if let at = arguments.firstIndex(of: "--locale") {
   locale = arguments[at + 1]
   arguments.removeSubrange(at...at + 1)
 }
+if let at = arguments.firstIndex(of: "--probe") {
+  guard arguments.count == 2, arguments.indices.contains(at + 1) else {
+    fail("Usage: podcast-ads --probe <episode address>")
+  }
+  exit(Probe.run(arguments[at + 1]))
+}
+var headSeconds: Double?
+if let at = arguments.firstIndex(of: "--head") {
+  guard arguments.indices.contains(at + 1), let seconds = Double(arguments[at + 1]), seconds >= 10 else {
+    fail("--head needs a number of seconds, at least 10, such as --head 90")
+  }
+  headSeconds = seconds
+  arguments.removeSubrange(at...at + 1)
+}
+var timings = false
+if let at = arguments.firstIndex(of: "--timings") {
+  timings = true
+  arguments.remove(at: at)
+}
 var play = false
 if let at = arguments.firstIndex(of: "--play") {
   play = true
   arguments.remove(at: at)
 }
 guard arguments.count == 1 else {
-  fail("Usage: podcast-ads [--play] [--locale en-US] <episode.transcript.json or audio file>")
+  fail(
+    "Usage: podcast-ads [--play | --head 90 --timings] [--locale en-US] <episode.transcript.json or audio file>\n       podcast-ads --probe <episode address>"
+  )
 }
 let input = URL(fileURLWithPath: arguments[0])
 guard FileManager.default.fileExists(atPath: input.path) else { fail("No file at \(input.path)") }
@@ -89,6 +117,16 @@ defer { try? FileManager.default.removeItem(at: work) }
 
 do {
   try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+  if let head = headSeconds {
+    guard timings else { fail("--head is used with --timings.") }
+    guard !input.lastPathComponent.hasSuffix(".transcript.json") else {
+      fail("--head needs an audio file.")
+    }
+    guard let recogniser = AppleSpeech.makeRecogniser() else { fail("Needs macOS 26 to transcribe.") }
+    try await HeadTimings.run(
+      audio: input, head: head, locale: locale, recogniser: recogniser, detector: detector, work: work)
+    exit(0)
+  }
   if play {
     guard !input.lastPathComponent.hasSuffix(".transcript.json") else {
       fail("--play needs an audio file, because it times the transcribing too.")

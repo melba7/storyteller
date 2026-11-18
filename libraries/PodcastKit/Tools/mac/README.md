@@ -40,6 +40,9 @@ the app is not added again.
 - `Transcribe an episode.command`: see the next section.
 - `Find ads in an episode.command`: see the section after it.
 - `Check ad skipping on an episode.command`: see "Check ad skipping".
+- `Time the first minute of an episode.command` and
+  `Compare two downloads of an episode.command`: see "How fast can the first ads
+  be found".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -128,6 +131,85 @@ It needs macOS 26 with Apple Intelligence turned on and Xcode 26, like the two
 tools above. It counts only the work on this Mac, not the download. The phone is
 slower than a Mac, so a Mac that only just keeps ahead means a phone that falls
 behind.
+
+## How fast can the first ads be found
+
+Two tools that measure what "skip the first ad at once" can rely on. They cost
+nothing and use no keys.
+
+### Time the first minute of an episode
+
+`Time the first minute of an episode.command` asks for an audio file and runs
+`podcast-ads --head 90 --timings`. It handles only the first 90 seconds, and it
+does so twice in one go, so you see a cold run (the app just opened) and a warm
+one. Each run prints four times, in seconds since that run began:
+
+- **speech model ready**: Apple's speech model loaded. The warm run should be
+  close to zero.
+- **first words**: the first 15 seconds transcribed, with the first words shown.
+- **head transcript done**: all 90 seconds transcribed.
+- **model's first answer**: the ad model has read the head and answered, with
+  the ads it found. This last time is the one that matters: it is how long the
+  first 90 seconds of a stream take to check.
+
+It saves the text next to the file as `<file name>.head-timings.txt`. Under 10
+seconds on the Mac is good. A phone is slower, so a Mac result is the best case.
+Pick an episode with an ad at the start. Needs macOS 26 with Apple Intelligence
+on and Xcode 26, like the other ad tools.
+
+### Compare two downloads of an episode
+
+`Compare two downloads of an episode.command` asks for an episode's audio
+address (the `.mp3` link in the show's feed; if the clipboard holds a web
+address it uses that without asking). It runs `podcast-ads --probe`: it
+downloads the first 3 MB twice, once as "StorytellerLofi/1.0 podcast client" and
+once under a different name, because a host that inserts ads chooses them per
+request and may hand the same ads to the same client twice. Then it cuts both
+copies into MP3 frames (skipping the ID3 tag), lines them up by a hash of each
+frame, and prints:
+
+- the host after redirects, the answer code (206 means the range request
+  worked), the size, the frame count and the length of each copy;
+- the **ranges that differ and then join again**, with their times in each copy.
+  These are candidate inserted ads. A range that is empty in one copy is an ad
+  only that copy had;
+- how many frames are **byte-identical** in both copies. A high share means the
+  show's own audio comes through the host untouched, so frames can be compared.
+  Zero means the host re-encodes every download and this method cannot work
+  there;
+- a line saying what it all means.
+
+If it says the copies are byte for byte the same, that host gave both listeners
+one file (the same ads, or none), and there is nothing to compare. Listen to a
+range at its time before believing it is an ad. It needs no key and no Apple
+Intelligence, only Xcode 26. The output goes to `~/Storyteller Lofi/logs`. The
+second download looks like a second listener to the publisher, so run it once
+per episode, not in a loop.
+
+### Which six episodes to try
+
+One episode from each of these six hosts, ideally from a show that plays ads at
+the start (so a second download can differ):
+
+| Host             | How to tell from the feed's audio address                        |
+| ---------------- | ---------------------------------------------------------------- |
+| Megaphone        | `traffic.megaphone.fm` (feeds are on `feeds.megaphone.fm`)       |
+| Art19            | `art19.com`, such as `rss.art19.com` for the feed                |
+| Acast            | `acast.com`; feeds look like `feeds.acast.com/public/shows/<id>` |
+| Simplecast       | `simplecast.com` or `simplecastaudio.com`                        |
+| Omny             | `omny.fm` or `omnycontent.com`                                   |
+| Spotify / Anchor | `anchor.fm` or `spotifycdn.com`                                  |
+
+Many shows send audio through a counting service first (`dts.podtrac.com`,
+`chrt.fm`, `pscrb.fm`, `mgln.ai` and the like). The probe prints the host after
+redirects, so run it once and read that line: that is the real host. To find an
+address, open the show's feed in a browser and copy an `<enclosure url="...">`.
+
+I could not confirm from the web which famous show sits on which host today (the
+pages found only listed old Panoply and Slate shows for Megaphone, and the Acast
+feed pattern above is from Acast's help page). Choose shows you listen to, look
+at their feeds, and use the table. Shows that come from a network with a sales
+team (public radio, big talk shows) are the most likely to have inserted ads.
 
 ## Tests
 
