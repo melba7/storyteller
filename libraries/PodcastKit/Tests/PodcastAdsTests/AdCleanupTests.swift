@@ -6,9 +6,18 @@ import XCTest
 final class AdCleanupTests: XCTestCase {
   private let plain = makeTranscript(talk(60))
 
+  /// Plain talk with a line that sells (a web address) at each of `lines`, counted from 1. An ad
+  /// that the model is sure of needs such a line in it, or it comes out unsure (`AdEvidence`).
+  private func selling(_ count: Int, at lines: [Int]) -> [String] {
+    var texts = talk(count)
+    for line in lines { texts[line - 1] = "go to acme dot com today" }
+    return texts
+  }
+
   func testSureAndUnsureAreKeptAndGuessesDropped() {
     let ads = AdCleanup.run(
-      ranges: [range(3, 6), range(20, 23, .unsure), range(40, 43, .guess)], transcript: plain)
+      ranges: [range(3, 6), range(20, 23, .unsure), range(40, 43, .guess)],
+      transcript: makeTranscript(selling(60, at: [4])))
     XCTAssertEqual(ads.map(\.confidence), [.sure, .unsure])
     XCTAssertEqual(ads.count, 2)
   }
@@ -36,7 +45,8 @@ final class AdCleanupTests: XCTestCase {
   func testAnAdAcrossACutIsFoundOnce() throws {
     // One piece saw lines 3-8 and the next, overlapping, saw 6-12.
     let ads = AdCleanup.run(
-      ranges: [range(3, 8, .unsure), range(6, 12, .sure)], transcript: plain)
+      ranges: [range(3, 8, .unsure), range(6, 12, .sure)],
+      transcript: makeTranscript(selling(60, at: [7])))
     let ad = try XCTUnwrap(ads.first)
     XCTAssertEqual(ads.count, 1)
     XCTAssertEqual(ad.start, 19.75, accuracy: 0.01)
@@ -50,7 +60,7 @@ final class AdCleanupTests: XCTestCase {
 
   func testAdsWithLittleSpeechBetweenThemAreOneBreak() throws {
     // One filler line (9 s of speech) lies between the two ads.
-    var texts = talk(60)
+    var texts = selling(60, at: [4, 8])
     texts[5] = "We'll be right back after one more word from our sponsor"
     let ads = AdCleanup.run(
       ranges: [range(3, 5, .sure), range(7, 9, .sure)], transcript: makeTranscript(texts))
@@ -61,13 +71,14 @@ final class AdCleanupTests: XCTestCase {
 
   func testAdsWithTwelveSecondsOfSpeechBetweenThemAreSeparate() {
     // Two lines (18 s of speech) lie between them.
-    let ads = AdCleanup.run(ranges: [range(3, 5), range(8, 10)], transcript: plain)
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5), range(8, 10)], transcript: makeTranscript(selling(60, at: [4, 9])))
     XCTAssertEqual(ads.count, 2)
   }
 
   func testSilenceBetweenAdsDoesNotCountAsSpeech() {
     // Same lines as above but the middle ones are silent: no words between the ads.
-    var transcript = makeTranscript(talk(60))
+    var transcript = makeTranscript(selling(60, at: [4, 9]))
     transcript.words.removeAll { $0.start >= 50 && $0.start < 70 }
     XCTAssertEqual(AdCleanup.run(ranges: [range(3, 5), range(8, 10)], transcript: transcript).count, 1)
   }
@@ -75,7 +86,7 @@ final class AdCleanupTests: XCTestCase {
   func testAMergedBreakNeverPassesFiveMinutes() {
     // 16 lines + 1 + 16 lines is 330 s. The line between them is filler, so only the cap keeps
     // them apart.
-    var texts = talk(60)
+    var texts = selling(60, at: [3, 20])
     texts[17] = "We'll be right back after one more word from our sponsor"
     let ads = AdCleanup.run(
       ranges: [range(2, 17), range(19, 34)], transcript: makeTranscript(texts))
@@ -83,7 +94,9 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testAdsOfDifferentKindsAreNotMerged() {
-    let ads = AdCleanup.run(ranges: [range(3, 5), range(7, 9, kind: .ownPlug)], transcript: plain)
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5), range(7, 9, kind: .ownPlug)],
+      transcript: makeTranscript(selling(60, at: [4, 8])))
     XCTAssertEqual(ads.map(\.kind), [.ad, .ownPlug])
   }
 
@@ -107,7 +120,7 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testTheEndIsCarriedOnWhileTheNextLinesReadAsTheAd() throws {
-    var texts = talk(30)
+    var texts = selling(30, at: [4])
     texts[5] = "that is acme dot com slash show"
     texts[6] = "use code SHOW for ten percent off"
     let transcript = makeTranscript(texts)
@@ -118,6 +131,7 @@ final class AdCleanupTests: XCTestCase {
 
   func testTheSponsorsNameCarriesTheEndOn() throws {
     var texts = talk(30)
+    texts[3] = "so Quokka is here"
     texts[5] = "Quokka makes it simple"
     let ad = try XCTUnwrap(
       AdCleanup.run(ranges: [range(3, 5, advertiser: "Quokka")], transcript: makeTranscript(texts))
@@ -133,7 +147,7 @@ final class AdCleanupTests: XCTestCase {
   // MARK: A short, strict carry-on
 
   private func texts(_ count: Int, line6 text: String) -> [String] {
-    var texts = talk(count)
+    var texts = selling(count, at: [4])
     texts[5] = text
     return texts
   }
@@ -246,12 +260,13 @@ final class AdCleanupTests: XCTestCase {
 
   func testAdsWithPlainTalkBetweenThemAreTwoAds() {
     // One line (9 s of speech) of plain talk lies between the two ads.
-    let ads = AdCleanup.run(ranges: [range(3, 5), range(7, 9)], transcript: plain)
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5), range(7, 9)], transcript: makeTranscript(selling(30, at: [4, 8])))
     XCTAssertEqual(ads.count, 2)
   }
 
   func testAFillerLineBetweenTwoSureAdsMakesThemOneBreak() throws {
-    var texts = talk(30)
+    var texts = selling(30, at: [4, 8])
     texts[5] = breakLine
     let ads = AdCleanup.run(
       ranges: [range(3, 5), range(7, 9)], transcript: makeTranscript(texts))
@@ -262,7 +277,7 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testALineThatNamesEitherAdvertiserIsFiller() {
-    var texts = talk(30)
+    var texts = selling(30, at: [4, 8])
     texts[5] = "so tell me more about Zebra"
     let ranges = [range(3, 5), range(7, 9, advertiser: "Zebra")]
     XCTAssertEqual(AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
@@ -271,14 +286,14 @@ final class AdCleanupTests: XCTestCase {
   func testALineWithAWebAddressBetweenTwoAdsIsFiller() {
     // Lines 6 and 7 are carried into the first ad; line 8 is the third address line, so it is
     // left between the ads, and it is filler because of its address.
-    var texts = talk(30)
+    var texts = selling(30, at: [4, 10])
     for line in 5...7 { texts[line] = "go to acme dot com" }
     let ranges = [range(3, 5), range(9, 11, advertiser: "Zebra")]
     XCTAssertEqual(AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
   }
 
   func testASureAndAnUnsureAdWithFillerBetweenThemStayTwo() {
-    var texts = talk(30)
+    var texts = selling(30, at: [4, 8])
     texts[5] = breakLine
     let ads = AdCleanup.run(
       ranges: [range(3, 5, .sure), range(7, 9, .unsure)], transcript: makeTranscript(texts))
@@ -289,7 +304,7 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testFillerDoesNotJoinAdsWithTwelveSecondsOfSpeechBetweenThem() {
-    var texts = talk(30)
+    var texts = selling(30, at: [4, 9])
     texts[5] = breakLine
     texts[6] = breakLine  // 18 s of speech
     let ads = AdCleanup.run(
@@ -302,8 +317,8 @@ final class AdCleanupTests: XCTestCase {
     func transcript(second: String) -> Transcript {
       ownTranscript(
         lines: [
-          (0, 40, "the first ad"), (41, 44, breakLine), (45, 48, second), (49, 90, "the second ad"),
-          (91, 130, "the show"),
+          (0, 40, "the first ad acme.com"), (41, 44, breakLine), (45, 48, second),
+          (49, 90, "the second ad acme.com"), (91, 130, "the show"),
         ],
         words: seconds(0, 44) + seconds(45, 130))
     }
@@ -317,7 +332,10 @@ final class AdCleanupTests: XCTestCase {
 
   func testUnderFourSecondsOfSpeechBetweenTwoSureAdsStillMerges() {
     let transcript = ownTranscript(
-      lines: [(0, 40, "the first ad"), (41, 43, "and"), (44, 90, "the second ad"), (91, 130, "show")],
+      lines: [
+        (0, 40, "the first ad acme.com"), (41, 43, "and"), (44, 90, "the second ad acme.com"),
+        (91, 130, "show"),
+      ],
       words: seconds(0, 43) + seconds(44, 130))
     XCTAssertEqual(AdCleanup.run(ranges: [range(1, 1), range(3, 3)], transcript: transcript).count, 1)
   }
@@ -486,7 +504,7 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testAnAdWithNoAdvertiserNameStillCarriesOnWebAddresses() throws {
-    var texts = talk(30)
+    var texts = selling(30, at: [4])
     texts[5] = "visit sleepy.com today"
     let ad = try XCTUnwrap(
       AdCleanup.run(ranges: [range(3, 5, advertiser: "")], transcript: makeTranscript(texts)).first)

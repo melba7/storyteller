@@ -31,14 +31,24 @@ public enum AdRules {
   public static let pause = 0.3
   /// How many words of the ad's start are kept to recognise it.
   public static let firstWords = 14
+  /// When the ads cover more than this share of an episode, or one ad is longer than `longAd`
+  /// seconds, an ad needs at least two lines of evidence (`AdEvidence`) to stay sure.
+  public static let shareLimit = 0.35
+  public static let longAd = 180.0
+  /// The share is only judged for a transcript of at least this many seconds: a stream's head
+  /// (3 minutes at most) can be mostly one ad.
+  public static let shareFrom = 240.0
 }
 
 public enum AdCleanup {
   /// The ads in an episode from all the detector's answers for its pieces. Steps: guesses and
-  /// answers that name no real lines are dropped; the model's last lines are trimmed when the
-  /// show is back, and an end is carried on while the next lines still read as the ad; line
+  /// answers that name no real lines are dropped; a sure answer with nothing in its lines that
+  /// says "ad" becomes unsure (`AdEvidence`); the model's last lines are trimmed when the show
+  /// is back, and a sure end is carried on while the next lines still read as the ad; line
   /// numbers become times; overlapping answers (an ad across a cut) are joined into one, and so
-  /// are sure ads of one break; edges land a quarter second before the next word (`AdLanding`);
+  /// are sure ads of one break; when the ads are too much of the episode or one is too long,
+  /// those with under two lines of evidence become unsure; edges land a quarter second before
+  /// the next word (`AdLanding`);
   /// what is too short or too long is dropped.
   public static func run(ranges: [AdRange], transcript: Transcript) -> [FoundAd] {
     explain(ranges: ranges, transcript: transcript).map(\.ad)
@@ -56,22 +66,31 @@ public enum AdCleanup {
       let last = max(range.startLine, range.endLine)
       guard first >= 1, last <= lines.count else { continue }
       // An ad that ends with the show coming back is cut short and nothing is carried; an ad the
-      // model is unsure of is never carried.
+      // model is unsure of is never carried, and a sure one with no evidence is unsure.
       var end = trimmedEnd(first: first, last: last, advertiser: range.advertiser, lines: lines)
       let trimmed = last - end
-      if trimmed == 0, range.confidence == .sure {
+      var confidence = range.confidence
+      if confidence == .sure,
+        AdEvidence.count(lines: lines[(first - 1)..<end], advertiser: range.advertiser) == 0
+      {
+        confidence = .unsure
+      }
+      if trimmed == 0, confidence == .sure {
         end = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
       }
       spans.append(
         Span(
           start: lines[first - 1].start, end: lines[end - 1].end, kind: range.kind,
-          advertiser: range.advertiser, confidence: range.confidence, first: first, last: last,
+          advertiser: range.advertiser, confidence: confidence, first: first, last: last,
           trimmed: trimmed, carried: end - last, answers: 1))
     }
 
     let words = transcript.words
+    let duration = transcript.duration > 0 ? transcript.duration : lines[lines.count - 1].end
+    let merged = needingProof(
+      merge(spans, lines: lines, words: words), lines: lines, duration: duration)
     var traces: [AdTrace] = []
-    for span in merge(spans, lines: lines, words: words) {
+    for span in merged {
       let landed = AdLanding.edges(start: span.start, end: span.end, words: words)
       let start = max(0, landed.start)
       let end = min(transcript.duration > 0 ? transcript.duration : .infinity, landed.end)
@@ -203,6 +222,25 @@ public enum AdCleanup {
           || AdSignals.namesAdvertiser($0.text, advertiser: first.advertiser)
           || AdSignals.namesAdvertiser($0.text, advertiser: second.advertiser)
       }
+  }
+
+  /// When the ads cover over `shareLimit` of the episode, every sure ad with under two lines of
+  /// evidence becomes unsure. A sure ad longer than `longAd` seconds needs the same, whatever
+  /// the share of the others.
+  private static func needingProof(
+    _ spans: [Span], lines: [TranscriptLine], duration: Double
+  ) -> [Span] {
+    let crowded =
+      duration >= AdRules.shareFrom
+      && spans.reduce(0) { $0 + $1.length } > AdRules.shareLimit * duration
+    return spans.map { span in
+      guard span.confidence == .sure, crowded || span.length > AdRules.longAd else { return span }
+      let inside = lines.filter { $0.start >= span.start - 0.01 && $0.start < span.end }
+      guard AdEvidence.count(lines: inside, advertiser: span.advertiser) < 2 else { return span }
+      var weak = span
+      weak.confidence = .unsure
+      return weak
+    }
   }
 
   /// Seconds of speech between two times: the length of the words that lie between them.
