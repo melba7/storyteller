@@ -271,6 +271,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       let words = try await speech.extend(file: temp, from: fed, to: cut.seconds)
       fed = cut.seconds
       PodcastTimeline.mark(episodeId, "head transcript: \(words.count) words to \(Int(fed)) s")
+      SkipLogWords.note(words, for: episodeId)
 
       let lines = LineRule.lines(from: words)
       let transcript = Self.transcript(words: words, lines: lines, duration: fed)

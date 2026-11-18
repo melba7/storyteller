@@ -394,6 +394,11 @@ type PodcastsNativeModule = {
   getStats(): Promise<Record<string, unknown>>
   /** Clears the listening stats. */
   resetStats(): Promise<void>
+  /**
+   * A copy of the skip log (one line of JSON for each ad skip) that the share sheet can read, as
+   * a file address, or null when no skip is logged yet. Nothing is sent by this call.
+   */
+  exportSkipLog(): Promise<string | null>
   /** Bytes taken by finished downloads. */
   storageUsed(): Promise<number>
   setWifiOnly(on: boolean): Promise<void>

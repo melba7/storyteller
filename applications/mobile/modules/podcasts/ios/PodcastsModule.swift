@@ -314,6 +314,9 @@ public final class PodcastsModule: Module {
     AsyncFunction("getStats") { () -> [String: Any] in StatsStore.shared.object() }
     AsyncFunction("resetStats") { () in StatsStore.shared.reset() }
 
+    // A copy of the skip log for the share sheet. Nothing is sent from here.
+    AsyncFunction("exportSkipLog") { () -> String? in SkipLogFile.copyForSharing()?.absoluteString }
+
     // MARK: Transcripts
 
     // Every downloaded episode's transcript state, and one finished transcript as JSON.

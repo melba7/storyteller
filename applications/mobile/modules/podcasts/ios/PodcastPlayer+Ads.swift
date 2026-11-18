@@ -81,7 +81,9 @@ final class PodcastAdSkipping {
     if let trim = skipper.backSeek(to: position, now: now) {
       store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
       StatsStore.shared.countAd(.tooFar)
+      PodcastSkipLogger.shared.trimmed(trim)
     }
+    PodcastSkipLogger.shared.seeked(to: position, knownAds: skipper.ads)
     skipper.seeked(to: position)
   }
 
@@ -136,6 +138,7 @@ final class PodcastAdSkipping {
     PodcastKnownAds.shared.forget(
       episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
       heard: owner.streamDownload?.head.memory.words ?? [])
+    PodcastSkipLogger.shared.undone()
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -181,6 +184,7 @@ final class PodcastAdSkipping {
     PodcastTimeline.firstSkip(episodeId)
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
     StatsStore.shared.countAd(.skipped)
+    PodcastSkipLogger.shared.skipped(skip, episodeId: episodeId)
     owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(

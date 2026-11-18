@@ -25,6 +25,7 @@ import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
 import { BelowBar, ScreenBar } from "./ScreenBar"
 import { SettingsGroup, SwitchRow } from "./SettingsGroup"
+import { SkipLogRow } from "./SkipLogRow"
 import { StatsCard } from "./StatsCard"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 
@@ -125,6 +126,7 @@ export function Profile() {
           </SettingsGroup>
           <SettingsGroup title="Ad skipping">
             <AdSkipSwitches />
+            <SkipLogRow />
           </SettingsGroup>
         </ScrollView>
       )}
