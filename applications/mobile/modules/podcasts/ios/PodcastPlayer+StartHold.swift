@@ -73,7 +73,8 @@ extension PodcastPlayer {
     let wanted = StartHold.wanted(
       skipAds: adSkipping.skipsAds, playsOwnDownload: !playsPlainAddress,
       startsAt: seekPending ? itemStart : position,
-      // A scan that is over has said what it has: the same wait would never be answered.
+      // A stream whose first look is done, or whose scan is over, has said what it has: the same
+      // wait would never be answered, also when the look found no ad and so saved no file.
       hasSavedAds: adSkipping.hasSavedAds || loader.head.hasChecked, showStartsClean: startsClean,
       // With the screen locked or the app away, iOS may suspend the app before the 3 second timer
       // fires, and an episode that never starts is worse than one that plays its first ad. That

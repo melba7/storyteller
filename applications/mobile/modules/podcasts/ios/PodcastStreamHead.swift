@@ -39,6 +39,9 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var stopped = false
   private var started = false
   private var scanDone = false
+  /// The first look at the stream's start is done (the 15 second step's rules and the memory of
+  /// ads have answered), whether or not it found an ad. A look that found none leaves no ads file.
+  private var firstLookDone = false
   private var waiters: [() -> Void] = []
   private var found: [FoundAd] = []
   private var covered = 0.0
@@ -104,8 +107,10 @@ final class PodcastStreamHead: @unchecked Sendable {
     }
   }
 
-  /// Whether the scan is over (finished, stopped or failed), so it has said all it will say.
-  var hasChecked: Bool { lock.withLock { scanDone } }
+  /// Whether the scan has said what matters for the start: its first look is done (also when it
+  /// found no ad, which saves no file), or it is over (finished, stopped or failed). Play does
+  /// not wait for a stream like that again.
+  var hasChecked: Bool { lock.withLock { firstLookDone || scanDone } }
 
   private func scanEnded() {
     let (ads, reached) = lock.withLock { (found, covered) }
@@ -298,6 +303,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
       if !told {
         told = true
+        lock.withLock { firstLookDone = true }
         if begun { reportShowBegan() } else { reportVerdict() }
       }
 
