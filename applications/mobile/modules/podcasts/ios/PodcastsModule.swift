@@ -144,6 +144,7 @@ public final class PodcastsModule: Module {
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
         position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
         language: item.language)
+      EpisodeShows.shared.remember(item.showId, for: item.id)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
     AsyncFunction("moveInUpNext") { (from: Int, to: Int) async in

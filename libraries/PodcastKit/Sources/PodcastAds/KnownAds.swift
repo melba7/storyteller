@@ -103,11 +103,17 @@ public struct KnownAds: Codable, Sendable, Equatable {
 
   /// The first words of an ad in a transcript, normalised: those whose middle lies in the ad.
   static func words(of ad: FoundAd, in transcript: Transcript) -> [String] {
+    words(from: ad.start, to: ad.end, in: transcript.words)
+  }
+
+  /// The first words between two times of some timed words, normalised: those whose middle lies
+  /// between them.
+  static func words(from start: Double, to end: Double, in timed: [TranscriptWord]) -> [String] {
     var result: [String] = []
-    for word in transcript.words {
+    for word in timed {
       let middle = (word.start + word.end) / 2
-      if middle > ad.end { break }
-      guard middle >= ad.start, let text = normalise(word.text) else { continue }
+      if middle > end { break }
+      guard middle >= start, let text = normalise(word.text) else { continue }
       result.append(text)
       if result.count == mostWords { break }
     }

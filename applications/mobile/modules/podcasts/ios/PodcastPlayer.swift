@@ -8,6 +8,7 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+import PodcastAds
 import PodcastPlayback
 import Readium
 
@@ -113,6 +114,8 @@ final class PodcastPlayer {
     episodeId = episode.id
     knownDuration = episode.duration
     applyShowSettings(forShow: episode.showId)
+    // The ads of this episode are remembered under its show (PodcastKnownAds).
+    EpisodeShows.shared.remember(episode.showId, for: episode.id)
 
     do {
       let session = AVAudioSession.sharedInstance()

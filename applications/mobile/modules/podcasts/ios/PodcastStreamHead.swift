@@ -46,6 +46,8 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var undone: [UndoneAd] = []
   private var trims: [AdTrim] = []
   private var detectorVersion = "1"
+  /// The ads the phone remembers, found in the words so far (PodcastStreamHead+Memory.swift).
+  let memory = HeadMemory()
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
   private let arrivals: AsyncStream<Int64>
@@ -205,10 +207,9 @@ final class PodcastStreamHead: @unchecked Sendable {
     var waitFor: Int64 = 0  // at least this many bytes are waited for
     var modelAds: [FoundAd] = []
     var first = true
-    var index = 0
-    while index < Self.targets.count {
+    var steps = HeadSteps(steps: Self.targets)
+    while let target = steps.target {
       try Task.checkCancellation()
-      let target = Self.targets[index]
       let need = max(Int64(tag) + Int64(target * rate) + 4096, waitFor)
       while available < need, !ended {
         if let next = await iterator.next() { available = next } else { ended = true }
@@ -252,7 +253,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       }
       guard cut.seconds > fed + 1 else {
         if ended { return }
-        index += 1
+        steps.advance()
         continue
       }
       tries = 0
@@ -267,13 +268,17 @@ final class PodcastStreamHead: @unchecked Sendable {
 
       let lines = LineRule.lines(from: words)
       let transcript = Self.transcript(words: words, lines: lines, duration: fed)
+      // The ads the phone remembers come first; an ad that opens at the end of the words moves
+      // the next step to where it should end.
+      let remembered = memory.look(in: words, episodeId: episodeId)
+      if let jump = remembered.jumpTo { steps.jump(to: jump, reached: fed) }
       let startedRules = Date()
       let ranges = AdHeadRules.find(lines: AdChunker.number(lines))
       let ruleAds = AdCleanup.run(ranges: ranges, transcript: transcript)
       PodcastTimeline.mark(
         episodeId,
         "rules: \(ruleAds.count) ads in \(Int(Date().timeIntervalSince(startedRules) * 1000)) ms")
-      save(AdHeadRules.merge(ruleAds + modelAds), covered: fed)
+      save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
 
       let warmOne: AdDetector? = detector
       if Self.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {
@@ -288,14 +293,14 @@ final class PodcastStreamHead: @unchecked Sendable {
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
-          save(AdHeadRules.merge(ruleAds + modelAds), covered: fed)
+          save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
         } catch {
           PodcastTimeline.mark(episodeId, "model: no answer (\(error))")
         }
         // The next model step gets a session that is made and asked to prewarm now.
         if Self.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }
       }
-      index += 1
+      steps.advance()
     }
   }
 
@@ -352,7 +357,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       let name = PodcastAdFinder.detectorName
       let before = ads.loadPartial(detector: name)
       absorbMarks(before)
-      let merged = AdHeadRules.merge(found + (before?.ads ?? []))
+      let merged = AdHeadRules.merge(found + memory.withoutOutdated(before?.ads ?? []))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
         sha256: key, detector: name, detectorVersion: detectorVersion,

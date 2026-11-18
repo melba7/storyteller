@@ -220,6 +220,8 @@ final class PodcastAdFinder: @unchecked Sendable {
       case .finished(let file):
         lock.withLock { failureCounts[id] = nil }
         set(id, AdsRules.finished(file))
+        // The sure ads are remembered by their words, so a repeat is found at once.
+        learnRemembered(id, ads: ads, finished: file, transcript: transcript)
         // An episode that is playing now starts skipping the new ads.
         Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
       case .stopped:

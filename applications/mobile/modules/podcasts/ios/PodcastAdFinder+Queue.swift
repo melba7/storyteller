@@ -97,6 +97,10 @@ extension PodcastAdFinder {
       switch outcome {
       case .finished:
         lock.withLock { partialFailures[id] = nil }
+        // The ads the phone remembers join what the model found, in the stretch it looked at.
+        let head = PrepRules.headSeconds
+        let looked = isPlaying ? partial.words : partial.words.filter { $0.end <= head }
+        addRemembered(id, ads: ads, words: looked)
         // The list and the seek bar show what was found so far.
         scan()
         // The player hears the new ranges of the episode it plays at once.

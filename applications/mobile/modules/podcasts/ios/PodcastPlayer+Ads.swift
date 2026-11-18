@@ -11,6 +11,7 @@ import AVFoundation
 import Foundation
 import PodcastAds
 import PodcastDownloads
+import PodcastTranscripts
 
 /// The listener's two switches, kept in the app's defaults so the player reads them with no
 /// JavaScript running.
@@ -124,6 +125,11 @@ final class PodcastAdSkipping {
     }
     StatsStore.shared.undoAdSkip()
     StatsStore.shared.countAd(.undone)
+    // An ad the listener did not want skipped is forgotten by the memory too, so it is not found
+    // again by its words in the next episode.
+    PodcastKnownAds.shared.forget(
+      episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
+      heard: owner.streamDownload?.head.memory.words ?? [])
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
