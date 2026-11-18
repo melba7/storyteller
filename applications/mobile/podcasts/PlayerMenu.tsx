@@ -4,7 +4,7 @@ import { Ellipsis } from "lucide-react-native"
 import { View } from "react-native"
 
 import { Icon } from "@/components/ui/icon"
-import { type MenuAction, Menu } from "@/components/ui/menu"
+import { Menu } from "@/components/ui/menu"
 import { setStarred } from "@/modules/podcasts/dbEpisodes"
 import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import { formatTime } from "@/modules/podcasts/playbackRules"
@@ -13,6 +13,7 @@ import {
   player,
   usePlayer,
 } from "@/modules/podcasts/playerInstance"
+import { playerMenuActions } from "@/modules/podcasts/playerMenuActions"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import {
   episodeHref,
@@ -31,9 +32,8 @@ import { useSheet } from "./playerSheetContext"
 import { chapterActions, useChapters } from "./useChapters"
 
 /**
- * The "..." at the right of the title: Save, Share (the episode, or from this place), Go to
- * Episode and Show, Chapters (with the previous and next one), Notes, Add Bookmark and
- * Bookmarks, Add to Playlist, Mark as Played and Show settings.
+ * The "..." at the right of the title. The actions are built in playerMenuActions, short enough
+ * to never need scrolling.
  */
 export function PlayerMenu({
   onPanel,
@@ -60,164 +60,64 @@ export function PlayerMenu({
     router.push(href)
   }
 
-  const places: MenuAction[] = []
-  if (!preview) {
-    places.push({
-      id: "episode",
-      title: "Go to Episode",
-      image: "doc.text",
-      onPress: () => leaveTo(episodeHref(segments, id)),
-    })
-  }
-  if (show) {
-    places.push({
-      id: "show",
-      title: "Go to Show",
-      image: "square.stack",
-      onPress: () =>
-        leaveTo(
-          preview
-            ? previewHref(segments, show.feedUrl)
-            : showHref(segments, show.id),
-        ),
-    })
-  }
-
-  const inside: MenuAction[] = [
-    {
-      id: "notes",
-      title: "Notes",
-      image: "text.alignleft",
-      onPress: () => onPanel("notes"),
-    },
-  ]
-  if (chapters.length > 0) {
-    inside.unshift(
-      {
-        id: "chapters",
-        title: "Chapters",
-        image: "list.number",
-        onPress: () => onPanel("chapters"),
+  const actions = playerMenuActions({
+    preview,
+    saved,
+    played,
+    timeText: formatTime(view.position),
+    hasChapters: chapters.length > 0,
+    hasShow: show !== null && show !== undefined,
+    on: {
+      save: () => {
+        setStarred([id], !saved).catch((cause: unknown) =>
+          console.warn("Couldn't change the episode's save", cause),
+        )
       },
-      {
-        id: "previous",
-        title: "Previous Chapter",
-        image: "backward.end",
-        onPress: () => chapterActions.previous(),
-      },
-      {
-        id: "next",
-        title: "Next Chapter",
-        image: "forward.end",
-        onPress: () => chapterActions.next(),
-      },
-    )
-  }
-
-  const keep: MenuAction[] = []
-  if (!preview) {
-    keep.push(
-      {
-        id: "bookmark",
-        title: "Add Bookmark",
-        image: "bookmark",
-        onPress: addBookmarkHere,
-      },
-      {
-        id: "bookmarks",
-        title: "Bookmarks",
-        image: "bookmark.fill",
-        onPress: () => onPanel("bookmarks"),
-      },
-    )
-  }
-  keep.push({
-    id: "playlist",
-    title: "Add to Playlist",
-    image: "text.badge.plus",
-    onPress: () => void chooseAndAddToPlaylist(episode, show),
-  })
-
-  const actions: MenuAction[] = [
-    ...(preview
-      ? []
-      : [
-          {
-            id: "save",
-            title: saved ? "Unsave Episode" : "Save Episode",
-            image: saved ? "bookmark.slash" : "plus.circle",
-            onPress: () => {
-              setStarred([id], !saved).catch((cause: unknown) =>
-                console.warn("Couldn't change the episode's save", cause),
-              )
-            },
-          } satisfies MenuAction,
-        ]),
-    {
-      id: "share",
-      title: "Share Episode",
-      image: "square.and.arrow.up",
-      onPress: () =>
+      share: () =>
         void shareContent(() => {
           const now = player.getView()
           return now.episode ? episodeShare(now.episode, now.show) : null
         }),
-    },
-    {
-      id: "share-from",
-      title: `Share from ${formatTime(view.position)}`,
-      image: "clock.arrow.circlepath",
-      onPress: () =>
+      shareFrom: () =>
         void shareContent(() => {
           const now = player.getView()
           return now.episode
             ? placeShare(now.episode, now.show, now.position)
             : null
         }),
+      playlist: () => void chooseAndAddToPlaylist(episode, show),
+      episode: () => leaveTo(episodeHref(segments, id)),
+      show: () => {
+        if (!show) return
+        leaveTo(
+          preview
+            ? previewHref(segments, show.feedUrl)
+            : showHref(segments, show.id),
+        )
+      },
+      allChapters: () => onPanel("chapters"),
+      previousChapter: () => chapterActions.previous(),
+      nextChapter: () => chapterActions.next(),
+      notes: () => onPanel("notes"),
+      addBookmark: addBookmarkHere,
+      allBookmarks: () => onPanel("bookmarks"),
+      played: () => {
+        markPlayed([id], !played).catch((cause: unknown) =>
+          console.warn("Couldn't change the episode's played mark", cause),
+        )
+      },
+      settings: () => {
+        if (show) leaveTo(settingsHref(segments, show.id))
+      },
     },
-    { id: "places", title: "Go to", displayInline: true, subactions: places },
-    {
-      id: "inside",
-      title: "In this episode",
-      displayInline: true,
-      subactions: inside,
-    },
-    { id: "keep", title: "Keep", displayInline: true, subactions: keep },
-    ...(preview
-      ? []
-      : [
-          {
-            id: "played",
-            title: played ? "Mark as Unplayed" : "Mark as Played",
-            image: played ? "circle" : "checkmark.circle",
-            onPress: () => {
-              markPlayed([id], !played).catch((cause: unknown) =>
-                console.warn(
-                  "Couldn't change the episode's played mark",
-                  cause,
-                ),
-              )
-            },
-          } satisfies MenuAction,
-        ]),
-    ...(show && !preview
-      ? [
-          {
-            id: "settings",
-            title: "Show Settings",
-            image: "gearshape",
-            onPress: () => leaveTo(settingsHref(segments, show.id)),
-          } satisfies MenuAction,
-        ]
-      : []),
-  ]
+  })
 
   return (
     <Menu actions={actions}>
       <View
         className="size-11 items-center justify-center"
         accessibilityRole="button"
-        accessibilityLabel="More: save, share, go to the episode or show, chapters, notes, bookmarks, playlist"
+        accessibilityLabel="More: save, share, playlist, go to the episode or show, chapters, notes, bookmarks, mark as played, show settings"
       >
         <Icon as={Ellipsis} size={24} color={sheet.ink} />
       </View>
