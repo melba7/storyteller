@@ -12,9 +12,9 @@ import {
   showsMiniPlayer,
 } from "@/modules/podcasts/playbackRules"
 import { skipLabel } from "@/modules/podcasts/playbackSettings"
+import { openPlayer } from "@/modules/podcasts/playerGate"
 import {
   player,
-  usePlayer,
   usePlayerValue,
   useRestoreLastEpisode,
 } from "@/modules/podcasts/playerInstance"
@@ -39,9 +39,11 @@ export function useHasMiniPlayer(): boolean {
 /**
  * What sits in the tab bar's accessory: small rounded artwork, the title in bold with the
  * episode's date under it in the plain text colour, a play button and skip forward. Tap it to
- * open the full-screen player. The compact row (shown when the tab bar is minimized) keeps the
- * two lines at a smaller size and leaves skip forward out. A long title ends in "..." because
- * the accessory is glass, so there is no known colour for a fade to end in.
+ * open the full-screen player: the row dims under the finger and gives a light tap, and the
+ * player gate (playerGate.ts) opens one player however often it is tapped. The compact row
+ * (shown when the tab bar is minimized) keeps the two lines at a smaller size and leaves skip
+ * forward out. A long title ends in "..." because the accessory is glass, so there is no known
+ * colour for a fade to end in.
  *
  * The player still slides up as a modal. Link.AppleZoom zooms only from a Link's own trigger
  * into a pushed screen of the same navigator, and the accessory is drawn by the native tab bar
@@ -50,31 +52,47 @@ export function useHasMiniPlayer(): boolean {
  */
 export function MiniPlayerContent() {
   const router = useRouter()
-  const view = usePlayer()
+  // The player's state is read in pieces: each is a plain value, so this row draws again only
+  // when one of them changes, not at every tick of the clock. The spoken label is built in the
+  // selector, so it changes only when the minutes left do.
+  const title = usePlayerValue((view) => view.episode?.title ?? null)
+  const label = usePlayerValue((view) =>
+    view.episode
+      ? miniPlayerLabel(view.episode.title, view.position, view.duration)
+      : null,
+  )
+  const artwork = usePlayerValue(
+    (view) => view.episode?.imageUrl ?? view.show?.imageUrl ?? null,
+  )
+  const publishedAt = usePlayerValue(
+    (view) => view.episode?.publishedAt ?? null,
+  )
+  const error = usePlayerValue((view) => view.error)
+  const isPlaying = usePlayerValue((view) => view.isPlaying)
+  const isBuffering = usePlayerValue((view) => view.isBuffering)
   const compact = NativeTabs.BottomAccessory.usePlacement() === "inline"
   const note = useSkipNote()
   const { skipForward } = usePlaybackSettings()
   // The symbols take the title's colour; left out, iOS would draw them in its own label colour,
   // which is the wrong one under a fixed dark or light Appearance.
   const ink = useCSSVariable("--color-foreground") as string
-  const { episode, show } = view
-  if (!episode) return null
+  if (title === null) return null
 
   return (
     <View className="flex-1 justify-center">
       <View className="flex-row items-center gap-3 px-[9px]">
         <Pressable
-          className="flex-1 flex-row items-center gap-3"
+          testID="podcasts-mini-player"
+          className="flex-1 flex-row items-center gap-3 active:opacity-60"
           accessibilityRole="button"
-          accessibilityLabel={miniPlayerLabel(
-            episode.title,
-            view.position,
-            view.duration,
-          )}
-          onPress={() => router.push("/podcasts/player")}
+          accessibilityLabel={label ?? undefined}
+          onPress={() => {
+            tap()
+            openPlayer(router)
+          }}
         >
           <Artwork
-            uri={episode.imageUrl ?? show?.imageUrl ?? null}
+            uri={artwork}
             size={compact ? 30 : 40}
             className="rounded-lg border-0"
           />
@@ -84,15 +102,14 @@ export function MiniPlayerContent() {
               numberOfLines={1}
               maxFontSizeMultiplier={1.15}
             >
-              {episode.title}
+              {title}
             </Text>
             <Text
               className={compact ? "text-xs" : "text-sm"}
               numberOfLines={1}
               maxFontSizeMultiplier={1.15}
             >
-              {view.error ??
-                (note ? skipNoteText(note) : miniSubtitle(episode.publishedAt))}
+              {error ?? (note ? skipNoteText(note) : miniSubtitle(publishedAt))}
             </Text>
           </View>
         </Pressable>
@@ -114,20 +131,20 @@ export function MiniPlayerContent() {
         <Pressable
           className="size-11 items-center justify-center"
           accessibilityRole="button"
-          accessibilityLabel={view.isPlaying ? "Pause" : "Play"}
+          accessibilityLabel={isPlaying ? "Pause" : "Play"}
           onPress={() => {
             tap()
             void player.togglePlayPause()
           }}
         >
-          {view.isBuffering ? (
+          {isBuffering ? (
             <ActivityIndicator accessibilityLabel="Buffering" />
           ) : (
             <SFIcon
-              name={view.isPlaying ? "pause.fill" : "play.fill"}
+              name={isPlaying ? "pause.fill" : "play.fill"}
               size={compact ? 22 : 26}
               color={ink}
-              fallback={view.isPlaying ? Pause : Play}
+              fallback={isPlaying ? Pause : Play}
               filled
             />
           )}

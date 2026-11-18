@@ -19,8 +19,8 @@ import {
 import { type DownloadInfo, Podcasts } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
+import { openPlayer } from "@/modules/podcasts/playerGate"
 import { markPlayed, usePlayerValue } from "@/modules/podcasts/playerInstance"
-import { requestPlayerPage } from "@/modules/podcasts/playerPageRequest"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref, showHref } from "@/modules/podcasts/routes"
 import { episodeShare } from "@/modules/podcasts/share"
@@ -188,8 +188,7 @@ export function EpisodeMenu({
     show: () => router.push(showHref(segments, episode.showId)),
     transcript: () => {
       // Only offered for the episode the player has loaded, which has the transcript.
-      requestPlayerPage("transcript")
-      router.push("/podcasts/player")
+      openPlayer(router, "transcript")
     },
     playlist: () => void chooseAndAddToPlaylist(episode, show),
     archive: archiveAction(episode).onPress,

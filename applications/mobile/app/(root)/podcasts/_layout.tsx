@@ -3,6 +3,7 @@ import { Stack } from "expo-router"
 import type { ComponentProps } from "react"
 import { ScopedTheme, useCSSVariable } from "uniwind"
 
+import { playerLeaving, playerStayed } from "@/modules/podcasts/playerGate"
 import { usePodcastsTheme } from "@/podcasts/usePodcastsTheme"
 
 // The generated uniwind-types.d.ts only lists light and dark until Metro runs with the extra
@@ -23,6 +24,20 @@ export default function PodcastsLayout() {
   )
 }
 
+/**
+ * What the player's sheet tells the player gate (modules/podcasts/playerGate.ts): a swipe down
+ * has started, and that swipe was cancelled. A tap on the mini player while the sheet slides
+ * away is then remembered, and opens the player once the sheet is gone, instead of stacking
+ * another sheet on one that is leaving. (A cancelled swipe sends `gestureCancel`: the sheet's
+ * own `transitionEnd` is not sent for it.)
+ */
+const playerListeners = {
+  transitionStart: (event: { data: { closing: boolean } }) => {
+    if (event.data.closing) playerLeaving()
+  },
+  gestureCancel: () => playerStayed(),
+}
+
 /** The stack, with the theme's background behind the screens while they slide. */
 function ThemedStack() {
   const background = useCSSVariable("--color-background") as string
@@ -34,7 +49,13 @@ function ThemedStack() {
       }}
     >
       <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="player" options={{ presentation: "modal" }} />
+      {/* One player at a time: a second push finds the route that is already there. */}
+      <Stack.Screen
+        name="player"
+        dangerouslySingular
+        options={{ presentation: "modal" }}
+        listeners={playerListeners}
+      />
       <Stack.Screen name="account" options={{ presentation: "modal" }} />
     </Stack>
   )
