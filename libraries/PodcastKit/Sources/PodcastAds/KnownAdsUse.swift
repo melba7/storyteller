@@ -30,11 +30,11 @@ public struct KnownAdUse: Equatable, Sendable {
   /// next step of the scan ends this long after it.
   public static let openingMargin = 1.0
   public static let jumpMargin = 10.0
-  /// The same numbers as E1's `landBefore` and `topOfEpisode` in the clean-up: the end lands a
-  /// quarter second before the next word, and an ad that begins in the first six seconds begins
+  /// The clean-up's landing numbers (`AdRules.landBefore`, `AdRules.topOfEpisode`): the end lands
+  /// a quarter second before the next word, and an ad that begins in the first six seconds begins
   /// at 0:00.
-  static let landBefore = 0.25
-  static let topOfEpisode = 6.0
+  static let landBefore = AdRules.landBefore
+  static let topOfEpisode = AdRules.topOfEpisode
   /// How many of the ad's words are kept to recognise it in a list (the clean-up keeps 14 too).
   static let listedWords = 14
 
