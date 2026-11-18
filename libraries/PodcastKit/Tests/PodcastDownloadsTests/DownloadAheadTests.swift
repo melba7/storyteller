@@ -21,11 +21,11 @@ final class DownloadAheadTests: XCTestCase {
 
   private func plan(
     _ upNext: [DownloadAhead.Item], playing: String? = "now", entries: [DownloadEntry] = [],
-    started: Set<String> = [], onWiFi: Bool = true, lowData: Bool = false
+    started: Set<String> = [], onWiFi: Bool = true, lowData: Bool = false, phoneFull: Bool = false
   ) -> DownloadAhead.Plan {
     DownloadAhead.plan(
       upNext: upNext, playingId: playing, entries: entries, started: started, onWiFi: onWiFi,
-      lowData: lowData)
+      lowData: lowData, phoneFull: phoneFull)
   }
 
   private let four = ["a", "b", "c", "d"]
@@ -99,14 +99,51 @@ final class DownloadAheadTests: XCTestCase {
     XCTAssertEqual(plan(queued, entries: [entry("b", .queued, ahead: true)]).start, ["a"])
   }
 
-  func testOneThatFailedOrLeftTheListDoesNotTakeUpRoom() {
+  func testOneThatLeftTheListDoesNotTakeUpRoom() {
     let queued = four.map { item($0) }
-    let failed = [entry("a", .failed(reason: "no"), ahead: true), entry("b", filed, ahead: true)]
-    XCTAssertEqual(plan(queued, entries: failed).start, ["c"])
     // "x" is no longer in Up Next (it is dropped by this same plan), so it takes up no room.
     XCTAssertEqual(
       plan(queued, entries: [entry("x", filed, ahead: true), entry("b", filed, ahead: true)]).start,
       ["a"])
+    XCTAssertEqual(
+      plan(queued, entries: [entry("x", .failed(reason: "no"), ahead: true)]).start, ["a", "b"])
+  }
+
+  func testAFailedOneKeepsItsPlaceAmongTheTwoWhileItIsInUpNext() {
+    let queued = four.map { item($0) }
+    let no = DownloadState.failed(reason: "no")
+    // One failed and one filed: no room left, so the third in line is not tried in its stead.
+    XCTAssertEqual(
+      plan(queued, entries: [entry("a", no, ahead: true), entry("b", filed, ahead: true)]).start,
+      [])
+    XCTAssertEqual(plan(queued, entries: [entry("a", no, ahead: true)]).start, ["b"])
+    XCTAssertEqual(
+      plan(queued, entries: [entry("a", no, ahead: true), entry("b", no, ahead: true)]).start, [])
+    // The one that is playing is not in the two, failed or not.
+    XCTAssertEqual(
+      plan(queued, playing: "a", entries: [entry("a", no, ahead: true)]).start, ["b", "c"])
+  }
+
+  func testNothingStartsOnceThePhoneIsFull() {
+    XCTAssertEqual(plan(four.map { item($0) }, phoneFull: true).start, [])
+    let entries = [entry("a", filed, ahead: true), entry("b", filed, ahead: true)]
+    let result = plan([item("c")], playing: "a", entries: entries, phoneFull: true)
+    XCTAssertEqual(result, DownloadAhead.Plan(start: [], adopt: ["a"], drop: ["b"]))
+  }
+
+  func testAnAheadDownloadThatFailedForLackOfRoomSaysThePhoneIsFull() {
+    let full = DownloadState.failed(reason: DownloadRecovery.phoneFullReason)
+    XCTAssertTrue(DownloadAhead.phoneIsFull(in: [entry("a", full, ahead: true)]))
+    XCTAssertTrue(DownloadAhead.phoneIsFull(in: [entry("a", filed), entry("b", full, ahead: true)]))
+    // Other reasons, other states, and downloads that were never ahead do not say it.
+    XCTAssertFalse(DownloadAhead.phoneIsFull(in: []))
+    XCTAssertFalse(DownloadAhead.phoneIsFull(in: [entry("a", full)]))
+    XCTAssertFalse(DownloadAhead.phoneIsFull(in: [entry("a", .failed(reason: "no"), ahead: true)]))
+    XCTAssertFalse(DownloadAhead.phoneIsFull(in: [entry("a", filed, ahead: true)]))
+    // The words come from the rule that makes them, not a copy.
+    XCTAssertEqual(
+      DownloadRecovery.decide(DownloadFailure(diskFull: true)),
+      .fail(DownloadRecovery.phoneFullReason))
   }
 
   func testTheListenersOwnDownloadsDoNotUseUpTheRoom() {

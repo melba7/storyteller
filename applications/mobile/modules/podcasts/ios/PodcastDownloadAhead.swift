@@ -24,6 +24,9 @@ final class PodcastDownloadAhead {
   /// the app is opened anew, so a file the listener deleted, or one taken back and then queued
   /// again, is not fetched over and over (50 to 100 MB each time).
   private var started = Set<String>()
+  /// Set when an ahead download failed for lack of room, and kept until the app is opened anew:
+  /// with a full phone, nothing more is fetched ahead.
+  private var phoneFull = false
 
   private init() {}
 
@@ -42,7 +45,7 @@ final class PodcastDownloadAhead {
   /// calls this the moment it begins an episode, because the look below waits a few seconds, and
   /// an episode paused and put aside, or the app closed, within them would lose its file.
   func handOver(_ episodeId: String) {
-    do { try PodcastDownloader.shared.store?.clearAhead(episodeId: episodeId) } catch {
+    do { _ = try PodcastDownloader.shared.store?.clearAhead(episodeId: episodeId) } catch {
       NSLog("Podcasts: an ahead download could not be handed over to the listener: \(error)")
     }
   }
@@ -54,12 +57,14 @@ final class PodcastDownloadAhead {
     guard let store = downloader.store else { return }
     let queued = player.queue.items
     let network = PodcastNetwork.shared
+    let entries = store.entries()
+    if DownloadAhead.phoneIsFull(in: entries) { phoneFull = true }
     let plan = DownloadAhead.plan(
       upNext: queued.map {
         DownloadAhead.Item(id: $0.id, url: $0.url, skipAds: player.skipAds(forShow: $0.showId))
       },
-      playingId: player.current?.id, entries: store.entries(), started: started,
-      onWiFi: network.onWiFi, lowData: network.isConstrained)
+      playingId: player.current?.id, entries: entries, started: started,
+      onWiFi: network.onWiFi, lowData: network.isConstrained, phoneFull: phoneFull)
 
     for id in plan.adopt { handOver(id) }
     for id in plan.drop {

@@ -47,19 +47,21 @@ public enum DownloadAhead {
 
   /// The plan for this moment. `upNext` is the queue after the playing episode, in order.
   /// `started` is every episode this run of the app has already started ahead. Nothing starts
-  /// off Wi-Fi, or while the network is in Low Data Mode (`lowData`: the listener asked the phone
-  /// to use less data, and an episode is 50 to 100 MB), but the other two still happen, so a
-  /// switch of network or of "Skip ads" never leaves files behind.
+  /// off Wi-Fi, while the network is in Low Data Mode (`lowData`: the listener asked the phone to
+  /// use less data, and an episode is 50 to 100 MB), or once an ahead download failed for lack of
+  /// room (`phoneFull`), but the other two still happen, so a switch of network or of "Skip ads"
+  /// never leaves files behind.
   ///
   /// The next episodes of Up Next that can be fetched, have "Skip ads" on and have no download
   /// of any kind (finished, moving, failed, the listener's own) start, but never so many that more
-  /// than `count` ahead downloads exist at once. An episode in `started` is never started again,
-  /// even when its file is gone (the listener deleted it), and while it is still in Up Next it
-  /// keeps its place among the two, so the third in line is not fetched in its stead. An ahead
-  /// download that failed is not tried again by this rule: the listener can tap it.
+  /// than `count` ahead downloads exist at once. An ahead download that failed still counts while
+  /// its episode is in Up Next, and is not tried again by this rule (the listener can tap it), so
+  /// a run of failures never works through the queue. An episode in `started` is never started
+  /// again, even when its file is gone (the listener deleted it), and while it is still in Up
+  /// Next it keeps its place among the two, so the third in line is not fetched in its stead.
   public static func plan(
     upNext: [Item], playingId: String?, entries: [DownloadEntry], started: Set<String>,
-    onWiFi: Bool, lowData: Bool
+    onWiFi: Bool, lowData: Bool, phoneFull: Bool
   ) -> Plan {
     let queued = Set(upNext.map(\.id))
     let marked = entries.filter(\.ahead)
@@ -67,12 +69,11 @@ public enum DownloadAhead {
     plan.adopt = marked.filter { $0.episodeId == playingId }.map(\.episodeId)
     plan.drop = marked.filter { $0.episodeId != playingId && !queued.contains($0.episodeId) }
       .map(\.episodeId)
-    guard onWiFi, !lowData else { return plan }
+    guard onWiFi, !lowData, !phoneFull else { return plan }
 
     var taken = Set(
-      marked.filter { entry in
-        queued.contains(entry.episodeId) && entry.episodeId != playingId && !isFailed(entry)
-      }.map(\.episodeId))
+      marked.filter { queued.contains($0.episodeId) && $0.episodeId != playingId }
+        .map(\.episodeId))
     taken.formUnion(started.filter { queued.contains($0) && $0 != playingId })
     var room = max(0, count - taken.count)
     var have = Set(entries.map(\.episodeId))
@@ -86,9 +87,12 @@ public enum DownloadAhead {
     return plan
   }
 
-  private static func isFailed(_ entry: DownloadEntry) -> Bool {
-    if case .failed = entry.state { return true }
-    return false
+  /// Whether an ahead download failed because the phone had no room. The player remembers it
+  /// for the rest of the run and passes it to `plan` as `phoneFull`.
+  public static func phoneIsFull(in entries: [DownloadEntry]) -> Bool {
+    entries.contains { entry in
+      entry.ahead && entry.state == .failed(reason: DownloadRecovery.phoneFullReason)
+    }
   }
 
   /// Not an added file or a preview, a usable folder name, and a web address.

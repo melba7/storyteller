@@ -49,6 +49,9 @@ public enum DownloadRecovery {
   /// A dropped connection is retried this many times before the row says it failed.
   public static let maxRetries = 3
 
+  /// What the row says when the phone had no room for the file.
+  public static let phoneFullReason = "The phone is full"
+
   /// URLError codes for a connection that may come back: timed out, cannot connect, lost,
   /// no internet, DNS trouble.
   private static let transient: Set<Int> = [-1001, -1003, -1004, -1005, -1006, -1009]
@@ -88,7 +91,7 @@ public enum DownloadRecovery {
   /// such as the server saying 404 or a full phone, fail with a reason the listener can read.
   public static func decide(_ failure: DownloadFailure) -> RecoveryAction {
     if failure.forceQuit { return failure.hasResumeData ? .resume : .restart }
-    if failure.diskFull { return .fail("The phone is full") }
+    if failure.diskFull { return .fail(phoneFullReason) }
     if let status = failure.httpStatus, !(200..<300).contains(status) {
       if status == 404 || status == 410 { return .fail("The episode is no longer there (\(status))") }
       return .fail("The server answered \(status)")
