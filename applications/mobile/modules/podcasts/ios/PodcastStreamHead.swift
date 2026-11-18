@@ -152,6 +152,35 @@ final class PodcastStreamHead: @unchecked Sendable {
     }
   }
 
+  /// The listener found the skip of an ad too far. The trim goes into the head's own list, so
+  /// every later write of the stream's ads keeps it, and it is written now under the lock the
+  /// scan's own write (`persist`) holds from its read to the end of its write, so neither can
+  /// overwrite the other. The store's call reaches a final ads file too, once there is one.
+  func markTrimmed(_ trim: AdTrim) {
+    lock.withLock {
+      trims.add(trim)
+      marksStore()?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
+    }
+  }
+
+  /// The listener undid the skip of `ad`: kept and written as `markTrimmed` does it.
+  func markUndone(_ ad: FoundAd) {
+    lock.withLock {
+      let item = UndoneAd(start: ad.start, end: ad.end)
+      if !undone.contains(item) { undone.append(item) }
+      marksStore()?.markUndone(detector: PodcastAdFinder.detectorName, adStart: ad.start)
+    }
+  }
+
+  /// The store a mark is written to (the caller holds the lock). Nil once the stream was stopped
+  /// or its download removed, so nothing makes the folder again.
+  private func marksStore() -> AdsStore? {
+    guard !stopped, store.entry(for: episodeId) != nil,
+      let folder = try? store.folder(for: episodeId)
+    else { return nil }
+    return AdsStore(folder: folder, sha256: key)
+  }
+
   /// The file on disk is now this long.
   func noteBytes(_ available: Int64) { feed.yield(available) }
 

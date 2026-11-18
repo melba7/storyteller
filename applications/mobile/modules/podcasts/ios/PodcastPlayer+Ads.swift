@@ -52,6 +52,12 @@ final class PodcastAdSkipping {
   /// Whether an ads file was saved for the loaded download (checked, with or without ads).
   var hasSavedAds: Bool { store?.best(detector: PodcastAdFinder.detectorName) != nil }
 
+  /// The head scan of the stream the loaded episode plays through, while it does.
+  private var streamHead: PodcastStreamHead? {
+    guard let loader = owner.streamDownload, loader.episodeId == episodeId else { return nil }
+    return loader.head
+  }
+
   /// The listener's switches, with the loaded show's own choices where it has them (P5a).
   private var settings: AdSkipSettings {
     let show = owner.showState.settings
@@ -79,7 +85,12 @@ final class PodcastAdSkipping {
   /// trim is saved with the ads and counted; the skipper already uses it.
   func seeked(to position: Double) {
     if let trim = skipper.backSeek(to: position, now: now) {
-      store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
+      // A stream's ads file is written by its head scan too, so the head takes the trim.
+      if let head = streamHead {
+        head.markTrimmed(trim)
+      } else {
+        store?.markTrimmed(detector: PodcastAdFinder.detectorName, trim)
+      }
       StatsStore.shared.countAd(.tooFar)
       PodcastSkipLogger.shared.trimmed(trim)
     }
@@ -129,7 +140,11 @@ final class PodcastAdSkipping {
     let ad = skip.ad
     // The ads that were skipped with it (an ad and then the hosts' plug) are undone too.
     for undone in [ad] + skip.chained {
-      store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
+      if let head = streamHead {
+        head.markUndone(undone)
+      } else {
+        store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
+      }
     }
     StatsStore.shared.undoAdSkip()
     StatsStore.shared.countAd(.undone)
