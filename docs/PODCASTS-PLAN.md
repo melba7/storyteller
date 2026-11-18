@@ -280,12 +280,12 @@ setting picks the detector, and each result is saved under the detector's id.
   between them (12 seconds when every line between reads as the ad; one ad
   break, at most 5 minutes in all), drop anything under 10 seconds, do not skip
   anything over 5 minutes (likely a mistake), carry a sure ad's end on by at
-  most 2 lines while the next lines still read as the ad (a web address, a
-  promo code, or its sponsor's name), stop at words that bring the show back
-  ("we're back"), and land each edge a quarter second before the next word
-  (an ad that begins in the first 6 seconds begins at 0:00). The carried end
-  comes from MinusPod (see "Open-source code we use"), shortened in the
-  ad-accuracy round (docs/PODCASTS-ADS-ACCURACY-PLAN.md).
+  most 2 lines while the next lines still read as the ad (a web address, a promo
+  code, or its sponsor's name), stop at words that bring the show back ("we're
+  back"), and land each edge a quarter second before the next word (an ad that
+  begins in the first 6 seconds begins at 0:00). The carried end comes from
+  MinusPod (see "Open-source code we use"), shortened in the ad-accuracy round
+  (docs/PODCASTS-ADS-ACCURACY-PLAN.md).
 - **How sure**: the model says how sure it is. Sure and unsure ads are both
   skipped, and "Ads found" marks the unsure ones "Not sure"; guesses are
   dropped.
