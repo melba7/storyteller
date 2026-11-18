@@ -39,6 +39,7 @@ extension PodcastPlayer {
         self.fallBackToStream(from: loader, reason: reason)
       }
     }
+    loader.head.setLanguage(episode.language)
     streamDownload = loader
     loader.start()
     return AVPlayerItem(asset: loader.makeAsset())
