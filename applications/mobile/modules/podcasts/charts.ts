@@ -15,7 +15,7 @@ export type ChartShow = {
 }
 
 /** A chart entry before its feed link is known. */
-type ChartEntry = Omit<ChartShow, "feedUrl">
+export type ChartEntry = Omit<ChartShow, "feedUrl">
 
 /** A category with Apple's genre number for its chart. */
 export type ChartCategory = { id: string; name: string }
@@ -46,11 +46,18 @@ export const CHART_CATEGORIES: readonly ChartCategory[] = [
   { id: "1309", name: "TV & Film" },
 ]
 
-const TOP_URL =
-  "https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcasts.json"
-const GENRE_URL = (id: string) =>
-  `https://itunes.apple.com/us/rss/toppodcasts/limit=50/genre=${id}/json`
-const LOOKUP_URL = "https://itunes.apple.com/lookup?id="
+/** The country of every chart address. One place to change if a setting is added later. */
+export const CHART_COUNTRY = "us"
+
+/** The address of the overall chart. */
+export const topUrl = () =>
+  `https://rss.marketingtools.apple.com/api/v2/${CHART_COUNTRY}/podcasts/top/50/podcasts.json`
+/** The address of one category's chart. */
+export const genreUrl = (id: string) =>
+  `https://itunes.apple.com/${CHART_COUNTRY}/rss/toppodcasts/limit=50/genre=${id}/json`
+/** The address that turns Apple ids into feed links. */
+export const lookupUrl = (ids: string[]) =>
+  `https://itunes.apple.com/lookup?id=${ids.join(",")}`
 
 /** A chart answer and its lookup are kept this long. */
 export const CACHE_MS = 24 * 60 * 60 * 1000
@@ -196,9 +203,9 @@ export function parseSavedChart(value: string): ChartShow[] | null {
 
 // MARK: Fetching
 
-type FetchFn = (url: string) => Promise<Response>
+export type FetchFn = (url: string) => Promise<Response>
 
-async function getJson(url: string, fetchFn: FetchFn): Promise<unknown> {
+export async function getJson(url: string, fetchFn: FetchFn): Promise<unknown> {
   let response: Response
   try {
     response = await fetchFn(url)
@@ -224,8 +231,8 @@ export interface ChartDeps {
 
 /**
  * One chart with feed links: `TOP_CHART` or a category's genre id. Kept for a day; a kept
- * answer that can't be read, or that is too old, is fetched again. A cache that fails
- * does not stop the chart.
+ * answer that can't be read, or that is too old, is fetched again, and if that fetch fails
+ * the old answer is returned. A cache that fails does not stop the chart.
  */
 export async function loadChart(
   chart: string,
@@ -236,20 +243,24 @@ export async function loadChart(
   const key = `chart:${chart}`
 
   const kept = await deps.cacheGet(key).catch(() => null)
-  if (kept && now() - kept.savedAt < CACHE_MS) {
-    const shows = parseSavedChart(kept.value)
-    if (shows) return shows
-  }
+  const old = kept ? parseSavedChart(kept.value) : null
+  if (kept && old && now() - kept.savedAt < CACHE_MS) return old
 
-  const isTop = chart === TOP_CHART
-  const answer = await getJson(isTop ? TOP_URL : GENRE_URL(chart), fetchFn)
-  const entries = isTop ? parseTopChart(answer) : parseCategoryChart(answer)
-  if (entries.length === 0) return []
-  const ids = entries.map((entry) => entry.appleId).join(",")
-  const feeds = parseLookup(await getJson(LOOKUP_URL + ids, fetchFn))
-  const shows = joinFeeds(entries, feeds)
-  if (shows.length > 0) {
-    await deps.cachePut(key, JSON.stringify(shows)).catch(() => {})
+  try {
+    const isTop = chart === TOP_CHART
+    const answer = await getJson(isTop ? topUrl() : genreUrl(chart), fetchFn)
+    const entries = isTop ? parseTopChart(answer) : parseCategoryChart(answer)
+    if (entries.length === 0) return []
+    const ids = entries.map((entry) => entry.appleId)
+    const feeds = parseLookup(await getJson(lookupUrl(ids), fetchFn))
+    const shows = joinFeeds(entries, feeds)
+    if (shows.length > 0) {
+      await deps.cachePut(key, JSON.stringify(shows)).catch(() => {})
+    }
+    return shows
+  } catch (error) {
+    // Yesterday's list is better than an error; only with nothing kept does it throw.
+    if (old) return old
+    throw error
   }
-  return shows
 }

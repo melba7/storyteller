@@ -205,6 +205,30 @@ describe("loadChart", () => {
     expect(shows).toHaveLength(2)
   })
 
+  it("returns the old kept list when the fetch fails, and throws when nothing is kept", async () => {
+    const old = [
+      {
+        appleId: "1",
+        title: "Old",
+        author: "A",
+        feedUrl: "https://x.test/rss",
+        imageUrl: null,
+      },
+    ]
+    const store = new Map([
+      ["chart:1321", { value: JSON.stringify(old), savedAt: 1_000_000 }],
+    ])
+    const { deps, advance } = setup(store)
+    advance(CACHE_MS + 1)
+    const offline = async (): Promise<Response> => {
+      throw new Error("offline")
+    }
+    expect(await loadChart("1321", { ...deps, fetchFn: offline })).toEqual(old)
+    await expect(
+      loadChart("1488", { ...deps, fetchFn: offline }),
+    ).rejects.toThrow("Couldn't reach Apple's charts")
+  })
+
   it("says plainly when Apple can't be reached, answers badly or sends junk", async () => {
     const base = setup(new Map()).deps
     await expect(
