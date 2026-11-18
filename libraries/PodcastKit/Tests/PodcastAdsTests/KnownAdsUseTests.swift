@@ -114,7 +114,8 @@ final class KnownAdsUseTests: XCTestCase {
   }
 
   func testAnOpeningSeenTwiceIsAlsoSavedAtOnceEndingOneSecondBeforeItsExpectedEnd() {
-    let use = KnownAdUse.from([hit(.opening(start: 10, expectedEnd: 40), seen: 2)], words: timed(plain(20)))
+    // 36 s of words are heard, so the guess may reach the expected end (see the cap below).
+    let use = KnownAdUse.from([hit(.opening(start: 10, expectedEnd: 40), seen: 2)], words: timed(plain(72)))
     XCTAssertEqual(use.ads.count, 1)
     XCTAssertEqual(use.ads[0].start, 10)
     XCTAssertEqual(use.ads[0].end, 39)
@@ -123,8 +124,31 @@ final class KnownAdsUseTests: XCTestCase {
     XCTAssertEqual(use.jumpTo, 50)
   }
 
+  func testAnOpeningIsOnlyGuessedAFewSecondsPastWhatWasHeard() {
+    // The remembered read is 90 s long, but the transcript ends at 25 s: the end of the guess is
+    // 5 s past that, not at the expected end, so a different, shorter read is not skipped whole.
+    let heard = timed(plain(50))  // 25 s of words
+    let use = KnownAdUse.from([hit(.opening(start: 0, expectedEnd: 90), seen: 3, length: 90)], words: heard)
+    XCTAssertEqual(use.ads.map(\.end), [30])
+    XCTAssertEqual(use.ads.map(\.confidence), [.unsure])
+    XCTAssertEqual(use.provisional, use.ads)
+    XCTAssertEqual(use.jumpTo, 100, "the next step still goes on to the whole read")
+    // Never past the expected end: heard 38 s of a read that should end at 40 s.
+    let near = KnownAdUse.from([hit(.opening(start: 10, expectedEnd: 40), seen: 2)], words: timed(plain(76)))
+    XCTAssertEqual(near.ads.map(\.end), [39])
+  }
+
+  func testTheCappedGuessIsDroppedOnceTheNextStepFindsNoMatch() {
+    let heard = timed(plain(50))
+    let guess = KnownAdUse.from([hit(.opening(start: 0, expectedEnd: 90), seen: 3, length: 90)], words: heard)
+    // A longer look hears a different read: the memory finds nothing now.
+    let later = KnownAdUse.from([], words: timed(plain(200)))
+    XCTAssertEqual(
+      KnownAdUse.withoutOutdated(guess.ads, everGuessed: guess.provisional, current: later.provisional), [])
+  }
+
   func testAnOpeningThatBeginsInTheFirstSecondsStartsAtZeroToo() {
-    let use = KnownAdUse.from([hit(.opening(start: 3, expectedEnd: 33), seen: 3)], words: timed(plain(20)))
+    let use = KnownAdUse.from([hit(.opening(start: 3, expectedEnd: 33), seen: 3)], words: timed(plain(60)))
     XCTAssertEqual(use.ads.map(\.start), [0])
     XCTAssertEqual(use.ads.map(\.end), [32])
   }

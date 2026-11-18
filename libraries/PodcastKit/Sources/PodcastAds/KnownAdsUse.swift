@@ -30,6 +30,10 @@ public struct KnownAdUse: Equatable, Sendable {
   /// next step of the scan ends this long after it.
   public static let openingMargin = 1.0
   public static let jumpMargin = 10.0
+  /// An opening is saved ending at most this far past the end of the words heard so far. The rest
+  /// of the remembered read is not heard yet, and a different, shorter read this week must not be
+  /// skipped as far as the old one was long.
+  public static let guessReach = 5.0
   /// The clean-up's landing numbers (`AdRules.landBefore`, `AdRules.topOfEpisode`): the end lands
   /// a quarter second before the next word, and an ad that begins in the first six seconds begins
   /// at 0:00.
@@ -57,7 +61,8 @@ public struct KnownAdUse: Equatable, Sendable {
         use.ads.append(found(hit.ad, start: start, end: landing(of: end, in: words), .sure))
       case .opening(let start, let expectedEnd):
         use.jumpTo = max(use.jumpTo ?? 0, expectedEnd + jumpMargin)
-        let end = expectedEnd - openingMargin
+        let heard = words.last?.end ?? start
+        let end = min(expectedEnd - openingMargin, heard + guessReach)
         guard hit.ad.seen >= seenForOpening, end > start + 1 else { continue }
         let ad = found(hit.ad, start: start, end: end, .unsure)
         use.ads.append(ad)
