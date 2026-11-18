@@ -106,9 +106,11 @@ public enum AppleAds {
       } catch let error as LanguageModelSession.GenerationError {
         switch error {
         case .exceededContextWindowSize: throw AdDetectorError.tooLong
-        // The model refused these lines. The runner counts the piece as having no ad and
-        // reports it, so the app can show that part was not read.
-        case .guardrailViolation: throw AdDetectorError.refused
+        // The model refused these lines, or could not put its answer in the asked shape. The
+        // answer is the same every time (the sampling is greedy), so asking again is no use:
+        // the runner counts the piece as having no ad and reports it, so the app can show
+        // that part was not read, and the rest of the episode still gets its ads.
+        case .guardrailViolation, .refusal, .decodingFailure: throw AdDetectorError.refused
         case .unsupportedLanguageOrLocale:
           throw AdDetectorError.failed("The on-device model does not support this language")
         default: throw AdDetectorError.failed("\(error)")
