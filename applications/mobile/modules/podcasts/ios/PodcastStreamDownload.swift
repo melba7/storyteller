@@ -308,7 +308,9 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
           self.head.filed(sha: sha, file: store.localFile(for: id))
         }
         PodcastDownloader.shared.emit(done)
-        PodcastTranscriber.shared.downloaded(id)
+        // The head scan may still be at work on the same first minutes: its analyzer and model
+        // session go first, and the transcriber starts when the scan ends (or after 90 seconds).
+        self.head.afterScan(timeout: 90) { PodcastTranscriber.shared.downloaded(id) }
       } catch DownloadError.noEntry {
         // Removed by the listener while it was being filed: nothing is brought back.
       } catch {

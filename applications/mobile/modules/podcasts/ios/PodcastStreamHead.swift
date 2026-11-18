@@ -35,6 +35,8 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var isFiled = false
   private var stopped = false
   private var started = false
+  private var scanDone = false
+  private var waiters: [() -> Void] = []
   private var found: [FoundAd] = []
   private var covered = 0.0
   private var detectorVersion = "1"
@@ -64,7 +66,36 @@ final class PodcastStreamHead: @unchecked Sendable {
       return true
     }
     guard go else { return }
-    task = Task.detached(priority: .userInitiated) { [self] in await run() }
+    task = Task.detached(priority: .userInitiated) { [self] in
+      await run()
+      scanEnded()
+    }
+  }
+
+  /// Runs `work` once the head scan is over (finished, stopped, failed, or never started), or
+  /// after `timeout` seconds, whichever comes first. The transcriber of the filed episode waits
+  /// for this, so two analyzers and two model sessions do not work on the same first minutes.
+  func afterScan(timeout: Double, _ work: @escaping @Sendable () -> Void) {
+    let once = RunOnce(work)
+    let waiting = lock.withLock { () -> Bool in
+      guard started, !scanDone else { return false }
+      waiters.append { once.run() }
+      return true
+    }
+    guard waiting else { return once.run() }
+    Task.detached {
+      try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+      once.run()
+    }
+  }
+
+  private func scanEnded() {
+    let release = lock.withLock { () -> [() -> Void] in
+      scanDone = true
+      defer { waiters = [] }
+      return waiters
+    }
+    for wake in release { wake() }
   }
 
   /// The file on disk is now this long.
@@ -132,7 +163,8 @@ final class PodcastStreamHead: @unchecked Sendable {
     var available: Int64 = 0
     var ended = false
     var fed = 0.0
-    var rate = 16_000.0  // bytes of file per second of audio, learned from the first cut
+    var rate = 16_000.0  // bytes of audio (the ID3 tag not counted) per second, learned from a cut
+    var learned = false
     var tries = 0
     var tag = 0  // bytes of ID3 tag before the audio (cover art can make it large)
     var waitFor: Int64 = 0  // at least this many bytes are waited for
@@ -142,7 +174,7 @@ final class PodcastStreamHead: @unchecked Sendable {
     while index < Self.targets.count {
       try Task.checkCancellation()
       let target = Self.targets[index]
-      let need = max(Int64(target * rate) + 4096 + Int64(tag), waitFor)
+      let need = max(Int64(tag) + Int64(target * rate) + 4096, waitFor)
       while available < need, !ended {
         if let next = await iterator.next() { available = next } else { ended = true }
       }
@@ -152,7 +184,7 @@ final class PodcastStreamHead: @unchecked Sendable {
         return PodcastTimeline.mark(episodeId, "head scan: the file cannot be read")
       }
       let cut: Mp3Prefix.Cut
-      switch Mp3Prefix.look(data, complete: ended) {
+      switch Mp3Prefix.look(data, complete: ended, maxSeconds: target) {
       case .cut(let found):
         cut = found
       case .needMore(let start):
@@ -167,11 +199,20 @@ final class PodcastStreamHead: @unchecked Sendable {
         return PodcastTimeline.mark(episodeId, "head scan: the file is not an MP3")
       }
       tag = cut.audioStart
-      if cut.seconds < target - 3, !ended {
-        // The file holds less audio than guessed: wait for more bytes.
+      // The byte rate of the audio is learned from the first cut, whichever way the guess was
+      // wrong, and again whenever a cut falls short. The cut is held to the step's target, so a
+      // lean file (32 kbit/s) never feeds the model far more than a step.
+      let short = cut.seconds < target - 3 && !ended
+      if short || (!learned && cut.seconds >= 5) {
         rate = Double(cut.bytes - cut.audioStart) / max(cut.seconds, 1) * 1.03
+        learned = true
+      }
+      if short {
+        // The file holds less audio than guessed: wait for more bytes.
         tries += 1
-        guard tries <= 4 else { return }
+        guard tries <= 4 else {
+          return PodcastTimeline.mark(episodeId, "head scan: the audio does not come at a steady rate")
+        }
         continue
       }
       guard cut.seconds > fed + 1 else {
@@ -280,5 +321,19 @@ final class PodcastStreamHead: @unchecked Sendable {
     guard changed else { return }
     PodcastTimeline.mark(episodeId, "player told to read the ads")
     Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+  }
+}
+
+/// Runs a closure at most once, from whichever caller comes first.
+private final class RunOnce: @unchecked Sendable {
+  private let lock = NSLock()
+  private var work: (@Sendable () -> Void)?
+  init(_ work: @escaping @Sendable () -> Void) { self.work = work }
+  func run() {
+    let go = lock.withLock { () -> (@Sendable () -> Void)? in
+      defer { work = nil }
+      return work
+    }
+    go?()
   }
 }

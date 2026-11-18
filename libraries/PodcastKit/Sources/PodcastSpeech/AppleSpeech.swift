@@ -112,11 +112,14 @@ public protocol HeadTranscribing: AnyObject, Sendable {
     }
 
     /// Reads `from` to `to` seconds of the file, from its frame position, and yields the audio
-    /// in the format the analyzer wants.
+    /// in the format the analyzer wants. Gives the seconds of audio really yielded, counted in
+    /// the analyzer's own frames: that is a little less than `to - from` (the decoder drops the
+    /// first frame and the rate converter keeps its last few samples).
+    @discardableResult
     static func feed(
       _ file: URL, from: Double, to: Double, as target: AVAudioFormat,
       into continuation: AsyncStream<AnalyzerInput>.Continuation, tolerant: Bool = false
-    ) throws {
+    ) throws -> Double {
       let audio = try AVAudioFile(forReading: file)
       let format = audio.processingFormat
       audio.framePosition = AVAudioFramePosition(from * format.sampleRate)
@@ -126,6 +129,7 @@ public protocol HeadTranscribing: AnyObject, Sendable {
         throw TranscriptError.failed("This audio cannot be converted for the speech recogniser")
       }
       let chunk = AVAudioFrameCount(format.sampleRate)
+      var yielded: AVAudioFramePosition = 0
       while remaining > 0 {
         let count = AVAudioFrameCount(min(AVAudioFramePosition(chunk), remaining))
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count) else {
@@ -140,8 +144,11 @@ public protocol HeadTranscribing: AnyObject, Sendable {
         }
         if buffer.frameLength == 0 { break }
         remaining -= AVAudioFramePosition(buffer.frameLength)
-        continuation.yield(AnalyzerInput(buffer: try convert(buffer, with: converter, to: target)))
+        let converted = try convert(buffer, with: converter, to: target)
+        yielded += AVAudioFramePosition(converted.frameLength)
+        continuation.yield(AnalyzerInput(buffer: converted))
       }
+      return Double(yielded) / target.sampleRate
     }
 
     static func convert(
@@ -181,6 +188,12 @@ public protocol HeadTranscribing: AnyObject, Sendable {
     private var words: [TranscriptWord] = []
     private var finalizedTo = 0.0
     private var failure: Error?
+    /// Seconds of audio given to the analyzer so far, on the analyzer's own clock.
+    private var yielded = 0.0
+    /// How long one `extend` may take before the scan gives up and the normal path does the work.
+    static let stepLimit = 20.0
+    /// Finalizing stops this far short of the audio yielded, so the analyzer has consumed it.
+    static let finalizeMargin = 0.05
 
     init(locale: String) { self.locale = locale }
 
@@ -232,16 +245,31 @@ public protocol HeadTranscribing: AnyObject, Sendable {
     }
 
     func extend(file: URL, from: Double, to: Double) async throws -> [TranscriptWord] {
+      try await withTimeLimit(
+        seconds: Self.stepLimit,
+        message: "The speech recogniser did not finish a step in \(Int(Self.stepLimit)) seconds"
+      ) { [self] in try await step(file: file, from: from, to: to) }
+    }
+
+    /// `finalize(through:)` waits until the analyzer has consumed that audio, so it is given the
+    /// time of the audio really yielded (a little short of `to`), never `to` itself.
+    private func step(file: URL, from: Double, to: Double) async throws -> [TranscriptWord] {
       guard let analyzer, let format, let inputs else {
         throw TranscriptError.failed("The head transcriber was not prepared")
       }
-      try AppleRecogniser.feed(file, from: from, to: to, as: format, into: inputs, tolerant: true)
-      try await analyzer.finalize(through: CMTime(seconds: to, preferredTimescale: 600))
-      // The results reach the collector a moment after they are final.
-      var waited = 0
-      while waited < 40, lock.withLock({ finalizedTo < to - 1 && failure == nil }) {
-        try await Task.sleep(nanoseconds: 25_000_000)
-        waited += 1
+      let added = try AppleRecogniser.feed(file, from: from, to: to, as: format, into: inputs, tolerant: true)
+      let through = lock.withLock { () -> Double in
+        yielded += added
+        return yielded - Self.finalizeMargin
+      }
+      if added > 0, through > 0 {
+        try await analyzer.finalize(through: CMTime(seconds: through, preferredTimescale: 600))
+        // The results reach the collector a moment after they are final.
+        var waited = 0
+        while waited < 40, lock.withLock({ finalizedTo < through - 1 && failure == nil }) {
+          try await Task.sleep(nanoseconds: 25_000_000)
+          waited += 1
+        }
       }
       return try lock.withLock {
         if let failure { throw failure }

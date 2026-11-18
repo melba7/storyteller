@@ -62,8 +62,10 @@ public enum Mp3Prefix {
 
   /// Looks at `data`, the first bytes of a file. The first frame must be followed at once by
   /// another valid header (a stray 0xFF 0xEx in a tag's padding is not a frame). With `complete`
-  /// (these are all the bytes there will be) a last frame needs no frame after it.
-  public static func look(_ data: Data, complete: Bool = false) -> Look {
+  /// (these are all the bytes there will be) a last frame needs no frame after it. With
+  /// `maxSeconds` the cut stops at the first frame that reaches that much audio, so a file that
+  /// is leaner than guessed (32 kbit/s) does not give a piece far longer than the step's target.
+  public static func look(_ data: Data, complete: Bool = false, maxSeconds: Double? = nil) -> Look {
     guard let start = audioStart(data) else { return .needMore(audioStart: nil) }
     guard start <= data.count else { return .needMore(audioStart: start) }
     var at = start
@@ -89,6 +91,7 @@ public enum Mp3Prefix {
     var frames = 0
     var seconds = 0.0
     while let next = frame(in: data, at: at), at + next.length <= data.count {
+      if let maxSeconds, seconds >= maxSeconds { break }
       at += next.length
       frames += 1
       seconds += next.seconds
@@ -97,8 +100,8 @@ public enum Mp3Prefix {
   }
 
   /// The cut of `data`, or nil when there is none (yet).
-  public static func cut(_ data: Data, complete: Bool = false) -> Cut? {
-    if case .cut(let cut) = look(data, complete: complete) { return cut }
+  public static func cut(_ data: Data, complete: Bool = false, maxSeconds: Double? = nil) -> Cut? {
+    if case .cut(let cut) = look(data, complete: complete, maxSeconds: maxSeconds) { return cut }
     return nil
   }
 }

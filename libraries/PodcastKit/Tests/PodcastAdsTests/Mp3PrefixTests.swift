@@ -77,4 +77,14 @@ final class Mp3PrefixTests: XCTestCase {
     XCTAssertNil(Mp3Prefix.cut(frame()))
     XCTAssertEqual(Mp3Prefix.cut(frame(), complete: true)?.frames, 1)
   }
+
+  func testTheCutStopsAtTheMostSecondsAsked() {
+    // 100 frames are 2.6 s; asked for 1 s, the cut ends at the first frame that reaches it.
+    let data = Data((0..<100).flatMap { _ in frame() })
+    let cut = Mp3Prefix.cut(data, maxSeconds: 1)
+    XCTAssertEqual(cut?.frames, 39)
+    XCTAssertEqual(cut?.bytes, 417 * 39)
+    XCTAssertGreaterThanOrEqual(cut?.seconds ?? 0, 1)
+    XCTAssertEqual(Mp3Prefix.cut(data)?.frames, 100)
+  }
 }
