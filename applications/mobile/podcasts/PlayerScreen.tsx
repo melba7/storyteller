@@ -171,8 +171,14 @@ export function PlayerScreen() {
                 style={{
                   paddingLeft: panel === "art" ? 0 : gutters.areaLeft,
                   paddingRight: panel === "art" ? 0 : gutters.areaRight,
+                  // `flex-1` gives a flex basis of 0, which wins over `width`: say it outright.
                   ...(split
-                    ? { width: columns.area, flexGrow: 0, flexShrink: 0 }
+                    ? {
+                        width: columns.area,
+                        flexBasis: columns.area,
+                        flexGrow: 0,
+                        flexShrink: 0,
+                      }
                     : null),
                 }}
                 onLayout={(event) =>
@@ -210,7 +216,12 @@ export function PlayerScreen() {
               <ScrollView
                 style={
                   split
-                    ? { width: columns.controls, flexGrow: 0, flexShrink: 0 }
+                    ? {
+                        width: columns.controls,
+                        flexBasis: columns.controls,
+                        flexGrow: 0,
+                        flexShrink: 0,
+                      }
                     : { flexGrow: 0, flexShrink: 1 }
                 }
                 bounces={false}
