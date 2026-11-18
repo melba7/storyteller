@@ -20,8 +20,10 @@ import {
   SAVE_EVERY_MS,
   clampPosition,
   clampSpeed,
+  type ListenSave,
   isPlayed,
   resumeStart,
+  shouldNotifyListen,
 } from "./playbackRules"
 import { isPreviewId } from "./preview"
 
@@ -76,10 +78,12 @@ export interface NativePlayer {
 export interface PlaybackDeps {
   /** Null where there is no native player (Android, the web). */
   native: NativePlayer | null
+  /** `notify` says whether the lists should read the library again (see `shouldNotifyListen`). */
   savePlayback(
     episodeId: string,
     position: number,
     played: boolean,
+    notify: boolean,
   ): Promise<void>
   saveArtworkColor(showId: string, color: string): Promise<void>
   lastPlayedEpisode(): Promise<StoredEpisode | null>
@@ -142,6 +146,8 @@ export function createPlayback(deps: PlaybackDeps) {
   let markedEarly = false
   /** The listener marked the loaded episode played, so the next save keeps it played. */
   let markedPlayed = false
+  /** The last save the lists were told about (see `shouldNotifyListen`). */
+  let told: ListenSave | null = null
   /** The id the native player knows the loaded episode by (a followed preview keeps its old one). */
   let nativeId: string | null = null
   /** Counts the plays that load an episode, so one that was deciding can see it was replaced. */
@@ -154,21 +160,32 @@ export function createPlayback(deps: PlaybackDeps) {
     for (const listener of listeners) listener()
   }
 
-  /** Keeps the place. A failure to save must not stop the playing. */
-  function persist(position: number, reachedEnd = false) {
+  /**
+   * Keeps the place. A failure to save must not stop the playing. A `timed` save (the 15
+   * second clock) tells the lists only when what they show could have changed.
+   */
+  function persist(position: number, reachedEnd = false, timed = false) {
     const episode = view.episode
     if (!episode) return
     const played =
       markedPlayed ||
       isPlayed(position, view.duration, reachedEnd, deps.playedWithin?.() ?? 0)
-    deps.savePlayback(episode.id, position, played).catch((cause: unknown) => {
-      deps.report?.(cause)
-    })
+    const save = { episodeId: episode.id, position, played }
+    const notify = shouldNotifyListen(told, save, timed)
+    if (notify) told = save
+    deps
+      .savePlayback(episode.id, position, played, notify)
+      .catch((cause: unknown) => {
+        deps.report?.(cause)
+      })
   }
 
   function syncTimer() {
     if (view.isPlaying && timer === null) {
-      timer = deps.setInterval(() => persist(view.position), SAVE_EVERY_MS)
+      timer = deps.setInterval(
+        () => persist(view.position, false, true),
+        SAVE_EVERY_MS,
+      )
     } else if (!view.isPlaying && timer !== null) {
       deps.clearInterval(timer)
       timer = null

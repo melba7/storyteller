@@ -85,6 +85,37 @@ export function isPlayed(
   return duration - position <= Math.max(within, PLAYED_WITHIN_SECONDS)
 }
 
+/** One save of the listener's place, as far as a list could show it. */
+export type ListenSave = {
+  episodeId: string
+  position: number
+  played: boolean
+}
+
+/**
+ * Whether a save of the place tells the lists to read the library again. The lists show the
+ * time left in whole minutes, so a timed save (every 15 seconds) inside the same minute
+ * would only make every open screen load and draw again for nothing. Any other save (a
+ * pause, a seek, a skip, another episode) always tells them, and so does a timed save that
+ * changes the episode, the played mark, or whether the episode was started at all. `before` is the last save the
+ * lists were told about, or null when they were told about none.
+ */
+export function shouldNotifyListen(
+  before: ListenSave | null,
+  after: ListenSave,
+  timed: boolean,
+): boolean {
+  if (!timed || before === null) return true
+  if (before.episodeId !== after.episodeId || before.played !== after.played) {
+    return true
+  }
+  // An episode that was never started is told apart from one in progress ("Resume", the
+  // Up Next shelf, a playlist of unplayed ones), so leaving place 0 tells the lists too.
+  if (before.position > 0 !== after.position > 0) return true
+  // A position that is not a number never equals itself, so it tells the lists too.
+  return Math.floor(before.position / 60) !== Math.floor(after.position / 60)
+}
+
 /** The mini player shows when an episode is loaded or one was played before. */
 export function showsMiniPlayer(
   loaded: StoredEpisode | null,
