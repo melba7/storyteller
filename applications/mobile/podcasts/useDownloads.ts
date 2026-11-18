@@ -7,6 +7,7 @@ import {
   type DownloadAction,
   type DownloadMap,
   applyChange,
+  finishedIdsReader,
   mapFromList,
   storageOf,
 } from "@/modules/podcasts/downloads"
@@ -60,6 +61,17 @@ function subscribe(listener: () => void): () => void {
 /** Every download, by episode id. */
 export function useDownloadMap(): DownloadMap {
   return useSyncExternalStore(subscribe, () => current)
+}
+
+// The ids of the finished downloads as a set. It keeps its identity through every progress step.
+const finishedIds = finishedIdsReader()
+
+/**
+ * The episodes whose download has finished. Draws again only when a download finishes or
+ * goes, not at every progress step of every download (`useDownloadMap` does that).
+ */
+export function useDownloadedIds(): ReadonlySet<string> {
+  return useSyncExternalStore(subscribe, () => finishedIds(current))
 }
 
 /** One episode's download, or undefined when it has none. Draws again only when it changes. */

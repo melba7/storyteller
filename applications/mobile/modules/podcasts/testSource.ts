@@ -210,3 +210,69 @@ export function callDepths(source: string, name: string): number[] {
   })
   return depths
 }
+
+export type Attribute = {
+  /** The node type of the value: "Identifier", "ArrowFunctionExpression", "ObjectExpression"... */
+  type: string
+  /** The name when the value is an identifier, else "". */
+  name: string
+}
+
+/** The value of attribute `name` on every `<tag ...>` in the source ("true" when it has none). */
+export function attributesOf(
+  source: string,
+  tag: string,
+  name: string,
+): Attribute[] {
+  const found: Attribute[] = []
+  walk(programOf(source), (node) => {
+    if (node.type !== "JSXOpeningElement") return
+    // A tag's name is a JSXIdentifier (`nameOf` reads identifiers and strings).
+    if (String((node["name"] as Node)["name"]) !== tag) return
+    for (const attribute of node["attributes"] as Node[]) {
+      if (attribute.type !== "JSXAttribute") continue
+      if (String((attribute["name"] as Node)["name"]) !== name) continue
+      const value = attribute["value"]
+      if (!isNode(value)) {
+        found.push({ type: "true", name: "" })
+        continue
+      }
+      const inner =
+        value.type === "JSXExpressionContainer" ? value["expression"] : value
+      found.push({
+        type: isNode(inner) ? inner.type : "unknown",
+        name: isNode(inner) && inner.type === "Identifier" ? nameOf(inner) : "",
+      })
+    }
+  })
+  return found
+}
+
+export type Declaration = {
+  /** What it is set to: the called function ("useCallback"), or the kind of value. */
+  how: string
+  /** How many functions it sits inside: 0 for the top of the file, 1 in a component. */
+  depth: number
+}
+
+/** How `const name = ...` or `function name() {}` is declared, or null when it is not. */
+export function declaredAs(source: string, name: string): Declaration | null {
+  let found: Declaration | null = null
+  walk(programOf(source), (node, depth) => {
+    if (node.type === "FunctionDeclaration" && nameOf(node["id"]) === name) {
+      found = { how: "function", depth }
+    }
+    if (node.type !== "VariableDeclarator" || nameOf(node["id"]) !== name)
+      return
+    const init = node["init"]
+    if (!isNode(init)) return
+    found = {
+      how:
+        init.type === "CallExpression" && isNode(init["callee"])
+          ? nameOf(init["callee"])
+          : init.type,
+      depth,
+    }
+  })
+  return found
+}

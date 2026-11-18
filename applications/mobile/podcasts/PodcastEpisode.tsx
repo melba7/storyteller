@@ -14,7 +14,7 @@ import {
 } from "@/modules/podcasts/episodeRowLook"
 import { peopleForEpisode } from "@/modules/podcasts/people"
 import { formatTime } from "@/modules/podcasts/playbackRules"
-import { player, usePlayer } from "@/modules/podcasts/playerInstance"
+import { player, usePlayerValue } from "@/modules/podcasts/playerInstance"
 import { showHref } from "@/modules/podcasts/routes"
 
 import { AdsFound } from "./AdsFound"
@@ -36,12 +36,14 @@ const ARTWORK = 200
 /** The chapters of the episode when it is the one the player has loaded; a tap plays one. */
 function EpisodeChapters({ episodeId }: { episodeId: string }) {
   const chapters = useChapters(episodeId)
-  const view = usePlayer()
-  if (chapters.length === 0) return null
-  const playing =
-    view.episode?.id === episodeId
+  // Only the number of the chapter that plays: the page draws again when it changes, not at
+  // every tick of the player's clock.
+  const playing = usePlayerValue((view) =>
+    chapters.length > 0 && view.episode?.id === episodeId
       ? currentChapterIndex(chapters, view.position)
-      : -1
+      : -1,
+  )
+  if (chapters.length === 0) return null
   return (
     <View className="w-full gap-1">
       <Text className="text-[22px] font-bold" accessibilityRole="header">
@@ -55,7 +57,7 @@ function EpisodeChapters({ episodeId }: { episodeId: string }) {
           accessibilityLabel={`Play chapter ${chapter.title} from ${formatTime(chapter.start)}`}
           onPress={() => {
             void player.seekTo(chapter.start)
-            if (!view.isPlaying) void player.togglePlayPause()
+            if (!player.getView().isPlaying) void player.togglePlayPause()
           }}
         >
           <Text

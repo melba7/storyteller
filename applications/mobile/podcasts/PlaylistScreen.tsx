@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter, useSegments } from "expo-router"
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import { ActivityIndicator, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
@@ -15,6 +15,11 @@ import { useShows } from "./hooks"
 import { usePlaylist, useSmartEpisodes } from "./usePlaylists"
 import { useSelection } from "./useSelection"
 
+/** The key function closes over nothing, so the list always gets the same one. */
+function episodeKey(episode: StoredEpisode) {
+  return episode.id
+}
+
 /** One smart playlist: what its rules ask for, and the episodes they take, in its order. */
 export function PlaylistScreen({ id }: { id: string }) {
   const router = useRouter()
@@ -28,6 +33,17 @@ export function PlaylistScreen({ id }: { id: string }) {
     [shows.data],
   )
   const current = playlist.data
+  // Everything the render function reads is in its list of dependencies, so the list keeps
+  // the same one until the shows or the selection change.
+  const renderItem = useCallback(
+    ({ item }: { item: StoredEpisode }) => {
+      const show = showById.get(item.showId)
+      return show ? (
+        <EpisodeRow artwork episode={item} show={show} selection={selection} />
+      ) : null
+    },
+    [showById, selection],
+  )
   return (
     <>
       {playlist.loading ? (
@@ -44,7 +60,7 @@ export function PlaylistScreen({ id }: { id: string }) {
         <FlatList<StoredEpisode>
           className="bg-background flex-1"
           data={episodes.data ?? []}
-          keyExtractor={(episode) => episode.id}
+          keyExtractor={episodeKey}
           contentContainerClassName="px-safe-or-4"
           contentInsetAdjustmentBehavior="automatic"
           extraData={selection.selected}
@@ -74,17 +90,8 @@ export function PlaylistScreen({ id }: { id: string }) {
               </Text>
             )
           }
-          renderItem={({ item }) => {
-            const show = showById.get(item.showId)
-            return show ? (
-              <EpisodeRow
-                artwork
-                episode={item}
-                show={show}
-                selection={selection}
-              />
-            ) : null
-          }}
+          renderItem={renderItem}
+          strictMode
         />
       )}
       <ScreenBar
