@@ -17,6 +17,8 @@ public struct MP3Frame: Equatable, Sendable {
   /// Whether the frame holds an Xing or Info tag. The first frame of a file made by an encoder
   /// has one; a tag in a later frame is where two files were joined.
   public var hasInfoTag: Bool
+  /// The bit reservoir pointer in the frame's side information (nil when it cannot be read).
+  public var mainDataBegin: Int?
 }
 
 public struct MP3Parse: Equatable, Sendable {
@@ -122,7 +124,8 @@ public enum MP3Frames {
           offset: at, length: head.length, start: time, duration: head.duration,
           hash: hash(bytes, at..<at + head.length), bitrate: head.bitrate,
           sampleRate: head.sampleRate, channels: head.channels,
-          hasInfoTag: hasInfoTag(bytes, at, head)))
+          hasInfoTag: hasInfoTag(bytes, at, head),
+          mainDataBegin: MP3SideInfo.mainDataBegin(bytes, at: at)))
       time += head.duration
       at += head.length
       synced = true

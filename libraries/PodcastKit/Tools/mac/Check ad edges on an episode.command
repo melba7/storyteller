@@ -4,12 +4,13 @@
 # podcast-ads --edges, Apple's on-device model), and for each ad prints what the model said, what
 # each clean-up step did to the start and end, and the lines of speech around each edge. It then
 # says whether the transcript's word times show pauses and, for an MP3 file, whether the file's
-# bitrate is steady (Apple's player can seek to the wrong place when it is not) and where the
-# encoding changes. The result is saved as "<file name>.ad-edges.txt" next to the file. If a file
-# named "<file name>.truth.txt" sits next to the episode (one ad to a line, as two times such as
-# 12:30 13:45), the skips are also compared with those marks. Needs macOS 26 with Apple
-# Intelligence turned on, and Xcode 26. Building takes a minute; the whole episode is processed,
-# so allow a few minutes. Nothing is sent anywhere and no audio is kept.
+# bitrate is steady (Apple's player can seek to the wrong place when it is not), where the
+# encoding changes and where the bit reservoir restarts. The result is saved as
+# "<file name>.ad-edges.txt" next to the file. If a file named "<file name>.truth.txt" sits next
+# to the episode (one ad to a line, as two times such as 12:30 13:45), the skips are also compared
+# with those marks. Needs macOS 26 with Apple Intelligence turned on, and Xcode 26. Building takes
+# a minute; the whole episode is processed, so allow a few minutes. Nothing is sent anywhere and no
+# audio is kept.
 set -o pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 KIT="$(cd "$HERE/../.." && pwd)"

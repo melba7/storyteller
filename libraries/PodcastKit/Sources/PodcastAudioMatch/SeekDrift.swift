@@ -26,11 +26,17 @@ public struct SeekDriftReport: Equatable, Sendable {
   /// and holds for at least `SeekDrift.seamFrames` frames, or an Xing or Info tag sits in a
   /// frame after the first (two files joined). Often where an ad was spliced in.
   public var seams: [Seam]
+  /// The frames (counted from 0 after the ID3 tag) whose bit reservoir pointer is 0 right after
+  /// `SeekDrift.resetAfter` frames or more with a pointer above 0. A piece of audio that was
+  /// encoded on its own starts that way, so this may mark where a spot was joined in.
+  public var reservoirResets: [Int]
 }
 
 public enum SeekDrift {
   /// A change in the header is a seam only when the new header holds for this many frames.
   public static let seamFrames = 50
+  /// A pointer of 0 is a reset only after this many frames in a row with a pointer above 0.
+  public static let resetAfter = 50
   /// The share of frames that one bitrate must have for the file to count as steady.
   public static let steadyShare = 0.99
 
@@ -42,7 +48,8 @@ public enum SeekDrift {
     return SeekDriftReport(
       framesPerBitrate: perBitrate,
       steady: !frames.isEmpty && Double(most) >= steadyShare * Double(frames.count),
-      worstSeconds: worst(frames), seams: seams(frames))
+      worstSeconds: worst(frames), seams: seams(frames),
+      reservoirResets: reservoirResets(frames))
   }
 
   /// For each frame: the time asked for is the frame's start, the guess is the byte at the same
@@ -99,5 +106,23 @@ public enum SeekDrift {
       found.append(Seam(time: frame.start, reason: "an Xing or Info tag in the middle of the file"))
     }
     return found.sorted { $0.time < $1.time }
+  }
+
+  private static func reservoirResets(_ frames: [MP3Frame]) -> [Int] {
+    var found: [Int] = []
+    var reaching = 0  // frames in a row that reach back into the reservoir
+    for (index, frame) in frames.enumerated() {
+      guard let pointer = frame.mainDataBegin else {
+        reaching = 0
+        continue
+      }
+      if pointer > 0 {
+        reaching += 1
+        continue
+      }
+      if reaching >= resetAfter { found.append(index) }
+      reaching = 0
+    }
+    return found
   }
 }

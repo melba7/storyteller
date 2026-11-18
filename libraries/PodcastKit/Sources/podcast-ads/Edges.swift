@@ -145,8 +145,7 @@ enum Edges {
       print("Seeking: this is not an MP3 file, so the check of its frames is left out.")
       return
     }
-    seekLines(SeekDrift.report(parse), frames: parse.frames.count, seconds: parse.seconds)
-      .forEach { print($0) }
+    seekLines(SeekDrift.report(parse), parse: parse).forEach { print($0) }
     #if canImport(AVFoundation)
       let decoded = try recogniser?.duration(of: audio)
       let reported = try? await AVURLAsset(url: audio).load(.duration).seconds
@@ -160,9 +159,9 @@ enum Edges {
     #endif
   }
 
-  private static func seekLines(
-    _ report: SeekDriftReport, frames: Int, seconds: Double
-  ) -> [String] {
+  private static func seekLines(_ report: SeekDriftReport, parse: MP3Parse) -> [String] {
+    let frames = parse.frames.count
+    let seconds = parse.seconds
     var text = ["Seeking: the file has \(frames) MP3 frames, \(AdEdgeReport.clock(seconds)) long."]
     let byBitrate = report.framesPerBitrate.sorted { $0.key < $1.key }.map { entry in
       let share = String(format: "%.1f %%", Double(entry.value) / Double(frames) * 100)
@@ -183,6 +182,19 @@ enum Edges {
         text.append("    \(AdEdgeReport.clock(seam.time)): \(seam.reason)")
       }
       if report.seams.count > 20 { text.append("    and \(report.seams.count - 20) more.") }
+    }
+    if report.reservoirResets.isEmpty {
+      text.append("  No reservoir resets.")
+    } else {
+      text.append(
+        "  Reservoir resets (a frame that needs nothing from the frames before it, after \(SeekDrift.resetAfter) that did; a spot encoded on its own starts so): \(report.reservoirResets.count)."
+      )
+      for index in report.reservoirResets.prefix(20) {
+        text.append("    \(AdEdgeReport.clock(parse.frames[index].start))")
+      }
+      if report.reservoirResets.count > 20 {
+        text.append("    and \(report.reservoirResets.count - 20) more.")
+      }
     }
     return text
   }

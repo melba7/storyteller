@@ -41,6 +41,8 @@ the app is not added again.
 - `Find ads in an episode.command`: see the section after it.
 - `Check ad skipping on an episode.command`: see "Check ad skipping".
 - `Check ad edges on an episode.command`: see "Check ad edges".
+- `Compare two episodes of a show.command`: see "Compare two episodes of a
+  show".
 - `Time the first minute of an episode.command` and
   `Compare two downloads of an episode.command`: see "How fast can the first ads
   be found".
@@ -163,8 +165,9 @@ finds a time by jumping to the same share of the file's bytes, which is right
 only when every frame is the same size (one steady bitrate). It prints how many
 frames there are at each bitrate, whether the bitrate is steady, the worst seek
 error that jump would make (0 s on a steady file), the places where the encoding
-changes for good (often where an ad was spliced in), and the length the player
-is given next to the decoded length.
+changes for good (often where an ad was spliced in), the places where the bit
+reservoir restarts (see the next section), and the length the player is given
+next to the decoded length.
 
 How to run it:
 
@@ -187,6 +190,66 @@ ad tools. With a transcript file (`<hash>.transcript.json`) and Terminal,
 `swift run -c release podcast-ads --edges <file>` still prints the transcript's
 numbers on a system without Apple Intelligence, and says that the rest is left
 out.
+
+## Compare two episodes of a show
+
+`Compare two episodes of a show.command` finds out whether an ad that comes back
+in two episodes of a show is the very same bytes in both. Some hosts may copy an
+ad's audio into every episode as it is. If so, an ad heard once could be known
+again from its first half second, before any transcript exists, and its start
+and end would be exact to one MP3 frame (about 26 milliseconds). No public
+write-up of whether hosts do this was found, so this is a measurement, not a
+fix. It changes nothing in the app.
+
+How to run it:
+
+1. In Finder, double-click `Compare two episodes of a show.command`.
+2. Choose the first episode (an MP3 file), then a second, different episode of
+   the same show. Pick two that open with the same kind of ad.
+3. Wait a minute. The first run builds the tool. The result is saved as
+   `ad-shared-<name of the first file>-<time>.txt` in `~/Storyteller Lofi/logs`,
+   and Finder shows it.
+4. Do this for two episodes of each of 3 shows and send back the 3 files.
+
+It needs no Apple Intelligence and no network, only Xcode 26. It reads the two
+files and keeps nothing.
+
+The report first says how long each file is and how often its bit reservoir
+restarts. An MP3 frame can borrow room from the frames before it; the pointer
+that says how far back is the "main data begin" number. A piece of audio that
+was encoded on its own starts with nothing to borrow, so a frame with the number
+0 that follows 50 or more frames with a number above 0 is called a reservoir
+reset, and may be where a spot was joined in. It then lists each stretch of 3 s
+or more that is the same bytes in both files, as a "run". The two files need not
+hold it at the same time; a spot may open one episode and sit in the middle of
+the other. A stretch has to hold 20 different frames, so digital silence is not
+a run. For each run it gives the times in both files and says whether a reset or
+a change of encoding sits within 2 frames of the start and of the end. The
+summary counts the runs of 10 s or more that have one at both ends, and says in
+plain words what the result means.
+
+How to read it: a run of 10 s or more that you recognise as an ad when you
+listen at its time, with a reset or a change at both ends, means the host copies
+ads as they are and the edges can be seen in the bytes. No run, or runs that are
+only a jingle, means a spot cannot be told by its bytes on that show. If the
+file says most of the two files is the same audio, you chose two downloads of
+one episode, not two episodes.
+
+### Marking the ads of an episode without listening
+
+`podcast-ads --truth-from-copies <first.mp3> <second.mp3>` takes two downloads
+of one episode (the same episode fetched twice, so a host that picks ads for
+each listener gave each copy different ads), finds where they differ and then
+agree again, and writes those stretches of the first file as
+`<first.mp3>.truth.txt`, the file of marked ads that
+`Check ad edges on an episode.command` compares the skips with. The times are
+exact to a frame. Run it in Terminal in `libraries/PodcastKit` with
+`swift run -c release podcast-ads --truth-from-copies <first.mp3> <second.mp3>`.
+It refuses to overwrite a `.truth.txt` that is already there, so marks you made
+by hand are kept. It marks only what the two copies do not share: an ad that
+both copies got is not marked, and the end of a file that stops differing is
+only mentioned in a note, because a download that was cut off looks the same.
+Stretches under 1 s are left out and noted too.
 
 ## How fast can the first ads be found
 

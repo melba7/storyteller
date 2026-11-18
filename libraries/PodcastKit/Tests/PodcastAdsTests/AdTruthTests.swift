@@ -83,4 +83,20 @@ final class AdTruthTests: XCTestCase {
     XCTAssertEqual(result.meanOvershoot, 0)
     XCTAssertEqual(result.worstOvershoot, 0)
   }
+
+  func testTheMillisecondTimesOfATruthFileMadeFromTwoCopiesAreRead() throws {
+    // `podcast-ads --truth-from-copies` writes times like these, with "#" notes above them.
+    let text = """
+      # Marked from two downloads of one episode.
+      0:00.000 0:03.918
+      12:34.500 12:59.250
+      1:02:03.500 1:02:09.025
+      """
+    XCTAssertEqual(
+      try AdTruth.parse(text),
+      [
+        TruthAd(start: 0, end: 3.918), TruthAd(start: 754.5, end: 779.25),
+        TruthAd(start: 3723.5, end: 3729.025),
+      ])
+  }
 }

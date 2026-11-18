@@ -5,6 +5,8 @@
 //   swift run -c release podcast-ads --head 90 --timings [--locale en-US] <audio file>
 //   swift run -c release podcast-ads --edges [--truth <file>] [--locale en-US] <transcript or audio>
 //   swift run -c release podcast-ads --probe <episode address>
+//   swift run -c release podcast-ads --shared <episode.mp3> <another episode of the show.mp3>
+//   swift run -c release podcast-ads --truth-from-copies <download.mp3> <second download.mp3>
 //
 // Prints each ad with its times, kind, advertiser, how sure the model is and its first words,
 // to the standard output, and progress to the standard error. An audio file is transcribed
@@ -20,9 +22,14 @@
 // seeks are (Edges.swift); with --truth (a file of hand-marked ads, one "12:30 13:45" to a
 // line) it also compares the two. With --probe it downloads the first 3 MB of an episode
 // address twice as two different listeners and prints where the two copies differ (no speech
-// or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
-// is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
-// still work there.
+// or model needed). With --shared (two MP3 files, two different episodes of one show) it prints
+// the stretches that are byte for byte the same in both, and whether a reset of the bit
+// reservoir or a change of encoding sits at each edge (Shared.swift). With --truth-from-copies
+// (two MP3 files, two downloads of one episode) it writes the stretches where the first differs
+// from the second as "<first file>.truth.txt", a file of marked ads for --edges --truth. These
+// two need no speech or model either. Needs macOS 26 with Apple Intelligence on, except for
+// --probe, --shared and --truth-from-copies. Where there is no Foundation Models framework
+// (Linux) it only says so, so `swift build` and `swift test` still work there.
 import Foundation
 import PodcastAds
 import PodcastAdsOnDevice
@@ -89,6 +96,16 @@ if let at = arguments.firstIndex(of: "--probe") {
   }
   exit(Probe.run(arguments[at + 1]))
 }
+for flag in ["--shared", "--truth-from-copies"] {
+  guard let at = arguments.firstIndex(of: flag) else { continue }
+  arguments.remove(at: at)
+  guard arguments.count == 2 else { fail("Usage: podcast-ads \(flag) <first file.mp3> <second file.mp3>") }
+  let files = arguments.map { URL(fileURLWithPath: $0) }
+  for file in files where !FileManager.default.fileExists(atPath: file.path) {
+    fail("No file at \(file.path)")
+  }
+  exit(flag == "--shared" ? Shared.run(files[0], files[1]) : Shared.truthFromCopies(files[0], files[1]))
+}
 var headSeconds: Double?
 if let at = arguments.firstIndex(of: "--head") {
   guard arguments.indices.contains(at + 1), let seconds = Double(arguments[at + 1]), seconds >= 10 else {
@@ -120,7 +137,7 @@ if let at = arguments.firstIndex(of: "--truth") {
 }
 guard arguments.count == 1 else {
   fail(
-    "Usage: podcast-ads [--play | --head 90 --timings | --edges [--truth <file>]] [--locale en-US] <episode.transcript.json or audio file>\n       podcast-ads --probe <episode address>"
+    "Usage: podcast-ads [--play | --head 90 --timings | --edges [--truth <file>]] [--locale en-US] <episode.transcript.json or audio file>\n       podcast-ads --probe <episode address>\n       podcast-ads --shared | --truth-from-copies <first file.mp3> <second file.mp3>"
   )
 }
 let input = URL(fileURLWithPath: arguments[0])

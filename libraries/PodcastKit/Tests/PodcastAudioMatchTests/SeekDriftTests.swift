@@ -117,4 +117,30 @@ final class SeekDriftTests: XCTestCase {
     XCTAssertTrue(report.framesPerBitrate.isEmpty)
     XCTAssertTrue(report.seams.isEmpty)
   }
+
+  // MARK: Reservoir resets
+
+  func testAResetAfterSixtyFramesWithAPointerIsListedAndOneAfterTenIsNot() {
+    let bytes =
+      Marked.frames(0..<60) + Marked.frame(100, pointer: 0) + Marked.frames(101..<111)
+      + Marked.frame(200, pointer: 0) + Marked.frames(201..<260)
+    let report = SeekDrift.report(MP3Frames.parse(bytes))
+    XCTAssertEqual(report.reservoirResets, [60])
+  }
+
+  func testFramesThatNeverHaveAnEmptyReservoirHaveNoResets() {
+    XCTAssertTrue(SeekDrift.report(MP3Frames.parse(Marked.frames(0..<300))).reservoirResets.isEmpty)
+  }
+
+  func testOnlyTheFirstOfSeveralEmptyFramesIsAReset() {
+    let bytes =
+      Marked.frames(0..<60) + (0..<3).flatMap { Marked.frame(100 + $0, pointer: 0) }
+      + Marked.frames(200..<260) + Marked.frame(300, pointer: 0)
+    XCTAssertEqual(SeekDrift.report(MP3Frames.parse(bytes)).reservoirResets, [60, 123])
+  }
+
+  func testTheFirstFrameOfAFileIsNotAReset() {
+    let bytes = Marked.frame(0, pointer: 0) + Marked.frames(1..<80)
+    XCTAssertTrue(SeekDrift.report(MP3Frames.parse(bytes)).reservoirResets.isEmpty)
+  }
 }
