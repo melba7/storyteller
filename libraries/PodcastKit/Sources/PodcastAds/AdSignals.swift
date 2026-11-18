@@ -37,6 +37,13 @@ public enum AdSignals {
     #"\bjoining me (today|now)\b"#,
   ])
 
+  /// Words the hosts use to bridge two ads of one break ("we'll be right back after one more
+  /// word from our sponsor").
+  private static let breaks = regexes([
+    #"\bright back\b"#, #"\bafter (the|this) break\b"#, #"\bquick break\b"#, #"\bone more\b"#,
+    #"\ba word from\b"#, #"\bsupport for\b"#, #"\bsponsors?\b"#, #"\balso brought\b"#,
+  ])
+
   private static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
     let whole = NSRange(text.startIndex..., in: text)
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
@@ -67,6 +74,9 @@ public enum AdSignals {
 
   /// A phrase that says the show is back (or begins): the ad is over by this line.
   public static func returnCue(_ text: String) -> Bool { matches(returns, text) }
+
+  /// A phrase that bridges two ads of one break.
+  public static func breakCue(_ text: String) -> Bool { matches(breaks, text) }
 
   /// Whether the line mentions the advertiser, a web address, a promo code or an offer.
   public static func readsLikeAd(_ text: String, advertiser: String) -> Bool {

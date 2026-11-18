@@ -42,6 +42,19 @@ final class AdSignalsTests: XCTestCase {
     }
   }
 
+  func testBreakCuesBridgeTwoAdsOfOneBreak() {
+    for text in [
+      "We'll be right back", "after the break", "after this break", "a quick break", "one more",
+      "a word from our friends", "support for this show comes from", "Sponsors",
+      "also brought to you",
+    ] {
+      XCTAssertTrue(AdSignals.breakCue(text), text)
+    }
+    for text in ["plain talk number 3 here", "they came right backstage", "the one moreover"] {
+      XCTAssertFalse(AdSignals.breakCue(text), text)
+    }
+  }
+
   func testTheCuesIgnoreCaseAndOnlyMatchWholeWords() {
     XCTAssertTrue(AdSignals.returnCue("WELCOME BACK"))
     XCTAssertFalse(AdSignals.returnCue("unwelcome backlash"))

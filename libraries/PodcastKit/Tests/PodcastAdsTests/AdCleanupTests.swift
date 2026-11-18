@@ -49,12 +49,14 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testAdsWithLittleSpeechBetweenThemAreOneBreak() throws {
-    // One line (9 s of speech) lies between the two ads.
+    // One filler line (9 s of speech) lies between the two ads.
+    var texts = talk(60)
+    texts[5] = "We'll be right back after one more word from our sponsor"
     let ads = AdCleanup.run(
-      ranges: [range(3, 5, .sure), range(7, 9, .unsure)], transcript: plain)
+      ranges: [range(3, 5, .sure), range(7, 9, .sure)], transcript: makeTranscript(texts))
     let ad = try XCTUnwrap(ads.first)
     XCTAssertEqual(ads.count, 1)
-    XCTAssertEqual(ad.confidence, .unsure, "a break is only as sure as its least sure part")
+    XCTAssertEqual(ad.confidence, .sure)
   }
 
   func testAdsWithTwelveSecondsOfSpeechBetweenThemAreSeparate() {
@@ -71,8 +73,12 @@ final class AdCleanupTests: XCTestCase {
   }
 
   func testAMergedBreakNeverPassesFiveMinutes() {
-    // 16 lines + 1 + 16 lines is 330 s.
-    let ads = AdCleanup.run(ranges: [range(2, 17), range(19, 34)], transcript: plain)
+    // 16 lines + 1 + 16 lines is 330 s. The line between them is filler, so only the cap keeps
+    // them apart.
+    var texts = talk(60)
+    texts[17] = "We'll be right back after one more word from our sponsor"
+    let ads = AdCleanup.run(
+      ranges: [range(2, 17), range(19, 34)], transcript: makeTranscript(texts))
     XCTAssertEqual(ads.count, 2)
   }
 
@@ -222,6 +228,88 @@ final class AdCleanupTests: XCTestCase {
     let unsure = [range(3, 5, .unsure)]
     let ad = try XCTUnwrap(AdCleanup.run(ranges: unsure, transcript: transcript).first)
     XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
+  }
+
+  // MARK: A stricter merge
+
+  private let breakLine = "We'll be right back after one more word from our sponsor"
+
+  func testAdsWithPlainTalkBetweenThemAreTwoAds() {
+    // One line (9 s of speech) of plain talk lies between the two ads.
+    let ads = AdCleanup.run(ranges: [range(3, 5), range(7, 9)], transcript: plain)
+    XCTAssertEqual(ads.count, 2)
+  }
+
+  func testAFillerLineBetweenTwoSureAdsMakesThemOneBreak() throws {
+    var texts = talk(30)
+    texts[5] = breakLine
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5), range(7, 9)], transcript: makeTranscript(texts))
+    let ad = try XCTUnwrap(ads.first)
+    XCTAssertEqual(ads.count, 1)
+    XCTAssertEqual(ad.start, 19.75, accuracy: 0.01)
+    XCTAssertEqual(ad.end, 89.75, accuracy: 0.01)
+  }
+
+  func testALineThatNamesEitherAdvertiserIsFiller() {
+    var texts = talk(30)
+    texts[5] = "so tell me more about Zebra"
+    let ranges = [range(3, 5), range(7, 9, advertiser: "Zebra")]
+    XCTAssertEqual(AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
+  }
+
+  func testALineWithAWebAddressBetweenTwoAdsIsFiller() {
+    // Lines 6 and 7 are carried into the first ad; line 8 is the third address line, so it is
+    // left between the ads, and it is filler because of its address.
+    var texts = talk(30)
+    for line in 5...7 { texts[line] = "go to acme dot com" }
+    let ranges = [range(3, 5), range(9, 11, advertiser: "Zebra")]
+    XCTAssertEqual(AdCleanup.run(ranges: ranges, transcript: makeTranscript(texts)).count, 1)
+  }
+
+  func testASureAndAnUnsureAdWithFillerBetweenThemStayTwo() {
+    var texts = talk(30)
+    texts[5] = breakLine
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5, .sure), range(7, 9, .unsure)], transcript: makeTranscript(texts))
+    XCTAssertEqual(ads.map(\.confidence), [.sure, .unsure])
+    let both = AdCleanup.run(
+      ranges: [range(3, 5, .unsure), range(7, 9, .unsure)], transcript: makeTranscript(texts))
+    XCTAssertEqual(both.count, 2, "an unsure ad never merges with a neighbour it does not overlap")
+  }
+
+  func testFillerDoesNotJoinAdsWithTwelveSecondsOfSpeechBetweenThem() {
+    var texts = talk(30)
+    texts[5] = breakLine
+    texts[6] = breakLine  // 18 s of speech
+    let ads = AdCleanup.run(
+      ranges: [range(3, 5), range(8, 10)], transcript: makeTranscript(texts))
+    XCTAssertEqual(ads.count, 2)
+  }
+
+  func testEveryLineBetweenTwoAdsMustBeFiller() {
+    // Two short lines, 6 s of speech in all.
+    func transcript(second: String) -> Transcript {
+      ownTranscript(
+        lines: [
+          (0, 40, "the first ad"), (41, 44, breakLine), (45, 48, second), (49, 90, "the second ad"),
+          (91, 130, "the show"),
+        ],
+        words: seconds(0, 44) + seconds(45, 130))
+    }
+    XCTAssertEqual(
+      AdCleanup.run(ranges: [range(1, 1), range(4, 4)], transcript: transcript(second: "and we chat"))
+        .count, 2)
+    XCTAssertEqual(
+      AdCleanup.run(ranges: [range(1, 1), range(4, 4)], transcript: transcript(second: breakLine))
+        .count, 1)
+  }
+
+  func testUnderFourSecondsOfSpeechBetweenTwoSureAdsStillMerges() {
+    let transcript = ownTranscript(
+      lines: [(0, 40, "the first ad"), (41, 43, "and"), (44, 90, "the second ad"), (91, 130, "show")],
+      words: seconds(0, 43) + seconds(44, 130))
+    XCTAssertEqual(AdCleanup.run(ranges: [range(1, 1), range(3, 3)], transcript: transcript).count, 1)
   }
 
   // MARK: Where the player lands

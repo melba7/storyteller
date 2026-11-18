@@ -1,14 +1,17 @@
 // LOFI-FORK: turns a detector's answers into the ads to show and skip (see FORK.md).
 //
-// The merge of ads with little speech between them (12 seconds, at most 5 minutes) and the
-// carried-on end follow MinusPod (MIT, github.com/ttlequals0/MinusPod); see FORK.md.
+// The merge of ads with little speech between them (at most 5 minutes) and the carried-on end
+// follow MinusPod (MIT, github.com/ttlequals0/MinusPod); see FORK.md.
 import Foundation
 import PodcastTranscripts
 
 /// The numbers the clean-up uses.
 public enum AdRules {
-  /// Two ads of one kind with less speech than this between them are one ad break.
-  public static let mergeSpeech = 12.0
+  /// Two sure ads of one kind with less speech than this between them are one ad break.
+  public static let mergeSpeech = 4.0
+  /// They are also one break with less speech than this between them when every line that lies
+  /// wholly between them is filler (a web address, an advertiser's name or a break cue).
+  public static let mergeFiller = 12.0
   /// A merged break is never longer than this.
   public static let mergeCap = 300.0
   /// Anything shorter is dropped.
@@ -60,7 +63,7 @@ public enum AdCleanup {
 
     let words = transcript.words
     var ads: [FoundAd] = []
-    for span in merge(spans, words: words) {
+    for span in merge(spans, lines: lines, words: words) {
       let landed = AdLanding.edges(start: span.start, end: span.end, words: words)
       let start = max(0, landed.start)
       let end = min(transcript.duration > 0 ? transcript.duration : .infinity, landed.end)
@@ -112,10 +115,11 @@ public enum AdCleanup {
     return last
   }
 
-  /// Joins spans that overlap (the same ad seen in two pieces: the surer answer stands), and
-  /// spans of one kind with less than `mergeSpeech` seconds of speech between them when the
-  /// result stays within `mergeCap` (one break: the less sure answer stands).
-  private static func merge(_ spans: [Span], words: [TranscriptWord]) -> [Span] {
+  /// Joins spans that overlap (the same ad seen in two pieces: the surer answer stands), and sure
+  /// spans of one kind that are one break (see `isOneBreak`).
+  private static func merge(
+    _ spans: [Span], lines: [TranscriptLine], words: [TranscriptWord]
+  ) -> [Span] {
     var result: [Span] = []
     for span in spans.sorted(by: { $0.start < $1.start }) {
       guard var last = result.popLast() else {
@@ -133,11 +137,8 @@ public enum AdCleanup {
         last.confidence = max(last.confidence, span.confidence)
         last.end = max(last.end, span.end)
         result.append(last)
-      } else if span.kind == last.kind, span.end - last.start <= AdRules.mergeCap,
-        speech(from: last.end, to: span.start, words: words) < AdRules.mergeSpeech
-      {
+      } else if isOneBreak(last, span, lines: lines, words: words) {
         last.end = span.end
-        last.confidence = min(last.confidence, span.confidence)
         if last.advertiser.isEmpty { last.advertiser = span.advertiser }
         result.append(last)
       } else {
@@ -146,6 +147,27 @@ public enum AdCleanup {
       }
     }
     return result
+  }
+
+  /// Whether two ads that do not overlap are one ad break. Both must be sure (an unsure ad never
+  /// joins a neighbour it does not overlap) and of one kind, and the break at most `mergeCap`
+  /// long. Then either less than `mergeSpeech` seconds of speech lie between them, or less than
+  /// `mergeFiller` and every line that lies wholly between them is filler.
+  private static func isOneBreak(
+    _ first: Span, _ second: Span, lines: [TranscriptLine], words: [TranscriptWord]
+  ) -> Bool {
+    guard first.confidence == .sure, second.confidence == .sure, first.kind == second.kind,
+      second.end - first.start <= AdRules.mergeCap
+    else { return false }
+    let between = speech(from: first.end, to: second.start, words: words)
+    if between < AdRules.mergeSpeech { return true }
+    guard between < AdRules.mergeFiller else { return false }
+    return lines.filter { $0.start >= first.end - 0.01 && $0.end <= second.start + 0.01 }
+      .allSatisfy {
+        AdSignals.hardSignal($0.text) || AdSignals.breakCue($0.text)
+          || AdSignals.namesAdvertiser($0.text, advertiser: first.advertiser)
+          || AdSignals.namesAdvertiser($0.text, advertiser: second.advertiser)
+      }
   }
 
   /// Seconds of speech between two times: the length of the words that lie between them.
