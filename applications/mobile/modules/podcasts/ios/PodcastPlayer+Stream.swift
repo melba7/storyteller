@@ -4,6 +4,7 @@
 // (PodcastStreamDownload, so ads can be found in the exact file that is heard), or its address.
 import AVFoundation
 import Foundation
+import PodcastAds
 import PodcastDownloads
 
 extension PodcastPlayer {
