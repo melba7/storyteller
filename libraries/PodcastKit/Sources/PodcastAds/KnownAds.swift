@@ -131,7 +131,7 @@ public struct KnownAds: Codable, Sendable, Equatable {
     guard file.coveredUntil == nil else { return }
     for ad in file.ads where ad.confidence == .sure && !file.isUndone(ad) {
       guard (Self.shortest...Self.longest).contains(ad.duration),
-        !trimmed.contains(where: { abs($0 - ad.start) < 0.5 })
+        !trimmed.contains(where: { AdTrim(adStart: $0, end: ad.end).applies(to: ad) })
       else { continue }
       let words = Self.words(of: ad, in: transcript)
       guard words.count >= Self.fewestWords else { continue }

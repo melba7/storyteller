@@ -78,6 +78,24 @@ final class KnownAdsTests: XCTestCase {
     XCTAssertEqual(known.ads.first?.words.last, "word149")
   }
 
+  func testAnAdTheListenerTrimmedIsNotLearnedWheneverTheSkipperWouldCallItTrimmed() {
+    // 4 words a second: the ad words run from 7.5 s to 132.5 s, so every ad below has words.
+    let ground = transcript(plain(30) + adWords(500) + plain(30, from: 900), step: 0.25)
+    func learnedCount(adAt start: Double, trimmedAt trims: [Double]) -> Int {
+      var known = KnownAds()
+      known.learn(
+        from: file([found(start, start + 30)], undone: []), transcript: ground, show: "show",
+        trimmed: trims, now: now)
+      return known.ads.count
+    }
+    // A trim saved at 100.0 is for an ad found at 98.9 (the skipper's rule: the ad starts at most
+    // half a second after the saved start, or runs over it), not only for one within 0.5 s.
+    XCTAssertEqual(learnedCount(adAt: 98.9, trimmedAt: [100.0]), 0)
+    XCTAssertEqual(learnedCount(adAt: 90, trimmedAt: [100.0]), 0, "an ad that runs over the place")
+    XCTAssertEqual(learnedCount(adAt: 100.6, trimmedAt: [100.0]), 1, "an ad that starts after it")
+    XCTAssertEqual(learnedCount(adAt: 40, trimmedAt: [100.0]), 1, "an ad that ends before it")
+  }
+
   func testAnUnsureUndoneTooShortOrTooLongAdIsNotLearned() {
     let texts = plain(30) + adWords(200) + plain(30, from: 500)
     let ground = transcript(texts, step: 0.25)  // 4 words a second, so even 12 s holds 48 words
