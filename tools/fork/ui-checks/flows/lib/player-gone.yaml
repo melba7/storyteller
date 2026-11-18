@@ -1,0 +1,25 @@
+# Checks that no player page is left: not the one that was swiped away and not a second copy under
+# it. Then checks that the tabs and the mini player show again. Maestro waits up to 10 seconds for
+# the page to go, which covers the slide down. A copy that stays makes this fail, and that is the
+# bug the check is for.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - extendedWaitUntil:
+          notVisible:
+            id: "podcasts-player-close"
+          timeout: 10000
+      - assertNotVisible:
+          id: "podcasts-player"
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - extendedWaitUntil:
+          notVisible: "Close the player"
+          timeout: 10000
+- assertVisible: "Library"
+- runFlow: mini-player-visible.yaml

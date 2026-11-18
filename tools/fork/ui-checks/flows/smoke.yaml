@@ -1,0 +1,11 @@
+# Flow 1. The app starts, the side menu opens, Podcasts opens and shows its tabs. It proves that
+# the build starts at all and that the first screens draw. It needs no network.
+appId: ${APP_ID}
+name: Smoke
+---
+- runFlow: lib/launch.yaml
+- assertVisible: "Home"
+- assertVisible: "New"
+- assertVisible: "Library"
+- assertVisible: "Search"
+- takeScreenshot: smoke-podcasts-home

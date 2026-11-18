@@ -1,0 +1,20 @@
+# Four taps on the mini player, 100 milliseconds apart. This is what Mo does when the first tap
+# seems to do nothing. Maestro finds the mini player once and then taps the same spot four times.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - tapOn:
+          id: "podcasts-mini-player"
+          repeat: 4
+          delay: 100
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - tapOn:
+          text: "Open the player.*"
+          repeat: 4
+          delay: 100

@@ -1,0 +1,161 @@
+# The simulator checks (tools/fork/ui-checks) on a GitHub Mac. See tools/fork/ui-checks/README.md.
+# It builds the Release app for the iOS Simulator, starts a simulator and drives the app with
+# Maestro: opens Podcasts, plays an episode, taps the small player and swipes the big one down.
+#
+# It runs only when started by hand (Actions tab, "UI checks", Run workflow), never on a push, so it
+# does not compete with Fork CI for GitHub's few Macs. The first place to run the checks is Mo's Mac
+# ("Run the UI checks.command"), which is online and builds the app in about 4 minutes. This is
+# the second place. A run takes an estimated 40 to 60 minutes, nearly all of it the build.
+name: UI checks
+
+on:
+  workflow_dispatch:
+    inputs:
+      macos:
+        description:
+          macOS runner for the build. Pick macos-15-intel when GitHub's
+          Apple-silicon Macs are too busy to take the job.
+        type: choice
+        options: [macos-26, macos-15-intel]
+        default: macos-26
+      flows:
+        description:
+          "Which flows to run, separated by spaces: smoke, player-opens-once,
+          player-tap-during-close, scroll. Empty runs all four."
+        type: string
+        default: ""
+      selectors:
+        description:
+          How the flows find the mini player and the player page. auto uses the
+          test ids when the app has them (see milestone S1), labels works on
+          every build.
+        type: choice
+        options: [auto, ids, labels]
+        default: auto
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ui-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: 26.12.1
+  # The Maestro release the flows were written against (CLI 2.11.0, 1 October 2026). The install
+  # script reads this variable.
+  MAESTRO_VERSION: 2.11.0
+
+jobs:
+  ui-checks:
+    name: Simulator checks (Maestro)
+    # GitHub's Apple-silicon Macs are sometimes too busy to take a job for
+    # hours; a run started by hand can pick an Intel Mac instead.
+    runs-on: ${{ inputs.macos || 'macos-26' }}
+    timeout-minutes: 120
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      EXPO_IMAGE_UTILS_NO_SHARP: "1"
+      # Sentry's symbol upload belongs to a published build, not to a check.
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      FLOWS: ${{ inputs.flows }}
+      SELECTORS: ${{ inputs.selectors || 'auto' }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          # Its automatic Yarn cache runs Yarn 1, which refuses this repository's
+          # packageManager (Yarn 4) before Corepack is enabled.
+          package-manager-cache: false
+      - name: Select the newest stable Xcode
+        run: |
+          xcode=$(ls -d /Applications/Xcode_[0-9]*.app | grep -vi beta | sort -V | tail -n 1)
+          sudo xcode-select -s "$xcode"
+          xcodebuild -version
+      # Maestro runs on Java 17 or newer.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >>"$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --help >/dev/null
+      # Same steps as the iOS build in fork-ci.yml, up to pod install.
+      - name: Install the mobile app's dependencies
+        run: |
+          npm i -g corepack && corepack enable
+          brew install cmake pkg-config
+          (cd applications/mobile && ./scripts/pre-install.mjs)
+          yarn workspaces focus @storyteller-platform/mobile
+      # No APP_VARIANT: the app gets the fork's store identity
+      # (io.github.melba7.storytellerlofi). A development build would not
+      # carry its own JavaScript.
+      - name: Expo prebuild (fork identity)
+        working-directory: applications/mobile
+        run: yarn expo prebuild --no-install -p ios
+      # pod install downloads Sentry's prebuilt framework from GitHub's release
+      # downloads once, with no retry, and those sometimes answer 504 for
+      # minutes. Keep it cached and fetch it with retries beforehand.
+      - name: Cache Sentry's prebuilt framework
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/sentry-react-native/xcframeworks
+          key: sentry-xcframework-${{ hashFiles('yarn.lock') }}
+          restore-keys: sentry-xcframework-
+      - name: Fetch Sentry's prebuilt framework, with retries
+        run: ruby tools/fork/prefetch-sentry-xcframework.rb applications/mobile
+      - name: Install pods
+        working-directory: applications/mobile/ios
+        run: pod install
+      # Release builds a copy that carries its own JavaScript, so no Metro server
+      # is needed. Built for this runner's own chip only, to save time.
+      - name: Build the Release app for the iOS simulator, unsigned
+        working-directory: applications/mobile/ios
+        run: |
+          set -o pipefail
+          workspace=$(ls -d *.xcworkspace | head -n 1)
+          scheme=$(basename "$workspace" .xcworkspace)
+          xcodebuild -workspace "$workspace" -scheme "$scheme" \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/derived" \
+            ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO COMPILER_INDEX_STORE_ENABLE=NO build |
+            if command -v xcbeautify >/dev/null; then
+              xcbeautify --renderer github-actions
+            else
+              tail -n 300
+            fi
+          app=$(ls -d "$RUNNER_TEMP"/derived/Build/Products/Release-iphonesimulator/*.app | head -n 1)
+          echo "Built $app"
+          echo "APP_PATH=$app" >>"$GITHUB_ENV"
+      # run.sh boots a simulator, installs the app, runs the flows one after the
+      # other and records the screen of each. It exits 1 when a flow fails.
+      - name: Run the checks
+        run: |
+          tools/fork/ui-checks/run.sh --app "$APP_PATH" \
+            --selectors "$SELECTORS" --flows "$FLOWS" \
+            --results "$RUNNER_TEMP/ui-check-results"
+      - name: Write the summary
+        if: always()
+        run: |
+          summary="$RUNNER_TEMP/ui-check-results/summary.txt"
+          if [ -f "$summary" ]; then
+            {
+              echo '### UI checks'
+              echo '```'
+              cat "$summary"
+              echo '```'
+            } >>"$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload the recordings, screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-check-results
+          path: ${{ runner.temp }}/ui-check-results
+          retention-days: 14
+          if-no-files-found: warn

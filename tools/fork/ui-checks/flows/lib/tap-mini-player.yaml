@@ -1,0 +1,14 @@
+# One tap on the mini player.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - tapOn:
+          id: "podcasts-mini-player"
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - tapOn: "Open the player.*"

@@ -1,0 +1,27 @@
+# Flow 2. Mo's bug: the small player needs several taps, a swipe down shows the same player page
+# again, and after a few swipes the player cannot be opened until the app is quit.
+#
+# It follows a public feed, plays the newest episode and waits for the mini player. Then it taps
+# the mini player four times, 100 milliseconds apart, and checks the player is open. One swipe
+# down must close it: nothing of the player may be left under it, and the tabs must show. Then it
+# opens and closes the player five more times with one tap and one swipe each.
+#
+# On a build without the fix, the extra taps stack extra copies of the page, so the page is still
+# there after one swipe and the flow fails at "player-gone". That is the proof.
+appId: ${APP_ID}
+name: Player opens once
+---
+- runFlow: lib/launch.yaml
+- runFlow: lib/follow-and-play.yaml
+- takeScreenshot: player-opens-once-1-mini-player
+- runFlow: lib/tap-mini-player-fast.yaml
+- runFlow: lib/player-visible.yaml
+- takeScreenshot: player-opens-once-2-after-four-taps
+- runFlow: lib/swipe-player-down.yaml
+- runFlow: lib/player-gone.yaml
+- takeScreenshot: player-opens-once-3-after-one-swipe
+- repeat:
+    times: 5
+    commands:
+      - runFlow: lib/open-and-close.yaml
+- takeScreenshot: player-opens-once-4-after-five-rounds
