@@ -3,8 +3,9 @@
 Done: 2 | Last cleanup: none | Podcasts: P1 to P6b, the bug check and the design
 (D1 to D5) merged (TestFlight 27.1); the Apple Podcasts sync fix, R1 to R8 from
 Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
-(B2) done in PR #48, which goes to TestFlight in one build with the Books look |
-Books look: B1 to B7 merged (PR #49), B8 (look check) next
+(B2) merged in PR #48 (TestFlight 29.1, with the Books look) | Books look: B1 to
+B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 to C12
+planned (Mo's ask after 29.1)
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1008,6 +1009,36 @@ TestFlight build.
     the swipe actions' padding and colours under the new buttons. Left for a
     device: pulling down on a show page opened by the zoom may close it instead
     of refreshing, and dragging the volume bar.
+
+### Covers and more lists (Mo's ask, 2026-11-18)
+
+Mo, after build 29.1: covers that look too small for their square, blurry
+covers, and a first page with many more lists ("top podcasts ... on Spotify,
+Apple Podcasts ... a bunch of different lists"). Fable planned it in
+`docs/PODCASTS-LISTS-PLAN.md` (findings, design and every milestone's files,
+first test and risks); Sonnet builds, Opus checks. One pull request, one
+TestFlight build.
+
+- [ ] **C0. Check the real addresses from a GitHub runner** (S): the cloud can't
+      reach Apple's or Spotify's hosts, so a probe workflow does.
+- [ ] **C1. A rule that picks a sharp picture address** (S): size buckets and
+      Apple's image size rewrite, the original as a fallback.
+- [ ] **C2. Covers use the rule** (S): `Artwork` loads the sharp address first.
+- [ ] **C3. Featured cards filled by their cover** (S): the cover edge to edge
+      with its title on a fade, no small square in a coloured box.
+- [ ] **C4. Charts in groups, with yesterday's list as a fallback** (M).
+- [ ] **C5. Which lists, in which order** (S).
+- [ ] **C6. Shelves that draw only what is near the screen** (S), with a loading
+      shelf.
+- [ ] **C7. Home gets the lists** (M): Top Shows and eight "Top in ..." shelves,
+      then the categories.
+- [ ] **C8. New gets every category as a shelf** (S).
+- [ ] **C9. Top Episodes** (M), if C0 says the source works.
+- [ ] **C10. Spotify's chart, read and matched** (M), if C0 says it answers.
+- [ ] **C11. "Top on Spotify" on the page** (M).
+- [ ] **C12. Docs and the Opus check** (S).
+  - Done when (each): the first test from the plan fails then passes, `check.sh`
+    passes, and for screens the iOS build passes in CI.
 
 ## Later
 
