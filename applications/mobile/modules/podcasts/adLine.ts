@@ -12,6 +12,13 @@ import { transcriptStatus } from "./transcripts"
 const READY = "Getting ready to find ads"
 const STREAMING = "Streaming without ad skipping"
 const CHECKING = "Checking the start for ads"
+/** A failure of this episode's own search: it is asked again by itself, so nothing is wrong. */
+const PAUSED = "Ad check paused. Trying again soon"
+/**
+ * How the words for such a failure start (`PodcastAdFinder.reason(for:)` in Swift). The rest
+ * of them is for the log, not for a line that has room for one row.
+ */
+const SEARCH_STOPPED = "Finding ads stopped:"
 
 function cannot(reason: string): string {
   return reason === "" ? "Ads can't be found" : `Ads can't be found: ${reason}`
@@ -53,7 +60,11 @@ export function playerAdLine(input: {
   if (input.streamsPlain === true)
     return `${STREAMING}. Next play will skip ads.`
   if (download.state !== "downloaded") return READY
-  if (ads?.state === "unavailable") return cannot(ads.reason ?? "")
+  if (ads?.state === "unavailable") {
+    const reason = ads.reason ?? ""
+    // The reasons that belong to the phone ("Apple Intelligence is off") keep their words.
+    return reason.startsWith(SEARCH_STOPPED) ? PAUSED : cannot(reason)
+  }
   if (ads?.state === "found" || ads?.state === "noAds") return adsStatus(ads)
   if (transcript?.state === "unsupported" || transcript?.state === "failed") {
     return cannot(transcriptStatus(transcript))

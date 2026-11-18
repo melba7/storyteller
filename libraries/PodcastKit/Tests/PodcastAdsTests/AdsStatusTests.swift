@@ -31,9 +31,43 @@ final class AdsStatusTests: XCTestCase {
     XCTAssertEqual(status(partial: file(ads: 0)), .waiting)
     XCTAssertEqual(status(partial: file(ads: 2, version: "0")), .waiting)
     XCTAssertEqual(status(partial: file(ads: 2), finding: 10), .finding(percent: 10))
+    // A failure does not hide them (see testAFailureDoesNotHideAdsFoundSoFar).
     let failed = status(partial: file(ads: 2), failure: "Finding ads stopped")
-    XCTAssertEqual(failed, .notPossible(reason: "Finding ads stopped"))
-    XCTAssertFalse(AdsRules.wantsRun(failed))
+    XCTAssertEqual(failed, .partialFound(count: 2))
+  }
+
+  func testAFailureDoesNotHideAdsFoundSoFar() {
+    let failure = "Finding ads stopped: The model refused to read a part of the transcript."
+    XCTAssertEqual(status(partial: file(ads: 2), failure: failure), .partialFound(count: 2))
+    // The model's reason does not hide them either.
+    XCTAssertEqual(
+      status(partial: file(ads: 2), unavailable: .appleIntelligenceOff, failure: failure),
+      .partialFound(count: 2))
+    // A partial result with no ads, or of another detector version, says nothing: the failure
+    // is what there is to say.
+    XCTAssertEqual(
+      status(partial: file(ads: 0), failure: failure), .notPossible(reason: failure))
+    XCTAssertEqual(
+      status(partial: file(ads: 2, version: "0"), failure: failure), .notPossible(reason: failure))
+    // The final file and a run that is going still win over a failure.
+    XCTAssertEqual(
+      status(file: file(ads: 3), partial: file(ads: 2), failure: failure), .found(count: 3))
+    XCTAssertEqual(
+      status(partial: file(ads: 2), finding: 40, failure: failure), .finding(percent: 40))
+  }
+
+  func testAFailedEpisodeIsNotQueuedAgainWhateverItsStatusShows() {
+    let failure = "Finding ads stopped"
+    // The ads found so far show, but a failed run is not tried again in a loop: it waits for
+    // its retry, which clears the failure.
+    let shown = status(partial: file(ads: 2), failure: failure)
+    XCTAssertEqual(shown, .partialFound(count: 2))
+    XCTAssertFalse(AdsRules.wantsRun(shown, failure: failure))
+    XCTAssertTrue(AdsRules.wantsRun(shown, failure: nil))
+    XCTAssertFalse(AdsRules.wantsRun(status(failure: failure), failure: failure))
+    XCTAssertTrue(AdsRules.wantsRun(.waiting, failure: nil))
+    XCTAssertFalse(AdsRules.wantsRun(.waiting, failure: failure))
+    XCTAssertFalse(AdsRules.wantsRun(.noneFound, failure: nil))
   }
 
   func testAFinishedEpisodeWithRefusedPiecesSaysSoEvenWithNoAds() {

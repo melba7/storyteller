@@ -231,6 +231,75 @@ describe("playerAdLine", () => {
     ).toBe("Ads can't be found")
   })
 
+  it("a failure of this episode's search is one short line", () => {
+    const reason =
+      "Finding ads stopped: The model couldn't finish: A part of the transcript was too long."
+    for (const transcriptInfo of [undefined, transcript("done")]) {
+      const line = playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcriptInfo,
+        ads: ads("unavailable", { reason }),
+      })
+      expect(line).toBe("Ad check paused. Trying again soon")
+      expect(line.length).toBeLessThanOrEqual(40)
+      expect(line).not.toContain("can't be found")
+      // It does not repeat the reason, or any part of it.
+      expect(line).not.toContain("Finding ads stopped")
+      expect(line).not.toContain("model")
+    }
+    // The same wording whatever words follow the colon.
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        ads: ads("unavailable", {
+          reason: "Finding ads stopped: The model refused to read a part.",
+        }),
+      }),
+    ).toBe("Ad check paused. Trying again soon")
+  })
+
+  it("keeps 'Ads can't be found' for the reasons that belong to the phone", () => {
+    for (const reason of [
+      "Apple Intelligence is off",
+      "The model is downloading",
+      "This iPhone can't run Apple Intelligence",
+      "Needs iOS 26",
+      "Apple Intelligence is not available",
+    ]) {
+      expect(
+        playerAdLine({
+          ...base,
+          download: download("downloaded"),
+          transcript: transcript("done"),
+          ads: ads("unavailable", { reason }),
+        }),
+      ).toBe(`Ads can't be found: ${reason}`)
+    }
+    // Any other reason that is not a failed search keeps its old words as well.
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        ads: ads("unavailable", { reason: "The transcript could not be read" }),
+      }),
+    ).toBe("Ads can't be found: The transcript could not be read")
+  })
+
+  it("says what was found, not a failure, when ads were found before it", () => {
+    // Swift reports the ads found so far as "found" even while a failed run waits to be tried
+    // again; the line then counts them.
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: ads("found", { count: 2 }),
+      }),
+    ).toBe("2 ads found")
+  })
+
   it("gives the transcript's reason when it can't be made", () => {
     expect(
       playerAdLine({

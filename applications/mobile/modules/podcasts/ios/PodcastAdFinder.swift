@@ -127,13 +127,15 @@ final class PodcastAdFinder: @unchecked Sendable {
       present.insert(id)
       var finding: Int?
       if case .finding(let percent)? = lock.withLock({ statuses[id] }) { finding = percent }
+      let failure = lock.withLock { failures[id] }
       let status = AdsRules.status(
         file: ads.load(detector: Self.detectorName),
         partial: ads.loadPartial(detector: Self.detectorName),
         detectorVersion: detector?.version ?? "",
-        finding: finding, unavailable: unavailable, failure: lock.withLock { failures[id] })
+        finding: finding, unavailable: unavailable, failure: failure)
       set(id, status)
-      if AdsRules.wantsRun(status) {
+      // A failed episode shows the ads found so far, but waits for its retry (it is not queued).
+      if AdsRules.wantsRun(status, failure: failure) {
         // Nothing found yet: its head is checked before any episode's rest (PrepQueue).
         let wantsHead = ads.best(detector: Self.detectorName) == nil
         lock.withLock {

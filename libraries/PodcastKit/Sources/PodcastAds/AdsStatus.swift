@@ -34,11 +34,12 @@ public enum AdsRules {
   ) -> AdsStatus {
     if let finding { return .finding(percent: finding) }
     if let file, file.detectorVersion == detectorVersion { return finished(file) }
-    // A failed run is not tried again in a loop, whatever a partial result says.
-    if let failure { return .notPossible(reason: failure) }
+    // The ads found so far are said before a failure, since the player skips them anyway. The
+    // episode is still not tried again in a loop: `wantsRun(_:failure:)` says so.
     if let partial, partial.detectorVersion == detectorVersion, !partial.ads.isEmpty {
       return .partialFound(count: partial.ads.count)
     }
+    if let failure { return .notPossible(reason: failure) }
     if let unavailable { return .notPossible(reason: unavailable.reason) }
     return .waiting
   }
@@ -55,6 +56,12 @@ public enum AdsRules {
     case .waiting, .partialFound: return true
     default: return false
     }
+  }
+
+  /// As `wantsRun(_:)`, but an episode whose last run failed is not queued again, whatever its
+  /// status shows (a failed run with ads found so far shows them). Its retry clears the failure.
+  public static func wantsRun(_ status: AdsStatus, failure: String?) -> Bool {
+    failure == nil && wantsRun(status)
   }
 
   /// Whether the work may go on now: the app is on the screen, a podcast is playing (iOS keeps
