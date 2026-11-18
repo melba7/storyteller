@@ -7,6 +7,8 @@ by the Apple Podcasts sync), downloads each feed once (at most 30 feeds, a few s
 a pause between them), takes the newest item's audio address and groups the shows by its host.
 It picks up to 8 shows from different hosts, ad-inserting hosts first. It downloads no audio;
 the probe does that (3 MB twice per show). Nothing is sent anywhere but the feeds' own hosts.
+While it reads the feeds it also counts the shows whose feed carries a publisher's transcript
+(podcast:transcript) and saves that count next to the picks, for the report.
 
   probe_shows.py pick <picks file>        prints the chosen shows, writes "title<TAB>address" lines
   probe_shows.py report <folder> <file>   joins the probe outputs in <folder> into one report
@@ -28,6 +30,11 @@ MAX_PICKS = 8
 FEED_TIMEOUT = 15
 FEED_LIMIT = 5_000_000
 PAUSE = 1.0
+# How many of a feed's newest items are looked at for a publisher's transcript, the file the
+# report keeps the count in, and how many shows make the idea worth building.
+TRANSCRIPT_ITEMS = 10
+TRANSCRIPTS_FILE = "transcripts.txt"
+TRANSCRIPT_MIN_SHOWS = 3
 
 # Hosts that insert ads per download, in the order they are preferred. A host matches when its
 # name contains one of these words.
@@ -141,6 +148,54 @@ def summary_line(title, info):
     return "%-32s %-34s %-24s %s" % (title[:32], (info["host"] or "?")[:34], copies, frames)
 
 
+# MARK: Publisher transcripts
+
+def transcript_types(xml_text):
+    """The MIME types of the podcast:transcript files in the newest items of a feed, each once,
+    sorted. Empty when there are none or the feed is not XML. Either namespace of the podcast
+    tags counts; a tag with no type is "unknown"."""
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return []
+    types = set()
+    for item in list(root.iter("item"))[:TRANSCRIPT_ITEMS]:
+        for element in item.iter():
+            tag = element.tag if isinstance(element.tag, str) else ""
+            namespace, _, name = tag[1:].partition("}") if tag.startswith("{") else ("", "", "")
+            if name == "transcript" and "podcast" in namespace.lower():
+                types.add((element.get("type") or "unknown").strip().lower())
+    return sorted(types)
+
+
+def transcript_summary(found):
+    """found: {show title: [types]} for each feed that was read. A few plain lines: how many
+    shows carry a publisher's transcript, in which types, and whether that is enough to build the
+    comparison of the app's words with it."""
+    if not found:
+        return "Publisher transcripts: No feed was read."
+    carrying = [title for title, types in found.items() if types]
+    counts = {}
+    for types in found.values():
+        for kind in types:
+            counts[kind] = counts.get(kind, 0) + 1
+    by_count = sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+    kinds = ": " + ", ".join("%s %d" % pair for pair in by_count) if by_count else ""
+    lines = ["Publisher transcripts (a podcast:transcript tag in a feed's newest %d items)"
+             % TRANSCRIPT_ITEMS,
+             "  %d of %d shows read have one%s" % (len(carrying), len(found), kinds)]
+    if carrying:
+        more = " and more" if len(carrying) > 12 else ""
+        lines.append("  Shows: " + ", ".join(carrying[:12]) + more)
+    if len(carrying) >= TRANSCRIPT_MIN_SHOWS:
+        lines.append("  The app could find inserted ads by comparing its words with these "
+                     "files. That is enough shows to build it.")
+    else:
+        lines.append("  That is fewer than %d shows, so comparing the app's words with a "
+                     "publisher's transcript is not worth building yet." % TRANSCRIPT_MIN_SHOWS)
+    return "\n".join(lines)
+
+
 # MARK: Feeds
 
 def load_shows(path):
@@ -161,16 +216,20 @@ def fetch_feed(feed):
         return response.read(FEED_LIMIT)
 
 
-def find_candidates(shows, fetch=fetch_feed, pause=PAUSE, say=print):
+def find_candidates(shows, fetch=fetch_feed, pause=PAUSE, say=print, transcripts=None):
+    """With `transcripts` (a dict), it also gets {title: types} for each feed that was read."""
     candidates = []
     for index, show in enumerate(shows[:MAX_FEEDS]):
         if index:
             time.sleep(pause)
         try:
-            address = newest_enclosure(fetch(show["feed"]))
+            xml_text = fetch(show["feed"])
+            address = newest_enclosure(xml_text)
         except Exception as error:  # a dead feed must not stop the others
             say("  skipped %s: %s" % (show["title"], error))
             continue
+        if transcripts is not None:
+            transcripts[show["title"]] = transcript_types(xml_text)
         if address:
             candidates.append({"title": show["title"], "address": address})
         else:
@@ -189,7 +248,13 @@ def pick_command(picks_path):
         print("Could not read %s: %s" % (SHOWS_FILE, error))
         return 2
     print("Reading the feeds of %d shows (at most %d)..." % (len(shows), MAX_FEEDS))
-    candidates = find_candidates(shows)
+    found = {}
+    candidates = find_candidates(shows, transcripts=found)
+    summary = transcript_summary(found)
+    print("\n" + summary)
+    with open(os.path.join(os.path.dirname(picks_path), TRANSCRIPTS_FILE), "w",
+              encoding="utf-8") as handle:
+        handle.write(summary + "\n")
     picks = choose(candidates)
     if not picks:
         print("No show with an audio address was found.")
@@ -222,6 +287,11 @@ def build_report(folder):
     parts.append("=" * 72 + "\nSummary\n")
     parts.append("%-32s %-34s %-24s %s" % ("Show", "Host after redirects", "Copies", "Frames"))
     parts.extend(lines)
+    try:
+        with open(os.path.join(folder, TRANSCRIPTS_FILE), encoding="utf-8") as handle:
+            parts.append("\n" + handle.read().rstrip())
+    except OSError:
+        pass  # the pick did not save a count
     return "\n".join(parts) + "\n"
 
 
