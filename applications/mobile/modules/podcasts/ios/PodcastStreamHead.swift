@@ -32,6 +32,7 @@ final class PodcastStreamHead: @unchecked Sendable {
   private let store: DownloadStore
   private let lock = NSLock()
   private var language: String?
+  private var sponsors: [String] = []
   private var source: URL?
   private var key: String
   private var isFiled = false
@@ -64,6 +65,9 @@ final class PodcastStreamHead: @unchecked Sendable {
   // MARK: What the download tells us
 
   func setLanguage(_ language: String?) { lock.withLock { self.language = language } }
+
+  /// The advertisers the episode's notes name, which the quick rules also look for.
+  func setSponsors(_ names: [String]) { lock.withLock { sponsors = names } }
 
   /// The staging file exists: the scan can begin.
   func begin(staged: URL) {
@@ -280,7 +284,8 @@ final class PodcastStreamHead: @unchecked Sendable {
       let remembered = memory.look(in: words, episodeId: episodeId)
       if let jump = remembered.jumpTo { steps.jump(to: jump, reached: fed) }
       let startedRules = Date()
-      let ranges = AdHeadRules.find(lines: AdChunker.number(lines))
+      let sponsors = lock.withLock { self.sponsors }
+      let ranges = AdHeadRules.find(lines: AdChunker.number(lines), sponsors: sponsors)
       let ruleAds = AdCleanup.run(ranges: ranges, transcript: transcript)
       PodcastTimeline.mark(
         episodeId,

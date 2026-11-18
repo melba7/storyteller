@@ -88,6 +88,9 @@ final class PodcastPlayer {
     var playThroughDownload = false
     /// The feed's language, for the transcript of an episode that starts downloading here.
     var language: String?
+    /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
+    var notes: String?
+    var showLink: String?
     /// The address to keep in Up Next when `url` is a local file (an episode started from the
     /// queue plays its download), so the item can go back to the queue and be fetched again.
     var queueURL: String?

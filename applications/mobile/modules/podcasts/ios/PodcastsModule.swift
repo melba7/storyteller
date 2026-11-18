@@ -29,6 +29,9 @@ struct PlaybackLoadOptions: Record {
   @Field var playThroughDownload: Bool = false
   /// The feed's language, for the transcript of the download that plays.
   @Field var language: String?
+  /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
+  @Field var notes: String?
+  @Field var showLink: String?
 }
 
 /// An episode to put in Up Next.
@@ -96,7 +99,8 @@ public final class PodcastsModule: Module {
         artworkUrl: options.artworkUrl, savedPosition: options.savedPosition,
         duration: options.duration, played: options.played, autoplay: options.autoplay,
         type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
-        playThroughDownload: options.playThroughDownload, language: options.language)
+        playThroughDownload: options.playThroughDownload, language: options.language,
+        notes: options.notes, showLink: options.showLink)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 

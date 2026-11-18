@@ -343,7 +343,7 @@ final class AdCleanupTests: XCTestCase {
   // MARK: The trace
 
   func testExplainSaysOneLineWasCarriedAndNamesIt() throws {
-    var texts = talk(30)
+    var texts = selling(30, at: [4])
     texts[5] = "go to acme dot com"
     let trace = try XCTUnwrap(
       AdCleanup.explain(ranges: [range(3, 5)], transcript: makeTranscript(texts)).first)

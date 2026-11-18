@@ -45,6 +45,8 @@ final class AdEdgeReportTests: XCTestCase {
 
   func testATraceNamesTheLinesAndWhatEachStepDidToTheEnd() throws {
     var texts = talk(30)
+    // A sure ad needs a line that sells inside it (AdEvidence); the carried line is the next.
+    texts[3] = "go to acme dot com today"
     texts[5] = "go to acme dot com"
     let transcript = makeTranscript(texts)
     let trace = try XCTUnwrap(

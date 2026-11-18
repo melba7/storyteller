@@ -245,6 +245,8 @@ describe("playEpisode", () => {
       chaptersUrl: null,
       playThroughDownload: false,
       language: null,
+      notes: "",
+      showLink: null,
     })
     expect(playback.getView().episode?.id).toBe("e1")
     expect(playback.getView().position).toBe(120)

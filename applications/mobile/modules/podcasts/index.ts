@@ -104,6 +104,9 @@ export type PlaybackLoadOptions = {
   playThroughDownload?: boolean
   /** The feed's language, for the transcript of the download that plays. */
   language?: string | null
+  /** The episode's notes and the show's web page: sponsors named there help the ad rules. */
+  notes?: string | null
+  showLink?: string | null
 }
 
 /** The episode played to its end. */

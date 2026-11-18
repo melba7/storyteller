@@ -217,8 +217,10 @@ final class PodcastAdFinder: @unchecked Sendable {
         },
         shouldContinue: { [weak self] in self?.mayContinue(PrepStep(id: id, stage: .rest)) ?? false })
       switch outcome {
-      case .finished(let file):
+      case .finished(let found):
         lock.withLock { failureCounts[id] = nil }
+        // Chapters named like an ad break (with words that sell inside) add to what was found.
+        let file = await withChapterAds(id, ads: ads, finished: found, transcript: transcript)
         set(id, AdsRules.finished(file))
         // The sure ads are remembered by their words, so a repeat is found at once.
         learnRemembered(id, ads: ads, finished: file, transcript: transcript)

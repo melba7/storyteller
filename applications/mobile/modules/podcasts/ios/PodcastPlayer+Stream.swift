@@ -51,6 +51,9 @@ extension PodcastPlayer {
       }
     }
     loader.head.setLanguage(episode.language)
+    loader.head.setSponsors(
+      AdHeadRules.sponsors(
+        inNotes: episode.notes ?? "", showLink: episode.showLink.flatMap(URL.init(string:))))
     streamDownload = loader
     loader.start()
     return AVPlayerItem(asset: loader.makeAsset())

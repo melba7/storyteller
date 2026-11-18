@@ -390,6 +390,8 @@ export function createPlayback(deps: PlaybackDeps) {
         chaptersUrl: episode.chaptersUrl,
         playThroughDownload: throughDownload,
         language: show?.language ?? null,
+        notes: episode.notes,
+        showLink: show?.link ?? null,
       }),
     )
     if (show) tintFor(show).catch(() => {})
