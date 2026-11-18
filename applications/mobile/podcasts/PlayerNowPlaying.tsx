@@ -13,6 +13,7 @@ import {
 } from "@/modules/podcasts/playerSheet"
 import { VolumeView } from "@/modules/podcasts/volumeView"
 
+import { AdFindingLine } from "./AdFindingLine"
 import { ChapterTitle } from "./ChapterBar"
 import { PlayerMenu } from "./PlayerMenu"
 import { type PlayerPanel } from "./PlayerPages"
@@ -117,6 +118,7 @@ export function PlayerNowPlaying({
           }
         />
       </View>
+      <AdFindingLine episode={episode} show={show} />
       <SkippedAdNote />
 
       <PlayerTransport view={view} />

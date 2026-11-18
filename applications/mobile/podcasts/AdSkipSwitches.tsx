@@ -8,6 +8,20 @@ import {
 import { type AdSkipSettings } from "@/modules/podcasts/index"
 
 import { SwitchRow } from "./SettingsGroup"
+import { useAdsUnavailable } from "./useAds"
+
+/**
+ * What the Skip ads switch does. A streamed episode plays through its own download (on Wi-Fi
+ * only, when "Download only on Wi-Fi" is on), and ads are skipped once they are found. Why
+ * ads can't be found comes last, when there is a reason.
+ */
+function skipAdsBody(unavailable: string | null): string {
+  const body =
+    'Skips sponsor reads and other ads once they are found. It works while streaming too: the episode plays from its own download, which on mobile data needs "Download only on Wi-Fi" to be off. It never skips when it is not sure.'
+  return unavailable === null
+    ? body
+    : `${body} Ads can't be found right now: ${unavailable}`
+}
 
 /**
  * The two switches for skipping ads and the hosts' own plugs, both on until turned off. Swift
@@ -15,6 +29,7 @@ import { SwitchRow } from "./SettingsGroup"
  */
 export function AdSkipSwitches() {
   const [settings, setSettings] = useState<AdSkipSettings | null>(null)
+  const unavailable = useAdsUnavailable()
 
   useEffect(() => {
     let live = true
@@ -43,7 +58,7 @@ export function AdSkipSwitches() {
     <>
       <SwitchRow
         title="Skip ads"
-        body="Skips sponsor reads and other ads in downloaded episodes whose ads were found. It never skips when it is not sure."
+        body={skipAdsBody(unavailable)}
         checked={settings?.skipAds ?? null}
         onChange={(on) => change({ skipAds: on })}
       />

@@ -13,6 +13,7 @@ import {
   formatClock,
   noteAfterUndo,
   readsAdsFile,
+  unavailableReason,
   parseAdsFile,
   skipNote,
   skipNoteShown,
@@ -240,5 +241,24 @@ describe("the ads file while the full pass runs", () => {
     const kept = { episodeId: "a", file: partial }
     expect(adsFileAfterRead("finding", kept, "b", null)).toBeNull()
     expect(adsFileAfterRead("finding", null, "b", null)).toBeNull()
+  })
+})
+
+describe("unavailableReason", () => {
+  it("gives the phone's reason when any episode has one", () => {
+    const map = adsMapFromList([
+      info("found", { count: 1 }),
+      {
+        episodeId: "e2",
+        state: "unavailable",
+        reason: "Apple Intelligence is off",
+      },
+    ])
+    expect(unavailableReason(map)).toBe("Apple Intelligence is off")
+  })
+
+  it("is null when ads can be found", () => {
+    expect(unavailableReason(adsMapFromList([info("noAds")]))).toBeNull()
+    expect(unavailableReason({})).toBeNull()
   })
 })

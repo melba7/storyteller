@@ -10,6 +10,7 @@ import {
   applyAdsChange,
   parseAdsFile,
   readsAdsFile,
+  unavailableReason,
 } from "@/modules/podcasts/ads"
 import { getAds, listAds } from "@/modules/podcasts/adsNative"
 import { type AdsInfo, Podcasts } from "@/modules/podcasts/index"
@@ -58,6 +59,11 @@ function subscribe(listener: () => void): () => void {
 /** One episode's ad finding state, or undefined when it has none. */
 export function useAdsInfo(episodeId: string): AdsInfo | undefined {
   return useSyncExternalStore(subscribe, () => current[episodeId])
+}
+
+/** Why ads can't be found on this phone, or null. */
+export function useAdsUnavailable(): string | null {
+  return useSyncExternalStore(subscribe, () => unavailableReason(current))
 }
 
 /** One episode's saved ads, read again whenever its ad finding changes. */

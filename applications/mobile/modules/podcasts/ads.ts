@@ -66,6 +66,17 @@ export function adsStatus(info: AdsInfo | undefined): string {
   }
 }
 
+/**
+ * Why ads can't be found on this phone, when any episode says so ("Apple Intelligence is
+ * off"), else null. The reason belongs to the phone, not the episode, so one is enough.
+ */
+export function unavailableReason(map: AdsMap): string | null {
+  for (const info of Object.values(map)) {
+    if (info.state === "unavailable") return info.reason ?? "Ads can't be found"
+  }
+  return null
+}
+
 /** The line so far (the download's, then the transcript's) followed by the ads'. */
 export function withAds(line: string, info: AdsInfo | undefined): string {
   return [line, adsStatus(info)].filter((part) => part !== "").join(" · ")

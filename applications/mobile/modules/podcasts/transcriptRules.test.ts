@@ -7,6 +7,7 @@ import {
   chooseTranscript,
   deviceChoice,
   deviceSource,
+  partialCovers,
   partialFooter,
   transcriptCacheFresh,
   transcriptSource,
@@ -69,14 +70,42 @@ describe("transcriptSource", () => {
     ...extra,
   })
 
-  it("uses the feed's transcript when there is one", () => {
+  it("uses the feed's transcript when the phone has none yet", () => {
+    const feed = { feedUrl: "https://x.test/t.vtt", feedType: "text/vtt" }
+    const expected = {
+      kind: "feed",
+      url: "https://x.test/t.vtt",
+      type: "text/vtt",
+    }
+    expect(transcriptSource({ ...feed, device: undefined })).toEqual(expected)
+    expect(transcriptSource({ ...feed, device: device("waiting") })).toEqual(
+      expected,
+    )
+  })
+
+  it("prefers the phone's finished transcript: the feed's timing drifts with inserted ads", () => {
     expect(
       transcriptSource({
         feedUrl: "https://x.test/t.vtt",
         feedType: "text/vtt",
         device: device("done"),
       }),
-    ).toEqual({ kind: "feed", url: "https://x.test/t.vtt", type: "text/vtt" })
+    ).toEqual({ kind: "device" })
+  })
+
+  it("prefers a partial one only where it covers the playhead", () => {
+    const input = {
+      feedUrl: "https://x.test/t.vtt",
+      feedType: "text/vtt",
+      device: device("transcribing", { percent: 30 }),
+    }
+    expect(transcriptSource({ ...input, partialCovers: true })).toEqual({
+      kind: "device",
+    })
+    expect(transcriptSource({ ...input, partialCovers: false }).kind).toBe(
+      "feed",
+    )
+    expect(transcriptSource(input).kind).toBe("feed")
   })
 
   it("then the one made on the phone", () => {
@@ -102,6 +131,25 @@ describe("transcriptSource", () => {
     expect(none(device("unsupported", { reason: "Needs iOS 26" })).reason).toBe(
       "Needs iOS 26",
     )
+  })
+})
+
+describe("partialCovers", () => {
+  const line = (start: number, end: number): TranscriptLine => ({
+    start,
+    end,
+    text: "x",
+  })
+
+  it("is true when the lines reach the playhead", () => {
+    expect(partialCovers([line(0, 300), line(300, 600)], 450)).toBe(true)
+    expect(partialCovers([line(0, 300)], 0)).toBe(true)
+  })
+
+  it("is false past the last line, and with no lines", () => {
+    expect(partialCovers([line(0, 300)], 400)).toBe(false)
+    expect(partialCovers([], 0)).toBe(false)
+    expect(partialCovers(null, 0)).toBe(false)
   })
 })
 

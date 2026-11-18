@@ -1,0 +1,182 @@
+// LOFI-FORK: the podcasts section's ads (see FORK.md).
+import { describe, expect, it } from "vitest"
+
+import { adsToShow, playerAdLine } from "./adLine"
+import type { AdsInfo, DownloadInfo, TranscriptInfo } from "./index"
+
+const download = (
+  state: DownloadInfo["state"],
+  extra: Partial<DownloadInfo> = {},
+): DownloadInfo => ({ episodeId: "e", state, updatedAt: 0, ...extra })
+const transcript = (
+  state: TranscriptInfo["state"],
+  extra: Partial<TranscriptInfo> = {},
+): TranscriptInfo => ({ episodeId: "e", state, ...extra })
+const ads = (
+  state: AdsInfo["state"],
+  extra: Partial<AdsInfo> = {},
+): AdsInfo => ({
+  episodeId: "e",
+  state,
+  ...extra,
+})
+
+const base = { episodeId: "e", skipAds: true }
+
+describe("playerAdLine", () => {
+  it("says nothing while Skip ads is off, or for an added file", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        skipAds: false,
+        download: download("downloaded"),
+      }),
+    ).toBe("")
+    expect(
+      playerAdLine({ ...base, episodeId: "file-1", download: undefined }),
+    ).toBe("")
+  })
+
+  it("says it streams without skipping when there is no download", () => {
+    expect(playerAdLine({ ...base, download: undefined })).toBe(
+      "Streaming without ad skipping",
+    )
+    expect(playerAdLine({ ...base, download: download("failed") })).toBe(
+      "Streaming without ad skipping",
+    )
+  })
+
+  it("is getting ready while the file arrives or nothing has started", () => {
+    const ready = "Getting ready to find ads"
+    expect(playerAdLine({ ...base, download: download("queued") })).toBe(ready)
+    expect(playerAdLine({ ...base, download: download("downloading") })).toBe(
+      ready,
+    )
+    expect(playerAdLine({ ...base, download: download("downloaded") })).toBe(
+      ready,
+    )
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("waiting"),
+      }),
+    ).toBe(ready)
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: ads("waiting"),
+      }),
+    ).toBe(ready)
+  })
+
+  it("finds ads while transcribing, with the percent", () => {
+    const line = (info: TranscriptInfo, adsInfo?: AdsInfo) =>
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: info,
+        ads: adsInfo,
+      })
+    expect(line(transcript("transcribing", { percent: 40.6 }))).toBe(
+      "Finding ads, 40% transcribed",
+    )
+    expect(line(transcript("transcribing"))).toBe("Finding ads")
+    expect(
+      line(transcript("transcribing", { percent: 40 }), ads("finding")),
+    ).toBe("Finding ads, 40% transcribed")
+  })
+
+  it("finds ads after the transcript is done", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: ads("finding", { percent: 55 }),
+      }),
+    ).toBe("Finding ads, 55%")
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: ads("finding"),
+      }),
+    ).toBe("Finding ads")
+  })
+
+  it("counts the ads found, and says when there are none", () => {
+    const line = (adsInfo: AdsInfo) =>
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: adsInfo,
+      })
+    expect(line(ads("found", { count: 3 }))).toBe("3 ads found")
+    expect(line(ads("found", { count: 1 }))).toBe("1 ad found")
+    expect(line(ads("noAds"))).toBe("No ads found")
+  })
+
+  it("gives the reason ads can't be found, even before the transcript is done", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("transcribing", { percent: 10 }),
+        ads: ads("unavailable", { reason: "Apple Intelligence is off" }),
+      }),
+    ).toBe("Ads can't be found: Apple Intelligence is off")
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        ads: ads("unavailable"),
+      }),
+    ).toBe("Ads can't be found")
+  })
+
+  it("gives the transcript's reason when it can't be made", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("unsupported", { reason: "Needs iOS 26" }),
+      }),
+    ).toBe("Ads can't be found: Needs iOS 26")
+    expect(
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcript("failed"),
+      }),
+    ).toBe("Ads can't be found: Transcribing failed")
+  })
+})
+
+describe("adsToShow", () => {
+  it("shows nothing before the audio is on the phone", () => {
+    expect(adsToShow(false, undefined, ads("unavailable"))).toBeUndefined()
+  })
+
+  it("shows the reason and the results before the transcript is done", () => {
+    const busy = transcript("transcribing", { percent: 5 })
+    const reason = ads("unavailable", { reason: "Apple Intelligence is off" })
+    expect(adsToShow(true, busy, reason)).toBe(reason)
+    expect(adsToShow(true, busy, ads("found", { count: 1 }))).toEqual(
+      ads("found", { count: 1 }),
+    )
+  })
+
+  it("keeps quiet about waiting while the transcript is not done", () => {
+    expect(
+      adsToShow(true, transcript("transcribing"), ads("waiting")),
+    ).toBeUndefined()
+    expect(adsToShow(true, transcript("done"), ads("waiting"))).toEqual(
+      ads("waiting"),
+    )
+  })
+})
