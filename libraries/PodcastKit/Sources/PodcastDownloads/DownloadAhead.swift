@@ -47,8 +47,9 @@ public enum DownloadAhead {
 
   /// The plan for this moment. `upNext` is the queue after the playing episode, in order.
   /// `started` is every episode this run of the app has already started ahead. Nothing starts
-  /// off Wi-Fi, but the other two still happen, so a switch of network or of "Skip ads" never
-  /// leaves files behind.
+  /// off Wi-Fi, or while the network is in Low Data Mode (`lowData`: the listener asked the phone
+  /// to use less data, and an episode is 50 to 100 MB), but the other two still happen, so a
+  /// switch of network or of "Skip ads" never leaves files behind.
   ///
   /// The next episodes of Up Next that can be fetched, have "Skip ads" on and have no download
   /// of any kind (finished, moving, failed, the listener's own) start, but never so many that more
@@ -58,7 +59,7 @@ public enum DownloadAhead {
   /// download that failed is not tried again by this rule: the listener can tap it.
   public static func plan(
     upNext: [Item], playingId: String?, entries: [DownloadEntry], started: Set<String>,
-    onWiFi: Bool
+    onWiFi: Bool, lowData: Bool
   ) -> Plan {
     let queued = Set(upNext.map(\.id))
     let marked = entries.filter(\.ahead)
@@ -66,7 +67,7 @@ public enum DownloadAhead {
     plan.adopt = marked.filter { $0.episodeId == playingId }.map(\.episodeId)
     plan.drop = marked.filter { $0.episodeId != playingId && !queued.contains($0.episodeId) }
       .map(\.episodeId)
-    guard onWiFi else { return plan }
+    guard onWiFi, !lowData else { return plan }
 
     var taken = Set(
       marked.filter { entry in

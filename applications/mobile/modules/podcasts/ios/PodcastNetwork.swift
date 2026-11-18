@@ -26,4 +26,11 @@ final class PodcastNetwork: @unchecked Sendable {
       return path.status == .satisfied && !path.isExpensive
     }
   }
+
+  /// Whether the network is in Low Data Mode (the listener turned it on for this Wi-Fi network or
+  /// for mobile data, to save data). True until the monitor has reported once, so nothing that
+  /// keeps out of Low Data Mode starts before the network is known.
+  var isConstrained: Bool {
+    lock.withLock { path?.isConstrained ?? true }
+  }
 }

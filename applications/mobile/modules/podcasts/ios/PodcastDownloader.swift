@@ -202,6 +202,8 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
       automatic: entry.automatic, setting: DownloadSettings.wifiOnly)
     request.allowsCellularAccess = !wifiOnly
     request.allowsExpensiveNetworkAccess = !wifiOnly
+    // What is fetched ahead, unasked, also waits while Low Data Mode is on (the others do not).
+    if entry.ahead { request.allowsConstrainedNetworkAccess = false }
     launch(session.downloadTask(with: request), for: entry.episodeId)
   }
 

@@ -21,10 +21,11 @@ final class DownloadAheadTests: XCTestCase {
 
   private func plan(
     _ upNext: [DownloadAhead.Item], playing: String? = "now", entries: [DownloadEntry] = [],
-    started: Set<String> = [], onWiFi: Bool = true
+    started: Set<String> = [], onWiFi: Bool = true, lowData: Bool = false
   ) -> DownloadAhead.Plan {
     DownloadAhead.plan(
-      upNext: upNext, playingId: playing, entries: entries, started: started, onWiFi: onWiFi)
+      upNext: upNext, playingId: playing, entries: entries, started: started, onWiFi: onWiFi,
+      lowData: lowData)
   }
 
   private let four = ["a", "b", "c", "d"]
@@ -39,6 +40,11 @@ final class DownloadAheadTests: XCTestCase {
 
   func testNothingStartsOffWiFi() {
     XCTAssertEqual(plan(four.map { item($0) }, onWiFi: false).start, [])
+  }
+
+  func testNothingStartsInLowDataMode() {
+    XCTAssertEqual(plan(four.map { item($0) }, lowData: true).start, [])
+    XCTAssertEqual(plan(four.map { item($0) }, lowData: false).start, ["a", "b"])
   }
 
   func testOnlyEpisodesOfShowsWithSkipAdsOnStart() {
@@ -162,6 +168,12 @@ final class DownloadAheadTests: XCTestCase {
   func testDroppingAndAdoptingNeedNeitherWiFiNorSkipAds() {
     let entries = [entry("a", filed, ahead: true), entry("b", filed, ahead: true)]
     let result = plan([item("c", skipAds: false)], playing: "a", entries: entries, onWiFi: false)
+    XCTAssertEqual(result, DownloadAhead.Plan(start: [], adopt: ["a"], drop: ["b"]))
+  }
+
+  func testLowDataModeStillHandsOverAndDrops() {
+    let entries = [entry("a", filed, ahead: true), entry("b", filed, ahead: true)]
+    let result = plan([item("c")], playing: "a", entries: entries, lowData: true)
     XCTAssertEqual(result, DownloadAhead.Plan(start: [], adopt: ["a"], drop: ["b"]))
   }
 

@@ -53,12 +53,13 @@ final class PodcastDownloadAhead {
     let downloader = PodcastDownloader.shared
     guard let store = downloader.store else { return }
     let queued = player.queue.items
+    let network = PodcastNetwork.shared
     let plan = DownloadAhead.plan(
       upNext: queued.map {
         DownloadAhead.Item(id: $0.id, url: $0.url, skipAds: player.skipAds(forShow: $0.showId))
       },
       playingId: player.current?.id, entries: store.entries(), started: started,
-      onWiFi: PodcastNetwork.shared.onWiFi)
+      onWiFi: network.onWiFi, lowData: network.isConstrained)
 
     for id in plan.adopt { handOver(id) }
     for id in plan.drop {
