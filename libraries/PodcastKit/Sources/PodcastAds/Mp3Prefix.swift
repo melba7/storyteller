@@ -10,6 +10,8 @@ public enum Mp3Prefix {
   /// A cut: how many bytes to keep, and the audio they hold.
   public struct Cut: Equatable, Sendable {
     public var bytes: Int
+    /// Where the audio starts: the size of the ID3 tag, or 0.
+    public var audioStart: Int
     public var frames: Int
     public var seconds: Double
   }
@@ -35,18 +37,55 @@ public enum Mp3Prefix {
     return (length, Double(first ? 1152 : 576) / Double(hertz))
   }
 
-  /// The cut of `data`, which is the first bytes of a file: past an ID3 tag, up to the end of the
-  /// last frame that is whole. Nil when no whole frame is there.
-  public static func cut(_ data: Data) -> Cut? {
-    var at = 0
-    if data.count >= 10, data[0] == 0x49, data[1] == 0x44, data[2] == 0x33 {  // "ID3"
-      let size = (0..<4).reduce(0) { $0 << 7 | Int(data[6 + $1] & 0x7F) }
-      at = 10 + size + (data[5] & 0x10 != 0 ? 10 : 0)
-      guard at <= data.count else { return nil }
+  /// What the first bytes of a file say.
+  public enum Look: Equatable, Sendable {
+    /// The bytes so far end too soon to tell (a tag not whole yet, or no whole frame yet). The
+    /// tag's end is given when known, so the caller can wait for the audio after it.
+    case needMore(audioStart: Int?)
+    /// There is no MP3 audio here: no frame follows the tag within the search window.
+    case notMp3
+    case cut(Cut)
+  }
+
+  /// How far past the tag a first frame is looked for.
+  public static let searchWindow = 65_536
+
+  /// The byte where audio starts: 0 without an ID3 tag, the end of the tag with one, nil when
+  /// the tag's own header is not whole yet.
+  public static func audioStart(_ data: Data) -> Int? {
+    guard data.count >= 3 else { return nil }
+    guard data[0] == 0x49, data[1] == 0x44, data[2] == 0x33 else { return 0 }  // "ID3"
+    guard data.count >= 10 else { return nil }
+    let size = (0..<4).reduce(0) { $0 << 7 | Int(data[6 + $1] & 0x7F) }
+    return 10 + size + (data[5] & 0x10 != 0 ? 10 : 0)
+  }
+
+  /// Looks at `data`, the first bytes of a file. The first frame must be followed at once by
+  /// another valid header (a stray 0xFF 0xEx in a tag's padding is not a frame). With `complete`
+  /// (these are all the bytes there will be) a last frame needs no frame after it.
+  public static func look(_ data: Data, complete: Bool = false) -> Look {
+    guard let start = audioStart(data) else { return .needMore(audioStart: nil) }
+    guard start <= data.count else { return .needMore(audioStart: start) }
+    var at = start
+    let searchEnd = min(data.count, start + searchWindow)
+    var found = false
+    while at < searchEnd {
+      if let first = frame(in: data, at: at) {
+        let next = at + first.length
+        if next + 4 <= data.count {
+          if frame(in: data, at: next) != nil { found = true; break }
+        } else if complete, next <= data.count {
+          found = true
+          break
+        } else {
+          return .needMore(audioStart: start)  // cannot be checked yet
+        }
+      }
+      at += 1
     }
-    // Junk between the tag and the first frame is stepped over, for a little way.
-    let searchEnd = min(data.count, at + 65_536)
-    while at < searchEnd, frame(in: data, at: at) == nil { at += 1 }
+    guard found else {
+      return data.count >= start + searchWindow ? .notMp3 : .needMore(audioStart: start)
+    }
     var frames = 0
     var seconds = 0.0
     while let next = frame(in: data, at: at), at + next.length <= data.count {
@@ -54,6 +93,12 @@ public enum Mp3Prefix {
       frames += 1
       seconds += next.seconds
     }
-    return frames > 0 ? Cut(bytes: at, frames: frames, seconds: seconds) : nil
+    return .cut(Cut(bytes: at, audioStart: start, frames: frames, seconds: seconds))
+  }
+
+  /// The cut of `data`, or nil when there is none (yet).
+  public static func cut(_ data: Data, complete: Bool = false) -> Cut? {
+    if case .cut(let cut) = look(data, complete: complete) { return cut }
+    return nil
   }
 }

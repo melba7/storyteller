@@ -134,24 +134,42 @@ final class PodcastStreamHead: @unchecked Sendable {
     var fed = 0.0
     var rate = 16_000.0  // bytes of file per second of audio, learned from the first cut
     var tries = 0
+    var tag = 0  // bytes of ID3 tag before the audio (cover art can make it large)
+    var waitFor: Int64 = 0  // at least this many bytes are waited for
     var modelAds: [FoundAd] = []
     var first = true
     var index = 0
     while index < Self.targets.count {
       try Task.checkCancellation()
       let target = Self.targets[index]
-      let need = Int64(target * rate) + 4096
+      let need = max(Int64(target * rate) + 4096 + Int64(tag), waitFor)
       while available < need, !ended {
         if let next = await iterator.next() { available = next } else { ended = true }
       }
       if first, available > 0 { first = false; PodcastTimeline.mark(episodeId, "first bytes on disk") }
       let want = ended ? available : min(available, need + 65_536)
-      guard want > 0, let data = await readPrefix(Int(want)), let cut = Mp3Prefix.cut(data) else {
-        return PodcastTimeline.mark(episodeId, "head scan: the file is not a plain MP3 yet")
+      guard want > 0, let data = await readPrefix(Int(want)) else {
+        return PodcastTimeline.mark(episodeId, "head scan: the file cannot be read")
       }
+      let cut: Mp3Prefix.Cut
+      switch Mp3Prefix.look(data, complete: ended) {
+      case .cut(let found):
+        cut = found
+      case .needMore(let start):
+        // A tag that is not whole yet, or no frame yet: wait for more bytes, up to 2 MB of audio.
+        tag = max(tag, start ?? 0)
+        guard !ended, tag < 20 << 20, available - Int64(tag) < 2 << 20 else {
+          return PodcastTimeline.mark(episodeId, "head scan: no MP3 audio found")
+        }
+        waitFor = available + 32_768
+        continue
+      case .notMp3:
+        return PodcastTimeline.mark(episodeId, "head scan: the file is not an MP3")
+      }
+      tag = cut.audioStart
       if cut.seconds < target - 3, !ended {
         // The file holds less audio than guessed: wait for more bytes.
-        rate = Double(cut.bytes) / max(cut.seconds, 1) * 1.03
+        rate = Double(cut.bytes - cut.audioStart) / max(cut.seconds, 1) * 1.03
         tries += 1
         guard tries <= 4 else { return }
         continue

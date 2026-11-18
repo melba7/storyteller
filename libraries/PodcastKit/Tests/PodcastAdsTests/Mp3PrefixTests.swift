@@ -11,7 +11,10 @@ final class Mp3PrefixTests: XCTestCase {
   }
 
   private func tag(_ size: Int) -> Data {
-    Data([0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0, 0, UInt8(size >> 7), UInt8(size & 0x7F)])
+    Data([
+      0x49, 0x44, 0x33, 0x04, 0x00, 0x00, UInt8((size >> 21) & 0x7F), UInt8((size >> 14) & 0x7F),
+      UInt8((size >> 7) & 0x7F), UInt8(size & 0x7F),
+    ])
       + Data(repeating: 0, count: size)
   }
 
@@ -39,5 +42,39 @@ final class Mp3PrefixTests: XCTestCase {
   func testTheCutStopsWhereTheFramesStop() {
     let data = frame() + frame() + Data(repeating: 0x00, count: 600) + frame()
     XCTAssertEqual(Mp3Prefix.cut(data)?.frames, 2)
+  }
+
+  func testALargeTagMeansNeedMoreUntilTheAudioAfterItIsThere() {
+    let whole = tag(700_000) + frame() + frame() + frame()
+    XCTAssertEqual(Mp3Prefix.look(whole.prefix(5)), .needMore(audioStart: nil))
+    XCTAssertEqual(Mp3Prefix.look(whole.prefix(484_000)), .needMore(audioStart: 700_010))
+    XCTAssertEqual(Mp3Prefix.look(whole.prefix(700_010 + 200)), .needMore(audioStart: 700_010))
+    let cut = Mp3Prefix.cut(whole)
+    XCTAssertEqual(cut?.frames, 3)
+    XCTAssertEqual(cut?.audioStart, 700_010)
+    XCTAssertEqual(cut?.bytes, 700_010 + 417 * 3)
+  }
+
+  func testAStraySyncPairBeforeTheFirstFrameIsNotAFrame() {
+    // A header-shaped pair in the tag's padding, with no frame after it.
+    let bogus = Data([0xFF, 0xFB, 0x90, 0x00]) + Data(repeating: 0x00, count: 600)
+    let data = tag(20) + bogus + frame() + frame() + frame()
+    let cut = Mp3Prefix.cut(data)
+    XCTAssertEqual(cut?.frames, 3)
+    XCTAssertEqual(cut?.bytes, 30 + 604 + 417 * 3)
+  }
+
+  func testJunkAfterTheTagIsWaitedPastAndThenGivenUpOn() {
+    let junk = tag(10) + Data(repeating: 0x41, count: 5000)
+    XCTAssertEqual(Mp3Prefix.look(junk), .needMore(audioStart: 20))
+    let later = junk + Data(repeating: 0x41, count: Mp3Prefix.searchWindow)
+    XCTAssertEqual(Mp3Prefix.look(later), .notMp3)
+    // Junk, then the real frames: found.
+    XCTAssertEqual(Mp3Prefix.cut(junk + frame() + frame())?.frames, 2)
+  }
+
+  func testALastFrameNeedsNoFollowerOnlyWhenTheFileIsComplete() {
+    XCTAssertNil(Mp3Prefix.cut(frame()))
+    XCTAssertEqual(Mp3Prefix.cut(frame(), complete: true)?.frames, 1)
   }
 }
