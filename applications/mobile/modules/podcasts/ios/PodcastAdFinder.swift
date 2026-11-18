@@ -195,7 +195,7 @@ final class PodcastAdFinder: @unchecked Sendable {
     kick()
   }
 
-  private func find(_ id: String) async {
+  func find(_ id: String) async {
     guard let downloads = PodcastDownloader.shared.store, let detector,
       let (ads, transcripts) = stores(for: id, in: downloads)
     else { return }
