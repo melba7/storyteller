@@ -276,12 +276,16 @@ setting picks the detector, and each result is saved under the detector's id.
   their other shows). Line numbers map back to word times, so the model never
   has to copy timestamps.
 - **Clean-up** (pure Swift, tested on Linux): join answers from overlapping
-  pieces, merge ads with less than 12 seconds of speech between them (one ad
+  pieces, merge sure ads of one kind that have less than 4 seconds of speech
+  between them (12 seconds when every line between reads as the ad; one ad
   break, at most 5 minutes in all), drop anything under 10 seconds, do not skip
-  anything over 5 minutes (likely a mistake), carry an ad's end on while the
-  next lines still read as the ad (its sponsor's name, a web address or a promo
-  code), and move each edge to the nearest pause between words. The 12 seconds
-  and the carried end come from MinusPod (see "Open-source code we use").
+  anything over 5 minutes (likely a mistake), carry a sure ad's end on by at
+  most 2 lines while the next lines still read as the ad (a web address, a
+  promo code, or its sponsor's name), stop at words that bring the show back
+  ("we're back"), and land each edge a quarter second before the next word
+  (an ad that begins in the first 6 seconds begins at 0:00). The carried end
+  comes from MinusPod (see "Open-source code we use"), shortened in the
+  ad-accuracy round (docs/PODCASTS-ADS-ACCURACY-PLAN.md).
 - **How sure**: the model says how sure it is. Sure and unsure ads are both
   skipped, and "Ads found" marks the unsure ones "Not sure"; guesses are
   dropped.
@@ -316,8 +320,12 @@ Haiku are in "Later" below; neither is built in the base version.
   seconds; on the lock screen the skip just happens.
 - **Up Next** lives in Swift for the same reason: when an episode ends with the
   screen locked, the next one starts without the app open.
-- **Streamed episodes play without ad skipping**, because a streamed copy can
-  carry different ads than any download.
+- **Streamed episodes** that play through the app's own download are checked
+  while they play: the first minutes are read from the stream's own bytes (quick
+  text rules at 15 s, the model at 30 s and later), and a skip lands where that
+  stream's ad ends. A plain web-address stream (no download) plays without ad
+  skipping, and is never swapped for a download, because its ads can differ from
+  any download's.
 
 ## Pocket Casts licence
 
