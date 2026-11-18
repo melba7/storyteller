@@ -176,3 +176,23 @@ export async function loadChartGroups(
   }
   await Promise.all(waiting)
 }
+
+/** What a page knows about one list: loading, ready to draw, or missing (draw nothing). */
+export type ListState =
+  | { status: "loading" }
+  | { status: "ready"; shows: ChartShow[] }
+  | { status: "missing" }
+
+/**
+ * Folds one report from `loadChartGroups` into a list's state. Shows already on screen are
+ * never taken away: a failure keeps them, and so does an empty answer. A list with nothing
+ * to draw after a failure or an empty answer is missing.
+ */
+export function applyListEvent(
+  state: ListState,
+  event: ChartListUpdate,
+): ListState {
+  const shows = event.shows
+  if (shows && shows.length > 0) return { status: "ready", shows }
+  return state.status === "ready" ? state : { status: "missing" }
+}

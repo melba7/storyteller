@@ -1,7 +1,13 @@
 // LOFI-FORK: the podcasts section's grouped chart loading (see FORK.md).
 import { describe, expect, it, vi } from "vitest"
 
-import { loadChartGroups, keptChart, type ChartListUpdate } from "./chartBatch"
+import {
+  applyListEvent,
+  loadChartGroups,
+  keptChart,
+  type ChartListUpdate,
+  type ListState,
+} from "./chartBatch"
 import { CACHE_MS, type ChartDeps, type ChartShow } from "./charts"
 
 const NOW = 10_000_000_000
@@ -208,5 +214,48 @@ describe("keptChart", () => {
         },
       }),
     ).toBeNull()
+  })
+})
+
+describe("applyListEvent", () => {
+  const shows = [{ appleId: "1" }] as ChartShow[]
+  const loading: ListState = { status: "loading" }
+  const ready: ListState = { status: "ready", shows }
+
+  it("makes a kept or loaded list ready with its shows", () => {
+    expect(
+      applyListEvent(loading, { status: "kept", shows, fresh: false }),
+    ).toEqual(ready)
+    expect(applyListEvent(loading, { status: "loaded", shows })).toEqual(ready)
+  })
+
+  it("replaces the shows of a ready list when new ones load", () => {
+    const fresh = [{ appleId: "2" }] as ChartShow[]
+    expect(applyListEvent(ready, { status: "loaded", shows: fresh })).toEqual({
+      status: "ready",
+      shows: fresh,
+    })
+  })
+
+  it("keeps the shows when a fetch fails after the list was ready", () => {
+    expect(applyListEvent(ready, { status: "failed", shows: null })).toBe(ready)
+    expect(applyListEvent(ready, { status: "failed", shows })).toEqual(ready)
+  })
+
+  it("gives missing when a fetch fails with nothing kept", () => {
+    expect(applyListEvent(loading, { status: "failed", shows: null })).toEqual({
+      status: "missing",
+    })
+  })
+
+  it("draws the old copy when the fetch fails but one is kept", () => {
+    expect(applyListEvent(loading, { status: "failed", shows })).toEqual(ready)
+  })
+
+  it("does not turn a ready list into missing when a load comes back empty", () => {
+    expect(applyListEvent(ready, { status: "loaded", shows: [] })).toBe(ready)
+    expect(applyListEvent(loading, { status: "loaded", shows: [] })).toEqual({
+      status: "missing",
+    })
   })
 })
