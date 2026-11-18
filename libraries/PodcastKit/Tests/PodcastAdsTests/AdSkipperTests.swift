@@ -269,4 +269,75 @@ final class AdSkipperTests: XCTestCase {
     _ = skipper.undo(now: 11)
     XCTAssertEqual(skipper.ads.map(\.start), [300])
   }
+
+  // MARK: An ad found while it plays
+
+  /// A fresh skipper with no ads, told of `file` while the playhead is at `playhead`.
+  private func found(
+    _ ads: [FoundAd], at playhead: Double?, settings: AdSkipSettings = AdSkipSettings()
+  ) -> AdSkip? {
+    var skipper = AdSkipper(file: nil, settings: settings)
+    return skipper.replace(file: file(ads), playhead: playhead, duration: 1000, now: 5)
+  }
+
+  func testAnAdFoundAroundThePlayheadWithTwentySecondsLeftIsLeftAtOnce() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    let skip = skipper.replace(
+      file: file([ad(100, 160)]), playhead: 140, duration: 1000, now: 5)
+    XCTAssertEqual(skip, AdSkip(ad: ad(100, 160), target: 160))
+    XCTAssertEqual(skipper.undo(now: 6), ad(100, 160), "the skip can be undone")
+  }
+
+  func testAnAdWithTwoSecondsLeftIsNotLeft() {
+    XCTAssertNil(found([ad(100, 160)], at: 158))
+    XCTAssertNotNil(found([ad(100, 160)], at: 157), "three seconds left is enough")
+  }
+
+  func testAnUndoneAdIsNotLeft() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    let undone = [UndoneAd(start: 100, end: 160)]
+    XCTAssertNil(
+      skipper.replace(file: file([ad(100, 160)], undone: undone), playhead: 120, duration: 1000, now: 5))
+    // Undone by the Undo button while this episode plays.
+    var undoing = AdSkipper(file: file([ad(100, 160)]), settings: AdSkipSettings())
+    _ = undoing.reached(position: 100.1, rate: 1, duration: 1000, now: 10)
+    _ = undoing.undo(now: 11)
+    XCTAssertNil(
+      undoing.replace(file: file([ad(100, 160)]), playhead: 120, duration: 1000, now: 12))
+  }
+
+  func testAfterAManualSeekIntoAnAdItIsNotLeftWhenTheAdIsFoundOrFoundAgain() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    skipper.seeked(to: 110)
+    XCTAssertNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 115, duration: 1000, now: 5))
+    XCTAssertNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 120, duration: 1000, now: 6))
+  }
+
+  func testAnAdTheSeekDidNotLandInIsLeftWhenPlaybackRanIntoIt() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    skipper.seeked(to: 50)
+    XCTAssertNotNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 120, duration: 1000, now: 5))
+  }
+
+  func testAnAdIsLeftOnlyOnceAndNotWhenThePlayheadIsOutsideIt() {
+    var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+    XCTAssertNotNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 120, duration: 1000, now: 5))
+    XCTAssertNil(
+      skipper.replace(file: file([ad(100, 160)]), playhead: 120.2, duration: 1000, now: 5.1),
+      "the same ad found again before the jump has landed")
+    XCTAssertNil(found([ad(100, 160)], at: 60))
+    XCTAssertNil(found([ad(100, 160)], at: 160), "the end of an ad is outside it")
+    XCTAssertNil(found([ad(100, 160)], at: nil), "not playing")
+  }
+
+  func testAnAdWithASwitchOffIsNotLeftAndAChainedPlugIsLeftWithIt() {
+    XCTAssertNil(
+      found([ad(100, 160)], at: 120, settings: AdSkipSettings(skipAds: false, skipOwnPlugs: true)))
+    let skip = found([ad(100, 160), ad(160.2, 190, kind: .ownPlug)], at: 158)
+    XCTAssertEqual(skip?.target, 190, "two seconds of the ad and a plug after it: worth leaving")
+  }
 }

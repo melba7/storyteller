@@ -48,11 +48,20 @@ public enum AdsRunner {
   /// `AdChunker.growingMinimum` seconds of lines, and again each time it has grown by
   /// `AdChunker.growingStep` seconds. Its newest answer replaces the older ones for the same
   /// start, so an ad is neither doubled nor kept when the longer answer dropped it.
+  ///
+  /// With `limit`, only the first `limit` seconds of the transcript are looked at (the head of an
+  /// episode that is not playing). The answer is kept like any growing piece's, so the later
+  /// passes carry on from it.
   public static func runPartial(
-    partial: PartialTranscript, detector: AdDetector, store: AdsStore, osVersion: String,
+    partial full: PartialTranscript, detector: AdDetector, store: AdsStore, osVersion: String,
     margin: Double = AdChunker.partialMargin, overlap: Double = AdChunker.overlap,
-    shouldContinue: @Sendable () -> Bool = { true }
+    limit: Double? = nil, shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> AdsOutcome {
+    var partial = full
+    if let limit, partial.reached > limit {
+      partial.reached = limit
+      partial.words = partial.words.filter { $0.end <= limit }
+    }
     let lines = LineRule.lines(from: partial.words)
     let numbered = AdChunker.number(lines)
     let pieces = AdChunker.safePieces(

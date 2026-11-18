@@ -7,6 +7,7 @@
 // (PodcastTranscriber+Background.swift). Every turn carries on from the partial file.
 
 import Foundation
+import PodcastAds
 import PodcastDownloads
 import PodcastSpeech
 import PodcastTranscripts
@@ -18,6 +19,8 @@ final class PodcastTranscriber: @unchecked Sendable {
   private var sink: ((String, [String: Any]) -> Void)?
   private var statuses: [String: TranscriptStatus] = [:]
   private var waiting: [String] = []
+  /// The waiting episodes whose head (the first three minutes) is transcribed already.
+  private var headDone: Set<String> = []
   /// The episode that is loaded in the player: it goes first, and the one at work makes way.
   private var urgent: String?
   var worker: Task<Void, Never>?
@@ -57,6 +60,7 @@ final class PodcastTranscriber: @unchecked Sendable {
   func removed(_ episodeId: String) {
     let send = lock.withLock { () -> ((String, [String: Any]) -> Void)? in
       waiting.removeAll { $0 == episodeId }
+      headDone.remove(episodeId)
       statuses[episodeId] = nil
       return sink
     }
@@ -118,7 +122,13 @@ final class PodcastTranscriber: @unchecked Sendable {
         let current = lock.withLock { statuses[id] }
         if case .transcribing? = current { continue }
         if current != .waiting { set(id, .waiting) }
-        lock.withLock { if !waiting.contains(id) { waiting.append(id) } }
+        let isNew = lock.withLock { !waiting.contains(id) && !headDone.contains(id) }
+        // A partial file that reaches the head was made by an earlier run: its head is done.
+        let headIsDone = isNew && (files.loadPartial()?.reached ?? 0) >= PrepRules.headSeconds
+        lock.withLock {
+          if headIsDone { headDone.insert(id) }
+          if !waiting.contains(id) { waiting.append(id) }
+        }
       case let settled:
         set(id, settled)
       }
@@ -149,18 +159,24 @@ final class PodcastTranscriber: @unchecked Sendable {
     kick()
   }
 
-  /// Takes the next episode off the queue: the one loaded in the player, then Up Next, then
-  /// the newest downloads (PrepQueue).
-  private func takeNext() -> String? {
-    let (list, playing) = lock.withLock { (waiting, urgent) }
-    guard let id = PrepQueue.next(waiting: list, playing: playing) else { return nil }
-    lock.withLock { waiting.removeAll { $0 == id } }
-    return id
+  /// Takes the next piece of work off the queue: every waiting episode's head before any rest,
+  /// except the one loaded in the player, which goes first (PrepQueue).
+  private func takeNext() -> PrepStep? {
+    guard let step = peekNext() else { return nil }
+    lock.withLock { waiting.removeAll { $0 == step.id } }
+    return step
   }
 
-  /// Whether another episode is urgent and waiting, so the one at work should stop.
-  private func makesWayForUrgent(_ id: String) -> Bool {
-    lock.withLock { QueueOrder.shouldStop(working: id, waiting: waiting, urgent: urgent) }
+  private func peekNext() -> PrepStep? {
+    let (list, done, playing) = lock.withLock { (waiting, headDone, urgent) }
+    return PrepQueue.nextStep(
+      heads: Set(list).subtracting(done), rests: list, playing: playing)
+  }
+
+  /// Whether the piece of work at hand should stop at its next piece to make way: a rest for any
+  /// head that waits, a head for the playing episode (PrepOrder.shouldYield).
+  private func makesWay(_ working: PrepStep) -> Bool {
+    PrepOrder.shouldYield(working: working, next: peekNext(), playing: lock.withLock { urgent })
   }
 
   var allowedNow: Bool { lock.withLock { appActive || playing || inBackgroundTask } }
@@ -181,16 +197,16 @@ final class PodcastTranscriber: @unchecked Sendable {
   }
 
   private func drain() async {
-    while allowedNow, let id = takeNext() {
-      await transcribe(id)
+    while allowedNow, let step = takeNext() {
+      await transcribe(step)
     }
     lock.withLock { worker = nil }
     kick()
   }
 
   /// Whether the episode may go on with its next piece.
-  private func mayContinue(_ id: String) -> Bool {
-    allowedNow && !makesWayForUrgent(id) && PodcastDownloader.shared.store?.entry(for: id) != nil
+  private func mayContinue(_ step: PrepStep) -> Bool {
+    allowedNow && !makesWay(step) && PodcastDownloader.shared.store?.entry(for: step.id) != nil
   }
 
   /// A piece of the playing episode is saved: its ads can be looked for now.
@@ -199,7 +215,9 @@ final class PodcastTranscriber: @unchecked Sendable {
     PodcastAdFinder.shared.transcriptGrew(id)
   }
 
-  private func transcribe(_ id: String) async {
+  /// The head stops after its first three minutes and goes back in the queue for its rest.
+  private func transcribe(_ step: PrepStep) async {
+    let id = step.id
     guard let downloads = PodcastDownloader.shared.store, let recogniser,
       let entry = downloads.entry(for: id), case .downloaded(let file, _, _, _) = entry.state,
       let files = files(for: id, in: downloads)
@@ -212,16 +230,22 @@ final class PodcastTranscriber: @unchecked Sendable {
       let outcome = try await TranscriptRunner.run(
         audio: files.folder.appendingPathComponent(file), sha256: files.sha256, locale: locale,
         recogniser: recogniser, store: files,
+        until: step.stage == .head ? PrepRules.headSeconds : nil,
         progress: { [weak self] percent in
           self?.set(id, .transcribing(percent: percent))
           self?.tellAdFinder(id)
         },
-        shouldContinue: { [weak self] in self?.mayContinue(id) ?? false })
+        shouldContinue: { [weak self] in self?.mayContinue(step) ?? false })
       switch outcome {
       case .finished:
         set(id, .done)
         PodcastAdFinder.shared.scan()
-      case .paused: pause(id)
+      case .paused(let reached):
+        if step.stage == .head, reached >= PrepRules.headSeconds - 0.01 {
+          lock.withLock { _ = headDone.insert(id) }
+          PodcastAdFinder.shared.transcriptHeadReady(id)
+        }
+        pause(id)
       }
     } catch let error as TranscriptError {
       switch error {

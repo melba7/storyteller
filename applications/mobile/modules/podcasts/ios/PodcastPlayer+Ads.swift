@@ -83,8 +83,13 @@ final class PodcastAdSkipping {
       store = found
     }
     skipper.apply(settings: settings)
-    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
+    // An ad found while it plays, with the playhead inside it, is left at once (unless the
+    // listener seeked into it, or it was undone).
+    let leave = skipper.replace(
+      file: store?.best(detector: PodcastAdFinder.detectorName),
+      playhead: owner.wantsToPlay ? owner.position : nil, duration: owner.currentDuration, now: now)
     setMarkers()
+    if let leave { jump(leave) }
     // Silence trimming keeps out of the ads that are skipped, so it reads them again too.
     owner.sound.refresh()
   }

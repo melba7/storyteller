@@ -45,6 +45,72 @@ public enum PrepOrder {
   }
 }
 
+/// What waits to be done for an episode: its head (the first minutes, so a pre-roll is found
+/// before the rest) and then its rest.
+public struct PrepWork: Sendable, Equatable {
+  public var id: String
+  public var addedAt: Date
+  public var headPending: Bool
+  public var restPending: Bool
+
+  public init(id: String, addedAt: Date, headPending: Bool, restPending: Bool) {
+    self.id = id
+    self.addedAt = addedAt
+    self.headPending = headPending
+    self.restPending = restPending
+  }
+}
+
+public enum PrepStage: Sendable, Equatable {
+  case head
+  case rest
+}
+
+public struct PrepStep: Sendable, Equatable {
+  public var id: String
+  public var stage: PrepStage
+
+  public init(id: String, stage: PrepStage) {
+    self.id = id
+    self.stage = stage
+  }
+}
+
+public enum PrepRules {
+  /// The head of an episode: its first three minutes, which is the first two transcript pieces
+  /// (60 and 120 seconds), so a head is cut the same way as the first part of a whole run.
+  public static let headSeconds = 180.0
+}
+
+extension PrepOrder {
+  /// The next piece of work. The playing episode goes first, its head and then its rest, because
+  /// the listener hears it now. Otherwise every waiting episode gets its head before any
+  /// episode's rest, so the first ad of each is known when it is played: the heads follow
+  /// `order` (Up Next, then the newest downloads), and so do the rests after them.
+  public static func nextStep(_ works: [PrepWork], playing: String?, upNext: [String]) -> PrepStep? {
+    let pending = works.filter { $0.headPending || $0.restPending }
+    let candidates = pending.map { PrepCandidate(id: $0.id, addedAt: $0.addedAt, state: .needsWork) }
+    let ordered = order(candidates, playing: playing, upNext: upNext)
+    let byId = Dictionary(pending.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    if let playing, let work = byId[playing] {
+      return PrepStep(id: playing, stage: work.headPending ? .head : .rest)
+    }
+    if let id = ordered.first(where: { byId[$0]?.headPending == true }) {
+      return PrepStep(id: id, stage: .head)
+    }
+    return ordered.first.map { PrepStep(id: $0, stage: .rest) }
+  }
+
+  /// Whether the episode being worked on stops at its next piece to make way. A rest makes way
+  /// for any other episode's head (the heads come first); a head makes way only for the playing
+  /// episode. The same episode's own next stage never makes it stop.
+  public static func shouldYield(working: PrepStep, next: PrepStep?, playing: String?) -> Bool {
+    guard let next, next.id != working.id else { return false }
+    if working.stage == .rest { return next.stage == .head || next.id == playing }
+    return next.id == playing
+  }
+}
+
 /// When the background turns may run.
 public enum BackgroundPower {
   /// Below this charge a turn on the battery does not run.

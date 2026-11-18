@@ -342,6 +342,27 @@ final class AdsGrowingPieceTests: XCTestCase {
     XCTAssertNil(file.refusedPieces)
   }
 
+  func testAHeadLimitAsksOnlyTheFirstThreeMinutesAndKeepsTheAnswer() async throws {
+    let asked = Asked()
+    let store = AdsStore(folder: folder, sha256: sha)
+    let outcome = try await AdsRunner.runPartial(
+      partial: partial(lines: 60, reached: 600), detector: detector(asked), store: store,
+      osVersion: "26", limit: PrepRules.headSeconds)
+    guard case .finished(let head) = outcome else { return XCTFail("\(outcome)") }
+    XCTAssertEqual(asked.all.count, 1)
+    XCTAssertLessThanOrEqual(asked.all[0].end, PrepRules.headSeconds - AdChunker.partialMargin)
+    XCTAssertEqual(head.ads.count, 1, "the sponsor read at 20 s is in the head")
+    XCTAssertEqual(store.loadPartial(detector: "fake"), head)
+    // The partial pass that follows reuses the head's answer while the piece has grown by
+    // less than a growing step, so the head is not asked again.
+    let later = try await AdsRunner.runPartial(
+      partial: partial(lines: 25, reached: 250), detector: detector(asked), store: store,
+      osVersion: "26")
+    guard case .finished(let grown) = later else { return XCTFail("\(later)") }
+    XCTAssertEqual(grown.ads.count, 1)
+    XCTAssertEqual(asked.all.count, 1, "nothing was asked again")
+  }
+
   func testTheLongerPieceAsksAgainAndTheAdIsNotDoubled() async throws {
     let asked = Asked()
     let first = try await run(partial(lines: 30, reached: 300), detector(asked))

@@ -58,6 +58,10 @@ public struct AdSkipper: Sendable {
   static let firstBoundary = 0.05
   /// An ad that starts this close to where the one before ends is skipped with it.
   static let chainGap = 0.5
+  /// An ad that is found while it plays is left only when at least this much of it (with the
+  /// ads skipped along with it) is still ahead. A jump costs about a second of seeking and
+  /// re-buffering and the "Skipped ad" note, so a shorter rest is cheaper to hear than to skip.
+  public static let leaveMinimum = 3.0
 
   /// The sure and unsure ads that were not undone before, whatever the switches say.
   private var candidates: [FoundAd]
@@ -66,6 +70,9 @@ public struct AdSkipper: Sendable {
   private var lastSeek: Double?
   private var enteredBySeek: Set<Double> = []
   private var undone: Set<Double> = []
+  /// The ads already left in progress, so a second look at the same file does not jump again
+  /// before the first jump has landed.
+  private var left: Set<Double> = []
   private var last: (skip: AdSkip, at: Double)?
 
   /// - Parameter file: the episode's ads file, nil when it has none. Sure and unsure ads that
@@ -87,6 +94,24 @@ public struct AdSkipper: Sendable {
   public mutating func replace(file: AdsFile?) {
     candidates = Self.candidates(in: file)
     if let lastSeek { seeked(to: lastSeek) }
+  }
+
+  /// Like `replace(file:)`, for the player while the episode plays at `playhead` (nil when it is
+  /// not playing): when the playhead is inside an ad that is to be skipped, the skip to make at
+  /// once. Not when the listener seeked into that ad (a manual seek is respected, also after
+  /// the ad was found), when the ad was undone, when its switch is off, when it was left this
+  /// way already, or when less than `leaveMinimum` seconds of it are left.
+  public mutating func replace(
+    file: AdsFile?, playhead: Double?, duration: Double?, now: Double
+  ) -> AdSkip? {
+    replace(file: file)
+    guard let playhead, playhead.isFinite,
+      let ad = ads.first(where: { $0.start <= playhead && playhead < $0.end }),
+      !enteredBySeek.contains(ad.start), !left.contains(ad.start),
+      chainEnd(of: ad) - playhead >= Self.leaveMinimum
+    else { return nil }
+    left.insert(ad.start)
+    return makeSkip(ad, duration: duration, now: now)
   }
 
   /// The ads that will be skipped under the current switches.
@@ -111,6 +136,7 @@ public struct AdSkipper: Sendable {
   public mutating func started(at position: Double, duration: Double?, now: Double) -> AdSkip? {
     lastSeek = nil
     enteredBySeek = []
+    left = []
     guard position.isFinite,
       let ad = ads.first(where: { $0.start <= position && position < $0.end })
     else { return nil }
@@ -119,6 +145,15 @@ public struct AdSkipper: Sendable {
 
   /// The skip for `ad`, taking on the ads that start within `chainGap` of where it ends.
   private mutating func makeSkip(_ ad: FoundAd, duration: Double?, now: Double) -> AdSkip {
+    let chained = chain(after: ad)
+    let skip = AdSkip(
+      ad: ad, target: Self.target(for: chained.last ?? ad, duration: duration), chained: chained)
+    last = (skip, now)
+    return skip
+  }
+
+  /// The ads that follow `ad` at once, in order.
+  private func chain(after ad: FoundAd) -> [FoundAd] {
     var chained: [FoundAd] = []
     var end = ad.end
     for next in ads where next.start > ad.start && !chained.contains(next) && next != ad {
@@ -127,11 +162,10 @@ public struct AdSkipper: Sendable {
         end = next.end
       }
     }
-    let skip = AdSkip(
-      ad: ad, target: Self.target(for: chained.last ?? ad, duration: duration), chained: chained)
-    last = (skip, now)
-    return skip
+    return chained
   }
+
+  private func chainEnd(of ad: FoundAd) -> Double { chain(after: ad).last?.end ?? ad.end }
 
   /// How far past a marker playback may be when the player is told about it and still count as
   /// having reached it: more at a higher speed, because the same delay covers more audio. Past

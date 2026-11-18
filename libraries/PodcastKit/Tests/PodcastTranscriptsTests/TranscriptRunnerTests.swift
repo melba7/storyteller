@@ -94,6 +94,29 @@ final class TranscriptRunnerTests: XCTestCase {
     XCTAssertEqual(resumed.lines, straight.lines)
   }
 
+  func testARunUntilTheHeadStopsThereAndTheNextRunResumesAfterIt() async throws {
+    let first = FakeRecogniser()
+    let outcome = try await TranscriptRunner.run(
+      audio: audio, sha256: sha, locale: "en-US", recogniser: first, store: store, until: 180)
+    XCTAssertEqual(outcome, .paused(reached: 180))
+    XCTAssertEqual(try XCTUnwrap(store.loadPartial()).reached, 180)
+    XCTAssertFalse(store.hasTranscript)
+
+    let second = FakeRecogniser()
+    let rest = try await TranscriptRunner.run(
+      audio: audio, sha256: sha, locale: "en-US", recogniser: second, store: store)
+    guard case .finished = rest else { return XCTFail("not finished") }
+    XCTAssertEqual(try XCTUnwrap(second.requests.first).0, 178, accuracy: 0.01, "after the head")
+  }
+
+  func testARunUntilAPointPastTheEndFinishesTheTranscript() async throws {
+    let recogniser = FakeRecogniser()
+    recogniser.duration = 100
+    let outcome = try await TranscriptRunner.run(
+      audio: audio, sha256: sha, locale: "en-US", recogniser: recogniser, store: store, until: 180)
+    guard case .finished = outcome else { return XCTFail("\(outcome)") }
+  }
+
   func testACorruptPartialFileMeansStartingOver() async throws {
     try Data("{not json".utf8).write(to: store.partialURL)
     let recogniser = FakeRecogniser()

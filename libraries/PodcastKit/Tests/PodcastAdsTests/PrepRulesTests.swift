@@ -66,6 +66,80 @@ final class PrepOrderTests: XCTestCase {
   }
 }
 
+final class PrepStepTests: XCTestCase {
+  private let base = Date(timeIntervalSince1970: 1_000_000)
+
+  private func work(
+    _ id: String, daysOld: Double = 0, head: Bool = true, rest: Bool = true
+  ) -> PrepWork {
+    PrepWork(
+      id: id, addedAt: base.addingTimeInterval(-daysOld * 86_400), headPending: head, restPending: rest)
+  }
+
+  /// Takes steps until nothing is left, as the queue does when each step finishes.
+  private func steps(_ all: [PrepWork], playing: String? = nil, upNext: [String] = []) -> [String] {
+    var left = all
+    var result: [String] = []
+    while let step = PrepOrder.nextStep(left, playing: playing, upNext: upNext) {
+      result.append("\(step.id) \(step.stage == .head ? "head" : "rest")")
+      guard let index = left.firstIndex(where: { $0.id == step.id }) else { break }
+      if step.stage == .head { left[index].headPending = false } else { left.remove(at: index) }
+    }
+    return result
+  }
+
+  func testThreeWaitingEpisodesHaveAllThreeHeadsDoneBeforeTheRestOfTheFirst() {
+    let all = [work("a", daysOld: 0), work("b", daysOld: 1), work("c", daysOld: 2)]
+    XCTAssertEqual(
+      steps(all), ["a head", "b head", "c head", "a rest", "b rest", "c rest"])
+  }
+
+  func testThePlayingEpisodeDoesItsHeadAndThenItsRestBeforeOtherHeads() {
+    let all = [work("a", daysOld: 0), work("b", daysOld: 1), work("p", daysOld: 9)]
+    XCTAssertEqual(
+      steps(all, playing: "p"), ["p head", "p rest", "a head", "b head", "a rest", "b rest"])
+  }
+
+  func testTheHeadsFollowUpNextBeforeTheNewestDownloads() {
+    let all = [work("new", daysOld: 0), work("q1", daysOld: 5), work("q2", daysOld: 3)]
+    XCTAssertEqual(
+      steps(all, upNext: ["q1", "q2"]),
+      ["q1 head", "q2 head", "new head", "q1 rest", "q2 rest", "new rest"])
+  }
+
+  func testAnEpisodeWhoseHeadIsDoneGoesStraightToItsRestAndSettledOnesAreLeftOut() {
+    let all = [work("a", head: false), work("b"), work("gone", head: false, rest: false)]
+    XCTAssertEqual(steps(all), ["b head", "a rest", "b rest"])
+  }
+
+  func testNothingIsPendingMeansNoStep() {
+    XCTAssertNil(PrepOrder.nextStep([work("a", head: false, rest: false)], playing: nil, upNext: []))
+    XCTAssertNil(PrepOrder.nextStep([], playing: "x", upNext: []))
+  }
+
+  func testAnEpisodeAtItsRestMakesWayForAnotherHeadButNotForAnotherRest() {
+    let rest = PrepStep(id: "a", stage: .rest)
+    XCTAssertTrue(
+      PrepOrder.shouldYield(working: rest, next: PrepStep(id: "b", stage: .head), playing: nil))
+    XCTAssertFalse(
+      PrepOrder.shouldYield(working: rest, next: PrepStep(id: "b", stage: .rest), playing: nil))
+    XCTAssertFalse(PrepOrder.shouldYield(working: rest, next: PrepStep(id: "a", stage: .head), playing: nil))
+    XCTAssertFalse(PrepOrder.shouldYield(working: rest, next: nil, playing: nil))
+  }
+
+  func testAHeadOnlyMakesWayForThePlayingEpisode() {
+    let head = PrepStep(id: "a", stage: .head)
+    XCTAssertFalse(
+      PrepOrder.shouldYield(working: head, next: PrepStep(id: "b", stage: .head), playing: nil))
+    XCTAssertTrue(
+      PrepOrder.shouldYield(working: head, next: PrepStep(id: "p", stage: .rest), playing: "p"))
+  }
+
+  func testTheHeadIsThreeMinutesWhichIsTheFirstTwoTranscriptPieces() {
+    XCTAssertEqual(PrepRules.headSeconds, 180)
+  }
+}
+
 final class BackgroundPowerTests: XCTestCase {
   func testChargingAlwaysMayRun() {
     XCTAssertTrue(BackgroundPower.mayRun(charging: true, batteryLevel: 0.05, lowPowerMode: true))

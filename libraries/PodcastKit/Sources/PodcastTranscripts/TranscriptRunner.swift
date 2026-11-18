@@ -27,10 +27,12 @@ public enum TranscriptRunner {
   /// Transcribes `audio` a piece at a time, saving a partial file after each piece and
   /// carrying on from an earlier one. `shouldContinue` is asked before each piece; a
   /// cancelled task stops too. When the last piece is done the final file is written and the
-  /// partial one removed.
+  /// partial one removed. With `until`, the run stops once that many seconds are done (a head):
+  /// it answers `.paused` with the partial file saved, and the next run carries on from there.
   public static func run(
     audio: URL, sha256: String, locale requested: String, recogniser: PieceRecogniser,
-    store: TranscriptStore, pieceSeconds: Double? = nil, overlap: Double = Pieces.overlap,
+    store: TranscriptStore, until stopAt: Double? = nil, pieceSeconds: Double? = nil,
+    overlap: Double = Pieces.overlap,
     progress: @Sendable (Int) -> Void = { _ in }, shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> RunOutcome {
     let locale = try await recogniser.prepare(locale: requested)
@@ -50,6 +52,7 @@ public enum TranscriptRunner {
     while let piece = Pieces.next(
       reached: reached, duration: duration, pieceSeconds: pieceSeconds, overlap: overlap)
     {
+      if let stopAt, reached >= stopAt - 0.01 { return .paused(reached: reached) }
       guard shouldContinue(), !Task.isCancelled else { return .paused(reached: reached) }
       let heard = try await recogniser.recognise(
         file: audio, locale: locale, from: piece.readFrom, to: piece.readTo)
