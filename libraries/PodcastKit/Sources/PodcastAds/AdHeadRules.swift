@@ -86,17 +86,6 @@ public enum AdHeadRules {
     #"\b[a-z0-9][a-z0-9-]*\.(com|net|org|io|co|fm|tv|me|ly|app|dev|shop|store)\b"#,
     #"\bdot (com|net|org|io|co)\b"#,
   ])
-  /// Words with which the hosts come back to the show: the patterns milestone E2 lists for
-  /// AdSignals.returnCue, with either kind of apostrophe.
-  // replace with AdSignals.returnCue when E2 is merged
-  private static let returnCues = regexes([
-    #"\bwelcome back\b"#, #"\b(we['’]re|we are) back\b"#,
-    #"\bback to the (show|episode|conversation|interview)\b"#, #"\blet['’]s get back\b"#,
-    #"\bnow,? back to\b"#, #"\bwhere were we\b"#, #"\bwelcome to\b"#, #"\bi['’]m your host\b"#,
-    #"\bon today['’]s (show|episode)\b"#, #"\bin this episode\b"#, #"\bmy guest today\b"#,
-    #"\bjoining me (today|now)\b"#,
-  ])
-
   private static func matches(_ list: [NSRegularExpression], _ text: String) -> Bool {
     let whole = NSRange(text.startIndex..., in: text)
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
@@ -118,10 +107,6 @@ public enum AdHeadRules {
   private static func isOffer(_ text: String) -> Bool {
     isCallToAction(text) && (matches(offers, text) || matches(capitalCodes, text))
   }
-
-  /// Whether the line has words that bring the hosts back to the show.
-  // replace with AdSignals.returnCue when E2 is merged
-  private static func returnCue(_ text: String) -> Bool { matches(returnCues, text) }
 
   /// An offer line that can stand alone as an ad: it also holds a web address, or another
   /// call to action comes at most `near` lines from it. One offer line in plain talk ("that is
@@ -187,7 +172,7 @@ public enum AdHeadRules {
     var last = start
     var next = start + 1
     while next < lines.count, next - last <= gap {
-      if returnCue(lines[next].text) { break }
+      if AdSignals.returnCue(lines[next].text) { break }
       if isCallToAction(lines[next].text), lines[next].start - lines[last].end <= gapSeconds {
         last = next
       }
