@@ -229,10 +229,22 @@ export interface ChartDeps {
   now?: () => number
 }
 
+/** How one list's fetch ended: a new list, or a failure with the old kept copy (or null). */
+export type ChartSettled =
+  | { status: "loaded"; shows: ChartShow[] }
+  | { status: "failed"; shows: ChartShow[] | null }
+
+/**
+ * One promise per list being fetched. `loadChart` and `loadChartGroups` (chartBatch.ts) both
+ * use it, so a list being fetched by either is not fetched again by the other.
+ */
+export const chartsInFlight = new Map<string, Promise<ChartSettled>>()
+
 /**
  * One chart with feed links: `TOP_CHART` or a category's genre id. Kept for a day; a kept
- * answer that can't be read, or that is too old, is fetched again, and if that fetch fails
- * the old answer is returned. A cache that fails does not stop the chart.
+ * answer that can't be read, or that is too old, is fetched again, and if that fetch fails,
+ * or answers with no shows, the old answer is returned. A cache that fails does not stop the
+ * chart. A list already being fetched by `loadChartGroups` is waited for, not fetched again.
  */
 export async function loadChart(
   chart: string,
@@ -246,21 +258,45 @@ export async function loadChart(
   const old = kept ? parseSavedChart(kept.value) : null
   if (kept && old && now() - kept.savedAt < CACHE_MS) return old
 
+  const existing = chartsInFlight.get(chart)
+  if (existing) {
+    const settled = await existing
+    const shows = settled.shows ?? old
+    if (shows) return shows
+    throw new Error("Couldn't load this chart. Check your connection.")
+  }
+
+  let finish: (settled: ChartSettled) => void = () => {}
+  chartsInFlight.set(
+    chart,
+    new Promise<ChartSettled>((resolve) => {
+      finish = resolve
+    }),
+  )
   try {
     const isTop = chart === TOP_CHART
     const answer = await getJson(isTop ? topUrl() : genreUrl(chart), fetchFn)
     const entries = isTop ? parseTopChart(answer) : parseCategoryChart(answer)
-    if (entries.length === 0) return []
     const ids = entries.map((entry) => entry.appleId)
-    const feeds = parseLookup(await getJson(lookupUrl(ids), fetchFn))
+    const feeds =
+      ids.length > 0
+        ? parseLookup(await getJson(lookupUrl(ids), fetchFn))
+        : new Map<string, string>()
     const shows = joinFeeds(entries, feeds)
     if (shows.length > 0) {
       await deps.cachePut(key, JSON.stringify(shows)).catch(() => {})
+      finish({ status: "loaded", shows })
+      return shows
     }
-    return shows
+    // An answer with no shows never replaces yesterday's list.
+    finish(old ? { status: "failed", shows: old } : { status: "loaded", shows })
+    return old ?? shows
   } catch (error) {
     // Yesterday's list is better than an error; only with nothing kept does it throw.
+    finish({ status: "failed", shows: old })
     if (old) return old
     throw error
+  } finally {
+    chartsInFlight.delete(chart)
   }
 }

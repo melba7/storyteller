@@ -9,6 +9,7 @@ import {
   type ChartEntry,
   type ChartShow,
   TOP_CHART,
+  chartsInFlight as inFlight,
   genreUrl,
   getJson,
   joinFeeds,
@@ -52,9 +53,6 @@ type Pending = {
   old: ChartShow[] | null
   entries?: ChartEntry[]
 }
-
-// One promise per list being fetched, so a second caller waits instead of fetching again.
-const inFlight = new Map<string, Promise<Settled>>()
 
 async function fetchEntries(
   id: string,

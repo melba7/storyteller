@@ -260,6 +260,34 @@ describe("loadChart", () => {
     expect(empty).toEqual([])
     expect(store.size).toBe(0)
   })
+
+  it("returns the old kept list, and keeps it, when the new answer has no shows or no feed links", async () => {
+    const old = [
+      {
+        appleId: "1",
+        title: "Old",
+        author: "A",
+        feedUrl: "https://x.test/rss",
+        imageUrl: null,
+      },
+    ]
+    const saved = JSON.stringify(old)
+    for (const mode of ["no entries", "no feed links"]) {
+      const store = new Map([
+        ["chart:1321", { value: saved, savedAt: 1_000_000 }],
+      ])
+      const { deps, advance } = setup(store)
+      advance(CACHE_MS + 1)
+      const fetchFn = async (url: string) =>
+        url.includes("/lookup")
+          ? answer({ results: [] })
+          : mode === "no entries"
+            ? answer({ feed: {} })
+            : answer(fixture("category-chart"))
+      expect(await loadChart("1321", { ...deps, fetchFn })).toEqual(old)
+      expect(store.get("chart:1321")?.value).toBe(saved)
+    }
+  })
 })
 
 describe("parseSavedChart", () => {

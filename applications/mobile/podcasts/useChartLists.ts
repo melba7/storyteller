@@ -1,5 +1,6 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useCallback, useEffect, useState } from "react"
+import { useFocusEffect } from "expo-router"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
   type ChartListUpdate,
@@ -27,7 +28,7 @@ export type ChartListStates = Record<string, ListState | EpisodesState>
  * `enabled` (Home and New wait for the followed shows, because they decide the order). Two
  * pages asking for the same list together fetch it once: `loadChartGroups` shares one
  * in-flight promise per list. The episode list (`EPISODES_CHART`) has its own loader and
- * its state sits among the others. `retry()` asks again; lists that are fresh cost no request.
+ * its state sits among the others. `retry()` asks again (also whenever the tab regains focus); lists that are fresh cost no request.
  */
 export function useChartLists(ids: string[], enabled: boolean) {
   const key = ids.join(",")
@@ -78,5 +79,14 @@ export function useChartLists(ids: string[], enabled: boolean) {
   }, [key, enabled, round])
 
   const retry = useCallback(() => setRound((r) => r + 1), [])
+  // Coming back to the tab asks again, so a list that failed on a bad connection is tried
+  // once more; fresh lists cost no request. The first focus is the page opening, which loads.
+  const opened = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (opened.current) retry()
+      opened.current = true
+    }, [retry]),
+  )
   return { states, retry }
 }

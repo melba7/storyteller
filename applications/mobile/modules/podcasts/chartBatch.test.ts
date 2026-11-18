@@ -8,7 +8,7 @@ import {
   type ChartListUpdate,
   type ListState,
 } from "./chartBatch"
-import { CACHE_MS, type ChartDeps, type ChartShow } from "./charts"
+import { CACHE_MS, type ChartDeps, type ChartShow, loadChart } from "./charts"
 
 const NOW = 10_000_000_000
 
@@ -196,6 +196,28 @@ describe("loadChartGroups", () => {
     expect(calls).toHaveLength(2 + 1)
     expect(a.events.filter(([, u]) => u.status === "loaded")).toHaveLength(2)
     expect(b.events.filter(([, u]) => u.status === "loaded")).toHaveLength(2)
+  })
+})
+
+describe("loadChart and loadChartGroups together", () => {
+  it("fetch a list once whichever starts first, and give the same shows", async () => {
+    for (const chartFirst of [true, false]) {
+      const { deps, calls } = setup()
+      const { events, onList } = collect()
+      const ids = ["91", "92"]
+      const chart = () => loadChart("91", deps)
+      const groups = () => loadChartGroups(ids, deps, onList)
+      const [a, b] = chartFirst ? [chart(), groups()] : [groups(), chart()]
+      await Promise.all([a, b])
+      const shows = await chart()
+      expect(calls.filter((c) => c.includes("genre=91"))).toHaveLength(1)
+      expect(lookups(calls).filter((c) => c.includes("91-0"))).toHaveLength(1)
+      const loaded = events.find(
+        ([id, u]) => id === "91" && u.status === "loaded",
+      )
+      expect(loaded?.[1].shows).toEqual(shows)
+      expect(shows).toHaveLength(50)
+    }
   })
 })
 

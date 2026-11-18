@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react"
 
 import {
+  type ForYouPick,
   type ForYouSuggestion,
   buildForYou,
   pickForYou,
@@ -48,18 +49,24 @@ export function useChart(chart: string): Query<ChartShow[]> {
 /**
  * "For you": suggestions from the categories of the followed shows. Empty while loading, and
  * when nothing is followed or no chart could be read (Discover then shows only the charts).
+ * `loaded` is true once the answer is in, so a page can tell "none yet" from "none".
  */
-export function useForYou(): ForYouSuggestion[] {
+export function useForYouState(): {
+  suggestions: ForYouSuggestion[]
+  picks: ForYouPick[]
+  loaded: boolean
+} {
   const shows = useShows().data
   const picks = useMemo(() => pickForYou(shows ?? []), [shows])
-  const [suggestions, setSuggestions] = useState<ForYouSuggestion[]>([])
+  const [done, setDone] = useState<ForYouSuggestion[] | null>(null)
 
   useEffect(() => {
     let current = true
     if (!shows || picks.length === 0) {
-      setSuggestions([])
+      setDone(null)
       return
     }
+    setDone(null)
     Promise.allSettled(picks.map((p) => loadChart(p.category.id, store))).then(
       (settled) => {
         if (!current) return
@@ -70,7 +77,7 @@ export function useForYou(): ForYouSuggestion[] {
             charts.set(pick.category.id, result.value)
           }
         })
-        setSuggestions(buildForYou(picks, charts, shows))
+        setDone(buildForYou(picks, charts, shows))
       },
     )
     return () => {
@@ -78,5 +85,10 @@ export function useForYou(): ForYouSuggestion[] {
     }
   }, [shows, picks])
 
-  return suggestions
+  const ready = shows !== undefined && (picks.length === 0 || done !== null)
+  return { suggestions: done ?? [], picks, loaded: ready }
+}
+
+export function useForYou(): ForYouSuggestion[] {
+  return useForYouState().suggestions
 }

@@ -5,6 +5,7 @@ import {
   type FollowedShow,
   buildForYou,
   chartCategoryFor,
+  forYouOmit,
   isFollowed,
   pickForYou,
   topLevelNames,
@@ -161,5 +162,23 @@ describe("buildForYou", () => {
   it("keeps at most the number asked for", () => {
     const result = buildForYou(picks, charts, mine, 1)
     expect(result[0]?.shows).toHaveLength(1)
+  })
+})
+
+describe("forYouOmit", () => {
+  const mine = [
+    followed("My Money Show", ["Business"]),
+    followed("My Jokes", ["Comedy"]),
+  ]
+  const picks = pickForYou(mine)
+  const drawn = buildForYou(picks, new Map([["1321", [chartShow("A")]]]), mine)
+
+  it("gives every pick while For You is loading, so the planned lists hold still", () => {
+    expect(forYouOmit(picks, [], false)).toEqual(["1321", "1303"])
+  })
+
+  it("gives only the categories For You drew once it has loaded", () => {
+    expect(forYouOmit(picks, drawn, true)).toEqual(["1321"])
+    expect(forYouOmit(picks, [], true)).toEqual([])
   })
 })

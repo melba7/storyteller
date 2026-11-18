@@ -110,3 +110,18 @@ export function buildForYou(
   }
   return suggestions
 }
+
+/**
+ * The category ids New's chart lists leave out because "For You" already shows them. While
+ * For You loads that is every pick, so the planned lists stay the same; once it has loaded it
+ * is only the categories it drew, so a pick whose chart failed still gets its "Top in ..."
+ * list.
+ */
+export function forYouOmit(
+  picks: ForYouPick[],
+  drawn: ForYouSuggestion[],
+  loaded: boolean,
+): string[] {
+  const shown = loaded ? drawn : picks
+  return shown.map((pick) => pick.category.id)
+}
