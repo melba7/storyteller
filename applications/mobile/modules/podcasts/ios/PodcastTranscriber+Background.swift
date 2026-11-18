@@ -2,11 +2,13 @@
 //
 // When the app leaves the screen with transcribing left, it asks iOS for a background
 // processing task (`<bundle id>.podcastTranscribe`). iOS picks the time, often overnight, and
-// wakes the app, which carries on from the partial files. When iOS says the time is up, the
+// wakes the app, which carries on from the partial files. A turn runs on the charger, or with
+// at least 30% battery and Low Power Mode off (PodcastPower). When iOS says the time is up, the
 // piece being transcribed is finished and saved, then the task asks for another turn.
 
 import BackgroundTasks
 import Foundation
+import PodcastAds
 import UIKit
 
 extension PodcastTranscriber {
@@ -42,6 +44,7 @@ extension PodcastTranscriber {
       if self?.hasWork == true { self?.askForBackgroundTime(force: true) }
     }
     DispatchQueue.main.async { [weak self] in
+      PodcastPower.startWatching()
       let active = UIApplication.shared.applicationState == .active
       self?.lock.withLock { self?.appActive = active }
       self?.scan()
@@ -59,7 +62,7 @@ extension PodcastTranscriber {
     guard !skip else { return }
     let request = BGProcessingTaskRequest(identifier: Self.identifier)
     request.requiresNetworkConnectivity = false
-    request.requiresExternalPower = false
+    request.requiresExternalPower = BackgroundPower.requiresExternalPower
     do {
       try BGTaskScheduler.shared.submit(request)
     } catch {
@@ -75,6 +78,12 @@ extension PodcastTranscriber {
       self?.lock.withLock { self?.inBackgroundTask = false }
     }
     Task { [self] in
+      // Too little battery: give the turn back and ask again later.
+      guard await PodcastPower.mayRunInBackground() else {
+        lock.withLock { inBackgroundTask = false }
+        if hasWork { askForBackgroundTime() }
+        return task.setTaskCompleted(success: false)
+      }
       scan()
       let running = lock.withLock { worker }
       await running?.value

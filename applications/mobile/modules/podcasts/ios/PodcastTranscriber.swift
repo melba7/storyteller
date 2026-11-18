@@ -149,13 +149,13 @@ final class PodcastTranscriber: @unchecked Sendable {
     kick()
   }
 
-  /// Takes the next episode off the queue: the urgent one when it waits, otherwise the first.
+  /// Takes the next episode off the queue: the one loaded in the player, then Up Next, then
+  /// the newest downloads (PrepQueue).
   private func takeNext() -> String? {
-    lock.withLock {
-      guard let id = QueueOrder.next(waiting: waiting, urgent: urgent) else { return nil }
-      waiting.removeAll { $0 == id }
-      return id
-    }
+    let (list, playing) = lock.withLock { (waiting, urgent) }
+    guard let id = PrepQueue.next(waiting: list, playing: playing) else { return nil }
+    lock.withLock { waiting.removeAll { $0 == id } }
+    return id
   }
 
   /// Whether another episode is urgent and waiting, so the one at work should stop.
