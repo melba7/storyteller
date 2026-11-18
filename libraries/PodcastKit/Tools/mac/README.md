@@ -159,14 +159,26 @@ on and Xcode 26, like the other ad tools.
 
 ### Compare two downloads of an episode
 
-`Compare two downloads of an episode.command` asks for an episode's audio
-address (the `.mp3` link in the show's feed; if the clipboard holds a web
-address it uses that without asking). It runs `podcast-ads --probe`: it
-downloads the first 3 MB twice, once as "StorytellerLofi/1.0 podcast client" and
-once under a different name, because a host that inserts ads chooses them per
-request and may hand the same ads to the same client twice. Then it cuts both
-copies into MP3 frames (skipping the ID3 tag), lines them up by a hash of each
-frame, and prints:
+`Compare two downloads of an episode.command` offers two choices.
+
+**Test my shows (recommended).** Double-click it, choose Test my shows, wait a
+few minutes, and send back the file it shows. It reads the shows you follow
+(from the Apple Podcasts sync; if that file is missing, it says to double-click
+`Sync Apple Podcasts now.command` first), takes the newest episode of up to 8 of
+them, one per hosting service, and probes each one (see below). The report is
+`~/Storyteller Lofi/logs/ad-probe-shows-<time>.txt`, with a table at the end:
+one line per show with its host, whether the two copies were the same bytes or
+differed, and whether they share frames. It downloads 3 MB twice per show, one
+show at a time with a pause between them. `probe_shows.py` picks the shows.
+
+**One episode address.** The rest of this section is about this choice, which
+asks for an episode's audio address (the `.mp3` link in the show's feed; if the
+clipboard holds a web address it uses that without asking). It runs
+`podcast-ads --probe`: it downloads the first 3 MB twice, once as
+"StorytellerLofi/1.0 podcast client" and once under a different name, because a
+host that inserts ads chooses them per request and may hand the same ads to the
+same client twice. Then it cuts both copies into MP3 frames (skipping the ID3
+tag), lines them up by a hash of each frame, and prints:
 
 - the host after redirects, the answer code (206 means the range request
   worked), the size, the frame count and the length of each copy;
