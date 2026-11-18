@@ -184,8 +184,10 @@ export type AdRow = {
   kind: string
   advertiser: string
   firstWords: string
-  /** The player skips this ad (sure, and not undone); the rest are only listed. */
+  /** The player skips this ad (sure or unsure, and not undone). */
   skipped: boolean
+  /** The detector was not sure about it (it is skipped all the same). */
+  unsure: boolean
   /** The listener took the skip back. */
   undone: boolean
   /** What a screen reader says. */
@@ -194,7 +196,7 @@ export type AdRow = {
 
 /**
  * The rows of the "Ads found" list, in order. Guesses are not listed. An unsure ad is listed
- * but marked as not skipped. (Whether the host plugs are skipped is the listener's switch.)
+ * and skipped like a sure one. (Whether the host plugs are skipped is the listener's switch.)
  */
 export function adRows(file: AdsFile): AdRow[] {
   return file.ads
@@ -215,7 +217,8 @@ export function adRows(file: AdsFile): AdRow[] {
         kind,
         advertiser: ad.advertiser,
         firstWords: ad.firstWords,
-        skipped: ad.confidence === "sure" && !undone,
+        skipped: !undone,
+        unsure: ad.confidence === "unsure",
         undone,
         label: [
           `${kind} at ${time}, ${length} long`,
@@ -276,11 +279,17 @@ export function noteAfterUndo(
 // MARK: Marks on the seek bar
 
 /** Where an ad sits on the seek bar, as shares (0 to 1) of its length. */
-export type AdMark = { left: number; width: number; skipped: boolean }
+export type AdMark = {
+  left: number
+  width: number
+  skipped: boolean
+  /** Not sure it is an ad: drawn faint, though it is skipped too. */
+  unsure: boolean
+}
 
 /** The marks for the listed ads. Nothing while the length is not known. */
 export function adMarks(
-  rows: readonly Pick<AdRow, "start" | "end" | "skipped">[],
+  rows: readonly Pick<AdRow, "start" | "end" | "skipped" | "unsure">[],
   duration: number | null,
 ): AdMark[] {
   if (duration === null || !(duration > 0)) return []
@@ -292,6 +301,7 @@ export function adMarks(
         left,
         width: Math.min(1 - left, (row.end - row.start) / duration),
         skipped: row.skipped,
+        unsure: row.unsure,
       },
     ]
   })

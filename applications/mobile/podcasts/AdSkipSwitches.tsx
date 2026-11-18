@@ -17,7 +17,7 @@ import { useAdsUnavailable } from "./useAds"
  */
 function skipAdsBody(unavailable: string | null): string {
   const body =
-    'Skips sponsor reads and other ads once they are found. It works while streaming too: the episode plays from its own download, which on mobile data needs "Download only on Wi-Fi" to be off. It never skips when it is not sure.'
+    'Skips sponsor reads and other ads once they are found. It works while streaming too: the episode plays from its own download, which on mobile data needs "Download only on Wi-Fi" to be off. An ad it is not sure about is skipped too, and you can undo any skip.'
   return unavailable === null
     ? body
     : `${body} Ads can't be found right now: ${unavailable}`

@@ -46,9 +46,9 @@ export function AdsFound({
                 {row.firstWords}
               </Text>
             ) : null}
-            {!row.skipped ? (
+            {row.undone || row.unsure ? (
               <Text className="text-muted-foreground text-xs">
-                {row.undone ? "Skip undone" : "Not sure, not skipped"}
+                {row.undone ? "Skip undone" : "Not sure"}
               </Text>
             ) : null}
           </View>

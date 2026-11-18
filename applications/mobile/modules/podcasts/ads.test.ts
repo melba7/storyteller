@@ -156,7 +156,9 @@ describe("adRows", () => {
     )
     const rows = adRows(file!)
     expect(rows.map((row) => row.kind)).toEqual(["Host plug", "Ad", "Ad"])
-    expect(rows.map((row) => row.skipped)).toEqual([true, false, false])
+    // Sure and unsure ads are both skipped, unless the listener undid the skip.
+    expect(rows.map((row) => row.skipped)).toEqual([true, true, false])
+    expect(rows.map((row) => row.unsure)).toEqual([false, true, false])
     expect(rows.map((row) => row.undone)).toEqual([false, false, true])
     expect(rows[1]?.label).toContain("not sure")
   })
@@ -192,15 +194,28 @@ describe("the note after a skip", () => {
 
 describe("adMarks", () => {
   const rows = [
-    { start: 100, end: 160, skipped: true },
-    { start: 500, end: 560, skipped: false },
+    { start: 100, end: 160, skipped: true, unsure: false },
+    { start: 500, end: 560, skipped: false, unsure: false },
+    { start: 700, end: 760, skipped: true, unsure: true },
   ]
 
   it("places each ad as shares of the episode", () => {
     const marks = adMarks(rows, 1000)
-    expect(marks[0]).toEqual({ left: 0.1, width: 0.06, skipped: true })
+    expect(marks[0]).toEqual({
+      left: 0.1,
+      width: 0.06,
+      skipped: true,
+      unsure: false,
+    })
     expect(marks[1]?.left).toBe(0.5)
     expect(marks[1]?.skipped).toBe(false)
+  })
+
+  it("keeps the unsure ones apart: skipped, drawn faint", () => {
+    expect(adMarks(rows, 1000)[2]).toMatchObject({
+      skipped: true,
+      unsure: true,
+    })
   })
 
   it("draws nothing while the length is unknown", () => {
@@ -209,12 +224,15 @@ describe("adMarks", () => {
   })
 
   it("keeps a mark inside the bar", () => {
-    const [mark] = adMarks([{ start: 950, end: 1100, skipped: true }], 1000)
+    const [mark] = adMarks(
+      [{ start: 950, end: 1100, skipped: true, unsure: false }],
+      1000,
+    )
     expect(mark?.left).toBe(0.95)
     expect(mark?.width).toBeCloseTo(0.05)
-    expect(adMarks([{ start: 1200, end: 1300, skipped: true }], 1000)).toEqual(
-      [],
-    )
+    expect(
+      adMarks([{ start: 1200, end: 1300, skipped: true, unsure: false }], 1000),
+    ).toEqual([])
   })
 })
 

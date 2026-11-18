@@ -147,7 +147,7 @@ export function SeekBar({
               <View
                 key={mark.left}
                 className={
-                  mark.skipped
+                  mark.skipped && !mark.unsure
                     ? "absolute h-full bg-amber-300"
                     : "absolute h-full bg-amber-300/40"
                 }
