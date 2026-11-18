@@ -10,9 +10,10 @@
 // first (as podcast-transcribe does). With --play it does what the phone does for an episode
 // that is playing (a transcript piece, then a partial ad pass, and so on), times each step, and
 // says for each ad whether a listener who pressed play at 0:00 would have had it skipped. With
-// --head N --timings it handles only the first N seconds, twice in one process (cold, then
-// warm), and prints when the speech model was ready, the first words came, the head transcript
-// was done and the model first answered. With --probe it downloads the first 3 MB of an episode
+// --head N --timings (an MP3 file) it runs the first N seconds down the path a stream takes
+// on the phone (the head transcriber, cuts of the file's first bytes, the text rules after each
+// 30 second step, the model at 60 and 180 s), twice in one process (cold, then warm), and
+// prints the time of each step. With --probe it downloads the first 3 MB of an episode
 // address twice as two different listeners and prints where the two copies differ (no
 // speech or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
 // is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
@@ -124,7 +125,7 @@ do {
     }
     guard let recogniser = AppleSpeech.makeRecogniser() else { fail("Needs macOS 26 to transcribe.") }
     try await HeadTimings.run(
-      audio: input, head: head, locale: locale, recogniser: recogniser, detector: detector, work: work)
+      audio: input, head: head, locale: locale, recogniser: recogniser, work: work)
     exit(0)
   }
   if play {

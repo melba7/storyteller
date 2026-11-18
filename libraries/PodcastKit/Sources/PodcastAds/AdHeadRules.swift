@@ -22,6 +22,20 @@ public enum AdHeadRules {
   /// How many lines around a sponsor named in the notes a call to action may be.
   public static let near = 2
 
+  /// The seconds of audio after which each step of a stream's head scan ends (the phone's steps).
+  public static let steps: [Double] = [30, 60, 90, 120, 150, 180]
+  /// The steps after which the on-device model is asked.
+  public static let modelSteps: Set<Double> = [60, 180]
+
+  /// The steps for a head of `seconds`: the phone's steps up to it, and the end itself when it
+  /// falls between two (a head of 100 seconds ends with a step of 100). Never past the last step.
+  public static func steps(upTo seconds: Double) -> [Double] {
+    var result = steps.filter { $0 <= seconds }
+    if let last = result.last, seconds - last > 1, seconds < (steps.last ?? 0) { result.append(seconds) }
+    if result.isEmpty { result = [seconds] }
+    return result
+  }
+
   private static func regexes(_ patterns: [String], caseInsensitive: Bool = true) -> [NSRegularExpression] {
     patterns.compactMap { try? NSRegularExpression(pattern: $0, options: caseInsensitive ? [.caseInsensitive] : []) }
   }

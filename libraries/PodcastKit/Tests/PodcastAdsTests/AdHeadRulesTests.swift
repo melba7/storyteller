@@ -154,4 +154,12 @@ final class AdHeadRulesTests: XCTestCase {
     XCTAssertEqual(
       AdHeadRules.find(lines: lines(["Visit acme.com slash sleepy for details."])).map(\.startLine), [1])
   }
+
+  func testTheStepsOfAHeadAreThePhonesStepsUpToIt() {
+    XCTAssertEqual(AdHeadRules.steps(upTo: 90), [30, 60, 90])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 100), [30, 60, 90, 100])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 10), [10])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 600), AdHeadRules.steps)
+    XCTAssertEqual(AdHeadRules.modelSteps, [60, 180])
+  }
 }

@@ -139,23 +139,29 @@ nothing and use no keys.
 
 ### Time the first minute of an episode
 
-`Time the first minute of an episode.command` asks for an audio file and runs
-`podcast-ads --head 90 --timings`. It handles only the first 90 seconds, and it
-does so twice in one go, so you see a cold run (the app just opened) and a warm
-one. Each run prints four times, in seconds since that run began:
+`Time the first minute of an episode.command` asks for an MP3 file and runs
+`podcast-ads --head 90 --timings`. It follows the path a stream takes on the
+phone: one speech analyzer made ready ahead, the start of the file cut at a
+whole MP3 frame in 30 second steps (30, 60, 90), each step transcribed, the text
+rules run after each step, and the ad model asked at 60 seconds (with a session
+warmed ahead) and at 180 seconds (with a fresh one) when the head reaches them.
+A stall or an error here is one the phone would meet too. It does all of this
+twice in one go, so you see a cold run (the app just opened) and a warm one.
+Each run prints, in seconds since that run began:
 
-- **speech model ready**: Apple's speech model loaded. The warm run should be
-  close to zero.
-- **first words**: the first 15 seconds transcribed, with the first words shown.
-- **head transcript done**: all 90 seconds transcribed.
-- **model's first answer**: the ad model has read the head and answered, with
-  the ads it found. This last time is the one that matters: it is how long the
-  first 90 seconds of a stream take to check.
+- **speech ready**: Apple's speech model loaded. The warm run should be close to
+  zero.
+- **transcript to N s**: each step's transcript, with its words and how long the
+  step took.
+- **rules at N s**: the text rules after that step, with the ads they found.
+- **model at N s**: the ad model's answer, with how long it took. The last time
+  on a run is how long the first 90 seconds of a stream take to check.
 
-It saves the text next to the file as `<file name>.head-timings.txt`. Under 10
-seconds on the Mac is good. A phone is slower, so a Mac result is the best case.
-Pick an episode with an ad at the start. Needs macOS 26 with Apple Intelligence
-on and Xcode 26, like the other ad tools.
+Then it lists the ads left at the end. It saves the text next to the file as
+`<file name>.head-timings.txt`. Under 10 seconds on the Mac is good. A phone is
+slower, so a Mac result is the best case. Pick an MP3 episode with an ad at the
+start (a file that is not an MP3 is refused, as the phone's scan refuses it).
+Needs macOS 26 with Apple Intelligence on and Xcode 26, like the other ad tools.
 
 ### Compare two downloads of an episode
 

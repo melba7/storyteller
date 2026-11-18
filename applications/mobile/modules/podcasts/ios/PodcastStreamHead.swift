@@ -22,9 +22,9 @@ import PodcastTranscripts
 
 final class PodcastStreamHead: @unchecked Sendable {
   /// Seconds of audio after which each step ends.
-  static let targets: [Double] = [30, 60, 90, 120, 150, 180]
+  static let targets = AdHeadRules.steps
   /// The steps after which the model is asked.
-  static let modelSteps: Set<Double> = [60, 180]
+  static let modelSteps = AdHeadRules.modelSteps
 
   let episodeId: String
   private let store: DownloadStore
