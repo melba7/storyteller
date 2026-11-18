@@ -10,9 +10,11 @@ import { blendOver } from "@/modules/podcasts/artworkTint"
 import { chapterArtwork } from "@/modules/podcasts/chapters"
 import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import {
+  MIN_ART_AREA,
   artworkPlan,
   sheetGutters,
   sideBySide,
+  splitWidths,
 } from "@/modules/podcasts/playerFrame"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
@@ -39,8 +41,6 @@ import { useChapters } from "./useChapters"
 const SIDE = 32
 /** The height of the grabber's row, which the artwork reaches up under. */
 const GRABBER = 24
-/** Under this height (large text), the artwork area is too small for a picture, so it is left out. */
-const MIN_ART_AREA = 140
 
 /**
  * The player sheet: the artwork's colour as the whole background with a grabber at the top.
@@ -75,12 +75,13 @@ export function PlayerScreen() {
   // A short, wide sheet (phone landscape) puts the artwork or panel left of the controls.
   const split = sideBySide(sheet)
   const gutters = sheetGutters({ side: SIDE, insets, sideBySide: split })
+  const columns = splitWidths(width)
   // The artwork is as wide as the sheet and square, and is cut off where the controls begin.
   // On a wide sheet with little height it is a centred square instead. Until the area is
   // measured it is as tall as it can be, so it doesn't jump.
   const plan = artworkPlan({
     sheetWidth: width,
-    areaWidth: split ? width / 2 : width,
+    areaWidth: split ? columns.area : width,
     areaHeight,
     grabber: GRABBER,
     minArea: MIN_ART_AREA,
@@ -136,7 +137,7 @@ export function PlayerScreen() {
               show?.imageUrl ??
               null
             }
-            width={split ? width / 2 : width}
+            width={split ? columns.area : width}
             height={plan.kind === "contained" ? plan.height : artHeight}
             fadeTo={fadeTo}
             contained={plan.kind === "contained"}
@@ -170,6 +171,9 @@ export function PlayerScreen() {
                 style={{
                   paddingLeft: panel === "art" ? 0 : gutters.areaLeft,
                   paddingRight: panel === "art" ? 0 : gutters.areaRight,
+                  ...(split
+                    ? { width: columns.area, flexGrow: 0, flexShrink: 0 }
+                    : null),
                 }}
                 onLayout={(event) =>
                   setAreaHeight(event.nativeEvent.layout.height)
@@ -204,7 +208,11 @@ export function PlayerScreen() {
               </View>
               {/* Everything under the artwork scrolls when large text makes it taller than the room left. */}
               <ScrollView
-                style={split ? { flex: 1 } : { flexGrow: 0, flexShrink: 1 }}
+                style={
+                  split
+                    ? { width: columns.controls, flexGrow: 0, flexShrink: 0 }
+                    : { flexGrow: 0, flexShrink: 1 }
+                }
                 bounces={false}
                 showsVerticalScrollIndicator={false}
               >
