@@ -7,6 +7,21 @@
 import Foundation
 import PodcastTranscripts
 
+
+/// Turns the start of an episode into words while the rest is still downloading. One analyzer
+/// is made ready ahead of the audio, then fed in steps; every call gives all words so far.
+public protocol HeadTranscribing: AnyObject, Sendable {
+  /// Loads the model and gets the analyzer ready. Throws when the speech model is not on the
+  /// phone yet (it is not downloaded here: the normal path does that) or the language is not
+  /// supported.
+  func prepare() async throws
+  /// Feeds `from` to `to` seconds of `file` (the next piece after the last call: the audio is
+  /// taken to be one run) and returns all the words that are final so far, timed from 0.
+  func extend(file: URL, from: Double, to: Double) async throws -> [TranscriptWord]
+  /// Lets go of the analyzer, so the full transcript can have it.
+  func finish() async
+}
+
 #if canImport(Speech) && compiler(>=6.2)
   import AVFoundation
   import CoreMedia
@@ -22,7 +37,7 @@ import PodcastTranscripts
     public init() {}
 
     /// The transcriber for a locale, asking for the time of each word.
-    private static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
+    static func makeTranscriber(_ locale: Locale) -> SpeechTranscriber {
       SpeechTranscriber(
         locale: locale, transcriptionOptions: [], reportingOptions: [],
         attributeOptions: [.audioTimeRange])
@@ -97,11 +112,14 @@ import PodcastTranscripts
     }
 
     /// Reads `from` to `to` seconds of the file, from its frame position, and yields the audio
-    /// in the format the analyzer wants.
-    private static func feed(
+    /// in the format the analyzer wants. Gives the seconds of audio really yielded, counted in
+    /// the analyzer's own frames: that is a little less than `to - from` (the decoder drops the
+    /// first frame and the rate converter keeps its last few samples).
+    @discardableResult
+    static func feed(
       _ file: URL, from: Double, to: Double, as target: AVAudioFormat,
-      into continuation: AsyncStream<AnalyzerInput>.Continuation
-    ) throws {
+      into continuation: AsyncStream<AnalyzerInput>.Continuation, tolerant: Bool = false
+    ) throws -> Double {
       let audio = try AVAudioFile(forReading: file)
       let format = audio.processingFormat
       audio.framePosition = AVAudioFramePosition(from * format.sampleRate)
@@ -111,19 +129,29 @@ import PodcastTranscripts
         throw TranscriptError.failed("This audio cannot be converted for the speech recogniser")
       }
       let chunk = AVAudioFrameCount(format.sampleRate)
+      var yielded: AVAudioFramePosition = 0
       while remaining > 0 {
         let count = AVAudioFrameCount(min(AVAudioFramePosition(chunk), remaining))
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count) else {
           throw TranscriptError.failed("Not enough memory to read the audio")
         }
-        try audio.read(into: buffer, frameCount: count)
+        // A copy of a file that is still downloading may end inside what its header promises:
+        // for it a read error is the end of the audio.
+        do {
+          try audio.read(into: buffer, frameCount: count)
+        } catch where tolerant {
+          break
+        }
         if buffer.frameLength == 0 { break }
         remaining -= AVAudioFramePosition(buffer.frameLength)
-        continuation.yield(AnalyzerInput(buffer: try convert(buffer, with: converter, to: target)))
+        let converted = try convert(buffer, with: converter, to: target)
+        yielded += AVAudioFramePosition(converted.frameLength)
+        continuation.yield(AnalyzerInput(buffer: converted))
       }
+      return Double(yielded) / target.sampleRate
     }
 
-    private static func convert(
+    static func convert(
       _ buffer: AVAudioPCMBuffer, with converter: AVAudioConverter?, to format: AVAudioFormat
     ) throws -> AVAudioPCMBuffer {
       guard let converter else { return buffer }
@@ -149,6 +177,113 @@ import PodcastTranscripts
       return output
     }
   }
+  @available(iOS 26.0, macOS 26.0, *)
+  final class AppleHeadTranscriber: HeadTranscribing, @unchecked Sendable {
+    private let locale: String
+    private var analyzer: SpeechAnalyzer?
+    private var format: AVAudioFormat?
+    private var inputs: AsyncStream<AnalyzerInput>.Continuation?
+    private var collector: Task<Void, Never>?
+    private let lock = NSLock()
+    private var words: [TranscriptWord] = []
+    private var finalizedTo = 0.0
+    private var failure: Error?
+    /// Seconds of audio given to the analyzer so far, on the analyzer's own clock.
+    private var yielded = 0.0
+    /// How long one `extend` may take before the scan gives up and the normal path does the work.
+    static let stepLimit = 20.0
+    /// Finalizing stops this far short of the audio yielded, so the analyzer has consumed it.
+    static let finalizeMargin = 0.05
+
+    init(locale: String) { self.locale = locale }
+
+    func prepare() async throws {
+      guard SpeechTranscriber.isAvailable,
+        let supported = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: locale))
+      else { throw TranscriptError.notSupported("Language not supported") }
+      let transcriber = AppleRecogniser.makeTranscriber(supported)
+      if try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) != nil {
+        throw TranscriptError.notSupported("The speech model is not on this phone yet")
+      }
+      guard let format = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber])
+      else { throw TranscriptError.failed("The speech recogniser has no audio format") }
+      // The model stays loaded for the process, so the next episode's head starts warm too.
+      let analyzer = SpeechAnalyzer(
+        modules: [transcriber],
+        options: SpeechAnalyzer.Options(priority: .userInitiated, modelRetention: .processLifetime))
+      try await analyzer.prepareToAnalyze(in: format)
+      let (stream, continuation) = AsyncStream.makeStream(of: AnalyzerInput.self)
+      try await analyzer.start(inputSequence: stream)
+      self.analyzer = analyzer
+      self.format = format
+      inputs = continuation
+      collector = Task { [weak self] in
+        do {
+          for try await result in transcriber.results {
+            self?.take(result)
+          }
+        } catch {
+          self?.lock.withLock { self?.failure = error }
+        }
+      }
+    }
+
+    private func take(_ result: SpeechTranscriber.Result) {
+      var found: [TranscriptWord] = []
+      for run in result.text.runs {
+        guard let range = run[AttributeScopes.SpeechAttributes.TimeRangeAttribute.self] else { continue }
+        let text = String(result.text[run.range].characters)
+          .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+          found.append(TranscriptWord(text: text, start: range.start.seconds, end: range.end.seconds))
+        }
+      }
+      lock.withLock {
+        words += found
+        finalizedTo = max(finalizedTo, result.resultsFinalizationTime.seconds, result.range.end.seconds)
+      }
+    }
+
+    func extend(file: URL, from: Double, to: Double) async throws -> [TranscriptWord] {
+      try await withTimeLimit(
+        seconds: Self.stepLimit,
+        message: "The speech recogniser did not finish a step in \(Int(Self.stepLimit)) seconds"
+      ) { [self] in try await step(file: file, from: from, to: to) }
+    }
+
+    /// `finalize(through:)` waits until the analyzer has consumed that audio, so it is given the
+    /// time of the audio really yielded (a little short of `to`), never `to` itself.
+    private func step(file: URL, from: Double, to: Double) async throws -> [TranscriptWord] {
+      guard let analyzer, let format, let inputs else {
+        throw TranscriptError.failed("The head transcriber was not prepared")
+      }
+      let added = try AppleRecogniser.feed(file, from: from, to: to, as: format, into: inputs, tolerant: true)
+      let through = lock.withLock { () -> Double in
+        yielded += added
+        return yielded - Self.finalizeMargin
+      }
+      if added > 0, through > 0 {
+        try await analyzer.finalize(through: CMTime(seconds: through, preferredTimescale: 600))
+        // The results reach the collector a moment after they are final.
+        var waited = 0
+        while waited < 40, lock.withLock({ finalizedTo < through - 1 && failure == nil }) {
+          try await Task.sleep(nanoseconds: 25_000_000)
+          waited += 1
+        }
+      }
+      return try lock.withLock {
+        if let failure { throw failure }
+        return words
+      }
+    }
+
+    func finish() async {
+      inputs?.finish()
+      collector?.cancel()
+      await analyzer?.cancelAndFinishNow()
+      analyzer = nil
+    }
+  }
 #endif
 
 public enum AppleSpeech {
@@ -159,6 +294,14 @@ public enum AppleSpeech {
   public static func makeRecogniser() -> PieceRecogniser? {
     #if canImport(Speech) && compiler(>=6.2)
       if #available(iOS 26.0, macOS 26.0, *) { return AppleRecogniser() }
+    #endif
+    return nil
+  }
+
+  /// A transcriber for the first minutes of a stream, or nil when this system has none.
+  public static func makeHeadTranscriber(locale identifier: String) -> HeadTranscribing? {
+    #if canImport(Speech) && compiler(>=6.2)
+      if #available(iOS 26.0, macOS 26.0, *) { return AppleHeadTranscriber(locale: identifier) }
     #endif
     return nil
   }

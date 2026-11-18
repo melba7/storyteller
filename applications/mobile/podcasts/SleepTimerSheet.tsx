@@ -1,9 +1,10 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { Moon } from "lucide-react-native"
 import { useState } from "react"
-import { Modal, Pressable, TextInput, View } from "react-native"
+import { Modal, Pressable, ScrollView, TextInput, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { ALL_ORIENTATIONS } from "@/modules/podcasts/playerFrame"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import {
   SLEEP_EXTRA_MINUTES,
@@ -66,6 +67,7 @@ export function SleepTimerButton() {
         visible={open}
         transparent
         animationType="slide"
+        supportedOrientations={ALL_ORIENTATIONS}
         onRequestClose={() => setOpen(false)}
       >
         <SleepSheet
@@ -106,71 +108,79 @@ function SleepSheet({
         accessibilityLabel="Close the sleep timer"
         onPress={onClose}
       />
-      <View className="bg-background pb-safe-offset-3 gap-1 rounded-t-3xl px-6 pt-5">
+      <View className="bg-background pb-safe-offset-3 px-safe-or-6 max-h-full rounded-t-3xl pt-5">
         <Text className="pb-2 text-lg font-semibold">Sleep timer</Text>
-        {SLEEP_PRESET_MINUTES.map((minutes) => (
+        {/* The choices scroll when the window is short (landscape, large text). */}
+        <ScrollView
+          className="shrink"
+          contentContainerClassName="gap-1"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {SLEEP_PRESET_MINUTES.map((minutes) => (
+            <Choice
+              key={minutes}
+              label={minutesLabel(minutes)}
+              onPress={() => choose(() => sleepTimer.startMinutes(minutes))}
+            />
+          ))}
+          {hasChapters ? (
+            <Choice
+              label="End of chapter"
+              onPress={() => choose(sleepTimer.endOfChapter)}
+            />
+          ) : null}
           <Choice
-            key={minutes}
-            label={minutesLabel(minutes)}
-            onPress={() => choose(() => sleepTimer.startMinutes(minutes))}
+            label="End of episode"
+            onPress={() => choose(sleepTimer.endOfEpisode)}
           />
-        ))}
-        {hasChapters ? (
-          <Choice
-            label="End of chapter"
-            onPress={() => choose(sleepTimer.endOfChapter)}
-          />
-        ) : null}
-        <Choice
-          label="End of episode"
-          onPress={() => choose(sleepTimer.endOfEpisode)}
-        />
-        <View className="flex-row items-center gap-3 py-2">
-          <TextInput
-            className="border-border text-foreground h-11 flex-1 rounded-xl border px-3"
-            placeholder="Your own time, in minutes"
-            keyboardType="number-pad"
-            value={typed}
-            onChangeText={setTyped}
-            maxLength={4}
-            accessibilityLabel="Your own time in minutes, 1 to 720"
-          />
-          <Pressable
-            className={`h-11 justify-center rounded-xl px-5 ${
-              custom === null ? "bg-secondary" : "bg-primary"
-            }`}
-            accessibilityRole="button"
-            accessibilityLabel="Start with your own time"
-            accessibilityState={{ disabled: custom === null }}
-            disabled={custom === null}
-            onPress={() =>
-              custom !== null && choose(() => sleepTimer.startMinutes(custom))
-            }
-          >
-            <Text
-              className={
-                custom === null
-                  ? "text-muted-foreground"
-                  : "text-primary-foreground"
+          <View className="flex-row items-center gap-3 py-2">
+            <TextInput
+              className="border-border text-foreground h-11 flex-1 rounded-xl border px-3"
+              placeholder="Your own time, in minutes"
+              keyboardType="number-pad"
+              value={typed}
+              onChangeText={setTyped}
+              maxLength={4}
+              accessibilityLabel="Your own time in minutes, 1 to 720"
+            />
+            <Pressable
+              className={`h-11 justify-center rounded-xl px-5 ${
+                custom === null ? "bg-secondary" : "bg-primary"
+              }`}
+              accessibilityRole="button"
+              accessibilityLabel="Start with your own time"
+              accessibilityState={{ disabled: custom === null }}
+              disabled={custom === null}
+              onPress={() =>
+                custom !== null && choose(() => sleepTimer.startMinutes(custom))
               }
             >
-              Start
-            </Text>
-          </Pressable>
-        </View>
-        {counting ? (
-          <Choice
-            label={`Add ${SLEEP_EXTRA_MINUTES} minutes`}
-            onPress={() => choose(sleepTimer.addFiveMinutes)}
-          />
-        ) : null}
-        {running ? (
-          <Choice
-            label="Turn off the timer"
-            destructive
-            onPress={() => choose(sleepTimer.cancel)}
-          />
-        ) : null}
+              <Text
+                className={
+                  custom === null
+                    ? "text-muted-foreground"
+                    : "text-primary-foreground"
+                }
+              >
+                Start
+              </Text>
+            </Pressable>
+          </View>
+          {counting ? (
+            <Choice
+              label={`Add ${SLEEP_EXTRA_MINUTES} minutes`}
+              onPress={() => choose(sleepTimer.addFiveMinutes)}
+            />
+          ) : null}
+          {running ? (
+            <Choice
+              label="Turn off the timer"
+              destructive
+              onPress={() => choose(sleepTimer.cancel)}
+            />
+          ) : null}
+        </ScrollView>
       </View>
     </View>
   )

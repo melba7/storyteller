@@ -1,17 +1,18 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ScrollView, useWindowDimensions } from "react-native"
+import { ScrollView } from "react-native"
 
 import { type ShelfEntry } from "@/modules/podcasts/home"
 import { type Show } from "@/modules/podcasts/library"
+import { upNextCardSize } from "@/modules/podcasts/pageFrame"
 
-import { UpNextCard, cardSize } from "./UpNextCard"
+import { UpNextCard } from "./UpNextCard"
+import { usePageFrame } from "./usePageFrame"
 
-const GUTTER = 16
 const GAP = 12
 
 /**
  * Home's Up Next shelf: cards in a row that snaps card by card, the next one peeking in at
- * the right, a 16 pt gutter at the left.
+ * the right, a gutter (16 pt or the safe-area inset) at the left. A card is at most 300 pt wide.
  */
 export function UpNextShelf({
   entries,
@@ -20,8 +21,8 @@ export function UpNextShelf({
   entries: readonly ShelfEntry[]
   showById: ReadonlyMap<string, Show>
 }) {
-  const { width: window } = useWindowDimensions()
-  const { width, height } = cardSize(window)
+  const frame = usePageFrame()
+  const { width, height } = upNextCardSize(frame.width)
   const now = Date.now()
   return (
     <ScrollView
@@ -30,7 +31,11 @@ export function UpNextShelf({
       decelerationRate="fast"
       snapToInterval={width + GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: GUTTER, gap: GAP }}
+      contentContainerStyle={{
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
+        gap: GAP,
+      }}
     >
       {entries.map((entry) => {
         const show = showById.get(entry.episode.showId)

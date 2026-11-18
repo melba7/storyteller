@@ -1,16 +1,15 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // When the app leaves the screen with ads still to find, it asks iOS for a background
-// processing task (`<bundle id>.podcastAds`). Unlike the transcribing task, this one asks to
-// run only on the charger. Running the model for an hour-long episode keeps the phone busy for
-// a minute or more, which should not use the battery, and iOS limits how much of the model an
-// app in the background may use, so a long, plugged-in turn at night suits it best. iOS picks
-// the time and wakes the app. When it says the time is up, the piece being asked about is
-// finished, then the task asks for another turn. Nothing is saved for a half-done episode, so
-// the next turn starts that episode over.
+// processing task (`<bundle id>.podcastAds`). iOS picks the time and wakes the app. A turn runs
+// on the charger, or with at least 30% battery and Low Power Mode off (PodcastPower); iOS also
+// limits how much of the model an app in the background may use. When it says the time is up,
+// the piece being asked about is finished, then the task asks for another turn. Nothing is
+// saved for a half-done episode, so the next turn starts that episode over.
 
 import BackgroundTasks
 import Foundation
+import PodcastAds
 import UIKit
 
 extension PodcastAdFinder {
@@ -47,13 +46,14 @@ extension PodcastAdFinder {
       if self?.hasWork == true { self?.askForBackgroundTime(force: true) }
     }
     DispatchQueue.main.async { [weak self] in
+      PodcastPower.startWatching()
       let active = UIApplication.shared.applicationState == .active
       self?.lock.withLock { self?.appActive = active }
       self?.scan()
     }
   }
 
-  /// Asks iOS for a turn on the charger. A new request replaces an earlier one; asking more
+  /// Asks iOS for a turn. A new request replaces an earlier one; asking more
   /// than once a minute is skipped unless `force`.
   func askForBackgroundTime(force: Bool = false) {
     let skip = lock.withLock { () -> Bool in
@@ -64,7 +64,7 @@ extension PodcastAdFinder {
     guard !skip else { return }
     let request = BGProcessingTaskRequest(identifier: Self.identifier)
     request.requiresNetworkConnectivity = false
-    request.requiresExternalPower = true
+    request.requiresExternalPower = BackgroundPower.requiresExternalPower
     do {
       try BGTaskScheduler.shared.submit(request)
     } catch {
@@ -79,6 +79,12 @@ extension PodcastAdFinder {
       self?.lock.withLock { self?.inBackgroundTask = false }
     }
     Task { [self] in
+      // Too little battery: give the turn back and ask again later.
+      guard await PodcastPower.mayRunInBackground() else {
+        lock.withLock { inBackgroundTask = false }
+        if hasWork { askForBackgroundTime() }
+        return task.setTaskCompleted(success: false)
+      }
       scan()
       let running = lock.withLock { worker }
       await running?.value

@@ -36,6 +36,20 @@ final class AdsStatusTests: XCTestCase {
     XCTAssertFalse(AdsRules.wantsRun(failed))
   }
 
+  func testAFinishedEpisodeWithRefusedPiecesSaysSoEvenWithNoAds() {
+    func finished(ads: Int, refused: Int?) -> AdsFile {
+      var result = file(ads: ads)
+      result.refusedPieces = refused
+      return result
+    }
+    XCTAssertEqual(status(file: finished(ads: 0, refused: nil)), .noneFound)
+    XCTAssertEqual(status(file: finished(ads: 0, refused: 3)), .partlyChecked(count: 0))
+    XCTAssertEqual(status(file: finished(ads: 2, refused: 1)), .partlyChecked(count: 2))
+    XCTAssertEqual(status(file: finished(ads: 2, refused: nil)), .found(count: 2))
+    XCTAssertEqual(AdsRules.finished(finished(ads: 1, refused: 2)), .partlyChecked(count: 1))
+    XCTAssertFalse(AdsRules.wantsRun(.partlyChecked(count: 0)))
+  }
+
   func testAFreshEpisodeWaits() {
     XCTAssertEqual(status(), .waiting)
     XCTAssertTrue(AdsRules.wantsRun(.waiting))

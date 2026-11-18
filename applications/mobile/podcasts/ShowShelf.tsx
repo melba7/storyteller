@@ -1,12 +1,20 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ScrollView, View, useWindowDimensions } from "react-native"
+import { FlatList, PixelRatio, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import {
+  SHELF_GAP,
+  SHELF_MAX_TEXT_SCALE,
+  shelfHeight,
+  shelfTextScale,
+  shelfTileSize,
+} from "@/modules/podcasts/homeLook"
 import { type PodcastHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
 import { PressableScale } from "./PressableScale"
 import { ZoomLink } from "./ZoomLink"
+import { usePageFrame } from "./usePageFrame"
 
 export type ShelfShow = {
   key: string
@@ -22,23 +30,48 @@ export type ShelfShow = {
   onPress?: () => void
 }
 
-/** A shelf of square artwork about 45% of the width across, rounded 10 pt, two lines under each. */
+/**
+ * A shelf of square artwork about 45% of the width across, rounded 10 pt, two lines under each.
+ * A horizontal list: it draws a few tiles at first and more as it scrolls, and its fixed tile
+ * length keeps the snapping exact.
+ */
 export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
-  const { width: window } = useWindowDimensions()
-  const size = Math.round(window * 0.45)
+  const frame = usePageFrame()
+  const size = shelfTileSize(frame.width)
+  // The texts grow with the system text size, up to 1.2 times; the height follows, and is the
+  // loading shelf's height, so the page does not jump when the shows arrive.
+  const ranked = shows.some((show) => show.rank !== undefined)
+  const height = shelfHeight(
+    size,
+    ranked,
+    shelfTextScale(PixelRatio.getFontScale()),
+  )
   return (
-    <ScrollView
+    <FlatList
+      style={{ height, flexGrow: 0 }}
       horizontal
+      data={shows}
+      keyExtractor={(show) => show.key}
       showsHorizontalScrollIndicator={false}
       decelerationRate="fast"
-      snapToInterval={size + 12}
+      snapToInterval={size + SHELF_GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-    >
-      {shows.map((show) => {
+      contentContainerStyle={{
+        paddingLeft: frame.left,
+        paddingRight: frame.right,
+      }}
+      ItemSeparatorComponent={() => <View style={{ width: SHELF_GAP }} />}
+      getItemLayout={(_, index) => ({
+        length: size,
+        offset: frame.left + index * (size + SHELF_GAP),
+        index,
+      })}
+      initialNumToRender={3}
+      maxToRenderPerBatch={3}
+      windowSize={5}
+      renderItem={({ item: show }) => {
         const tile = (
           <PressableScale
-            key={show.key}
             style={{ width: size }}
             accessibilityRole="button"
             accessibilityLabel={[
@@ -58,6 +91,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
             <View className="mt-2">
               {show.rank === undefined ? null : (
                 <Text
+                  maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                   className="text-lg font-bold"
                   style={{ fontVariant: ["tabular-nums"] }}
                 >
@@ -65,6 +99,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
                 </Text>
               )}
               <Text
+                maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                 className={`text-lg ${show.rank === undefined ? "font-bold" : ""}`}
                 numberOfLines={1}
               >
@@ -72,6 +107,7 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
               </Text>
               {show.caption ? (
                 <Text
+                  maxFontSizeMultiplier={SHELF_MAX_TEXT_SCALE}
                   className="text-muted-foreground text-lg"
                   numberOfLines={1}
                 >
@@ -81,14 +117,8 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
             </View>
           </PressableScale>
         )
-        return show.href ? (
-          <ZoomLink key={show.key} href={show.href}>
-            {tile}
-          </ZoomLink>
-        ) : (
-          tile
-        )
-      })}
-    </ScrollView>
+        return show.href ? <ZoomLink href={show.href}>{tile}</ZoomLink> : tile
+      }}
+    />
   )
 }

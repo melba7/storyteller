@@ -9,8 +9,8 @@ public enum AdKind: String, Codable, Sendable, Equatable {
   case ownPlug
 }
 
-/// How sure the detector is. Sure ads are skipped, unsure ones are only listed and guesses are
-/// dropped by the clean-up.
+/// How sure the detector is. Sure and unsure ads are skipped (the listener can undo a skip) and
+/// guesses are dropped by the clean-up.
 public enum AdConfidence: String, Codable, Sendable, Equatable, Comparable {
   case guess
   case unsure
@@ -136,6 +136,10 @@ public enum AdDetectorError: Error, Equatable, Sendable {
   case tooLong
   case unavailable(AdUnavailable)
   case failed(String)
+  /// The model refused the lines (Apple's guardrails). This is the one failure that counts as
+  /// "no ads" for the piece: asking again would be refused again. The runner counts it and
+  /// reports it (`AdsFile.refusedPieces`).
+  case refused
 }
 
 /// Finds ads in a piece of transcript. The one for the phone is in PodcastAdsOnDevice; the
@@ -148,4 +152,20 @@ public protocol AdDetector: Sendable {
   /// The transcript tokens one request may carry.
   var tokenBudget: Int { get }
   func findAds(in piece: TranscriptPiece) async throws -> [AdRange]
+}
+
+extension AdDetectorError: LocalizedError {
+  /// Plain sentences for the listener. Without them the system says "The operation couldn't be
+  /// completed. (PodcastAds.AdDetectorError error 2.)".
+  public var errorDescription: String? {
+    switch self {
+    case .tooLong: return "A part of the transcript was too long for the model."
+    case .unavailable(let reason): return "\(reason.reason)."
+    case .failed(let text):
+      let detail = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !detail.isEmpty else { return "The model couldn't finish." }
+      return "The model couldn't finish: \(detail.hasSuffix(".") ? String(detail.dropLast()) : detail)."
+    case .refused: return "The model refused to read a part of the transcript."
+    }
+  }
 }

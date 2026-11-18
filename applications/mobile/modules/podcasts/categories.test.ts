@@ -5,6 +5,8 @@ import {
   type FollowedShow,
   buildForYou,
   chartCategoryFor,
+  forYouKey,
+  forYouOmit,
   isFollowed,
   pickForYou,
   topLevelNames,
@@ -161,5 +163,44 @@ describe("buildForYou", () => {
   it("keeps at most the number asked for", () => {
     const result = buildForYou(picks, charts, mine, 1)
     expect(result[0]?.shows).toHaveLength(1)
+  })
+})
+
+describe("forYouOmit", () => {
+  const mine = [
+    followed("My Money Show", ["Business"]),
+    followed("My Jokes", ["Comedy"]),
+  ]
+  const picks = pickForYou(mine)
+  const drawn = buildForYou(picks, new Map([["1321", [chartShow("A")]]]), mine)
+
+  it("gives every pick while For You is loading, so the planned lists hold still", () => {
+    expect(forYouOmit(picks, [], false)).toEqual(["1321", "1303"])
+  })
+
+  it("gives only the categories For You drew once it has loaded", () => {
+    expect(forYouOmit(picks, drawn, true)).toEqual(["1321"])
+    expect(forYouOmit(picks, [], true)).toEqual([])
+  })
+})
+
+describe("forYouKey", () => {
+  const a = followed("A", ["Comedy"])
+  const b = followed("B", ["Comedy"])
+
+  it("stays the same for a new array of the same shows, whatever the order", () => {
+    const one = forYouKey(pickForYou([a, b]), [a, b])
+    const two = forYouKey(pickForYou([{ ...b }, { ...a }]), [
+      { ...b },
+      { ...a },
+    ])
+    expect(two).toBe(one)
+  })
+
+  it("changes when a show is followed or a pick changes", () => {
+    const c = followed("C", ["News"])
+    expect(forYouKey(pickForYou([a, b, c]), [a, b, c])).not.toBe(
+      forYouKey(pickForYou([a, b]), [a, b]),
+    )
   })
 })

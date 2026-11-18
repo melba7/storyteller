@@ -92,9 +92,9 @@ export function SeekBar({
       "worklet"
       scheduleOnRN(move, barFraction(event.x, width.get()))
     })
-    .onEnd((event) => {
+    .onEnd((event, success) => {
       "worklet"
-      scheduleOnRN(finish, barFraction(event.x, width.get()))
+      if (success) scheduleOnRN(finish, barFraction(event.x, width.get()))
     })
     .onFinalize((_event, success) => {
       "worklet"
@@ -147,7 +147,7 @@ export function SeekBar({
               <View
                 key={mark.left}
                 className={
-                  mark.skipped
+                  mark.skipped && !mark.unsure
                     ? "absolute h-full bg-amber-300"
                     : "absolute h-full bg-amber-300/40"
                 }

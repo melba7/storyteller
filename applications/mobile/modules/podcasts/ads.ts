@@ -57,13 +57,45 @@ export function adsStatus(info: AdsInfo | undefined): string {
       return "Finding ads"
     case "found": {
       const count = Math.max(0, Math.floor(info.count ?? 0))
-      return count === 1 ? "1 ad found" : `${count} ads found`
+      const found = count === 1 ? "1 ad found" : `${count} ads found`
+      return info.unchecked === true
+        ? `${found}. Couldn't check some parts`
+        : found
     }
     case "noAds":
-      return "No ads found"
+      return info.unchecked === true
+        ? "Couldn't check some parts for ads"
+        : "No ads found"
     case "unavailable":
       return info.reason ?? "Can't find ads"
   }
+}
+
+/**
+ * The reasons that belong to the phone, as `AdUnavailable.reason` in PodcastAds writes them
+ * (and the Swift that passes them on): Apple Intelligence off, not supported, the model not
+ * ready or downloading, iOS too old, and the system's catch-all. Any other reason is one
+ * episode's own failure ("The transcript could not be read", "Finding ads stopped: ...").
+ */
+const PHONE_REASONS: readonly string[] = [
+  "Apple Intelligence is off",
+  "The model is downloading",
+  "This iPhone can't run Apple Intelligence",
+  "Needs iOS 26",
+  "Apple Intelligence is not available",
+]
+
+/**
+ * Why ads can't be found on this phone, when any episode says so ("Apple Intelligence is
+ * off"), else null. The reason belongs to the phone, not the episode, so one is enough. Only
+ * the phone-wide reasons count; the rest is one episode's failure.
+ */
+export function unavailableReason(map: AdsMap): string | null {
+  for (const info of Object.values(map)) {
+    if (info.state !== "unavailable") continue
+    if (info.reason && PHONE_REASONS.includes(info.reason)) return info.reason
+  }
+  return null
 }
 
 /** The line so far (the download's, then the transcript's) followed by the ads'. */
@@ -173,8 +205,10 @@ export type AdRow = {
   kind: string
   advertiser: string
   firstWords: string
-  /** The player skips this ad (sure, and not undone); the rest are only listed. */
+  /** The player skips this ad (sure or unsure, and not undone). */
   skipped: boolean
+  /** The detector was not sure about it (it is skipped all the same). */
+  unsure: boolean
   /** The listener took the skip back. */
   undone: boolean
   /** What a screen reader says. */
@@ -183,7 +217,7 @@ export type AdRow = {
 
 /**
  * The rows of the "Ads found" list, in order. Guesses are not listed. An unsure ad is listed
- * but marked as not skipped. (Whether the host plugs are skipped is the listener's switch.)
+ * and skipped like a sure one. (Whether the host plugs are skipped is the listener's switch.)
  */
 export function adRows(file: AdsFile): AdRow[] {
   return file.ads
@@ -204,7 +238,8 @@ export function adRows(file: AdsFile): AdRow[] {
         kind,
         advertiser: ad.advertiser,
         firstWords: ad.firstWords,
-        skipped: ad.confidence === "sure" && !undone,
+        skipped: !undone,
+        unsure: ad.confidence === "unsure",
         undone,
         label: [
           `${kind} at ${time}, ${length} long`,
@@ -265,11 +300,17 @@ export function noteAfterUndo(
 // MARK: Marks on the seek bar
 
 /** Where an ad sits on the seek bar, as shares (0 to 1) of its length. */
-export type AdMark = { left: number; width: number; skipped: boolean }
+export type AdMark = {
+  left: number
+  width: number
+  skipped: boolean
+  /** Not sure it is an ad: drawn faint, though it is skipped too. */
+  unsure: boolean
+}
 
 /** The marks for the listed ads. Nothing while the length is not known. */
 export function adMarks(
-  rows: readonly Pick<AdRow, "start" | "end" | "skipped">[],
+  rows: readonly Pick<AdRow, "start" | "end" | "skipped" | "unsure">[],
   duration: number | null,
 ): AdMark[] {
   if (duration === null || !(duration > 0)) return []
@@ -281,6 +322,7 @@ export function adMarks(
         left,
         width: Math.min(1 - left, (row.end - row.start) / duration),
         skipped: row.skipped,
+        unsure: row.unsure,
       },
     ]
   })

@@ -5,6 +5,7 @@ import { useCSSVariable } from "uniwind"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { adsToShow } from "@/modules/podcasts/adLine"
 import { withAds } from "@/modules/podcasts/ads"
 import { downloadLook } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
@@ -40,11 +41,11 @@ export function useDownloadStatus(episode: Props["episode"]): string {
   const ads = useAdsInfo(episode.id)
   if (Podcasts === null || isLocalEpisodeId(episode.id)) return ""
   const look = downloadLook(info, episode.title)
-  // The transcript only matters once the audio is on the phone.
+  // The transcript and the ads only matter once the audio is on the phone.
   const downloaded = info?.state === "downloaded"
   return withAds(
     withTranscript(look.status, downloaded ? transcript : undefined),
-    downloaded && transcript?.state === "done" ? ads : undefined,
+    adsToShow(downloaded, transcript, ads),
   )
 }
 

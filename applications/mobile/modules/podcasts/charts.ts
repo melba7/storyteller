@@ -15,7 +15,7 @@ export type ChartShow = {
 }
 
 /** A chart entry before its feed link is known. */
-type ChartEntry = Omit<ChartShow, "feedUrl">
+export type ChartEntry = Omit<ChartShow, "feedUrl">
 
 /** A category with Apple's genre number for its chart. */
 export type ChartCategory = { id: string; name: string }
@@ -46,11 +46,18 @@ export const CHART_CATEGORIES: readonly ChartCategory[] = [
   { id: "1309", name: "TV & Film" },
 ]
 
-const TOP_URL =
-  "https://rss.marketingtools.apple.com/api/v2/us/podcasts/top/50/podcasts.json"
-const GENRE_URL = (id: string) =>
-  `https://itunes.apple.com/us/rss/toppodcasts/limit=50/genre=${id}/json`
-const LOOKUP_URL = "https://itunes.apple.com/lookup?id="
+/** The country of every chart address. One place to change if a setting is added later. */
+export const CHART_COUNTRY = "us"
+
+/** The address of the overall chart. */
+export const topUrl = () =>
+  `https://rss.marketingtools.apple.com/api/v2/${CHART_COUNTRY}/podcasts/top/50/podcasts.json`
+/** The address of one category's chart. */
+export const genreUrl = (id: string) =>
+  `https://itunes.apple.com/${CHART_COUNTRY}/rss/toppodcasts/limit=50/genre=${id}/json`
+/** The address that turns Apple ids into feed links. */
+export const lookupUrl = (ids: string[]) =>
+  `https://itunes.apple.com/lookup?id=${ids.join(",")}`
 
 /** A chart answer and its lookup are kept this long. */
 export const CACHE_MS = 24 * 60 * 60 * 1000
@@ -196,22 +203,58 @@ export function parseSavedChart(value: string): ChartShow[] | null {
 
 // MARK: Fetching
 
-type FetchFn = (url: string) => Promise<Response>
+export type FetchFn = (
+  url: string,
+  init?: { signal?: AbortSignal },
+) => Promise<Response>
 
-async function getJson(url: string, fetchFn: FetchFn): Promise<unknown> {
-  let response: Response
+/** How long one request may take before the chart is treated as unreachable. */
+export const FETCH_TIMEOUT_MS = 12_000
+
+/**
+ * Reads one address as JSON. A network that hangs (a captive Wi-Fi, one bar) would otherwise
+ * keep every list waiting for the system's own 60 s limit, group after group. The one limit
+ * covers the answer's headers and its body, so a body that stalls is cut off too.
+ */
+export async function getJson(
+  url: string,
+  fetchFn: FetchFn,
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<unknown> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+  // The timer also rejects, so a fetch or a body that ignores the abort signal can't hang us.
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error("timeout"))
+    }, timeoutMs)
+  })
+  // Whichever of the two loses the race must not become an unhandled rejection.
+  timeout.catch(() => {})
   try {
-    response = await fetchFn(url)
-  } catch {
-    throw new Error("Couldn't reach Apple's charts. Check your connection.")
-  }
-  if (!response.ok) {
-    throw new Error(`Apple's charts answered with status ${response.status}.`)
-  }
-  try {
-    return await response.json()
-  } catch {
-    throw new Error("Apple's charts sent an answer that couldn't be read.")
+    let response: Response
+    try {
+      response = await Promise.race([
+        fetchFn(url, { signal: controller.signal }),
+        timeout,
+      ])
+    } catch {
+      throw new Error("Couldn't reach Apple's charts. Check your connection.")
+    }
+    if (!response.ok) {
+      throw new Error(`Apple's charts answered with status ${response.status}.`)
+    }
+    try {
+      return await Promise.race([response.json() as Promise<unknown>, timeout])
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === "timeout") {
+        throw new Error("Couldn't reach Apple's charts. Check your connection.")
+      }
+      throw new Error("Apple's charts sent an answer that couldn't be read.")
+    }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
@@ -222,10 +265,22 @@ export interface ChartDeps {
   now?: () => number
 }
 
+/** How one list's fetch ended: a new list, or a failure with the old kept copy (or null). */
+export type ChartSettled =
+  | { status: "loaded"; shows: ChartShow[] }
+  | { status: "failed"; shows: ChartShow[] | null }
+
+/**
+ * One promise per list being fetched. `loadChart` and `loadChartGroups` (chartBatch.ts) both
+ * use it, so a list being fetched by either is not fetched again by the other.
+ */
+export const chartsInFlight = new Map<string, Promise<ChartSettled>>()
+
 /**
  * One chart with feed links: `TOP_CHART` or a category's genre id. Kept for a day; a kept
- * answer that can't be read, or that is too old, is fetched again. A cache that fails
- * does not stop the chart.
+ * answer that can't be read, or that is too old, is fetched again, and if that fetch fails,
+ * or answers with no shows, the old answer is returned. A cache that fails does not stop the
+ * chart. A list already being fetched by `loadChartGroups` is waited for, not fetched again.
  */
 export async function loadChart(
   chart: string,
@@ -236,20 +291,48 @@ export async function loadChart(
   const key = `chart:${chart}`
 
   const kept = await deps.cacheGet(key).catch(() => null)
-  if (kept && now() - kept.savedAt < CACHE_MS) {
-    const shows = parseSavedChart(kept.value)
+  const old = kept ? parseSavedChart(kept.value) : null
+  if (kept && old && now() - kept.savedAt < CACHE_MS) return old
+
+  const existing = chartsInFlight.get(chart)
+  if (existing) {
+    const settled = await existing
+    const shows = settled.shows ?? old
     if (shows) return shows
+    throw new Error("Couldn't load this chart. Check your connection.")
   }
 
-  const isTop = chart === TOP_CHART
-  const answer = await getJson(isTop ? TOP_URL : GENRE_URL(chart), fetchFn)
-  const entries = isTop ? parseTopChart(answer) : parseCategoryChart(answer)
-  if (entries.length === 0) return []
-  const ids = entries.map((entry) => entry.appleId).join(",")
-  const feeds = parseLookup(await getJson(LOOKUP_URL + ids, fetchFn))
-  const shows = joinFeeds(entries, feeds)
-  if (shows.length > 0) {
-    await deps.cachePut(key, JSON.stringify(shows)).catch(() => {})
+  let finish: (settled: ChartSettled) => void = () => {}
+  chartsInFlight.set(
+    chart,
+    new Promise<ChartSettled>((resolve) => {
+      finish = resolve
+    }),
+  )
+  try {
+    const isTop = chart === TOP_CHART
+    const answer = await getJson(isTop ? topUrl() : genreUrl(chart), fetchFn)
+    const entries = isTop ? parseTopChart(answer) : parseCategoryChart(answer)
+    const ids = entries.map((entry) => entry.appleId)
+    const feeds =
+      ids.length > 0
+        ? parseLookup(await getJson(lookupUrl(ids), fetchFn))
+        : new Map<string, string>()
+    const shows = joinFeeds(entries, feeds)
+    if (shows.length > 0) {
+      await deps.cachePut(key, JSON.stringify(shows)).catch(() => {})
+      finish({ status: "loaded", shows })
+      return shows
+    }
+    // An answer with no shows never replaces yesterday's list.
+    finish(old ? { status: "failed", shows: old } : { status: "loaded", shows })
+    return old ?? shows
+  } catch (error) {
+    // Yesterday's list is better than an error; only with nothing kept does it throw.
+    finish({ status: "failed", shows: old })
+    if (old) return old
+    throw error
+  } finally {
+    chartsInFlight.delete(chart)
   }
-  return shows
 }

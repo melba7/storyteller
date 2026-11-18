@@ -28,11 +28,14 @@ public struct AdsFile: Codable, Sendable, Equatable {
   public var undone: [UndoneAd]
   /// For a partial file: the seconds of audio checked so far. Nil in a final file.
   public var coveredUntil: Double?
+  /// How many pieces the model refused to read (counted as having no ads). Nil when none, so
+  /// the app can tell a clean "no ads" from one with parts unread.
+  public var refusedPieces: Int?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
-    coveredUntil: Double? = nil
+    coveredUntil: Double? = nil, refusedPieces: Int? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -43,11 +46,13 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.ads = ads
     self.undone = undone
     self.coveredUntil = coveredUntil
+    self.refusedPieces = refusedPieces
   }
 
-  /// Whether the listener undid the skip of this ad.
+  /// Whether the listener undid the skip of this ad: the ad starts where an undone one did, or
+  /// overlaps it (the same ad found again a little later, or cut a little differently).
   public func isUndone(_ ad: FoundAd) -> Bool {
-    undone.contains { abs($0.start - ad.start) < 0.5 }
+    undone.contains { abs($0.start - ad.start) < 0.5 || ($0.start < ad.end && ad.start < $0.end) }
   }
 }
 

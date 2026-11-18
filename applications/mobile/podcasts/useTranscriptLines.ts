@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 
 import { type StoredEpisode } from "@/modules/podcasts/library"
+import { player } from "@/modules/podcasts/playerInstance"
 import {
   type TranscriptResult,
   loadTranscript,
@@ -15,7 +16,7 @@ export type TranscriptState =
 
 /**
 
- * The transcript of an episode, loaded when the screen using it opens and again when the
+ * The transcript of an episode (the phone's own when it has one, else the feed's), loaded when the screen using it opens and again when the
  * phone's own transcript changes state or percent (it may have grown or just finished). Mount it once per
  * episode (give the screen the episode's id as its key).
  */
@@ -30,7 +31,10 @@ export function useTranscriptLines(
     device?.state === "transcribing" ? (device.percent ?? null) : null
   useEffect(() => {
     let live = true
+    // Where the listener is now, so a transcript still being made is used if it reaches it.
+    const view = player.getView()
     loadTranscript({
+      playhead: view.episode?.id === episode.id ? view.position : null,
       id: episode.id,
       transcriptUrl: episode.transcriptUrl,
       transcriptType: episode.transcriptType,

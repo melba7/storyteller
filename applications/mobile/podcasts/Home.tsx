@@ -2,9 +2,11 @@
 import { Stack, useRouter, useSegments } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { Podcast } from "lucide-react-native"
+import { useMemo } from "react"
 import { RefreshControl, ScrollView, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import { planChartLists } from "@/modules/podcasts/chartLists"
 import { topShowCaption, updateCadence } from "@/modules/podcasts/homeLook"
 import {
   NEW_HREF,
@@ -14,7 +16,9 @@ import {
   upNextHref,
 } from "@/modules/podcasts/routes"
 
+import { CategoryTiles } from "./CategoryTiles"
 import { useOpenPreview } from "./ChartRow"
+import { ChartShelves } from "./ChartShelves"
 import { EmptyState } from "./EmptyState"
 import { ScreenBar } from "./ScreenBar"
 import { SectionHeader } from "./SectionHeader"
@@ -22,21 +26,25 @@ import { SectionMenuButton } from "./SectionMenu"
 import { ShowShelf } from "./ShowShelf"
 import { UpNextShelf } from "./UpNextShelf"
 import { useShows } from "./hooks"
+import { useChartLists } from "./useChartLists"
 import {
   useShowDates,
   useTopShows,
   useUpNextShelf,
   useYouMightLike,
 } from "./useHome"
+import { usePageFrame } from "./usePageFrame"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import { useRefreshShows } from "./useRefreshShows"
 
 /**
  * The Home tab: "Up Next >" (a shelf of cards: episodes in progress, then the newest unplayed
- * one of each show), "Your Top Shows >" and "You Might Like >". Pull down to refresh the feeds.
+ * one of each show), "Your Top Shows >" and "You Might Like >", then Apple's charts (Top Shows and eight
+ * categories) and the category tiles. Pull down to refresh the feeds and retry the charts.
  */
 export function Home() {
   const statusBarStyle = useStatusBarStyle()
+  const frame = usePageFrame()
   const router = useRouter()
   const segments = useSegments()
   const openPreview = useOpenPreview()
@@ -47,6 +55,15 @@ export function Home() {
   const top = useTopShows()
   const dates = useShowDates()
   const mightLike = useYouMightLike()
+  // The charts wait for the followed shows, because those decide which categories come first.
+  const lists = useMemo(
+    () => planChartLists(shows.data ?? [], "home"),
+    [shows.data],
+  )
+  const charts = useChartLists(
+    lists.map((list) => list.id),
+    !shows.loading,
+  )
   const empty = !shows.loading && (shows.data ?? []).length === 0
 
   return (
@@ -54,16 +71,22 @@ export function Home() {
       <ScrollView
         className="bg-background flex-1"
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
         refreshControl={
           <RefreshControl
             refreshing={refresh.refreshing}
-            onRefresh={refresh.refresh}
+            onRefresh={() => {
+              charts.retry()
+              void refresh.refresh()
+            }}
           />
         }
       >
         {refresh.problem ? (
-          <View className="bg-destructive/10 mx-4 mt-2 rounded-xl p-3">
+          <View
+            className="bg-destructive/10 mt-2 rounded-xl p-3"
+            style={{ marginLeft: frame.left, marginRight: frame.right }}
+          >
             <Text
               className="text-destructive text-sm"
               accessibilityRole="alert"
@@ -126,6 +149,9 @@ export function Home() {
             />
           </>
         ) : null}
+        <ChartShelves lists={lists} states={charts.states} />
+        <SectionHeader title="Browse Categories" />
+        <CategoryTiles />
       </ScrollView>
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />
       <ScreenBar

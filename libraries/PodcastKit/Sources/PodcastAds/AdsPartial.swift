@@ -16,6 +16,18 @@ extension TranscriptPiece {
   }
 }
 
+extension TranscriptPiece {
+  /// The numbers inside a `key`: the first line number and the start and end in milliseconds,
+  /// or nil for a key of another shape.
+  static func keyParts(_ key: String) -> (first: Int, startMilli: Int, endMilli: Int)? {
+    let parts = key.split(separator: "-", omittingEmptySubsequences: false)
+    guard parts.count == 5, let first = Int(parts[0]), let start = Int(parts[2]),
+      let end = Int(parts[3])
+    else { return nil }
+    return (first, start, end)
+  }
+}
+
 extension AdChunker {
   /// How far before the edge of a partial transcript a piece has to end to be asked, so the
   /// words near the edge (which can still change) are left out.
@@ -31,6 +43,27 @@ extension AdChunker {
     let all = pieces(of: lines, tokenBudget: tokenBudget, overlap: overlap)
     return Array(all.dropLast().prefix { $0.end <= reached - margin })
   }
+
+  /// A growing last piece has to hold at least this many seconds of lines to be asked.
+  public static let growingMinimum = 60.0
+  /// A growing last piece is asked again only when it has grown by this many seconds since its
+  /// last answer (or when it has become a whole piece, which is always asked).
+  public static let growingStep = 120.0
+
+  /// The last piece of a partial transcript, which is still growing, cut to the lines that end
+  /// at least `margin` seconds before `reached`. Nil while it holds less than `minimum` seconds
+  /// of lines, or when it adds nothing to the piece before it.
+  public static func growingPiece(
+    of lines: [NumberedLine], tokenBudget: Int, reached: Double, margin: Double = partialMargin,
+    overlap: Double = overlap, minimum: Double = growingMinimum
+  ) -> TranscriptPiece? {
+    let all = pieces(of: lines, tokenBudget: tokenBudget, overlap: overlap)
+    guard let last = all.last else { return nil }
+    let piece = TranscriptPiece(lines: Array(last.lines.prefix { $0.end <= reached - margin }))
+    guard !piece.lines.isEmpty, piece.end - piece.start >= minimum else { return nil }
+    if all.count > 1, piece.end <= all[all.count - 2].end { return nil }
+    return piece
+  }
 }
 
 /// What a detector answered for each piece so far, saved as
@@ -41,11 +74,45 @@ public struct AdProgress: Codable, Sendable, Equatable {
   public var detectorVersion: String
   /// The answers by `TranscriptPiece.key`.
   public var answers: [String: [AdRange]] = [:]
+  /// The keys of the pieces the model refused. Their answer is "no ads"; they are listed so a
+  /// result can say how many pieces were not read.
+  public var refused: [String]?
 
   public init(sha256: String, detector: String, detectorVersion: String) {
     self.sha256 = sha256
     self.detector = detector
     self.detectorVersion = detectorVersion
+  }
+}
+
+extension AdProgress {
+  /// The longest answer kept for a growing piece that starts where `piece` starts: its key,
+  /// where it ends and what it said. Nil when there is none.
+  func growingAnswer(for piece: TranscriptPiece) -> (key: String, end: Double, ranges: [AdRange])? {
+    let best = answers.keys.compactMap { key -> (String, Int)? in
+      guard let parts = TranscriptPiece.keyParts(key), sameStart(parts, piece) else { return nil }
+      return (key, parts.endMilli)
+    }.max { $0.1 < $1.1 }
+    guard let best, let ranges = answers[best.0] else { return nil }
+    return (best.0, Double(best.1) / 1000, ranges)
+  }
+
+  /// Forgets the answers for other pieces that start where `piece` starts: they are shorter
+  /// versions of it, and its own answer replaces them.
+  mutating func dropShorter(than piece: TranscriptPiece) {
+    let own = piece.key
+    for key in answers.keys where key != own {
+      if let parts = TranscriptPiece.keyParts(key), sameStart(parts, piece) {
+        answers[key] = nil
+        refused?.removeAll { $0 == key }
+      }
+    }
+  }
+
+  private func sameStart(
+    _ parts: (first: Int, startMilli: Int, endMilli: Int), _ piece: TranscriptPiece
+  ) -> Bool {
+    parts.first == piece.firstNumber && parts.startMilli == Int((piece.start * 1000).rounded())
   }
 }
 
@@ -69,6 +136,12 @@ extension AdsStore {
       saved.sha256 == sha256, saved.detector == detector, saved.detectorVersion == version
     else { return fresh }
     return saved
+  }
+
+  /// Removes the partial result and the kept answers of this detector, for a name that a new
+  /// run of the same episode reuses (the stream's made-up one).
+  public func discardPartial(detector: String) {
+    for kind in ["partial", "progress"] { try? FileManager.default.removeItem(at: scratchURL(detector, kind)) }
   }
 
   /// Saves what a partial run found so far, as `<sha256>.ads.<detector>.partial.json`.

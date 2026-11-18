@@ -45,8 +45,16 @@ final class PodcastPlayer {
   private var ticks = 0
   /// Feeds the loaded item from its own download, while there is one (PodcastPlayer+Stream.swift).
   var streamDownload: PodcastStreamDownload?
+  /// The loaded item is the episode's plain address, so no ad is skipped (the app says so).
+  var playsPlainAddress = false
   /// Where the loaded episode was told to start (PodcastPlayer+Stream.swift's fallback).
   var itemStart = 0.0
+  /// A seek has been asked for and has not landed. `player.currentTime()` is the old place until
+  /// it does (for a resume on a stream, until the bytes up to the place have arrived), so an ad
+  /// is not left from it (PodcastPlayer+Ads.swift).
+  var seekPending = false
+  /// Counts the seeks, so only the latest one's completion ends the pending state.
+  private var seekCount = 0
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -119,6 +127,7 @@ final class PodcastPlayer {
     // Keeps voices natural at any speed.
     item.audioTimePitchAlgorithm = .timeDomain
     player.defaultRate = Float(speed.value)
+    forgetPendingSeek()
     player.replaceCurrentItem(with: item)
     watch(item)
     lockScreen.setEpisode(
@@ -128,11 +137,7 @@ final class PodcastPlayer {
       savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played,
       intro: showState.settings.introSeconds)
     itemStart = start
-    if start > 0 {
-      player.seek(
-        to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero,
-        toleranceAfter: .zero)
-    }
+    if start > 0 { movePlayhead(to: start) }
     noteSaved(
       .skipping,
       audioSeconds: ListeningStats.introSkipped(
@@ -159,6 +164,9 @@ final class PodcastPlayer {
     rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
     player.play()
+    // An ad found while paused, with the playhead inside it, is left now (unless it was entered
+    // by a seek, or a seek is still on its way).
+    adSkipping.refresh()
     takeTheLockScreen()
     publish()
   }
@@ -180,14 +188,37 @@ final class PodcastPlayer {
     adSkipping.seeked(to: target)
     sound.seeked(to: target)
     chapterSeeked(to: target)
-    player.seek(
-      to: CMTime(seconds: target, preferredTimescale: 600), toleranceBefore: .zero,
-      toleranceAfter: .zero
-    ) { [weak self] _ in
-      Task { @MainActor in self?.publish() }
-    }
+    movePlayhead(to: target)
     // Report the new place at once, before the seek has finished.
     publish(positionOverride: target)
+  }
+
+  /// Seeks exactly to `seconds` and notes that the seek is on its way. When the latest seek
+  /// has landed, the place is published and ads are looked at again, because one that was found
+  /// meanwhile may hold the place (the listener's own seek into an ad is still respected).
+  func movePlayhead(to seconds: Double) {
+    seekCount += 1
+    let count = seekCount
+    seekPending = true
+    player.seek(
+      to: CMTime(seconds: seconds, preferredTimescale: 600), toleranceBefore: .zero,
+      toleranceAfter: .zero
+    ) { [weak self] _ in
+      Task { @MainActor in
+        guard let self else { return }
+        if count == self.seekCount {
+          self.seekPending = false
+          self.adSkipping.refresh()
+        }
+        self.publish()
+      }
+    }
+  }
+
+  /// The item is being replaced: seeks on the old one no longer count.
+  func forgetPendingSeek() {
+    seekCount += 1
+    seekPending = false
   }
 
   func skip(by seconds: Double) {
@@ -227,6 +258,7 @@ final class PodcastPlayer {
       "isPlaying": player.timeControlStatus == .playing,
       "isBuffering": wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
       "rate": speed.value,
+      "streamsPlain": playsPlainAddress,
     ]
     if let episodeId { object["episodeId"] = episodeId }
     if let duration = currentDuration { object["duration"] = duration }

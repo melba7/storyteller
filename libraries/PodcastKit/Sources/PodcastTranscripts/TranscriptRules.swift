@@ -55,8 +55,22 @@ public struct PiecePlan: Sendable, Equatable {
 
 /// Cutting the audio into pieces, the overlap between them, and progress.
 public enum Pieces {
-  /// About five minutes of audio at a time.
+  /// About five minutes of audio at a time, once the first pieces are done.
   public static let seconds = 300.0
+  /// The first pieces are shorter, so the first lines of the transcript (and the first ads)
+  /// are there within seconds of starting: 60 seconds, then 120, then `seconds` each.
+  public static let firstPieces = [60.0, 120.0]
+
+  /// The length of the piece that starts after `reached` seconds are done. It depends only on
+  /// `reached`, so a restart in the middle cuts the same pieces as one run.
+  public static func length(after reached: Double) -> Double {
+    var edge = 0.0
+    for length in firstPieces {
+      edge += length
+      if reached < edge - 0.01 { return length }
+    }
+    return seconds
+  }
   /// Each piece, and a restart, begins this far before the saved time, so a word cut in two
   /// at the edge is heard whole.
   public static let overlap = 2.0
@@ -66,10 +80,12 @@ public enum Pieces {
     reached >= duration - 0.01
   }
 
-  /// The next piece after `reached` seconds are done, or nil when the audio is done.
+  /// The next piece after `reached` seconds are done, or nil when the audio is done. Without
+  /// `pieceSeconds` the piece has the length `length(after:)` gives.
   public static func next(
-    reached: Double, duration: Double, pieceSeconds: Double = seconds, overlap: Double = overlap
+    reached: Double, duration: Double, pieceSeconds: Double? = nil, overlap: Double = overlap
   ) -> PiecePlan? {
+    let pieceSeconds = pieceSeconds ?? length(after: max(0, reached))
     guard duration > 0, pieceSeconds > 0, !isDone(reached: reached, duration: duration) else {
       return nil
     }

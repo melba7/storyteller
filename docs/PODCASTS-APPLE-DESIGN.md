@@ -19,14 +19,14 @@ with a card's "…" menu open, 05 a show's episode list scrolled, 06 a show page
 
 ## Structure
 
-| Apple Podcasts | Ours today                   | Ours after                                                     |
-| -------------- | ---------------------------- | -------------------------------------------------------------- |
-| Home           | Podcasts tab (library grid)  | Home: Up Next cards, Your Top Shows, You Might Like            |
-| New            | Discover tab                 | New: featured cards, Top Shows with ranks, For You, categories |
-| Library        | Podcasts, Playlists, Up Next | Library: rooms and playlists as rows, then Recently Updated    |
-| Search         | search screens in two tabs   | Search tab: category tiles, then shows, episodes, spoken       |
-| Account button | Profile tab                  | The round button at the top right opens Profile as a sheet     |
-| Player queue   | Up Next tab                  | The player's queue button; Home's "Up Next >" page             |
+| Apple Podcasts | Ours today                   | Ours after                                                  |
+| -------------- | ---------------------------- | ----------------------------------------------------------- |
+| Home           | Podcasts tab (library grid)  | Home: Up Next cards, Your Top Shows, You Might Like, charts |
+| New            | Discover tab                 | New: featured cards, Top Shows with ranks, For You, charts  |
+| Library        | Podcasts, Playlists, Up Next | Library: rooms and playlists as rows, then Recently Updated |
+| Search         | search screens in two tabs   | Search tab: category tiles, then shows, episodes, spoken    |
+| Account button | Profile tab                  | The round button at the top right opens Profile as a sheet  |
+| Player queue   | Up Next tab                  | The player's queue button; Home's "Up Next >" page          |
 
 - **Tab bar** (01, 10): iOS 26's floating glass bar with four tabs, Home
   (`house.fill`), New (`square.grid.2x2.fill`), Library (`square.stack.fill`)
@@ -66,11 +66,21 @@ with a card's "…" menu open, 05 a show's episode list scrolled, 06 a show page
     Weekly" (from its episode dates) in grey under it. Shows ranked by time
     listened, then by recent plays.
   - **"You Might Like >"**: the same shelf from Discover's "For you".
-- **New** (01): Discover without its search. A paging row of featured cards: a
-  grey caps label ("TOP SHOW"), a bold headline (the show's title), and a wide
-  rounded image card (the artwork on its blurred colour). Then "Top Shows >": a
-  shelf of square artwork with the rank number in bold, the title and the author
-  under it. Then "For You >" and the categories.
+  - **The charts** (Mo's ask, 2026-11-18): "Top Shows >", "Top Episodes" (pages
+    of three ranked rows with a 60 pt cover) and eight "Top in ... >" shelves,
+    the categories of followed shows first, then "Browse Categories" with the
+    colour tiles. A new install shows them under "No podcasts yet". The plan and
+    its reasons are in `docs/PODCASTS-LISTS-PLAN.md`.
+- **New** (01): Discover without its search. A paging row of featured cards:
+  square, filled edge to edge by the cover, with a grey caps label ("TOP SHOW"),
+  the title and the author on a fade at the bottom. Then "Top Shows >": a shelf
+  of square artwork with the rank number in bold, the title and the author under
+  it. Then "For You >", "Top Episodes", a "Top in ... >" shelf for every other
+  category, and the category tiles.
+- **Covers** everywhere ask Apple's image server for a size that fits the frame
+  on this screen (160, 320, 640 or 1280 px), and fall back to the original
+  address, so chart covers are sharp. Shelves draw only the covers near the
+  screen, and a loading shelf has the real shelf's height.
 - **Library** (02): rows with a purple SF Symbol, the name in large type, an
   optional count in grey and a chevron, separators inset to the text: Shows
   (`square.stack`), Saved (`bookmark`), Downloaded (`arrow.down.circle`), Latest

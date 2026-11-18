@@ -7,7 +7,16 @@ import {
   agoLabel,
   cardLine,
   cardPalette,
+  EPISODE_ROW_HEIGHT,
+  EPISODE_SHELF_HEIGHT,
+  episodeColumnWidth,
+  pagesOfRows,
   plainText,
+  SHELF_LINE_HEIGHT,
+  SHELF_TEXT_GAP,
+  shelfHeight,
+  shelfTextScale,
+  shelfTileSize,
   timeLeftLabel,
   topShowCaption,
   updateCadence,
@@ -177,5 +186,56 @@ describe("the dates SQL", () => {
       800, 700, 600, 500, 400, 300,
     ])
     expect(new Set(found.map((row) => row.show_id))).toEqual(new Set(["s1"]))
+  })
+})
+
+describe("the shelf's measures", () => {
+  it("sizes a tile at 45% of the window, rounded", () => {
+    expect(shelfTileSize(393)).toBe(177)
+    expect(shelfTileSize(430)).toBe(194)
+  })
+
+  it("stops at 220 pt on a wide window", () => {
+    expect(shelfTileSize(1024)).toBe(220)
+    expect(shelfTileSize(480)).toBe(216)
+  })
+
+  it("grows its text lines with the text scale, at most 1.2 times", () => {
+    expect(shelfTextScale(1)).toBe(1)
+    expect(shelfTextScale(0.8)).toBe(1)
+    expect(shelfTextScale(3)).toBe(1.2)
+    expect(shelfHeight(177, false, 1.2)).toBe(177 + SHELF_TEXT_GAP + 2 * 34)
+  })
+
+  it("is one line taller when the shelf shows ranks", () => {
+    const plain = shelfHeight(177, false)
+    expect(plain).toBe(177 + SHELF_TEXT_GAP + 2 * SHELF_LINE_HEIGHT)
+    expect(shelfHeight(177, true)).toBe(plain + SHELF_LINE_HEIGHT)
+  })
+})
+
+describe("the episode shelf's measures", () => {
+  it("makes a page as wide as the window less the gutter, the gap and a peek", () => {
+    expect(episodeColumnWidth(400)).toBe(400 - 16 - 12 - 28)
+    expect(episodeColumnWidth(10)).toBe(0)
+  })
+
+  it("caps a page at 400 pt, so a wide window shows a second page beside the first", () => {
+    expect(episodeColumnWidth(430)).toBe(430 - 16 - 12 - 28)
+    expect(episodeColumnWidth(852)).toBe(400)
+    expect(episodeColumnWidth(1024)).toBe(400)
+  })
+
+  it("is three rows tall, and a row holds its 60 pt cover and 3 lines of text", () => {
+    expect(EPISODE_ROW_HEIGHT).toBe(76)
+    expect(EPISODE_SHELF_HEIGHT).toBe(3 * 76)
+  })
+
+  it("splits thirty episodes into ten pages of three", () => {
+    const pages = pagesOfRows(Array.from({ length: 30 }, (_, i) => i))
+    expect(pages).toHaveLength(10)
+    expect(pages[0]).toEqual([0, 1, 2])
+    expect(pagesOfRows([1, 2, 3, 4]).map((p) => p.length)).toEqual([3, 1])
+    expect(pagesOfRows([])).toEqual([])
   })
 })

@@ -13,10 +13,11 @@ import {
   Radio,
 } from "lucide-react-native"
 import { useMemo } from "react"
-import { Alert, FlatList, View, useWindowDimensions } from "react-native"
+import { Alert, FlatList, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
 import { downloadedCount } from "@/modules/podcasts/downloads"
+import { chunkRows, gridColumns } from "@/modules/podcasts/pageFrame"
 import { episodeCount } from "@/modules/podcasts/playlistLook"
 import { type Playlist } from "@/modules/podcasts/playlists"
 import {
@@ -42,6 +43,7 @@ import { askNewPlaylist } from "./addToPlaylist"
 import { useShows } from "./hooks"
 import { useDownloadMap } from "./useDownloads"
 import { useRecentShows, useStarred } from "./useEpisodeLists"
+import { usePageFrame } from "./usePageFrame"
 import { useItemCounts, usePlaylists, useSmartEpisodes } from "./usePlaylists"
 import { useStatusBarStyle } from "./usePodcastsTheme"
 import { useUpNext } from "./useUpNext"
@@ -82,7 +84,7 @@ export function Library() {
   const statusBarStyle = useStatusBarStyle()
   const router = useRouter()
   const segments = useSegments()
-  const { width } = useWindowDimensions()
+  const frame = usePageFrame()
   const shows = useShows()
   const recent = useRecentShows()
   const saved = useStarred()
@@ -102,7 +104,11 @@ export function Library() {
       }),
     [recent.data, showById],
   )
-  const size = recentCellSize(width)
+  // Two columns on a phone, four on a wide window. The rows are laid out here, as one-column
+  // list items, so a fold or unfold changes the columns without remounting the list.
+  const columns = gridColumns(2, frame.width)
+  const size = recentCellSize(frame.width, columns)
+  const rows = useMemo(() => chunkRows(grid, columns), [grid, columns])
   const now = Date.now()
 
   function newSmart() {
@@ -168,7 +174,7 @@ export function Library() {
       />
       {grid.length > 0 ? (
         <Text
-          className="px-4 pt-8 pb-3 text-3xl font-bold"
+          className="px-safe-or-4 pt-8 pb-3 text-3xl font-bold"
           accessibilityRole="header"
         >
           Recently Updated
@@ -181,25 +187,32 @@ export function Library() {
     <>
       <FlatList
         className="bg-background flex-1"
-        data={grid}
-        numColumns={2}
-        keyExtractor={(item) => item.show.id}
+        data={rows}
+        keyExtractor={(row) => row[0]!.show.id}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={{ paddingBottom: 24 }}
-        columnWrapperStyle={{
-          gap: 12,
-          paddingHorizontal: 16,
-          marginBottom: 20,
-        }}
         ListHeaderComponent={header}
-        renderItem={({ item }) => (
-          <RecentCell
-            show={item.show}
-            recent={item.entry}
-            size={size}
-            now={now}
-            href={showHref(segments, item.show.id)}
-          />
+        renderItem={({ item: row }) => (
+          <View
+            style={{
+              flexDirection: "row",
+              gap: 12,
+              paddingLeft: frame.left,
+              paddingRight: frame.right,
+              marginBottom: 20,
+            }}
+          >
+            {row.map((item) => (
+              <RecentCell
+                key={item.show.id}
+                show={item.show}
+                recent={item.entry}
+                size={size}
+                now={now}
+                href={showHref(segments, item.show.id)}
+              />
+            ))}
+          </View>
         )}
       />
       <StatusBar style={statusBarStyle} verticalBarBehaviorIOS="disabled" />

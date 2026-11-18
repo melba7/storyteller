@@ -282,10 +282,12 @@ setting picks the detector, and each result is saved under the detector's id.
   next lines still read as the ad (its sponsor's name, a web address or a promo
   code), and move each edge to the nearest pause between words. The 12 seconds
   and the carried end come from MinusPod (see "Open-source code we use").
-- **How sure**: the model says how sure it is. Sure ads are skipped; unsure ones
-  are only listed in "Ads found" with a play button; guesses are dropped.
-- **When unsure, do not skip.** A missed ad costs a tap on "skip 30 s"; a wrong
-  skip loses part of the show.
+- **How sure**: the model says how sure it is. Sure and unsure ads are both
+  skipped, and "Ads found" marks the unsure ones "Not sure"; guesses are
+  dropped.
+- **Unsure ads are skipped too, with Undo** (Mo, 2026-11-18, after build 29.1
+  marked an ad only as unsure). Undo on the "Skipped ad" note plays it, and an
+  undone ad is not skipped again.
 - **Two switches**: "Skip ads" and "Skip the hosts' own plugs", both on by
   default (Mo, 2026-11-16), in Settings and per show.
 
@@ -353,6 +355,27 @@ wording are used (credited in `FORK.md`), and only Transcriptator's time reading
 was adapted. OutcastID3 could not be fetched, so the MP3 chapter reader was
 written from the ID3 spec in PodcastKit `PodcastChapters`.
 
+## Chart sources checked (2026-11-18)
+
+The cloud container can't reach Apple's or Spotify's hosts, so
+`tools/fork/probe-podcast-sources.mjs` checks them from a GitHub runner
+(workflow "Podcast sources probe", run on a `claude/**` push that changes the
+script). Its second run, on 2026-11-18, found:
+
+1. **Cover sizes: yes.** Rewriting a chart cover's last segment from
+   `100x100bb.png` to `640x640bb.jpg` or `1280x1280bb.jpg` returns a real JPEG
+   at that size (36 KB and 100 KB).
+2. **Top episodes: yes, through the show.**
+   `.../podcasts/top/50/podcast-episodes.json` answers with 50 entries (the
+   singular `podcast-episode.json` is a 404). A lookup of the episode ids gives
+   nothing, but each entry's link carries its show's id, and a lookup of the
+   show ids gives the feed link. So a row opens its show, and the episode is
+   found in the feed by its title.
+3. **Spotify: no.** `top` and `top_episodes` answered "no healthy upstream"
+   (503) or "Internal Server Error" (500), plain or browser-like, in both runs;
+   `trending` answered only some of the time. Spotify is left out of this round.
+4. **Overall chart with 100 entries and the genre tree: yes.**
+
 ## Risks
 
 | Risk                                                                                       | What the plan does                                                                                                                                                                                                                 |
@@ -416,8 +439,8 @@ mode refuses `swift run`.
    before you listen and storage stays small.
 5. **What counts as an ad?** Sponsor reads and promos for other shows are
    skipped. Mo's answer: the hosts' own plugs (Patreon, merch, their other
-   shows) are skipped too, under their own switch, separate from ads. When the
-   model is unsure, it does not skip.
+   shows) are skipped too, under their own switch, separate from ads. Unsure ads
+   are skipped too, with Undo (Mo, 2026-11-18).
 
 Assumed: the podcasts are in English (other languages the recogniser and model
 support can follow), and Apple Intelligence is on on the phone.

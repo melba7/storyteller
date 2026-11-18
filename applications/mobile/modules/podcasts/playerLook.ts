@@ -39,8 +39,12 @@ export function playerBackground(color: string | null): string {
   return `#${hex(r * scale)}${hex(g * scale)}${hex(b * scale)}`
 }
 
-/** How far along the bar a touch is, from 0 to 1. */
+/**
+ * How far along the bar a touch is, from 0 to 1. The seek bar's gesture callbacks call this on
+ * the UI thread, so it is a worklet (it may use only its arguments and globals).
+ */
 export function barFraction(x: number, width: number): number {
+  "worklet"
   if (!(width > 0) || !Number.isFinite(x)) return 0
   return Math.min(1, Math.max(0, x / width))
 }

@@ -12,13 +12,15 @@ extension PodcastPlayer {
   func makeItem(for episode: Episode) -> AVPlayerItem {
     streamDownload?.stop()
     streamDownload = nil
+    playsPlainAddress = false
     if let file = PodcastDownloader.shared.localFile(for: episode.id) {
       return AVPlayerItem(url: file)
     }
     let entry = PodcastDownloader.shared.store?.entry(for: episode.id)
-    // A new episode's automatic download that is still waiting for Wi-Fi has nothing to play,
-    // so it does not keep the listener from a download of their own.
-    let waiting = entry.map(StreamThroughDownload.isWaitingAutomatic) ?? false
+    // A new episode's automatic download that is waiting or still running gives way to a
+    // download of the listener's own, so this play skips ads. It is cancelled below, only when
+    // playing through is allowed. A download the listener asked for plays as the plain stream.
+    let waiting = entry.map(StreamThroughDownload.givesWay) ?? false
     // A play-through entry nobody is feeding is left over from a run that was stopped; the new
     // loader replaces it.
     let stale = (entry?.playThrough ?? false) && !PodcastDownloader.shared.isPlayThrough(episode.id)
@@ -29,7 +31,10 @@ extension PodcastPlayer {
         wifiOnly: DownloadSettings.wifiOnly, onWiFi: PodcastNetwork.shared.onWiFi),
       let loader = PodcastStreamDownload(
         episodeId: episode.id, url: episode.url, type: episode.type)
-    else { return AVPlayerItem(url: episode.url) }
+    else {
+      playsPlainAddress = true
+      return AVPlayerItem(url: episode.url)
+    }
     if waiting { try? PodcastDownloader.shared.cancel(episodeId: episode.id) }
     // The language is noted before the download can finish, as when a download is asked for.
     PodcastTranscriber.shared.noteLanguage(episode.language, for: episode.id)
@@ -39,6 +44,7 @@ extension PodcastPlayer {
         self.fallBackToStream(from: loader, reason: reason)
       }
     }
+    loader.head.setLanguage(episode.language)
     streamDownload = loader
     loader.start()
     return AVPlayerItem(asset: loader.makeAsset())
@@ -53,8 +59,10 @@ extension PodcastPlayer {
     let place = ready ? position : max(position, itemStart)
     // The old item is let go first, so its requests failing in stop() never reach the player.
     removeItemObservers()
+    forgetPendingSeek()
     loader.stop()
     streamDownload = nil
+    playsPlainAddress = true
     if reason == .noLength, let type = current?.type {
       // The ad finder still needs the file; an ordinary download handles any length. stop()
       // forgot the show's language, so it is noted again for the transcriber.
@@ -67,11 +75,7 @@ extension PodcastPlayer {
     item.audioTimePitchAlgorithm = .timeDomain
     player.replaceCurrentItem(with: item)
     watch(item)
-    if place > 0 {
-      player.seek(
-        to: CMTime(seconds: place, preferredTimescale: 600), toleranceBefore: .zero,
-        toleranceAfter: .zero)
-    }
+    if place > 0 { movePlayhead(to: place) }
     if wantsToPlay { player.play() }
     sound.refresh()
     publish()

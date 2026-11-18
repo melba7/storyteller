@@ -3,11 +3,17 @@ import { useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
 import { useMemo, useState } from "react"
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native"
+import { useSafeAreaInsets } from "react-native-safe-area-context"
 
 import { Text } from "@/components/ui/text"
 import { blendOver } from "@/modules/podcasts/artworkTint"
 import { chapterArtwork } from "@/modules/podcasts/chapters"
 import { lastTabSegments } from "@/modules/podcasts/lastTab"
+import {
+  artworkPlan,
+  sheetGutters,
+  sideBySide,
+} from "@/modules/podcasts/playerFrame"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
 import { sheetColors } from "@/modules/podcasts/playerSheet"
@@ -47,11 +53,13 @@ export function PlayerScreen() {
   const segments = lastTabSegments()
   const view = usePlayer()
   const windowSize = useWindowDimensions()
+  const insets = useSafeAreaInsets()
   // A screen that opened the player may have asked for a page (the menu's "View Transcript").
   const [chosen, setChosen] = useState<PlayerPanel>(
     () => takePlayerPageRequest() ?? "art",
   )
-  const [areaHeight, setAreaHeight] = useState(0)
+  // Null until the room above the controls is measured: a measured 0 means no room at all.
+  const [areaHeight, setAreaHeight] = useState<number | null>(null)
   const [sheet, setSheet] = useState({ width: 0, height: 0 })
   const sheetHeight = sheet.height
   // The sheet's own width: on iPad the modal sheet is narrower than the window.
@@ -64,10 +72,21 @@ export function PlayerScreen() {
   const chapters = useChapters(episode?.id ?? "")
   // The chapters panel goes away with the chapters (a new episode without any).
   const panel = chosen === "chapters" && chapters.length === 0 ? "art" : chosen
+  // A short, wide sheet (phone landscape) puts the artwork or panel left of the controls.
+  const split = sideBySide(sheet)
+  const gutters = sheetGutters({ side: SIDE, insets, sideBySide: split })
   // The artwork is as wide as the sheet and square, and is cut off where the controls begin.
-  // Until the area is measured it is as tall as it can be, so it doesn't jump.
-  const artHeight =
-    areaHeight > 0 ? Math.min(width, areaHeight + GRABBER) : width
+  // On a wide sheet with little height it is a centred square instead. Until the area is
+  // measured it is as tall as it can be, so it doesn't jump.
+  const plan = artworkPlan({
+    sheetWidth: width,
+    areaWidth: split ? width / 2 : width,
+    areaHeight,
+    grabber: GRABBER,
+    minArea: MIN_ART_AREA,
+    sideBySide: split,
+  })
+  const artHeight = plan.kind === "edge" ? plan.height : 0
   // The sheet's gradient at the artwork's lower edge, where the fade ends.
   const fadeTo =
     sheetHeight > 0
@@ -77,7 +96,6 @@ export function PlayerScreen() {
           Math.min(1, artHeight / sheetHeight),
         )
       : colors.top
-  const showArt = areaHeight === 0 || areaHeight >= MIN_ART_AREA
 
   function close() {
     if (router.canGoBack()) router.back()
@@ -110,7 +128,7 @@ export function PlayerScreen() {
           backgroundImage: `linear-gradient(180deg, ${colors.top}, ${colors.bottom})`,
         }}
       >
-        {panel === "art" && showArt && episode ? (
+        {panel === "art" && plan.kind !== "hidden" && episode ? (
           <PlayerArtwork
             uri={
               chapterArtwork(chapters, view.position) ??
@@ -118,9 +136,11 @@ export function PlayerScreen() {
               show?.imageUrl ??
               null
             }
-            width={width}
-            height={artHeight}
+            width={split ? width / 2 : width}
+            height={plan.kind === "contained" ? plan.height : artHeight}
             fadeTo={fadeTo}
+            contained={plan.kind === "contained"}
+            top={GRABBER}
           />
         ) : null}
         <Pressable
@@ -144,56 +164,63 @@ export function PlayerScreen() {
           </Text>
         ) : (
           <>
-            <View
-              className="flex-1"
-              style={{ paddingHorizontal: panel === "art" ? 0 : SIDE }}
-              onLayout={(event) =>
-                setAreaHeight(event.nativeEvent.layout.height)
-              }
-            >
-              {panel === "art" ? (
-                <View className="flex-1" />
-              ) : panel === "transcript" ? (
-                <TranscriptView key={episode.id} episode={episode} />
-              ) : panel === "queue" ? (
-                <PlayerQueue />
-              ) : panel === "chapters" ? (
-                <View className="flex-1">
-                  <PanelTitle
-                    title="Chapters"
+            <View className={split ? "flex-1 flex-row" : "flex-1"}>
+              <View
+                className="flex-1"
+                style={{
+                  paddingLeft: panel === "art" ? 0 : gutters.areaLeft,
+                  paddingRight: panel === "art" ? 0 : gutters.areaRight,
+                }}
+                onLayout={(event) =>
+                  setAreaHeight(event.nativeEvent.layout.height)
+                }
+              >
+                {panel === "art" ? (
+                  <View className="flex-1" />
+                ) : panel === "transcript" ? (
+                  <TranscriptView key={episode.id} episode={episode} />
+                ) : panel === "queue" ? (
+                  <PlayerQueue />
+                ) : panel === "chapters" ? (
+                  <View className="flex-1">
+                    <PanelTitle
+                      title="Chapters"
+                      onDone={() => setChosen("art")}
+                    />
+                    <ChapterList episodeId={episode.id} chapters={chapters} />
+                  </View>
+                ) : panel === "bookmarks" ? (
+                  <BookmarksPage
+                    episode={episode}
+                    show={show}
                     onDone={() => setChosen("art")}
                   />
-                  <ChapterList episodeId={episode.id} chapters={chapters} />
-                </View>
-              ) : panel === "bookmarks" ? (
-                <BookmarksPage
-                  episode={episode}
-                  show={show}
-                  onDone={() => setChosen("art")}
-                />
-              ) : (
-                <NotesPage
-                  notes={episode.notes}
-                  onDone={() => setChosen("art")}
-                />
-              )}
-            </View>
-            {/* Everything under the artwork scrolls when large text makes it taller than the room left. */}
-            <ScrollView
-              style={{ flexGrow: 0, flexShrink: 1 }}
-              bounces={false}
-              showsVerticalScrollIndicator={false}
-            >
-              <PlayerNowPlaying
-                view={view}
-                chapters={chapters}
-                onPanel={setChosen}
-                onShow={goToShow}
-              />
-              <View className="pt-1">
-                <PlayerToolbar panel={panel} onPanel={setChosen} />
+                ) : (
+                  <NotesPage
+                    notes={episode.notes}
+                    onDone={() => setChosen("art")}
+                  />
+                )}
               </View>
-            </ScrollView>
+              {/* Everything under the artwork scrolls when large text makes it taller than the room left. */}
+              <ScrollView
+                style={split ? { flex: 1 } : { flexGrow: 0, flexShrink: 1 }}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+              >
+                <PlayerNowPlaying
+                  view={view}
+                  chapters={chapters}
+                  onPanel={setChosen}
+                  onShow={goToShow}
+                  left={gutters.controlsLeft}
+                  right={gutters.controlsRight}
+                />
+                <View className="pt-1">
+                  <PlayerToolbar panel={panel} onPanel={setChosen} />
+                </View>
+              </ScrollView>
+            </View>
           </>
         )}
       </View>

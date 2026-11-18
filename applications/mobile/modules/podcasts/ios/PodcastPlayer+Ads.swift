@@ -76,14 +76,22 @@ final class PodcastAdSkipping {
     // An episode playing through its own download has a store once the download is filed, but
     // only for the file this download filed: another download of the episode (with other ads
     // inserted) is not the audio that is heard.
-    if store == nil, let loader = owner.streamDownload, loader.episodeId == episodeId,
-      let sha = loader.filedSha
+    // While it streams, the head scan's ads are under a made-up name; once filed, the real hash.
+    if let loader = owner.streamDownload, loader.episodeId == episodeId,
+      let found = loader.head.adsStore
     {
-      store = Self.downloadedStore(episodeId, sha256: sha)
+      store = found
     }
     skipper.apply(settings: settings)
-    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
+    // An ad found while it plays, with the playhead inside it, is left at once (unless the
+    // listener seeked into it, or it was undone). While a seek is on its way the playhead still
+    // reads the old place, so nothing is left then; the seek's landing looks again.
+    let playhead = owner.wantsToPlay && !owner.seekPending ? owner.position : nil
+    let leave = skipper.replace(
+      file: store?.best(detector: PodcastAdFinder.detectorName), playhead: playhead,
+      duration: owner.currentDuration, now: now)
     setMarkers()
+    if let leave { jump(leave) }
     // Silence trimming keeps out of the ads that are skipped, so it reads them again too.
     owner.sound.refresh()
   }
@@ -149,10 +157,9 @@ final class PodcastAdSkipping {
   /// Seeks to the end of the skipped ad (and the ones that follow it at once) and tells the app.
   private func jump(_ skip: AdSkip, from place: Double? = nil) {
     guard let episodeId else { return }
+    PodcastTimeline.firstSkip(episodeId)
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
-    owner.player.seek(
-      to: CMTime(seconds: skip.target, preferredTimescale: 600), toleranceBefore: .zero,
-      toleranceAfter: .zero)
+    owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(
       "onAdSkipped",

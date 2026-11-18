@@ -16,11 +16,17 @@ export function SectionHeader({
   title: string
   onPress?: () => void
 }) {
-  const label = <Text className="text-[28px] leading-8 font-bold">{title}</Text>
+  // One line: a long title ("Top in Religion & Spirituality") shrinks its box and ends in
+  // "...", so the chevron stays beside it.
+  const label = (
+    <Text className="shrink text-[28px] leading-8 font-bold" numberOfLines={1}>
+      {title}
+    </Text>
+  )
   if (!onPress) {
     return (
       <View
-        className="flex-row items-center gap-1 px-4 pt-7 pb-3"
+        className="px-safe-or-4 flex-row items-center gap-1 pt-7 pb-3"
         accessible
         accessibilityRole="header"
         accessibilityLabel={title}
@@ -31,13 +37,17 @@ export function SectionHeader({
   }
   return (
     <Pressable
-      className="flex-row items-center gap-1 px-4 pt-7 pb-3"
+      className="px-safe-or-4 flex-row items-center gap-1 pt-7 pb-3"
       accessibilityRole="header"
       accessibilityLabel={title}
       onPress={onPress}
     >
       {label}
-      <Icon as={ChevronRight} size={24} className="text-muted-foreground" />
+      <Icon
+        as={ChevronRight}
+        size={24}
+        className="text-muted-foreground shrink-0"
+      />
     </Pressable>
   )
 }

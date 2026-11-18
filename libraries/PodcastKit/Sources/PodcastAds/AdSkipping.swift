@@ -58,18 +58,29 @@ public struct AdSkipper: Sendable {
   static let firstBoundary = 0.05
   /// An ad that starts this close to where the one before ends is skipped with it.
   static let chainGap = 0.5
+  /// An ad that is found while it plays is left only when at least this much of it (with the
+  /// ads skipped along with it) is still ahead. A jump costs about a second of seeking and
+  /// re-buffering and the "Skipped ad" note, so a shorter rest is cheaper to hear than to skip.
+  public static let leaveMinimum = 3.0
 
-  /// The ads sure enough to skip and not undone before, whatever the switches say.
+  /// The sure and unsure ads that were not undone before, whatever the switches say.
   private var candidates: [FoundAd]
   public private(set) var settings: AdSkipSettings
   /// Where the playhead was put last, and the ads it landed in.
   private var lastSeek: Double?
   private var enteredBySeek: Set<Double> = []
-  private var undone: Set<Double> = []
+  /// What the listener undid in this episode, so far: an ad found again a second later (the
+  /// model's first line, a pause snap) is the same ad.
+  private var undone: [(start: Double, end: Double)] = []
+  /// Where the ads left in progress were skipped to (start and end), so a second look at the
+  /// same file does not jump again before the first jump has landed, while an ad that is found
+  /// again longer (cut short at the edge of the first pass) is left once more.
+  private var left: [(start: Double, end: Double)] = []
   private var last: (skip: AdSkip, at: Double)?
 
-  /// - Parameter file: the episode's ads file, nil when it has none. Only sure ads that the
-  ///   listener did not undo before are ever skipped; unsure ones are only listed.
+  /// - Parameter file: the episode's ads file, nil when it has none. Sure and unsure ads that
+  ///   the listener did not undo before are skipped (Undo takes a wrong skip back for good);
+  ///   guesses are never in the file.
   public init(file: AdsFile?, settings: AdSkipSettings) {
     self.settings = settings
     candidates = Self.candidates(in: file)
@@ -77,7 +88,7 @@ public struct AdSkipper: Sendable {
 
   private static func candidates(in file: AdsFile?) -> [FoundAd] {
     (file?.ads ?? []).filter { ad in
-      ad.confidence == .sure && file?.isUndone(ad) == false && ad.end > ad.start
+      ad.confidence >= .unsure && file?.isUndone(ad) == false && ad.end > ad.start
     }.sorted { $0.start < $1.start }
   }
 
@@ -88,8 +99,36 @@ public struct AdSkipper: Sendable {
     if let lastSeek { seeked(to: lastSeek) }
   }
 
+  /// Like `replace(file:)`, for the player while the episode plays at `playhead` (nil when it is
+  /// not playing): when the playhead is inside an ad that is to be skipped, the skip to make at
+  /// once. Not when the listener seeked into that ad (a manual seek is respected, also after
+  /// the ad was found), when the ad was undone, when its switch is off, when it was left this
+  /// way already, or when less than `leaveMinimum` seconds of it are left.
+  public mutating func replace(
+    file: AdsFile?, playhead: Double?, duration: Double?, now: Double
+  ) -> AdSkip? {
+    replace(file: file)
+    guard let playhead, playhead.isFinite,
+      let ad = ads.first(where: { $0.start <= playhead && playhead < $0.end }),
+      !enteredBySeek.contains(ad.start), !wasLeft(ad),
+      chainEnd(of: ad) - playhead >= Self.leaveMinimum
+    else { return nil }
+    left.append((ad.start, ad.end))
+    return makeSkip(ad, duration: duration, now: now)
+  }
+
+  /// Whether a jump out of this ad (or out of one that ended no sooner) was made already.
+  private func wasLeft(_ ad: FoundAd) -> Bool {
+    left.contains { $0.start < ad.end && ad.start < $0.end && $0.end >= ad.end - 0.5 }
+  }
+
   /// The ads that will be skipped under the current switches.
-  public var ads: [FoundAd] { candidates.filter { settings.allows($0.kind) && !undone.contains($0.start) } }
+  public var ads: [FoundAd] { candidates.filter { settings.allows($0.kind) && !isUndone($0) } }
+
+  /// Whether an ad overlaps a stretch the listener undid.
+  private func isUndone(_ ad: FoundAd) -> Bool {
+    undone.contains { $0.start < ad.end && ad.start < $0.end }
+  }
 
   /// Where to set the markers, in seconds, in order.
   public var boundaryTimes: [Double] { ads.map { max(Self.firstBoundary, $0.start) } }
@@ -110,6 +149,7 @@ public struct AdSkipper: Sendable {
   public mutating func started(at position: Double, duration: Double?, now: Double) -> AdSkip? {
     lastSeek = nil
     enteredBySeek = []
+    left = []
     guard position.isFinite,
       let ad = ads.first(where: { $0.start <= position && position < $0.end })
     else { return nil }
@@ -118,6 +158,15 @@ public struct AdSkipper: Sendable {
 
   /// The skip for `ad`, taking on the ads that start within `chainGap` of where it ends.
   private mutating func makeSkip(_ ad: FoundAd, duration: Double?, now: Double) -> AdSkip {
+    let chained = chain(after: ad)
+    let skip = AdSkip(
+      ad: ad, target: Self.target(for: chained.last ?? ad, duration: duration), chained: chained)
+    last = (skip, now)
+    return skip
+  }
+
+  /// The ads that follow `ad` at once, in order.
+  private func chain(after ad: FoundAd) -> [FoundAd] {
     var chained: [FoundAd] = []
     var end = ad.end
     for next in ads where next.start > ad.start && !chained.contains(next) && next != ad {
@@ -126,11 +175,10 @@ public struct AdSkipper: Sendable {
         end = next.end
       }
     }
-    let skip = AdSkip(
-      ad: ad, target: Self.target(for: chained.last ?? ad, duration: duration), chained: chained)
-    last = (skip, now)
-    return skip
+    return chained
   }
+
+  private func chainEnd(of ad: FoundAd) -> Double { chain(after: ad).last?.end ?? ad.end }
 
   /// How far past a marker playback may be when the player is told about it and still count as
   /// having reached it: more at a higher speed, because the same delay covers more audio. Past
@@ -174,8 +222,7 @@ public struct AdSkipper: Sendable {
   /// one (an ad and then the hosts' plug) can be saved as undone as well.
   public mutating func undoSkip(now: Double) -> AdSkip? {
     guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
-    undone.insert(last.skip.ad.start)
-    for later in last.skip.chained { undone.insert(later.start) }
+    for undid in [last.skip.ad] + last.skip.chained { undone.append((undid.start, undid.end)) }
     self.last = nil
     return last.skip
   }

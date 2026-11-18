@@ -13,6 +13,7 @@ import {
   formatClock,
   noteAfterUndo,
   readsAdsFile,
+  unavailableReason,
   parseAdsFile,
   skipNote,
   skipNoteShown,
@@ -34,6 +35,18 @@ describe("adsStatus", () => {
     expect(adsStatus(info("found", { count: 3 }))).toBe("3 ads found")
     expect(adsStatus(info("found", { count: 1 }))).toBe("1 ad found")
     expect(adsStatus(info("noAds"))).toBe("No ads found")
+  })
+
+  it("says when some parts could not be checked", () => {
+    expect(adsStatus(info("noAds", { unchecked: true }))).toBe(
+      "Couldn't check some parts for ads",
+    )
+    expect(adsStatus(info("found", { count: 2, unchecked: true }))).toBe(
+      "2 ads found. Couldn't check some parts",
+    )
+    expect(adsStatus(info("found", { count: 1, unchecked: false }))).toBe(
+      "1 ad found",
+    )
   })
 
   it("gives the reason when ads can't be found", () => {
@@ -155,7 +168,9 @@ describe("adRows", () => {
     )
     const rows = adRows(file!)
     expect(rows.map((row) => row.kind)).toEqual(["Host plug", "Ad", "Ad"])
-    expect(rows.map((row) => row.skipped)).toEqual([true, false, false])
+    // Sure and unsure ads are both skipped, unless the listener undid the skip.
+    expect(rows.map((row) => row.skipped)).toEqual([true, true, false])
+    expect(rows.map((row) => row.unsure)).toEqual([false, true, false])
     expect(rows.map((row) => row.undone)).toEqual([false, false, true])
     expect(rows[1]?.label).toContain("not sure")
   })
@@ -191,15 +206,28 @@ describe("the note after a skip", () => {
 
 describe("adMarks", () => {
   const rows = [
-    { start: 100, end: 160, skipped: true },
-    { start: 500, end: 560, skipped: false },
+    { start: 100, end: 160, skipped: true, unsure: false },
+    { start: 500, end: 560, skipped: false, unsure: false },
+    { start: 700, end: 760, skipped: true, unsure: true },
   ]
 
   it("places each ad as shares of the episode", () => {
     const marks = adMarks(rows, 1000)
-    expect(marks[0]).toEqual({ left: 0.1, width: 0.06, skipped: true })
+    expect(marks[0]).toEqual({
+      left: 0.1,
+      width: 0.06,
+      skipped: true,
+      unsure: false,
+    })
     expect(marks[1]?.left).toBe(0.5)
     expect(marks[1]?.skipped).toBe(false)
+  })
+
+  it("keeps the unsure ones apart: skipped, drawn faint", () => {
+    expect(adMarks(rows, 1000)[2]).toMatchObject({
+      skipped: true,
+      unsure: true,
+    })
   })
 
   it("draws nothing while the length is unknown", () => {
@@ -208,12 +236,15 @@ describe("adMarks", () => {
   })
 
   it("keeps a mark inside the bar", () => {
-    const [mark] = adMarks([{ start: 950, end: 1100, skipped: true }], 1000)
+    const [mark] = adMarks(
+      [{ start: 950, end: 1100, skipped: true, unsure: false }],
+      1000,
+    )
     expect(mark?.left).toBe(0.95)
     expect(mark?.width).toBeCloseTo(0.05)
-    expect(adMarks([{ start: 1200, end: 1300, skipped: true }], 1000)).toEqual(
-      [],
-    )
+    expect(
+      adMarks([{ start: 1200, end: 1300, skipped: true, unsure: false }], 1000),
+    ).toEqual([])
   })
 })
 
@@ -240,5 +271,67 @@ describe("the ads file while the full pass runs", () => {
     const kept = { episodeId: "a", file: partial }
     expect(adsFileAfterRead("finding", kept, "b", null)).toBeNull()
     expect(adsFileAfterRead("finding", null, "b", null)).toBeNull()
+  })
+})
+
+describe("unavailableReason", () => {
+  it("gives the phone's reason when any episode has one", () => {
+    const map = adsMapFromList([
+      info("found", { count: 1 }),
+      {
+        episodeId: "e2",
+        state: "unavailable",
+        reason: "Apple Intelligence is off",
+      },
+    ])
+    expect(unavailableReason(map)).toBe("Apple Intelligence is off")
+  })
+
+  it("ignores one episode's own failure", () => {
+    const map = adsMapFromList([
+      info("unavailable", { reason: "Finding ads stopped: The model failed." }),
+    ])
+    expect(unavailableReason(map)).toBeNull()
+    const both = adsMapFromList([
+      info("unavailable", { reason: "Finding ads stopped: The model failed." }),
+      {
+        episodeId: "e2",
+        state: "unavailable",
+        reason: "The model is downloading",
+      },
+    ])
+    expect(unavailableReason(both)).toBe("The model is downloading")
+  })
+
+  it("shows only the phone-wide reasons", () => {
+    for (const reason of [
+      "Apple Intelligence is off",
+      "The model is downloading",
+      "This iPhone can't run Apple Intelligence",
+      "Needs iOS 26",
+      "Apple Intelligence is not available",
+    ]) {
+      expect(
+        unavailableReason(adsMapFromList([info("unavailable", { reason })])),
+      ).toBe(reason)
+    }
+  })
+
+  it("treats any other reason as one episode's failure", () => {
+    for (const reason of [
+      "The transcript could not be read",
+      "The model refused this episode",
+      "Finding ads stopped: The model failed.",
+    ]) {
+      expect(
+        unavailableReason(adsMapFromList([info("unavailable", { reason })])),
+      ).toBeNull()
+    }
+    expect(unavailableReason(adsMapFromList([info("unavailable")]))).toBeNull()
+  })
+
+  it("is null when ads can be found", () => {
+    expect(unavailableReason(adsMapFromList([info("noAds")]))).toBeNull()
+    expect(unavailableReason({})).toBeNull()
   })
 })

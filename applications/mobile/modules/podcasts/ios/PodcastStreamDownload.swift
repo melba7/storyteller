@@ -73,6 +73,8 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   let backgroundLock = NSLock()
   var backgroundTask = UIBackgroundTaskIdentifier.invalid
   private let shaLock = NSLock()
+  /// Checks the first minutes for ads while the rest downloads (PodcastStreamHead.swift).
+  let head: PodcastStreamHead
   private var filed: String?
   var serveScheduled = false
   var stopped = false
@@ -90,6 +92,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     guard let custom = StreamScheme.customURL(for: upgraded) else { return nil }
     self.store = store
     self.episodeId = episodeId
+    self.head = PodcastStreamHead(episodeId: episodeId, store: store)
     self.originalURL = url
     self.enclosureType = type
     self.fileExtension = DownloadFile.fileExtension(type: type, url: upgraded)
@@ -113,6 +116,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
   /// Starts fetching. Call it before the player is given the asset.
   @MainActor
   func start() {
+    PodcastTimeline.tap(episodeId)
     holdBackground()
     // The downloader keeps its own clean-up and any second download away from this episode,
     // and calls this when the listener removes the download.
@@ -129,6 +133,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     queue.sync {
       guard !stopped else { return }
       stopped = true
+      head.stop()
       PodcastDownloader.shared.unregisterPlayThrough(episodeId)
       releaseBackground()
       task?.cancel()
@@ -161,6 +166,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     do {
       let staged = try store.newStagingFile(episodeId: episodeId)
       stagedURL = staged
+      head.begin(staged: staged)
       writer = try FileHandle(forWritingTo: staged)
       reader = try FileHandle(forReadingFrom: staged)
       let entry = DownloadEntry(
@@ -244,6 +250,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
       return failed(DownloadFailure(diskFull: DownloadFailure.isDiskFull(error)))
     }
     available += Int64(data.count)
+    head.noteBytes(available)
     resumes = 0
     waits = 0
     if throttle.shouldReport(bytes: available, expected: expected, at: Date()),
@@ -279,6 +286,8 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     ended = true
     completed = true
     expected = available
+    head.noteBytes(available)
+    head.noMoreBytes()
     try? writer?.close()
     writer = nil
     session?.finishTasksAndInvalidate()
@@ -293,10 +302,16 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
         self.releaseBackground()
       }
       do {
+        self.head.rememberUndone()  // filing removes the folder, and the stream's file with it
         let done = try store.installStaged(staged, episodeId: id, fileExtension: ext)
-        if case .downloaded(_, let sha, _, _) = done.state { self.noteFiled(sha) }
+        if case .downloaded(_, let sha, _, _) = done.state {
+          self.noteFiled(sha)
+          self.head.filed(sha: sha, file: store.localFile(for: id))
+        }
         PodcastDownloader.shared.emit(done)
-        PodcastTranscriber.shared.downloaded(id)
+        // The head scan may still be at work on the same first minutes: its analyzer and model
+        // session go first, and the transcriber starts when the scan ends (or after 90 seconds).
+        self.head.afterScan(timeout: 90) { PodcastTranscriber.shared.downloaded(id) }
       } catch DownloadError.noEntry {
         // Removed by the listener while it was being filed: nothing is brought back.
       } catch {
@@ -331,6 +346,7 @@ final class PodcastStreamDownload: NSObject, AVAssetResourceLoaderDelegate, URLS
     // Nothing arrived, so nothing is lost by playing the plain address instead.
     if available == 0, !stopped, onFallback != nil { return giveUp(.noFirstByte) }
     ended = true
+    head.stop()
     PodcastDownloader.shared.unregisterPlayThrough(episodeId)
     releaseBackground()
     let reason = DownloadRecovery.reason(for: failure)

@@ -9,6 +9,7 @@ import type { TranscriptInfo } from "./index"
 import {
   deviceChoice,
   deviceSource,
+  partialCovers,
   transcriptCacheFresh,
   transcriptCacheKey,
   transcriptSource,
@@ -93,8 +94,10 @@ async function fromPartial(
 }
 
 /**
- * The transcript to show for an episode, or why there is none. The feed's comes first; when
- * it can't be loaded or read, the phone's own is used if there is one, else the reason
+ * The transcript to show for an episode, or why there is none. The phone's own comes first
+ * when it is finished or already covers `playhead` (seconds), because the feed's is timed
+ * against the publisher's cut and drifts once ads are inserted. Else the feed's; when it
+ * can't be loaded or read, the phone's partial one is used if there is one, else the reason
  * is the feed's.
  */
 export async function loadTranscript(episode: {
@@ -102,11 +105,21 @@ export async function loadTranscript(episode: {
   transcriptUrl: string | null
   transcriptType: string | null
   device: TranscriptInfo | undefined
+  /** Seconds into the episode that plays; null (or left out) when it is not playing. */
+  playhead?: number | null
 }): Promise<TranscriptResult> {
+  const choice = deviceChoice(episode.device)
+  const partial =
+    choice.kind === "partial"
+      ? await fromPartial(episode.id, choice.percent, choice.empty)
+      : null
   const source = transcriptSource({
     feedUrl: episode.transcriptUrl,
     feedType: episode.transcriptType,
     device: episode.device,
+    partialCovers:
+      partial?.lines != null &&
+      partialCovers(partial.lines, episode.playhead ?? null),
   })
   let reason: string | null = null
   if (source.kind === "feed") {
@@ -119,9 +132,7 @@ export async function loadTranscript(episode: {
           : "The transcript couldn't be opened."
     }
   }
-  const choice = deviceChoice(episode.device)
-  if (choice.kind === "partial") {
-    const partial = await fromPartial(episode.id, choice.percent, choice.empty)
+  if (partial) {
     if (partial.lines || reason === null) return partial
     return { lines: null, reason }
   }

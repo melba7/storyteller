@@ -27,6 +27,7 @@ let package = Package(
         .library(name: "PodcastAds", targets: ["PodcastAds"]),
         .library(name: "PodcastChapters", targets: ["PodcastChapters"]),
         .library(name: "PodcastAdsOnDevice", targets: ["PodcastAdsOnDevice"]),
+        .library(name: "PodcastAudioMatch", targets: ["PodcastAudioMatch"]),
         .executable(name: "podcast-transcribe", targets: ["podcast-transcribe"]),
         .executable(name: "podcast-ads", targets: ["podcast-ads"]),
     ],
@@ -68,6 +69,11 @@ let package = Package(
         // only, so it tests on Linux with hand-built bytes.
         .target(name: "PodcastChapters"),
         .testTarget(name: "PodcastChaptersTests", dependencies: ["PodcastChapters"]),
+        // Audio matching without decoding: cuts an MP3 file into frames (skipping the ID3 tag) and
+        // lines up two downloads of one episode by frame hashes, to find what differs (inserted
+        // ads). Foundation only, so it tests on Linux with hand-built bytes.
+        .target(name: "PodcastAudioMatch"),
+        .testTarget(name: "PodcastAudioMatchTests", dependencies: ["PodcastAudioMatch"]),
         // The detector made of Apple's on-device model (Foundation Models, iOS 26 and macOS 26).
         // Empty where there is no such framework. Swift 5 mode for the same reason as
         // PodcastSpeech: it cannot be compiled here.
@@ -79,7 +85,7 @@ let package = Package(
             name: "podcast-ads",
             dependencies: [
                 "PodcastAds", "PodcastAdsOnDevice", "PodcastSpeech", "PodcastTranscripts",
-                "PodcastDownloads",
+                "PodcastDownloads", "PodcastAudioMatch",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
     ]

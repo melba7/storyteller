@@ -39,18 +39,36 @@ export type TranscriptSource =
   | { kind: "none"; reason: string }
 
 /**
- * Where the transcript comes from: the feed's when it has one (it also works while
- * streaming), else the one made on the phone, else why there is none.
+ * Where the transcript comes from: the phone's own when it is finished, or still being made
+ * and already covering the playhead (`partialCovers`), else the feed's, else why there is
+ * none. The feed's is timed against the publisher's cut, but the audio that plays has ads
+ * inserted, so its lines drift: it is only the fallback when the phone has nothing to show.
  */
 export function transcriptSource(input: {
   feedUrl: string | null
   feedType: string | null
   device: TranscriptInfo | undefined
+  partialCovers?: boolean
 }): TranscriptSource {
+  if (input.device?.state === "done") return { kind: "device" }
+  if (input.partialCovers === true) return { kind: "device" }
   if (input.feedUrl) {
     return { kind: "feed", url: input.feedUrl, type: input.feedType ?? "" }
   }
   return deviceSource(input.device)
+}
+
+/**
+ * Whether the lines saved so far of a transcript being made reach `playhead` seconds. The
+ * playhead is null for an episode that is not playing: it has none, so a half-made transcript
+ * never covers it and does not replace a whole feed transcript.
+ */
+export function partialCovers(
+  lines: readonly { end: number }[] | null | undefined,
+  playhead: number | null,
+): boolean {
+  const last = lines?.[lines.length - 1]
+  return playhead !== null && last !== undefined && last.end >= playhead
 }
 
 /** The phone's own transcript, or the reason there is none. */

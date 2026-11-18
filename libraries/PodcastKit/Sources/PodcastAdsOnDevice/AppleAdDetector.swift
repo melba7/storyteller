@@ -14,8 +14,24 @@
 import Foundation
 import PodcastAds
 
+/// A detector that can load the model ahead of its one request, so the answer comes sooner.
+public protocol PrewarmableAdDetector: AdDetector {
+  /// Starts loading the model and the instructions now. The system may ignore it (in the
+  /// background, or under load); the request still works.
+  func prewarm()
+}
+
 /// What the model needs from this system, and what the app asks of it.
 public enum AppleAds {
+  /// A detector for one request, with its session made and asked to prewarm by `prewarm()`.
+  /// Use it once: a session keeps what it has been asked. Nil when this system has no model.
+  public static func makeWarmDetector() -> PrewarmableAdDetector? {
+    #if canImport(FoundationModels) && compiler(>=6.2)
+      if #available(iOS 26.0, macOS 26.0, *) { return AppleAdDetector(warm: true) }
+    #endif
+    return nil
+  }
+
   /// The Apple detector, or nil when this system or build has no Foundation Models.
   public static func makeDetector() -> AdDetector? {
     #if canImport(FoundationModels) && compiler(>=6.2)
@@ -37,7 +53,7 @@ public enum AppleAds {
   import FoundationModels
 
   @available(iOS 26.0, macOS 26.0, *)
-  public struct AppleAdDetector: AdDetector {
+  public struct AppleAdDetector: PrewarmableAdDetector {
     public let name = "apple-on-device"
     /// Bumped when the instructions or what this file does with answers changes.
     public let version = "1"
@@ -49,7 +65,16 @@ public enum AppleAds {
     static let answerRoom = 600
     static let window = 4096
 
-    public init() {}
+    /// The session made ahead for one request, when this detector was made to be warmed.
+    private let warmSession: LanguageModelSession?
+
+    public init() { warmSession = nil }
+
+    fileprivate init(warm: Bool) {
+      warmSession = warm ? LanguageModelSession(instructions: Self.instructions) : nil
+    }
+
+    public func prewarm() { warmSession?.prewarm() }
 
     /// Why the model cannot be used now, or nil when it can.
     public static func availability() -> AdUnavailable? {
@@ -73,7 +98,7 @@ public enum AppleAds {
       let prompt = "The lines of a podcast episode, each with its number in brackets:\n\n" + piece.prompt
       guard fits(prompt: prompt) else { throw AdDetectorError.tooLong }
 
-      let session = LanguageModelSession(instructions: Self.instructions)
+      let session = warmSession ?? LanguageModelSession(instructions: Self.instructions)
       do {
         let response = try await session.respond(
           to: prompt, generating: AdAnswer.self, options: GenerationOptions(sampling: .greedy))
@@ -81,8 +106,11 @@ public enum AppleAds {
       } catch let error as LanguageModelSession.GenerationError {
         switch error {
         case .exceededContextWindowSize: throw AdDetectorError.tooLong
-        // The model refused these lines; they count as having no ad.
-        case .guardrailViolation: return []
+        // The model refused these lines, or could not put its answer in the asked shape. The
+        // answer is the same every time (the sampling is greedy), so asking again is no use:
+        // the runner counts the piece as having no ad and reports it, so the app can show
+        // that part was not read, and the rest of the episode still gets its ads.
+        case .guardrailViolation, .refusal, .decodingFailure: throw AdDetectorError.refused
         case .unsupportedLanguageOrLocale:
           throw AdDetectorError.failed("The on-device model does not support this language")
         default: throw AdDetectorError.failed("\(error)")

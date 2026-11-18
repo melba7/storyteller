@@ -11,6 +11,7 @@ import {
   CHART_CATEGORIES,
   TOP_CHART,
   type ChartDeps,
+  getJson,
   loadChart,
   parseCategoryChart,
   parseLookup,
@@ -205,6 +206,30 @@ describe("loadChart", () => {
     expect(shows).toHaveLength(2)
   })
 
+  it("returns the old kept list when the fetch fails, and throws when nothing is kept", async () => {
+    const old = [
+      {
+        appleId: "1",
+        title: "Old",
+        author: "A",
+        feedUrl: "https://x.test/rss",
+        imageUrl: null,
+      },
+    ]
+    const store = new Map([
+      ["chart:1321", { value: JSON.stringify(old), savedAt: 1_000_000 }],
+    ])
+    const { deps, advance } = setup(store)
+    advance(CACHE_MS + 1)
+    const offline = async (): Promise<Response> => {
+      throw new Error("offline")
+    }
+    expect(await loadChart("1321", { ...deps, fetchFn: offline })).toEqual(old)
+    await expect(
+      loadChart("1488", { ...deps, fetchFn: offline }),
+    ).rejects.toThrow("Couldn't reach Apple's charts")
+  })
+
   it("says plainly when Apple can't be reached, answers badly or sends junk", async () => {
     const base = setup(new Map()).deps
     await expect(
@@ -236,6 +261,34 @@ describe("loadChart", () => {
     expect(empty).toEqual([])
     expect(store.size).toBe(0)
   })
+
+  it("returns the old kept list, and keeps it, when the new answer has no shows or no feed links", async () => {
+    const old = [
+      {
+        appleId: "1",
+        title: "Old",
+        author: "A",
+        feedUrl: "https://x.test/rss",
+        imageUrl: null,
+      },
+    ]
+    const saved = JSON.stringify(old)
+    for (const mode of ["no entries", "no feed links"]) {
+      const store = new Map([
+        ["chart:1321", { value: saved, savedAt: 1_000_000 }],
+      ])
+      const { deps, advance } = setup(store)
+      advance(CACHE_MS + 1)
+      const fetchFn = async (url: string) =>
+        url.includes("/lookup")
+          ? answer({ results: [] })
+          : mode === "no entries"
+            ? answer({ feed: {} })
+            : answer(fixture("category-chart"))
+      expect(await loadChart("1321", { ...deps, fetchFn })).toEqual(old)
+      expect(store.get("chart:1321")?.value).toBe(saved)
+    }
+  })
 })
 
 describe("parseSavedChart", () => {
@@ -252,5 +305,71 @@ describe("parseSavedChart", () => {
     expect(parseSavedChart(JSON.stringify(shows))).toEqual(shows)
     expect(parseSavedChart('[{"appleId":"1"}]')).toBeNull()
     expect(parseSavedChart("3")).toBeNull()
+  })
+})
+
+describe("getJson's timeout", () => {
+  const never = () => new Promise<Response>(() => {})
+
+  it("rejects when the network never answers", async () => {
+    vi.useFakeTimers()
+    try {
+      const result = getJson("https://x.test/a", never).then(
+        () => "answered",
+        (error: Error) => error.message,
+      )
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toMatch(/Couldn't reach Apple's charts/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("rejects when the headers arrive but the body never does", async () => {
+    vi.useFakeTimers()
+    try {
+      const hangingBody = async () =>
+        ({
+          ok: true,
+          status: 200,
+          json: () => new Promise(() => {}),
+        }) as Response
+      const result = getJson("https://x.test/a", hangingBody).then(
+        () => "answered",
+        (error: Error) => error.message,
+      )
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toMatch(/Couldn't reach Apple's charts/)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("lets loadChart fall back on the kept copy when the fetch hangs", async () => {
+    vi.useFakeTimers()
+    try {
+      const old = [
+        {
+          appleId: "1",
+          title: "Old",
+          author: "",
+          feedUrl: "https://x.test/f",
+          imageUrl: null,
+        },
+      ]
+      const deps: ChartDeps = {
+        fetchFn: never,
+        cacheGet: async () => ({
+          value: JSON.stringify(old),
+          savedAt: Date.now() - CACHE_MS - 1000,
+        }),
+        cachePut: async () => {},
+      }
+      const result = loadChart("hang-chart", deps)
+      await vi.advanceTimersByTimeAsync(13_000)
+      expect(await result).toEqual(old)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

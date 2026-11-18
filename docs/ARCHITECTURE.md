@@ -234,6 +234,41 @@ in `FORK.md`.
 | 2026-11-17 | Mini players are Liquid Glass capsules (`expo-glass-effect`), `bg-secondary` before iOS 26; the reader's scrubber sits above               | Apple's look, seek stays easy to hit                       |
 | 2026-11-17 | The listening player is washed with the cover's colour (`artworkColor`) under 50% black, with white text and a light status bar            | Readable on any cover                                      |
 | 2026-11-17 | The home screen shows "Storyteller+"; TestFlight and the App Store show the App Store Connect record's name until Mo renames it            | Bundle id unchanged                                        |
+| 2026-11-18 | Covers ask Apple's image server for a size (160, 320, 640 or 1280 px) from the frame's points times the screen scale, the original second  | Sharp covers; the 100 px thumbnails looked blurry          |
+| 2026-11-18 | New's featured cards are square and filled edge to edge by the cover, with the label and title on a fade                                   | No small cover in a coloured box                           |
+| 2026-11-18 | Chart lists load in groups of three with one lookup each; one in-flight promise per list is shared by every chart loader                   | Stays under Apple's ~20 lookups a minute                   |
+| 2026-11-18 | A chart is fresh for 24 h; an older kept copy (up to 7 days) is drawn at once and kept when a fetch fails or comes back empty              | Offline, Home and New still have their lists               |
+| 2026-11-18 | Each list is loading, ready or missing (pure `applyListEvent`); a missing list draws nothing, heading included                             | One failing chart never blanks the page                    |
+| 2026-11-18 | Home: Top Shows, Top Episodes and 8 "Top in ..." shelves under its own; New: every other category; one planner (`chartLists.ts`)           | Mo's ask: a long first page with many lists                |
+| 2026-11-18 | Chart lists wait for the followed shows; New leaves out the categories For You drew, once For You has loaded                               | The order loads once; no category twice                    |
+| 2026-11-18 | Lists retry on pull to refresh (Home and New) and when the tab is focused again; fresh lists cost no request                               | A bad start doesn't leave a page empty                     |
+| 2026-11-18 | Top Episodes joins Apple's episode chart to one lookup of its shows' ids; the preview finds the episode by its title                       | The chart has no guid or audio address                     |
+| 2026-11-18 | Spotify's charts are left out                                                                                                              | Its service failed on its own side in both probes          |
+| 2026-11-18 | The player's "..." menu has at most 10 top-level rows: Share, Chapters and Bookmarks are submenus, and sections have no titles             | iOS 26 would not scroll the tall menu in the sheet         |
+| 2026-11-18 | Worklets call only worklets: an imported helper needs "worklet"; `worklets.test.ts` compiles the podcasts files to check                   | A plain call on the UI thread crashed the play bar         |
+| 2026-11-18 | Ad work starts at download: the playing episode, then Up Next, then the newest downloads; in the background only on power or 30% battery   | Ads were found after Mo had heard them                     |
+| 2026-11-18 | Transcript pieces are 60, 120, then 300 s; the growing last piece is asked for ads at 60 s and every 120 s more                            | The first ads are known within minutes                     |
+| 2026-11-18 | Unsure ads are skipped too, with Undo; the episode page lists them as "Not sure"                                                           | Mo's choice (2026-11-18)                                   |
+| 2026-11-18 | The phone's transcript wins over the feed's once it is done or covers the playhead of the playing episode                                  | Feed transcripts are timed without the inserted ads        |
+| 2026-11-18 | The player shows one line under the seek bar on how ad finding is going, or why it can't                                                   | Mo couldn't tell why nothing was skipped                   |
+| 2026-11-18 | Every episode's first 3 minutes are transcribed and checked before any episode's rest; the playing episode goes first and never yields     | A pre-roll is skipped on the first play                    |
+| 2026-11-18 | An ad found while it plays is left at once when 3 s or more remain; a seek into it, Undo or its switch off keep it playing                 | Ads found late still save the listener time                |
+| 2026-11-18 | A stream's first minutes are cut at MP3 frames from the growing file and transcribed in 30 s steps to 180 s; rules each step, model 60 s   | The first skip comes seconds after play                    |
+| 2026-11-18 | A stream's ads are kept as stream-<episode> until the file is filed, then under its SHA-256                                                | There is no hash before the file is whole                  |
+| 2026-11-18 | A partial pass keeps saved ads outside the stretch it asked; the full pass saves a partial file after each piece                           | Head, finder and full pass never erase each other          |
+| 2026-11-18 | A piece the model refuses is recorded and passed over; the status says some parts couldn't be checked                                      | One refusal blocked a whole episode                        |
+| 2026-11-18 | A plain-address stream says "Streaming without ad skipping"; the item is never swapped to the downloaded file                              | Inserted ads differ per download                           |
+| 2026-11-18 | PodcastAudioMatch compares two downloads' MP3 frames by hash, Foundation only (Mac probe now, phone later)                                 | Tests on Linux; the basis for I3                           |
+| 2026-11-18 | Chart requests time out after 12 s; New's Top Shows retries on pull to refresh and focus, like the lists                                   | A hanging network can't hold the page                      |
+| 2026-11-18 | Shelf and Top Episodes text grows to 1.2x at most and shelf heights scale with it; cards stop at 400 pt, tiles at 220 pt                   | Large text and iPad don't overlap or balloon               |
+| 2026-11-18 | The stream head scan finalizes through the audio yielded minus 50 ms, with 20 s per step; a filed stream's transcriber waits for it (90 s) | No stalled step; no two analyzers at the first skip        |
+| 2026-11-18 | Quick ad rules join a sponsor lead-in to a link or code only within 4 lines and 25 s; bare "code" or "slash" is not an offer               | Talk after a sponsor mention isn't skipped                 |
+| 2026-11-18 | Undo survives filing a stream and is matched by overlap; partial passes keep ads that straddle the stretch they asked                      | An undone ad found again isn't skipped again               |
+| 2026-11-18 | No ad is left while a seek is on its way; the check runs again when it lands and on play                                                   | A resume or drag isn't replaced by a jump                  |
+| 2026-11-18 | A running automatic download gives way to the play-through when Skip ads is on; the listener's own download is kept                        | A new episode tapped while it downloads still skips ads    |
+| 2026-11-18 | Podcasts pages size from the window and safe-area insets (`usePageFrame`); nothing is keyed on width or on a device size                   | The iPhone Duo folds and turns without losing the place    |
+| 2026-11-18 | Wide grids are lists of rows with columns doubled from 600 pt; show header picture at most 430 pt and 60% of the height                    | More room on the Duo's inner display, no remount           |
+| 2026-11-18 | The player sits side by side when short and wide, shows a whole cover on a centred sheet, and its sheets turn with the phone               | Landscape and the Duo's centred sheet                      |
 
 ## Known problems
 
