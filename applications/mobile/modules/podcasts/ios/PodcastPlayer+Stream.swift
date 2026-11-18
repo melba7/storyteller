@@ -66,9 +66,10 @@ extension PodcastPlayer {
     guard streamDownload === loader else { return }
     // The plain address plays now, with no ads to wait for.
     cancelStartHold()
-    // A seek to the saved place may not have happened yet on an item that never became ready.
+    // A seek to the saved place may not have happened yet, on an item that never became ready or
+    // one that is ready and waits for bytes: the plain address must start where the seek went.
     let ready = player.currentItem?.status == .readyToPlay
-    let place = ready ? position : max(position, itemStart)
+    let place = seekPending ? seekTarget : (ready ? position : max(position, itemStart))
     // The old item is let go first, so its requests failing in stop() never reach the player.
     removeItemObservers()
     forgetPendingSeek()

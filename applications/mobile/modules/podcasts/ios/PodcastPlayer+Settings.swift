@@ -50,7 +50,7 @@ extension PodcastPlayer {
     let back = RewindRule.seconds(
       pausedFor: Date().timeIntervalSince(paused),
       enabled: PlaybackSettingsStore.current.rewindAfterPause)
-    if back > 0 { seek(to: position - back) }
+    if back > 0 { seek(to: place - back) }
   }
 
   /// The next button on the headphones or lock screen.

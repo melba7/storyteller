@@ -1,0 +1,24 @@
+# Flow 3. A tap on the mini player while the player page is sliding away.
+#
+# It opens the player, swipes it down fast and taps the mini player at once. A tap during the
+# slide must not be lost and must not add a second copy: exactly one player page is open
+# afterwards, and one swipe closes it. Then the player must open once more, which a stuck native
+# lock would prevent until the app is quit.
+#
+# Maestro cannot choose the millisecond. The tap may come before the slide ends or just after it.
+# The flow checks the end state in both cases, but a pass does not prove the race was hit.
+appId: ${APP_ID}
+name: Player tap during close
+---
+- runFlow: lib/launch.yaml
+- runFlow: lib/follow-and-play.yaml
+- runFlow: lib/tap-mini-player.yaml
+- runFlow: lib/player-visible.yaml
+- runFlow: lib/swipe-player-down-fast.yaml
+- runFlow: lib/tap-mini-player.yaml
+- runFlow: lib/player-visible.yaml
+- takeScreenshot: player-tap-during-close-1-open-again
+- runFlow: lib/swipe-player-down.yaml
+- runFlow: lib/player-gone.yaml
+- takeScreenshot: player-tap-during-close-2-closed-by-one-swipe
+- runFlow: lib/open-and-close.yaml

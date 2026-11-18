@@ -1,0 +1,27 @@
+# From the Podcasts tabs: follows the public feed in FEED_URL through the Search tab ("Follow this
+# link"), then plays the show's latest episode from the white capsule at the top of its page, and
+# waits for the mini player. Needs the network. The episode is whichever one is newest, so the
+# flow does not depend on a title.
+appId: ${APP_ID}
+---
+- tapOn: "Search"
+# The system search tab normally opens with the search field already active. If it does not, this
+# taps the field by its hint text.
+- tapOn:
+    text: "Shows, episodes and words said"
+    optional: true
+- inputText: ${FEED_URL}
+- extendedWaitUntil:
+    visible: "Follow this link"
+    timeout: 30000
+- tapOn: "Follow this link"
+# The capsule is dimmed (disabled) until the episodes are read from the feed.
+- extendedWaitUntil:
+    visible:
+      text: "(Latest Episode|Resume), .*"
+      enabled: true
+    timeout: 90000
+- tapOn:
+    text: "(Latest Episode|Resume), .*"
+    enabled: true
+- runFlow: mini-player-visible.yaml

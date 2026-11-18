@@ -65,12 +65,36 @@ describe("speed", () => {
 })
 
 describe("resumeStart and isPlayed", () => {
-  it("resumes unless played or nearly over", () => {
+  // The rule changed with Mo's OK (S14): the feed's length no longer decides where an episode
+  // resumes. This test used to expect 0 for 595 and 700 of 600. Only the played mark and an
+  // unusable place start an episode over.
+  it("resumes where the listener stopped, unless played", () => {
     expect(resumeStart(120, 600, false)).toBe(120)
     expect(resumeStart(120, 600, true)).toBe(0)
-    expect(resumeStart(595, 600, false)).toBe(0)
-    expect(resumeStart(700, 600, false)).toBe(0)
+    expect(resumeStart(595, 600, false)).toBe(595)
+    expect(resumeStart(700, 600, false)).toBe(700)
     expect(resumeStart(120, null, false)).toBe(120)
+  })
+
+  it("keeps a place past the feed's length", () => {
+    expect(resumeStart(3660, 3600, false)).toBe(3660)
+    expect(resumeStart(3595, 3600, false)).toBe(3595)
+    expect(resumeStart(3660, 3600, true)).toBe(0)
+  })
+
+  it("starts over for a place that is not a usable number", () => {
+    expect(resumeStart(-5, 600, false)).toBe(0)
+    expect(resumeStart(0, 600, false)).toBe(0)
+    expect(resumeStart(Number.NaN, 600, false)).toBe(0)
+    expect(resumeStart(Number.POSITIVE_INFINITY, 600, false)).toBe(0)
+  })
+
+  it("never starts later than the saved place", () => {
+    for (const saved of [0, 0.4, 5, 590, 595, 600, 601, 3600, 99999]) {
+      for (const duration of [null, 0, 1, 600, 3600]) {
+        expect(resumeStart(saved, duration, false)).toBeLessThanOrEqual(saved)
+      }
+    }
   })
 
   it("counts played at the end or within 5 seconds of it", () => {
@@ -78,6 +102,13 @@ describe("resumeStart and isPlayed", () => {
     expect(isPlayed(595, 600, false)).toBe(true)
     expect(isPlayed(594, 600, false)).toBe(false)
     expect(isPlayed(595, null, false)).toBe(false)
+  })
+
+  it("does not count a place well past the length: the length is wrong, not the end", () => {
+    expect(isPlayed(3660, 3600, false)).toBe(false)
+    expect(isPlayed(3660, 3600, false, 60)).toBe(false)
+    // A hair past the end is the end (a clock that overshoots by a fraction).
+    expect(isPlayed(600.4, 600, false)).toBe(true)
   })
 })
 

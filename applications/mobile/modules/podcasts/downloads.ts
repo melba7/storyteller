@@ -29,6 +29,44 @@ export function mapFromList(list: readonly DownloadInfo[]): DownloadMap {
   return Object.fromEntries(list.map((info) => [info.episodeId, info]))
 }
 
+/** The episodes whose download has finished, in order. */
+export function downloadedIds(map: DownloadMap): string[] {
+  return Object.values(map)
+    .filter((info) => info.state === "downloaded")
+    .map((info) => info.episodeId)
+    .sort()
+}
+
+/**
+ * A string that changes only when the set of finished downloads changes. A download's
+ * progress, or one that starts or fails, does not change it, so a screen that only needs
+ * to know which episodes are on the phone can draw again just then.
+ */
+export function downloadedIdsKey(map: DownloadMap): string {
+  return JSON.stringify(downloadedIds(map))
+}
+
+/**
+ * Reads the finished downloads' ids as a set, and gives back the very same set until a download
+ * finishes or goes. A screen can hold it as a value that changes only then (the set of a map
+ * that only moved on in progress is the one it had).
+ */
+export function finishedIdsReader(): (map: DownloadMap) => ReadonlySet<string> {
+  let readMap: DownloadMap | null = null
+  let readKey: string | null = null
+  let ids: ReadonlySet<string> = new Set()
+  return (map) => {
+    if (map === readMap) return ids
+    readMap = map
+    const key = downloadedIdsKey(map)
+    if (key !== readKey) {
+      readKey = key
+      ids = new Set(downloadedIds(map))
+    }
+    return ids
+  }
+}
+
 /** How far a download has come, 0 to 1, or null when the size is not known. */
 export function downloadFraction(info: DownloadInfo): number | null {
   if (info.state === "downloaded") return 1

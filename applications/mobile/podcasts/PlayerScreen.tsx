@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
 import { useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native"
 import { useSafeAreaInsets } from "react-native-safe-area-context"
 
@@ -16,6 +16,11 @@ import {
   sideBySide,
   splitWidths,
 } from "@/modules/podcasts/playerFrame"
+import {
+  closePlayer,
+  playerGone,
+  playerShown,
+} from "@/modules/podcasts/playerGate"
 import { usePlayer } from "@/modules/podcasts/playerInstance"
 import { takePlayerPageRequest } from "@/modules/podcasts/playerPageRequest"
 import { sheetColors } from "@/modules/podcasts/playerSheet"
@@ -52,6 +57,11 @@ export function PlayerScreen() {
   // The player is a modal, so its own segments name no tab: use the tab you were in.
   const segments = lastTabSegments()
   const view = usePlayer()
+  // The gate (playerGate.ts) knows the sheet is up from here to the unmount.
+  useEffect(() => {
+    playerShown()
+    return () => playerGone()
+  }, [])
   const windowSize = useWindowDimensions()
   const insets = useSafeAreaInsets()
   // A screen that opened the player may have asked for a page (the menu's "View Transcript").
@@ -98,9 +108,9 @@ export function PlayerScreen() {
         )
       : colors.top
 
+  // Through the gate, so a double tap on the close control goes back only once.
   function close() {
-    if (router.canGoBack()) router.back()
-    else router.replace("/podcasts")
+    closePlayer(router)
   }
 
   function goToShow() {
@@ -119,6 +129,7 @@ export function PlayerScreen() {
     <SheetProvider value={colors}>
       <StatusBar style={colors.ink === "#ffffff" ? "light" : "dark"} />
       <View
+        testID="podcasts-player"
         className="pb-safe-offset-2 flex-1"
         onLayout={(event) => {
           const { width: w, height: h } = event.nativeEvent.layout
@@ -145,6 +156,7 @@ export function PlayerScreen() {
           />
         ) : null}
         <Pressable
+          testID="podcasts-player-close"
           className="h-6 items-center justify-center"
           accessibilityRole="button"
           accessibilityLabel="Close the player"

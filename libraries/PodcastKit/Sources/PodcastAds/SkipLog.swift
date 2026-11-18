@@ -155,11 +155,12 @@ public struct SkipLog: Sendable, Equatable {
   public private(set) var lines: [String]
 
   /// The log as it is saved (empty for no file). Blank lines are dropped, and a file of more than
-  /// `maxLines` lines keeps the newest.
+  /// `maxLines` lines keeps the newest. The ad finder's diary lines (`AdDiary`), which the copy
+  /// that is sent has after the skip lines, are not skips and are left out.
   public init(text: String = "") {
     lines = Array(
       text.split(separator: "\n", omittingEmptySubsequences: true).map(String.init)
-        .suffix(Self.maxLines))
+        .filter { !AdDiary.isDiaryLine($0) }.suffix(Self.maxLines))
   }
 
   private static let encoder: JSONEncoder = {

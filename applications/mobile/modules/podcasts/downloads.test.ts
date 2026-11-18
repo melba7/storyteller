@@ -5,7 +5,10 @@ import {
   applyChange,
   downloadFraction,
   downloadedCount,
+  downloadedIds,
+  downloadedIdsKey,
   downloadLook,
+  finishedIdsReader,
   downloadsSummary,
   downloadMenuTitle,
   formatStorage,
@@ -305,5 +308,111 @@ describe("downloadedCount", () => {
     ])
     expect(downloadedCount(map)).toBe(3)
     expect(downloadedCount({})).toBe(0)
+  })
+})
+
+describe("downloadedIdsKey", () => {
+  const moving = (bytes: number) =>
+    mapFromList([
+      info({ episodeId: "a", state: "downloading", bytes, expected: 100 }),
+      info({ episodeId: "b", state: "downloaded" }),
+    ])
+
+  it("progress alone does not change the downloaded ids", () => {
+    expect(downloadedIdsKey(moving(10))).toBe(downloadedIdsKey(moving(60)))
+    // A new map with the same finished downloads, in another order, reads the same.
+    const reversed = mapFromList([
+      info({ episodeId: "b", state: "downloaded", updatedAt: 5 }),
+      info({ episodeId: "a", state: "queued" }),
+    ])
+    expect(downloadedIdsKey(reversed)).toBe(downloadedIdsKey(moving(10)))
+  })
+
+  it("changes when a download finishes, and when a finished one goes", () => {
+    const before = downloadedIdsKey(moving(99))
+    const finished = mapFromList([
+      info({ episodeId: "a", state: "downloaded" }),
+      info({ episodeId: "b", state: "downloaded" }),
+    ])
+    expect(downloadedIdsKey(finished)).not.toBe(before)
+    const removed = applyChange(finished, {
+      episodeId: "b",
+      state: "none",
+    })
+    expect(downloadedIdsKey(removed)).not.toBe(downloadedIdsKey(finished))
+    expect(downloadedIdsKey({})).not.toBe(before)
+  })
+
+  it("does not count a failed, queued or moving download", () => {
+    const map = mapFromList([
+      info({ episodeId: "a", state: "failed" }),
+      info({ episodeId: "b", state: "queued" }),
+      info({ episodeId: "c", state: "downloading" }),
+    ])
+    expect(downloadedIdsKey(map)).toBe(downloadedIdsKey({}))
+  })
+
+  it("cannot mistake one id for two", () => {
+    const one = mapFromList([info({ episodeId: "a,b", state: "downloaded" })])
+    const two = mapFromList([
+      info({ episodeId: "a", state: "downloaded" }),
+      info({ episodeId: "b", state: "downloaded" }),
+    ])
+    expect(downloadedIdsKey(one)).not.toBe(downloadedIdsKey(two))
+  })
+})
+
+describe("downloadedIds", () => {
+  it("lists the finished downloads' episodes in order", () => {
+    const map = mapFromList([
+      info({ episodeId: "c", state: "downloaded" }),
+      info({ episodeId: "a", state: "downloaded" }),
+      info({ episodeId: "b", state: "downloading" }),
+    ])
+    expect(downloadedIds(map)).toEqual(["a", "c"])
+    expect(downloadedIds({})).toEqual([])
+  })
+})
+
+describe("finishedIdsReader", () => {
+  const moving = (bytes: number) =>
+    mapFromList([
+      info({ episodeId: "a", state: "downloading", bytes, expected: 100 }),
+      info({ episodeId: "b", state: "downloaded" }),
+    ])
+
+  it("gives the very same set while only progress changes", () => {
+    const read = finishedIdsReader()
+    const first = read(moving(10))
+    expect(first).toEqual(new Set(["b"]))
+    expect(read(moving(40))).toBe(first)
+    expect(read(moving(90))).toBe(first)
+  })
+
+  it("gives a new set when a download finishes or goes", () => {
+    const read = finishedIdsReader()
+    const first = read(moving(10))
+    const done = applyChange(
+      moving(100),
+      info({ episodeId: "a", state: "downloaded" }),
+    )
+    const second = read(done)
+    expect(second).not.toBe(first)
+    expect(second).toEqual(new Set(["a", "b"]))
+    const gone = applyChange(done, { episodeId: "b", state: "none" })
+    expect(read(gone)).toEqual(new Set(["a"]))
+  })
+
+  it("gives the same set for the same map, and an empty one for none", () => {
+    const read = finishedIdsReader()
+    const map = moving(10)
+    expect(read(map)).toBe(read(map))
+    expect(finishedIdsReader()({})).toEqual(new Set())
+  })
+
+  it("keeps one reader's set apart from another's", () => {
+    const one = finishedIdsReader()
+    const two = finishedIdsReader()
+    expect(one(moving(1))).not.toBe(two(moving(1)))
   })
 })

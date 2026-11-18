@@ -150,11 +150,15 @@ export async function searchEpisodes(input: string): Promise<EpisodeHit[]> {
 
 // MARK: Playing
 
-/** Keeps where the listener is in an episode, and whether it counts as played. */
+/**
+ * Keeps where the listener is in an episode, and whether it counts as played. `notify` is
+ * false for a save that no list could show yet, so the open screens do not read again.
+ */
 export async function savePlayback(
   episodeId: string,
   position: number,
   played: boolean,
+  notify = true,
 ): Promise<void> {
   const db = await database()
   const now = Date.now()
@@ -165,7 +169,7 @@ export async function savePlayback(
     now,
     episodeId,
   ])
-  notifyLibraryChanged()
+  if (notify) notifyLibraryChanged()
 }
 
 /** The episode played most recently, for the mini player after the app restarts. */

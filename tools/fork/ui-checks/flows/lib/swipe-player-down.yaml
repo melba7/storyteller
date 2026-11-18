@@ -1,0 +1,20 @@
+# One swipe down on the player page, starting on the close control at the top of the sheet, the
+# way a listener pulls a sheet down.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - swipe:
+          from:
+            id: "podcasts-player-close"
+          direction: DOWN
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - swipe:
+          from:
+            text: "Close the player"
+          direction: DOWN

@@ -3,7 +3,7 @@
 // The one quiet line in the player that says how ad finding is going for the episode that
 // plays. Plain rules over what Swift reports; the texts of the ads and the transcript come
 // from ads.ts and transcripts.ts.
-import { adsStatus } from "./ads"
+import { AD_CHECK_PAUSED, SEARCH_STOPPED, adsStatus } from "./ads"
 import type { AdsInfo, DownloadInfo, TranscriptInfo } from "./index"
 import { isLocalEpisodeId } from "./localFiles"
 import { isPreviewId } from "./preview"
@@ -53,7 +53,11 @@ export function playerAdLine(input: {
   if (input.streamsPlain === true)
     return `${STREAMING}. Next play will skip ads.`
   if (download.state !== "downloaded") return READY
-  if (ads?.state === "unavailable") return cannot(ads.reason ?? "")
+  if (ads?.state === "unavailable") {
+    const reason = ads.reason ?? ""
+    // The reasons that belong to the phone ("Apple Intelligence is off") keep their words.
+    return reason.startsWith(SEARCH_STOPPED) ? AD_CHECK_PAUSED : cannot(reason)
+  }
   if (ads?.state === "found" || ads?.state === "noAds") return adsStatus(ads)
   if (transcript?.state === "unsupported" || transcript?.state === "failed") {
     return cannot(transcriptStatus(transcript))

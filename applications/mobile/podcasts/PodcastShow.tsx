@@ -2,7 +2,7 @@
 import { useRouter, useSegments } from "expo-router"
 import { useHeaderHeight } from "expo-router/react-navigation"
 import { StatusBar } from "expo-status-bar"
-import { useMemo, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import {
   ActivityIndicator,
   Alert,
@@ -36,8 +36,16 @@ import { SelectionBar } from "./SelectionBar"
 import { showBarItems } from "./ShowBarButtons"
 import { ShowHeader } from "./ShowHeader"
 import { useEpisodes, useShow } from "./hooks"
-import { useDownloadMap } from "./useDownloads"
+import { useDownloadedIds } from "./useDownloads"
 import { useSelection } from "./useSelection"
+
+/** Every row on this page has the same one, so a row sees no new `here` at a draw. */
+const HERE_SHOW = { show: true }
+
+/** The key function closes over nothing, so the list always gets the same one. */
+function itemKey(item: EpisodeListItem) {
+  return item.key
+}
 
 export function PodcastShow({ id }: { id: string }) {
   const router = useRouter()
@@ -47,7 +55,7 @@ export function PodcastShow({ id }: { id: string }) {
   const [refreshing, setRefreshing] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
   const [filter, setFilter] = useState<EpisodeFilter>("all")
-  const downloads = useDownloadMap()
+  const downloaded = useDownloadedIds()
   const selection = useSelection()
   // The bar's title appears once the header's own title has scrolled under the bar.
   const headerHeight = useHeaderHeight()
@@ -55,11 +63,6 @@ export function PodcastShow({ id }: { id: string }) {
   const [titleInBar, setTitleInBar] = useState(false)
   const items = useMemo(() => {
     if (!show.data) return []
-    const downloaded = new Set(
-      Object.values(downloads)
-        .filter((info) => info.state === "downloaded")
-        .map((info) => info.episodeId),
-    )
     // The Archived filter has to see the archived episodes the view hides.
     const view =
       filter === "archived"
@@ -69,10 +72,30 @@ export function PodcastShow({ id }: { id: string }) {
       filterEpisodes(episodes.data ?? [], filter, downloaded),
       view,
     )
-  }, [episodes.data, show.data, filter, downloads])
+  }, [episodes.data, show.data, filter, downloaded])
   const shows = useMemo(
     () => new Map(show.data ? [[show.data.id, show.data]] : []),
     [show.data],
+  )
+  // Everything the render function reads is in its list of dependencies, so the list keeps
+  // the same one until the show or the selection changes.
+  const renderItem = useCallback(
+    ({ item }: { item: EpisodeListItem }) =>
+      item.kind === "header" ? (
+        <Text variant="h4" className="px-safe-or-4 pt-4 pb-1">
+          {item.title}
+        </Text>
+      ) : show.data ? (
+        <View className="px-safe-or-4">
+          <EpisodeRow
+            episode={item.episode}
+            show={show.data}
+            selection={selection}
+            here={HERE_SHOW}
+          />
+        </View>
+      ) : null,
+    [show.data, selection],
   )
 
   async function refresh() {
@@ -133,7 +156,7 @@ export function PodcastShow({ id }: { id: string }) {
         <FlatList<EpisodeListItem>
           className="bg-background flex-1"
           data={items}
-          keyExtractor={(item) => item.key}
+          keyExtractor={itemKey}
           contentInsetAdjustmentBehavior="automatic"
           scrollEventThrottle={32}
           onScroll={(event) => {
@@ -175,22 +198,8 @@ export function PodcastShow({ id }: { id: string }) {
               </Text>
             )
           }
-          renderItem={({ item }) =>
-            item.kind === "header" ? (
-              <Text variant="h4" className="px-safe-or-4 pt-4 pb-1">
-                {item.title}
-              </Text>
-            ) : (
-              <View className="px-safe-or-4">
-                <EpisodeRow
-                  episode={item.episode}
-                  show={current}
-                  selection={selection}
-                  here={{ show: true }}
-                />
-              </View>
-            )
-          }
+          renderItem={renderItem}
+          strictMode
           extraData={selection.selected}
         />
       )}

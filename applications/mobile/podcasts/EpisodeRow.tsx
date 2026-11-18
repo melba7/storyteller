@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { useRouter } from "expo-router"
 import {
   ArrowDownToLine,
   Check,
@@ -8,7 +8,7 @@ import {
   CircleCheck,
   Star,
 } from "lucide-react-native"
-import { useMemo } from "react"
+import { memo, useMemo } from "react"
 import { Pressable, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
@@ -16,6 +16,7 @@ import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { type RowMeta, rowMeta, rowState } from "@/modules/podcasts/episodeLook"
 import { dateLineParts, stripHtml } from "@/modules/podcasts/episodeRowLook"
+import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import {
   type Show,
   type StoredEpisode,
@@ -24,14 +25,14 @@ import {
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref } from "@/modules/podcasts/routes"
-import { queuedLabel } from "@/modules/podcasts/upNext"
+import { sameRowProps } from "@/modules/podcasts/sameProps"
 
 import { Artwork } from "./Artwork"
 import { EpisodeMenu } from "./EpisodeMenu"
 import { PlayCapsule, ProgressRing } from "./PlayButton"
 import { useDownload } from "./useDownloads"
 import { type Selection } from "./useSelection"
-import { useUpNext } from "./useUpNext"
+import { useQueued } from "./useUpNext"
 
 /** The small glyph at the start of the meta line: a download's state, or the played check. */
 function MetaGlyph({ meta }: { meta: RowMeta }) {
@@ -65,9 +66,11 @@ const ARTWORK = 96
  * and "Up Next" when they apply), the title in bold, a grey description, the artwork at the
  * right, and a bottom row with the play capsule, a download symbol and the "..." menu. A
  * played episode's title is muted. Swipe actions come from the list; a long press starts
- * multi-select.
+ * multi-select. It is memoized: it draws again only when its props hold other data (see
+ * `sameRowProps`) or something it reads for itself changes (its download, its place in Up
+ * Next, whether it plays).
  */
-export function EpisodeRow({
+function EpisodeRowView({
   episode,
   show,
   openable = true,
@@ -90,10 +93,9 @@ export function EpisodeRow({
   here?: { show?: boolean }
 }) {
   const router = useRouter()
-  const segments = useSegments()
   const state = rowState(episode)
   const length = formatEpisodeLength(episode)
-  const queued = queuedLabel(useUpNext(), episode.id)
+  const queued = useQueued(episode.id)
   // An added file's download is its only copy, and a preview episode has none.
   const downloadInfo = useDownload(episode.id)
   const download =
@@ -137,7 +139,7 @@ export function EpisodeRow({
           onPress={() =>
             picking
               ? selection.toggle(episode.id)
-              : router.push(episodeHref(segments, episode.id))
+              : router.push(episodeHref(lastTabSegments(), episode.id))
           }
           onLongPress={
             selection && openable && !picking
@@ -208,3 +210,5 @@ export function EpisodeRow({
     </View>
   )
 }
+
+export const EpisodeRow = memo(EpisodeRowView, sameRowProps)

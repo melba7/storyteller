@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { useRouter, useSegments } from "expo-router"
+import { useRouter } from "expo-router"
 import { Ellipsis } from "lucide-react-native"
 import { type ReactElement } from "react"
 
@@ -17,21 +17,21 @@ import {
   menuLayout,
 } from "@/modules/podcasts/episodeMenuModel"
 import { type DownloadInfo, Podcasts } from "@/modules/podcasts/index"
+import { lastTabSegments } from "@/modules/podcasts/lastTab"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { isLocalEpisodeId } from "@/modules/podcasts/localFiles"
+import { openPlayer } from "@/modules/podcasts/playerGate"
 import { markPlayed, usePlayerValue } from "@/modules/podcasts/playerInstance"
-import { requestPlayerPage } from "@/modules/podcasts/playerPageRequest"
 import { isPreviewId } from "@/modules/podcasts/preview"
 import { episodeHref, showHref } from "@/modules/podcasts/routes"
 import { episodeShare } from "@/modules/podcasts/share"
-import { isQueued } from "@/modules/podcasts/upNext"
 
 import { EpisodeMenuSurface } from "./EpisodeMenuSurface"
 import { shareContent } from "./ShareButton"
 import { chooseAndAddToPlaylist } from "./addToPlaylist"
 import { localFileActions } from "./localFileActions"
 import { pressDownload, useDownload } from "./useDownloads"
-import { addToUpNext, removeQueued, useUpNext } from "./useUpNext"
+import { addToUpNext, removeQueued, useQueued } from "./useUpNext"
 
 export function archiveAction(episode: StoredEpisode) {
   const archived = episode.archived
@@ -147,8 +147,7 @@ export function EpisodeMenu({
   here?: { episode?: boolean; show?: boolean }
 }) {
   const router = useRouter()
-  const segments = useSegments()
-  const queue = useUpNext()
+  const queued = useQueued(episode.id)
   const download = downloadAction(episode, useDownload(episode.id))
   const inPlayer = usePlayerValue((view) => view.episode?.id === episode.id)
   if (Podcasts === null) return null
@@ -164,7 +163,7 @@ export function EpisodeMenu({
     starred: episode.starredAt !== null,
     played: episode.played,
     archived: episode.archived,
-    queued: isQueued(queue, episode.id),
+    queued: queued !== "",
     preview,
     transcript: inPlayer,
     ...(here ? { here } : {}),
@@ -184,12 +183,11 @@ export function EpisodeMenu({
     last: () => addToUpNext(episode, show, "last"),
     "remove-queued": () => removeQueued(episode.id),
     played: playedAction(episode).onPress,
-    episode: () => router.push(episodeHref(segments, episode.id)),
-    show: () => router.push(showHref(segments, episode.showId)),
+    episode: () => router.push(episodeHref(lastTabSegments(), episode.id)),
+    show: () => router.push(showHref(lastTabSegments(), episode.showId)),
     transcript: () => {
       // Only offered for the episode the player has loaded, which has the transcript.
-      requestPlayerPage("transcript")
-      router.push("/podcasts/player")
+      openPlayer(router, "transcript")
     },
     playlist: () => void chooseAndAddToPlaylist(episode, show),
     archive: archiveAction(episode).onPress,

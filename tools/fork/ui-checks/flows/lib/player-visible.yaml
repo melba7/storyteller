@@ -1,0 +1,21 @@
+# Waits until the player page is open. The labels mode looks for the close control's label,
+# "Close the player", which the app has had from the start.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "podcasts-player-close"
+          timeout: 15000
+      - assertVisible:
+          id: "podcasts-player"
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - extendedWaitUntil:
+          visible: "Close the player"
+          timeout: 15000

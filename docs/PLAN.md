@@ -8,7 +8,9 @@ B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 to C9 and
 C12 done, Spotify dropped; Mo's 29.1 bugs fixed; ad skipping I0 to I2 and the
 iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test | Ad skipping accuracy
 (start and end, two Fable plans, built by Sonnet, checked twice by Opus): all
-milestones built, waiting on the iOS build and Mo's Mac measurements
+milestones built (PR #52, TestFlight 31.1) | Player, ads and smoothness (S1 to
+S15, from Mo's 31.1 report): all built and checked, waiting on the iOS build and
+the phone
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1122,6 +1124,39 @@ fixed). Everything that touches the iOS module compiles only in Fork CI.
       heads-only download, frame memory, per-show caution from the skip log),
       and the phone checks: first-skip timing, the wait, "Back 10 s", the
       stream's last seeks.
+
+### The player, ad finding and smoothness (Mo's ask, 2026-11-18, after build 31.1)
+
+Mo's 31.1 report: ads not skipped on an episode, "Finding ads" takes a long time
+and finds nothing, swiping the player down shows another copy (three swipes,
+then it cannot be opened until the app is quit), the mini player needs several
+taps, scrolling stutters. Fable planned it (`docs/PODCASTS-STABILITY-PLAN.md`)
+and walked the flows the first plan did not
+(`docs/PODCASTS-STABILITY-SWEEP.md`), Sonnet built it in parallel worktrees,
+Opus checked it at extra effort (one SHOULD-FIX per half, all fixed).
+
+- [x] **S1 The player opens once, on the first tap**: the player screen is
+      singular, one gate (`playerGate.ts`) opens it, the mini player has a
+      pressed look and a haptic. **S6** a playing episode no longer reloads
+      every list every 15 s. **S7** rows draw again only when what they show
+      changes. **S8** lists and the episode page stop drawing on every tick.
+- [x] **S2 A model refusal no longer stops the ad search**, **S3** a refused
+      piece is asked again in halves, **S4** a failed episode shows the ads
+      found and "Ad check paused. Trying again soon", **S5** the ad finder's
+      diary (`ad-diary.jsonl`, sent with "Send skip log").
+- [x] **S9 Simulator checks** (`tools/fork/ui-checks`, Maestro): flows for the
+      player opening once, a tap during the slide away, scrolling; run on Mo's
+      Mac first (`Run the UI checks.command`), GitHub second.
+- [x] **S10 The player knows its place while a seek is on its way**, **S11**
+      Play starts a failed episode again, **S12** a loading stream can be
+      paused, **S13** a feed refresh tells the screens only when something
+      changed, **S14** an episode stopped near its end resumes there, **S15**
+      the end-of-chapter sleep survives an ad skip.
+- [ ] **Waits on the phone or Mac**: TestFlight 32.1 phone steps 1 to 6
+      (`docs/PODCASTS-STABILITY-PLAN.md`, "On Mo's phone"), M1 (the real model
+      on The Daily "Finally, a Vaccine for Cancer", before and after S2 and S3),
+      the S9 flows run once on main and then on this branch, and the
+      first-seconds question (H1, not this round).
 
 ## Later
 

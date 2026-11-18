@@ -58,6 +58,38 @@ describe("adsStatus", () => {
     expect(adsStatus(info("unavailable"))).toBe("Can't find ads")
   })
 
+  it("shows one short line for a failure of this episode's own search", () => {
+    const reason =
+      "Finding ads stopped: The model couldn't finish: x [model error: A.B concurrentRequests]."
+    const line = adsStatus(info("unavailable", { reason }))
+    expect(line).toBe("Ad check paused. Trying again soon")
+    expect(line).not.toContain("model error")
+    // The same line wherever the status is used, with no technical tail or with another one.
+    expect(
+      adsStatus(
+        info("unavailable", {
+          reason: "Finding ads stopped: The model refused to read a part.",
+        }),
+      ),
+    ).toBe("Ad check paused. Trying again soon")
+    expect(withAds("340 MB", info("unavailable", { reason }))).toBe(
+      "340 MB · Ad check paused. Trying again soon",
+    )
+  })
+
+  it("keeps the words of a reason that belongs to the phone", () => {
+    for (const reason of [
+      "Apple Intelligence is off",
+      "The model is downloading",
+      "This iPhone can't run Apple Intelligence",
+      "Needs iOS 26",
+      "Apple Intelligence is not available",
+      "The transcript could not be read",
+    ]) {
+      expect(adsStatus(info("unavailable", { reason }))).toBe(reason)
+    }
+  })
+
   it("puts the ads after the download and transcript lines", () => {
     expect(
       withAds("340 MB · Transcript ready", info("found", { count: 2 })),

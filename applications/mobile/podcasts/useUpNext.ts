@@ -5,7 +5,7 @@ import { Alert } from "react-native"
 import { Podcasts, type UpNextItem } from "@/modules/podcasts/index"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { readableError } from "@/modules/podcasts/nativeError"
-import { orderAfterMove } from "@/modules/podcasts/upNext"
+import { orderAfterMove, queuedLabel } from "@/modules/podcasts/upNext"
 import {
   clearUpNext,
   listUpNext,
@@ -55,6 +55,14 @@ function subscribe(listener: () => void): () => void {
 /** The queue, in play order. */
 export function useUpNext(): readonly UpNextItem[] {
   return useSyncExternalStore(subscribe, () => current)
+}
+
+/**
+ * One episode's place in the queue as a row says it ("Up Next, number 2"), or "" when it is
+ * not queued. Draws again only when that text changes, not at every change of the queue.
+ */
+export function useQueued(episodeId: string): string {
+  return useSyncExternalStore(subscribe, () => queuedLabel(current, episodeId))
 }
 
 function tell(title: string, cause: unknown) {

@@ -1,0 +1,33 @@
+# Flow 4. Scrolls a show's page down and up ten times while its newest episode plays, and checks
+# that the app still answers. The video that run.sh records (and the two screenshots) show a hang
+# or a blank row. It does NOT measure smoothness: a simulator is not an iPhone.
+#
+# Each round swipes the page three times toward older episodes and three times back. The swipes
+# stay between 25% and 75% of the screen height, clear of the tab bar and the mini player.
+appId: ${APP_ID}
+name: Scroll
+---
+- runFlow: lib/launch.yaml
+- runFlow: lib/follow-and-play.yaml
+- takeScreenshot: scroll-1-top
+- repeat:
+    times: 10
+    commands:
+      - repeat:
+          times: 3
+          commands:
+            - swipe:
+                start: 50%, 75%
+                end: 50%, 25%
+                duration: 300
+      - repeat:
+          times: 3
+          commands:
+            - swipe:
+                start: 50%, 25%
+                end: 50%, 75%
+                duration: 300
+- takeScreenshot: scroll-2-after-ten-rounds
+# The app still answers: the mini player is there and can be tapped, and the player opens.
+- runFlow: lib/mini-player-visible.yaml
+- runFlow: lib/open-and-close.yaml

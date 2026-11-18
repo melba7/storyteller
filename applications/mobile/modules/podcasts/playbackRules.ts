@@ -8,7 +8,8 @@ export const SKIP_BACK_SECONDS = 10
 export const SKIP_AHEAD_SECONDS = 45
 export const SAVE_EVERY_MS = 15_000
 const PLAYED_WITHIN_SECONDS = 5
-const RESTART_WITHIN_SECONDS = 10
+/** A clock that overshoots the end by this much is still at the end. */
+const PAST_END_SLACK_SECONDS = 1
 
 /** "0:05", "12:34", "1:02:03". Not a number or negative reads as "0:00". */
 export function formatTime(seconds: number): string {
@@ -57,22 +58,26 @@ export function clampSpeed(rate: number): number {
   return Math.min(3, Math.max(0.5, Math.round(rate * 10) / 10))
 }
 
-/** 0 for a played episode or one with under 10 seconds left; otherwise the saved place. */
+/**
+ * 0 for a played episode or a place that is not a usable number; otherwise the saved place,
+ * never later. The length does not decide: a feed's length is often shorter than the real
+ * audio, and the listener's place past it must not be thrown away. The length stays in the
+ * signature (unused), like Swift's `ResumeRule.start`, so no caller changes.
+ */
 export function resumeStart(
   saved: number,
-  duration: number | null,
+  _duration: number | null,
   played: boolean,
 ): number {
   if (played || !Number.isFinite(saved) || saved <= 0) return 0
-  if (duration !== null && duration > 0) {
-    if (saved >= duration || duration - saved < RESTART_WITHIN_SECONDS) return 0
-  }
   return saved
 }
 
 /**
  * Played to its end, or stopped within 5 seconds of the end. `within` is the listener's
  * "mark played when this many seconds are left" (0 is off); it never shrinks the 5 seconds.
+ * A place more than a second past the length is not the end: the length is the feed's
+ * guess (the audio has not told its own yet), so the episode is not played.
  */
 export function isPlayed(
   position: number,
@@ -82,7 +87,40 @@ export function isPlayed(
 ): boolean {
   if (reachedEnd) return true
   if (duration === null || !(duration > 0)) return false
-  return duration - position <= Math.max(within, PLAYED_WITHIN_SECONDS)
+  const left = duration - position
+  if (left < -PAST_END_SLACK_SECONDS) return false
+  return left <= Math.max(within, PLAYED_WITHIN_SECONDS)
+}
+
+/** One save of the listener's place, as far as a list could show it. */
+export type ListenSave = {
+  episodeId: string
+  position: number
+  played: boolean
+}
+
+/**
+ * Whether a save of the place tells the lists to read the library again. The lists show the
+ * time left in whole minutes, so a timed save (every 15 seconds) inside the same minute
+ * would only make every open screen load and draw again for nothing. Any other save (a
+ * pause, a seek, a skip, another episode) always tells them, and so does a timed save that
+ * changes the episode, the played mark, or whether the episode was started at all. `before` is the last save the
+ * lists were told about, or null when they were told about none.
+ */
+export function shouldNotifyListen(
+  before: ListenSave | null,
+  after: ListenSave,
+  timed: boolean,
+): boolean {
+  if (!timed || before === null) return true
+  if (before.episodeId !== after.episodeId || before.played !== after.played) {
+    return true
+  }
+  // An episode that was never started is told apart from one in progress ("Resume", the
+  // Up Next shelf, a playlist of unplayed ones), so leaving place 0 tells the lists too.
+  if (before.position > 0 !== after.position > 0) return true
+  // A position that is not a number never equals itself, so it tells the lists too.
+  return Math.floor(before.position / 60) !== Math.floor(after.position / 60)
 }
 
 /** The mini player shows when an episode is loaded or one was played before. */

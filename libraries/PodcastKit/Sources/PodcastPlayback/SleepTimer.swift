@@ -54,14 +54,15 @@ public struct SleepTimer: Equatable, Sendable {
     case waiting
     /// At the end of the chapter: pause now.
     case reached
-    /// The listener went well past the end; the timer is out of date.
+    /// Playback is well past the end: the playhead jumped over it. What that means depends on
+    /// who moved it (see `chapterAction`).
     case passed
   }
 
   /// How close to the end of the chapter the player pauses. The player checks about twice a
   /// second, so it stops a little early rather than late into the next chapter.
   public static let chapterEndSlack = 0.5
-  /// Further than this past the end means the listener moved on, not that the chapter ended.
+  /// Further than this past the end means the playhead jumped, not that the chapter ended.
   public static let chapterPassedBy = 3.0
 
   /// Where playback is compared with the end of the chapter, for an end-of-chapter timer.
@@ -69,6 +70,29 @@ public struct SleepTimer: Equatable, Sendable {
     guard kind == .endOfChapter, position.isFinite else { return .waiting }
     if position > endsAt + Self.chapterPassedBy { return .passed }
     return position >= endsAt - Self.chapterEndSlack ? .reached : .waiting
+  }
+
+  /// What the player does about an end-of-chapter timer once playback is at `position`.
+  public enum ChapterAction: Equatable, Sendable {
+    /// Nothing yet (or this is not a chapter timer).
+    case none
+    /// Pause now, and the timer is used up.
+    case pause
+    /// The timer is out of date: drop it and keep playing.
+    case cancel
+  }
+
+  /// What to do about the timer at `position`. `listenerSeeked` is true when the listener moved
+  /// the playhead (a scrub, a skip button, the lock screen). Past the end by a listener's seek
+  /// means "I moved on", so the timer goes. Past it by the player's own jump (an ad skip, a
+  /// skipped chapter) means the chapter's end was jumped over, and the listener still asked to
+  /// stop there, so it pauses.
+  public func chapterAction(at position: Double, listenerSeeked: Bool) -> ChapterAction {
+    switch chapterStatus(at: position) {
+    case .waiting: return .none
+    case .reached: return .pause
+    case .passed: return listenerSeeked ? .cancel : .pause
+    }
   }
 
   /// Seconds left on a countdown, never below zero. Nil for the end-of-episode timer.

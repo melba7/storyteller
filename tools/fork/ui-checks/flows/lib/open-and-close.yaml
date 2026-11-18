@@ -1,0 +1,8 @@
+# One round: tap the mini player once, check that the player is open, swipe it down once, check
+# that it is gone and the tabs show again.
+appId: ${APP_ID}
+---
+- runFlow: tap-mini-player.yaml
+- runFlow: player-visible.yaml
+- runFlow: swipe-player-down.yaml
+- runFlow: player-gone.yaml

@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's player controller (see FORK.md).
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { PodcastsEvents } from "./index"
 import type { Show, StoredEpisode } from "./library"
@@ -8,7 +8,7 @@ import {
   type PlaybackDeps,
   createPlayback,
 } from "./playback"
-import { showsMiniPlayer } from "./playbackRules"
+import { shouldNotifyListen, showsMiniPlayer } from "./playbackRules"
 import { DEFAULT_SHOW_SETTINGS } from "./showSettings"
 
 // MARK: Controller
@@ -79,7 +79,7 @@ function setup(last: StoredEpisode | null = null) {
   const ticks: { callback: () => void; ms: number }[] = []
   const deps = {
     native: native as unknown as NativePlayer,
-    savePlayback: vi.fn(() => Promise.resolve()),
+    savePlayback: vi.fn<PlaybackDeps["savePlayback"]>(() => Promise.resolve()),
     saveArtworkColor: vi.fn(() => Promise.resolve()),
     lastPlayedEpisode: vi.fn(() => Promise.resolve(last)),
     getShow: vi.fn(() => Promise.resolve<Show | null>(show)),
@@ -364,7 +364,7 @@ describe("marking played when seconds are left", () => {
     state(500, true)
     expect(deps.savePlayback).not.toHaveBeenCalled()
     state(570, true)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 570, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 570, true, true)
     state(572, true)
     expect(deps.savePlayback).toHaveBeenCalledTimes(1)
   })
@@ -393,7 +393,7 @@ describe("marking played when seconds are left", () => {
     state(530, true)
     deps.savePlayback.mockClear()
     state(545, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 545, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 545, true, true)
   })
 })
 
@@ -406,7 +406,7 @@ describe("the next button starting another episode", () => {
     deps.savePlayback.mockClear()
     handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
     await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
-    expect(deps.savePlayback).toHaveBeenCalledWith("e1", 120, false)
+    expect(deps.savePlayback).toHaveBeenCalledWith("e1", 120, false, true)
   })
 
   it("does not save again for one that already ended", async () => {
@@ -423,6 +423,37 @@ describe("the next button starting another episode", () => {
     handlers.onPlaybackAdvanced?.({ episodeId: "e2" })
     await vi.waitFor(() => expect(playback.getView().episode?.id).toBe("e2"))
     expect(deps.savePlayback).not.toHaveBeenCalled()
+  })
+})
+
+describe("switching away before the real length is known", () => {
+  it("keeps a resume past the feed's length unplayed", async () => {
+    const { playback, deps, state } = setup()
+    await playback.playEpisode(
+      episode({ positionSeconds: 3660, durationSeconds: 3600 }),
+      show,
+    )
+    // Until the audio loads, Swift reports the feed's length and the place as the seek target.
+    state(3660, false, { duration: 3600, isBuffering: true })
+    deps.savePlayback.mockClear()
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    expect(deps.savePlayback).toHaveBeenCalledWith("e1", 3660, false, true)
+  })
+
+  it("keeps it unplayed with the mark-played setting on, too", async () => {
+    const { playback, deps, state } = setup()
+    deps.playedWithin.mockReturnValue(60)
+    await playback.playEpisode(
+      episode({ positionSeconds: 3660, durationSeconds: 3600 }),
+      show,
+    )
+    state(3660, false, { duration: 3600, isBuffering: true })
+    expect(deps.savePlayback).not.toHaveBeenCalledWith(
+      "e1",
+      3660,
+      true,
+      expect.anything(),
+    )
   })
 })
 
@@ -470,7 +501,7 @@ describe("keeping the place", () => {
     await playback.playEpisode(episode(), show)
     state(30, true)
     state(42, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 42, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 42, false, true)
   })
 
   it("saves every 15 seconds while playing, and stops when paused", async () => {
@@ -482,7 +513,7 @@ describe("keeping the place", () => {
     state(45, true)
     expect(ticks).toHaveLength(1)
     ticks[0]?.callback()
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 45, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 45, false, true)
     state(46, false)
     expect(deps.clearInterval).toHaveBeenCalledWith(1)
   })
@@ -492,9 +523,9 @@ describe("keeping the place", () => {
     await playback.playEpisode(episode(), show)
     state(0, true)
     await playback.seekTo(200)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 200, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 200, false, true)
     await playback.seekTo(9000)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 600, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 600, true, true)
   })
 
   it("saves a skip, kept inside the episode", async () => {
@@ -503,7 +534,7 @@ describe("keeping the place", () => {
     state(5, true)
     await playback.skip(-10)
     expect(native.skipBy).toHaveBeenCalledWith(-10)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 0, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 0, false, true)
   })
 
   it("marks played when it plays to the end", async () => {
@@ -515,7 +546,7 @@ describe("keeping the place", () => {
       duration: 600,
       played: true,
     })
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 600, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 600, true, true)
     expect(playback.getView().isPlaying).toBe(false)
   })
 
@@ -524,7 +555,7 @@ describe("keeping the place", () => {
     await playback.playEpisode(episode(), show)
     state(590, true)
     state(597, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 597, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 597, true, true)
   })
 
   it("does not save while the stream is only buffering", async () => {
@@ -607,6 +638,64 @@ describe("controls", () => {
     expect(native.play).toHaveBeenCalled()
   })
 
+  it("a tap while the stream is loading pauses it", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true })
+    expect(playback.getView()).toMatchObject({
+      loaded: true,
+      isPlaying: false,
+      isBuffering: true,
+    })
+    await playback.togglePlayPause()
+    expect(native.pause).toHaveBeenCalledTimes(1)
+    expect(native.play).not.toHaveBeenCalled()
+  })
+
+  it("a tap during the start check lets the episode start", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true, checkingStart: true })
+    await playback.togglePlayPause()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("a tap in the first moments of a new episode still loads it", async () => {
+    const { playback, native } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(playback.getView()).toMatchObject({
+      loaded: false,
+      isBuffering: true,
+    })
+    await playback.togglePlayPause()
+    expect(native.load).toHaveBeenCalledTimes(2)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("play never pauses, also while the stream is loading", async () => {
+    const { playback, native, state } = setup()
+    await playback.playEpisode(episode(), show)
+    state(0, false, { isBuffering: true })
+    await playback.play()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+    state(1, true)
+    await playback.play()
+    expect(native.play).toHaveBeenCalledTimes(1)
+    expect(native.pause).not.toHaveBeenCalled()
+  })
+
+  it("play loads an episode that was only remembered", async () => {
+    const last = episode({ positionSeconds: 200, lastPlayedAt: 5 })
+    const { playback, native } = setup(last)
+    await playback.restoreLast()
+    await playback.play()
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeId: "e1", savedPosition: 200 }),
+    )
+  })
+
   it("sets the speed to the one the player reports", async () => {
     const { playback, native } = setup()
     native.setRate.mockResolvedValueOnce(1.3)
@@ -663,7 +752,7 @@ describe("marking the loaded episode", () => {
     state(30, true)
     await playback.episodesMarked(["e1"], true)
     state(31, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 31, true)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 31, true, true)
   })
 
   it("unplayed goes back to the start and is saved as unplayed", async () => {
@@ -673,9 +762,9 @@ describe("marking the loaded episode", () => {
     await playback.episodesMarked(["e1"], true)
     await playback.episodesMarked(["e1"], false)
     expect(native.seekTo).toHaveBeenCalledWith(0)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 0, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 0, false, true)
     state(1, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 1, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 1, false, true)
   })
 
   it("ignores other episodes", async () => {
@@ -685,7 +774,7 @@ describe("marking the loaded episode", () => {
     await playback.episodesMarked(["other"], false)
     expect(native.seekTo).not.toHaveBeenCalled()
     state(11, false)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 11, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 11, false, true)
   })
 })
 
@@ -715,7 +804,7 @@ describe("a followed preview", () => {
       show,
     )
     expect(playback.getView().episode?.id).toBe("lib1")
-    expect(deps.savePlayback).toHaveBeenCalledWith("lib1", 77, false)
+    expect(deps.savePlayback).toHaveBeenCalledWith("lib1", 77, false, true)
     // The native player still calls it by the preview id, and the view keeps following.
     handlers.onPlaybackState?.({
       episodeId: "preview:f#g1",
@@ -743,7 +832,7 @@ describe("seeking before the first Play", () => {
     await playback.seekTo(200)
     await playback.skip(15)
     expect(playback.getView().position).toBe(215)
-    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 215, false)
+    expect(deps.savePlayback).toHaveBeenLastCalledWith("e1", 215, false, true)
     expect(native.seekTo).not.toHaveBeenCalled()
     await playback.togglePlayPause()
     expect(native.load).toHaveBeenCalledWith(
@@ -759,5 +848,182 @@ describe("a renamed episode", () => {
     deps.getEpisode.mockResolvedValue(episode({ title: "Renamed" }))
     await playback.refreshEpisode()
     expect(playback.getView().episode?.title).toBe("Renamed")
+  })
+})
+
+// MARK: Telling the lists
+
+describe("shouldNotifyListen", () => {
+  const before = { episodeId: "e1", position: 61, played: false }
+
+  it("tells the lists when they were told nothing yet", () => {
+    expect(shouldNotifyListen(null, before, true)).toBe(true)
+  })
+
+  it("stays quiet for a timed save inside the same minute", () => {
+    const after = { ...before, position: 119.9 }
+    expect(shouldNotifyListen(before, after, true)).toBe(false)
+  })
+
+  it("tells the lists when a timed save crosses a whole minute", () => {
+    expect(shouldNotifyListen(before, { ...before, position: 120 }, true)).toBe(
+      true,
+    )
+    // A step back over a minute (a seek the timer saw first) counts too.
+    expect(shouldNotifyListen(before, { ...before, position: 59 }, true)).toBe(
+      true,
+    )
+  })
+
+  it("always tells the lists after a save that is not a timed one", () => {
+    const after = { ...before, position: 62 }
+    expect(shouldNotifyListen(before, after, false)).toBe(true)
+  })
+
+  it("tells the lists when an episode leaves the start", () => {
+    const atStart = { ...before, position: 0 }
+    expect(
+      shouldNotifyListen(atStart, { ...atStart, position: 15 }, true),
+    ).toBe(true)
+    expect(shouldNotifyListen(atStart, { ...atStart, position: 0 }, true)).toBe(
+      false,
+    )
+  })
+
+  it("tells the lists when the episode or the played mark changes", () => {
+    expect(
+      shouldNotifyListen(before, { ...before, episodeId: "e2" }, true),
+    ).toBe(true)
+    expect(shouldNotifyListen(before, { ...before, played: true }, true)).toBe(
+      true,
+    )
+  })
+
+  it("tells the lists when a position is not a number", () => {
+    expect(
+      shouldNotifyListen(before, { ...before, position: Number.NaN }, true),
+    ).toBe(true)
+  })
+})
+
+describe("saving the place without making every list load again", () => {
+  /** A player on the fake clock, so the 15 second saves really come from the 15 second timer. */
+  function onFakeClock() {
+    const made = setup()
+    const playback = createPlayback({
+      ...made.deps,
+      setInterval: (callback, ms) => setInterval(callback, ms),
+      clearInterval: (handle) =>
+        clearInterval(handle as ReturnType<typeof setInterval>),
+    })
+    /** Plays, and lets the timer save at each of these positions, 15 seconds apart. */
+    const playThrough = async (positions: number[]) => {
+      await playback.playEpisode(episode(), show)
+      made.state(0, true)
+      for (const position of positions) {
+        made.state(position, true)
+        vi.advanceTimersByTime(15_000)
+      }
+    }
+    const saved = () => made.deps.savePlayback.mock.calls
+    return { ...made, playback, playThrough, saved }
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("a timed save inside the same minute does not notify the library", async () => {
+    const { playThrough, saved } = onFakeClock()
+    await playThrough([15, 30, 45])
+    // The place is still saved every 15 seconds. Only the first one tells the lists.
+    expect(saved().map(([, position]) => position)).toEqual([15, 30, 45])
+    expect(saved().map(([, , , notify]) => notify)).toEqual([
+      true,
+      false,
+      false,
+    ])
+  })
+
+  it("a timed save that crosses a whole minute notifies", async () => {
+    const { playThrough, saved } = onFakeClock()
+    await playThrough([30, 59, 61, 90, 121])
+    expect(saved().map(([, , , notify]) => notify)).toEqual([
+      true,
+      false,
+      true,
+      false,
+      true,
+    ])
+  })
+
+  it("a save after a pause notifies", async () => {
+    const { playThrough, saved, state } = onFakeClock()
+    await playThrough([15, 30])
+    state(31, false)
+    expect(saved().map(([, , , notify]) => notify)).toEqual([true, false, true])
+  })
+
+  it("a timed save that starts an episode from its beginning notifies", async () => {
+    const { playback, saved, state } = onFakeClock()
+    await playback.playEpisode(episode(), show)
+    state(0, true)
+    state(0, false)
+    state(0, true)
+    state(15, true)
+    vi.advanceTimersByTime(15_000)
+    state(30, true)
+    vi.advanceTimersByTime(15_000)
+    expect(saved().map(([, position, , notify]) => [position, notify])).toEqual(
+      [
+        [0, true],
+        [15, true],
+        [30, false],
+      ],
+    )
+  })
+
+  it("a save after a seek or a skip notifies", async () => {
+    const { playback, playThrough, saved } = onFakeClock()
+    await playThrough([15, 30])
+    await playback.seekTo(33)
+    await playback.skip(10)
+    expect(saved().map(([, , , notify]) => notify)).toEqual([
+      true,
+      false,
+      true,
+      true,
+    ])
+  })
+
+  it("a save after a change of episode notifies", async () => {
+    const { playback, playThrough, saved, state } = onFakeClock()
+    await playThrough([15, 30])
+    // The old episode's place is saved as the new one loads.
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    state(0, true, { episodeId: "e2" })
+    state(15, true, { episodeId: "e2" })
+    vi.advanceTimersByTime(15_000)
+    expect(saved().map(([id, , , notify]) => [id, notify])).toEqual([
+      ["e1", true],
+      ["e1", false],
+      ["e1", true],
+      ["e2", true],
+    ])
+  })
+
+  it("a timed save after a change of played notifies", async () => {
+    const { playback, playThrough, saved } = onFakeClock()
+    await playThrough([15, 30])
+    await playback.episodesMarked(["e1"], true)
+    vi.advanceTimersByTime(15_000)
+    expect(saved().map(([, , played, notify]) => [played, notify])).toEqual([
+      [false, true],
+      [false, false],
+      [true, true],
+    ])
   })
 })

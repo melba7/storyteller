@@ -24,16 +24,19 @@ public enum Skip {
 
 /// Where an episode starts when it is loaded.
 public enum ResumeRule {
-  /// An episode with fewer seconds than this left starts over.
+  /// An intro that reaches within this many seconds of the end of an episode is not skipped
+  /// (see `ShowRules.start`).
   public static let nearEnd = 10.0
 
-  /// 0 when the episode was played, was left within 10 seconds of its end, or the saved
-  /// place is at or past the end or not a usable number; otherwise the saved place.
+  /// 0 when the episode was played or the saved place is not a usable number; otherwise the
+  /// saved place, never later.
+  ///
+  /// The length does not decide. A feed's length is often shorter than the real audio (ads
+  /// are inserted, or the feed is wrong), and an episode stopped past that length, or in its
+  /// last seconds, used to start again at 0:00. An episode stopped at its real end is already
+  /// marked played, which starts it over. `duration` stays in the signature so no caller changes.
   public static func start(savedPosition: Double, duration: Double?, played: Bool) -> Double {
     if played || !savedPosition.isFinite || savedPosition <= 0 { return 0 }
-    if let duration, duration.isFinite, duration > 0 {
-      if savedPosition >= duration || duration - savedPosition < nearEnd { return 0 }
-    }
     return savedPosition
   }
 }
@@ -42,15 +45,21 @@ public enum ResumeRule {
 public enum PlayedRule {
   /// Stopping this close to the end counts as played.
   public static let nearEnd = 5.0
+  /// A clock that overshoots the end by this much is still at the end.
+  public static let pastEndSlack = 1.0
 
   /// `within` is how many seconds from the end count as played: the listener's setting (see
-  /// PlaybackSettings.markPlayedWhenLeft), never less than `nearEnd`.
+  /// PlaybackSettings.markPlayedWhenLeft), never less than `nearEnd`. A place more than
+  /// `pastEndSlack` past the length is not the end: the length is the feed's guess (the audio
+  /// has not told its own yet), so the episode is not played.
   public static func isPlayed(
     position: Double, duration: Double?, reachedEnd: Bool, within: Double = nearEnd
   ) -> Bool {
     if reachedEnd { return true }
     guard let duration, duration.isFinite, duration > 0, position.isFinite else { return false }
-    return duration - position <= max(within, nearEnd)
+    let left = duration - position
+    if left < -pastEndSlack { return false }
+    return left <= max(within, nearEnd)
   }
 }
 

@@ -68,15 +68,37 @@ final class ResumeRuleTests: XCTestCase {
     XCTAssertEqual(ResumeRule.start(savedPosition: 120, duration: 600, played: true), 0)
   }
 
-  func testStartsOverWhenFewerThanTenSecondsWereLeft() {
-    XCTAssertEqual(ResumeRule.start(savedPosition: 595, duration: 600, played: false), 0)
-    XCTAssertEqual(ResumeRule.start(savedPosition: 591, duration: 600, played: false), 0)
-    // Exactly ten seconds left still resumes.
+  // The rule changed with Mo's OK (S14): the feed's length no longer decides where an episode
+  // resumes. These two tests used to expect 0 for a place within ten seconds of the length and
+  // for one past it. Only the played mark and an unusable place start an episode over.
+  func testResumesEvenWhenFewerThanTenSecondsWereLeftInTheFeed() {
+    XCTAssertEqual(ResumeRule.start(savedPosition: 595, duration: 600, played: false), 595)
+    XCTAssertEqual(ResumeRule.start(savedPosition: 591, duration: 600, played: false), 591)
     XCTAssertEqual(ResumeRule.start(savedPosition: 590, duration: 600, played: false), 590)
   }
 
-  func testStartsOverWhenPastTheEnd() {
-    XCTAssertEqual(ResumeRule.start(savedPosition: 700, duration: 600, played: false), 0)
+  func testResumesAtAPlacePastTheFeedsLength() {
+    XCTAssertEqual(ResumeRule.start(savedPosition: 700, duration: 600, played: false), 700)
+    XCTAssertEqual(ResumeRule.start(savedPosition: 600, duration: 600, played: false), 600)
+  }
+
+  func testAPlacePastTheFeedsLengthIsKept() {
+    XCTAssertEqual(ResumeRule.start(savedPosition: 3660, duration: 3600, played: false), 3660)
+    XCTAssertEqual(ResumeRule.start(savedPosition: 3595, duration: 3600, played: false), 3595)
+  }
+
+  func testAPlayedEpisodeStillStartsOverNearTheEnd() {
+    XCTAssertEqual(ResumeRule.start(savedPosition: 3660, duration: 3600, played: true), 0)
+    XCTAssertEqual(ResumeRule.start(savedPosition: 3595, duration: 3600, played: true), 0)
+  }
+
+  func testTheStartIsNeverLaterThanTheSavedPlace() {
+    for saved in [0.0, 0.4, 5, 590, 595, 600, 601, 3600, 99999] {
+      for duration in [nil, 0, 1, 600, 3600] as [Double?] {
+        XCTAssertLessThanOrEqual(
+          ResumeRule.start(savedPosition: saved, duration: duration, played: false), saved)
+      }
+    }
   }
 
   func testUnknownDurationKeepsThePlace() {
@@ -103,6 +125,14 @@ final class PlayedRuleTests: XCTestCase {
   func testStoppingEarlierDoesNot() {
     XCTAssertFalse(PlayedRule.isPlayed(position: 594.9, duration: 600, reachedEnd: false))
     XCTAssertFalse(PlayedRule.isPlayed(position: 0, duration: 600, reachedEnd: false))
+  }
+
+  func testAPlaceWellPastTheLengthIsNotTheEnd() {
+    XCTAssertFalse(PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: false))
+    XCTAssertFalse(
+      PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: false, within: 60))
+    XCTAssertTrue(PlayedRule.isPlayed(position: 600.4, duration: 600, reachedEnd: false))
+    XCTAssertTrue(PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: true))
   }
 
   func testUnknownDurationNeverCountsWithoutTheEnd() {

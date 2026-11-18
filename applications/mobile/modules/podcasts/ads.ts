@@ -48,6 +48,16 @@ export function adsFileAfterRead(
   return last !== null && last.episodeId === episodeId ? last.file : null
 }
 
+/**
+ * How the words for a failure of one episode's own search start (`PodcastAdFinder.reason(for:)`
+ * in Swift). The rest of them, with any technical tail, is for the log, not for a line that
+ * has room for one row.
+ */
+export const SEARCH_STOPPED = "Finding ads stopped:"
+
+/** What a screen says for such a failure: it is asked again by itself, so nothing is wrong. */
+export const AD_CHECK_PAUSED = "Ad check paused. Trying again soon"
+
 export function adsStatus(info: AdsInfo | undefined): string {
   if (!info) return ""
   switch (info.state) {
@@ -66,8 +76,11 @@ export function adsStatus(info: AdsInfo | undefined): string {
       return info.unchecked === true
         ? "Couldn't check some parts for ads"
         : "No ads found"
-    case "unavailable":
-      return info.reason ?? "Can't find ads"
+    case "unavailable": {
+      const reason = info.reason ?? "Can't find ads"
+      // The reasons that belong to the phone ("Apple Intelligence is off") keep their words.
+      return reason.startsWith(SEARCH_STOPPED) ? AD_CHECK_PAUSED : reason
+    }
   }
 }
 

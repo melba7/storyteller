@@ -17,7 +17,7 @@ import {
 import { type Playlist } from "@/modules/podcasts/playlists"
 
 import { type Query, useLibraryQuery } from "./hooks"
-import { useDownloadMap } from "./useDownloads"
+import { useDownloadedIds } from "./useDownloads"
 
 export function usePlaylists(): Query<Playlist[]> {
   return useLibraryQuery(listPlaylists, "playlists")
@@ -32,7 +32,7 @@ export function usePlaylist(id: string): Query<Playlist | null> {
 export function useSmartEpisodes(
   playlist: Playlist | null | undefined,
 ): Query<StoredEpisode[]> {
-  const map = useDownloadMap()
+  const onPhone = useDownloadedIds()
   const key = playlist
     ? `smart:${playlist.id}:${serializeRules(playlist.rules)}:${playlist.sort}`
     : "smart:none"
@@ -42,13 +42,8 @@ export function useSmartEpisodes(
   )
   const data = useMemo(() => {
     if (!playlist || !found.data) return found.data
-    const onPhone = new Set(
-      Object.values(map)
-        .filter((info) => info.state === "downloaded")
-        .map((info) => info.episodeId),
-    )
     return filterDownloaded(found.data, playlist.rules, onPhone)
-  }, [found.data, playlist, map])
+  }, [found.data, playlist, onPhone])
   return { ...found, data }
 }
 

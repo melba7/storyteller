@@ -295,6 +295,26 @@ in `FORK.md`.
 | 2026-11-18 | The skip log (`skip-log.jsonl`, newest 500 lines) stays on the phone and leaves only by "Send skip log"                                    | To see why a skip was wrong                                |
 | 2026-11-18 | The notes and show link go from the app to the stream head, so the quick rules also look for the sponsors named there                      | Sponsors in the notes are the best clue for a pre-roll     |
 | 2026-11-18 | A split player's two columns get a width and a flex basis; a small cover shows from 100 pt of room; a short sheet is under 640 pt          | The iPhone Duo's folded and open sheets                    |
+| 2026-11-18 | The player route is singular and opened only through `playerGate.ts`; a tap during a slide away waits and opens once                       | Taps stacked copies of the player and then locked it       |
+| 2026-11-18 | The gate's `stayed` comes from `gestureCancel` (a cancelled swipe sends no `transitionEnd`); one 1.5 s timer runs while opening or closing | A missed sheet event can never lock the player             |
+| 2026-11-18 | The mini player reads the player as plain values (label built in a selector) and has a pressed look, a haptic and test ids                 | It drew twice a second and gave no sign of a press         |
+| 2026-11-18 | A model error is read by type name, case name and a short word list on the model's own types, never by naming iOS 27 symbols               | One unknown error must not stop the whole ad pass          |
+| 2026-11-18 | A refused whole piece is asked again in halves, 2 levels deep (not a growing piece); a refused leaf counts as no ads                       | An ad in the half the model accepts is kept                |
+| 2026-11-18 | A failed episode shows the ads found so far (`wantsRun(_:failure:)` stops a loop); its own failure reads "Ad check paused"                 | The line told the wrong story and a retry would loop       |
+| 2026-11-18 | `ad-diary.jsonl`: 500 lines, no words, addresses or error text, sent only by "Send skip log"; failures carry a model-error tail            | Nobody could say why a pre-roll was missed                 |
+| 2026-11-18 | A timed place save tells the library only when the minute, played, the episode or started-or-not changes                                   | Every 15 s every open list reloaded and redrew             |
+| 2026-11-18 | `EpisodeRow` is memoized (`sameRowProps`, field by field, new episodes for 2 days); rows read the queue per episode, the tab at press time | Rows redrew on every queue, route and library change       |
+| 2026-11-18 | Screens read `useDownloadedIds()`, not the whole download map; lists keep their `renderItem` and use `strictMode`                          | Progress steps redrew whole lists                          |
+| 2026-11-18 | UI checks use Maestro, first on Mo's Mac, then on GitHub (`workflow_dispatch` only); flows find ids or labels (`SELECTORS`)                | No app change; GitHub's Macs are often full                |
+| 2026-11-18 | `PodcastPlayer.place` is the pending seek's target, else the clock; audio decisions (ads, chapters, sleep) still read `position`           | A seek's target is the place while the clock lags          |
+| 2026-11-18 | `PlayRecovery` keeps the last good place; Play on a failed episode loads it again there, never by itself                                   | A failed item's clock reads 0 and must not be saved        |
+| 2026-11-18 | `togglePlayPause` pauses a buffering stream except in the start check; "play from here" taps use `player.play()`                           | A loading stream could not be paused                       |
+| 2026-11-18 | A show's refresh notifies the screens only when `feedChanged` says so; `refreshAllShows` notifies once at the end                          | 30 shows caused 30 reloads of every open list              |
+| 2026-11-18 | `ResumeRule.start` and `resumeStart` ignore the feed's length: only a played mark or an unusable place starts at 0:00                      | Feed lengths are often short and the place was lost        |
+| 2026-11-18 | The end-of-chapter sleep cancels only on the listener's seek (`sleepSeeked`); a jump by the player past the end pauses                     | An ad skip cancelled it and playback ran all night         |
+| 2026-11-18 | `isPlayed` (JS and Swift) is false for a place over 1 s past the length: that length is the feed's, not the audio's                        | Switching away before load marked the episode played       |
+| 2026-11-18 | Chapter moves, the chapter sleep and the plain-address fallback read `place`; Play restarts a finished episode only if the place agrees    | A seek on its way must count as where the listener is      |
+| 2026-11-18 | `publish` notes a failed item itself, so a failed clock's 0 is never sent as the place                                                     | The failure notice and the tick run in no fixed order      |
 
 ## Known problems
 

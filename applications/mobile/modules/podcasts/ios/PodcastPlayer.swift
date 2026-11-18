@@ -60,6 +60,9 @@ final class PodcastPlayer {
   private var seekCount = 0
   /// Play is waiting a moment for the first look at a stream's start (PodcastPlayer+StartHold).
   var startHold: PodcastStartHold?
+  /// The last good place and whether the item failed, so Play can start it again
+  /// (PodcastPlayer+Reload.swift).
+  var recovery = PlayRecovery()
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -150,6 +153,7 @@ final class PodcastPlayer {
       savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played,
       intro: showState.settings.introSeconds)
     itemStart = start
+    recovery.loaded(startingAt: start)
     if start > 0 { movePlayhead(to: start) }
     noteSaved(
       .skipping,
@@ -170,6 +174,7 @@ final class PodcastPlayer {
 
   func play() {
     guard player.currentItem != nil else { return }
+    if reloadIfFailed() { return }
     // A stream nothing is known about may wait a moment first; a second tap ends that wait.
     if holdTheStart() { return }
     startPlaying()
@@ -179,8 +184,12 @@ final class PodcastPlayer {
   func startPlaying() {
     wantsToPlay = true
     try? AVAudioSession.sharedInstance().setActive(true)
-    // A finished episode starts over.
-    if let duration = currentDuration, position >= duration - 0.5 { seek(to: 0) }
+    // A finished episode starts over. It must be finished by the clock and by the listener's place:
+    // a resume past the feed's length is a seek on its way (the clock is behind it), and a scrub
+    // back after the end is a seek on its way too (the place is behind it). Neither starts over.
+    if let duration = currentDuration, position >= duration - 0.5, place >= duration - 0.5 {
+      seek(to: 0)
+    }
     rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
     player.play()
@@ -210,6 +219,7 @@ final class PodcastPlayer {
     sound.seeked(to: target)
     chapterSeeked(to: target)
     movePlayhead(to: target)
+    recovery.moved(to: target)
     // Report the new place at once, before the seek has finished.
     publish(positionOverride: target)
   }
@@ -244,7 +254,7 @@ final class PodcastPlayer {
   }
 
   func skip(by seconds: Double) {
-    seek(to: Skip.target(from: position, by: seconds, duration: currentDuration))
+    seek(to: Skip.target(from: place, by: seconds, duration: currentDuration))
   }
 
   /// Sets the speed (clamped to 0.5x to 3x in tenths) and returns the speed now in use.
@@ -258,13 +268,22 @@ final class PodcastPlayer {
     return speed.value
   }
 
-  func state() -> [String: Any] { stateObject(position: position) }
+  func state() -> [String: Any] { stateObject(position: place) }
 
   // MARK: Reading the player
 
   var position: Double {
     let seconds = player.currentTime().seconds
     return seconds.isFinite ? max(0, seconds) : 0
+  }
+
+  /// Where the episode is for the listener: where a seek that is on its way is going, else the
+  /// clock, and after a failure the last good place. Used for what is shown, saved and skipped
+  /// from. Ads, silence, chapters, the sleep timer and the statistics decide about audio that
+  /// is heard, so they read `position`.
+  var place: Double {
+    let clock = Playhead.place(reported: position, seekPending: seekPending, seekTarget: seekTarget)
+    return recovery.place(reported: clock)
   }
 
   var currentDuration: Double? {
@@ -290,7 +309,10 @@ final class PodcastPlayer {
   }
 
   func publish(positionOverride: Double? = nil, refreshCard: Bool = true) {
-    let place = positionOverride ?? position
+    // A failed item's clock reads 0. The failure's own notice may still be on its way, so it is
+    // noted here too, and the 0 is never sent as the place.
+    if player.currentItem?.status == .failed { recovery.itemFailed() }
+    let place = positionOverride ?? self.place
     sink?("onPlaybackState", stateObject(position: place))
     guard refreshCard else { return }
     lockScreen.update(
@@ -342,6 +364,8 @@ final class PodcastPlayer {
 
   private func tick() {
     ticks += 1
+    // Only an item that is ready has a clock worth remembering (a failing one reads 0).
+    if player.currentItem?.status == .readyToPlay { recovery.noted(place) }
     statsTick()
     endAtOutroIfReached()
     chapterTick()
@@ -364,6 +388,7 @@ final class PodcastPlayer {
   private func itemStatusChanged(_ failure: String?) {
     if let failure {
       wantsToPlay = false
+      recovery.itemFailed()
       emitError(episodeId, readableFailure(failure))
     }
     publish()
@@ -375,6 +400,7 @@ final class PodcastPlayer {
 
   private func failed(_ message: String) {
     wantsToPlay = false
+    recovery.itemFailed()
     emitError(episodeId, readableFailure(message))
     publish()
   }

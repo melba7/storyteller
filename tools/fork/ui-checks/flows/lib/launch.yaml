@@ -1,0 +1,15 @@
+# Starts the app from a clean state and opens the Podcasts section through the side menu.
+# The first start of a new install can take a while on a slow Mac, so it waits up to 90 seconds.
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Open the section menu"
+    timeout: 90000
+- tapOn: "Open the section menu"
+- tapOn: "Podcasts"
+# The tab bar of the Podcasts section.
+- extendedWaitUntil:
+    visible: "Library"
+    timeout: 30000

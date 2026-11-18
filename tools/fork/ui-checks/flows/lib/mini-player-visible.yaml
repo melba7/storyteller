@@ -1,0 +1,20 @@
+# Waits until the mini player is showing. The ids mode finds it by the test id from milestone S1.
+# The labels mode finds it by its spoken label, "Open the player, <title>, <time> left", which
+# the app has had from the start, so it works on a build without the ids.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: "podcasts-mini-player"
+          timeout: 60000
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - extendedWaitUntil:
+          visible: "Open the player.*"
+          timeout: 60000

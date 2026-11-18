@@ -90,18 +90,30 @@ extension PodcastPlayer {
     return true
   }
 
-  /// The end-of-chapter timer, checked with every tick: pause at the chapter's end, and let the
-  /// timer go when the listener has moved well past it.
+  /// The end-of-chapter timer, checked with every tick: pause at the chapter's end. A tick only
+  /// sees where playback is, not who moved it, so a place past the end is treated as a jump by
+  /// the player (an ad skip, a skipped chapter) and pauses too. A listener's seek past the end
+  /// has already let the timer go in `sleepSeeked`.
   private func chapterSleepTick(_ timer: SleepTimer) {
     guard wantsToPlay else { return }
-    switch timer.chapterStatus(at: position) {
-    case .waiting: break
-    case .reached:
+    switch timer.chapterAction(at: position, listenerSeeked: false) {
+    case .none: break
+    case .pause:
       SleepState.shared.timer = nil
       pause()
       sink?("onSleepTimerChange", sleepObject())
-    case .passed: cancelSleep()
+    case .cancel: cancelSleep()
     }
+  }
+
+  /// The playhead is being moved to `target` by `seek(to:)` (the scrubber, the skip buttons,
+  /// the lock screen). An end-of-chapter timer whose end the listener seeks well past is out
+  /// of date, so it goes now and playback carries on. The player's own jumps do not call this.
+  func sleepSeeked(to target: Double) {
+    guard let timer = SleepState.shared.timer,
+      timer.chapterAction(at: target, listenerSeeked: true) == .cancel
+    else { return }
+    cancelSleep()
   }
 
   private func setSleep(_ timer: SleepTimer) {

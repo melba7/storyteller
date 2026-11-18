@@ -24,7 +24,7 @@ extension PodcastPlayer {
   func bookmarkFromHeadphones() {
     guard let episode = current, PendingBookmarks.canBookmark(episodeId: episode.id) else { return }
     let bookmark = PendingBookmark(
-      id: UUID().uuidString, episodeId: episode.id, positionSeconds: position,
+      id: UUID().uuidString, episodeId: episode.id, positionSeconds: place,
       createdAt: (Date().timeIntervalSince1970 * 1000).rounded())
     do {
       try PendingBookmarks.append(bookmark, to: PendingBookmarksStore.url)

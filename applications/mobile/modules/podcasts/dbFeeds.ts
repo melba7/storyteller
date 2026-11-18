@@ -11,6 +11,7 @@ import { CACHE_KEEP_MS, PRUNE_CACHE_SQL } from "./cacheSql"
 import { notifyLibraryChanged } from "./changes"
 import { database, getShow, listEpisodes, listShows, rows } from "./db"
 import { MARK_PLAYED_FROM_APPLE_SQL } from "./episodeSql"
+import { feedChanged } from "./feedChanges"
 import { normalizeFeedUrl } from "./feedUrl"
 import { Podcasts, type PodcastFeedData } from "./index"
 import {
@@ -184,6 +185,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
   const arrived = insert.map((episode) => finished.has(episode.guid))
   const db = await database()
   await db.transaction(async (tx) => {
+    // feedChanged (feedChanges.ts) compares these same values: a new column needs a line there.
     await tx.execute(
       `UPDATE shows SET title = ?, author = ?, description = ?, image_url = ?, link = ?,
          language = ?, refreshed_at = ?, categories = ?, funding = ?, people = ?
@@ -222,7 +224,12 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     show.feedUrl,
     insert.filter((_, at) => arrived[at]).map((episode) => episode.guid),
   )
-  notifyLibraryChanged()
+  // A feed that says nothing new does not make every open screen read the library again.
+  if (
+    feedChanged(show, feed, { inserted: insert.length, updated: update.length })
+  ) {
+    notifyLibraryChanged()
+  }
   return newEpisodes(
     id,
     insert.filter((_, at) => !arrived[at]),
@@ -232,11 +239,13 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
 }
 
 /**
- * Refreshes every show, one after the other. A show that fails does not stop the rest.
- * `added` is every episode the refresh added. `onAdded` is called with each show's new
- * episodes as soon as that show is read, so a run that is cut short loses none of them. The
- * Apple Podcasts list is read first, but for no more than 30 seconds (a pull-to-refresh
- * reads it too); the automatic run reads it itself and passes `appleSync: false`.
+ * Refreshes every show, one after the other. A show that fails does not stop the rest. The
+ * screens are told once when the run is over, whatever the shows said on their own, so a
+ * change that `feedChanged` missed still reaches them. `added` is every episode the refresh
+ * added. `onAdded` is called with each show's new episodes as soon as that show is read, so a
+ * run that is cut short loses none of them. The Apple Podcasts list is read first, but for no
+ * more than 30 seconds (a pull-to-refresh reads it too); the automatic run reads it itself and
+ * passes `appleSync: false`.
  */
 export async function refreshAllShows(
   options: {
@@ -262,6 +271,7 @@ export async function refreshAllShows(
       failed.push(show.title)
     }
   }
+  notifyLibraryChanged()
   return { failed, added }
 }
 

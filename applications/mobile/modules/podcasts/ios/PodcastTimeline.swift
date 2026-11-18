@@ -5,6 +5,10 @@
 // subsystem `StorytellerLofi` and category `AdTimeline`, or on a Mac:
 // `log stream --predicate 'subsystem == "StorytellerLofi" AND category == "AdTimeline"'`.
 // The lines are kept at the "notice" level, so they stay in the log after the run.
+//
+// Every mark is also a line in the ad finder's diary (`ad-diary.jsonl`, see PodcastSkipLog.swift
+// and `AdDiary` in PodcastAds), for any episode and with or without a tap, so "Send skip log"
+// can say what the head scan and the model did.
 import Foundation
 import os
 
@@ -20,6 +24,7 @@ enum PodcastTimeline {
       taps = [episodeId: Date()]
       skipped = []
     }
+    SkipLogFile.appendDiary(episodeId, "play tapped on a stream")
     logger.notice("tap +0.00s \(episodeId, privacy: .public)")
   }
 
@@ -29,8 +34,10 @@ enum PodcastTimeline {
     lock.withLock { taps[episodeId] }.map { Date().timeIntervalSince($0) }
   }
 
-  /// One step of the timeline. Nothing is logged for an episode that was not tapped here.
+  /// One step of the timeline. The diary keeps every step; the system log gets nothing for an
+  /// episode that was not tapped here.
   static func mark(_ episodeId: String, _ what: String) {
+    SkipLogFile.appendDiary(episodeId, what)
     guard let at = lock.withLock({ taps[episodeId] }) else { return }
     logger.notice("\(what, privacy: .public) +\(String(format: "%.2f", Date().timeIntervalSince(at)), privacy: .public)s")
   }

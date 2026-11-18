@@ -1,0 +1,25 @@
+# The same swipe, but quick (150 milliseconds), and the next command does not wait for the screen
+# to settle (best effort, see waitToSettleTimeoutMs in Maestro's tapOn page). It is used to tap
+# the mini player while the sheet is still sliding away.
+appId: ${APP_ID}
+---
+- runFlow:
+    when:
+      true: ${SELECTORS == 'ids'}
+    commands:
+      - swipe:
+          from:
+            id: "podcasts-player-close"
+          direction: DOWN
+          duration: 150
+          waitToSettleTimeoutMs: 100
+- runFlow:
+    when:
+      true: ${SELECTORS != 'ids'}
+    commands:
+      - swipe:
+          from:
+            text: "Close the player"
+          direction: DOWN
+          duration: 150
+          waitToSettleTimeoutMs: 100
