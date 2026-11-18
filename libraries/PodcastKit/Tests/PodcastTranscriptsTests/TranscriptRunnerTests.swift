@@ -71,17 +71,17 @@ final class TranscriptRunnerTests: XCTestCase {
 
   func testProgressIsSavedAfterEachPieceAndAStopResumesFromIt() async throws {
     let first = FakeRecogniser()
-    let outcome = try await run(first, stopAfter: 1)
-    XCTAssertEqual(outcome, .paused(reached: 300))
+    let outcome = try await run(first, stopAfter: 2)
+    XCTAssertEqual(outcome, .paused(reached: 180))
     let partial = try XCTUnwrap(store.loadPartial())
-    XCTAssertEqual(partial.reached, 300)
-    XCTAssertEqual(partial.words.count, 300)
+    XCTAssertEqual(partial.reached, 180)
+    XCTAssertEqual(partial.words.count, 180)
     XCTAssertFalse(store.hasTranscript)
 
     let second = FakeRecogniser()
     let done = try await run(second)
     guard case .finished(let resumed) = done else { return XCTFail("not finished") }
-    XCTAssertEqual(second.requests.first?.0, 298, "carries on 2 s before the saved time")
+    XCTAssertEqual(second.requests.first?.0, 178, "carries on 2 s before the saved time")
     XCTAssertEqual(second.requests.count, 2)
 
     let other = folder.appendingPathComponent("other")
@@ -108,7 +108,7 @@ final class TranscriptRunnerTests: XCTestCase {
     _ = try await TranscriptRunner.run(
       audio: audio, sha256: sha, locale: "en-US", recogniser: FakeRecogniser(), store: store,
       progress: { seen.add($0) })
-    XCTAssertEqual(seen.values, [0, 42, 85, 100])
+    XCTAssertEqual(seen.values, [0, 8, 25, 68, 100])
   }
 
   func testAnUnsupportedLanguageThrowsBeforeAnyWork() async throws {

@@ -136,6 +136,10 @@ public enum AdDetectorError: Error, Equatable, Sendable {
   case tooLong
   case unavailable(AdUnavailable)
   case failed(String)
+  /// The model refused the lines (Apple's guardrails). This is the one failure that counts as
+  /// "no ads" for the piece: asking again would be refused again. The runner counts it and
+  /// reports it (`AdsFile.refusedPieces`).
+  case refused
 }
 
 /// Finds ads in a piece of transcript. The one for the phone is in PodcastAdsOnDevice; the

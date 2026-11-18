@@ -242,8 +242,11 @@ final class AdsRunnerPartialTests: XCTestCase {
     let outcome = try await AdsRunner.run(
       transcript: transcript, detector: detector(fullAsked), store: store, osVersion: "26")
     guard case .finished(let file) = outcome else { return XCTFail("\(outcome)") }
-    let total = AdChunker.pieces(of: AdChunker.number(transcript.lines), tokenBudget: 160).count
-    XCTAssertEqual(fullAsked.all.count, total - early)
+    let all = AdChunker.pieces(of: AdChunker.number(transcript.lines), tokenBudget: 160)
+    XCTAssertGreaterThan(early, 0)
+    XCTAssertEqual(
+      Set(fullAsked.all), Set(all.map(\.key)).subtracting(asked.all),
+      "only the pieces without a kept whole answer are asked")
     XCTAssertTrue(Set(fullAsked.all).isDisjoint(with: asked.all))
     XCTAssertNil(file.coveredUntil)
     XCTAssertEqual(store.load(detector: "fake"), file)
@@ -259,5 +262,188 @@ final class AdsRunnerPartialTests: XCTestCase {
       transcript: transcript, detector: detector(Asked()), store: AdsStore(folder: fresh, sha256: sha),
       osVersion: "26")
     XCTAssertEqual(again, .finished(file))
+  }
+}
+
+/// The growing last piece: an ad in the first minutes is found as soon as that part is there.
+final class AdsGrowingPieceTests: XCTestCase {
+  private var folder: URL!
+  private let sha = "aa"
+
+  override func setUpWithError() throws { folder = try temporaryFolder() }
+  override func tearDown() { try? FileManager.default.removeItem(at: folder) }
+
+  private final class Asked: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pieces: [TranscriptPiece] = []
+    func add(_ piece: TranscriptPiece) { lock.withLock { pieces.append(piece) } }
+    var all: [TranscriptPiece] { lock.withLock { pieces } }
+  }
+
+  /// A detector with the real budget. `ad` says which lines it calls an ad in a piece.
+  private func detector(
+    _ asked: Asked, ad: @escaping @Sendable (TranscriptPiece) -> ClosedRange<Int>? = { _ in 3...5 }
+  ) -> FakeDetector {
+    FakeDetector(tokenBudget: 2500) { piece in
+      asked.add(piece)
+      guard let wanted = ad(piece) else { return [] }
+      let inside = piece.lines.map(\.number).filter { wanted.contains($0) }
+      guard let first = inside.first, let last = inside.last else { return [] }
+      return [range(first, last)]
+    }
+  }
+
+  /// The first `count` lines of a transcript with a sponsor read at lines 3 to 5 (20 to 49 s).
+  private func partial(lines count: Int, reached: Double) -> PartialTranscript {
+    let transcript = makeTranscript(talk(60, ad: 3...5))
+    let words = transcript.words.filter { $0.start < Double(count) * 10 }
+    return PartialTranscript(
+      identity: transcript.identity, duration: 600, reached: reached, words: words)
+  }
+
+  private func run(
+    _ partial: PartialTranscript, _ detector: FakeDetector
+  ) async throws -> AdsFile {
+    let outcome = try await AdsRunner.runPartial(
+      partial: partial, detector: detector, store: AdsStore(folder: folder, sha256: sha),
+      osVersion: "26")
+    guard case .finished(let file) = outcome else {
+      XCTFail("\(outcome)")
+      throw CancellationError()
+    }
+    return file
+  }
+
+  func testAFiveMinutePartialTranscriptYieldsOneAskablePiece() throws {
+    let lines = AdChunker.number(makeTranscript(talk(30)).lines)
+    XCTAssertTrue(AdChunker.safePieces(of: lines, tokenBudget: 2500, reached: 300).isEmpty)
+    let piece = try XCTUnwrap(AdChunker.growingPiece(of: lines, tokenBudget: 2500, reached: 300))
+    XCTAssertEqual(piece.firstNumber, 1)
+    XCTAssertEqual(piece.end, 279)
+    XCTAssertLessThanOrEqual(piece.end, 300 - AdChunker.partialMargin)
+  }
+
+  func testTooLittleTranscriptIsNotAsked() {
+    let lines = AdChunker.number(makeTranscript(talk(12)).lines)
+    // 120 s done, the lines up to 100 s are old enough: 100 s is enough...
+    XCTAssertNotNil(AdChunker.growingPiece(of: lines, tokenBudget: 2500, reached: 120))
+    // ...but 70 s done leaves 50 s of lines, under the minimum.
+    XCTAssertNil(AdChunker.growingPiece(of: lines, tokenBudget: 2500, reached: 70))
+    XCTAssertNil(AdChunker.growingPiece(of: [], tokenBudget: 2500, reached: 700))
+  }
+
+  func testAnAdInTheFirstMinutesIsFoundFromAFiveMinuteTranscript() async throws {
+    let asked = Asked()
+    let file = try await run(partial(lines: 30, reached: 300), detector(asked))
+    XCTAssertEqual(asked.all.count, 1)
+    XCTAssertEqual(file.ads.count, 1)
+    XCTAssertEqual(file.ads[0].start, 20, accuracy: 10)
+    XCTAssertEqual(file.coveredUntil, 279)
+    XCTAssertNil(file.refusedPieces)
+  }
+
+  func testTheLongerPieceAsksAgainAndTheAdIsNotDoubled() async throws {
+    let asked = Asked()
+    let first = try await run(partial(lines: 30, reached: 300), detector(asked))
+    let second = try await run(partial(lines: 60, reached: 600), detector(asked))
+    XCTAssertEqual(asked.all.count, 2, "the grown piece was asked again")
+    XCTAssertEqual(first.ads.count, 1)
+    XCTAssertEqual(second.ads, first.ads)
+    XCTAssertEqual(second.coveredUntil, 579)
+    // Only the newest answer for the piece is kept.
+    let kept = AdsStore(folder: folder, sha256: sha).loadProgress(detector: "fake", version: "1")
+    XCTAssertEqual(kept.answers.count, 1)
+  }
+
+  func testAnAdOnlyTheShortPieceFoundIsDroppedByTheLongerAnswer() async throws {
+    let asked = Asked()
+    let shortOnly = detector(asked) { $0.lines.count < 40 ? 3...5 : nil }
+    let first = try await run(partial(lines: 30, reached: 300), shortOnly)
+    XCTAssertEqual(first.ads.count, 1)
+    let second = try await run(partial(lines: 60, reached: 600), shortOnly)
+    XCTAssertEqual(second.ads, [], "the longer answer wins")
+  }
+
+  func testASmallGrowthDoesNotAskAgain() async throws {
+    let asked = Asked()
+    let first = try await run(partial(lines: 30, reached: 300), detector(asked))
+    let second = try await run(partial(lines: 34, reached: 345), detector(asked))
+    XCTAssertEqual(asked.all.count, 1, "40 more seconds is under the step")
+    XCTAssertEqual(second.ads, first.ads)
+    XCTAssertEqual(second.coveredUntil, first.coveredUntil, "it reaches as far as the answer does")
+    let third = try await run(partial(lines: 44, reached: 445), detector(asked))
+    XCTAssertEqual(asked.all.count, 2, "120 s more asks again")
+    XCTAssertEqual(third.coveredUntil, 419)
+  }
+
+  func testAWholePieceIsAlwaysAskedAndReplacesTheGrowingAnswers() async throws {
+    let asked = Asked()
+    // A small budget, so the pieces fill up quickly.
+    let small = FakeDetector(tokenBudget: 160) { piece in
+      asked.add(piece)
+      return []
+    }
+    _ = try await run(partial(lines: 20, reached: 210), small)
+    _ = try await run(partial(lines: 60, reached: 600), small)
+    let kept = AdsStore(folder: folder, sha256: sha).loadProgress(detector: "fake", version: "1")
+    let starts = kept.answers.keys.compactMap { TranscriptPiece.keyParts($0)?.first }
+    XCTAssertEqual(starts.count, Set(starts).count, "one answer for each start")
+  }
+
+  func testTheFullPassOfAFinishedTranscriptIsUnchangedByTheGrowingAnswers() async throws {
+    let transcript = makeTranscript(talk(30, ad: 3...5))
+    let asked = Asked()
+    _ = try await run(partial(lines: 30, reached: 300), detector(asked))
+    let store = AdsStore(folder: folder, sha256: sha)
+    let outcome = try await AdsRunner.run(
+      transcript: transcript, detector: detector(Asked()), store: store, osVersion: "26")
+    let fresh = try temporaryFolder()
+    defer { try? FileManager.default.removeItem(at: fresh) }
+    let again = try await AdsRunner.run(
+      transcript: transcript, detector: detector(Asked()),
+      store: AdsStore(folder: fresh, sha256: sha), osVersion: "26")
+    XCTAssertEqual(outcome, again)
+    guard case .finished(let file) = outcome else { return XCTFail("\(outcome)") }
+    XCTAssertEqual(file.ads.count, 1)
+    XCTAssertNil(file.coveredUntil)
+  }
+
+  // MARK: Failures
+
+  func testARefusedPieceCountsAsNoAdsAndIsReported() async throws {
+    let asked = Asked()
+    let refusing = FakeDetector(tokenBudget: 2500) { piece in
+      asked.add(piece)
+      throw AdDetectorError.refused
+    }
+    let file = try await run(partial(lines: 30, reached: 300), refusing)
+    XCTAssertEqual(file.ads, [])
+    XCTAssertEqual(file.refusedPieces, 1)
+    // It is not asked again (it would be refused again), and the count stays.
+    let again = try await run(partial(lines: 31, reached: 310), refusing)
+    XCTAssertEqual(asked.all.count, 1)
+    XCTAssertEqual(again.refusedPieces, 1)
+  }
+
+  func testAnyOtherFailureIsThrownAndSavesNothing() async throws {
+    let failing = FakeDetector(tokenBudget: 2500) { _ in throw AdDetectorError.failed("boom") }
+    do {
+      _ = try await run(partial(lines: 30, reached: 300), failing)
+      XCTFail("should throw")
+    } catch {
+      XCTAssertEqual(error as? AdDetectorError, .failed("boom"))
+    }
+    let store = AdsStore(folder: folder, sha256: sha)
+    XCTAssertNil(store.loadPartial(detector: "fake"))
+  }
+
+  func testAFullRunReportsRefusedPieces() async throws {
+    let transcript = makeTranscript(talk(30))
+    let refusing = FakeDetector(tokenBudget: 2500) { _ in throw AdDetectorError.refused }
+    let outcome = try await AdsRunner.run(
+      transcript: transcript, detector: refusing, store: AdsStore(folder: folder, sha256: sha),
+      osVersion: "26")
+    guard case .finished(let file) = outcome else { return XCTFail("\(outcome)") }
+    XCTAssertEqual(file.refusedPieces, 1)
   }
 }

@@ -49,15 +49,54 @@ final class TranscriptRulesTests: XCTestCase {
   // MARK: Pieces and the overlap
 
   func testThePiecesStartAtTheSavedTimeMinusTheOverlap() throws {
-    let first = try XCTUnwrap(Pieces.next(reached: 0, duration: 700))
+    let first = try XCTUnwrap(Pieces.next(reached: 0, duration: 700, pieceSeconds: 300))
     XCTAssertEqual(first, PiecePlan(readFrom: 0, readTo: 300, keepFrom: 0))
-    let second = try XCTUnwrap(Pieces.next(reached: 300, duration: 700))
+    let second = try XCTUnwrap(Pieces.next(reached: 300, duration: 700, pieceSeconds: 300))
     XCTAssertEqual(second, PiecePlan(readFrom: 298, readTo: 600, keepFrom: 300))
-    let last = try XCTUnwrap(Pieces.next(reached: 600, duration: 700))
+    let last = try XCTUnwrap(Pieces.next(reached: 600, duration: 700, pieceSeconds: 300))
     XCTAssertEqual(last, PiecePlan(readFrom: 598, readTo: 700, keepFrom: 600))
     XCTAssertNil(Pieces.next(reached: 700, duration: 700))
     XCTAssertNil(Pieces.next(reached: 699.995, duration: 700))
     XCTAssertNil(Pieces.next(reached: 0, duration: 0))
+  }
+
+  /// All the pieces of an episode, as a run without a stop cuts them.
+  private func cut(duration: Double, from start: Double = 0) -> [PiecePlan] {
+    var plans: [PiecePlan] = []
+    var reached = start
+    while let plan = Pieces.next(reached: reached, duration: duration) {
+      plans.append(plan)
+      reached = plan.readTo
+    }
+    return plans
+  }
+
+  func testTheFirstPiecesAreShort() {
+    let plans = cut(duration: 1000)
+    XCTAssertEqual(plans.map(\.readTo), [60, 180, 480, 780, 1000])
+    XCTAssertEqual(plans.first, PiecePlan(readFrom: 0, readTo: 60, keepFrom: 0))
+    XCTAssertEqual(plans[1], PiecePlan(readFrom: 58, readTo: 180, keepFrom: 60))
+    XCTAssertEqual(plans[2], PiecePlan(readFrom: 178, readTo: 480, keepFrom: 180))
+  }
+
+  func testAShortEpisodeIsCutAtItsEnd() {
+    XCTAssertEqual(cut(duration: 45).map(\.readTo), [45])
+    XCTAssertEqual(cut(duration: 100).map(\.readTo), [60, 100])
+  }
+
+  func testARestartInTheMiddleGivesTheSamePieces() {
+    let whole = cut(duration: 1000)
+    for (index, plan) in whole.enumerated().dropLast() {
+      XCTAssertEqual(cut(duration: 1000, from: plan.readTo), Array(whole.dropFirst(index + 1)))
+    }
+  }
+
+  func testAPieceLengthDependsOnlyOnTheTimeDone() {
+    XCTAssertEqual(Pieces.length(after: 0), 60)
+    XCTAssertEqual(Pieces.length(after: 59.995), 120)
+    XCTAssertEqual(Pieces.length(after: 60), 120)
+    XCTAssertEqual(Pieces.length(after: 180), 300)
+    XCTAssertEqual(Pieces.length(after: 5000), 300)
   }
 
   func testTheOverlapsWordsAreNotDoubled() {

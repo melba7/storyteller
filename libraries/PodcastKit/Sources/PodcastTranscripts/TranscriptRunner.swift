@@ -30,7 +30,7 @@ public enum TranscriptRunner {
   /// partial one removed.
   public static func run(
     audio: URL, sha256: String, locale requested: String, recogniser: PieceRecogniser,
-    store: TranscriptStore, pieceSeconds: Double = Pieces.seconds, overlap: Double = Pieces.overlap,
+    store: TranscriptStore, pieceSeconds: Double? = nil, overlap: Double = Pieces.overlap,
     progress: @Sendable (Int) -> Void = { _ in }, shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> RunOutcome {
     let locale = try await recogniser.prepare(locale: requested)
