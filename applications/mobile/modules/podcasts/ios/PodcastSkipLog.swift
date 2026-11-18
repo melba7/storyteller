@@ -101,7 +101,8 @@ enum SkipLogFile {
   /// Adds the entries, with the words around their edges, and keeps the newest 500 lines.
   static func append(_ entries: [SkipLogEntry]) {
     queue.async {
-      var log = SkipLog(text: (try? String(contentsOf: url, encoding: .utf8)) ?? "")
+      let file = SkipLogFile.url
+      var log = SkipLog(text: (try? String(contentsOf: file, encoding: .utf8)) ?? "")
       var words: [String: [TranscriptWord]] = [:]
       for var entry in entries {
         if words[entry.episode] == nil { words[entry.episode] = SkipLogWords.words(for: entry.episode) }
@@ -110,8 +111,8 @@ enum SkipLogFile {
       }
       do {
         try FileManager.default.createDirectory(
-          at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data(log.text.utf8).write(to: url, options: .atomic)
+          at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(log.text.utf8).write(to: file, options: .atomic)
       } catch {
         NSLog("Podcasts: the skip log could not be saved: \(error)")
       }
@@ -122,7 +123,7 @@ enum SkipLogFile {
   /// the app's own document and caches folders). Nil when nothing is logged yet.
   static func copyForSharing() -> URL? {
     queue.sync { () -> URL? in
-      guard let data = try? Data(contentsOf: url), !data.isEmpty else { return nil }
+      guard let data = try? Data(contentsOf: SkipLogFile.url), !data.isEmpty else { return nil }
       let copy = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("skip-log.jsonl")
       do {
