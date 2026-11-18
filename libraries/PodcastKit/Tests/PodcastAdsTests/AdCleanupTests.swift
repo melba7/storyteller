@@ -124,11 +124,104 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
   }
 
-  func testCarryingOnStopsAfterEightLines() {
+  // MARK: A short, strict carry-on
+
+  private func texts(_ count: Int, line6 text: String) -> [String] {
+    var texts = talk(count)
+    texts[5] = text
+    return texts
+  }
+
+  func testTalkAboutTheSponsorsCompanyIsNotCarriedIn() throws {
+    let talk = "Quokka shares fell four percent after the company reported earnings on Tuesday"
+    let transcript = makeTranscript(texts(30, line6: talk))
+    let ad = try XCTUnwrap(
+      AdCleanup.run(ranges: [range(3, 5, advertiser: "Quokka")], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
+  }
+
+  func testAThanksToTheSponsorIsCarriedIn() throws {
+    let transcript = makeTranscript(texts(30, line6: "Thanks again to Quokka"))
+    let ad = try XCTUnwrap(
+      AdCleanup.run(ranges: [range(3, 5, advertiser: "Quokka")], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
+  }
+
+  func testALongLineThatNamesTheSponsorWithoutACueIsNotCarriedIn() throws {
+    // Nine words, the name, no soft cue: the hosts are talking about the company.
+    let transcript = makeTranscript(
+      texts(30, line6: "I read that Quokka is opening an office in Lisbon next year"))
+    let ad = try XCTUnwrap(
+      AdCleanup.run(ranges: [range(3, 5, advertiser: "Quokka")], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
+  }
+
+  func testAReturnToTheShowEndsTheAdEvenWithAWebAddressAfterIt() throws {
+    let transcript = makeTranscript(
+      texts(30, line6: "Welcome back to the show, find us at example.com slash podcast"))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 5)], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
+  }
+
+  func testTheShowIsBackInTheModelsOwnLastLinesTrimsTheAd() throws {
+    let transcript = makeTranscript(texts(30, line6: "And we're back. So where were we"))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 6)], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01, "the ad ends at line 5")
+  }
+
+  func testAHardSignalKeepsALineThatSaysWelcomeBack() throws {
+    let transcript = makeTranscript(
+      texts(30, line6: "Welcome back, and remember code SHOW at acme.com"))
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 6)], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 59.75, accuracy: 0.01)
+  }
+
+  func testTheAdvertisersNameAfterTheReturnCueKeepsTheLine() throws {
+    var texts = talk(30)
+    texts[5] = "Welcome back to the show"
+    texts[6] = "Quokka is the best"
+    let ad = try XCTUnwrap(
+      AdCleanup.run(ranges: [range(3, 7, advertiser: "Quokka")], transcript: makeTranscript(texts))
+        .first)
+    XCTAssertEqual(ad.end, 69.75, accuracy: 0.01)
+  }
+
+  func testOnlyTheModelsLastThreeLinesAreTrimmedAndNeverItsFirst() throws {
+    var texts = talk(30)
+    texts[3] = "welcome back to the show"  // line 4 of an ad that ends at line 9
+    let transcript = makeTranscript(texts)
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 9)], transcript: transcript).first)
+    XCTAssertEqual(ad.end, 89.75, accuracy: 0.01, "line 4 is not one of the last three")
+    var first = talk(30)
+    first[2] = "welcome back to the show"
+    let short = makeTranscript(first)
+    let whole = try XCTUnwrap(AdCleanup.run(ranges: [range(3, 5)], transcript: short).first)
+    XCTAssertEqual(whole.start, 19.75, accuracy: 0.01, "the first line is never trimmed")
+    XCTAssertEqual(whole.end, 49.75, accuracy: 0.01)
+  }
+
+  func testCarryingOnStopsAfterTwoLines() {
     let texts = [String](repeating: "go to acme dot com", count: 40)
     let carried = AdCleanup.carriedEnd(
       of: 5, advertiser: "Acme", lines: makeTranscript(texts).lines)
-    XCTAssertEqual(carried, 13)
+    XCTAssertEqual(carried, 7)
+  }
+
+  func testACarriedLineMustStartWithinFifteenSecondsOfTheModelsLastLine() {
+    // Two lines of 3 s with 20 s of silence before the second.
+    let lines = [
+      TranscriptLine(start: 0, end: 30, text: "the ad"),
+      TranscriptLine(start: 31, end: 34, text: "go to acme dot com"),
+      TranscriptLine(start: 54, end: 57, text: "go to acme dot com"),
+    ]
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 2)
+  }
+
+  func testAnUnsureAdIsNeverCarriedOn() throws {
+    let transcript = makeTranscript(texts(30, line6: "that is acme dot com slash show"))
+    let unsure = [range(3, 5, .unsure)]
+    let ad = try XCTUnwrap(AdCleanup.run(ranges: unsure, transcript: transcript).first)
+    XCTAssertEqual(ad.end, 49.75, accuracy: 0.01)
   }
 
   // MARK: Where the player lands

@@ -16,7 +16,9 @@ public enum AdRules {
   /// Anything longer is dropped: it is more likely a mistake than an ad.
   public static let maxLength = 300.0
   /// How many lines after an ad may still be carried into it.
-  public static let carryLines = 8
+  public static let carryLines = 2
+  /// A carried line must start within this many seconds of the end of the model's last line.
+  public static let carrySeconds = 15.0
   /// A skip lands this long before the first word of the show (and starts this long before the
   /// first word of the ad).
   public static let landBefore = 0.25
@@ -44,10 +46,15 @@ public enum AdCleanup {
       let first = min(range.startLine, range.endLine)
       let last = max(range.startLine, range.endLine)
       guard first >= 1, last <= lines.count else { continue }
-      let carried = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
+      // An ad that ends with the show coming back is cut short and nothing is carried; an ad the
+      // model is unsure of is never carried.
+      var end = trimmedEnd(first: first, last: last, advertiser: range.advertiser, lines: lines)
+      if end == last, range.confidence == .sure {
+        end = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
+      }
       spans.append(
         Span(
-          start: lines[first - 1].start, end: lines[carried - 1].end, kind: range.kind,
+          start: lines[first - 1].start, end: lines[end - 1].end, kind: range.kind,
           advertiser: range.advertiser, confidence: range.confidence))
     }
 
@@ -75,16 +82,34 @@ public enum AdCleanup {
     var length: Double { end - start }
   }
 
-  /// The last line number of an ad after carrying it on: while the line after it names the
-  /// advertiser or gives a web address or promo code, it belongs to the ad.
+  /// The last line number of an ad after carrying it on: while the line after it sells (see
+  /// `AdSignals.carriesOn`), it belongs to the ad, for at most `carryLines` lines, and only
+  /// lines that start within `carrySeconds` of the model's last line.
   static func carriedEnd(of last: Int, advertiser: String, lines: [TranscriptLine]) -> Int {
     var end = last
     while end < lines.count, end - last < AdRules.carryLines,
-      AdSignals.readsLikeAd(lines[end].text, advertiser: advertiser)
+      lines[end].start - lines[last - 1].end <= AdRules.carrySeconds,
+      AdSignals.carriesOn(lines[end].text, advertiser: advertiser)
     {
       end += 1
     }
     return end
+  }
+
+  /// The last line number of an ad after trimming it: the model's last three lines (never its
+  /// first) are searched for the first line R that says the show is back, with no line from R to
+  /// the end that gives a hard signal or names the advertiser. The ad then ends at line R-1.
+  static func trimmedEnd(
+    first: Int, last: Int, advertiser: String, lines: [TranscriptLine]
+  ) -> Int {
+    guard max(first + 1, last - 2) <= last else { return last }
+    for line in max(first + 1, last - 2)...last where AdSignals.returnCue(lines[line - 1].text) {
+      let sells = lines[(line - 1)..<last].contains {
+        AdSignals.hardSignal($0.text) || AdSignals.namesAdvertiser($0.text, advertiser: advertiser)
+      }
+      if !sells { return line - 1 }
+    }
+    return last
   }
 
   /// Joins spans that overlap (the same ad seen in two pieces: the surer answer stands), and

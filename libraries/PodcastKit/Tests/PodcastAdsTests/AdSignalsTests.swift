@@ -1,0 +1,68 @@
+import XCTest
+
+@testable import PodcastAds
+
+final class AdSignalsTests: XCTestCase {
+  func testHardSignalsAreWebAddressesCodesAndOffers() {
+    for text in [
+      "go to betterhelp.com slash show", "that is acme dot com", "use code SHOW today",
+      "twenty percent off", "start your free trial", "this is brought to you by Acme",
+    ] {
+      XCTAssertTrue(AdSignals.hardSignal(text), text)
+    }
+    for text in ["plain talk number 3 here", "we went to the store", "the code is hard to read"] {
+      XCTAssertFalse(AdSignals.hardSignal(text), text)
+    }
+  }
+
+  func testSoftCuesAreTheWordsAnAdCloses() {
+    for text in [
+      "Thanks again to Quokka", "thank you to our sponsor", "go to the site", "head to the store",
+      "visit us", "check out the new line", "sign up today", "learn more", "Again, that's Quokka",
+      "Again that's Quokka",
+    ] {
+      XCTAssertTrue(AdSignals.softCue(text), text)
+    }
+    for text in ["a visitor came by", "the signup form", "we talked about it"] {
+      XCTAssertFalse(AdSignals.softCue(text), text)
+    }
+  }
+
+  func testReturnCuesSayTheShowIsBack() {
+    for text in [
+      "Welcome back to the show", "And we're back", "we are back", "We’re back, everyone",
+      "back to the conversation", "let's get back to it", "Now, back to the interview",
+      "so where were we", "Welcome to Tech Talk", "I'm your host Sam", "on today's episode",
+      "in this episode we ask", "my guest today is", "joining me now is",
+    ] {
+      XCTAssertTrue(AdSignals.returnCue(text), text)
+    }
+    for text in ["feedback welcome", "they went back to the store", "go to acme dot com"] {
+      XCTAssertFalse(AdSignals.returnCue(text), text)
+    }
+  }
+
+  func testTheCuesIgnoreCaseAndOnlyMatchWholeWords() {
+    XCTAssertTrue(AdSignals.returnCue("WELCOME BACK"))
+    XCTAssertFalse(AdSignals.returnCue("unwelcome backlash"))
+    XCTAssertFalse(AdSignals.softCue("revisit"))
+  }
+
+  func testALineIsCarriedWhenItSellsAndTheShowIsNotBack() {
+    XCTAssertTrue(AdSignals.carriesOn("go to acme dot com", advertiser: "Quokka"))
+    XCTAssertTrue(AdSignals.carriesOn("Quokka makes it simple", advertiser: "Quokka"))
+    XCTAssertTrue(
+      AdSignals.carriesOn(
+        "I really think you should check out what Quokka is doing for sleep", advertiser: "Quokka"))
+    let talk = "Quokka shares fell four percent after the company reported earnings"
+    XCTAssertFalse(AdSignals.carriesOn(talk, advertiser: "Quokka"))
+    XCTAssertFalse(AdSignals.carriesOn("We had a good week", advertiser: "Quokka"))
+    XCTAssertFalse(AdSignals.carriesOn("Welcome back, go to acme.com", advertiser: "Acme"))
+  }
+
+  func testAnUnusableAdvertiserNeverMatches() {
+    XCTAssertFalse(AdSignals.namesAdvertiser("the sponsor said so", advertiser: "sponsor"))
+    XCTAssertFalse(AdSignals.namesAdvertiser("anything", advertiser: ""))
+    XCTAssertTrue(AdSignals.namesAdvertiser("we love QUOKKA", advertiser: "Quokka"))
+  }
+}
