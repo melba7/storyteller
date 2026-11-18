@@ -113,9 +113,11 @@ public enum AdSignals {
 
   /// Whether a line after an ad's last line is carried into it: it has no return cue and holds
   /// a hard signal, or names the advertiser and has a soft cue or is at most `shortLine` words.
-  static func carriesOn(_ text: String, advertiser: String) -> Bool {
+  /// After a line that ends with a legal line of a spot (`previous`) only a hard signal counts.
+  static func carriesOn(_ text: String, advertiser: String, after previous: String = "") -> Bool {
     if returnCue(text) { return false }
     if hardSignal(text) { return true }
+    if endsWithTermsCue(previous) { return false }
     guard namesAdvertiser(text, advertiser: advertiser) else { return false }
     return softCue(text) || text.split(whereSeparator: \.isWhitespace).count <= shortLine
   }

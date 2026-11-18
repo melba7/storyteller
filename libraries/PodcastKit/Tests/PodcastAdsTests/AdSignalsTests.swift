@@ -109,4 +109,52 @@ final class AdSignalsTests: XCTestCase {
     XCTAssertTrue(AdSignals.namesAdvertiser("visit better help dot com", advertiser: "BetterHelp"))
     XCTAssertTrue(AdSignals.carriesOn("Better Help makes it simple", advertiser: "BetterHelp"))
   }
+
+  // MARK: The close of a produced spot (N7)
+
+  func testSpotCuesAreTheLegalAndStoreCloseOfAProducedSpot() {
+    for text in [
+      "Terms and conditions apply", "terms apply.", "Restrictions apply", "See site for details",
+      "see store for details", "Member FDIC", "You must be 21 or older", "For ages 18 and up",
+      "Please gamble responsibly", "For a limited time only", "Download the Quokka app today",
+      "Download the free Quokka app", "Available now at your local store",
+      "available today on all platforms", "Wherever you get your podcasts",
+      "wherever you listen to podcasts", "Streaming now on Netflix", "Only in theaters",
+      "Call 1-800-555-0100", "Call 1 888 555 0100",
+    ] {
+      XCTAssertTrue(AdSignals.spotCue(text), text)
+    }
+    for text in [
+      "plain talk number 3 here", "the terms of the deal were clear", "download the file",
+      "we downloaded the Quokka app", "unlimited time", "available soon", "in the theatre",
+      "call 555 0100",
+    ] {
+      XCTAssertFalse(AdSignals.spotCue(text), text)
+    }
+  }
+
+  func testALineThatEndsWithATermsCueClosesTheSpot() {
+    for text in [
+      "Offer valid in select states, restrictions apply.", "Terms and conditions apply",
+      "See site for details!", "Must be 21 or older.", "Member FDIC", "Please gamble responsibly.",
+    ] {
+      XCTAssertTrue(AdSignals.endsWithTermsCue(text), text)
+    }
+    for text in [
+      "Terms and conditions apply, so read them before you sign anything in the shop",
+      "Download the Quokka app today", "limited time only", "plain talk number 3 here",
+    ] {
+      XCTAssertFalse(AdSignals.endsWithTermsCue(text), text)
+    }
+  }
+
+  func testALineAfterACloserIsCarriedOnlyWithAHardSignal() {
+    let closer = "Offer valid in select states, restrictions apply."
+    XCTAssertFalse(
+      AdSignals.carriesOn("Thanks again to Quokka", advertiser: "Quokka", after: closer))
+    XCTAssertTrue(
+      AdSignals.carriesOn("Thanks again to Quokka", advertiser: "Quokka", after: "Quokka is great"))
+    XCTAssertTrue(
+      AdSignals.carriesOn("go to quokka dot com", advertiser: "Quokka", after: closer))
+  }
 }

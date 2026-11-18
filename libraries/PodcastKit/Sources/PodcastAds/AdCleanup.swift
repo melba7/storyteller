@@ -158,7 +158,7 @@ public enum AdCleanup {
     var end = last
     while end < lines.count, end - last < AdRules.carryLines,
       lines[end].start - lines[last - 1].end <= AdRules.carrySeconds,
-      AdSignals.carriesOn(lines[end].text, advertiser: advertiser)
+      AdSignals.carriesOn(lines[end].text, advertiser: advertiser, after: lines[end - 1].text)
     {
       end += 1
     }

@@ -101,37 +101,47 @@ public enum AdHeadRules {
   }
 
   /// An offer line that can stand alone as an ad: it also holds a web address, or another
-  /// call to action comes at most `near` lines from it. One offer line in plain talk ("that is
-  /// twenty percent off the usual price") is not enough.
+  /// call to action or a spot cue comes at most `near` lines from it. One offer line in plain
+  /// talk ("that is twenty percent off the usual price") is not enough.
   private static func hasTwoSignals(_ at: Int, _ lines: [NumberedLine]) -> Bool {
-    matches(webAddresses, lines[at].text) || callNearby(at, lines, includingSelf: false)
+    matches(webAddresses, lines[at].text)
+      || callNearby(at, lines, includingSelf: false, spotCues: true)
   }
 
   private static func mentions(_ text: String, any names: [String]) -> Bool {
     names.contains { AdSignals.mentions(text, name: $0) }
   }
 
-  /// The sure ads in the lead-in lines of an episode, as the ranges a detector would answer
-  /// (the same clean-up turns them into times). `sponsors` are the names found in the notes.
+  /// The ads in the lead-in lines of an episode, as the ranges a detector would answer (the same
+  /// clean-up turns them into times). `sponsors` are the names found in the notes. All are sure,
+  /// except a span that only holds closing phrases of a produced spot ("download the app",
+  /// "terms apply") and no web address or offer: that one is unsure.
   public static func find(lines: [NumberedLine], sponsors: [String] = []) -> [AdRange] {
-    var spans: [(first: Int, last: Int, lead: Bool)] = []  // indexes into `lines`
+    // Indexes into `lines`; `spot` is true while only spot cues made the span.
+    var spans: [(first: Int, last: Int, lead: Bool, spot: Bool)] = []
     for (at, line) in lines.enumerated() {
       if isLeadIn(line.text) {
         guard let firstCall = (at..<min(lines.count, at + reach + 1)).first(where: {
           isCallToAction(lines[$0].text) && lines[$0].start - lines[at].end <= reachSeconds
         })
         else { continue }
-        spans.append((at, carried(from: firstCall, in: lines), true))
+        spans.append((at, carried(from: firstCall, in: lines), true, false))
       } else if (isOffer(line.text) && hasTwoSignals(at, lines))
         || (mentions(line.text, any: sponsors) && callNearby(at, lines))
       {
-        spans.append((at, carried(from: at, in: lines), false))
+        spans.append((at, carried(from: at, in: lines), false, false))
+      } else if AdSignals.spotCue(line.text),
+        callNearby(at, lines, includingSelf: false, spotCues: true)
+      {
+        spans.append((at, carried(from: at, in: lines), false, true))
       }
     }
-    var joined: [(first: Int, last: Int, lead: Bool)] = []
+    var joined: [(first: Int, last: Int, lead: Bool, spot: Bool)] = []
     for span in spans.sorted(by: { $0.first < $1.first }) {
       if let last = joined.last, span.first <= last.last + 1 {
-        joined[joined.count - 1] = (last.first, max(last.last, span.last), last.lead || span.lead)
+        joined[joined.count - 1] = (
+          last.first, max(last.last, span.last), last.lead || span.lead, last.spot && span.spot
+        )
       } else {
         joined.append(span)
       }
@@ -139,18 +149,22 @@ public enum AdHeadRules {
     return joined.map { span in
       let text = lines[span.first...span.last].map(\.text).joined(separator: " ")
       let plug = !span.lead && !mentions(text, any: sponsors) && matches(ownPlugs, text)
+      let proved = !span.spot || lines[span.first...span.last].contains { isCallToAction($0.text) }
       return AdRange(
         startLine: lines[span.first].number, endLine: lines[span.last].number,
         advertiser: plug ? "" : advertiser(in: text, sponsors: sponsors),
-        kind: plug ? .ownPlug : .ad, confidence: .sure)
+        kind: plug ? .ownPlug : .ad, confidence: proved ? .sure : .unsure)
     }
   }
 
+  /// Whether a line within `near` lines of `at` is a call to action (or, with `spotCues`, a
+  /// closing phrase of a produced spot).
   private static func callNearby(
-    _ at: Int, _ lines: [NumberedLine], includingSelf: Bool = true
+    _ at: Int, _ lines: [NumberedLine], includingSelf: Bool = true, spotCues: Bool = false
   ) -> Bool {
     (max(0, at - near)...min(lines.count - 1, at + near)).contains {
-      ($0 != at || includingSelf) && isCallToAction(lines[$0].text)
+      ($0 != at || includingSelf)
+        && (isCallToAction(lines[$0].text) || (spotCues && AdSignals.spotCue(lines[$0].text)))
     }
   }
 

@@ -20,6 +20,8 @@ final class AdEvidenceTests: XCTestCase {
     XCTAssertTrue(AdEvidence.isEvidence("use code SHOW today", advertiser: ""))
     XCTAssertTrue(AdEvidence.isEvidence("thanks again to our friends", advertiser: ""))
     XCTAssertTrue(AdEvidence.isEvidence("we love Quokka", advertiser: "Quokka"))
+    XCTAssertTrue(AdEvidence.isEvidence("Terms and conditions apply", advertiser: ""))
+    XCTAssertTrue(AdEvidence.isEvidence("Download the Quokka app today", advertiser: ""))
     XCTAssertFalse(AdEvidence.isEvidence("we love Quokka", advertiser: ""))
     XCTAssertFalse(AdEvidence.isEvidence("we love Quokka", advertiser: "sponsor"))
     XCTAssertFalse(AdEvidence.isEvidence("plain talk number 3 here", advertiser: "Acme"))
@@ -40,6 +42,12 @@ final class AdEvidenceTests: XCTestCase {
 
   func testAWebAddressInTheAdKeepsItSure() {
     let ads = run([range(3, 5, advertiser: "")], texts(30, [4: "go to acme.com today"]))
+    XCTAssertEqual(ads.map(\.confidence), [.sure])
+  }
+
+  func testAClosingPhraseOfAProducedSpotKeepsItSure() {
+    let closer = "Offer valid in select states, restrictions apply."
+    let ads = run([range(3, 5, advertiser: "")], texts(30, [5: closer]))
     XCTAssertEqual(ads.map(\.confidence), [.sure])
   }
 
