@@ -28,3 +28,13 @@ export function featuredCards(
   }
   return cards
 }
+
+/** Room kept at the left of the row, between the cards and for the next card's peek, in points. */
+const GUTTER = 16
+const GAP = 12
+const PEEK = 28
+
+/** The side of a featured card: the window minus the gutter, the gap and the peek; at least 1. */
+export function featuredCardSize(windowWidth: number): number {
+  return Math.max(1, windowWidth - GUTTER - GAP - PEEK)
+}

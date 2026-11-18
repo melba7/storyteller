@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest"
 
 import { type ChartShow } from "./charts"
-import { FEATURED_TOP, featuredCards } from "./featured"
+import { FEATURED_TOP, featuredCardSize, featuredCards } from "./featured"
 
 const show = (n: number): ChartShow => ({
   appleId: String(n),
@@ -45,5 +45,15 @@ describe("featuredCards", () => {
 
   it("is empty with no chart", () => {
     expect(featuredCards([], [])).toEqual([])
+  })
+})
+
+describe("featuredCardSize", () => {
+  it("is the window minus gutter, gap and peek", () => {
+    expect(featuredCardSize(393)).toBe(337)
+  })
+  it("never goes under 1", () => {
+    expect(featuredCardSize(0)).toBe(1)
+    expect(featuredCardSize(10)).toBe(1)
   })
 })
