@@ -170,7 +170,7 @@ do {
     )
   }
   let sure = file.ads.filter { $0.confidence == .sure }.count
-  say("\(file.ads.count) found, \(sure) sure (those are the ones the player skips).")
+  say("\(file.ads.count) found, \(sure) sure. The player skips sure and unsure ads alike, with Undo.")
 } catch AdDetectorError.unavailable(let reason) {
   fail("Cannot find ads now: \(reason.reason).")
 } catch {
