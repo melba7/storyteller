@@ -156,11 +156,24 @@ final class AdHeadRulesTests: XCTestCase {
   }
 
   func testTheStepsOfAHeadAreThePhonesStepsUpToIt() {
-    XCTAssertEqual(AdHeadRules.steps(upTo: 90), [30, 60, 90])
-    XCTAssertEqual(AdHeadRules.steps(upTo: 100), [30, 60, 90, 100])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 90), [15, 30, 60, 90])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 100), [15, 30, 60, 90, 100])
     XCTAssertEqual(AdHeadRules.steps(upTo: 10), [10])
+    XCTAssertEqual(AdHeadRules.steps(upTo: 20), [15, 20])
     XCTAssertEqual(AdHeadRules.steps(upTo: 600), AdHeadRules.steps)
-    XCTAssertEqual(AdHeadRules.modelSteps, [60, 180])
+    XCTAssertEqual(AdHeadRules.steps, [15, 30, 60, 90, 120, 150, 180])
+    XCTAssertEqual(AdHeadRules.modelSteps, [30, 60, 120, 180])
+  }
+
+  func testTheModelsFirstStepCountsOnlyItsSureAnswers() {
+    let sure = range(2, 4)
+    let unsure = range(6, 8, .unsure)
+    let guess = range(9, 9, .guess)
+    let answer = [sure, unsure, guess]
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 30), [sure])
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 15), [sure])
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 60), answer)
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 180), answer)
   }
 
   // MARK: A shorter carry-on and two signals (E4)

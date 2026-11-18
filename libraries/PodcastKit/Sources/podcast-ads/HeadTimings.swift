@@ -2,10 +2,11 @@
 // down the path a stream takes on the phone and times each step (see FORK.md).
 //
 // That path is what PodcastStreamHead does: one head transcriber made ready ahead, the start of
-// the file cut with Mp3Prefix at a whole frame in 30 second steps, `extend` for each step, the
-// text rules (AdHeadRules) after each step, and the model at the 60 and 180 second steps (a
-// warmed one at the first, a fresh one at the second). The file is whole here, so the cut is
-// taken from its first bytes as if only those had arrived.
+// the file cut with Mp3Prefix at a whole frame in steps (15, 30, 60 seconds, then every 30),
+// `extend` for each step, the text rules (AdHeadRules) after each step, and the model at the 30,
+// 60, 120 and 180 second steps (each with a session warmed after the last answer; only its sure
+// answers count at the 30 second step). The file is whole here, so the cut is taken from its
+// first bytes as if only those had arrived.
 import Foundation
 import PodcastAds
 import PodcastAdsOnDevice
@@ -66,17 +67,22 @@ enum HeadTimings {
           final = AdHeadRules.merge(ruleAds + modelAds)
 
           if AdHeadRules.modelSteps.contains(target) {
-            // A warm session is used once, as on the phone; the next step gets a fresh one.
+            // A warm session is used once, as on the phone; the next model step gets one made now.
             let model: AdDetector? = warm ?? AppleAds.makeDetector()
             warm = nil
             guard let model else { throw HeadError("This Mac has no on-device model.") }
             let asked = since()
             do {
               let answer = try await model.findAds(in: TranscriptPiece(lines: AdChunker.number(lines)))
-              modelAds = AdCleanup.run(ranges: answer, transcript: transcript)
+              modelAds = AdCleanup.run(
+                ranges: AdHeadRules.counted(answer, atStep: target), transcript: transcript)
               line("model at \(Int(target)) s:", "\(modelAds.count) ad(s), the model took \(String(format: "%.2f", since() - asked)) s")
             } catch {
               line("model at \(Int(target)) s:", "no answer (\(error))")
+            }
+            if steps.contains(where: { $0 > target && AdHeadRules.modelSteps.contains($0) }) {
+              warm = AppleAds.makeWarmDetector()
+              warm?.prewarm()
             }
             final = AdHeadRules.merge(ruleAds + modelAds)
           }
@@ -93,7 +99,7 @@ enum HeadTimings {
     }
     print("")
     print("All times are seconds from the start of that run. This is the phone's stream path (head")
-    print("transcriber, MP3 cuts, text rules after each step, the model at 60 and 180 s), so a")
+    print("transcriber, MP3 cuts, text rules after each step, the model at 30, 60, 120 and 180 s), so a")
     print("stall or an error here is one the phone would meet too. A phone is slower than a Mac:")
     print("read these as the best case.")
   }

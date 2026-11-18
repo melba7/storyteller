@@ -1,12 +1,14 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // The first minutes of a stream, checked for ads while the rest still downloads. As soon as
-// about 30 seconds of audio are on disk the start of the file is copied to a small file, cut at
+// about 15 seconds of audio are on disk the start of the file is copied to a small file, cut at
 // a whole MP3 frame, and transcribed by an analyzer that was made ready ahead; the copy grows in
-// 30 second steps to about 3 minutes. After each step the text rules (AdHeadRules) run at once,
-// and after the 60 second step the on-device model is asked once, with a session that was asked
-// to prewarm when play started. The ads found are saved as the episode's partial ads file, which
-// the player already reads, and the player is told to read it again.
+// steps (15, 30, 60 seconds, then every 30) to about 3 minutes. After each step the text rules
+// (AdHeadRules) run at once, and after the 30, 60, 120 and 180 second steps the on-device model
+// is asked, with a session that was asked to prewarm when play started and, after each answer,
+// another one for the next time. At the 30 second step only its sure answers count (an unsure
+// one waits for the 60 second step). The ads found are saved as the episode's partial ads file,
+// which the player already reads, and the player is told to read it again.
 //
 // The file is not whole, so there is no SHA-256 to name the ads by. Until the download is filed
 // they are kept under a made-up name ("stream-<episode>"), which `adsStore` gives the player;
@@ -172,8 +174,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       return PodcastTimeline.mark(id, "head scan: this phone has no speech recogniser")
     }
     // The model starts loading now, while the speech model does.
-    let detector = AppleAds.makeWarmDetector()
-    detector?.prewarm()
+    let detector = Self.warmDetector()
     lock.withLock { detectorVersion = detector?.version ?? "1" }
     PodcastTimeline.mark(id, "model prewarm asked")
     do {
@@ -277,7 +278,9 @@ final class PodcastStreamHead: @unchecked Sendable {
         do {
           let piece = TranscriptPiece(lines: AdChunker.number(lines))
           let answer = try await model.findAds(in: piece)
-          modelAds = AdCleanup.run(ranges: answer, transcript: transcript)
+          // At the first model step only the sure answers count; the next step hears more.
+          modelAds = AdCleanup.run(
+            ranges: AdHeadRules.counted(answer, atStep: target), transcript: transcript)
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
@@ -285,9 +288,18 @@ final class PodcastStreamHead: @unchecked Sendable {
         } catch {
           PodcastTimeline.mark(episodeId, "model: no answer (\(error))")
         }
+        // The next model step gets a session that is made and asked to prewarm now.
+        if Self.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }
       }
       index += 1
     }
+  }
+
+  /// A model session for one request, made now and asked to prewarm. Nil when there is no model.
+  private static func warmDetector() -> PrewarmableAdDetector? {
+    let detector = AppleAds.makeWarmDetector()
+    detector?.prewarm()
+    return detector
   }
 
   private static func transcript(

@@ -26,9 +26,17 @@ public enum AdHeadRules {
   public static let near = 2
 
   /// The seconds of audio after which each step of a stream's head scan ends (the phone's steps).
-  public static let steps: [Double] = [30, 60, 90, 120, 150, 180]
+  public static let steps: [Double] = [15, 30, 60, 90, 120, 150, 180]
   /// The steps after which the on-device model is asked.
-  public static let modelSteps: Set<Double> = [60, 180]
+  public static let modelSteps: Set<Double> = [30, 60, 120, 180]
+  /// At this step (and any before it) only the model's sure answers count; an unsure one waits for
+  /// the next model step, when the model has heard more of the ad.
+  public static let sureOnlyStep = 30.0
+
+  /// The model's answer at `step`, as far as it counts.
+  public static func counted(_ answer: [AdRange], atStep step: Double) -> [AdRange] {
+    step <= sureOnlyStep ? answer.filter { $0.confidence == .sure } : answer
+  }
 
   /// The steps for a head of `seconds`: the phone's steps up to it, and the end itself when it
   /// falls between two (a head of 100 seconds ends with a step of 100). Never past the last step.

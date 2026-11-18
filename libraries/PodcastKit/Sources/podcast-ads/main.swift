@@ -12,10 +12,10 @@
 // says for each ad whether a listener who pressed play at 0:00 would have had it skipped. With
 // --head N --timings (an MP3 file) it runs the first N seconds down the path a stream takes
 // on the phone (the head transcriber, cuts of the file's first bytes, the text rules after each
-// 30 second step, the model at 60 and 180 s), twice in one process (cold, then warm), and
-// prints the time of each step. With --probe it downloads the first 3 MB of an episode
-// address twice as two different listeners and prints where the two copies differ (no
-// speech or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
+// step of 15, 30, 60 s and so on, the model at 30, 60, 120 and 180 s), twice in one process
+// (cold, then warm), and prints the time of each step. With --probe it downloads the first 3 MB
+// of an episode address twice as two different listeners and prints where the two copies differ
+// (no speech or model needed). Needs macOS 26 with Apple Intelligence on, except for --probe. Where there
 // is no Foundation Models framework (Linux) it only says so, so `swift build` and `swift test`
 // still work there.
 import Foundation

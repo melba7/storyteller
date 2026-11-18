@@ -142,12 +142,13 @@ nothing and use no keys.
 `Time the first minute of an episode.command` asks for an MP3 file and runs
 `podcast-ads --head 90 --timings`. It follows the path a stream takes on the
 phone: one speech analyzer made ready ahead, the start of the file cut at a
-whole MP3 frame in 30 second steps (30, 60, 90), each step transcribed, the text
-rules run after each step, and the ad model asked at 60 seconds (with a session
-warmed ahead) and at 180 seconds (with a fresh one) when the head reaches them.
-A stall or an error here is one the phone would meet too. It does all of this
-twice in one go, so you see a cold run (the app just opened) and a warm one.
-Each run prints, in seconds since that run began:
+whole MP3 frame in steps (15, 30, 60, 90 seconds), each step transcribed, the
+text rules run after each step, and the ad model asked at 30 seconds (only its
+sure answers count then) and at 60 seconds, and at 120 and 180 seconds when the
+head reaches them. Each time the model gets a session that was warmed after the
+last answer. A stall or an error here is one the phone would meet too. It does
+all of this twice in one go, so you see a cold run (the app just opened) and a
+warm one. Each run prints, in seconds since that run began:
 
 - **speech ready**: Apple's speech model loaded. The warm run should be close to
   zero.
@@ -156,6 +157,9 @@ Each run prints, in seconds since that run began:
 - **rules at N s**: the text rules after that step, with the ads they found.
 - **model at N s**: the ad model's answer, with how long it took. The last time
   on a run is how long the first 90 seconds of a stream take to check.
+
+In the warm run, the "rules at 15 s" line should come under 2 seconds and the
+"model at 30 s" line under 6 seconds.
 
 Then it lists the ads left at the end. It saves the text next to the file as
 `<file name>.head-timings.txt`. Under 10 seconds on the Mac is good. A phone is
