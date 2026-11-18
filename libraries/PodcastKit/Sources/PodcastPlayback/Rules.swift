@@ -45,15 +45,21 @@ public enum ResumeRule {
 public enum PlayedRule {
   /// Stopping this close to the end counts as played.
   public static let nearEnd = 5.0
+  /// A clock that overshoots the end by this much is still at the end.
+  public static let pastEndSlack = 1.0
 
   /// `within` is how many seconds from the end count as played: the listener's setting (see
-  /// PlaybackSettings.markPlayedWhenLeft), never less than `nearEnd`.
+  /// PlaybackSettings.markPlayedWhenLeft), never less than `nearEnd`. A place more than
+  /// `pastEndSlack` past the length is not the end: the length is the feed's guess (the audio
+  /// has not told its own yet), so the episode is not played.
   public static func isPlayed(
     position: Double, duration: Double?, reachedEnd: Bool, within: Double = nearEnd
   ) -> Bool {
     if reachedEnd { return true }
     guard let duration, duration.isFinite, duration > 0, position.isFinite else { return false }
-    return duration - position <= max(within, nearEnd)
+    let left = duration - position
+    if left < -pastEndSlack { return false }
+    return left <= max(within, nearEnd)
   }
 }
 

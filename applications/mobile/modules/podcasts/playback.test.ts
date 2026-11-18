@@ -426,6 +426,37 @@ describe("the next button starting another episode", () => {
   })
 })
 
+describe("switching away before the real length is known", () => {
+  it("keeps a resume past the feed's length unplayed", async () => {
+    const { playback, deps, state } = setup()
+    await playback.playEpisode(
+      episode({ positionSeconds: 3660, durationSeconds: 3600 }),
+      show,
+    )
+    // Until the audio loads, Swift reports the feed's length and the place as the seek target.
+    state(3660, false, { duration: 3600, isBuffering: true })
+    deps.savePlayback.mockClear()
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    expect(deps.savePlayback).toHaveBeenCalledWith("e1", 3660, false, true)
+  })
+
+  it("keeps it unplayed with the mark-played setting on, too", async () => {
+    const { playback, deps, state } = setup()
+    deps.playedWithin.mockReturnValue(60)
+    await playback.playEpisode(
+      episode({ positionSeconds: 3660, durationSeconds: 3600 }),
+      show,
+    )
+    state(3660, false, { duration: 3600, isBuffering: true })
+    expect(deps.savePlayback).not.toHaveBeenCalledWith(
+      "e1",
+      3660,
+      true,
+      expect.anything(),
+    )
+  })
+})
+
 describe("playFrom", () => {
   it("loads a new episode at the given second, even if it was played", async () => {
     const { playback, native } = setup()

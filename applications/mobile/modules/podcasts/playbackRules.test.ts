@@ -103,6 +103,13 @@ describe("resumeStart and isPlayed", () => {
     expect(isPlayed(594, 600, false)).toBe(false)
     expect(isPlayed(595, null, false)).toBe(false)
   })
+
+  it("does not count a place well past the length: the length is wrong, not the end", () => {
+    expect(isPlayed(3660, 3600, false)).toBe(false)
+    expect(isPlayed(3660, 3600, false, 60)).toBe(false)
+    // A hair past the end is the end (a clock that overshoots by a fraction).
+    expect(isPlayed(600.4, 600, false)).toBe(true)
+  })
 })
 
 describe("showsMiniPlayer", () => {

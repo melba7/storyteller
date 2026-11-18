@@ -184,9 +184,12 @@ final class PodcastPlayer {
   func startPlaying() {
     wantsToPlay = true
     try? AVAudioSession.sharedInstance().setActive(true)
-    // A finished episode starts over. This reads the clock, not `place`: a resume past the feed's
-    // length is a seek on its way, and it must not start over.
-    if let duration = currentDuration, position >= duration - 0.5 { seek(to: 0) }
+    // A finished episode starts over. It must be finished by the clock and by the listener's place:
+    // a resume past the feed's length is a seek on its way (the clock is behind it), and a scrub
+    // back after the end is a seek on its way too (the place is behind it). Neither starts over.
+    if let duration = currentDuration, position >= duration - 0.5, place >= duration - 0.5 {
+      seek(to: 0)
+    }
     rewindAfterLongPause()
     player.defaultRate = Float(speed.value)
     player.play()
@@ -306,6 +309,9 @@ final class PodcastPlayer {
   }
 
   func publish(positionOverride: Double? = nil, refreshCard: Bool = true) {
+    // A failed item's clock reads 0. The failure's own notice may still be on its way, so it is
+    // noted here too, and the 0 is never sent as the place.
+    if player.currentItem?.status == .failed { recovery.itemFailed() }
     let place = positionOverride ?? self.place
     sink?("onPlaybackState", stateObject(position: place))
     guard refreshCard else { return }

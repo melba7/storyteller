@@ -312,6 +312,9 @@ in `FORK.md`.
 | 2026-11-18 | A show's refresh notifies the screens only when `feedChanged` says so; `refreshAllShows` notifies once at the end                          | 30 shows caused 30 reloads of every open list              |
 | 2026-11-18 | `ResumeRule.start` and `resumeStart` ignore the feed's length: only a played mark or an unusable place starts at 0:00                      | Feed lengths are often short and the place was lost        |
 | 2026-11-18 | The end-of-chapter sleep cancels only on the listener's seek (`sleepSeeked`); a jump by the player past the end pauses                     | An ad skip cancelled it and playback ran all night         |
+| 2026-11-18 | `isPlayed` (JS and Swift) is false for a place over 1 s past the length: that length is the feed's, not the audio's                        | Switching away before load marked the episode played       |
+| 2026-11-18 | Chapter moves, the chapter sleep and the plain-address fallback read `place`; Play restarts a finished episode only if the place agrees    | A seek on its way must count as where the listener is      |
+| 2026-11-18 | `publish` notes a failed item itself, so a failed clock's 0 is never sent as the place                                                     | The failure notice and the tick run in no fixed order      |
 
 ## Known problems
 

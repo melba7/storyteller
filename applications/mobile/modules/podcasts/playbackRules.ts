@@ -8,6 +8,8 @@ export const SKIP_BACK_SECONDS = 10
 export const SKIP_AHEAD_SECONDS = 45
 export const SAVE_EVERY_MS = 15_000
 const PLAYED_WITHIN_SECONDS = 5
+/** A clock that overshoots the end by this much is still at the end. */
+const PAST_END_SLACK_SECONDS = 1
 
 /** "0:05", "12:34", "1:02:03". Not a number or negative reads as "0:00". */
 export function formatTime(seconds: number): string {
@@ -74,6 +76,8 @@ export function resumeStart(
 /**
  * Played to its end, or stopped within 5 seconds of the end. `within` is the listener's
  * "mark played when this many seconds are left" (0 is off); it never shrinks the 5 seconds.
+ * A place more than a second past the length is not the end: the length is the feed's
+ * guess (the audio has not told its own yet), so the episode is not played.
  */
 export function isPlayed(
   position: number,
@@ -83,7 +87,9 @@ export function isPlayed(
 ): boolean {
   if (reachedEnd) return true
   if (duration === null || !(duration > 0)) return false
-  return duration - position <= Math.max(within, PLAYED_WITHIN_SECONDS)
+  const left = duration - position
+  if (left < -PAST_END_SLACK_SECONDS) return false
+  return left <= Math.max(within, PLAYED_WITHIN_SECONDS)
 }
 
 /** One save of the listener's place, as far as a list could show it. */

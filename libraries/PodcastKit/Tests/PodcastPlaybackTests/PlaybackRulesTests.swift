@@ -127,6 +127,14 @@ final class PlayedRuleTests: XCTestCase {
     XCTAssertFalse(PlayedRule.isPlayed(position: 0, duration: 600, reachedEnd: false))
   }
 
+  func testAPlaceWellPastTheLengthIsNotTheEnd() {
+    XCTAssertFalse(PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: false))
+    XCTAssertFalse(
+      PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: false, within: 60))
+    XCTAssertTrue(PlayedRule.isPlayed(position: 600.4, duration: 600, reachedEnd: false))
+    XCTAssertTrue(PlayedRule.isPlayed(position: 3660, duration: 3600, reachedEnd: true))
+  }
+
   func testUnknownDurationNeverCountsWithoutTheEnd() {
     XCTAssertFalse(PlayedRule.isPlayed(position: 595, duration: nil, reachedEnd: false))
     XCTAssertFalse(PlayedRule.isPlayed(position: 595, duration: 0, reachedEnd: false))

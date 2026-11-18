@@ -116,21 +116,25 @@ extension PodcastPlayer {
 
   // MARK: Moving between chapters
 
+  // These four read `place`, not the clock: a seek on its way (a far scrub on a stream) is where
+  // the listener already is, so two quick presses of next count as two, and the sleep timer's
+  // chapter is the one the listener sees.
+
   /// Whether a chapter starts after the playhead (for the headphones' next button).
   var chapterAhead: Bool {
-    ChapterRules.nextTarget(at: position, in: ChapterState.shared.chapters) != nil
+    ChapterRules.nextTarget(at: place, in: ChapterState.shared.chapters) != nil
   }
 
   func previousChapter() {
     let chapters = ChapterState.shared.chapters
     guard !chapters.isEmpty else { return }
-    seek(to: ChapterRules.previousTarget(at: position, in: chapters))
+    seek(to: ChapterRules.previousTarget(at: place, in: chapters))
   }
 
   /// Goes to the next chapter; false when there is none.
   @discardableResult
   func nextChapter() -> Bool {
-    guard let target = ChapterRules.nextTarget(at: position, in: ChapterState.shared.chapters)
+    guard let target = ChapterRules.nextTarget(at: place, in: ChapterState.shared.chapters)
     else { return false }
     seek(to: target)
     return true
@@ -139,7 +143,7 @@ extension PodcastPlayer {
   /// Where the chapter playing now ends, for the sleep timer.
   func currentChapterEnd() -> Double? {
     let chapters = ChapterState.shared.chapters
-    guard let index = ChapterRules.current(at: position, in: chapters) else { return nil }
+    guard let index = ChapterRules.current(at: place, in: chapters) else { return nil }
     return ChapterRules.end(of: index, in: chapters, duration: currentDuration)
   }
 

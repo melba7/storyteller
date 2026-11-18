@@ -114,3 +114,6 @@ One line per lesson.
   confirmed by Opus).
 - `yarn oxfmt` on one file does not sort imports, but `check.sh` formats
   directories and does: run it on the directories (2026-11-18).
+- A value that the native player reports before the audio loads (the feed's
+  length) is a guess: a rule that compares the place with it, like "played",
+  must not read a place past it as the end (2026-11-18, found by Opus).
