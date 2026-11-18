@@ -1,72 +1,31 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useRouter, useSegments } from "expo-router"
-import {
-  Baby,
-  BookOpen,
-  Briefcase,
-  Church,
-  Clapperboard,
-  Cpu,
-  Fingerprint,
-  FlaskConical,
-  GraduationCap,
-  HeartPulse,
-  Landmark,
-  Laugh,
-  type LucideIcon,
-  Music,
-  Newspaper,
-  Palette,
-  Podcast,
-  Scroll,
-  Sofa,
-  Trophy,
-  Users,
-} from "lucide-react-native"
-import { ActivityIndicator, View, useWindowDimensions } from "react-native"
+import { useMemo } from "react"
+import { ActivityIndicator, View } from "react-native"
 
 import { Text } from "@/components/ui/text"
-import { categoryColors } from "@/modules/podcasts/categoryColors"
-import { CHART_CATEGORIES, TOP_CHART } from "@/modules/podcasts/charts"
+import { pickForYou } from "@/modules/podcasts/categories"
+import { planChartLists } from "@/modules/podcasts/chartLists"
+import { TOP_CHART } from "@/modules/podcasts/charts"
 import { featuredCards } from "@/modules/podcasts/featured"
 import { categoryHref } from "@/modules/podcasts/routes"
 
+import { CategoryTiles } from "./CategoryTiles"
 import { useOpenPreview } from "./ChartRow"
+import { ChartShelves } from "./ChartShelves"
 import { FeaturedCards } from "./FeaturedCards"
-import { PressableScale } from "./PressableScale"
 import { SectionHeader } from "./SectionHeader"
 import { ShowShelf } from "./ShowShelf"
 import { useChart, useForYou } from "./discoverHooks"
+import { useShows } from "./hooks"
+import { useChartLists } from "./useChartLists"
 
 /** How many of the top chart the "Top Shows" shelf holds; the chart page has all of it. */
 const TOP_SHELF = 25
 
-/** One icon per Apple category id. A category without one gets the podcast icon. */
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  "1301": Palette,
-  "1321": Briefcase,
-  "1303": Laugh,
-  "1304": GraduationCap,
-  "1483": BookOpen,
-  "1511": Landmark,
-  "1512": HeartPulse,
-  "1487": Scroll,
-  "1305": Baby,
-  "1502": Sofa,
-  "1310": Music,
-  "1489": Newspaper,
-  "1314": Church,
-  "1533": FlaskConical,
-  "1324": Users,
-  "1545": Trophy,
-  "1318": Cpu,
-  "1488": Fingerprint,
-  "1309": Clapperboard,
-}
-
 /**
  * What New shows, Apple's way: the featured cards, "Top Shows >" with ranks, "For You >"
- * (one shelf per category you follow) and the categories.
+ * (one shelf per category you follow), a chart for every other category and the tiles.
  */
 export function DiscoverBrowse() {
   const router = useRouter()
@@ -76,6 +35,22 @@ export function DiscoverBrowse() {
   const top = useChart(TOP_CHART)
   const topShows = top.data ?? []
   const cards = featuredCards(topShows, forYou)
+  // The lists under "For You": New has its own "Top Shows" and shows the "For You" categories
+  // above, so neither comes twice. They load in groups after the followed shows are known,
+  // so the cards and "Top Shows" above never wait for them.
+  const shows = useShows()
+  const lists = useMemo(() => {
+    const followed = shows.data ?? []
+    const omit = [
+      TOP_CHART,
+      ...pickForYou(followed).map((pick) => pick.category.id),
+    ]
+    return planChartLists(followed, "new", omit)
+  }, [shows.data])
+  const charts = useChartLists(
+    lists.map((list) => list.id),
+    !shows.loading,
+  )
   return (
     <View className="pt-2">
       {top.loading ? (
@@ -132,65 +107,12 @@ export function DiscoverBrowse() {
         </View>
       ))}
 
+      <ChartShelves lists={lists} states={charts.states} />
+
       <SectionHeader title="Categories" />
       <View className="px-4">
         <CategoryTiles />
       </View>
-    </View>
-  )
-}
-
-const GRID_GAP = 12
-const TILE_RATIO = 0.6
-
-/**
- * The categories as a two-column grid of tiles inside the screen's 16 pt gutters: a gradient
- * of the category's colour, its name in bold white at the bottom left and a large symbol in
- * a lighter shade at the top right. Each opens the category's chart.
- */
-export function CategoryTiles() {
-  const router = useRouter()
-  const segments = useSegments()
-  const { width } = useWindowDimensions()
-  const tile = Math.max(1, Math.floor((width - 32 - GRID_GAP) / 2))
-  return (
-    <View className="flex-row flex-wrap" style={{ gap: GRID_GAP }}>
-      {CHART_CATEGORIES.map((category) => {
-        const { from, to, symbol } = categoryColors(category.id)
-        const Symbol = CATEGORY_ICONS[category.id] ?? Podcast
-        return (
-          <PressableScale
-            key={category.id}
-            style={{ width: tile }}
-            accessibilityRole="button"
-            accessibilityLabel={`${category.name}, top podcasts`}
-            onPress={() => router.push(categoryHref(category.id, segments))}
-          >
-            <View
-              className="justify-end overflow-hidden rounded-xl p-3"
-              style={{
-                height: Math.round(tile * TILE_RATIO),
-                backgroundImage: `linear-gradient(135deg, ${from}, ${to})`,
-              }}
-              accessible={false}
-            >
-              <View style={{ position: "absolute", top: 10, right: 10 }}>
-                <Symbol
-                  size={Math.round(tile * 0.36)}
-                  strokeWidth={1.5}
-                  color={symbol}
-                />
-              </View>
-              <Text
-                className="text-xl leading-6 font-bold text-white"
-                numberOfLines={2}
-              >
-                {category.name}
-              </Text>
-            </View>
-          </PressableScale>
-        )
-      })}
     </View>
   )
 }

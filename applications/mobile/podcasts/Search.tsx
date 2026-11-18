@@ -9,7 +9,7 @@ import { type DirectoryShow } from "@/modules/podcasts/directory"
 import { isFollowLink } from "@/modules/podcasts/followLinkText"
 import { type SpokenResult } from "@/modules/podcasts/spokenSearch"
 
-import { CategoryTiles } from "./DiscoverBrowse"
+import { CategoryTiles } from "./CategoryTiles"
 import { EpisodeRow } from "./EpisodeRow"
 import { ScreenBar } from "./ScreenBar"
 import {

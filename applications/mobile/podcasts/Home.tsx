@@ -16,9 +16,9 @@ import {
   upNextHref,
 } from "@/modules/podcasts/routes"
 
+import { CategoryTiles } from "./CategoryTiles"
 import { useOpenPreview } from "./ChartRow"
 import { ChartShelves } from "./ChartShelves"
-import { CategoryTiles } from "./DiscoverBrowse"
 import { EmptyState } from "./EmptyState"
 import { ScreenBar } from "./ScreenBar"
 import { SectionHeader } from "./SectionHeader"
