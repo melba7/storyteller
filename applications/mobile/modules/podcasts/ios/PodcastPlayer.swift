@@ -60,6 +60,9 @@ final class PodcastPlayer {
   private var seekCount = 0
   /// Play is waiting a moment for the first look at a stream's start (PodcastPlayer+StartHold).
   var startHold: PodcastStartHold?
+  /// The last good place and whether the item failed, so Play can start it again
+  /// (PodcastPlayer+Reload.swift).
+  var recovery = PlayRecovery()
 
   private init() {
     lockScreen.onCommand = { [weak self] command in self?.handle(command) }
@@ -150,6 +153,7 @@ final class PodcastPlayer {
       savedPosition: episode.savedPosition, duration: episode.duration, played: episode.played,
       intro: showState.settings.introSeconds)
     itemStart = start
+    recovery.loaded(startingAt: start)
     if start > 0 { movePlayhead(to: start) }
     noteSaved(
       .skipping,
@@ -170,6 +174,7 @@ final class PodcastPlayer {
 
   func play() {
     guard player.currentItem != nil else { return }
+    if reloadIfFailed() { return }
     // A stream nothing is known about may wait a moment first; a second tap ends that wait.
     if holdTheStart() { return }
     startPlaying()
@@ -211,6 +216,7 @@ final class PodcastPlayer {
     sound.seeked(to: target)
     chapterSeeked(to: target)
     movePlayhead(to: target)
+    recovery.moved(to: target)
     // Report the new place at once, before the seek has finished.
     publish(positionOverride: target)
   }
@@ -269,10 +275,12 @@ final class PodcastPlayer {
   }
 
   /// Where the episode is for the listener: where a seek that is on its way is going, else the
-  /// clock. Used for what is shown, saved and skipped from. Ads, silence, chapters, the sleep
-  /// timer and the statistics decide about audio that is heard, so they read `position`.
+  /// clock, and after a failure the last good place. Used for what is shown, saved and skipped
+  /// from. Ads, silence, chapters, the sleep timer and the statistics decide about audio that
+  /// is heard, so they read `position`.
   var place: Double {
-    Playhead.place(reported: position, seekPending: seekPending, seekTarget: seekTarget)
+    let clock = Playhead.place(reported: position, seekPending: seekPending, seekTarget: seekTarget)
+    return recovery.place(reported: clock)
   }
 
   var currentDuration: Double? {
@@ -350,6 +358,8 @@ final class PodcastPlayer {
 
   private func tick() {
     ticks += 1
+    // Only an item that is ready has a clock worth remembering (a failing one reads 0).
+    if player.currentItem?.status == .readyToPlay { recovery.noted(place) }
     statsTick()
     endAtOutroIfReached()
     chapterTick()
@@ -372,6 +382,7 @@ final class PodcastPlayer {
   private func itemStatusChanged(_ failure: String?) {
     if let failure {
       wantsToPlay = false
+      recovery.itemFailed()
       emitError(episodeId, readableFailure(failure))
     }
     publish()
@@ -383,6 +394,7 @@ final class PodcastPlayer {
 
   private func failed(_ message: String) {
     wantsToPlay = false
+    recovery.itemFailed()
     emitError(episodeId, readableFailure(message))
     publish()
   }
