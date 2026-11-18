@@ -34,13 +34,48 @@ final class ChapterAdsTests: XCTestCase {
     let ads = ChapterAds.find(marks: chapters, transcript: spoken, episodeDuration: 800)
     XCTAssertEqual(ads.count, 1)
     let ad = try XCTUnwrap(ads.first)
-    XCTAssertEqual(ad.start, 600, accuracy: 0.001)
+    // The first line that sells is line 65 (640 s): the ad starts a quarter second before it.
+    XCTAssertEqual(ad.start, 639.75, accuracy: 0.001)
     // The end lands a quarter second before the first word of the show (line 70 starts at 690).
     XCTAssertEqual(ad.end, 689.75, accuracy: 0.001)
     XCTAssertEqual(ad.kind, .ad)
     XCTAssertEqual(ad.confidence, .sure)
     XCTAssertEqual(ad.advertiser, "Squarespace")
-    XCTAssertTrue(ad.firstWords.hasPrefix("plain talk number 61"))
+    XCTAssertTrue(ad.firstWords.hasPrefix("go to squarespace dot com"))
+  }
+
+  func testTheAdStartsAtTheFirstSellingLineWhenInsertedAdsPushedTheReadLater() throws {
+    // The chapter says 600 to 690, but the real read runs 630 to 720: its first 30 s are talk.
+    let spoken = transcript([
+      64: "this episode is brought to you by squarespace", 65: "go to squarespace dot com slash show",
+      66: "squarespace makes it simple",
+    ])
+    let ad = try XCTUnwrap(
+      ChapterAds.find(marks: chapters, transcript: spoken, episodeDuration: 800).first)
+    // The first selling line is line 64 (630 s): a quarter second before its first word.
+    XCTAssertEqual(ad.start, 629.75, accuracy: 0.001)
+    XCTAssertEqual(ad.end, 689.75, accuracy: 0.001)
+    XCTAssertEqual(ad.confidence, .sure)
+    XCTAssertTrue(ad.firstWords.hasPrefix("this episode is brought to you by"))
+  }
+
+  func testAReadThatStartsWithTheChapterStartsWithIt() throws {
+    let spoken = transcript([
+      61: "this episode is brought to you by squarespace", 65: "go to squarespace dot com slash show",
+    ])
+    let ad = try XCTUnwrap(
+      ChapterAds.find(marks: chapters, transcript: spoken, episodeDuration: 800).first)
+    XCTAssertEqual(ad.start, 600, accuracy: 0.001)
+    XCTAssertEqual(ad.end, 689.75, accuracy: 0.001)
+  }
+
+  func testALeadInStartsTheAdBeforeTheLineThatSells() throws {
+    let spoken = transcript([
+      63: "and now a word from our friends", 65: "go to squarespace dot com slash show",
+    ])
+    let ad = try XCTUnwrap(
+      ChapterAds.find(marks: chapters, transcript: spoken, episodeDuration: 800).first)
+    XCTAssertEqual(ad.start, 619.75, accuracy: 0.001)
   }
 
   func testTheSameChapterWithPlainTalkInsideIsNoAd() {
@@ -108,7 +143,7 @@ final class ChapterAdsTests: XCTestCase {
     XCTAssertEqual(ChapterAds.find(marks: marks, transcript: spoken, episodeDuration: nil), [])
     let ad = try XCTUnwrap(
       ChapterAds.find(marks: marks, transcript: spoken, episodeDuration: 780).first)
-    XCTAssertEqual(ad.start, 700, accuracy: 0.001)
+    XCTAssertEqual(ad.start, 739.75, accuracy: 0.001)  // line 75 is the first that sells
     XCTAssertEqual(ad.end, 780, accuracy: 0.3)
   }
 
@@ -133,7 +168,7 @@ final class ChapterAdsTests: XCTestCase {
     ])
     let ad = try XCTUnwrap(
       ChapterAds.find(marks: chapters, transcript: spoken, episodeDuration: 800).first)
-    XCTAssertEqual(ad.start, 600, accuracy: 0.001)
+    XCTAssertEqual(ad.start, 629.75, accuracy: 0.001)  // line 64 is the first that sells
     // Line 66 is the last before the return cue (line 67 starts at 660): the ad ends a quarter
     // second before its first word, as any ad does.
     XCTAssertEqual(ad.end, 659.75, accuracy: 0.001)

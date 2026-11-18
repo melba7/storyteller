@@ -4,8 +4,9 @@
 // an ad's edges exactly, but a host that inserts ads does not move its chapters, so a chapter can
 // lie late by the length of the ads before it (RSS.com says so in its help). So a chapter is an
 // ad only when the words inside it sell: a web address, a promo code, "brought to you by" or the
-// name in the title. And nothing here makes a skip longer: an ad the model found is only cut
-// short by a chapter, never stretched. Foundation only.
+// name in the title. The ad starts at the first line that sells or opens a sponsor read, and
+// nothing here makes a skip longer: an ad the model found is only cut short by a chapter, never
+// stretched. Foundation only.
 import Foundation
 import PodcastTranscripts
 
@@ -92,7 +93,13 @@ public enum ChapterAds {
       guard inside.contains(where: { sells($0.text, sponsorNames) }) else { continue }
       var end = limit
       if let back = showIsBack(in: inside, names: sponsorNames) { end = inside[back - 1].end }
-      let landed = AdLanding.edges(start: mark.start, end: end, words: transcript.words)
+      // Inserted ads may have pushed the real read later than its chapter: the ad starts at the
+      // first line that sells or opens a sponsor read, not at the chapter's start.
+      let first = inside.first {
+        sells($0.text, sponsorNames) || AdSignals.matches(AdSignals.leadIns, $0.text)
+      }
+      let landed = AdLanding.edges(
+        start: max(mark.start, first?.start ?? mark.start), end: end, words: transcript.words)
       // Landing may only shorten: not before the chapter's start, not after its end.
       let start = max(mark.start, landed.start)
       let stop = min(limit, landed.end)
