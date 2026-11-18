@@ -234,6 +234,18 @@ in `FORK.md`.
 | 2026-11-17 | Mini players are Liquid Glass capsules (`expo-glass-effect`), `bg-secondary` before iOS 26; the reader's scrubber sits above               | Apple's look, seek stays easy to hit                       |
 | 2026-11-17 | The listening player is washed with the cover's colour (`artworkColor`) under 50% black, with white text and a light status bar            | Readable on any cover                                      |
 | 2026-11-17 | The home screen shows "Storyteller+"; TestFlight and the App Store show the App Store Connect record's name until Mo renames it            | Bundle id unchanged                                        |
+| 2026-11-18 | Covers ask Apple's image server for a size (160, 320, 640 or 1280 px) from the frame's points times the screen scale, the original second  | Sharp covers; the 100 px thumbnails looked blurry          |
+| 2026-11-18 | New's featured cards are square and filled edge to edge by the cover, with the label and title on a fade                                   | No small cover in a coloured box                           |
+| 2026-11-18 | Chart lists load in groups of three with one lookup each; one in-flight promise per list is shared by every chart loader                   | Stays under Apple's ~20 lookups a minute                   |
+| 2026-11-18 | A chart is fresh for 24 h; an older kept copy (up to 7 days) is drawn at once and kept when a fetch fails or comes back empty              | Offline, Home and New still have their lists               |
+| 2026-11-18 | Each list is loading, ready or missing (pure `applyListEvent`); a missing list draws nothing, heading included                             | One failing chart never blanks the page                    |
+| 2026-11-18 | Home: Top Shows, Top Episodes and 8 "Top in ..." shelves under its own; New: every other category; one planner (`chartLists.ts`)           | Mo's ask: a long first page with many lists                |
+| 2026-11-18 | Chart lists wait for the followed shows; New leaves out the categories For You drew, once For You has loaded                               | The order loads once; no category twice                    |
+| 2026-11-18 | Lists retry on pull to refresh (Home and New) and when the tab is focused again; fresh lists cost no request                               | A bad start doesn't leave a page empty                     |
+| 2026-11-18 | Top Episodes joins Apple's episode chart to one lookup of its shows' ids; the preview finds the episode by its title                       | The chart has no guid or audio address                     |
+| 2026-11-18 | Spotify's charts are left out                                                                                                              | Its service failed on its own side in both probes          |
+| 2026-11-18 | The player's "..." menu has at most 10 top-level rows: Share, Chapters and Bookmarks are submenus, and sections have no titles             | iOS 26 would not scroll the tall menu in the sheet         |
+| 2026-11-18 | Worklets call only worklets: an imported helper needs "worklet"; `worklets.test.ts` compiles the podcasts files to check                   | A plain call on the UI thread crashed the play bar         |
 
 ## Known problems
 
