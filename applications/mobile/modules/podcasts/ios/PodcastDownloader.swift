@@ -125,6 +125,10 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     guard let given = URL(string: url), let scheme = given.scheme?.lowercased(),
       scheme == "http" || scheme == "https", given.host != nil
     else { throw PodcastFetchError(message: "This episode has no downloadable link.") }
+    // A download the listener asks for is theirs, also when the app is already fetching this
+    // episode ahead (or has fetched it): the mark comes off before any early return below, so the
+    // file is kept when the episode leaves Up Next. A new entry made below starts unmarked.
+    if !automatic { try store.clearAhead(episodeId: episodeId) }
     // https is tried first. A feed that only serves http gets its original address back once,
     // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS
