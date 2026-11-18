@@ -115,6 +115,12 @@ public enum AppleAds {
           throw AdDetectorError.failed("The on-device model does not support this language")
         default: throw AdDetectorError.failed("\(error)")
         }
+      } catch let error as CancellationError {
+        throw error
+      } catch {
+        // Any other error of the model (iOS 27 brings new types) is read by its names, so a
+        // refusal is no longer the end of the pass: the runner counts the piece as refused.
+        throw AdModelFailure.classify(error)
       }
     }
 
