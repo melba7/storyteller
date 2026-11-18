@@ -1,7 +1,12 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ScrollView, View, useWindowDimensions } from "react-native"
+import { FlatList, View, useWindowDimensions } from "react-native"
 
 import { Text } from "@/components/ui/text"
+import {
+  SHELF_GAP,
+  SHELF_GUTTER,
+  shelfTileSize,
+} from "@/modules/podcasts/homeLook"
 import { type PodcastHref } from "@/modules/podcasts/routes"
 
 import { Artwork } from "./Artwork"
@@ -22,23 +27,36 @@ export type ShelfShow = {
   onPress?: () => void
 }
 
-/** A shelf of square artwork about 45% of the width across, rounded 10 pt, two lines under each. */
+/**
+ * A shelf of square artwork about 45% of the width across, rounded 10 pt, two lines under each.
+ * A horizontal list: it draws a few tiles at first and more as it scrolls, and its fixed tile
+ * length keeps the snapping exact.
+ */
 export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
   const { width: window } = useWindowDimensions()
-  const size = Math.round(window * 0.45)
+  const size = shelfTileSize(window)
   return (
-    <ScrollView
+    <FlatList
       horizontal
+      data={shows}
+      keyExtractor={(show) => show.key}
       showsHorizontalScrollIndicator={false}
       decelerationRate="fast"
-      snapToInterval={size + 12}
+      snapToInterval={size + SHELF_GAP}
       snapToAlignment="start"
-      contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}
-    >
-      {shows.map((show) => {
+      contentContainerStyle={{ paddingHorizontal: SHELF_GUTTER }}
+      ItemSeparatorComponent={() => <View style={{ width: SHELF_GAP }} />}
+      getItemLayout={(_, index) => ({
+        length: size,
+        offset: SHELF_GUTTER + index * (size + SHELF_GAP),
+        index,
+      })}
+      initialNumToRender={3}
+      maxToRenderPerBatch={3}
+      windowSize={5}
+      renderItem={({ item: show }) => {
         const tile = (
           <PressableScale
-            key={show.key}
             style={{ width: size }}
             accessibilityRole="button"
             accessibilityLabel={[
@@ -81,14 +99,8 @@ export function ShowShelf({ shows }: { shows: readonly ShelfShow[] }) {
             </View>
           </PressableScale>
         )
-        return show.href ? (
-          <ZoomLink key={show.key} href={show.href}>
-            {tile}
-          </ZoomLink>
-        ) : (
-          tile
-        )
-      })}
-    </ScrollView>
+        return show.href ? <ZoomLink href={show.href}>{tile}</ZoomLink> : tile
+      }}
+    />
   )
 }

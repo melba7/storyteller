@@ -131,3 +131,25 @@ export function updateCadence(dates: readonly number[], now: number): string {
 export function topShowCaption(show: Pick<Show, "categories" | "title">) {
   return topLevelNames(show.categories)[0] ?? show.title
 }
+
+/** The height of one line of shelf text (Tailwind's `text-lg`: 18 pt on 28 pt). */
+export const SHELF_LINE_HEIGHT = 28
+/** The space between a shelf tile's artwork and its text (Tailwind's `mt-2`). */
+export const SHELF_TEXT_GAP = 8
+/** The space between neighbouring shelf tiles. */
+export const SHELF_GAP = 12
+/** The space at each end of a shelf, which lines it up with the page's text. */
+export const SHELF_GUTTER = 16
+
+/** The side of a shelf tile's square artwork: 45% of the window's width, rounded. */
+export function shelfTileSize(windowWidth: number): number {
+  return Math.round(windowWidth * 0.45)
+}
+
+/**
+ * The height of a shelf: the artwork, the gap, then two lines of text (title and caption),
+ * or three when the shelf shows ranks. The loading shelf uses it too, so they always agree.
+ */
+export function shelfHeight(tileSize: number, ranked: boolean): number {
+  return tileSize + SHELF_TEXT_GAP + (ranked ? 3 : 2) * SHELF_LINE_HEIGHT
+}

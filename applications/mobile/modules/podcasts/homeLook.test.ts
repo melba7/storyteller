@@ -8,6 +8,10 @@ import {
   cardLine,
   cardPalette,
   plainText,
+  SHELF_LINE_HEIGHT,
+  SHELF_TEXT_GAP,
+  shelfHeight,
+  shelfTileSize,
   timeLeftLabel,
   topShowCaption,
   updateCadence,
@@ -177,5 +181,18 @@ describe("the dates SQL", () => {
       800, 700, 600, 500, 400, 300,
     ])
     expect(new Set(found.map((row) => row.show_id))).toEqual(new Set(["s1"]))
+  })
+})
+
+describe("the shelf's measures", () => {
+  it("sizes a tile at 45% of the window, rounded", () => {
+    expect(shelfTileSize(393)).toBe(177)
+    expect(shelfTileSize(430)).toBe(194)
+  })
+
+  it("is one line taller when the shelf shows ranks", () => {
+    const plain = shelfHeight(177, false)
+    expect(plain).toBe(177 + SHELF_TEXT_GAP + 2 * SHELF_LINE_HEIGHT)
+    expect(shelfHeight(177, true)).toBe(plain + SHELF_LINE_HEIGHT)
   })
 })
