@@ -10,6 +10,7 @@ import {
 import { skipAdsFor } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import type { Show, StoredEpisode } from "@/modules/podcasts/library"
+import { usePlayerValue } from "@/modules/podcasts/playerInstance"
 
 import { useSheet } from "./playerSheetContext"
 import { useAdsInfo } from "./useAds"
@@ -58,6 +59,9 @@ export function AdFindingLine({
   const download = useDownload(episode.id)
   const transcript = useTranscript(episode.id)
   const ads = useAdsInfo(episode.id)
+  const streamsPlain = usePlayerValue(
+    (view) => view.episode?.id === episode.id && view.streamsPlain,
+  )
   if (Podcasts === null) return null
   const line = playerAdLine({
     episodeId: episode.id,
@@ -65,6 +69,7 @@ export function AdFindingLine({
     download,
     transcript,
     ads,
+    streamsPlain,
   })
   if (line === "") return null
   return (

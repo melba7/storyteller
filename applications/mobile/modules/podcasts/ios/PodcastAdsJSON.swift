@@ -12,6 +12,9 @@ enum AdsJSON {
     case .finding(let percent): return ["episodeId": id, "state": "finding", "percent": percent]
     case .found(let count), .partialFound(let count):
       return ["episodeId": id, "state": "found", "count": count]
+    case .partlyChecked(let count):
+      // The model refused some pieces: the app says so next to the count (or "no ads").
+      return ["episodeId": id, "state": count > 0 ? "found" : "noAds", "count": count, "unchecked": true]
     case .noneFound: return ["episodeId": id, "state": "noAds"]
     case .notPossible(let reason): return ["episodeId": id, "state": "unavailable", "reason": reason]
     }

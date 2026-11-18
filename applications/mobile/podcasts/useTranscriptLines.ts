@@ -34,7 +34,7 @@ export function useTranscriptLines(
     // Where the listener is now, so a transcript still being made is used if it reaches it.
     const view = player.getView()
     loadTranscript({
-      playhead: view.episode?.id === episode.id ? view.position : 0,
+      playhead: view.episode?.id === episode.id ? view.position : null,
       id: episode.id,
       transcriptUrl: episode.transcriptUrl,
       transcriptType: episode.transcriptType,

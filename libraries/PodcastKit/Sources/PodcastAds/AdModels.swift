@@ -153,3 +153,19 @@ public protocol AdDetector: Sendable {
   var tokenBudget: Int { get }
   func findAds(in piece: TranscriptPiece) async throws -> [AdRange]
 }
+
+extension AdDetectorError: LocalizedError {
+  /// Plain sentences for the listener. Without them the system says "The operation couldn't be
+  /// completed. (PodcastAds.AdDetectorError error 2.)".
+  public var errorDescription: String? {
+    switch self {
+    case .tooLong: return "A part of the transcript was too long for the model."
+    case .unavailable(let reason): return "\(reason.reason)."
+    case .failed(let text):
+      let detail = text.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !detail.isEmpty else { return "The model couldn't finish." }
+      return "The model couldn't finish: \(detail.hasSuffix(".") ? String(detail.dropLast()) : detail)."
+    case .refused: return "The model refused to read a part of the transcript."
+    }
+  }
+}

@@ -37,6 +37,18 @@ describe("adsStatus", () => {
     expect(adsStatus(info("noAds"))).toBe("No ads found")
   })
 
+  it("says when some parts could not be checked", () => {
+    expect(adsStatus(info("noAds", { unchecked: true }))).toBe(
+      "Couldn't check some parts for ads",
+    )
+    expect(adsStatus(info("found", { count: 2, unchecked: true }))).toBe(
+      "2 ads found. Couldn't check some parts",
+    )
+    expect(adsStatus(info("found", { count: 1, unchecked: false }))).toBe(
+      "1 ad found",
+    )
+  })
+
   it("gives the reason when ads can't be found", () => {
     expect(
       adsStatus(info("unavailable", { reason: "Apple Intelligence is off" })),
@@ -273,6 +285,22 @@ describe("unavailableReason", () => {
       },
     ])
     expect(unavailableReason(map)).toBe("Apple Intelligence is off")
+  })
+
+  it("ignores one episode's own failure", () => {
+    const map = adsMapFromList([
+      info("unavailable", { reason: "Finding ads stopped: The model failed." }),
+    ])
+    expect(unavailableReason(map)).toBeNull()
+    const both = adsMapFromList([
+      info("unavailable", { reason: "Finding ads stopped: The model failed." }),
+      {
+        episodeId: "e2",
+        state: "unavailable",
+        reason: "The model is downloading",
+      },
+    ])
+    expect(unavailableReason(both)).toBe("The model is downloading")
   })
 
   it("is null when ads can be found", () => {

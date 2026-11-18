@@ -105,7 +105,8 @@ export async function loadTranscript(episode: {
   transcriptUrl: string | null
   transcriptType: string | null
   device: TranscriptInfo | undefined
-  playhead?: number
+  /** Seconds into the episode that plays; null (or left out) when it is not playing. */
+  playhead?: number | null
 }): Promise<TranscriptResult> {
   const choice = deviceChoice(episode.device)
   const partial =
@@ -118,7 +119,7 @@ export async function loadTranscript(episode: {
     device: episode.device,
     partialCovers:
       partial?.lines != null &&
-      partialCovers(partial.lines, episode.playhead ?? 0),
+      partialCovers(partial.lines, episode.playhead ?? null),
   })
   let reason: string | null = null
   if (source.kind === "feed") {

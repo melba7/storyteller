@@ -57,22 +57,33 @@ export function adsStatus(info: AdsInfo | undefined): string {
       return "Finding ads"
     case "found": {
       const count = Math.max(0, Math.floor(info.count ?? 0))
-      return count === 1 ? "1 ad found" : `${count} ads found`
+      const found = count === 1 ? "1 ad found" : `${count} ads found`
+      return info.unchecked === true
+        ? `${found}. Couldn't check some parts`
+        : found
     }
     case "noAds":
-      return "No ads found"
+      return info.unchecked === true
+        ? "Couldn't check some parts for ads"
+        : "No ads found"
     case "unavailable":
       return info.reason ?? "Can't find ads"
   }
 }
 
+/** How the reason of one episode's own failed run starts (PodcastAdFinder+Retry.swift). */
+const EPISODE_FAILURE_PREFIX = "Finding ads stopped"
+
 /**
  * Why ads can't be found on this phone, when any episode says so ("Apple Intelligence is
- * off"), else null. The reason belongs to the phone, not the episode, so one is enough.
+ * off"), else null. The reason belongs to the phone, not the episode, so one is enough. One
+ * episode's own failure ("Finding ads stopped: ...") is not the phone's reason.
  */
 export function unavailableReason(map: AdsMap): string | null {
   for (const info of Object.values(map)) {
-    if (info.state === "unavailable") return info.reason ?? "Ads can't be found"
+    if (info.state !== "unavailable") continue
+    if (info.reason?.startsWith(EPISODE_FAILURE_PREFIX)) continue
+    return info.reason ?? "Ads can't be found"
   }
   return null
 }

@@ -70,6 +70,8 @@ export type PlaybackState = {
   isBuffering: boolean
   /** 0.5 to 3.0 in tenths. */
   rate: number
+  /** The player plays the episode's plain address, so no ad is skipped. */
+  streamsPlain?: boolean
 }
 
 export type PlaybackLoadOptions = {
@@ -171,6 +173,8 @@ export type AdsInfo = {
   count?: number
   /** Plain words for an unavailable one ("Apple Intelligence is off"). */
   reason?: string
+  /** The model refused some parts of the transcript, so they were not checked for ads. */
+  unchecked?: boolean
 }
 
 /** An episode's ad finding changed, or (state "none") went with its download. */

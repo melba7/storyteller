@@ -58,13 +58,17 @@ export function transcriptSource(input: {
   return deviceSource(input.device)
 }
 
-/** Whether the lines saved so far of a transcript being made reach `playhead` seconds. */
+/**
+ * Whether the lines saved so far of a transcript being made reach `playhead` seconds. The
+ * playhead is null for an episode that is not playing: it has none, so a half-made transcript
+ * never covers it and does not replace a whole feed transcript.
+ */
 export function partialCovers(
   lines: readonly { end: number }[] | null | undefined,
-  playhead: number,
+  playhead: number | null,
 ): boolean {
   const last = lines?.[lines.length - 1]
-  return last !== undefined && last.end >= playhead
+  return playhead !== null && last !== undefined && last.end >= playhead
 }
 
 /** The phone's own transcript, or the reason there is none. */

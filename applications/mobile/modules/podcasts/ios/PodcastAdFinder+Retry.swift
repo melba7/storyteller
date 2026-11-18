@@ -28,6 +28,8 @@ extension PodcastAdFinder {
 
   /// The words for the listener for an error.
   static func reason(for error: Error) -> String {
+    // AdDetectorError has plain sentences of its own. The start of this text is also how
+    // ads.ts tells one episode's failure from a reason that belongs to the phone.
     "Finding ads stopped: \(error.localizedDescription)"
   }
 }

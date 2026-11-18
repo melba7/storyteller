@@ -45,6 +45,8 @@ final class PodcastPlayer {
   private var ticks = 0
   /// Feeds the loaded item from its own download, while there is one (PodcastPlayer+Stream.swift).
   var streamDownload: PodcastStreamDownload?
+  /// The loaded item is the episode's plain address, so no ad is skipped (the app says so).
+  var playsPlainAddress = false
   /// Where the loaded episode was told to start (PodcastPlayer+Stream.swift's fallback).
   var itemStart = 0.0
 
@@ -227,6 +229,7 @@ final class PodcastPlayer {
       "isPlaying": player.timeControlStatus == .playing,
       "isBuffering": wantsToPlay && player.timeControlStatus == .waitingToPlayAtSpecifiedRate,
       "rate": speed.value,
+      "streamsPlain": playsPlainAddress,
     ]
     if let episodeId { object["episodeId"] = episodeId }
     if let duration = currentDuration { object["duration"] = duration }

@@ -506,3 +506,23 @@ final class AdsGrowingPieceTests: XCTestCase {
     XCTAssertEqual(file.refusedPieces, 1)
   }
 }
+
+final class AdDetectorErrorTextTests: XCTestCase {
+  func testEveryFailureReadsAsPlainEnglish() {
+    let errors: [AdDetectorError] = [
+      .tooLong, .unavailable(.appleIntelligenceOff), .failed("boom"), .refused,
+    ]
+    for error in errors {
+      let text = error.localizedDescription
+      XCTAssertFalse(text.contains("error 2"), text)
+      XCTAssertFalse(text.contains("AdDetectorError"), text)
+      XCTAssertTrue(text.hasSuffix("."), text)
+    }
+    XCTAssertEqual(
+      AdDetectorError.unavailable(.appleIntelligenceOff).localizedDescription,
+      "Apple Intelligence is off.")
+    XCTAssertEqual(
+      AdDetectorError.failed("boom").localizedDescription, "The model couldn't finish: boom.")
+    XCTAssertEqual(AdDetectorError.failed("").localizedDescription, "The model couldn't finish.")
+  }
+}

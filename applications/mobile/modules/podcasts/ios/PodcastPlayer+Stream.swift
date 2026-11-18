@@ -12,6 +12,7 @@ extension PodcastPlayer {
   func makeItem(for episode: Episode) -> AVPlayerItem {
     streamDownload?.stop()
     streamDownload = nil
+    playsPlainAddress = false
     if let file = PodcastDownloader.shared.localFile(for: episode.id) {
       return AVPlayerItem(url: file)
     }
@@ -29,7 +30,10 @@ extension PodcastPlayer {
         wifiOnly: DownloadSettings.wifiOnly, onWiFi: PodcastNetwork.shared.onWiFi),
       let loader = PodcastStreamDownload(
         episodeId: episode.id, url: episode.url, type: episode.type)
-    else { return AVPlayerItem(url: episode.url) }
+    else {
+      playsPlainAddress = true
+      return AVPlayerItem(url: episode.url)
+    }
     if waiting { try? PodcastDownloader.shared.cancel(episodeId: episode.id) }
     // The language is noted before the download can finish, as when a download is asked for.
     PodcastTranscriber.shared.noteLanguage(episode.language, for: episode.id)
@@ -56,6 +60,7 @@ extension PodcastPlayer {
     removeItemObservers()
     loader.stop()
     streamDownload = nil
+    playsPlainAddress = true
     if reason == .noLength, let type = current?.type {
       // The ad finder still needs the file; an ordinary download handles any length. stop()
       // forgot the show's language, so it is noted again for the transcriber.

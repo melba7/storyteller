@@ -10,6 +10,9 @@ public enum AdsStatus: Sendable, Equatable {
   /// the episode still waits for its full pass.
   case partialFound(count: Int)
   case noneFound
+  /// A finished run in which the model refused some pieces, so those were not checked. `count`
+  /// is the ads found in the rest, possibly none.
+  case partlyChecked(count: Int)
   /// Not now, with the words for the listener ("Apple Intelligence is off").
   case notPossible(reason: String)
 }
@@ -30,9 +33,7 @@ public enum AdsRules {
     unavailable: AdUnavailable?, failure: String?
   ) -> AdsStatus {
     if let finding { return .finding(percent: finding) }
-    if let file, file.detectorVersion == detectorVersion {
-      return file.ads.isEmpty ? .noneFound : .found(count: file.ads.count)
-    }
+    if let file, file.detectorVersion == detectorVersion { return finished(file) }
     // A failed run is not tried again in a loop, whatever a partial result says.
     if let failure { return .notPossible(reason: failure) }
     if let partial, partial.detectorVersion == detectorVersion, !partial.ads.isEmpty {
@@ -40,6 +41,12 @@ public enum AdsRules {
     }
     if let unavailable { return .notPossible(reason: unavailable.reason) }
     return .waiting
+  }
+
+  /// The status of a finished run: how many ads, and whether some pieces were not checked.
+  public static func finished(_ file: AdsFile) -> AdsStatus {
+    if (file.refusedPieces ?? 0) > 0 { return .partlyChecked(count: file.ads.count) }
+    return file.ads.isEmpty ? .noneFound : .found(count: file.ads.count)
   }
 
   /// Whether the episode is to be queued: a waiting one, or one that has only a partial result.

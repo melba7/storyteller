@@ -151,6 +151,11 @@ describe("partialCovers", () => {
     expect(partialCovers([], 0)).toBe(false)
     expect(partialCovers(null, 0)).toBe(false)
   })
+
+  it("is false for an episode that is not playing, whatever the lines", () => {
+    expect(partialCovers([line(0, 300), line(300, 600)], null)).toBe(false)
+    expect(partialCovers([line(0, 300)], null)).toBe(false)
+  })
 })
 
 describe("the cache", () => {

@@ -46,6 +46,57 @@ describe("playerAdLine", () => {
     )
   })
 
+  it("says it streams without skipping when the player plays the plain address", () => {
+    const line = (download: DownloadInfo | undefined, adsInfo?: AdsInfo) =>
+      playerAdLine({
+        ...base,
+        streamsPlain: true,
+        download,
+        transcript: transcript("done"),
+        ads: adsInfo,
+      })
+    // Nothing on the phone to skip with next time.
+    expect(line(undefined)).toBe("Streaming without ad skipping")
+    expect(line(download("failed"))).toBe("Streaming without ad skipping")
+    // A download exists or is running: the next play will skip, and the ads found are not
+    // claimed as skipped now.
+    const next = "Streaming without ad skipping. Next play will skip ads."
+    expect(line(download("downloading"))).toBe(next)
+    expect(line(download("downloaded"), ads("found", { count: 3 }))).toBe(next)
+    expect(line(download("downloaded"), ads("noAds"))).toBe(next)
+  })
+
+  it("keeps the other lines when the player plays the file", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        streamsPlain: false,
+        download: download("downloaded"),
+        transcript: transcript("done"),
+        ads: ads("found", { count: 3 }),
+      }),
+    ).toBe("3 ads found")
+  })
+
+  it("says nothing about streaming while Skip ads is off or for an added file", () => {
+    expect(
+      playerAdLine({
+        ...base,
+        skipAds: false,
+        streamsPlain: true,
+        download: undefined,
+      }),
+    ).toBe("")
+    expect(
+      playerAdLine({
+        ...base,
+        episodeId: "file-1",
+        streamsPlain: true,
+        download: undefined,
+      }),
+    ).toBe("")
+  })
+
   it("is getting ready while the file arrives or nothing has started", () => {
     const ready = "Getting ready to find ads"
     expect(playerAdLine({ ...base, download: download("queued") })).toBe(ready)
