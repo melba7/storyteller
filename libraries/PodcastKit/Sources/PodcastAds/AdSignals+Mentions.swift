@@ -10,11 +10,15 @@ extension AdSignals {
   /// words or put "dot" next to it: "better help dot com" says "betterhelp". The pieces must
   /// start and end at word edges, with at most one letter left over (a plural), so two plain
   /// words that happen to run together ("the zoo moves") never say "Zoom". A name that is not
-  /// usable (see `usableName`) is never said.
-  public static func mentions(_ text: String, name: String) -> Bool {
+  /// usable (see `usableName`) is never said. With `wholeWord` a name is only said as a whole
+  /// word, never inside a longer one ("time" is not in "sometimes" or "times"); that is for a name
+  /// that is only a guess, such as the site of a link.
+  public static func mentions(_ text: String, name: String, wholeWord: Bool = false) -> Bool {
     guard usableName(name) else { return false }
     let wanted = name.trimmingCharacters(in: .whitespacesAndNewlines)
-    if text.range(of: wanted, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
+    if wholeWord {
+      if containsWord(wanted, in: text) { return true }
+    } else if text.range(of: wanted, options: [.caseInsensitive, .diacriticInsensitive]) != nil {
       return true
     }
     let key = pieces(of: wanted).joined()
@@ -25,11 +29,30 @@ extension AdSignals {
       for piece in spoken[first...].prefix(mostPieces) {
         joined += piece
         if joined.count >= key.count {
-          if joined.hasPrefix(key), joined.count - key.count <= 1 { return true }
+          if joined.hasPrefix(key), joined.count - key.count <= (wholeWord ? 0 : 1) { return true }
           break
         }
         if !key.hasPrefix(joined) { break }
       }
+    }
+    return false
+  }
+
+  /// Whether the name stands in the text with no letter or digit right before or after it.
+  private static func containsWord(_ name: String, in text: String) -> Bool {
+    let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+    let folded = text.folding(options: options, locale: nil)
+    let wanted = name.folding(options: options, locale: nil)
+    var from = folded.startIndex
+    while let found = folded.range(of: wanted, range: from..<folded.endIndex) {
+      let before = found.lowerBound > folded.startIndex ? folded[folded.index(before: found.lowerBound)] : nil
+      let after = found.upperBound < folded.endIndex ? folded[found.upperBound] : nil
+      if !(before?.isLetter ?? false), !(before?.isNumber ?? false), !(after?.isLetter ?? false),
+        !(after?.isNumber ?? false)
+      {
+        return true
+      }
+      from = folded.index(after: found.lowerBound)
     }
     return false
   }

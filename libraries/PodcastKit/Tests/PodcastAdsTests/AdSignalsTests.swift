@@ -99,6 +99,22 @@ final class AdSignalsTests: XCTestCase {
     XCTAssertFalse(AdSignals.mentions("the mat is wet", name: "them"))
   }
 
+  func testAGuessedNameIsOnlyFoundAsAWholeWord() {
+    XCTAssertFalse(AdSignals.mentions("sometimes I wonder", name: "time", wholeWord: true))
+    XCTAssertFalse(AdSignals.mentions("so many times", name: "time", wholeWord: true))
+    XCTAssertFalse(AdSignals.mentions("the zoo moves at night", name: "Zoom", wholeWord: true))
+    XCTAssertTrue(AdSignals.mentions("time", name: "time", wholeWord: true))
+    XCTAssertTrue(AdSignals.mentions("go to time dot com", name: "time", wholeWord: true))
+    XCTAssertTrue(AdSignals.mentions("go to time.com/pod", name: "time", wholeWord: true))
+    XCTAssertTrue(AdSignals.mentions("we love Quokka's mattress", name: "Quokka", wholeWord: true))
+    XCTAssertTrue(
+      AdSignals.mentions("visit better help dot com slash show", name: "betterhelp", wholeWord: true))
+    XCTAssertFalse(AdSignals.mentions("betterhelps dot com", name: "betterhelp", wholeWord: true))
+    // The same text with a firm name keeps the looser rule: a plural or a longer word still says it.
+    XCTAssertTrue(AdSignals.mentions("betterhelps dot com", name: "betterhelp"))
+    XCTAssertTrue(AdSignals.mentions("sometimes I wonder", name: "time"))
+  }
+
   func testAnUnusableNameIsNeverMentioned() {
     XCTAssertFalse(AdSignals.mentions("the sponsor said so", name: "sponsor"))
     XCTAssertFalse(AdSignals.mentions("anything", name: ""))

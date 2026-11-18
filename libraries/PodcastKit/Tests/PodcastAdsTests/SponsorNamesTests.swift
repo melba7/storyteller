@@ -16,13 +16,13 @@ final class SponsorNamesTests: XCTestCase {
     let notes =
       "Go to betterhelp.com/show for 10% off. Follow us at instagram.com/show and example.fm/live"
     XCTAssertEqual(
-      AdHeadRules.sponsors(inNotes: notes, showLink: URL(string: "https://www.example.fm/")),
+      AdHeadRules.sponsors(inNotes: notes, showLink: URL(string: "https://www.example.fm/")).map(\.text),
       ["betterhelp"])
   }
 
   func testALinkNamesTheSiteWhateverItsSubdomainAndScheme() {
     let notes = "Offers: https://www.quince.com/pod and get.ridge.com/walk and Shop.Zebra.io/x/y"
-    XCTAssertEqual(AdHeadRules.sponsors(inNotes: notes), ["quince", "ridge", "zebra"])
+    XCTAssertEqual(AdHeadRules.sponsors(inNotes: notes).map(\.text), ["quince", "ridge", "zebra"])
   }
 
   func testACodeNextToAWebAddressNamesASponsorWithoutAPath() {
@@ -41,7 +41,8 @@ final class SponsorNamesTests: XCTestCase {
   }
 
   func testANameUnderFourLettersFromALinkIsLeftOut() {
-    XCTAssertEqual(AdHeadRules.sponsors(inNotes: "Try zip.com/pod and ridge.com/pod"), ["ridge"])
+    XCTAssertEqual(
+      AdHeadRules.sponsors(inNotes: "Try zip.com/pod and ridge.com/pod").map(\.text), ["ridge"])
   }
 
   func testASponsorInTheNotesAndItsLinkIsOneName() {
@@ -75,5 +76,47 @@ final class SponsorNamesTests: XCTestCase {
     XCTAssertEqual(SponsorNames.name(ofHost: "WWW.BBC.CO.UK"), "bbc")
     XCTAssertEqual(SponsorNames.name(ofHost: "example.fm"), "example")
     XCTAssertNil(SponsorNames.name(ofHost: "localhost"))
+  }
+
+  // MARK: Names from links are only guesses (ads review fix)
+
+  func testANameFromALinkIsNotFoundInsideAnOrdinaryWord() {
+    let sponsors = AdHeadRules.sponsors(inNotes: "Sources: time.com/6123/x and nature.com/articles/x")
+    XCTAssertEqual(sponsors.map(\.text), ["time", "nature"])
+    let head = lines([
+      "welcome to the show sometimes I wonder about all of it",
+      "support the show at patreon.com/myshow",
+    ])
+    let found = AdHeadRules.find(lines: head, sponsors: sponsors)
+    XCTAssertEqual(found.map(\.startLine), [2])
+    XCTAssertEqual(found.map(\.kind), [.ownPlug])
+  }
+
+  func testANameFromALinkCountsOnlyOnALineThatSellsWithSomethingBesidesAnOwnPlug() {
+    let sponsors = AdHeadRules.sponsors(inNotes: "Try acme.com/pod today")
+    let head = lines(["we love Acme because it is great", "visit acme dot com"])
+    XCTAssertEqual(AdHeadRules.find(lines: head, sponsors: sponsors).map(\.startLine), [2])
+    // A firm name (written as "sponsored by Acme") still starts the ad at the line that names it.
+    XCTAssertEqual(AdHeadRules.find(lines: head, sponsors: ["Acme"]).map(\.startLine), [1])
+    let plug = lines(["we love Acme, so join our patreon dot com"])
+    XCTAssertEqual(AdHeadRules.find(lines: plug, sponsors: sponsors), [])
+  }
+
+  func testANameFromALinkNeverExcusesAnOwnPlug() {
+    let head = lines(["acme dot com slash pod", "and join us on patreon.com/myshow"])
+    let guess = AdHeadRules.sponsors(inNotes: "Try acme.com/pod today")
+    XCTAssertEqual(AdHeadRules.find(lines: head, sponsors: guess).map(\.kind), [.ownPlug])
+    XCTAssertEqual(AdHeadRules.find(lines: head, sponsors: ["Acme"]).map(\.kind), [.ad])
+  }
+
+  func testOnlyAPlainLinkMakesAGuess() {
+    let path = AdHeadRules.sponsors(inNotes: "Try acme.com/pod today")
+    XCTAssertEqual(path, [SponsorName("acme", fromLink: true)])
+    let code = AdHeadRules.sponsors(inNotes: "Use code POD at acme.com for ten percent off")
+    XCTAssertEqual(code, [SponsorName("acme")])
+    let both = AdHeadRules.sponsors(inNotes: "Try acme.com/pod. Use code POD at acme.com")
+    XCTAssertEqual(both, [SponsorName("acme")])
+    let said = AdHeadRules.sponsors(inNotes: "Sponsored by Acme. Try acme.com/pod today")
+    XCTAssertEqual(said, [SponsorName("Acme")])
   }
 }

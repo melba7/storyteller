@@ -108,15 +108,25 @@ public enum AdHeadRules {
       || callNearby(at, lines, includingSelf: false, spotCues: true)
   }
 
-  private static func mentions(_ text: String, any names: [String]) -> Bool {
-    names.contains { AdSignals.mentions(text, name: $0) }
+  private static func mentions(_ text: String, any names: [SponsorName]) -> Bool {
+    names.contains { AdSignals.mentions(text, name: $0.text, wholeWord: $0.fromLink) }
+  }
+
+  /// Whether the line names a sponsor in a way that points to an ad. A name that is only a guess
+  /// from a link counts on a line that also holds a web address, a promo code or an offer that is
+  /// not the hosts' own plug.
+  private static func namesSponsor(_ text: String, _ sponsors: [SponsorName]) -> Bool {
+    sponsors.contains { name in
+      mentions(text, any: [name])
+        && (!name.fromLink || (AdSignals.hardSignal(text) && !matches(ownPlugs, text)))
+    }
   }
 
   /// The ads in the lead-in lines of an episode, as the ranges a detector would answer (the same
   /// clean-up turns them into times). `sponsors` are the names found in the notes. All are sure,
   /// except a span that only holds closing phrases of a produced spot ("download the app",
   /// "terms apply") and no web address or offer: that one is unsure.
-  public static func find(lines: [NumberedLine], sponsors: [String] = []) -> [AdRange] {
+  public static func find(lines: [NumberedLine], sponsors: [SponsorName] = []) -> [AdRange] {
     // Indexes into `lines`; `spot` is true while only spot cues made the span.
     var spans: [(first: Int, last: Int, lead: Bool, spot: Bool)] = []
     for (at, line) in lines.enumerated() {
@@ -127,7 +137,7 @@ public enum AdHeadRules {
         else { continue }
         spans.append((at, carried(from: firstCall, in: lines), true, false))
       } else if (isOffer(line.text) && hasTwoSignals(at, lines))
-        || (mentions(line.text, any: sponsors) && callNearby(at, lines))
+        || (namesSponsor(line.text, sponsors) && callNearby(at, lines))
       {
         spans.append((at, carried(from: at, in: lines), false, false))
       } else if AdSignals.spotCue(line.text),
@@ -148,7 +158,9 @@ public enum AdHeadRules {
     }
     return joined.map { span in
       let text = lines[span.first...span.last].map(\.text).joined(separator: " ")
-      let plug = !span.lead && !mentions(text, any: sponsors) && matches(ownPlugs, text)
+      // Only a firm name excuses the hosts' own plugs; a guess from a link never does.
+      let firm = sponsors.filter { !$0.fromLink }
+      let plug = !span.lead && !mentions(text, any: firm) && matches(ownPlugs, text)
       let proved = !span.spot || lines[span.first...span.last].contains { isCallToAction($0.text) }
       return AdRange(
         startLine: lines[span.first].number, endLine: lines[span.last].number,
@@ -184,8 +196,8 @@ public enum AdHeadRules {
     return last
   }
 
-  private static func advertiser(in text: String, sponsors: [String]) -> String {
-    if let name = sponsors.first(where: { mentions(text, any: [$0]) }) { return name }
+  private static func advertiser(in text: String, sponsors: [SponsorName]) -> String {
+    if let name = sponsors.first(where: { mentions(text, any: [$0]) }) { return name.text }
     let whole = NSRange(text.startIndex..., in: text)
     for pattern in named {
       if let match = pattern.firstMatch(in: text, options: [], range: whole),
@@ -234,9 +246,9 @@ public enum AdHeadRules {
   /// "Sponsors:", split at commas and "and" (tags and web addresses are left out), and then the
   /// site of each link with a path or a promo code ("betterhelp.com/show" gives "betterhelp"),
   /// except the show's own site (`showLink`), social sites, podcast apps and the hosts' own plugs.
-  public static func sponsors(inNotes notes: String, showLink: URL? = nil) -> [String] {
+  public static func sponsors(inNotes notes: String, showLink: URL? = nil) -> [SponsorName] {
     let plain = notes.replacingOccurrences(of: "<[^>]+>", with: "\n", options: .regularExpression)
-    var names: [String] = []
+    var names: [SponsorName] = []
     let whole = NSRange(plain.startIndex..., in: plain)
     for pattern in notePatterns {
       for match in pattern.matches(in: plain, options: [], range: whole) {
@@ -246,14 +258,14 @@ public enum AdHeadRules {
         for part in parts {
           let name = part.trimmingCharacters(in: .whitespacesAndNewlines)
           guard AdSignals.usableName(name), name.split(separator: " ").count <= 4,
-            !name.contains("/"), !name.contains("@"), !names.contains(name)
+            !name.contains("/"), !name.contains("@"), !names.contains(where: { $0.text == name })
           else { continue }
-          names.append(name)
+          names.append(SponsorName(name))
         }
       }
     }
     for name in SponsorNames.fromLinks(in: plain, showLink: showLink)
-    where !names.contains(where: { squashed($0) == squashed(name) }) {
+    where !names.contains(where: { squashed($0.text) == squashed(name.text) }) {
       names.append(name)
     }
     return names

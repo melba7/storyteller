@@ -32,7 +32,7 @@ final class PodcastStreamHead: @unchecked Sendable {
   private let store: DownloadStore
   private let lock = NSLock()
   private var language: String?
-  private var sponsors: [String] = []
+  private var sponsors: [SponsorName] = []
   private var source: URL?
   private var key: String
   private var isFiled = false
@@ -72,7 +72,7 @@ final class PodcastStreamHead: @unchecked Sendable {
   func setLanguage(_ language: String?) { lock.withLock { self.language = language } }
 
   /// The advertisers the episode's notes name, which the quick rules also look for.
-  func setSponsors(_ names: [String]) { lock.withLock { sponsors = names } }
+  func setSponsors(_ names: [SponsorName]) { lock.withLock { sponsors = names } }
 
   /// The staging file exists: the scan can begin.
   func begin(staged: URL) {
