@@ -41,8 +41,10 @@ final class PodcastStreamHead: @unchecked Sendable {
   private var waiters: [() -> Void] = []
   private var found: [FoundAd] = []
   private var covered = 0.0
-  /// What the listener undid, kept here because filing the download wipes the stream's file.
+  /// What the listener undid and trimmed, kept here because filing the download wipes the
+  /// stream's file.
   private var undone: [UndoneAd] = []
+  private var trims: [AdTrim] = []
   private var detectorVersion = "1"
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
@@ -105,28 +107,30 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   /// A stream of this episode that failed part-way leaves its "stream-<episode>" file behind, with
   /// ads from a request that may have carried other inserted ads. This stream starts clean; only
-  /// what the listener undid is kept.
+  /// what the listener undid or trimmed is kept.
   private func discardEarlierStream() {
     lock.withLock {
       guard let folder = try? store.folder(for: episodeId) else { return }
       let ads = AdsStore(folder: folder, sha256: key)
-      absorbUndone(ads.loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+      absorbMarks(ads.loadPartial(detector: PodcastAdFinder.detectorName))
       ads.discardPartial(detector: PodcastAdFinder.detectorName)
     }
   }
 
-  /// Adds the undone ads of a file (the caller holds the lock).
-  private func absorbUndone(_ list: [UndoneAd]?) {
-    for item in list ?? [] where !undone.contains(item) { undone.append(item) }
+  /// Adds the undone ads and the trims of a file (the caller holds the lock). For one ad the
+  /// earlier end of a trim stays.
+  private func absorbMarks(_ file: AdsFile?) {
+    for item in file?.undone ?? [] where !undone.contains(item) { undone.append(item) }
+    for trim in file?.trims ?? [] { trims.add(trim) }
   }
 
-  /// Reads the Undo list from the stream's file. The loader calls it just before the download is
-  /// filed, which removes the folder with that file.
+  /// Reads the Undo list and the trims from the stream's file. The loader calls it just before the
+  /// download is filed, which removes the folder with that file.
   func rememberUndone() {
     lock.withLock {
       guard let folder = try? store.folder(for: episodeId) else { return }
-      absorbUndone(
-        AdsStore(folder: folder, sha256: key).loadPartial(detector: PodcastAdFinder.detectorName)?.undone)
+      absorbMarks(
+        AdsStore(folder: folder, sha256: key).loadPartial(detector: PodcastAdFinder.detectorName))
     }
   }
 
@@ -347,7 +351,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       let ads = AdsStore(folder: folder, sha256: key)
       let name = PodcastAdFinder.detectorName
       let before = ads.loadPartial(detector: name)
-      absorbUndone(before?.undone)
+      absorbMarks(before)
       let merged = AdHeadRules.merge(found + (before?.ads ?? []))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
@@ -356,6 +360,7 @@ final class PodcastStreamHead: @unchecked Sendable {
         duration: max(before?.duration ?? 0, covered), ads: merged,
         coveredUntil: max(before?.coveredUntil ?? 0, covered), refusedPieces: before?.refusedPieces)
       file.undone = undone
+      file.trims = trims.isEmpty ? nil : trims
       guard before?.ads != merged else { return false }
       do {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)

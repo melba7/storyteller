@@ -81,4 +81,45 @@ final class AdsStoreTrimTests: XCTestCase {
     let back = try JSONDecoder().decode(AdsFile.self, from: Data(text.utf8))
     XCTAssertEqual(back.trims, [AdTrim(adStart: 20, end: 50)])
   }
+
+  // MARK: Carrying trims from one file to another (a stream's ads moving to its real name)
+
+  func testTrimsAreAddedOneByOneAndTheEarlierEndOfTheSameAdStays() {
+    var list: [AdTrim] = []
+    list.add(AdTrim(adStart: 20, end: 50))
+    list.add(AdTrim(adStart: 20.3, end: 40))
+    list.add(AdTrim(adStart: 20, end: 55))
+    list.add(AdTrim(adStart: 200, end: 230))
+    XCTAssertEqual(list, [AdTrim(adStart: 20, end: 40), AdTrim(adStart: 200, end: 230)])
+  }
+
+  func testTrimsCarriedInTheFileAreMergedWithTheOnesOnDiskAndNeverMakeAnAdLonger() throws {
+    let store = AdsStore(folder: folder, sha256: sha)
+    // The file under the real name already has a trim, made after the download was filed.
+    try store.savePartial(file(trims: [AdTrim(adStart: 20, end: 45)]))
+    // The stream's head carries the trims made while it streamed: one for the same ad, later.
+    try store.savePartial(file(trims: [AdTrim(adStart: 20, end: 55)]))
+    XCTAssertEqual(store.loadPartial(detector: "fake")?.trims, [AdTrim(adStart: 20, end: 45)])
+    // And one that is earlier shortens it further.
+    try store.savePartial(file(trims: [AdTrim(adStart: 20, end: 30)]))
+    XCTAssertEqual(store.loadPartial(detector: "fake")?.trims, [AdTrim(adStart: 20, end: 30)])
+  }
+
+  func testAStreamsTrimSurvivesTheMoveToTheRealName() throws {
+    // While it streams, the ads are under a made-up name and the listener trims one.
+    let stream = AdsStore(folder: folder, sha256: "stream-ep1")
+    var streamFile = file()
+    streamFile.sha256 = "stream-ep1"
+    try stream.savePartial(streamFile)
+    XCTAssertTrue(stream.markTrimmed(detector: "fake", AdTrim(adStart: 20, end: 50)))
+    // The head keeps what it read from that file, then the file goes away with the folder.
+    var carried: [AdTrim] = []
+    for trim in stream.loadPartial(detector: "fake")?.trims ?? [] { carried.add(trim) }
+    stream.discardPartial(detector: "fake")
+    // Saved again under the real hash, the ad is still trimmed.
+    let real = AdsStore(folder: folder, sha256: sha)
+    try real.savePartial(file(trims: carried))
+    XCTAssertEqual(real.loadPartial(detector: "fake")?.trims, [AdTrim(adStart: 20, end: 50)])
+    XCTAssertEqual(real.best(detector: "fake")?.ads.first?.trimmed(by: carried).end, 50)
+  }
 }

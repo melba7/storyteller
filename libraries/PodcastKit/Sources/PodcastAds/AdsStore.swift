@@ -30,6 +30,19 @@ public struct AdTrim: Codable, Sendable, Equatable {
   func applies(to ad: FoundAd) -> Bool { ad.start - 0.5 <= adStart && adStart < ad.end }
 }
 
+extension Array where Element == AdTrim {
+  /// Adds a trim. For the same ad (a start within half a second of one already here) the earlier
+  /// end stays, so a trim never makes an ad longer. A list that has to move from one file to
+  /// another (the stream's ads, when the download is filed) is carried by adding its trims.
+  public mutating func add(_ trim: AdTrim) {
+    if let index = firstIndex(where: { abs($0.adStart - trim.adStart) < 0.5 }) {
+      self[index].end = Swift.min(self[index].end, trim.end)
+    } else {
+      append(trim)
+    }
+  }
+}
+
 extension FoundAd {
   /// This ad cut short by the trims that are for it: it ends at the earliest of its own end and
   /// theirs. An ad is never made longer.
@@ -84,11 +97,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.
   public mutating func addTrim(_ trim: AdTrim) {
     var list = trims ?? []
-    if let index = list.firstIndex(where: { abs($0.adStart - trim.adStart) < 0.5 }) {
-      list[index].end = min(list[index].end, trim.end)
-    } else {
-      list.append(trim)
-    }
+    list.add(trim)
     trims = list
   }
 
