@@ -6,7 +6,9 @@ Mo's first try, the Apple Podcasts redesign (A1 to A6) and a second bug check
 (B2) merged in PR #48 (TestFlight 29.1, with the Books look) | Books look: B1 to
 B7 merged (PR #49), B8 (look check) next | Covers and more lists: C0 to C9 and
 C12 done, Spotify dropped; Mo's 29.1 bugs fixed; ad skipping I0 to I2 and the
-iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test
+iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test | Ad skipping accuracy
+(start and end, two Fable plans, built by Sonnet, checked twice by Opus): all
+milestones built, waiting on the iOS build and Mo's Mac measurements
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1077,6 +1079,49 @@ every part; Sonnet built; Opus checked.
       Duo's centred sheet; sheets turn with the phone.
   - Needs Mo's phone or the Duo simulator: first-skip timing on a stream, the
     fold and unfold, and how SpeechTranscriber writes web addresses.
+
+### Ad skipping: starts and ends (Mo's ask, 2026-11-18)
+
+Mo: "ad skipping doesn't skip ads in the first few seconds, and when it does it
+skips too far". Fable planned it twice (`docs/PODCASTS-ADS-ACCURACY-PLAN.md`:
+sections 1 to 6 and then 16 more ideas in section 7), Sonnet built it in
+parallel worktrees, Opus checked it twice (first review found three ways a skip
+could run into the show, a layout bug and a few hang and storage risks; all were
+fixed). Everything that touches the iOS module compiles only in Fork CI.
+
+- [x] **E1 Safe landing**: a skip lands 0.25 s before the next word; an ad that
+      begins in the first 6 s begins at 0:00. **E2** a short, strict carry-on (2
+      lines, stops at "we're back"). **E3** a stricter merge of ads of one
+      break. **E4** tighter quick rules for a stream's head.
+- [x] **M1 Measure the edges** (`Check ad edges on an episode.command`): waits
+      on Mo to run it on 3 episodes where a skip went too far and send the
+      `.ad-edges.txt` files.
+- [x] **F1 "Too far" is one tap**: "Back 10 s" on the note shortens the ad for
+      good; three counters in the stats file. **E5a** a downloaded file opens
+      with precise timing (the stream half waits on M1's numbers).
+- [x] **S1 A faster first look** (rules at 15 s, model at 30/60/120/180 s, warm
+      speech model), **S2 remember ads by their words** (`KnownAds`), **S3 the
+      phone uses that memory** (whole match, opening, Undo forgets), **S4 a 3 s
+      wait before a never-checked stream starts** (Mo approved), **S5 download
+      the next 2 Up Next episodes on Wi-Fi** (Mo approved).
+- [x] **N1 Shared frames between episodes**
+      (`Compare two episodes of a show     .command`, "Compare my shows"): waits
+      on Mo's one file; **N2** sponsor names from the notes reach the rules;
+      **N3** compare our words with the feed's transcript (pure part and a Mac
+      count; the fetch is not wired); **N4** the show's opening words; **N5**
+      cut inside the edge line; **N6** an evidence check on "sure" ads; **N7**
+      cues of produced spots; **N8** a skip log on the phone with a "Send skip
+      log" row in Profile; **N9** chapters that name a sponsor.
+- [x] **The Duo player**: a small cover shows when the room is 100 pt or more,
+      the open Duo's sheet is split in two columns, the two columns have fixed
+      widths; Search's category tiles fit the page; Up Next cards stay above the
+      mini player.
+- [ ] **Waits on Mo or on measurements**: E6 (the model checks each end and new
+      instructions), I3 (a second quick download), N10 to N16 (see section 7.5
+      of the plan: the fetch of the feed's transcript, offering unsure ads, a
+      heads-only download, frame memory, per-show caution from the skip log),
+      and the phone checks: first-skip timing, the wait, "Back 10 s", the
+      stream's last seeks.
 
 ## Later
 
