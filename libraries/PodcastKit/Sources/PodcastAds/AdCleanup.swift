@@ -45,10 +45,11 @@ public enum AdCleanup {
   /// answers that name no real lines are dropped; a sure answer with nothing in its lines that
   /// says "ad" becomes unsure (`AdEvidence`); the model's last lines are trimmed when the show
   /// is back, and a sure end is carried on while the next lines still read as the ad; line
-  /// numbers become times; overlapping answers (an ad across a cut) are joined into one, and so
-  /// are sure ads of one break; when the ads are too much of the episode or one is too long,
-  /// those with under two lines of evidence become unsure; edges land a quarter second before
-  /// the next word (`AdLanding`);
+  /// numbers become times, and an edge line is cut where its words say the show is back or the
+  /// lead-in begins (`AdEdgeCut`); overlapping answers (an ad across a cut) are joined into one,
+  /// and so are sure ads of one break; when the ads are too much of the episode or one is too
+  /// long, those with under two lines of evidence become unsure; edges land a quarter second
+  /// before the next word (`AdLanding`);
   /// what is too short or too long is dropped.
   public static func run(ranges: [AdRange], transcript: Transcript) -> [FoundAd] {
     explain(ranges: ranges, transcript: transcript).map(\.ad)
@@ -60,6 +61,7 @@ public enum AdCleanup {
     let lines = transcript.lines
     guard !lines.isEmpty else { return [] }
 
+    let words = transcript.words
     var spans: [Span] = []
     for range in ranges where range.confidence != .guess {
       let first = min(range.startLine, range.endLine)
@@ -78,14 +80,27 @@ public enum AdCleanup {
       if trimmed == 0, confidence == .sure {
         end = carriedEnd(of: last, advertiser: range.advertiser, lines: lines)
       }
+      // The ad ends before the show is back and starts at its lead-in, when its edge lines say so.
+      var start = lines[first - 1].start
+      var stop = lines[end - 1].end
+      if let cut = AdEdgeCut.end(of: lines[end - 1], advertiser: range.advertiser, words: words),
+        cut > start
+      {
+        stop = cut
+      }
+      if confidence == .sure,
+        let cut = AdEdgeCut.start(of: lines[first - 1], advertiser: range.advertiser, words: words),
+        cut < stop
+      {
+        start = cut
+      }
       spans.append(
         Span(
-          start: lines[first - 1].start, end: lines[end - 1].end, kind: range.kind,
-          advertiser: range.advertiser, confidence: confidence, first: first, last: last,
-          trimmed: trimmed, carried: end - last, answers: 1))
+          start: start, end: stop, kind: range.kind, advertiser: range.advertiser,
+          confidence: confidence, first: first, last: last, trimmed: trimmed,
+          carried: end - last, answers: 1))
     }
 
-    let words = transcript.words
     let duration = transcript.duration > 0 ? transcript.duration : lines[lines.count - 1].end
     let merged = needingProof(
       merge(spans, lines: lines, words: words), lines: lines, duration: duration)
@@ -235,7 +250,7 @@ public enum AdCleanup {
       && spans.reduce(0) { $0 + $1.length } > AdRules.shareLimit * duration
     return spans.map { span in
       guard span.confidence == .sure, crowded || span.length > AdRules.longAd else { return span }
-      let inside = lines.filter { $0.start >= span.start - 0.01 && $0.start < span.end }
+      let inside = lines.filter { $0.end > span.start + 0.001 && $0.start < span.end }
       guard AdEvidence.count(lines: inside, advertiser: span.advertiser) < 2 else { return span }
       var weak = span
       weak.confidence = .unsure

@@ -37,6 +37,15 @@ public enum AdSignals {
     #"\bjoining me (today|now)\b"#,
   ])
 
+  /// Words that open a sponsor read.
+  static let leadIns = regexes([
+    #"\bbrought to you by\b"#, #"\bsponsored by\b"#, #"\bmade possible by\b"#,
+    #"\bsupport for (this|the|today's)\b.{0,40}\bcomes from\b"#,
+    #"\b(our|today's|this week's|this episode's) sponsors?\b"#,
+    #"\bthis (episode|podcast|show) is (brought|sponsored|supported|made possible)\b"#,
+    #"\ba word from our\b"#,
+  ])
+
   /// Words the hosts use to bridge two ads of one break ("we'll be right back after one more
   /// word from our sponsor").
   private static let breaks = regexes([
@@ -74,6 +83,25 @@ public enum AdSignals {
 
   /// A phrase that bridges two ads of one break.
   public static func breakCue(_ text: String) -> Bool { matches(breaks, text) }
+
+  /// The words that the first return cue in the text covers, counted from 0 over the text split
+  /// at spaces; nil when it has none.
+  static func returnCueRange(in text: String) -> Range<Int>? { firstRange(of: returns, in: text) }
+
+  /// The words that the first sponsor lead-in in the text covers, counted the same way.
+  static func leadInRange(in text: String) -> Range<Int>? { firstRange(of: leadIns, in: text) }
+
+  /// Where in the text (as word numbers) the earliest match of any of the patterns lies.
+  private static func firstRange(of list: [NSRegularExpression], in text: String) -> Range<Int>? {
+    let whole = NSRange(text.startIndex..., in: text)
+    let found = list.compactMap { $0.firstMatch(in: text, options: [], range: whole)?.range }
+      .min { $0.location < $1.location }
+    guard let found, let match = Range(found, in: text) else { return nil }
+    let before = text[..<match.lowerBound]
+    var first = before.split(whereSeparator: \.isWhitespace).count
+    if let last = before.last, !last.isWhitespace { first -= 1 }  // the match starts inside a word
+    return first..<(first + text[match].split(whereSeparator: \.isWhitespace).count)
+  }
 
   /// Whether the line mentions the advertiser, a web address, a promo code or an offer.
   public static func readsLikeAd(_ text: String, advertiser: String) -> Bool {

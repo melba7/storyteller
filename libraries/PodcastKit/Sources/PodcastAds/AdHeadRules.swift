@@ -51,14 +51,6 @@ public enum AdHeadRules {
     patterns.compactMap { try? NSRegularExpression(pattern: $0, options: caseInsensitive ? [.caseInsensitive] : []) }
   }
 
-  /// Words that open a sponsor read.
-  private static let leadIns = regexes([
-    #"\bbrought to you by\b"#, #"\bsponsored by\b"#, #"\bmade possible by\b"#,
-    #"\bsupport for (this|the|today's)\b.{0,40}\bcomes from\b"#,
-    #"\b(our|today's|this week's|this episode's) sponsors?\b"#,
-    #"\bthis (episode|podcast|show) is (brought|sponsored|supported|made possible)\b"#,
-    #"\ba word from our\b"#,
-  ])
   /// A promo code, an offer, or a web address with a path: a web address alone is not enough.
   /// The bare word "code" or "slash" is no sign ("the code is on github.com").
   private static let offers = regexes([
@@ -91,12 +83,12 @@ public enum AdHeadRules {
     return list.contains { $0.firstMatch(in: text, options: [], range: whole) != nil }
   }
 
-  private static func isLeadIn(_ text: String) -> Bool { matches(leadIns, text) }
+  private static func isLeadIn(_ text: String) -> Bool { matches(AdSignals.leadIns, text) }
 
   /// A web address, a promo code or an offer, not counting the lead-in's own words.
   private static func isCallToAction(_ text: String) -> Bool {
     var rest = text
-    for lead in leadIns {
+    for lead in AdSignals.leadIns {
       rest = lead.stringByReplacingMatches(
         in: rest, options: [], range: NSRange(rest.startIndex..., in: rest), withTemplate: " ")
     }
