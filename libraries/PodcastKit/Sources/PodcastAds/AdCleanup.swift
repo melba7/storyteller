@@ -20,7 +20,9 @@ public enum AdRules {
   public static let maxLength = 300.0
   /// How many lines after an ad may still be carried into it.
   public static let carryLines = 2
-  /// A carried line must start within this many seconds of the end of the model's last line.
+  /// A carried line must end within this many seconds of the end of the line before it (for the
+  /// first carried line that is the model's last line). A line that starts soon but runs long is
+  /// host talk, not the end of the read; and the plan's two lines of ten seconds still fit.
   public static let carrySeconds = 15.0
   /// A skip lands this long before the first word of the show (and starts this long before the
   /// first word of the ad).
@@ -153,11 +155,11 @@ public enum AdCleanup {
 
   /// The last line number of an ad after carrying it on: while the line after it sells (see
   /// `AdSignals.carriesOn`), it belongs to the ad, for at most `carryLines` lines, and only
-  /// lines that start within `carrySeconds` of the model's last line.
+  /// lines that end within `carrySeconds` of the end of the line before them.
   static func carriedEnd(of last: Int, advertiser: String, lines: [TranscriptLine]) -> Int {
     var end = last
     while end < lines.count, end - last < AdRules.carryLines,
-      lines[end].start - lines[last - 1].end <= AdRules.carrySeconds,
+      lines[end].end - lines[end - 1].end <= AdRules.carrySeconds,
       AdSignals.carriesOn(lines[end].text, advertiser: advertiser, after: lines[end - 1].text)
     {
       end += 1

@@ -237,7 +237,7 @@ final class AdCleanupTests: XCTestCase {
     XCTAssertEqual(carried, 7)
   }
 
-  func testACarriedLineMustStartWithinFifteenSecondsOfTheModelsLastLine() {
+  func testACarriedLineMustEndWithinFifteenSecondsOfTheLineBeforeIt() {
     // Two lines of 3 s with 20 s of silence before the second.
     let lines = [
       TranscriptLine(start: 0, end: 30, text: "the ad"),
@@ -245,6 +245,42 @@ final class AdCleanupTests: XCTestCase {
       TranscriptLine(start: 54, end: 57, text: "go to acme dot com"),
     ]
     XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 2)
+  }
+
+  func testALongLineThatStartsSoonButEndsLateIsNotCarried() {
+    // The model's last line ends at 50 s. The next starts 14 s later, so it starts within 15 s,
+    // but it runs 16 s and ends 30 s after the ad: host talk that only mentions the site.
+    let lines = [
+      TranscriptLine(start: 0, end: 50, text: "this is brought to you by Acme at acme dot com"),
+      TranscriptLine(start: 64, end: 80, text: "I told my brother about acme dot com last week"),
+    ]
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 1)
+    let transcript = Transcript(
+      identity: makeTranscript(["x"]).identity, duration: 100, lines: lines, words: [])
+    let ad = AdCleanup.run(ranges: [range(1, 1)], transcript: transcript).first
+    XCTAssertEqual(ad?.end, 50)
+  }
+
+  func testALineThatEndsExactlyFifteenSecondsAfterTheLineBeforeItIsCarried() {
+    let carried = [
+      TranscriptLine(start: 0, end: 50, text: "the ad"),
+      TranscriptLine(start: 52, end: 65, text: "go to acme dot com"),
+    ]
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: carried), 2)
+    var late = carried
+    late[1].end = 65.5
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: late), 1)
+  }
+
+  func testEachCarriedLineIsMeasuredFromTheOneBeforeIt() {
+    // The second carried line ends 25 s after the model's last line, 12 s after the first one.
+    let lines = [
+      TranscriptLine(start: 0, end: 50, text: "the ad"),
+      TranscriptLine(start: 52, end: 63, text: "go to acme dot com"),
+      TranscriptLine(start: 64, end: 75, text: "use code SHOW at acme dot com"),
+      TranscriptLine(start: 76, end: 80, text: "go to acme dot com"),
+    ]
+    XCTAssertEqual(AdCleanup.carriedEnd(of: 1, advertiser: "Acme", lines: lines), 3)
   }
 
   func testAnUnsureAdIsNeverCarriedOn() throws {
