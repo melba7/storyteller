@@ -63,15 +63,20 @@ export function parseTeachingList(text: string): TeachingList | null {
 /**
  * The files to fetch: the listed ones whose SHA-256 is not the installed one and whose size is
  * not over the limit. `installed` maps a name to the checksum of the file the phone has.
+ * `refused` maps a name to the checksum of a file the phone refused earlier in this launch; the
+ * same file is not fetched again.
  */
 export function filesToFetch(
   list: TeachingList,
   installed: Readonly<Record<string, string>>,
+  refused: Readonly<Record<string, string>> = {},
 ): TeachingName[] {
   return TEACHING_NAMES.filter((name) => {
     const listed = list[name]
     if (!listed || listed.bytes > MAX_TEACHING_BYTES) return false
-    return installed[name]?.toLowerCase() !== listed.sha256.toLowerCase()
+    const sha = listed.sha256.toLowerCase()
+    if (refused[name]?.toLowerCase() === sha) return false
+    return installed[name]?.toLowerCase() !== sha
   })
 }
 

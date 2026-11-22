@@ -90,6 +90,16 @@ describe("filesToFetch", () => {
     ])
   })
 
+  it("leaves out a file the phone refused until the list shows another checksum", () => {
+    const refused = { "ad-model.json": SHA_A.toUpperCase() }
+    expect(filesToFetch(files, {}, refused)).toEqual([
+      "ad-library.json",
+      "show-habits.json",
+    ])
+    const changed = { ...files, "ad-model.json": { sha256: SHA_B, bytes: 100 } }
+    expect(filesToFetch(changed, {}, refused)[0]).toBe("ad-model.json")
+  })
+
   it("leaves out what is installed with the same checksum, in any letter case", () => {
     const installed = {
       "ad-model.json": SHA_A.toUpperCase(),
