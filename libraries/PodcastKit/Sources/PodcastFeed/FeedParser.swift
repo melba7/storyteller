@@ -37,6 +37,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
 
   private(set) var sawChannel = false
   private var title = "", author = "", showDescription = "", summary = "", subtitle = ""
+  private var newFeedAddress = ""
   private var link = "", language = "", itunesImage = "", plainImage = ""
   private var topCategories: [String] = [], subCategories: [String] = []
   private var currentTop = ""
@@ -55,7 +56,8 @@ private final class FeedReader: NSObject, XMLParserDelegate {
       language: language.isEmpty ? nil : language,
       categories: topCategories + subCategories,
       people: people, funding: funding,
-      episodes: episodes)
+      episodes: episodes,
+      newFeedURL: URL(string: newFeedAddress).flatMap(webAddress))
   }
 
   func parser(
@@ -123,6 +125,7 @@ private final class FeedReader: NSObject, XMLParserDelegate {
     case "rss/channel/description": if showDescription.isEmpty { showDescription = value }
     case "rss/channel/itunes:summary": if summary.isEmpty { summary = value }
     case "rss/channel/itunes:subtitle": if subtitle.isEmpty { subtitle = value }
+    case "rss/channel/itunes:new-feed-url": if newFeedAddress.isEmpty { newFeedAddress = value }
     case "rss/channel/itunes:author": if author.isEmpty { author = value }
     case "rss/channel/image/url": if plainImage.isEmpty { plainImage = value }
     case "rss/channel/item/title": item?.title = value
