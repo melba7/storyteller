@@ -9,7 +9,10 @@
 #   6. publish  (teach_publish.py)   copies the results to the folders the phone reads
 # A step that fails is said plainly and the later steps still run, except that the two Swift steps
 # (4 and 5) are left out together when podcast-teach does not build. It ends with one line per
-# step (worked, nothing to do, failed) and exits 0 when publish worked, 1 otherwise.
+# step (worked, nothing to do, failed) and exits 0 when publish worked, 1 otherwise. It holds the
+# teaching folder's run lock for its whole length (it starts itself again under
+# `teach_store.py hold`), so a second window cannot gather, mark or train while it works. When
+# another run holds the lock it says so and exits 3 without doing anything.
 # Everything it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log. It uses no
 # Claude allowance.
 #
@@ -26,6 +29,11 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 export PATH="$PATH:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin"
 
 command -v python3 > /dev/null || { echo "python3 is missing. Install Apple's command line tools: open Terminal and run xcode-select --install"; exit 1; }
+if [ -z "$TEACH_HOLDING" ]; then
+  TEACH_HOLDING=1
+  export TEACH_HOLDING
+  exec python3 -u "$TOOLS/teach_store.py" hold "$FOLDER" /bin/bash "$0" "$@"
+fi
 mkdir -p "$LOG_FOLDER" || { echo "Could not make $LOG_FOLDER."; exit 1; }
 # Everything below is shown and added to the log; pipefail keeps the exit codes of the tools.
 set -o pipefail
@@ -48,7 +56,8 @@ note() { SUMMARY="$SUMMARY  $1: $2
 # run_step LABEL OUTPUT COMMAND...: runs a tool, shows what it prints (also in the log) and notes
 # whether it worked. OUTPUT is the file the tool writes: "worked" when it is new or changed and
 # "nothing to do" when it is not there or the same as before. With OUTPUT "-" the tool worked when
-# it said a file was written. Returns 1 when the tool failed.
+# it said a file was written. Returns 1 when the tool failed, and leaves its own exit code in
+# LAST_CODE.
 run_step() {
   local label="$1" output="$2" before after code
   shift 2
@@ -56,6 +65,7 @@ run_step() {
   : > "$CAPTURE"
   "$@" 2>&1 | tee -a "$LOG" "$CAPTURE"
   code="${PIPESTATUS[0]}"
+  LAST_CODE="$code"
   after="$(fingerprint "$output")"
   if [ "$code" -ne 0 ]; then
     note "$label" "failed"
@@ -119,7 +129,7 @@ fi
 say
 say "Step 6 of 6: copying the results to the phone's folders"
 run_step "Publish" "-" python3 -u "$TOOLS/teach_publish.py" --folder "$FOLDER"
-PUBLISH="$?"
+PUBLISH="$LAST_CODE"
 
 say
 say "Summary:"
@@ -127,6 +137,9 @@ printf '%s' "$SUMMARY" | tee -a "$LOG"
 if [ "$PUBLISH" -eq 0 ]; then
   say "The results are where the phone reads them."
   exit 0
+elif [ "$PUBLISH" -eq 3 ]; then
+  say "The results reached the Mac's own folder, but the copy into iCloud Drive did not work (see above), so the phone does not have them yet. Give /bin/bash Full Disk Access (or fix iCloud Drive) and run this again."
+  exit 1
 fi
 say "The results did not reach the phone's folders (see above)."
 exit 1

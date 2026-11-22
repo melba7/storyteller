@@ -29,9 +29,12 @@ It is looked up in the show's feed by guid (or by audio address when it has no g
 feed is not followed, whose address is not http or https, that is no longer in its feed, or that is
 already gathered, is left out and counted. A damaged wanted.json is ignored.
 
+--max-gb is the limit for all the audio kept in the folder, not for one run, and audio is never
+deleted, so once the folder is full nothing more is downloaded, the wanted episodes included.
+
 --list only reads the feeds and says what a run would download. Exit codes: 0 it ran, 2 the shows
 file cannot be read, the folder cannot be written, episodes.json is damaged or another run is
-working in the folder.
+working in the folder, 3 it ran but the size limit stopped downloads that were waiting.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -53,6 +56,7 @@ WANTED = teach_wanted.MOST
 MAX_GB = 12
 KEEP_FREE_GB = 15
 GB = 1_000_000_000
+SIZE_LIMIT = 3  # the exit code when the size limit on kept audio stopped the downloads
 SKIPPED = "skipped:"
 ALL = 1_000_000
 
@@ -248,10 +252,10 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
     if result["skipped"]:
         say("%d were left out for good because the file is too big." % result["skipped"])
     if result["waiting"]:
-        why = ("the %.0f GB size limit was reached" % args.max_gb if result["why"] == "size"
-               else "free disk space is under %.0f GB" % args.keep_free_gb)
+        why = ("the %.0f GB size limit on all kept audio was reached" % args.max_gb
+               if result["why"] == "size" else "free disk space is under %.0f GB" % args.keep_free_gb)
         say("%d are still waiting because %s." % (result["waiting"], why))
-    return 0
+    return SIZE_LIMIT if result["why"] == "size" else 0
 
 
 if __name__ == "__main__":

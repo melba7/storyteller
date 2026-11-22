@@ -28,8 +28,10 @@ at most 4.5 MB (the phone refuses files over 5 MB). A file is written through a 
 the same folder, and only when its content differs from what is there. A destination folder that
 does not exist or cannot be written is reported and the others are still tried.
 
-Exit code: 0 every existing source reached the first destination folder (also when there was
-nothing to publish), 2 a source reached no folder or not the first one, or the arguments are wrong.
+Exit code: 0 every existing source reached every destination folder that exists (also when there
+was nothing to publish), 2 a source reached no folder or not the first one, or the arguments are
+wrong, 3 the first folder was written but a later folder that exists (the iCloud copy, which is the
+one the phone reads) could not be written. The last lines then say which copy failed.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -50,6 +52,7 @@ FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.jso
 MODEL = "ad-model.json"
 LIST = "teaching.json"
 MIN_PRECISION = 0.85
+ICLOUD_FAILED = 3
 MIN_EPISODES = 5
 MIN_SHOWS = 3
 MIN_AD_SECONDS = 600
@@ -121,11 +124,14 @@ def weak_model(data, minimum):
 
 
 def write_atomically(path, data):
-    """Writes `data` to `path` through a temporary file in the same folder."""
+    """Writes `data` to `path` through a temporary file in the same folder, forced to disk before it
+    replaces the old file."""
     handle, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".", suffix=".tmp")
     try:
         with os.fdopen(handle, "wb") as f:
             f.write(data)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(temporary, path)
     except BaseException:
         if os.path.exists(temporary):
@@ -199,6 +205,21 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
     folder = os.path.expanduser(options.folder)
     destinations = [os.path.expanduser(f) for f in options.to] if options.to else defaults()
     exit_code = 0
+    broken = []  # the destinations an existing folder could not be written to, in order
+
+    def failed(number, destination):
+        """Notes a failed write: the first folder is a set-up problem (2), a later folder that exists
+        (the iCloud copy the phone reads) has its own code (3)."""
+        nonlocal exit_code
+        if number == 0:
+            exit_code = 2
+        elif os.path.isdir(destination):
+            exit_code = exit_code or ICLOUD_FAILED
+        else:
+            return
+        if destination not in broken:
+            broken.append(destination)
+
     for source, target in FILES:
         try:
             data = checked(os.path.join(folder, source), limit)
@@ -223,18 +244,20 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
                 outcome = None
             else:
                 say("%s in %s: %s." % (target, destination, outcome))
-            if number == 0 and outcome is None:
-                exit_code = 2
+            if outcome is None:
+                failed(number, destination)
     for number, destination in enumerate(destinations):
         try:
             outcome = update_list(destination, writer, now)
         except OSError as error:
             say("%s in %s: failed (%s)." % (LIST, destination, error))
-            if number == 0:
-                exit_code = 2
+            failed(number, destination)
         else:
             if outcome:
                 say("%s in %s: %s." % (LIST, destination, outcome))
+    for destination in broken:
+        say("The copy into %s did not work, so that folder does not have the new files%s."
+            % (destination, " (the phone reads this one)" if destination != destinations[0] else ""))
     return exit_code
 
 

@@ -334,6 +334,19 @@ class CheckTests(unittest.TestCase):
         self.assertIn("lineAnyAd", held)
 
 
+class WriteTextTests(unittest.TestCase):
+    def test_the_text_is_forced_to_disk_before_it_replaces_the_old_file(self):
+        from unittest import mock
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, True)
+        path = os.path.join(folder, "m.json")
+        with mock.patch.object(train.os, "fsync") as fsync:
+            train.write_text(path, "abc")
+        self.assertEqual(fsync.call_count, 1)
+        with open(path) as f:
+            self.assertEqual(f.read(), "abc")
+
+
 class ShelfAfterModelTests(unittest.TestCase):
     def test_the_shelf_is_not_saved_when_no_model_follows(self):
         folder = Folder(self)

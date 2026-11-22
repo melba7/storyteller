@@ -13,7 +13,7 @@ is signed in to and shares its usage allowance. Nothing is sent anywhere else.
                  [--retry-failed] [--yes]
 
 Without --yes it says what it is about to do and waits for you to type yes. It stops when --limit
-episodes are done, when the cost so far (every call counts, also the ones that failed) reaches
+episodes have been tried (one that failed counts, because it was sent and cost something), when the cost so far (every call counts, also the ones that failed) reaches
 --cap, when Claude says the usage limit is reached or it is not signed in, or after three
 episodes in a row that had never failed before failed. Failures are remembered in failures.json:
 episodes that never failed come first, an episode that failed three times is left out (--retry-failed
@@ -122,9 +122,10 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False):
         return reply
 
     in_a_row = 0
+    attempted = 0
     for number, (item, lines) in enumerate(items, 1):
         stop = None
-        if limit is not None and result["done"] >= limit:
+        if limit is not None and attempted >= limit:
             stop = ("limit", "Stopped: the limit of %d episodes was reached." % limit)
         elif cap is not None and result["cost"] >= cap:
             stop = ("cap", "Stopped: the cost so far, $%.2f, reached the cap of $%.2f."
@@ -133,6 +134,7 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False):
             result["stop"], result["reason"] = stop
             return result
         name = "%d of %d: %s, %s" % (number, len(items), item["show"], item["title"])
+        attempted += 1  # an episode that fails still cost a call, so it counts towards --limit
         try:
             made = label_episode(item, lines, model, counted)
         except UsageLimit as error:

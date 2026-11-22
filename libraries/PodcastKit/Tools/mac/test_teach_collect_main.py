@@ -9,6 +9,7 @@ import unittest
 import teach_collect as tc
 import teach_fetch
 import teach_store as store
+import teach_testing
 from test_teach_collect import SHOWS, feeds_for, fetcher
 
 
@@ -70,6 +71,20 @@ class MainTests(unittest.TestCase):
         self.assertEqual(lines, ["Another teaching run is already working in this folder. Wait for it "
                                  "to finish, or close its window."])
         self.assertFalse(os.path.exists(os.path.join(self.folder, "episodes.json")))
+
+    def test_the_size_limit_on_kept_audio_gives_its_own_exit_code(self):
+        # 60 MB of audio is kept already and the limit is 0.05 GB, so the new episodes wait.
+        os.makedirs(self.folder)
+        store.save_manifest(self.folder, [teach_testing.entry(1, audio=True, bytes=60_000_000)])
+        lines = []
+        code = self.run_main("--max-gb", "0.05", download=lambda a, p, **m: self.fail("no download"),
+                             say=lines.append)
+        self.assertEqual(code, tc.SIZE_LIMIT)
+        self.assertTrue(any("size limit on all kept audio" in line for line in lines), lines)
+
+    def test_free_disk_space_is_not_the_size_limit(self):
+        self.assertEqual(self.run_main("--keep-free-gb", "100000000",
+                                       download=lambda a, p, **m: self.fail("no download")), 0)
 
     def test_the_lock_is_free_after_a_run(self):
         self.assertEqual(self.run_main(download=lambda a, p, **m: self.fail("no download wanted")), 0)

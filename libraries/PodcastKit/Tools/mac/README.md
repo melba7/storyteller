@@ -380,13 +380,19 @@ double-click the files below, in this order, and read what the window says. Each
 window shows what it does. Everything is also added to
 `~/Storyteller Lofi/logs/podcast-teaching.log`. A window can be stopped with
 Control-C and started again: it carries on where it was. Only one run can work
-in the teaching folder at a time; a second window says so and stops.
+in the teaching folder at a time; a second window says so and stops. The steps
+after marking hold that lock too, for their whole length, so a second window
+cannot gather, mark or train while they work. When marking finds another run
+busy, `Mark ads in the teaching episodes.command` stops without running them,
+and `Teach the phone again.command` says so and stops.
 
 ### What to double-click
 
 1. `Gather episodes for teaching.command`. Step 1 reads the feed of every show
-   you follow and downloads the newest four episodes of each, up to 12 GB,
-   keeping 15 GB of the disk free. Episodes the phone asked for (see "The
+   you follow and downloads the newest four episodes of each, up to 12 GB of
+   audio kept in all (the limit is for everything kept, not for one run, and the
+   window ends with its own code and says so when it is reached), keeping 15 GB
+   of the disk free. Episodes the phone asked for (see "The
    phone's notes and the wanted list" below) go first. Step 2 writes down what
    is said in them with the Swift code the app uses (needs macOS 26 and Xcode
    26; it can take hours, so keep the Mac plugged in). This does not use Claude.
@@ -493,7 +499,13 @@ type `yes`, and installs nothing otherwise. Each week the job reads the phone's
 notes, gathers the newest episode of each show (plus the wanted ones), writes
 them down, has Claude mark up to 15 episodes and runs the steps after marking.
 Marking is the only part that uses your Claude plan, about 15 episodes a week of
-its allowance. The Mac has to be on or asleep at that time, not shut down: a
+its allowance. An episode that fails still counts towards the 15, and marking
+stops when the cost Claude itself counts for the calls reaches $25 (change it
+with `TEACH_CAP` near the top of `teach-weekly.sh`; the checker has no real
+price, 15 episodes were estimated at about $1 each). The gather step keeps at
+most 12 GB of audio in all, for every week together (`TEACH_MAX_GB`). Audio is
+never deleted, so once the folder is full the job gathers nothing new: it ends
+with a non-zero status and one sentence in the log that says so. The Mac has to be on or asleep at that time, not shut down: a
 start missed while the Mac slept runs when it wakes up, and a week the Mac was
 off is skipped. If another teaching run is working in the folder, the job says
 so and ends. Double-click the installer again to replace the job (it never makes

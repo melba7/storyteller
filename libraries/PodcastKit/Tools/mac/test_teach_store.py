@@ -1,8 +1,11 @@
 """Tests for teach_store.py and teach_failures.py: the episode list, the atomic JSON writer, the run
 lock and the memory of failures. Temporary folders only.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import contextlib
+import io
 import json
 import os
+import sys
 import unittest
 from unittest import mock
 
@@ -149,6 +152,36 @@ class BusyCheckTests(unittest.TestCase):
     def test_bad_arguments_give_2(self):
         self.assertEqual(store.main([]), 2)
         self.assertEqual(store.main(["busy"]), 2)
+
+
+class HoldTests(unittest.TestCase):
+    """`python3 teach_store.py hold FOLDER COMMAND...`, which teach-finish.sh runs itself under."""
+
+    def test_the_command_runs_with_the_lock_held_and_its_code_comes_back(self):
+        folder = Folder(self)
+        seen = []
+
+        def runner(command):
+            seen.append((command, store.main(["busy", folder.dir])))
+            return 7
+
+        self.assertEqual(store.hold(folder.dir, ["x", "y"], runner=runner), 7)
+        self.assertEqual(seen, [(["x", "y"], 3)])
+        self.assertEqual(store.main(["busy", folder.dir]), 0)  # released afterwards
+
+    def test_a_folder_in_use_gives_3_says_so_and_runs_nothing(self):
+        folder = Folder(self)
+        ran = []
+        said = io.StringIO()
+        with store.run_lock(folder.dir), contextlib.redirect_stdout(said):
+            code = store.hold(folder.dir, ["x"], runner=ran.append)
+        self.assertEqual((code, ran), (3, []))
+        self.assertIn("Another teaching run is already working", said.getvalue())
+
+    def test_the_command_line_runs_a_real_command(self):
+        folder = Folder(self)
+        self.assertEqual(store.main(["hold", folder.dir, sys.executable, "-c", "raise SystemExit(5)"]), 5)
+        self.assertEqual(store.main(["hold", folder.dir]), 2)
 
 
 class FailuresTests(unittest.TestCase):

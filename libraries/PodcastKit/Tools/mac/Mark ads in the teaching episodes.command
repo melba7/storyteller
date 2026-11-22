@@ -7,7 +7,8 @@
 # again. If you do not type yes, nothing else runs.
 # (python3 -u keeps what it prints from being held back while it is also copied to the log.)
 # Optional first argument: the name of another Claude model to use instead of the default one.
-# Only one run can work in the folder at a time.
+# Only one run can work in the folder at a time: marking and the steps after it each hold the
+# folder's lock, and when marking finds another run busy the steps after it do not run.
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FOLDER="$HOME/Storyteller Lofi/PodcastTeaching"
@@ -16,7 +17,8 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 
 finish() {
   echo
-  read -r -p "$1 Press Return to close this window. " _
+  echo "$1"
+  read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 
@@ -35,14 +37,20 @@ CODE="${PIPESTATUS[0]}"
 # You did not type yes: nothing was marked, so there is nothing to work out.
 [ "$CODE" = 4 ] && finish "Nothing was marked, because you did not type yes. Double-click again and type yes to start." 0
 
+# Marking did not start: something is not set up, or another run is working in the folder. The
+# steps after marking must not run then.
+if [ "$CODE" != 0 ] && [ "$CODE" != 3 ]; then
+  finish "Something is not set up, or another run is working in the folder (see above). Nothing was marked and the steps after marking did not run." 2
+fi
+
 echo
 echo "Now the steps after marking: habits, model, library, sounds, score and the copy to the phone."
 "$HERE/teach-finish.sh"
 AFTER="$?"
 
+[ "$AFTER" = 3 ] && finish "Another teaching run started while this one was marking, so the steps after marking did not run (see above). Double-click \"Teach the phone again\" when it is done." 2
 [ "$CODE" = 0 ] && [ "$AFTER" != 0 ] && finish "The ads are marked, but not every step after it worked (see the summary above)." 2
 case "$CODE" in
   0) finish "Done. The marks are in $FOLDER/labels and the results are in the phone's folders." ;;
   3) finish "It stopped early (see the last lines above). What was marked is saved and was used for the steps after it. Double-click again to carry on, for example after your usage allowance has reset." 3 ;;
-  *) finish "Something is not set up, or another run is working in the folder (see above). Nothing was marked." 2 ;;
 esac

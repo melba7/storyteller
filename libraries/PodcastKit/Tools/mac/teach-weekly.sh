@@ -5,8 +5,9 @@
 #   1. reads the phone's notes (teach_feedback.py), which lists the episodes to fetch first
 #   2. gathers new episodes, one newest episode per show, plus the wanted ones (teach_collect.py)
 #   3. writes down what is said in them (podcast-transcribe, after building it)
-#   4. has Claude mark the ads in at most 15 episodes (teach_label.py --yes --limit 15). This is the
-#      only step that uses the Claude plan's usage allowance
+#   4. has Claude mark the ads in at most 15 episodes, at most $25 of Claude's own cost estimate
+#      (teach_label.py --yes --limit 15 --cap 25). Every episode that is sent counts towards the 15,
+#      also one that fails. This is the only step that uses the Claude plan's usage allowance
 #   5. runs the steps after marking (teach-finish.sh): habits, model, library, sounds, score, and
 #      the copy to the phone's folders
 # One run at a time is enforced by the tools' lock on the teaching folder. When another run holds
@@ -16,11 +17,15 @@
 # ~/Storyteller Lofi/logs/podcast-teaching.log.
 #
 # launchd starts jobs with no terminal and a short PATH, so the usual places are added to it. The
-# Mac's bash is 3.2: plain variables only. For the tests, TEACH_TOOLS, TEACH_KIT and TEACH_FOLDER
-# can be set (see teach-finish.sh).
+# Mac's bash is 3.2: plain variables only. TEACH_CAP (dollars, at the price Claude itself reports
+# for each call; 15 episodes were estimated at about $1 each, so $25 leaves room) and TEACH_MAX_GB (the most
+# audio the teaching folder keeps) can be set to change the two limits. For the tests, TEACH_TOOLS,
+# TEACH_KIT and TEACH_FOLDER can be set too (see teach-finish.sh).
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TOOLS="${TEACH_TOOLS:-$HERE}"
 FOLDER="${TEACH_FOLDER:-$HOME/Storyteller Lofi/PodcastTeaching}"
+CAP="${TEACH_CAP:-25}"
+MAX_GB="${TEACH_MAX_GB:-12}"
 LOG_FOLDER="$HOME/Storyteller Lofi/logs"
 LOG="$LOG_FOLDER/podcast-teaching.log"
 export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.claude/local"
@@ -65,8 +70,12 @@ if [ "$?" -ne 0 ]; then
   STATUS=1
 fi
 
-step "Step 2 of 5: gathering new episodes" $CAFFEINATE python3 -u "$TOOLS/teach_collect.py" --folder "$FOLDER" --per-show 1
-if [ "$?" -ne 0 ]; then
+step "Step 2 of 5: gathering new episodes" $CAFFEINATE python3 -u "$TOOLS/teach_collect.py" --folder "$FOLDER" --per-show 1 --max-gb "$MAX_GB"
+GATHERED="$?"
+if [ "$GATHERED" -eq 3 ]; then
+  say "Nothing more can be gathered: the audio kept in the teaching folder has reached its limit of $MAX_GB GB. To go on, raise TEACH_MAX_GB (the number near the top of teach-weekly.sh). The run goes on with what is already there."
+  STATUS=1
+elif [ "$GATHERED" -ne 0 ]; then
   say "Gathering did not work (see above). The run goes on with what is already there."
   STATUS=1
 fi
@@ -102,7 +111,7 @@ else
   fi
 fi
 
-step "Step 4 of 5: having Claude mark the ads in at most 15 episodes (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --limit 15
+step "Step 4 of 5: having Claude mark the ads in at most 15 episodes, at most about \$$CAP (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --limit 15 --cap "$CAP"
 if [ "$?" -ne 0 ]; then
   say "Marking did not finish (see above). What was marked is saved. The run goes on."
   STATUS=1

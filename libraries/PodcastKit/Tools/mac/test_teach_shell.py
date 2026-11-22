@@ -25,7 +25,17 @@ script="$(basename "$1")"
 shift
 echo "python3 $script $*" >> "$CALLS"
 case " $FAIL " in *" $script "*) echo "$script: pretending to fail"; exit 1 ;; esac
-[ "$script" = teach_store.py ] && { [ -n "$BUSY" ] && exit 3; exit 0; }
+for pair in $CODES; do
+  [ "${pair%%=*}" = "$script" ] && { echo "$script: ending with ${pair#*=}"; exit "${pair#*=}"; }
+done
+if [ "$script" = teach_store.py ]; then
+  [ -n "$BUSY" ] && { echo "Another teaching run is already working in this folder."; exit 3; }
+  if [ "$1" = hold ]; then
+    shift 2
+    exec "$@"
+  fi
+  exit 0
+fi
 folder=""
 while [ $# -gt 0 ]; do
   [ "$1" = "--folder" ] && folder="$2"
@@ -110,6 +120,7 @@ class Setup(unittest.TestCase):
         self.program("python3", PYTHON)
         self.program("swift", SWIFT)
         self.program("podcast-teach", TEACH)
+        self.program("caffeinate", '#!/bin/bash\nshift\nexec "$@"\n')
         open(self.calls, "w").close()
 
     def program(self, name, text):
@@ -121,7 +132,7 @@ class Setup(unittest.TestCase):
     def run_script(self, name, **more):
         env = {"HOME": self.home, "PATH": "%s:/usr/bin:/bin" % self.bin, "TEACH_TOOLS": "/stand/in/tools",
                "TEACH_KIT": self.kit, "TMPDIR": os.path.join(self.root, "tmp"), "CALLS": self.calls,
-               "BIN": self.bin, "FAIL": "", "NOOP": "", "BUSY": "", "BUILD_FAILS": ""}
+               "BIN": self.bin, "FAIL": "", "NOOP": "", "BUSY": "", "BUILD_FAILS": "", "CODES": ""}
         env.update(more)
         return subprocess.run(["bash", os.path.join(HERE, name)], env=env, capture_output=True,
                               text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -134,7 +145,7 @@ class Setup(unittest.TestCase):
         """The calls, each as its tool and first words, without the folder arguments."""
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
         return [line.replace(" --folder " + folder, "").replace(" " + folder, "")
-                for line in self.called()]
+                for line in self.called() if " teach_store.py hold" not in line]
 
     def log(self):
         with open(os.path.join(self.home, "Storyteller Lofi", "logs", "podcast-teaching.log")) as f:
@@ -249,16 +260,179 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0)
 
 
+class FinishLockTests(Setup):
+    def test_it_runs_under_the_lock_for_its_whole_length(self):
+        self.run_script("teach-finish.sh")
+        holds = [c for c in self.called() if " teach_store.py hold" in c]
+        self.assertEqual(len(holds), 1)
+        self.assertTrue(holds[0].startswith("python3 teach_store.py hold "))
+        self.assertTrue(holds[0].endswith("teach-finish.sh"), holds[0])
+        # The hold is the first call, so every step is inside it.
+        self.assertEqual(self.called()[0], holds[0])
+
+    def test_another_run_in_the_folder_stops_it_with_exit_3_before_any_step(self):
+        done = self.run_script("teach-finish.sh", BUSY="1")
+        self.assertEqual(done.returncode, 3)
+        self.assertIn("Another teaching run is already working", done.stdout)
+        self.assertEqual(self.short(), [])
+
+    def test_a_publish_that_missed_icloud_does_not_say_the_phone_has_the_results(self):
+        done = self.run_script("teach-finish.sh", CODES="teach_publish.py=3")
+        self.assertEqual(done.returncode, 1)
+        self.assertNotIn("The results are where the phone reads them", done.stdout)
+        self.assertIn("the copy into iCloud Drive did not work", done.stdout)
+        self.assertIn("  Publish: failed", done.stdout)
+
+
+class CommandTests(Setup):
+    MARK = "Mark ads in the teaching episodes.command"
+    AGAIN = "Teach the phone again.command"
+
+    def test_marking_that_finds_another_run_busy_does_not_run_the_steps_after_it(self):
+        done = self.run_script(self.MARK, CODES="teach_label.py=2")
+        self.assertEqual(done.returncode, 2)
+        self.assertIn("the steps after marking did not run", done.stdout)
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_label.py"])
+
+    def test_marking_that_worked_runs_the_steps_after_it(self):
+        done = self.run_script(self.MARK)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("python3 teach_publish.py", " ".join(self.called()))
+
+    def test_marking_that_stopped_early_still_runs_the_steps_after_it(self):
+        done = self.run_script(self.MARK, CODES="teach_label.py=3")
+        self.assertEqual(done.returncode, 3)
+        self.assertIn("python3 teach_publish.py", " ".join(self.called()))
+
+    def test_not_typing_yes_runs_nothing_after_it(self):
+        self.run_script(self.MARK, CODES="teach_label.py=4")
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_label.py"])
+
+    def test_teaching_again_says_so_and_stops_when_a_run_is_busy(self):
+        done = self.run_script(self.AGAIN, BUSY="1")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Another teaching run is already working", done.stdout)
+        self.assertEqual([c.split()[1:3] for c in self.called()], [["teach_store.py", "busy"]])
+
+    def test_teaching_again_runs_when_nothing_is_busy(self):
+        done = self.run_script(self.AGAIN)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        names = [c.split()[1] for c in self.called() if c.startswith("python3")]
+        self.assertEqual(names[:2], ["teach_store.py", "teach_feedback.py"])
+        self.assertIn("teach_publish.py", names)
+
+
+class InstallerTests(Setup):
+    NAME = "Install weekly teaching.command"
+
+    def setUp(self):
+        super().setUp()
+        self.later = os.path.join(self.home, ".local", "bin")
+        os.makedirs(self.later)
+        for name in ("claude", "swift"):
+            self.program_in(self.later, name, "#!/bin/bash\nexit 0\n")
+        os.remove(os.path.join(self.bin, "swift"))
+        self.program_in(self.bin, "plutil", '#!/bin/bash\necho "plutil $*" >> "$CALLS"\n'
+                        '[ -n "$LINT_FAILS" ] && exit 1\nexit 0\n')
+        self.program_in(self.bin, "launchctl", '#!/bin/bash\necho "launchctl $*" >> "$CALLS"\n'
+                        'if [ "$1" = bootstrap ]; then\n  echo x >> "$CALLS.boot"\n'
+                        '  [ -n "$BOOT_FAILS" ] && [ "$(wc -l < "$CALLS.boot")" -le "$BOOT_FAILS" ] && exit 5\n'
+                        'fi\nexit 0\n')
+        self.program_in(self.bin, "id", "#!/bin/bash\necho 501\n")
+        self.plist = os.path.join(self.home, "Library", "LaunchAgents",
+                                  "com.storyteller-lofi.podcast-teaching.plist")
+
+    def program_in(self, folder, name, text):
+        path = os.path.join(folder, name)
+        with open(path, "w") as f:
+            f.write(text)
+        os.chmod(path, 0o755)
+
+    def install(self, folder=None, **more):
+        """Runs the installer (from `folder`, a copy of this folder) and types yes."""
+        folder = folder or HERE
+        env = {"HOME": self.home, "PATH": "%s:/usr/bin:/bin" % self.bin, "TMPDIR": os.path.join(self.root, "tmp"),
+               "CALLS": self.calls, "LINT_FAILS": "", "BOOT_FAILS": ""}
+        env.update(more)
+        return subprocess.run(["bash", os.path.join(folder, self.NAME)], env=env, input="yes\n\n",
+                              capture_output=True, text=True, timeout=60)
+
+    def test_it_installs_when_claude_and_swift_are_on_the_jobs_path(self):
+        done = self.install()
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertTrue(os.path.exists(self.plist))
+        self.assertIn("plutil -lint", " ".join(self.called()))
+        self.assertEqual([n for n in os.listdir(os.path.join(self.root, "tmp"))], [])
+
+    def test_a_missing_claude_or_swift_stops_it_before_anything_is_changed(self):
+        for missing, words in (("claude", "Install Claude Code"), ("swift", "Install Xcode 26")):
+            os.remove(os.path.join(self.later, missing))
+            done = self.install()
+            self.assertEqual(done.returncode, 1, missing)
+            self.assertIn(words, done.stdout)
+            self.assertFalse(os.path.exists(self.plist), missing)
+            self.program_in(self.later, missing, "#!/bin/bash\nexit 0\n")
+
+    def test_a_job_file_that_fails_the_check_is_never_put_in_place(self):
+        done = self.install(LINT_FAILS="1")
+        self.assertEqual(done.returncode, 1)
+        self.assertFalse(os.path.exists(self.plist))
+        self.assertNotIn("launchctl bootstrap", " ".join(self.called()))
+        self.assertEqual(os.listdir(os.path.join(self.root, "tmp")), [])
+
+    def test_a_folder_name_with_xml_characters_is_escaped(self):
+        odd = os.path.join(self.root, "a&b <c>")
+        os.makedirs(odd)
+        for name in (self.NAME, "teach-weekly.sh"):
+            shutil.copy(os.path.join(HERE, name), os.path.join(odd, name))
+        done = self.install(folder=odd)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        import plistlib
+        with open(self.plist, "rb") as f:
+            job = plistlib.load(f)
+        self.assertEqual(job["ProgramArguments"], ["/bin/bash", os.path.join(odd, "teach-weekly.sh")])
+
+    def test_a_start_that_fails_right_after_bootout_is_tried_once_more(self):
+        done = self.install(BOOT_FAILS="1")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(len([c for c in self.called() if c.startswith("launchctl bootstrap")]), 2)
+
+    def test_a_start_that_fails_twice_is_said(self):
+        done = self.install(BOOT_FAILS="2")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Could not start the job", done.stdout)
+
+
 class WeeklyTests(Setup):
     def test_the_steps_run_in_order(self):
         done = self.run_script("teach-weekly.sh")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), [
             "python3 teach_store.py busy", "python3 teach_feedback.py",
-            "python3 teach_collect.py --per-show 1",
+            "python3 teach_collect.py --per-show 1 --max-gb 12",
             "swift build -c release --product podcast-transcribe",
             "swift build -c release --show-bin-path", "python3 teach_transcribe.py --tool %s/podcast-transcribe" % self.bin,
-            "python3 teach_label.py --yes --limit 15"] + FINISH_ORDER)
+            "python3 teach_label.py --yes --limit 15 --cap 25"] + FINISH_ORDER)
+
+    def test_marking_is_limited_by_a_cap_that_can_be_changed(self):
+        self.run_script("teach-weekly.sh")
+        self.assertIn("python3 teach_label.py --yes --limit 15 --cap 25", " ".join(self.short()))
+        open(self.calls, "w").close()
+        self.run_script("teach-weekly.sh", TEACH_CAP="9.5")
+        self.assertIn("--limit 15 --cap 9.5", " ".join(self.short()))
+
+    def test_a_full_audio_folder_ends_non_zero_with_one_plain_sentence(self):
+        done = self.run_script("teach-weekly.sh", CODES="teach_collect.py=3")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("Nothing more can be gathered: the audio kept in the teaching folder has "
+                      "reached its limit of 12 GB", done.stdout)
+        self.assertIn("TEACH_MAX_GB", done.stdout)
+        self.assertNotIn("Gathering did not work", done.stdout)
+        self.assertIn("python3 teach_publish.py", " ".join(self.called()))  # the run goes on
+
+    def test_the_audio_limit_can_be_changed(self):
+        self.run_script("teach-weekly.sh", TEACH_MAX_GB="20")
+        self.assertIn("python3 teach_collect.py --per-show 1 --max-gb 20", " ".join(self.short()))
 
     def test_the_transcriber_is_the_one_that_was_built(self):
         self.run_script("teach-weekly.sh")
@@ -289,8 +463,29 @@ class WeeklyTests(Setup):
         self.assertIn("The transcriber did not build", done.stdout)
 
     def test_it_works_with_a_short_path_as_launchd_gives_it(self):
-        done = self.run_script("teach-weekly.sh", PATH="%s:/usr/bin:/bin" % self.bin)
+        # launchd gives only the system folders. Only python3 may be found there; swift, the
+        # transcriber and caffeinate live in ~/.local/bin, which the script adds to the path itself.
+        later = os.path.join(self.home, ".local", "bin")
+        os.makedirs(later)
+        for name in ("swift", "podcast-teach", "caffeinate"):
+            shutil.move(os.path.join(self.bin, name), os.path.join(later, name))
+        short = os.path.join(self.root, "system")
+        os.makedirs(short)
+        shutil.copy(os.path.join(self.bin, "python3"), os.path.join(short, "python3"))
+        done = self.run_script("teach-weekly.sh", PATH="%s:/usr/bin:/bin:/usr/sbin:/sbin" % short)
         self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("swift build -c release --product podcast-transcribe", self.called())
+
+    def test_a_short_path_without_the_places_it_adds_would_not_find_swift(self):
+        # The same set-up with swift nowhere on the path must fail, so the test above really tests
+        # the added places.
+        short = os.path.join(self.root, "system")
+        os.makedirs(short)
+        shutil.copy(os.path.join(self.bin, "python3"), os.path.join(short, "python3"))
+        os.remove(os.path.join(self.bin, "swift"))
+        done = self.run_script("teach-weekly.sh", PATH="%s:/usr/bin:/bin:/usr/sbin:/sbin" % short)
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("swift is missing", done.stdout)
 
     def test_the_log_gets_a_heading_with_the_date(self):
         self.run_script("teach-weekly.sh")

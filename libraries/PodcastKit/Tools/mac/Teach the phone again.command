@@ -13,7 +13,8 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 
 finish() {
   echo
-  read -r -p "$1 Press Return to close this window. " _
+  echo "$1"
+  read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 
@@ -23,6 +24,11 @@ command -v python3 > /dev/null || finish "python3 is missing. Install Apple's co
 mkdir -p "$LOG_FOLDER" || finish "Could not make $LOG_FOLDER." 2
 # Everything below is shown here and added to the log; pipefail keeps the Python exit codes.
 set -o pipefail
+
+python3 -u "$HERE/teach_store.py" busy "$FOLDER" > /dev/null 2>&1
+if [ "$?" = 3 ]; then
+  finish "Another teaching run is already working in the teaching folder, so nothing was done. Wait for it to finish (or close its window), then double-click this again." 1
+fi
 
 echo "This does not use your Claude usage allowance: nothing new is marked."
 echo "It reads what the phone noted, then works out the habits, trains the model, makes the"
@@ -39,6 +45,7 @@ echo
 "$HERE/teach-finish.sh"
 AFTER="$?"
 
+[ "$AFTER" = 3 ] && finish "Another teaching run started while this one worked, so the steps after marking did not run (see above). Wait for it to finish and double-click this again." 1
 [ "$AFTER" != 0 ] && finish "Not every step worked (see the summary above)." 1
 [ "$NOTES" != 0 ] && finish "The results are in the phone's folders, but the phone's notes could not be used (see above)." 1
 finish "Done. The results are in the phone's folders."

@@ -203,7 +203,7 @@ class PublishTests(Setup):
         self.assertEqual(len([m for m in self.messages if "failed" in m]), 5)
         self.assertTrue(any("Operation not permitted" in m for m in self.messages))
 
-    def test_a_failing_second_folder_does_not_change_exit_0(self):
+    def test_a_failing_second_folder_that_exists_has_its_own_exit_code_and_is_named(self):
         self.all_sources()
 
         def failing(path, data):
@@ -211,7 +211,28 @@ class PublishTests(Setup):
                 raise OSError("no iCloud")
             publish.write_atomically(path, data)
 
-        self.assertEqual(self.main(self.one, self.two, writer=failing), 0)
+        self.assertEqual(self.main(self.one, self.two, writer=failing), 3)
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-model.json")))
+        last = self.messages[-1]
+        self.assertIn("The copy into %s did not work" % self.two, last)
+        self.assertIn("the phone reads this one", last)
+        self.assertEqual(len([m for m in self.messages if m.startswith("The copy into")]), 1)
+
+    def test_a_second_folder_that_does_not_exist_is_not_a_failure(self):
+        self.all_sources()
+        self.assertEqual(self.main(self.one, os.path.join(self.root, "no iCloud here")), 0)
+
+    def test_a_failing_first_folder_is_still_2(self):
+        self.all_sources()
+
+        def failing(path, data):
+            if path.startswith(self.one):
+                raise OSError("disk full")
+            publish.write_atomically(path, data)
+
+        self.assertEqual(self.main(self.one, self.two, writer=failing), 2)
+        self.assertIn("The copy into %s did not work" % self.one, self.messages[-1])
+        self.assertNotIn("the phone reads", self.messages[-1])
 
     def test_no_temporary_file_is_left_behind(self):
         self.all_sources()
@@ -250,6 +271,18 @@ class PublishTests(Setup):
 
     def test_bad_arguments_exit_2(self):
         self.assertEqual(publish.main(["--nonsense"], say=self.say), 2)
+
+
+class WriteTests(Setup):
+    def test_a_file_is_forced_to_disk_before_it_replaces_the_old_one(self):
+        from unittest import mock
+        path = os.path.join(self.one, "x.json")
+        with mock.patch.object(publish.os, "fsync") as fsync, \
+                mock.patch.object(publish.os, "replace", wraps=os.replace) as replace:
+            publish.write_atomically(path, b"{}")
+        self.assertEqual(fsync.call_count, 1)
+        self.assertEqual(replace.call_count, 1)
+        self.assertEqual(read(path), b"{}")
 
 
 class WeakModelTests(Setup):

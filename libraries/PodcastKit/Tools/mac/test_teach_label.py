@@ -161,6 +161,27 @@ class RunTests(RunHelpers, unittest.TestCase):
         self.assertEqual((result["done"], result["stop"]), (2, "limit"))
         self.assertEqual(len(teaching.labels()), 2)
 
+    def test_episodes_that_fail_count_towards_the_limit(self):
+        teaching = Teaching(self, 6)
+        log = []
+        result, said = self.go(teaching, self.fake_ask(text="not json", log=log), limit=2)
+        # Two episodes were sent (each asked twice because the first answer was unreadable).
+        self.assertEqual((result["done"], result["failed"], result["stop"]), (0, 2, "limit"))
+        self.assertEqual(len(log), 4)
+
+    def test_one_failure_among_successes_uses_up_one_place_of_the_limit(self):
+        teaching = Teaching(self, 5)
+        calls = []
+
+        def ask(prompt):
+            calls.append(prompt)
+            if "Episode 1" in prompt and len(calls) <= 2:
+                return {"text": "not json", "cost": 0.1}
+            return {"text": answer((1, 2)), "cost": 0.1}
+
+        result, _ = self.go(teaching, ask, limit=3)
+        self.assertEqual((result["done"], result["failed"], result["stop"]), (2, 1, "limit"))
+
     def test_cap(self):
         teaching = Teaching(self, 4)
         result, said = self.go(teaching, self.fake_ask(cost=0.5), cap=1.0)

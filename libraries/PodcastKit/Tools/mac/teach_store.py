@@ -5,7 +5,9 @@ Standard library only. teach_collect, teach_transcribe, teach_label and teach_ha
 write through this module, so there is one folder name, one version number and one way of saving.
 
 `python3 teach_store.py busy FOLDER` exits 3 when another run holds the lock on FOLDER and 0 when it
-is free (teach-weekly.sh asks this before it starts).
+is free (teach-weekly.sh asks this before it starts). `python3 teach_store.py hold FOLDER COMMAND...`
+runs the command while holding the lock (teach-finish.sh does, for its whole length) and exits with
+the command's code, or 3 when another run holds the lock.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import contextlib
@@ -13,6 +15,7 @@ import fcntl
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -142,17 +145,34 @@ def run_lock(folder):
         handle.close()
 
 
-def main(argv):
-    """The command line: `busy FOLDER`. Exit code 0 the folder is free, 3 another run is working in
-    it, 2 the arguments are wrong."""
-    if len(argv) != 2 or argv[0] != "busy":
-        print("Usage: teach_store.py busy FOLDER")
-        return 2
+def hold(folder, command, runner=subprocess.call):
+    """Runs `command` while holding the folder's run lock, and returns its exit code. When another
+    run holds the lock it says so and returns 3 without running anything."""
     try:
-        with run_lock(os.path.expanduser(argv[1])):
-            return 0
-    except Busy:
+        with run_lock(folder):
+            return runner(command)
+    except Busy as error:
+        print(error)
         return 3
+    except OSError as error:
+        print("The teaching folder %s cannot be used: %s" % (folder, error))
+        return 1
+
+
+def main(argv):
+    """The command line: `busy FOLDER` (exit code 0 the folder is free, 3 another run is working in
+    it) and `hold FOLDER COMMAND...` (runs the command with the lock held, see `hold`). 2 when the
+    arguments are wrong."""
+    if len(argv) == 2 and argv[0] == "busy":
+        try:
+            with run_lock(os.path.expanduser(argv[1])):
+                return 0
+        except Busy:
+            return 3
+    if len(argv) >= 3 and argv[0] == "hold":
+        return hold(os.path.expanduser(argv[1]), argv[2:])
+    print("Usage: teach_store.py busy FOLDER | teach_store.py hold FOLDER COMMAND...")
+    return 2
 
 
 if __name__ == "__main__":
