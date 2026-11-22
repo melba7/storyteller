@@ -117,3 +117,11 @@ One line per lesson.
 - A value that the native player reports before the audio loads (the feed's
   length) is a guess: a rule that compares the place with it, like "played",
   must not read a place past it as the end (2026-11-18, found by Opus).
+- An agent's worktree starts from `origin/main`, not from the branch being
+  worked on: every builder brief starts with `git merge --ff-only <branch>`, and
+  its commits come back by cherry-pick (2026-11-22).
+- Two tools that share a file must be tested against the same text: the Mac
+  wrote shows as `feed` while the phone's reader needed `show` and `id`, and
+  each side's own tests passed (2026-11-22, found before it shipped).
+- The Mac's auto mode also refuses a script that fetches when it is started
+  through the device shell. Leave a `.command` for Mo (2026-11-22).

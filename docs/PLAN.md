@@ -10,7 +10,9 @@ iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test | Ad skipping accuracy
 (start and end, two Fable plans, built by Sonnet, checked twice by Opus): all
 milestones built (PR #52, TestFlight 31.1) | Player, ads and smoothness (S1 to
 S15, from Mo's 31.1 report): all built and checked, waiting on the iOS build and
-the phone
+the phone | The Mac teaches, the phone skips alone (T1 to T9, Mo's ask
+2026-11-22): T1 to T6 built and tested, T7 (the app wiring) and the checks in
+progress
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1158,6 +1160,51 @@ Opus checked it at extra effort (one SHOULD-FIX per half, all fixed).
       the S9 flows run once on main and then on this branch, and the
       first-seconds question (H1, not this round).
 
+### The Mac teaches, the phone skips alone (Mo's ask, 2026-11-22)
+
+Mo's report on build 32.1: an ad has played "a big chunk" before it is skipped,
+the show's own promos ("come to a show") are missed, "generally not functional".
+Mo's rule: the phone must skip ads alone, and the Mac may only teach it. Fable
+planned it (the Claude Doc "Podcast ad skipping rethink",
+https://claude.ai/artifact/VNrsKHbqDXvyijXHBdoZ4s), Sonnet builds it in parallel
+worktrees, Opus checks it at extra effort, Fable does the final check. The
+design and the contracts are in `docs/PODCASTS-ADS-TEACHING.md`.
+
+- [x] **T1 The Mac's teaching tools**: gather the newest episodes of the
+      followed shows, transcribe them, have Claude mark four sorts of stretch
+      (through `claude -p`, after a typed "yes"), work out each show's start
+      habits (`Tools/mac/teach_*.py`). Opus found 3 serious and 7 smaller
+      problems; all fixed with tests.
+- [x] **T2 The backups in PodcastKit**: four sorts with their own switches (ad,
+      own plug, promo, credits), word rules for promos (`AdPromoRules`), the
+      small word model and its trainer (`AdWordModel`, `teach_train.py`), the
+      library of known ads (`AdLibrary`, `teach_library.py`), start habits
+      (`ShowHabits`, a 5 second wait for shows that open with an ad).
+- [x] **T3 Finders that never wait for Apple's model**: `LocalAds` (rules and
+      the small model), the kind-aware `AdJoin`, `LocalAdsFile` (adds local ads
+      to an episode's files, or saves them as its result), `TeachingFiles`.
+- [x] **T4 The scorecard**: `podcast-teach score` runs the local finders over
+      the marked episodes and prints what was caught, heard and cut, per sort
+      and per show, what each layer adds, and what changed since the last run.
+- [x] **T5 Matching by sound**: `podcast-teach sounds` makes prints of the
+      marked ads from the MP3 frames, and `AdSoundScanner` finds them in a file
+      as it arrives, with no decoding.
+- [x] **T6 The Mac side of the extras**: the phone's notes become a list of
+      episodes to gather first (`teach_feedback.py`), a weak model is not
+      published, `teaching.json` lists what was published, one finish script,
+      files to double-click, and a weekly launchd job.
+- [ ] **T7 The app**: the finder and the stream's first minutes run the local
+      layers first and keep their ads whatever Apple's model does; the wait
+      before the audio follows the show's habits; four switches; a Skip ad
+      button; notes and the diary go to the linked folder; the teaching files
+      come from it; an "Ad skipping results" page.
+- [ ] **T8 Opus check of the round**, then fixes.
+- [ ] **T9 Opus bug check of the whole Podcasts section** (Mo's ask), then
+      fixes.
+- [ ] **Waits on Mo**: the first teaching run on the Mac ("Gather episodes for
+      teaching", then the OK for Claude to mark them), the merge, and the phone
+      steps after the TestFlight build.
+
 ## Later
 
 - Podcasts: with a dark Podcasts theme on a light iPhone (or the other way
@@ -1172,6 +1219,14 @@ Opus checked it at extra effort (one SHOULD-FIX per half, all fixed).
   while it plays are not avoided until the next load.
 - Podcasts: since the Books look, Appearance's Dark and Extra Dark are both
   black and differ only in their accent colour.
+
+- Podcasts ads: the head scan stops at three minutes; decide from the diary
+  whether it should go on. A missed-ad tap jumps 30 seconds; it could end where
+  the small model thinks the stretch ends and teach the phone's memory at once.
+  `AdCleanup`'s own merge is not kind-aware. The teaching run transcribes
+  everything as US English, a feed without dates that lists its oldest episode
+  first gives the oldest episodes, and a feed with no guids makes a new id when
+  an audio address changes.
 
 - Run lint (`oxlint` on fork paths) in Fork CI too.
 - Podcasts: `savePlayback` notifies the library on every 15 s save, so open

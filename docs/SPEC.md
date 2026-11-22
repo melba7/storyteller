@@ -103,6 +103,23 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   turned off per show. The hosts' own plugs (Patreon, merch) are skipped too,
   under their own switch. Check: on 3 episodes Mo picks, most ads (4 in 5) are
   skipped and at most one skip cuts the show.
+- The phone skips ads alone, whether or not Apple Intelligence can be asked and
+  whether or not the Mac is on (Mo's rule, 2026-11-22). There are four sorts,
+  each with its own switch: sponsor ads, the hosts' own plugs, promos for the
+  show's or network's other things, and intros and credits (off until turned
+  on). Check: with Apple Intelligence off, a downloaded episode still shows its
+  ads and skips them.
+- The Mac teaches the phone from Mo's own shows: it gathers episodes, Claude
+  marks the ads (after Mo's OK), and it makes a small model, a library of known
+  ads, each show's start habits and sound prints, which reach the phone through
+  the linked iCloud folder. A scorecard on episodes the model never saw says how
+  many ads are caught and how much show is cut. Check: "Score the ad skipping"
+  prints the scorecard, and the phone's results page says what the Mac taught.
+- The player has a Skip ad button for an ad that was missed. What the listener
+  skips, takes back and marks as missed goes back to the Mac, which gathers
+  those episodes first. An "Ad skipping results" page shows the tally per show.
+  Check: a tap on Skip ad jumps ahead, and the next "Teach the phone again"
+  lists that episode.
 
 ## Out of scope (v1)
 
@@ -111,14 +128,16 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
 - The shelved lofi music (`shelved/lofi-music/`).
 - Publishing to the App Store or sharing builds with others.
 - Android.
-- Paid ad detection (Claude Haiku) and Apple's cloud model in the base podcasts
-  version; ad skipping in streamed episodes.
+- Paid ad detection on the phone (Claude Haiku) and Apple's cloud model. Any
+  step that needs the Mac or the network when Play is pressed.
 - Scoring the whole server library (only chosen books).
 
 ## Assumptions
 
 - The phone gets builds through TestFlight; the iPhone can't use Developer Mode.
 - Scoring uses Claude through Mo's plan on the Mac (Opus).
+- Marking the ads of teaching episodes uses Claude through Mo's plan on the Mac,
+  only after Mo's OK.
 - Podcasts are in English, and Apple Intelligence is on on the iPhone 15 Pro
   (iOS 26 or later).
 - Recordings come from Freesound (personal edition) and Wikimedia Commons

@@ -14,16 +14,16 @@ working.
 
 ## The layers on the phone
 
-| Layer             | Needs                        | Where                                      |
-| ----------------- | ---------------------------- | ------------------------------------------ |
-| Word rules        | nothing                      | `AdHeadRules`, `AdPromoRules`              |
-| Small model       | `ad-model.json` from the Mac | `AdWordModel`                              |
-| Known ads         | the phone's own memory, plus | `KnownAds`, `AdLibrary`                    |
-|                   | `ad-library.json`            |                                            |
-| Sounds            | `ad-sounds.json`             | `AdSoundScanner` in `PodcastAudioMatch`    |
-| Apple's model     | Apple Intelligence           | `AppleAdDetector` in `PodcastAdsOnDevice`  |
-| Chapters          | chapters in the file         | `ChapterAds`                               |
-| The listener      | a tap                        | Skip ad, Undo, going back after a skip     |
+| Layer         | Needs                        | Where                                     |
+| ------------- | ---------------------------- | ----------------------------------------- |
+| Word rules    | nothing                      | `AdHeadRules`, `AdPromoRules`             |
+| Small model   | `ad-model.json` from the Mac | `AdWordModel`                             |
+| Known ads     | the phone's own memory, plus | `KnownAds`, `AdLibrary`                   |
+|               | `ad-library.json`            |                                           |
+| Sounds        | `ad-sounds.json`             | `AdSoundScanner` in `PodcastAudioMatch`   |
+| Apple's model | Apple Intelligence           | `AppleAdDetector` in `PodcastAdsOnDevice` |
+| Chapters      | chapters in the file         | `ChapterAds`                              |
+| The listener  | a tap                        | Skip ad, Undo, going back after a skip    |
 
 `LocalAds` runs the word rules and the small model together. `AdJoin.join` joins
 what the layers found: ads of one kind that touch become one, and where two
@@ -60,21 +60,21 @@ never committed. `teach_publish.py` copies four files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
 the phone has linked.
 
-| File                | Made by                 | Holds                                                |
-| ------------------- | ----------------------- | ---------------------------------------------------- |
-| `ad-model.json`     | `teach_train.py`        | weights of the small word model                      |
-| `ad-library.json`   | `teach_library.py`      | the words of ads met in marked episodes              |
-| `show-habits.json`  | `teach_habits.py`       | per show: how many episodes open with an ad          |
-| `ad-sounds.json`    | `podcast-teach sounds`  | the sound prints of marked ads                       |
-| `teaching.json`     | `teach_publish.py`      | the four files' sizes and SHA-256, read first        |
+| File               | Made by                | Holds                                         |
+| ------------------ | ---------------------- | --------------------------------------------- |
+| `ad-model.json`    | `teach_train.py`       | weights of the small word model               |
+| `ad-library.json`  | `teach_library.py`     | the words of ads met in marked episodes       |
+| `show-habits.json` | `teach_habits.py`      | per show: how many episodes open with an ad   |
+| `ad-sounds.json`   | `podcast-teach sounds` | the sound prints of marked ads                |
+| `teaching.json`    | `teach_publish.py`     | the four files' sizes and SHA-256, read first |
 
 All are JSON objects with `"version": 1` and stay under 4.5 MB (the phone
 refuses a file over 5 MB).
 
 - `ad-model.json`:
   `{"version", "buckets": 262144, "classes": ["none", "sponsor", "network_promo", "host_ask", "intro_credits"], "thresholds": {...}, "weights": {"<bucket>": [5 numbers]}, "trained": {"writtenAt", "episodes", "lines", "shelf", "heldOut": {"episodes", "lines", "anyAd": {"precision", "recall"}, "classes": {...}}}}`.
-  A file with no weights is refused. `teach_publish.py` does not publish a
-  model whose held-out precision for any ad is below 0.85.
+  A file with no weights is refused. `teach_publish.py` does not publish a model
+  whose held-out precision for any ad is below 0.85.
 - `ad-library.json`:
   `{"version", "writtenAt", "ads": [{"feed", "scope": "show" | "all", "sort", "who", "text", "length", "seen"}]}`.
 - `show-habits.json`:
@@ -88,8 +88,8 @@ refuses a file over 5 MB).
 **Shows are named by their feed address in the Mac's files.** The phone names a
 show by its own id. The app tells the native side which feed is which show
 (`setTeachingShows`), and the phone converts when it reads the files. Feed
-addresses are compared as "feed keys": no scheme, no `www.`, lower-case host,
-no fragment, no closing slash (`feedKey` in `applePodcasts.ts`, `FeedKey` in
+addresses are compared as "feed keys": no scheme, no `www.`, lower-case host, no
+fragment, no closing slash (`feedKey` in `applePodcasts.ts`, `FeedKey` in
 PodcastKit).
 
 ## From the phone back to the Mac
@@ -108,18 +108,18 @@ The phone writes two files into `Podcasts/` of its linked folder:
 
 Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 
-| Function                                                        | Returns                                              |
-| --------------------------------------------------------------- | ---------------------------------------------------- |
-| `getAdSkipSettings()`                                           | `{skipAds, skipOwnPlugs, skipPromos, skipCredits}`   |
-| `setAdSkipSettings(skipAds, skipOwnPlugs, skipPromos, skipCredits)` | nothing                                          |
-| `skipAdNow()`                                                   | `{to, known}` or null when nothing is loaded         |
-| `readPendingAdNotes()`                                          | the pending notes as JSON lines, "" when none        |
-| `removePendingAdNotes(count)`                                   | nothing; drops the first `count` lines               |
-| `getAdTally()`                                                  | JSON text, see below                                 |
-| `readSkipLogText()`                                             | the skip log and diary text, or null                 |
-| `installTeachingFile(name, text, sha256)`                       | true when the file was checked and installed         |
-| `setTeachingShows(json)`                                        | nothing; `json` is `{"<feed key>": "<show id>"}`     |
-| `getTeachingState()`                                            | JSON text, see below                                 |
+| Function                                                            | Returns                                            |
+| ------------------------------------------------------------------- | -------------------------------------------------- |
+| `getAdSkipSettings()`                                               | `{skipAds, skipOwnPlugs, skipPromos, skipCredits}` |
+| `setAdSkipSettings(skipAds, skipOwnPlugs, skipPromos, skipCredits)` | nothing                                            |
+| `skipAdNow()`                                                       | `{to, known}` or null when nothing is loaded       |
+| `readPendingAdNotes()`                                              | the pending notes as JSON lines, "" when none      |
+| `removePendingAdNotes(count)`                                       | nothing; drops the first `count` lines             |
+| `getAdTally()`                                                      | JSON text, see below                               |
+| `readSkipLogText()`                                                 | the skip log and diary text, or null               |
+| `installTeachingFile(name, text, sha256)`                           | true when the file was checked and installed       |
+| `setTeachingShows(json)`                                            | nothing; `json` is `{"<feed key>": "<show id>"}`   |
+| `getTeachingState()`                                                | JSON text, see below                               |
 
 - A pending note is
   `{"v": 1, "at": <ms>, "what", "episode": "<episode id>", "show": "<show id or empty>", "start", "end": <seconds or null>, "kind"}`.
@@ -133,9 +133,9 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 
 Native module `LofiScore` (`modules/lofi-score`):
 
-| Function                             | Returns                                                                       |
-| ------------------------------------ | ----------------------------------------------------------------------------- |
-| `writeLinkedFolderFile(path, text)`  | `{status: "written"}`, `{status: "notLinked" \| "folderGone"}` or `{status: "unwritable", message}` |
+| Function                            | Returns                                                                                             |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `writeLinkedFolderFile(path, text)` | `{status: "written"}`, `{status: "notLinked" \| "folderGone"}` or `{status: "unwritable", message}` |
 
 ## Measuring
 
