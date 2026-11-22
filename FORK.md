@@ -70,8 +70,9 @@ Files and folders that belong to the fork, which upstream never touches:
   the transcripts and the ad finder (`PodcastAds`, with the Apple-only
   `PodcastAdsOnDevice`) and the chapters (`PodcastChapters`: the feed's JSON
   chapters, an ID3 reader written from the ID3v2.3 and v2.4 specs, and the rules
-  for the current, previous and next chapter and for skipping), each with a
-  podspec so CocoaPods builds it from source for the app.
+  for the current, previous and next chapter and for skipping) and the audio
+  matching (`PodcastAudioMatch`: MP3 frames and the ad sounds the Mac taught),
+  each with a podspec so CocoaPods builds it from source for the app.
 - `applications/mobile/modules/podcasts/`: its Expo module (iOS only, it fetches
   a feed, reads it with `PodcastFeed` and plays episodes) and the JavaScript
   side: the library in its own SQLite file (`podcasts.db`), Apple's directory
