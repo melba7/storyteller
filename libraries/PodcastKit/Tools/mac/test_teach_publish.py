@@ -10,7 +10,12 @@ import unittest
 import teach_publish as publish
 
 NAMES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
-         ("habits.json", "show-habits.json"))
+         ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"))
+GOOD = {"version": 1, "trained": {"heldOut": {"anyAd": {"precision": 0.9, "recall": 0.5}}}}
+
+
+def model(precision):
+    return {"version": 1, "trained": {"heldOut": {"anyAd": {"precision": precision}}}}
 
 
 def read(path):
@@ -39,6 +44,8 @@ class Setup(unittest.TestCase):
     def source(self, name, value=None, raw=None):
         path = os.path.join(self.teaching, name)
         with open(path, "wb") as f:
+            if value is None and name == "ad-model.json":
+                value = GOOD
             f.write(raw if raw is not None else json.dumps(value or {"version": 1, "n": name})
                     .encode("utf-8"))
         return path
@@ -47,8 +54,8 @@ class Setup(unittest.TestCase):
         for name, _ in NAMES:
             self.source(name)
 
-    def main(self, *folders, **kw):
-        arguments = ["--folder", self.teaching]
+    def main(self, *folders, extra=(), **kw):
+        arguments = ["--folder", self.teaching] + list(extra)
         for folder in folders:
             arguments += ["--to", folder]
         return publish.main(arguments, say=self.say, **kw)
@@ -96,7 +103,7 @@ class PublishTests(Setup):
             for source, target in NAMES:
                 self.assertEqual(read(self.published(folder, target)),
                                  read(os.path.join(self.teaching, source)))
-        self.assertEqual(len([m for m in self.messages if "written" in m]), 6)
+        self.assertEqual(len([m for m in self.messages if "written" in m]), 10)
 
     def test_unchanged_content_is_not_written_again(self):
         self.all_sources()
@@ -106,7 +113,7 @@ class PublishTests(Setup):
         self.messages.clear()
         self.assertEqual(self.main(self.one), 0)
         self.assertEqual(os.stat(path).st_mtime, 1000)
-        self.assertEqual(len([m for m in self.messages if "unchanged" in m]), 3)
+        self.assertEqual(len([m for m in self.messages if "unchanged" in m]), 5)
 
     def test_the_writer_is_not_called_for_unchanged_content(self):
         self.all_sources()
@@ -117,13 +124,14 @@ class PublishTests(Setup):
             publish.write_atomically(path, data)
 
         self.main(self.one, writer=counting)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 5)
         self.main(self.one, writer=counting)
-        self.assertEqual(len(calls), 3)
+        self.assertEqual(len(calls), 5)
         self.source("ad-library.json", {"version": 1, "n": "changed"})
         self.main(self.one, writer=counting)
-        self.assertEqual(len(calls), 4)
-        self.assertTrue(calls[-1].endswith("ad-library.json"))
+        self.assertEqual(len(calls), 7)
+        self.assertTrue(calls[-2].endswith("ad-library.json"))
+        self.assertTrue(calls[-1].endswith("teaching.json"))
         self.assertIn(b"changed", read(self.published(self.one, "ad-library.json")))
 
     def test_a_missing_source_is_skipped_with_one_line(self):
@@ -137,7 +145,7 @@ class PublishTests(Setup):
 
     def test_nothing_to_publish_exits_0(self):
         self.assertEqual(self.main(self.one), 0)
-        self.assertEqual(len(self.messages), 3)
+        self.assertEqual(len(self.messages), 4)
         self.assertEqual(os.listdir(self.one), [])
 
     def test_an_invalid_source_is_refused_and_says_why(self):
@@ -166,7 +174,7 @@ class PublishTests(Setup):
         self.all_sources()
         missing = os.path.join(self.root, "not there")
         self.assertEqual(self.main(self.one, missing), 0)
-        self.assertEqual(len(os.listdir(os.path.join(self.one, "Podcasts"))), 3)
+        self.assertEqual(len(os.listdir(os.path.join(self.one, "Podcasts"))), 5)
         self.assertFalse(os.path.exists(missing))
         self.assertTrue(any("not there" in m and "does not exist" in m for m in self.messages))
 
@@ -174,7 +182,7 @@ class PublishTests(Setup):
         self.all_sources()
         missing = os.path.join(self.root, "not there")
         self.assertEqual(self.main(missing, self.one), 2)
-        self.assertEqual(len(os.listdir(os.path.join(self.one, "Podcasts"))), 3)
+        self.assertEqual(len(os.listdir(os.path.join(self.one, "Podcasts"))), 5)
 
     def test_nowhere_to_write_is_exit_2(self):
         self.all_sources()
@@ -189,8 +197,8 @@ class PublishTests(Setup):
             publish.write_atomically(path, data)
 
         self.assertEqual(self.main(self.one, self.two, writer=failing), 2)
-        self.assertEqual(len(os.listdir(os.path.join(self.two, "Podcasts"))), 3)
-        self.assertEqual(len([m for m in self.messages if "failed" in m]), 3)
+        self.assertEqual(len(os.listdir(os.path.join(self.two, "Podcasts"))), 5)
+        self.assertEqual(len([m for m in self.messages if "failed" in m]), 5)
         self.assertTrue(any("Operation not permitted" in m for m in self.messages))
 
     def test_a_failing_second_folder_does_not_change_exit_0(self):
@@ -209,7 +217,8 @@ class PublishTests(Setup):
         self.main(self.one, self.two)
         for folder in (self.one, self.two):
             self.assertEqual(sorted(os.listdir(os.path.join(folder, "Podcasts"))),
-                             ["ad-library.json", "ad-model.json", "show-habits.json"])
+                             ["ad-library.json", "ad-model.json", "ad-sounds.json", "show-habits.json",
+                              "teaching.json"])
 
     def test_a_failed_replace_leaves_no_temporary_file(self):
         folder = os.path.join(self.root, "Podcasts")
@@ -239,6 +248,111 @@ class PublishTests(Setup):
 
     def test_bad_arguments_exit_2(self):
         self.assertEqual(publish.main(["--nonsense"], say=self.say), 2)
+
+
+class WeakModelTests(Setup):
+    def test_a_model_below_the_bar_is_not_copied_but_the_others_are(self):
+        self.all_sources()
+        self.source("ad-model.json", model(0.62))
+        self.assertEqual(self.main(self.one), 0, self.messages)
+        self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")))
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-library.json")))
+        said = [m for m in self.messages if "ad-model.json" in m]
+        self.assertEqual(len(said), 1)
+        self.assertIn("62%", said[0])
+        self.assertIn("85%", said[0])
+        self.assertNotIn("ad-model.json", json.loads(
+            read(self.published(self.one, "teaching.json")))["files"])
+
+    def test_exactly_the_bar_is_good_enough(self):
+        self.source("ad-model.json", model(0.85))
+        self.assertEqual(self.main(self.one), 0)
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-model.json")))
+
+    def test_a_missing_or_null_check_is_weak(self):
+        for value in ({"version": 1}, model(None), {"version": 1, "trained": {"heldOut": []}},
+                      model("high"), model(True)):
+            self.messages.clear()
+            self.source("ad-model.json", value)
+            self.assertEqual(self.main(self.one), 0, value)
+            self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")), value)
+            self.assertEqual(len(self.messages), 4, value)
+            self.assertIn("no precision", [m for m in self.messages if "ad-model" in m][0])
+
+    def test_a_model_already_there_is_left_alone(self):
+        self.source("ad-model.json", model(0.9))
+        self.main(self.one)
+        before = read(self.published(self.one, "ad-model.json"))
+        self.source("ad-model.json", model(0.4))
+        self.assertEqual(self.main(self.one), 0)
+        self.assertEqual(read(self.published(self.one, "ad-model.json")), before)
+        self.assertIn("ad-model.json", json.loads(
+            read(self.published(self.one, "teaching.json")))["files"])
+
+    def test_the_bar_can_be_changed(self):
+        self.source("ad-model.json", model(0.62))
+        self.assertEqual(self.main(self.one, extra=("--min-precision", "0.6")), 0)
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-model.json")))
+
+    def test_a_bad_bar_exits_2(self):
+        for text in ("2", "-0.1", "lots"):
+            self.assertEqual(self.main(self.one, extra=("--min-precision", text)), 2, text)
+
+
+class TeachingListTests(Setup):
+    def list_of(self, folder):
+        return json.loads(read(self.published(folder, "teaching.json")))
+
+    def test_it_lists_the_files_with_hash_and_size(self):
+        import hashlib
+        self.all_sources()
+        self.assertEqual(self.main(self.one, self.two), 0)
+        for folder in (self.one, self.two):
+            listing = self.list_of(folder)
+            self.assertEqual(listing["version"], 1)
+            self.assertIsInstance(listing["writtenAt"], int)
+            self.assertEqual(sorted(listing["files"]), ["ad-library.json", "ad-model.json",
+                                                         "ad-sounds.json", "show-habits.json"])
+            data = read(self.published(folder, "ad-model.json"))
+            self.assertEqual(listing["files"]["ad-model.json"],
+                             {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)})
+
+    def test_it_lists_what_is_there_now_not_what_was_copied(self):
+        os.makedirs(os.path.join(self.one, "Podcasts"))
+        with open(self.published(self.one, "ad-library.json"), "wb") as f:
+            f.write(b"older")
+        self.source("habits.json")
+        self.assertEqual(self.main(self.one), 0)
+        self.assertEqual(sorted(self.list_of(self.one)["files"]),
+                         ["ad-library.json", "show-habits.json"])
+
+    def test_it_is_not_written_again_when_the_files_part_is_the_same(self):
+        self.all_sources()
+        times = iter([1000, 2000, 3000])
+        self.main(self.one, now=lambda: next(times))
+        path = self.published(self.one, "teaching.json")
+        first = read(path)
+        self.main(self.one, now=lambda: next(times))
+        self.assertEqual(read(path), first)
+        self.source("habits.json", {"version": 1, "n": "new"})
+        self.main(self.one, now=lambda: next(times))
+        self.assertEqual(self.list_of(self.one)["writtenAt"], 2000)
+
+    def test_nothing_published_and_no_podcasts_folder_writes_no_list(self):
+        self.assertEqual(self.main(self.one), 0)
+        self.assertFalse(os.path.exists(os.path.join(self.one, "Podcasts")))
+
+    def test_a_list_that_cannot_be_written_is_reported(self):
+        self.all_sources()
+
+        def failing(path, data):
+            if path.endswith("teaching.json"):
+                raise OSError("disk full")
+            publish.write_atomically(path, data)
+
+        self.assertEqual(self.main(self.one, self.two, writer=failing), 2)
+        self.assertTrue(any("teaching.json" in m and "disk full" in m for m in self.messages))
+        self.assertTrue(os.path.exists(self.published(self.two, "ad-model.json")))
 
 
 if __name__ == "__main__":

@@ -7,8 +7,16 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
   ad-model.json    from <folder>/ad-model.json    (teach_train.py)
   ad-library.json  from <folder>/ad-library.json  (teach_library.py)
   show-habits.json from <folder>/habits.json      (teach_habits.py)
+  ad-sounds.json   from <folder>/ad-sounds.json   (podcast-teach sounds)
+  teaching.json    a small list of the four files above that are in the Podcasts folder now,
+                   each with its sha256 and size, so the phone fetches a big file only when its
+                   hash changed. It is rewritten only when that list changes.
 
-  teach_publish.py [--folder F] [--to FOLDER ...]
+  teach_publish.py [--folder F] [--to FOLDER ...] [--min-precision 0.85]
+
+A weak model is not published: ad-model.json is copied only when trained.heldOut.anyAd.precision
+in it is at least --min-precision. Otherwise the tool says so in one sentence, leaves a model that
+is already at the destination alone and still publishes the other files (this is not a failure).
 
 Without --to the destinations are the ones apple_podcasts_export.py writes to: the LofiMusic
 folder under ~/Storyteller Lofi and its copy in iCloud Drive. A source that does not exist is
@@ -22,10 +30,12 @@ nothing to publish), 2 a source reached no folder or not the first one, or the a
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
+import hashlib
 import json
 import os
 import sys
 import tempfile
+import time
 
 import teach_store
 from apple_podcasts_export import default_folders
@@ -33,7 +43,10 @@ from apple_podcasts_export import default_folders
 LIMIT = 4500000
 SUBFOLDER = "Podcasts"
 FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
-         ("habits.json", "show-habits.json"))
+         ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"))
+MODEL = "ad-model.json"
+LIST = "teaching.json"
+MIN_PRECISION = 0.85
 
 
 def checked(path, limit=LIMIT):
@@ -53,6 +66,31 @@ def checked(path, limit=LIMIT):
             or value["version"] != 1:
         raise ValueError("it is not an object with \"version\": 1")
     return data
+
+
+def precision_of(data):
+    """The number at trained.heldOut.anyAd.precision in a model's JSON bytes, or None when it is
+    missing, null or not a number."""
+    value = json.loads(data)
+    for key in ("trained", "heldOut", "anyAd", "precision"):
+        value = value.get(key) if isinstance(value, dict) else None
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
+def percent(value):
+    return "%g%%" % round(value * 100, 1)
+
+
+def weak_model(data, minimum):
+    """A sentence saying why the model is not good enough to publish, or None when it is."""
+    precision = precision_of(data)
+    if precision is None:
+        return ("the model has no precision number from the check on held-out episodes, so it "
+                "cannot be trusted yet (%s is needed)" % percent(minimum))
+    if precision < minimum:
+        return ("the model is not good enough yet: it found ads with a precision of %s, and %s "
+                "is needed" % (percent(precision), percent(minimum)))
+    return None
 
 
 def write_atomically(path, data):
@@ -85,10 +123,48 @@ def put(folder, name, data, writer):
     return "written"
 
 
-def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default_folders):
+def share(value):
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a number" % value)
+    if not 0 <= number <= 1:
+        raise argparse.ArgumentTypeError("%r is not between 0 and 1" % value)
+    return number
+
+
+def update_list(destination, writer, now):
+    """Writes <destination>/Podcasts/teaching.json for the teaching files that are in that folder
+    now, hashed as they are on disk: "written", "unchanged", or None when the destination has no
+    Podcasts folder yet. Raises OSError."""
+    directory = os.path.join(destination, SUBFOLDER)
+    if not os.path.isdir(directory):
+        return None
+    files = {}
+    for _, target in FILES:
+        try:
+            with open(os.path.join(directory, target), "rb") as f:
+                data = f.read()
+        except FileNotFoundError:
+            continue
+        files[target] = {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+    try:
+        with open(os.path.join(directory, LIST), "rb") as f:
+            if json.loads(f.read()).get("files") == files:
+                return "unchanged"
+    except (OSError, ValueError, AttributeError):
+        pass
+    text = json.dumps({"version": 1, "writtenAt": now(), "files": files}, indent=1)
+    writer(os.path.join(directory, LIST), text.encode("utf-8"))
+    return "written"
+
+
+def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default_folders,
+         now=lambda: int(time.time() * 1000)):
     parser = argparse.ArgumentParser(prog="teach_publish.py")
     parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--to", action="append", metavar="FOLDER")
+    parser.add_argument("--min-precision", type=share, default=MIN_PRECISION)
     try:
         options = parser.parse_args(argv)
     except SystemExit:
@@ -106,6 +182,12 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
             say("%s: not copied, %s is not fit to publish: %s." % (target, source, error))
             exit_code = 2
             continue
+        if target == MODEL:
+            reason = weak_model(data, options.min_precision)
+            if reason:
+                say("%s: not copied, %s. A model already in the phone's folder is left as it is."
+                    % (target, reason))
+                continue
         for number, destination in enumerate(destinations):
             try:
                 outcome = put(destination, target, data, writer)
@@ -116,6 +198,16 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
                 say("%s in %s: %s." % (target, destination, outcome))
             if number == 0 and outcome is None:
                 exit_code = 2
+    for number, destination in enumerate(destinations):
+        try:
+            outcome = update_list(destination, writer, now)
+        except OSError as error:
+            say("%s in %s: failed (%s)." % (LIST, destination, error))
+            if number == 0:
+                exit_code = 2
+        else:
+            if outcome:
+                say("%s in %s: %s." % (LIST, destination, outcome))
     return exit_code
 
 
