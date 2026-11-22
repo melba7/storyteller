@@ -196,13 +196,23 @@ export type AdSkipped = {
   end: number
   /** Seconds: how long the ad was. */
   length: number
+  /** The sort: "ad", "ownPlug", "promo" or "credits". Missing from an older build: an ad. */
+  kind?: string
 }
 
 /** The listener undid the skip of the ad that started here. */
 export type AdUndone = { episodeId: string; start: number }
 
-/** The two switches for skipping ads, both on until turned off. */
-export type AdSkipSettings = { skipAds: boolean; skipOwnPlugs: boolean }
+/**
+ * The four switches for skipping: sponsor ads, the hosts' own plugs and promos are on until
+ * turned off, intros and credits are off until turned on.
+ */
+export type AdSkipSettings = {
+  skipAds: boolean
+  skipOwnPlugs: boolean
+  skipPromos: boolean
+  skipCredits: boolean
+}
 
 /** An episode in Up Next, with what the player needs to start it without JavaScript. */
 export type UpNextItem = {
@@ -382,7 +392,35 @@ type PodcastsNativeModule = {
   /** An episode's saved ads as JSON (`AdsFile` in PodcastAds), or null. */
   getAds(episodeId: string): Promise<string | null>
   getAdSkipSettings(): Promise<AdSkipSettings>
-  setAdSkipSettings(skipAds: boolean, skipOwnPlugs: boolean): Promise<void>
+  setAdSkipSettings(
+    skipAds: boolean,
+    skipOwnPlugs: boolean,
+    skipPromos: boolean,
+    skipCredits: boolean,
+  ): Promise<void>
+  /**
+   * The Skip ad button: jumps ahead to the end of the ad the phone knows here, or 30 seconds
+   * when it knows none (and notes the miss for the Mac). Null when nothing is loaded.
+   */
+  skipAdNow(): Promise<{ to: number; known: boolean } | null>
+  /** The notes not yet sent to the Mac (skips, undos, trims, missed ads), as JSON lines. "" when none. */
+  readPendingAdNotes(): Promise<string>
+  /** Drops the first `count` pending notes, once they are written to the linked folder. */
+  removePendingAdNotes(count: number): Promise<void>
+  /** What the phone skipped, undid, trimmed and missed, per show, as JSON text (see adResults.ts). */
+  getAdTally(): Promise<string>
+  /** The skip log and the ad finder's diary as text, or null when there is none. */
+  readSkipLogText(): Promise<string | null>
+  /** Checks a teaching file from the Mac and installs it. True when it was installed. */
+  installTeachingFile(
+    name: string,
+    text: string,
+    sha256: string,
+  ): Promise<boolean>
+  /** Tells the native side which show each feed key is: `{"<feed key>": "<show id>"}`. */
+  setTeachingShows(json: string): Promise<void>
+  /** What is installed from the Mac, as JSON text (see teaching.ts). */
+  getTeachingState(): Promise<string>
   /**
    * Takes back the skip that was just made: back to the ad's start, playing, and the skip is
    * recorded as wrong. False when it is too late.

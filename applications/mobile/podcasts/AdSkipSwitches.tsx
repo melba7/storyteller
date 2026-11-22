@@ -1,6 +1,8 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { useEffect, useState } from "react"
 
+import { AD_SWITCHES } from "@/modules/podcasts/adSwitches"
+import { DEFAULT_AD_SKIP_SETTINGS } from "@/modules/podcasts/ads"
 import {
   getAdSkipSettings,
   setAdSkipSettings,
@@ -11,21 +13,21 @@ import { SwitchRow } from "./SettingsGroup"
 import { useAdsUnavailable } from "./useAds"
 
 /**
- * What the Skip ads switch does. A streamed episode plays through its own download (on Wi-Fi
- * only, when "Download only on Wi-Fi" is on), and ads are skipped once they are found. Why
- * ads can't be found comes last, when there is a reason.
+ * What the sponsor ads switch says: what it skips, and that a streamed episode plays through its
+ * own download (on Wi-Fi only, when "Download only on Wi-Fi" is on) because ads are skipped
+ * once they are found. Why ads can't be found comes last, when there is a reason.
  */
-function skipAdsBody(unavailable: string | null): string {
-  const body =
-    'Skips sponsor reads and other ads once they are found. It works while streaming too: the episode plays from its own download, which on mobile data needs "Download only on Wi-Fi" to be off. An ad it is not sure about is skipped too, and you can undo any skip.'
+function sponsorBody(base: string, unavailable: string | null): string {
+  const body = `${base} It works while streaming too: the episode plays from its own download, which on mobile data needs "Download only on Wi-Fi" to be off. An ad it is not sure about is skipped too, and you can undo any skip.`
   return unavailable === null
     ? body
     : `${body} Ads can't be found right now: ${unavailable}`
 }
 
 /**
- * The two switches for skipping ads and the hosts' own plugs, both on until turned off. Swift
- * keeps them, so the player skips with no JavaScript running.
+ * The four switches for skipping: sponsor ads, the hosts' own plugs, promos, and intros and
+ * credits (the last one off until turned on). Swift keeps them, so the player skips with no
+ * JavaScript running.
  */
 export function AdSkipSwitches() {
   const [settings, setSettings] = useState<AdSkipSettings | null>(null)
@@ -38,7 +40,7 @@ export function AdSkipSwitches() {
         if (live) setSettings(value)
       },
       () => {
-        if (live) setSettings({ skipAds: true, skipOwnPlugs: true })
+        if (live) setSettings(DEFAULT_AD_SKIP_SETTINGS)
       },
     )
     return () => {
@@ -56,18 +58,19 @@ export function AdSkipSwitches() {
 
   return (
     <>
-      <SwitchRow
-        title="Skip ads"
-        body={skipAdsBody(unavailable)}
-        checked={settings?.skipAds ?? null}
-        onChange={(on) => change({ skipAds: on })}
-      />
-      <SwitchRow
-        title="Skip the hosts' own plugs"
-        body="Also skips the hosts promoting their own things, such as Patreon or their other shows."
-        checked={settings?.skipOwnPlugs ?? null}
-        onChange={(on) => change({ skipOwnPlugs: on })}
-      />
+      {AD_SWITCHES.map((row) => (
+        <SwitchRow
+          key={row.key}
+          title={row.title}
+          body={
+            row.key === "skipAds"
+              ? sponsorBody(row.body, unavailable)
+              : row.body
+          }
+          checked={settings?.[row.key] ?? null}
+          onChange={(on) => change({ [row.key]: on })}
+        />
+      ))}
     </>
   )
 }

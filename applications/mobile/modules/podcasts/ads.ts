@@ -3,7 +3,13 @@
 // What a row says about an episode's ad finding, how a change from Swift updates what the
 // screens know, and the list of ads on the episode card. The finding itself is Swift
 // (PodcastAds); this file does not need the native module.
-import type { AdSkipped, AdUndone, AdsChange, AdsInfo } from "./index"
+import type {
+  AdSkipSettings,
+  AdSkipped,
+  AdUndone,
+  AdsChange,
+  AdsInfo,
+} from "./index"
 
 /** What the screens know about ad finding, by episode id. */
 export type AdsMap = Readonly<Record<string, AdsInfo>>
@@ -118,7 +124,8 @@ export function withAds(line: string, info: AdsInfo | undefined): string {
 
 // MARK: The saved ads
 
-export type AdKind = "ad" | "ownPlug"
+/** The four sorts: sponsor ads, the hosts' own plugs, promos for other things, intros and credits. */
+export type AdKind = "ad" | "ownPlug" | "promo" | "credits"
 export type AdConfidence = "sure" | "unsure" | "guess"
 
 /** One ad as saved in `<sha256>.ads.<detector>.json`, in seconds of audio. */
@@ -138,6 +145,39 @@ export type AdsFile = {
   undone: { start: number; end: number }[]
 }
 
+/** The sort a saved or reported name stands for. A name that is not known is taken for an ad. */
+export function adKindOf(value: unknown): AdKind {
+  return value === "ownPlug" || value === "promo" || value === "credits"
+    ? value
+    : "ad"
+}
+
+/** The switches until the listener changes them: credits are skipped only when asked for. */
+export const DEFAULT_AD_SKIP_SETTINGS: AdSkipSettings = {
+  skipAds: true,
+  skipOwnPlugs: true,
+  skipPromos: true,
+  skipCredits: false,
+}
+
+/** The switches from what the phone sent: what it did not say (an older build) is the default. */
+export function readAdSkipSettings(raw: unknown): AdSkipSettings {
+  const given = (raw && typeof raw === "object" ? raw : {}) as Record<
+    string,
+    unknown
+  >
+  const flag = (key: keyof AdSkipSettings): boolean => {
+    const value = given[key]
+    return typeof value === "boolean" ? value : DEFAULT_AD_SKIP_SETTINGS[key]
+  }
+  return {
+    skipAds: flag("skipAds"),
+    skipOwnPlugs: flag("skipOwnPlugs"),
+    skipPromos: flag("skipPromos"),
+    skipCredits: flag("skipCredits"),
+  }
+}
+
 function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value)
 }
@@ -151,7 +191,6 @@ function readAd(value: unknown): FoundAd | null {
     ad["end"] <= ad["start"]
   )
     return null
-  if (ad["kind"] !== "ad" && ad["kind"] !== "ownPlug") return null
   const confidence = ad["confidence"]
   if (
     confidence !== "sure" &&
@@ -162,7 +201,7 @@ function readAd(value: unknown): FoundAd | null {
   return {
     start: ad["start"],
     end: ad["end"],
-    kind: ad["kind"],
+    kind: adKindOf(ad["kind"]),
     advertiser: typeof ad["advertiser"] === "string" ? ad["advertiser"] : "",
     confidence,
     firstWords: typeof ad["firstWords"] === "string" ? ad["firstWords"] : "",
@@ -258,6 +297,14 @@ export type AdRow = {
   label: string
 }
 
+/** What the "Ads found" list calls each sort. */
+const KIND_LABELS: Record<AdKind, string> = {
+  ad: "Ad",
+  ownPlug: "Host plug",
+  promo: "Promo",
+  credits: "Credits",
+}
+
 /**
  * The rows of the "Ads found" list, in order. Guesses are not listed. An unsure ad is listed
  * and skipped like a sure one. (Whether the host plugs are skipped is the listener's switch.)
@@ -271,7 +318,7 @@ export function adRows(file: AdsFile): AdRow[] {
       )
       const time = formatClock(ad.start)
       const length = formatClock(ad.end - ad.start)
-      const kind = ad.kind === "ad" ? "Ad" : "Host plug"
+      const kind = KIND_LABELS[ad.kind]
       return {
         key: String(ad.start),
         start: ad.start,
@@ -307,6 +354,8 @@ export type SkipNote = {
   start: number
   /** How long it was, in seconds. */
   length: number
+  /** What was skipped. */
+  kind: AdKind
   /** When the note appeared, in milliseconds. */
   shownAt: number
 }
@@ -316,6 +365,7 @@ export function skipNote(event: AdSkipped, now: number): SkipNote {
     episodeId: event.episodeId,
     start: event.start,
     length: event.length,
+    kind: adKindOf(event.kind),
     shownAt: now,
   }
 }
@@ -334,9 +384,16 @@ export function skipNoteBackLabels(seconds: number = SKIP_NOTE_BACK_SECONDS): {
   }
 }
 
-/** "Skipped ad (1:05)". */
+const SKIPPED_WORDS: Record<AdKind, string> = {
+  ad: "Skipped ad",
+  promo: "Skipped promo",
+  ownPlug: "Skipped the hosts' plug",
+  credits: "Skipped credits",
+}
+
+/** "Skipped ad (1:05)", "Skipped promo (1:05)", "Skipped the hosts' plug (1:05)"... */
 export function skipNoteText(note: SkipNote): string {
-  return `Skipped ad (${formatClock(note.length)})`
+  return `${SKIPPED_WORDS[note.kind]} (${formatClock(note.length)})`
 }
 
 /** Whether the note is still to be shown at `now`. */

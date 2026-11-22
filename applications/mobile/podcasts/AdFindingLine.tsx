@@ -7,8 +7,8 @@ import {
   getAdSkipSettings,
   onAdSkipSettingsChanged,
 } from "@/modules/podcasts/adsNative"
-import { skipAdsFor } from "@/modules/podcasts/downloads"
-import { Podcasts } from "@/modules/podcasts/index"
+import { skippingAnyFor } from "@/modules/podcasts/downloads"
+import { type AdSkipSettings, Podcasts } from "@/modules/podcasts/index"
 import type { Show, StoredEpisode } from "@/modules/podcasts/library"
 import { usePlayerValue } from "@/modules/podcasts/playerInstance"
 
@@ -19,9 +19,9 @@ import { useTranscript } from "./useTranscripts"
 
 // The last value read, so the line is drawn right away when the player opens and does not
 // push the artwork and controls down a moment later.
-let lastMain = false
+let lastMain: AdSkipSettings | null = null
 
-/** The Skip ads switch for this show, read again when the episode or the setting changes. */
+/** Whether any sort of ad is skipped for this show, read again when the episode or the setting changes. */
 function useSkipAds(show: Show | null, episodeId: string): boolean {
   const [main, setMain] = useState(lastMain)
   const [round, setRound] = useState(0)
@@ -30,8 +30,8 @@ function useSkipAds(show: Show | null, episodeId: string): boolean {
     let live = true
     getAdSkipSettings().then(
       (value) => {
-        lastMain = value.skipAds
-        if (live) setMain(value.skipAds)
+        lastMain = value
+        if (live) setMain(value)
       },
       () => {},
     )
@@ -39,7 +39,7 @@ function useSkipAds(show: Show | null, episodeId: string): boolean {
       live = false
     }
   }, [episodeId, round])
-  return skipAdsFor(show?.settings.skipAds, main)
+  return main !== null && skippingAnyFor(show?.settings, main)
 }
 
 /**

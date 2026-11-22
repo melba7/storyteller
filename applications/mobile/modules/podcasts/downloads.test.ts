@@ -15,6 +15,7 @@ import {
   mapFromList,
   shouldDownloadOnPlay,
   skipAdsFor,
+  skippingAnyFor,
   sortDownloads,
   storageOf,
 } from "./downloads"
@@ -295,6 +296,34 @@ describe("skipAdsFor", () => {
     expect(skipAdsFor(false, true)).toBe(false)
     expect(skipAdsFor(null, true)).toBe(true)
     expect(skipAdsFor(undefined, false)).toBe(false)
+  })
+})
+
+describe("skippingAnyFor", () => {
+  const off = {
+    skipAds: false,
+    skipOwnPlugs: false,
+    skipPromos: false,
+    skipCredits: false,
+  }
+
+  it("is on when any one of the four sorts is skipped", () => {
+    expect(skippingAnyFor(undefined, off)).toBe(false)
+    expect(skippingAnyFor(undefined, { ...off, skipPromos: true })).toBe(true)
+    expect(skippingAnyFor(undefined, { ...off, skipCredits: true })).toBe(true)
+    expect(skippingAnyFor(undefined, { ...off, skipOwnPlugs: true })).toBe(true)
+  })
+
+  it("lets the show's own choice replace only the first two switches", () => {
+    const on = { ...off, skipAds: true, skipOwnPlugs: true }
+    expect(skippingAnyFor({ skipAds: false, skipPlugs: false }, on)).toBe(false)
+    expect(skippingAnyFor({ skipAds: false, skipPlugs: null }, on)).toBe(true)
+    expect(
+      skippingAnyFor(
+        { skipAds: false, skipPlugs: false },
+        { ...on, skipPromos: true },
+      ),
+    ).toBe(true)
   })
 })
 

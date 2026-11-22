@@ -9,8 +9,11 @@ import {
   adRows,
   adsFileAfterRead,
   adsMapFromList,
+  adKindOf,
   adsStatus,
   applyAdsChange,
+  readAdSkipSettings,
+  DEFAULT_AD_SKIP_SETTINGS,
   formatClock,
   noteAfterUndo,
   readsAdsFile,
@@ -146,13 +149,33 @@ describe("parseAdsFile", () => {
     expect(file?.undone).toEqual([{ start: 300, end: 360 }])
   })
 
+  it("reads all four sorts and takes an unknown one for an ad", () => {
+    const file = parseAdsFile(
+      JSON.stringify({
+        ads: [
+          ad(10, 20, { kind: "ownPlug" }),
+          ad(30, 40, { kind: "promo" }),
+          ad(50, 60, { kind: "credits" }),
+          ad(70, 80, { kind: "banner" }),
+          ad(90, 100, { kind: undefined }),
+        ],
+      }),
+    )
+    expect(file?.ads.map((item) => item.kind)).toEqual([
+      "ownPlug",
+      "promo",
+      "credits",
+      "ad",
+      "ad",
+    ])
+  })
+
   it("leaves out entries that make no sense", () => {
     const file = parseAdsFile(
       JSON.stringify({
         ads: [
           ad(60, 120),
           ad(200, 100),
-          ad(5, 50, { kind: "banner" }),
           ad(5, 50, { confidence: "certain" }),
           null,
           "x",
@@ -247,6 +270,14 @@ describe("adRows", () => {
     )
     const rows = adRows(file!)
     expect(rows.map((row) => row.kind)).toEqual(["Host plug", "Ad", "Ad"])
+    const more = adRows(
+      parseAdsFile(
+        JSON.stringify({
+          ads: [ad(1, 5, { kind: "promo" }), ad(10, 15, { kind: "credits" })],
+        }),
+      )!,
+    )
+    expect(more.map((row) => row.kind)).toEqual(["Promo", "Credits"])
     // Sure and unsure ads are both skipped, unless the listener undid the skip.
     expect(rows.map((row) => row.skipped)).toEqual([true, true, false])
     expect(rows.map((row) => row.unsure)).toEqual([false, true, false])
@@ -426,5 +457,57 @@ describe("unavailableReason", () => {
   it("is null when ads can be found", () => {
     expect(unavailableReason(adsMapFromList([info("noAds")]))).toBeNull()
     expect(unavailableReason({})).toBeNull()
+  })
+})
+
+describe("what a skip note says", () => {
+  const event = { episodeId: "e1", start: 10, end: 75, length: 65 }
+
+  it("names the sort that was skipped", () => {
+    const text = (kind?: string) =>
+      skipNoteText(skipNote({ ...event, kind }, 0))
+    expect(text("ad")).toBe("Skipped ad (1:05)")
+    expect(text("promo")).toBe("Skipped promo (1:05)")
+    expect(text("ownPlug")).toBe("Skipped the hosts' plug (1:05)")
+    expect(text("credits")).toBe("Skipped credits (1:05)")
+  })
+
+  it("says ad when the sort is missing or not known", () => {
+    expect(skipNoteText(skipNote(event, 0))).toBe("Skipped ad (1:05)")
+    expect(skipNoteText(skipNote({ ...event, kind: "x" }, 0))).toBe(
+      "Skipped ad (1:05)",
+    )
+    expect(adKindOf(42)).toBe("ad")
+  })
+})
+
+describe("the four switches", () => {
+  it("start with ads, plugs and promos on and credits off", () => {
+    expect(DEFAULT_AD_SKIP_SETTINGS).toEqual({
+      skipAds: true,
+      skipOwnPlugs: true,
+      skipPromos: true,
+      skipCredits: false,
+    })
+  })
+
+  it("fills what the phone did not say from the defaults", () => {
+    expect(readAdSkipSettings(null)).toEqual(DEFAULT_AD_SKIP_SETTINGS)
+    expect(readAdSkipSettings({ skipAds: false, skipOwnPlugs: false })).toEqual(
+      {
+        skipAds: false,
+        skipOwnPlugs: false,
+        skipPromos: true,
+        skipCredits: false,
+      },
+    )
+    expect(
+      readAdSkipSettings({
+        skipAds: true,
+        skipOwnPlugs: true,
+        skipPromos: false,
+        skipCredits: true,
+      }),
+    ).toMatchObject({ skipPromos: false, skipCredits: true })
   })
 })
