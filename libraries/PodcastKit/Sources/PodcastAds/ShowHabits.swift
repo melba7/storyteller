@@ -21,7 +21,7 @@ public struct ShowHabits: Codable, Sendable, Equatable {
 
     /// Whether the numbers are possible. A show whose numbers are not says nothing.
     var isSound: Bool {
-      episodes >= 0 && (0...episodes).contains(opensWithAd) && (openingEnds?.isFinite ?? true)
+      (0...1_000_000).contains(episodes) && (0...episodes).contains(opensWithAd) && (openingEnds?.isFinite ?? true)
     }
   }
 

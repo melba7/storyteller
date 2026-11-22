@@ -62,7 +62,7 @@ public struct AdWordModel: Sendable, Equatable {
     for (key, row) in file.weights {
       guard !key.isEmpty, key.utf8.allSatisfy({ $0 >= 48 && $0 <= 57 }),
         let index = Int(key), index < file.buckets,
-        row.count == Self.classes.count, row.allSatisfy(\.isFinite)
+        row.count == Self.classes.count, row.allSatisfy({ $0.isFinite && abs($0) <= 1_000_000 })
       else { return nil }
       table[index] = row
     }

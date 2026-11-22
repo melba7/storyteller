@@ -79,7 +79,7 @@ public enum AdLibrary {
         .compactMap { KnownAds.normalise(String($0)) }.prefix(KnownAds.mostWords)
       guard words.count >= KnownAds.fewestWords else { continue }
       let text = words.joined(separator: " ")
-      let seen = max(entry.seen, 1)
+      let seen = min(max(entry.seen, 1), 1_000_000)
       let key = [text, entry.show, entry.scope].joined(separator: "\u{1F}")
       if let found = at[key] {
         ads[found].seen = max(ads[found].seen, seen)
