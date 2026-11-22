@@ -3,15 +3,24 @@ import { List, MessageSquareQuote } from "lucide-react-native"
 import { Pressable, View } from "react-native"
 import { type SFSymbol } from "sf-symbols-typescript"
 
+import { Text } from "@/components/ui/text"
+import {
+  SKIP_AD_ACCESSIBILITY,
+  SKIP_AD_BUTTON,
+  SKIP_AD_LABEL,
+} from "@/modules/podcasts/skipAdLook"
+
 import { AirPlayButton } from "./AirPlayButton"
 import { type PlayerPanel } from "./PlayerPages"
 import { SFIcon } from "./SFIcon"
 import { pick } from "./haptics"
 import { useSheet } from "./playerSheetContext"
+import { pressSkipAd } from "./useMissedNote"
 
 /**
- * The player's bottom row: transcript, AirPlay and the queue spread evenly (at about a sixth, a half and five sixths
- * of the width), the transcript and queue lit while their panel shows. Each panel button toggles its panel in place of the artwork.
+ * The player's bottom row: Skip ad, transcript, AirPlay and the queue spread evenly, the
+ * transcript and queue lit while their panel shows. Each panel button toggles its panel in place
+ * of the artwork. Skip ad is a capsule with its words in it; the others are round icons.
  */
 export function PlayerToolbar({
   panel,
@@ -22,6 +31,7 @@ export function PlayerToolbar({
 }) {
   return (
     <View className="w-full flex-row items-center justify-around">
+      <SkipAdButton />
       <PanelButton
         symbol="quote.bubble"
         icon={MessageSquareQuote}
@@ -40,6 +50,37 @@ export function PlayerToolbar({
         onPanel={onPanel}
       />
     </View>
+  )
+}
+
+/** Skips the ad that plays now: to its end when the phone knows it, else 30 seconds ahead. */
+function SkipAdButton() {
+  const sheet = useSheet()
+  return (
+    <Pressable
+      className="items-center justify-center rounded-full active:opacity-60"
+      style={{
+        height: SKIP_AD_BUTTON.height,
+        minWidth: SKIP_AD_BUTTON.minWidth,
+        paddingHorizontal: SKIP_AD_BUTTON.paddingX,
+        backgroundColor: sheet.rest,
+      }}
+      accessibilityRole="button"
+      accessibilityLabel={SKIP_AD_ACCESSIBILITY}
+      onPress={() => {
+        pick()
+        pressSkipAd()
+      }}
+    >
+      <Text
+        className="text-sm font-semibold"
+        style={{ color: sheet.ink }}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.3}
+      >
+        {SKIP_AD_LABEL}
+      </Text>
+    </Pressable>
   )
 }
 
