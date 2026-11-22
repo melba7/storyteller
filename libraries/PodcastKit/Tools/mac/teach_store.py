@@ -4,12 +4,16 @@ one atomic JSON writer and the lock that keeps two runs from working in the fold
 Standard library only. teach_collect, teach_transcribe, teach_label and teach_habits all read and
 write through this module, so there is one folder name, one version number and one way of saving.
 
+`python3 teach_store.py busy FOLDER` exits 3 when another run holds the lock on FOLDER and 0 when it
+is free (teach-weekly.sh asks this before it starts).
+
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import contextlib
 import fcntl
 import json
 import os
 import re
+import sys
 import tempfile
 import time
 
@@ -136,3 +140,20 @@ def run_lock(folder):
         yield
     finally:
         handle.close()
+
+
+def main(argv):
+    """The command line: `busy FOLDER`. Exit code 0 the folder is free, 3 another run is working in
+    it, 2 the arguments are wrong."""
+    if len(argv) != 2 or argv[0] != "busy":
+        print("Usage: teach_store.py busy FOLDER")
+        return 2
+    try:
+        with run_lock(os.path.expanduser(argv[1])):
+            return 0
+    except Busy:
+        return 3
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

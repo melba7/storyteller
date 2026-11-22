@@ -132,6 +132,25 @@ class LockTests(unittest.TestCase):
             self.assertTrue(os.path.exists(folder.path("not", "yet", ".lock")))
 
 
+class BusyCheckTests(unittest.TestCase):
+    """`python3 teach_store.py busy FOLDER`, which the weekly job asks before it starts."""
+
+    def test_a_free_folder_gives_0_and_is_not_left_locked(self):
+        folder = Folder(self)
+        self.assertEqual(store.main(["busy", folder.dir]), 0)
+        with store.run_lock(folder.dir):
+            pass
+
+    def test_a_folder_in_use_gives_3(self):
+        folder = Folder(self)
+        with store.run_lock(folder.dir):
+            self.assertEqual(store.main(["busy", folder.dir]), 3)
+
+    def test_bad_arguments_give_2(self):
+        self.assertEqual(store.main([]), 2)
+        self.assertEqual(store.main(["busy"]), 2)
+
+
 class FailuresTests(unittest.TestCase):
     def test_counts_are_remembered_between_runs_in_the_documented_file(self):
         folder = Folder(self)
