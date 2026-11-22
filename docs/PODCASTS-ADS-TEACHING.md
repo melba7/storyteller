@@ -36,6 +36,27 @@ other things (`promo`) and intros and credits (`credits`, off until turned on).
 The Mac's names for them are `sponsor`, `host_ask`, `network_promo` and
 `intro_credits`; `AdKind(sort:)` converts.
 
+A show can have its own choice for sponsor ads and for the hosts' plugs
+(`AdSkipSettings.overridden`). A show whose own Skip ads is off keeps its promos
+too, because promos were ads before this round. On a phone updated from the
+two-switch build only the Skip ads switch is stored, and promos take its value.
+The app's `effectiveAdSettings` and `skippingAnyFor` follow the same two rules.
+
+What keeps the layers from cutting the show itself:
+
+- `AdPromoRules` keeps a promo only on proof: a web address, a code or an offer
+  near the cue, cues from two groups (a live show and a subscription, say), or
+  two different cue phrases of which one asks the listener to do something. One
+  phrase said twice, or two phrases people also use in plain talk, prove
+  nothing.
+- The small model's span is cut where the sort changes from one line to the
+  next, so credits beside an ad stay credits and are not skipped with it.
+- The phone refuses a model file whose line with no known word is not plain
+  talk, or whose start threshold is below 0.5.
+- A sound match ends where the matching stopped, not at the sound's full length.
+- An ad the listener undid stays undone when the episode is checked again, and a
+  trim stays when a new ad cuts the trimmed one.
+
 ### When each layer runs
 
 - **A stream's first three minutes** (`PodcastStreamHead`): at each step the
@@ -73,10 +94,18 @@ refuses a file over 5 MB).
 
 - `ad-model.json`:
   `{"version", "buckets": 262144, "classes": ["none", "sponsor", "network_promo", "host_ask", "intro_credits"], "thresholds": {...}, "weights": {"<bucket>": [5 numbers]}, "trained": {"writtenAt", "episodes", "lines", "shelf", "heldOut": {"episodes", "lines", "anyAd": {"precision", "recall"}, "classes": {...}}}}`.
-  A file with no weights is refused. `teach_publish.py` does not publish a model
-  whose held-out precision for any ad is below 0.85.
+  A file with no weights is refused. `heldOut` also holds `shows`,
+  `predictedAdSeconds`, `adSeconds` and `lineAnyAd`. `teach_publish.py`
+  publishes a model only when its check rests on at least 5 held-out episodes
+  from 3 shows and 600 predicted ad seconds, the spans the phone would cut are
+  right for at least 0.85 of their seconds, and the phone would accept the file.
+  `teach_spans.py` decodes spans exactly as `AdWordModel+Spans.swift` does;
+  change neither without the other.
 - `ad-library.json`:
   `{"version", "writtenAt", "ads": [{"feed", "scope": "show" | "all", "sort", "who", "text", "length", "seen"}]}`.
+  `teach_library.py` also writes `ad-library-score.json`, the same library built
+  without the shelf episodes. It is not published. The scorecard reads it when
+  it scores only the shelf, so an episode is never scored against its own ads.
 - `show-habits.json`:
   `{"version", "writtenAt", "shows": [{"feed", "title", "episodes", "opensWithAd", "openingStarts", "openingEnds", "breaks", "adSeconds"}]}`.
 - `ad-sounds.json`:
@@ -84,6 +113,10 @@ refuses a file over 5 MB).
   An anchor is the low 32 bits of the hash of every 8th MP3 frame.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
+
+An episode's length is the same number everywhere (the trainer, the scorecard
+and the phone's end-of-episode feature): `seconds` from `episodes.json` when it
+is above zero, otherwise the start of the last line.
 
 **Shows are named by their feed address in the Mac's files.** The phone names a
 show by its own id. The app tells the native side which feed is which show
@@ -114,7 +147,7 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 | `setAdSkipSettings(skipAds, skipOwnPlugs, skipPromos, skipCredits)` | nothing                                            |
 | `skipAdNow()`                                                       | `{to, known}` or null when nothing is loaded       |
 | `readPendingAdNotes()`                                              | the pending notes as JSON lines, "" when none      |
-| `removePendingAdNotes(count)`                                       | nothing; drops the first `count` lines             |
+| `removePendingAdNotes(count, upToAt)`                               | nothing; see below                                 |
 | `getAdTally()`                                                      | JSON text, see below                               |
 | `readSkipLogText()`                                                 | the skip log and diary text, or null               |
 | `installTeachingFile(name, text, sha256)`                           | true when the file was checked and installed       |
@@ -124,12 +157,32 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 - A pending note is
   `{"v": 1, "at": <ms>, "what", "episode": "<episode id>", "show": "<show id or empty>", "start", "end": <seconds or null>, "kind"}`.
   The app adds the feed, guid, title and audio address from its database before
-  it writes the line to the linked folder.
+  it writes the line to the linked folder. A "missed" note has an empty `kind`,
+  and the file keeps it empty.
+- `removePendingAdNotes(count, upToAt)` drops at most `count` lines from the
+  start, and only lines whose `at` is not later than `upToAt` (the `at` of the
+  newest note the app wrote). A note made since the read stays. The app does not
+  write a line the file already holds, so a removal that never ran costs
+  nothing.
+- `skipAdNow()` inside a known ad skips that ad whatever the switches say, as an
+  ordinary skip with its note and Undo (`known` true). Anywhere else it jumps 30
+  seconds, or to the end of a skipped ad the landing falls in. Within 3 seconds
+  of a skip it does nothing. `AdSkipNow.decide` holds the rule.
 - `getAdTally()`:
   `{"since": <ms or null>, "shows": {"<show id>": {"skipped", "undone", "trimmed", "missed", "seconds"}}}`.
+  The results page calls an id that starts with `preview:` "A show you
+  previewed" and an empty id "Your files".
 - `getTeachingState()`:
   `{"files": {"<name>": {"sha256", "installedAt"}}, "model": {"writtenAt", "episodes", "precision", "recall"} | null, "library": <entries>, "habits": <shows>, "sounds": <sounds>}`.
-- The `onAdSkipped` event also carries `"kind"`.
+- The `onAdSkipped` event also carries `"kind"`. `onAdsChange` is also sent
+  after a trim.
+- The load options take `startChosen`: true when the listener chose the place to
+  start from, so an ad there is not skipped at once.
+- An Up Next item carries `notes` (the first 4,000 characters) and `showLink`,
+  so an episode the player moves to on its own is checked with its sponsors'
+  names.
+- `fetchFeed`'s answer carries `newFeedUrl` when the feed names a new address
+  (http or https only). The app moves the show to it (`feedMove.ts`).
 
 Native module `LofiScore` (`modules/lofi-score`):
 

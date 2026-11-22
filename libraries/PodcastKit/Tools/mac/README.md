@@ -392,10 +392,10 @@ and `Teach the phone again.command` says so and stops.
    you follow and downloads the newest four episodes of each, up to 12 GB of
    audio kept in all (the limit is for everything kept, not for one run, and the
    window ends with its own code and says so when it is reached), keeping 15 GB
-   of the disk free. Episodes the phone asked for (see "The
-   phone's notes and the wanted list" below) go first. Step 2 writes down what
-   is said in them with the Swift code the app uses (needs macOS 26 and Xcode
-   26; it can take hours, so keep the Mac plugged in). This does not use Claude.
+   of the disk free. Episodes the phone asked for (see "The phone's notes and
+   the wanted list" below) go first. Step 2 writes down what is said in them
+   with the Swift code the app uses (needs macOS 26 and Xcode 26; it can take
+   hours, so keep the Mac plugged in). This does not use Claude.
 2. `Mark ads in the teaching episodes.command`. Claude marks every ad and
    promotion in the written-down episodes. This is the step that uses your
    Claude plan: it shares your usage allowance, so it says what it is about to
@@ -484,9 +484,9 @@ the most recent first, at most 40. Lines that are not valid notes are counted
 and skipped: not JSON, over 64 KB, a time that is not a finite number, or a feed
 or audio address that is not http or https. A notes file over 8 MB is not read
 (it says so). A wanted episode is used only when its feed matches a show you
-follow (the same feed key as the phone's: no scheme, no `www.`, lower-case
-host, no fragment, no closing slash); it is gathered under the followed show's
-own feed address. When the phone has sent no notes yet it says so and writes
+follow (the same feed key as the phone's: no scheme, no `www.`, lower-case host,
+no fragment, no closing slash); it is gathered under the followed show's own
+feed address. When the phone has sent no notes yet it says so and writes
 nothing, and when macOS does not let the tool read the notes it says that
 instead.
 
@@ -507,18 +507,20 @@ notes, gathers the newest episode of each show (plus the wanted ones), writes
 them down, has Claude mark up to 15 episodes and runs the steps after marking.
 Marking is the only part that uses your Claude plan, about 15 episodes a week of
 its allowance. An episode that fails still counts towards the 15, and marking
-stops when the cost Claude itself counts for the calls reaches $25 (change it
+stops when the cost Claude itself counts for the calls reaches
+$25 (change it
 with `TEACH_CAP` near the top of `teach-weekly.sh`; the checker has no real
-price, 15 episodes were estimated at about $1 each). The gather step keeps at
-most 12 GB of audio in all, for every week together (`TEACH_MAX_GB`). Audio is
-never deleted, so once the folder is full the job gathers nothing new: it ends
-with a non-zero status and one sentence in the log that says so. The Mac has to be on or asleep at that time, not shut down: a
-start missed while the Mac slept runs when it wakes up, and a week the Mac was
-off is skipped. If another teaching run is working in the folder, the job says
-so and ends. Double-click the installer again to replace the job (it never makes
-two), and `Stop weekly teaching.command` to turn it off. For the job to copy
-into iCloud Drive, give `/bin/bash` Full Disk Access once, as in "Set it up
-once" above. The job runs the files in the folder you installed it from, so
+price, 15 episodes were estimated at about $1
+each). The gather step keeps at most 12 GB of audio in all, for every week
+together (`TEACH_MAX_GB`). Audio is never deleted, so once the folder is full
+the job gathers nothing new: it ends with a non-zero status and one sentence in
+the log that says so. The Mac has to be on or asleep at that time, not shut
+down: a start missed while the Mac slept runs when it wakes up, and a week the
+Mac was off is skipped. If another teaching run is working in the folder, the
+job says so and ends. Double-click the installer again to replace the job (it
+never makes two), and `Stop weekly teaching.command` to turn it off. For the job
+to copy into iCloud Drive, give `/bin/bash` Full Disk Access once, as in "Set it
+up once" above. The job runs the files in the folder you installed it from, so
 install it again if you move that folder.
 
 ### The logs
