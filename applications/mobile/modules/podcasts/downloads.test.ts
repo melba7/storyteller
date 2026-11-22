@@ -314,14 +314,27 @@ describe("skippingAnyFor", () => {
     expect(skippingAnyFor(undefined, { ...off, skipOwnPlugs: true })).toBe(true)
   })
 
-  it("lets the show's own choice replace only the first two switches", () => {
+  it("lets the show's own choice replace the first two switches", () => {
     const on = { ...off, skipAds: true, skipOwnPlugs: true }
     expect(skippingAnyFor({ skipAds: false, skipPlugs: false }, on)).toBe(false)
     expect(skippingAnyFor({ skipAds: false, skipPlugs: null }, on)).toBe(true)
+  })
+
+  it("keeps a show's promos when the show's own ad choice is off", () => {
+    const promos = { ...off, skipAds: true, skipPromos: true }
+    expect(skippingAnyFor({ skipAds: false, skipPlugs: false }, promos)).toBe(
+      false,
+    )
+    expect(skippingAnyFor({ skipAds: true, skipPlugs: false }, promos)).toBe(
+      true,
+    )
+    expect(skippingAnyFor({ skipAds: null, skipPlugs: false }, promos)).toBe(
+      true,
+    )
     expect(
       skippingAnyFor(
         { skipAds: false, skipPlugs: false },
-        { ...on, skipPromos: true },
+        { ...promos, skipCredits: true },
       ),
     ).toBe(true)
   })

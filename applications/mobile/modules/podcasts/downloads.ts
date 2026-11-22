@@ -227,7 +227,8 @@ export function skipAdsFor(
 
 /**
  * Whether any sort of ad is skipped for a show. The show's own choice replaces the main switch
- * for sponsor ads and for the hosts' plugs only; promos and credits follow the main switches.
+ * for sponsor ads and for the hosts' plugs. Promos follow the main switch, but a show whose own
+ * ad choice is off keeps its promos too. Credits follow the main switch.
  * Ads are skipped only in a file on the phone, so this is what asks for the download.
  */
 export function skippingAnyFor(
@@ -237,7 +238,7 @@ export function skippingAnyFor(
   return (
     skipAdsFor(show?.skipAds, main.skipAds) ||
     skipAdsFor(show?.skipPlugs, main.skipOwnPlugs) ||
-    main.skipPromos ||
+    (main.skipPromos && show?.skipAds !== false) ||
     main.skipCredits
   )
 }
