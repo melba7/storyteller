@@ -4,7 +4,7 @@
 // linked folder (docs/PODCASTS-ADS-TEACHING.md). These are the rules for which files the phone
 // fetches and for the table of feeds it sends to the native side. Nothing here touches the
 // folder or the native modules (teachingSync.ts does).
-import { feedKey } from "./applePodcasts"
+import { type AppleExport, feedKey } from "./applePodcasts"
 import { feedShows } from "./localFiles"
 
 export const TEACHING_LIST_FILE = "Podcasts/teaching.json"
@@ -80,23 +80,41 @@ export function filesToFetch(
   })
 }
 
-/** The table of feed key to show id for the shows with a feed. */
+/**
+ * The table of feed key to show id for the shows with a feed. A show that moved to a new feed
+ * is also known under the address the Apple export has for it (matched by title, as
+ * `withLibraryFeeds` does), so the Mac's habits and ad library for the newer address still
+ * reach it.
+ */
 export function showTable(
-  shows: readonly { id: string; feedUrl: string }[],
+  shows: readonly { id: string; feedUrl: string; title?: string }[],
+  apple: AppleExport | null = null,
 ): Record<string, string> {
   const table: Record<string, string> = {}
-  for (const show of feedShows(shows)) {
+  const own = feedShows(shows)
+  for (const show of own) {
     const key = feedKey(show.feedUrl)
     if (key !== "" && !(key in table)) table[key] = show.id
+  }
+  const byTitle = new Map<string, string>()
+  for (const show of own) {
+    const title = (show.title ?? "").trim().toLowerCase()
+    if (title !== "" && !byTitle.has(title)) byTitle.set(title, show.id)
+  }
+  for (const item of apple?.shows ?? []) {
+    const id = byTitle.get((item.title ?? "").trim().toLowerCase())
+    const key = feedKey(item.feed)
+    if (id !== undefined && key !== "" && !(key in table)) table[key] = id
   }
   return table
 }
 
 /** The table as JSON text, keys in order, so a table that did not change reads the same. */
 export function showTableText(
-  shows: readonly { id: string; feedUrl: string }[],
+  shows: readonly { id: string; feedUrl: string; title?: string }[],
+  apple: AppleExport | null = null,
 ): string {
-  const table = showTable(shows)
+  const table = showTable(shows, apple)
   const sorted: Record<string, string> = {}
   for (const key of Object.keys(table).sort()) sorted[key] = table[key] ?? ""
   return JSON.stringify(sorted)

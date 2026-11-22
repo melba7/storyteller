@@ -129,6 +129,23 @@ describe("showTable", () => {
     })
   })
 
+  it("also maps the Apple export's address of a show matched by title", () => {
+    const table = showTable(
+      [{ id: "s1", feedUrl: "https://lib.test/feed", title: "The Daily" }],
+      {
+        shows: [
+          { feed: "https://apple.test/new", title: " the daily " },
+          { feed: "https://lib.test/feed", title: "The Daily" },
+          { feed: "https://x.test/feed", title: "Another" },
+          { feed: "https://y.test/feed", title: null },
+        ],
+        finished: [],
+      },
+    )
+    expect(table).toEqual({ "lib.test/feed": "s1", "apple.test/new": "s1" })
+    expect(showTableText([], null)).toBe("{}")
+  })
+
   it("leaves out the added files' stand-in show", () => {
     expect(showTable([{ id: "local-files", feedUrl: "local:files" }])).toEqual(
       {},

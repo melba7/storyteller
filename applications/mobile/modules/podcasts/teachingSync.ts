@@ -8,6 +8,7 @@
 // teaching.ts. Not imported by any test, because the native modules are not there.
 import { LofiScore } from "@/modules/lofi-score"
 
+import { type AppleExport, parseAppleExport } from "./applePodcasts"
 import { onLibraryChanged } from "./changes"
 import { listShows } from "./db"
 import { Podcasts } from "./index"
@@ -19,15 +20,27 @@ import {
   showTableText,
 } from "./teaching"
 
+const APPLE_FILE = "Podcasts/apple-podcasts.json"
 let sentShows: string | null = null
 let watching = false
 // The files the phone refused in this launch, by name, with the checksum that was refused.
 const refused: Record<string, string> = {}
 
+/** The Apple Podcasts export in the linked folder, or null when it is not there to read. */
+async function appleExport(): Promise<AppleExport | null> {
+  if (!LofiScore) return null
+  try {
+    const read = await LofiScore.readLinkedFolderFileStatus(APPLE_FILE)
+    return read.status === "found" ? parseAppleExport(read.text) : null
+  } catch {
+    return null
+  }
+}
+
 /** Tells the native side which feed is which show, when the followed shows are not as last told. */
 export async function sendTeachingShows(): Promise<void> {
   if (!Podcasts) return
-  const text = showTableText(await listShows())
+  const text = showTableText(await listShows(), await appleExport())
   if (text === sentShows) return
   await Podcasts.setTeachingShows(text)
   sentShows = text
