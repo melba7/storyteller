@@ -60,11 +60,20 @@ final class AdPromoRulesTests: XCTestCase {
     XCTAssertEqual(found, [])
   }
 
-  func testACueWithOnlyACallNearbyIsUnsureWithoutAWebAddress() {
+  func testACueWithOnlyASoftCallNearbyIsNotAPromo() {
     let found = AdPromoRules.find(
       lines: lines([
         "Come see us live next month.",
         "Learn more on our site.",
+      ]))
+    XCTAssertEqual(found, [])
+  }
+
+  func testACueWithAnOfferButNoWebAddressIsAnUnsurePromo() {
+    let found = AdPromoRules.find(
+      lines: lines([
+        "Come see us live next month.",
+        "Use promo code LIVE for twenty percent off.",
       ]))
     XCTAssertEqual(found.count, 1)
     XCTAssertEqual(found.first?.confidence, .unsure)

@@ -4,8 +4,9 @@
 // episode: a live tour or tickets, a paid subscription or membership, another show or its
 // trailer, a book or an app. The sponsor rules (AdHeadRules) miss these because no outside brand
 // pays for them. These rules run without a model: a line with a promo cue only counts when
-// another signal (a second cue, or a call to action such as a web address) is a line or two
-// away, so one passing word ("the band went on tour") is left alone. The word lists are a first
+// proof is a line or two away: a web address, a code or an offer, or a second cue line (cues
+// from two different groups make the promo sure). A soft call such as "go to" or "visit" is no proof, so plain talk ("we were on tour,
+// I had to go to the hospital") is left alone. The word lists are a first
 // version, to be tuned against episodes that people have marked. Foundation only.
 import Foundation
 
@@ -27,34 +28,27 @@ public enum AdPromoRules {
     regexes([
       #"\b(get|grab|buy|book) (your |those )?tickets\b"#, #"\btickets (are |go )?(on sale|available)\b"#,
       #"\btickets at\b"#, #"\blive (show|shows|taping|event|events|tour|on stage)\b"#,
-      #"\b(on|our|the) (live )?tour\b"#, #"\bjoin us (live|in person|on stage)\b"#,
+      #"\bour (live )?tour\b"#, #"\bwe(['’]re| are) (going|heading) on tour\b"#, #"\bjoin us (live|in person|on stage)\b"#,
       #"\bcome see (us|the show)\b"#, #"\bsee (us|the show) live\b"#,
     ]),
     regexes([
       #"\b(become|becoming) a (subscriber|member|supporter|patron)\b"#,
       #"\bsubscribe to (the|our) [\w' ]{0,30}?\b(times|post|journal|atlantic|new yorker|economist|magazine|plus|premium)\b"#,
-      #"\b(subscribers|members) (get|can|have|also)\b"#, #"\b(ad[- ]free|bonus episodes?|early access)\b"#,
+      #"\bour (subscribers|members) (get|can|have|also)\b"#, #"\b(ad[- ]free|bonus episodes?|early access)\b"#,
       #"\bsupport (our|this) (journalism|reporting|work)\b"#, #"\bsubscribe (today|now) at\b"#,
     ]),
     regexes([
       #"\b(new|another) (podcast|show|series) from\b"#, #"\bfrom the (makers|creators|team|people) (of|behind)\b"#,
       #"\b(listen|follow|search for|find) [^.?!]{0,60}wherever you (get|listen to) (your )?podcasts\b"#,
-      #"\bcheck out (our|the) (new |other |latest )?(podcast|show|series)\b"#,
-      #"\bhere['’]s (a|the) (preview|trailer|clip)\b"#, #"\bnew episodes (every|each|drop|are out|out)\b"#,
+      #"\bcheck out (our|the) (new |other |latest )?(podcast|series)\b"#, #"\bcheck out (our (new |other |latest )?|the (new |other |latest ))show\b"#,
+      #"\bhere['’]s (a|the) (preview|trailer)\b"#, #"\bnew episodes (every|each|drop|are out|out)\b"#,
     ]),
     regexes([
-      #"\b(download|get) the [\w' ]{1,30}? app\b"#, #"\bsign up (for|at)\b[^.?!]{0,40}\bnewsletter\b"#,
+      #"\b(download|get) our [\w' ]{1,30}? app\b"#, #"\bsign up (for|at)\b[^.?!]{0,40}\bnewsletter\b"#,
       #"\bpre-?order\b"#,
       #"\b(my|our) (new )?book\b[^.?!]{0,60}\b(available|out now|wherever books|in stores|on sale)\b"#,
     ]),
   ]
-
-  /// Words that send the listener somewhere or to something; a web address, promo code or offer
-  /// also counts (see `isCall`).
-  private static let calls = regexes([
-    #"\bgo to\b"#, #"\bhead to\b"#, #"\bvisit\b"#, #"\bsign up\b"#, #"\blearn more\b"#,
-    #"\bfind out more\b"#, #"\bdetails at\b"#, #"\bavailable (now|today)\b"#, #"\bon sale now\b"#,
-  ])
 
   /// A web address, the same two patterns AdHeadRules counts.
   private static let webAddresses = regexes([
@@ -72,8 +66,10 @@ public enum AdPromoRules {
     cueGroups.enumerated().reduce(0) { $0 | (matches($1.element, text) ? 1 << $1.offset : 0) }
   }
 
+  /// A web address, a code or an offer: the proof a promo needs. Soft calls such as "go to" or
+  /// "visit" are plain talk and prove nothing.
   private static func isCall(_ text: String) -> Bool {
-    AdSignals.readsLikeAd(text, advertiser: "") || matches(calls, text)
+    AdSignals.hardSignal(text) || matches(webAddresses, text)
   }
 
   private static func bits(_ mask: Int) -> Int { mask.nonzeroBitCount }
@@ -91,17 +87,19 @@ public enum AdPromoRules {
       var first = at
       var last = at
       var found = callAt[at] || bits(masks[at]) > 1
+      var seen = masks[at]
+      var cueLines = 1
       var before = at - 1
       while before >= max(0, at - near), !returns[before] {
-        if isSignal(before) { first = before; found = true }
+        if isSignal(before) { first = before; seen |= masks[before]; cueLines += masks[before] != 0 ? 1 : 0; found = found || callAt[before] }
         before -= 1
       }
       var after = at + 1
       while after <= min(lines.count - 1, at + near), !returns[after] {
-        if isSignal(after) { last = after; found = true }
+        if isSignal(after) { last = after; seen |= masks[after]; cueLines += masks[after] != 0 ? 1 : 0; found = found || callAt[after] }
         after += 1
       }
-      if found { spans.append((first, carried(from: last, in: lines, returns: returns, isSignal: isSignal))) }
+      if found || bits(seen) > 1 || cueLines > 1 { spans.append((first, carried(from: last, in: lines, returns: returns, isSignal: isSignal))) }
     }
 
     var joined: [(first: Int, last: Int)] = []
