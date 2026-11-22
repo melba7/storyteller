@@ -390,12 +390,12 @@ and `Teach the phone again.command` says so and stops.
 
 1. `Gather episodes for teaching.command`. Step 1 reads the feed of every show
    you follow and downloads the newest four episodes of each, up to 12 GB of
-   audio kept in all (the limit is for everything kept, not for one run, and the
-   window ends with its own code and says so when it is reached), keeping 15 GB
-   of the disk free. Episodes the phone asked for (see "The phone's notes and
-   the wanted list" below) go first. Step 2 writes down what is said in them
-   with the Swift code the app uses (needs macOS 26 and Xcode 26; it can take
-   hours, so keep the Mac plugged in). This does not use Claude.
+   audio kept in all (the limit is for everything kept, not for one run; when it
+   is reached the window says so and goes on to step 2 with what is on disk),
+   keeping 15 GB of the disk free. Episodes the phone asked for (see "The
+   phone's notes and the wanted list" below) go first. Step 2 writes down what
+   is said in them with the Swift code the app uses (needs macOS 26 and Xcode
+   26; it can take hours, so keep the Mac plugged in). This does not use Claude.
 2. `Mark ads in the teaching episodes.command`. Claude marks every ad and
    promotion in the written-down episodes. This is the step that uses your
    Claude plan: it shares your usage allowance, so it says what it is about to

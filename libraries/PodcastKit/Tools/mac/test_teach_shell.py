@@ -327,6 +327,29 @@ class FinishLockTests(Setup):
         self.assertIn("  Publish: failed", done.stdout)
 
 
+class GatherTests(Setup):
+    GATHER = "Gather episodes for teaching.command"
+
+    def test_the_downloads_come_first_then_the_writing_down(self):
+        done = self.run_script(self.GATHER)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        names = [c.split()[1] for c in self.called()]
+        self.assertEqual(names, ["teach_collect.py", "build", "build", "teach_transcribe.py"])
+
+    def test_a_full_audio_folder_is_not_a_failure_and_is_still_written_down(self):
+        done = self.run_script(self.GATHER, CODES="teach_collect.py=3")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("The size limit is reached", done.stdout)
+        self.assertIn("teach_transcribe.py", " ".join(self.called()))
+        self.assertIn("The size limit is reached", self.log())
+
+    def test_downloads_that_failed_stop_it_before_the_writing_down(self):
+        done = self.run_script(self.GATHER, CODES="teach_collect.py=2")
+        # The sentence that says so is the prompt of the wait for Return, which only a Terminal shows.
+        self.assertEqual(done.returncode, 1)
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_collect.py"])
+
+
 class CommandTests(Setup):
     MARK = "Mark ads in the teaching episodes.command"
     AGAIN = "Teach the phone again.command"

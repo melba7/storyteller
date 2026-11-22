@@ -139,3 +139,6 @@ One line per lesson.
 - Matching a stored row by one value alone (an audio address, a count of lines)
   breaks on the odd feed or the odd moment: ask what else must be the same
   (2026-11-22).
+- A launcher is only tested when every exit code of the tool it starts has been
+  run through it: the gathering treated "size limit reached" as a failure and
+  stopped before writing anything down on Mo's first real run (2026-11-22).

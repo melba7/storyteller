@@ -32,7 +32,12 @@ echo
 
 echo "Step 1 of 2: downloading episodes" | tee -a "$LOG"
 caffeinate -i python3 -u "$HERE/teach_collect.py" --folder "$FOLDER" 2>&1 | tee -a "$LOG"
-if [ "$?" -ne 0 ]; then
+CODE="$?"
+# 3 means the size limit on all kept audio stopped the downloads. That is not a failure: what is
+# on disk still gets written down.
+if [ "$CODE" -eq 3 ]; then
+  echo "The size limit is reached, so nothing more is downloaded. Step 2 goes on with what is on disk." | tee -a "$LOG"
+elif [ "$CODE" -ne 0 ]; then
   finish "Step 1 did not work (see above)." 1
 fi
 
