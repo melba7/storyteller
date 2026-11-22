@@ -68,7 +68,9 @@ export function AdSkipSwitches() {
               : row.body
           }
           checked={settings?.[row.key] ?? null}
-          onChange={(on) => change({ [row.key]: on })}
+          onChange={(on) =>
+            change({ [row.key]: on } as Partial<AdSkipSettings>)
+          }
         />
       ))}
     </>
