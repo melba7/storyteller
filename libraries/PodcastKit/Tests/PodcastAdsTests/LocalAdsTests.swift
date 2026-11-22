@@ -53,20 +53,22 @@ final class LocalAdsTests: XCTestCase {
     XCTAssertEqual(found.first?.advertiser, "")
   }
 
-  func testAModelSpanOverARuleRangeWidensItAndKeepsTheRulesKind() {
+  func testAModelSpanOverARuleRangeLiftsTheRuleLinesAndKeepsTheModelsOwnKindOutside() {
     let texts = ["plain", "x1"] + promo + ["x2", "x3", "plain"]
     let found = LocalAds(model: model).ranges(lines: lines(texts))
-    XCTAssertEqual(found.map { [$0.startLine, $0.endLine] }, [[2, 7]])
-    XCTAssertEqual(found.first?.kind, .promo)
+    // The model calls every line a sponsor; the rules call lines 3 to 5 a promo.
+    XCTAssertEqual(found.map { [$0.startLine, $0.endLine] }, [[2, 2], [3, 5], [6, 7]])
+    XCTAssertEqual(found.map(\.kind), [.ad, .promo, .ad])
     XCTAssertEqual(AdPromoRules.find(lines: lines(texts)).first?.confidence, .unsure)
-    XCTAssertEqual(found.first?.confidence, .sure, "the span is sure, so the rule's lines are")
+    XCTAssertEqual(found[1].confidence, .sure, "the span is sure, so the rule's lines are")
+    XCTAssertEqual(found[0].confidence, .unsure)
   }
 
-  func testLinesBeforeTheFirstRuleLineTakeTheNextRuleLinesKind() {
+  func testModelLinesBeforeTheFirstRuleLineKeepTheirOwnKind() {
     let texts = ["plain", "x1", "x2"] + promo + ["plain"]
     let found = LocalAds(model: model).ranges(lines: lines(texts))
-    XCTAssertEqual(found.map { [$0.startLine, $0.endLine] }, [[2, 6]])
-    XCTAssertEqual(found.first?.kind, .promo)
+    XCTAssertEqual(found.map { [$0.startLine, $0.endLine] }, [[2, 3], [4, 6]])
+    XCTAssertEqual(found.map(\.kind), [.ad, .promo])
   }
 
   func testASureSpanMakesTheRuleLinesSure() {
@@ -84,7 +86,7 @@ final class LocalAdsTests: XCTestCase {
   func testSwitchedOffLayersGiveNothingFromThatFinder() {
     let texts = ["plain", sponsor, "plain"] + promo + ["x1", "x2", "x3", "x4", "x5", "plain"]
     let all = LocalAds(model: model).ranges(lines: lines(texts))
-    XCTAssertEqual(all.count, 2, "the sponsor, and the promo that the model span widens")
+    XCTAssertEqual(all.count, 3, "the sponsor, the promo, and the model's own lines after it")
     XCTAssertEqual(LocalAds(model: model, layers: []).ranges(lines: lines(texts)), [])
     let rulesOnly = LocalAds(model: model, layers: .rules).ranges(lines: lines(texts))
     XCTAssertEqual(rulesOnly.map(\.kind), [.ad])

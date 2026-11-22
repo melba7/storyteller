@@ -50,15 +50,13 @@ public struct LocalAds: Sendable {
         let inside = lines.indices.filter {
           span.firstLine <= lines[$0].number && lines[$0].number <= span.lastLine
         }
-        let ruled = inside.filter { byRules[$0] != nil }
         for at in inside {
           if var rule = byRules[at] {
             if span.sure { rule.confidence = .sure }
             labels[at] = rule
-          } else if let first = ruled.first {
-            let near = ruled.last { $0 < at } ?? first
-            labels[at] = Label(kind: byRules[near]!.kind, confidence: .unsure, advertiser: "")
           } else {
+            // A line with no rule keeps the kind of its own piece of the span, so credits are
+            // never taken for an ad (or an ad for credits) because a rule line is near.
             labels[at] = Label(kind: kind, confidence: .unsure, advertiser: "")
           }
         }

@@ -16,8 +16,12 @@ extension AdWordModel {
   }
 
   /// Decodes the line scores into spans, by the contract with the Mac trainer: smooth the
-  /// ad probability over neighbouring lines, open a span where it reaches `start`, keep it
-  /// open while it stays at `stay` (bridging one weak line), then drop short, weak spans.
+  /// ad probability over neighbouring lines (a quarter of each neighbour, half of the line),
+  /// open a span where it reaches `start`, keep it open while it stays at `stay` (bridging one
+  /// weak line), drop the whole span when it is shorter than 8 seconds and scores below 0.9,
+  /// and cut what is left into pieces where the top class other than "none" changes from one
+  /// line to the next (a bridged line takes the class of the line before it). Each piece has
+  /// its own sort, mean score and "sure" (score at `sure` and 15 seconds long).
   public func spans(lines: [NumberedLine], duration: Double?) -> [Span] {
     let rows = probabilities(lines: lines, duration: duration)
     let n = rows.count
@@ -46,26 +50,43 @@ extension AdWordModel {
           break
         }
       }
-      // The first of the non-"none" classes with the largest total wins a tie.
-      var best = 1
-      var bestSum = -Double.infinity
-      for c in 1..<Self.classes.count {
-        let sum = rows[i...j].reduce(0) { $0 + $1[c] }
-        if sum > bestSum {
-          bestSum = sum
-          best = c
+      // Each line's class is its own top class other than "none" (the first one wins a tie). A
+      // line bridged because it was weak takes the class of the line before it.
+      var sorts: [Int] = []
+      for k in i...j {
+        if k > i, s[k] < thresholds.stay {
+          sorts.append(sorts[sorts.count - 1])
+        } else {
+          sorts.append(topClass(rows[k]))
         }
       }
-      let score = s[i...j].reduce(0, +) / Double(j - i + 1)
-      let length = lines[j].end - lines[i].start
-      if length >= 8 || score >= 0.9 {
-        found.append(
-          Span(
-            firstLine: lines[i].number, lastLine: lines[j].number, sort: Self.classes[best],
-            score: score, sure: score >= thresholds.sure && length >= 15))
+      // The span as a whole must be long or strong enough; then it is cut into one piece for
+      // each run of one class, and every piece has its own sort, score and "sure".
+      let wholeScore = s[i...j].reduce(0, +) / Double(j - i + 1)
+      if lines[j].end - lines[i].start >= 8 || wholeScore >= 0.9 {
+        var from = i
+        while from <= j {
+          var to = from
+          while to < j, sorts[to + 1 - i] == sorts[from - i] { to += 1 }
+          let score = s[from...to].reduce(0, +) / Double(to - from + 1)
+          let length = lines[to].end - lines[from].start
+          found.append(
+            Span(
+              firstLine: lines[from].number, lastLine: lines[to].number,
+              sort: Self.classes[sorts[from - i]], score: score,
+              sure: score >= thresholds.sure && length >= 15))
+          from = to + 1
+        }
       }
       i = j + 1
     }
     return found
+  }
+
+  /// The index of the class other than "none" with the highest probability on a line.
+  private func topClass(_ row: [Double]) -> Int {
+    var best = 1
+    for c in 2..<Self.classes.count where row[c] > row[best] { best = c }
+    return best
   }
 }
