@@ -7,6 +7,7 @@ import {
   SKIP_NOTE_MS,
   adMarks,
   adRows,
+  effectiveAdSettings,
   adsFileAfterRead,
   adsMapFromList,
   adKindOf,
@@ -239,10 +240,56 @@ describe("parseAdsFile", () => {
   })
 })
 
+describe("the promo switch of an older build", () => {
+  it("takes the stored Skip ads value when the promos key is missing", () => {
+    expect(
+      readAdSkipSettings({ skipAds: false, skipOwnPlugs: false }),
+    ).toEqual({
+      skipAds: false,
+      skipOwnPlugs: false,
+      skipPromos: false,
+      skipCredits: false,
+    })
+    expect(readAdSkipSettings({ skipAds: true }).skipPromos).toBe(true)
+  })
+
+  it("keeps a stored promos value", () => {
+    expect(
+      readAdSkipSettings({ skipAds: false, skipPromos: true }).skipPromos,
+    ).toBe(true)
+  })
+})
+
+describe("effectiveAdSettings", () => {
+  it("lets a show replace the first two switches", () => {
+    expect(
+      effectiveAdSettings(DEFAULT_AD_SKIP_SETTINGS, {
+        skipAds: true,
+        skipPlugs: false,
+      }),
+    ).toEqual({ ...DEFAULT_AD_SKIP_SETTINGS, skipOwnPlugs: false })
+  })
+
+  it("does not skip promos for a show whose own ad choice is off", () => {
+    expect(
+      effectiveAdSettings(DEFAULT_AD_SKIP_SETTINGS, {
+        skipAds: false,
+        skipPlugs: null,
+      }),
+    ).toEqual({ ...DEFAULT_AD_SKIP_SETTINGS, skipAds: false, skipPromos: false })
+  })
+
+  it("keeps the main switches for a show with no choices", () => {
+    expect(effectiveAdSettings(DEFAULT_AD_SKIP_SETTINGS, undefined)).toEqual(
+      DEFAULT_AD_SKIP_SETTINGS,
+    )
+  })
+})
+
 describe("adRows", () => {
   it("lists time, length, kind, advertiser and first words", () => {
     const file = parseAdsFile(JSON.stringify({ ads: [ad(723, 788)] }))
-    const [row] = adRows(file!)
+    const [row] = adRows(file!, DEFAULT_AD_SKIP_SETTINGS)
     expect(row).toMatchObject({
       start: 723,
       time: "12:03",
@@ -268,7 +315,7 @@ describe("adRows", () => {
         undone: [{ start: 200, end: 260 }],
       }),
     )
-    const rows = adRows(file!)
+    const rows = adRows(file!, DEFAULT_AD_SKIP_SETTINGS)
     expect(rows.map((row) => row.kind)).toEqual(["Host plug", "Ad", "Ad"])
     const more = adRows(
       parseAdsFile(
@@ -276,6 +323,7 @@ describe("adRows", () => {
           ads: [ad(1, 5, { kind: "promo" }), ad(10, 15, { kind: "credits" })],
         }),
       )!,
+      DEFAULT_AD_SKIP_SETTINGS,
     )
     expect(more.map((row) => row.kind)).toEqual(["Promo", "Credits"])
     // Sure and unsure ads are both skipped, unless the listener undid the skip.
@@ -283,6 +331,28 @@ describe("adRows", () => {
     expect(rows.map((row) => row.unsure)).toEqual([false, true, false])
     expect(rows.map((row) => row.undone)).toEqual([false, false, true])
     expect(rows[1]?.label).toContain("not sure")
+  })
+
+  it("shows a kind the switches do not skip as found but not skipped", () => {
+    const file = parseAdsFile(
+      JSON.stringify({
+        ads: [
+          ad(10, 60),
+          ad(100, 160, { kind: "ownPlug" }),
+          ad(200, 260, { kind: "promo" }),
+          ad(300, 360, { kind: "credits" }),
+        ],
+      }),
+    )
+    // Credits are off by default; turn the plugs and promos off too.
+    const rows = adRows(file!, {
+      skipAds: true,
+      skipOwnPlugs: false,
+      skipPromos: false,
+      skipCredits: false,
+    })
+    expect(rows.map((row) => row.skipped)).toEqual([true, false, false, false])
+    expect(rows.map((row) => row.undone)).toEqual([false, false, false, false])
   })
 })
 
@@ -493,9 +563,9 @@ describe("the four switches", () => {
 
   it("fills what the phone did not say from the defaults", () => {
     expect(readAdSkipSettings(null)).toEqual(DEFAULT_AD_SKIP_SETTINGS)
-    expect(readAdSkipSettings({ skipAds: false, skipOwnPlugs: false })).toEqual(
+    expect(readAdSkipSettings({ skipAds: true, skipOwnPlugs: false })).toEqual(
       {
-        skipAds: false,
+        skipAds: true,
         skipOwnPlugs: false,
         skipPromos: true,
         skipCredits: false,

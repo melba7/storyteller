@@ -8,6 +8,7 @@ import { adRows } from "@/modules/podcasts/ads"
 import { type Show, type StoredEpisode } from "@/modules/podcasts/library"
 import { player } from "@/modules/podcasts/playerInstance"
 
+import { useEffectiveAdSettings } from "./useAdSettings"
 import { useAdsFile } from "./useAds"
 
 /**
@@ -23,7 +24,8 @@ export function AdsFound({
   show: Show | null
 }) {
   const file = useAdsFile(episode.id)
-  const rows = file ? adRows(file) : []
+  const settings = useEffectiveAdSettings(show)
+  const rows = file ? adRows(file, settings) : []
   if (rows.length === 0) return null
   return (
     <View className="w-full gap-1 pt-2">

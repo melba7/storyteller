@@ -23,6 +23,7 @@ import { SFIcon } from "./SFIcon"
 import { SeekBar } from "./SeekBar"
 import { SkippedAdNote } from "./SkippedAdNote"
 import { useSheet } from "./playerSheetContext"
+import { useEffectiveAdSettings } from "./useAdSettings"
 import { useAdsFile } from "./useAds"
 
 /**
@@ -50,7 +51,10 @@ export function PlayerNowPlaying({
   const sheet = useSheet()
   const { episode, show } = view
   const adsFile = useAdsFile(episode?.id ?? "")
-  const marks = adsFile ? adMarks(adRows(adsFile), view.duration) : []
+  const settings = useEffectiveAdSettings(show)
+  const marks = adsFile
+    ? adMarks(adRows(adsFile, settings), view.duration)
+    : []
   if (!episode) return null
   const date = dateWords(episode.publishedAt)
 

@@ -1,46 +1,16 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
-import { useEffect, useState } from "react"
-
 import { Text } from "@/components/ui/text"
 import { playerAdLine } from "@/modules/podcasts/adLine"
-import {
-  getAdSkipSettings,
-  onAdSkipSettingsChanged,
-} from "@/modules/podcasts/adsNative"
 import { skippingAnyFor } from "@/modules/podcasts/downloads"
-import { type AdSkipSettings, Podcasts } from "@/modules/podcasts/index"
+import { Podcasts } from "@/modules/podcasts/index"
 import type { Show, StoredEpisode } from "@/modules/podcasts/library"
 import { usePlayerValue } from "@/modules/podcasts/playerInstance"
 
 import { useSheet } from "./playerSheetContext"
+import { useMainAdSettings } from "./useAdSettings"
 import { useAdsInfo } from "./useAds"
 import { useDownload } from "./useDownloads"
 import { useTranscript } from "./useTranscripts"
-
-// The last value read, so the line is drawn right away when the player opens and does not
-// push the artwork and controls down a moment later.
-let lastMain: AdSkipSettings | null = null
-
-/** Whether any sort of ad is skipped for this show, read again when the episode or the setting changes. */
-function useSkipAds(show: Show | null, episodeId: string): boolean {
-  const [main, setMain] = useState(lastMain)
-  const [round, setRound] = useState(0)
-  useEffect(() => onAdSkipSettingsChanged(() => setRound((r) => r + 1)), [])
-  useEffect(() => {
-    let live = true
-    getAdSkipSettings().then(
-      (value) => {
-        lastMain = value
-        if (live) setMain(value)
-      },
-      () => {},
-    )
-    return () => {
-      live = false
-    }
-  }, [episodeId, round])
-  return main !== null && skippingAnyFor(show?.settings, main)
-}
 
 /**
  * One quiet line under the seek bar that says how ad finding is going for this episode, only
@@ -55,7 +25,8 @@ export function AdFindingLine({
   show: Show | null
 }) {
   const sheet = useSheet()
-  const skipAds = useSkipAds(show, episode.id)
+  const main = useMainAdSettings(episode.id)
+  const skipAds = main !== null && skippingAnyFor(show?.settings, main)
   const download = useDownload(episode.id)
   const transcript = useTranscript(episode.id)
   const ads = useAdsInfo(episode.id)

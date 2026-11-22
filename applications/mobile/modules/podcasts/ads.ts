@@ -160,7 +160,11 @@ export const DEFAULT_AD_SKIP_SETTINGS: AdSkipSettings = {
   skipCredits: false,
 }
 
-/** The switches from what the phone sent: what it did not say (an older build) is the default. */
+/**
+ * The switches from what the phone sent: what it did not say (an older build) is the default.
+ * The promos switch is new: when it is missing and Skip ads is stored, promos follow Skip ads,
+ * as they were counted as ads before. (Swift reads it the same way.)
+ */
 export function readAdSkipSettings(raw: unknown): AdSkipSettings {
   const given = (raw && typeof raw === "object" ? raw : {}) as Record<
     string,
@@ -170,11 +174,48 @@ export function readAdSkipSettings(raw: unknown): AdSkipSettings {
     const value = given[key]
     return typeof value === "boolean" ? value : DEFAULT_AD_SKIP_SETTINGS[key]
   }
+  const skipAds = flag("skipAds")
+  const promos = given["skipPromos"]
+  const skipPromos =
+    typeof promos === "boolean"
+      ? promos
+      : typeof given["skipAds"] === "boolean"
+        ? skipAds
+        : DEFAULT_AD_SKIP_SETTINGS.skipPromos
   return {
-    skipAds: flag("skipAds"),
+    skipAds,
     skipOwnPlugs: flag("skipOwnPlugs"),
-    skipPromos: flag("skipPromos"),
+    skipPromos,
     skipCredits: flag("skipCredits"),
+  }
+}
+
+/**
+ * The four switches for one show: its own choices replace the first two where it has them.
+ * When the show's own ad choice is off, promos are not skipped for that show either.
+ */
+export function effectiveAdSettings(
+  main: AdSkipSettings,
+  show: { skipAds: boolean | null; skipPlugs: boolean | null } | undefined,
+): AdSkipSettings {
+  return {
+    skipAds: show?.skipAds ?? main.skipAds,
+    skipOwnPlugs: show?.skipPlugs ?? main.skipOwnPlugs,
+    skipPromos: main.skipPromos && show?.skipAds !== false,
+    skipCredits: main.skipCredits,
+  }
+}
+
+function allowed(settings: AdSkipSettings, kind: AdKind): boolean {
+  switch (kind) {
+    case "ad":
+      return settings.skipAds
+    case "ownPlug":
+      return settings.skipOwnPlugs
+    case "promo":
+      return settings.skipPromos
+    case "credits":
+      return settings.skipCredits
   }
 }
 
@@ -287,7 +328,7 @@ export type AdRow = {
   kind: string
   advertiser: string
   firstWords: string
-  /** The player skips this ad (sure or unsure, and not undone). */
+  /** The player skips this ad (sure or unsure, a kind the switches allow, and not undone). */
   skipped: boolean
   /** The detector was not sure about it (it is skipped all the same). */
   unsure: boolean
@@ -307,9 +348,9 @@ const KIND_LABELS: Record<AdKind, string> = {
 
 /**
  * The rows of the "Ads found" list, in order. Guesses are not listed. An unsure ad is listed
- * and skipped like a sure one. (Whether the host plugs are skipped is the listener's switch.)
+ * and skipped like a sure one. A kind the switches do not skip is listed as found, not skipped.
  */
-export function adRows(file: AdsFile): AdRow[] {
+export function adRows(file: AdsFile, settings: AdSkipSettings): AdRow[] {
   return file.ads
     .filter((ad) => ad.confidence !== "guess")
     .map((ad) => {
@@ -328,7 +369,7 @@ export function adRows(file: AdsFile): AdRow[] {
         kind,
         advertiser: ad.advertiser,
         firstWords: ad.firstWords,
-        skipped: !undone,
+        skipped: !undone && allowed(settings, ad.kind),
         unsure: ad.confidence === "unsure",
         undone,
         label: [
