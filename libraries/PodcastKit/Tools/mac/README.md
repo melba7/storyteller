@@ -374,42 +374,144 @@ team (public radio, big talk shows) are the most likely to have inserted ads.
 
 ## Teaching run
 
-Two files to double-click collect the examples the ad detector is taught from.
-Each window shows what it does, and everything is also added to
-`~/Storyteller Lofi/logs/podcast-teaching.log`. Both can be stopped with
-Control-C and started again: they carry on where they were. Only one of them can
-work at a time; a second window says so and stops.
+The teaching run collects the examples the ad detector is taught from, and
+sends what it learned to the phone. You do not need to write any code: you
+double-click the files below, in this order, and read what the window says.
+Each window shows what it does. Everything is also added to
+`~/Storyteller Lofi/logs/podcast-teaching.log`. A window can be stopped with
+Control-C and started again: it carries on where it was. Only one run can work
+in the teaching folder at a time; a second window says so and stops.
 
-- `Gather episodes for teaching.command` has two steps. Step 1 reads the feed of
-  every show you follow and downloads the newest four episodes of each, up to
-  12 GB, keeping 15 GB of the disk free. Step 2 writes down what is said in
-  them with the Swift code the app uses (needs macOS 26 and Xcode 26; it can
-  take hours, so keep the Mac plugged in).
-- `Mark ads in the teaching episodes.command` has Claude mark every ad and
-  promotion in the written-down episodes, then works out each show's habits (for
-  example whether it often starts with an ad). It uses your Claude plan and
-  shares its usage allowance, so it says what it is about to do and waits for
-  you to type `yes`. Anything else marks nothing. It stops by itself when the
-  allowance is used up, and you can double-click it again later.
+### What to double-click
+
+1. `Gather episodes for teaching.command`. Step 1 reads the feed of every show
+   you follow and downloads the newest four episodes of each, up to 12 GB,
+   keeping 15 GB of the disk free. Episodes the phone asked for (see "The
+   phone's notes and the wanted list" below) go first. Step 2 writes down what
+   is said in them with the Swift code the app uses (needs macOS 26 and Xcode
+   26; it can take hours, so keep the Mac plugged in). This does not use
+   Claude.
+2. `Mark ads in the teaching episodes.command`. Claude marks every ad and
+   promotion in the written-down episodes. This is the step that uses your
+   Claude plan: it shares your usage allowance, so it says what it is about to
+   do and waits for you to type `yes`. Anything else marks nothing, and
+   nothing else runs. It stops by itself when the allowance is used up, and you
+   can double-click it again later. When the marking is over (also when it
+   stopped early) it runs the steps after marking, described below.
+3. `Teach the phone again.command`. Reads the phone's notes, then runs the steps
+   after marking on what is marked so far. It marks nothing new and uses no
+   Claude allowance. Use it after you have listened for a while, or to send the
+   phone the newest results without waiting for new marks.
+4. `Score the ad skipping.command`. Builds the Swift tool `podcast-teach` and has
+   it score the ad skipping on the teaching folder. The report is what the
+   window shows, and it is added to `scorecard.json`. It uses no Claude
+   allowance.
+5. `Install weekly teaching.command`, and later `Stop weekly teaching.command`.
+   See "The weekly job" below.
+
+The steps after marking are done by `teach-finish.sh`, which is not
+double-clicked: the files above call it. In this order it works out each show's
+habits, trains the model, makes the library of known ads, builds `podcast-teach`
+and has it write the ad sounds, scores the ad skipping, and copies the results to
+the folders the phone reads. Every step prints a heading. A step that fails is
+said plainly and the later steps still run, except that the two Swift steps are
+left out together when `podcast-teach` does not build. At the end it prints one
+line per step (worked, nothing to do or failed). It counts as done when the
+copy to the phone worked.
+
+### What the steps write
 
 Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 
-- `episodes.json`: the list of episodes and what happened to each one (step 1
-  writes it).
+- `episodes.json`: the list of episodes and what happened to each one (the
+  gather step writes it).
 - `audio/`: the downloaded files. A file that is over 600 MB is marked
   "skipped" in the list and not tried again.
-- `transcripts/`: one text file per episode (step 2).
+- `transcripts/`: one text file per episode (the writing-down step).
 - `labels/`: one file per episode with the stretches Claude marked.
 - `habits.json`: what is usual for each show.
-- `failures.json`: which episodes failed in step 2 or in the marking. Episodes
-  that never failed go first. One that failed three times is left out, and the
-  last lines of the window say how many. To try those once more, run the step
-  in Terminal with `--retry-failed`, for example
+- `shelf.json` and `ad-model.json`: the training keeps back the newest episode
+  of each show as a test shelf, then writes the small model that spots ads and
+  how well it did on the shelf.
+- `ad-library.json`: the ads that came back in several episodes.
+- `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
+- `scorecard.json`: every scorecard `podcast-teach score` has made.
+- `wanted.json`: the episodes to fetch first next time (see below).
+- `failures.json`: which episodes failed in the writing-down step or in the
+  marking. Episodes that never failed go first. One that failed three times is
+  left out, and the last lines of the window say how many. To try those once
+  more, run the step in Terminal with `--retry-failed`, for example
   `python3 teach_label.py --retry-failed` in the folder with these tools.
 - `.lock`: how a second run notices the first. Leave it alone.
 
-The tests are `python3 -m unittest discover -s libraries/PodcastKit/Tools/mac`;
-they use fake feeds and a fake `claude`, so they cost nothing and send nothing.
+### What the phone gets
+
+`teach_publish.py` copies the results into the `Podcasts` folder of
+`~/Storyteller Lofi/LofiMusic` and of its iCloud Drive copy, the folder the phone
+follows: `ad-model.json`, `ad-library.json`, `show-habits.json` (from
+`habits.json`) and `ad-sounds.json`. Each file is checked first (it must be JSON
+with `"version": 1` and under 4.5 MB) and is only rewritten when it changed.
+
+A weak model is not sent. The model is copied only when its precision on the test
+shelf is at least 85% (`--min-precision` changes that). When it is lower, or
+missing, the window says so in one sentence, a model the phone already has is
+left alone and the other files are still sent. This is not counted as a failure.
+
+`Podcasts/teaching.json` is a short list of the four files that are in that
+folder, each with its hash and size. The phone reads this small file first and
+downloads a big file only when its hash changed. It is rewritten only when the
+list changes.
+
+### The phone's notes and the wanted list
+
+While you listen, the phone writes what happened to
+`Podcasts/phone-notes.jsonl` in the folder it is linked to (the iCloud copy of
+`LofiMusic`): ads it skipped, skips you took back ("undone"), skips you trimmed,
+and times you pressed Skip ad where the phone knew no ad ("missed").
+`teach_feedback.py` reads that file (the iCloud copy first, then the Mac's own
+copy), prints a small table per show and writes `wanted.json`: the episodes with
+at least one "missed" or "undone" note, the most recent first, at most 40. Lines
+that are not valid notes are counted and skipped. When the phone has sent no
+notes yet it says so and writes nothing.
+
+The next gather plans the wanted episodes before the newest episodes of each
+show, at most 20 in one run (`--wanted 20`), even when that is more than the
+usual four per show. A wanted episode is looked up in its show's feed, by its
+guid or by its audio address. One that is no longer in the feed, or is already
+gathered, is left out, and the window says so for a missing one. A damaged
+`wanted.json` is ignored with one line. `Teach the phone again.command` and the
+weekly job both run `teach_feedback.py` for you.
+
+### The weekly job
+
+`Install weekly teaching.command` sets up a job that runs `teach-weekly.sh`
+every Sunday at 3:00 at night. It first says what it will do and asks you to
+type `yes`, and installs nothing otherwise. Each week the job reads the phone's
+notes, gathers the newest episode of each show (plus the wanted ones), writes
+them down, has Claude mark up to 15 episodes and runs the steps after marking.
+Marking is the only part that uses your Claude plan, about 15 episodes a week of
+its allowance. The Mac has to be on or asleep at that time, not shut down: a
+start missed while the Mac slept runs when it wakes up, and a week the Mac was
+off is skipped. If another teaching run is working in the folder, the job says
+so and ends. Double-click the installer again to replace the job (it never
+makes two), and `Stop weekly teaching.command` to turn it off. For the job to
+copy into iCloud Drive, give `/bin/bash` Full Disk Access once, as in "Set it
+up once" above. The job runs the files in the folder you installed it from, so
+install it again if you move that folder.
+
+### The logs
+
+- `~/Storyteller Lofi/logs/podcast-teaching.log`: what every window and the
+  weekly job printed, with a dated heading for each run.
+- `~/Storyteller Lofi/logs/podcast-teaching-weekly.log`: what launchd saw from
+  the weekly job.
+
+### Tests
+
+The tests are `python3 -m unittest discover -s libraries/PodcastKit/Tools/mac`.
+They use fake feeds, a fake `claude`, and stand-in `python3`, `swift` and
+`podcast-teach` programs for the shell files, so they cost nothing, send nothing
+and need no Mac. They also run `bash -n` on every `.command` and `.sh` file.
 
 ## Tests
 
