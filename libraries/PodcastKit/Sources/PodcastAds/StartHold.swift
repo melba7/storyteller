@@ -4,12 +4,20 @@
 // an ad when the head scan finds it. For an episode that plays through its own download, starts
 // at 0:00, was never checked and is of a show that is not known to start clean, Play waits a
 // moment for the first look (the 15 second step's rules and the memory of ads), so an ad that
-// holds 0:00 is left before it is heard. The wait never lasts past `longest`. Foundation only.
+// holds 0:00 is left before it is heard. The wait never lasts past `longest` (3 seconds), or
+// `longestForAdOpeners` (5 seconds) for a show that usually opens with an ad. Foundation only.
 import Foundation
 
 public struct StartHold: Equatable, Sendable {
   /// The wait never lasts longer than this many seconds from the tap.
   public static let longest = 3.0
+  /// A show that usually opens with an ad is waited for a little longer.
+  public static let longestForAdOpeners = 5.0
+
+  /// The longest wait for a show, by whether it usually opens with an ad.
+  public static func longest(usuallyOpensWithAd: Bool) -> Double {
+    usuallyOpensWithAd ? longestForAdOpeners : longest
+  }
   /// An episode that starts later than this many seconds is not waited for (it resumes).
   public static let startsUnder = 1.0
 
@@ -52,9 +60,10 @@ public struct StartHold: Equatable, Sendable {
   public mutating func scanEnded() -> Release? { release(.scanEnded) }
   public mutating func tappedAgain() -> Release? { release(.secondTap) }
 
-  /// `elapsed` seconds have gone by since the tap.
-  public mutating func tick(elapsed: Double) -> Release? {
-    elapsed >= Self.longest ? release(.timeout) : nil
+  /// `elapsed` seconds have gone by since the tap. The wait ends at `longest` seconds, which is
+  /// longer for a show that usually opens with an ad (`longest(usuallyOpensWithAd:)`).
+  public mutating func tick(elapsed: Double, longest: Double = StartHold.longest) -> Release? {
+    elapsed >= longest ? release(.timeout) : nil
   }
 
   /// The reason, when this is the one that ended the wait.

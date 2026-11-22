@@ -251,6 +251,114 @@ final class KnownAdsTests: XCTestCase {
     XCTAssertEqual(broken.find(in: timed(adWords()), show: "show"), [])
   }
 
+  // MARK: Scope and taught ads
+
+  private func ad(
+    _ words: [String], show: String = "show", scope: String? = nil, seen: Int = 1,
+    name: String = "Acme", kind: AdKind = .ad, length: Double = 30
+  ) -> KnownAd {
+    KnownAd(
+      showId: show, advertiser: name, kind: kind, text: words.joined(separator: " "),
+      length: length, seen: seen, lastSeen: now, scope: scope)
+  }
+
+  func testAFileSavedBeforeScopeExistedStillLoads() throws {
+    let old = """
+      {"version":1,"ads":[{"showId":"show","advertiser":"Acme","kind":"ad","text":"a b c",\
+      "length":30,"seen":2,"lastSeen":"2027-01-15T08:00:00Z"}]}
+      """
+    let url = try temporaryFolder().appendingPathComponent(KnownAds.fileName)
+    try Data(old.utf8).write(to: url)
+    let loaded = KnownAds.load(from: url)
+    XCTAssertEqual(loaded.ads.count, 1)
+    XCTAssertNil(loaded.ads.first?.scope)
+    try loaded.save(to: url)
+    XCTAssertFalse(try String(contentsOf: url, encoding: .utf8).contains("scope"), "nil is not written")
+    XCTAssertEqual(KnownAds.load(from: url), loaded)
+  }
+
+  func testAnAdWithScopeAllIsFoundInAnyShowAndOneWithoutScopeOnlyInItsOwn() {
+    let later = timed(plain(30, from: 900) + adWords() + plain(30, from: 1000))
+    let everywhere = KnownAds(ads: [ad(adWords(), show: "elsewhere", scope: "all")])
+    XCTAssertEqual(everywhere.find(in: later, show: "show").count, 1)
+    XCTAssertEqual(everywhere.find(in: later, show: "").count, 1)
+    for scope in [nil, "show"] {
+      let own = KnownAds(ads: [ad(adWords(), show: "elsewhere", scope: scope)])
+      XCTAssertEqual(own.find(in: later, show: "show"), [], "scope \(scope ?? "nil")")
+      XCTAssertEqual(own.find(in: later, show: "elsewhere").count, 1)
+    }
+  }
+
+  func testHitsOfTheMemoryAndTheSeedsComeTogetherByStart() {
+    let own = KnownAds(ads: [ad(adWords(40), name: "Own")])
+    let seed = KnownAds(ads: [ad(adWords(40).map { $0 + "x" }, name: "Seed")])
+    let spoken = plain(10, from: 900) + adWords(40).map { $0 + "x" } + plain(10, from: 950)
+      + adWords(40) + plain(10, from: 1000)
+    let hits = own.find(in: timed(spoken), show: "show", seeds: seed)
+    XCTAssertEqual(hits.map(\.ad.advertiser), ["Seed", "Own"])
+    XCTAssertEqual(hits.map(\.match.start), [5.0, 30.0])
+    XCTAssertEqual(KnownAds().find(in: timed(spoken), show: "show", seeds: KnownAds()), [])
+  }
+
+  func testOfTwoWholeHitsOnTheSameAdTheLargerSeenWinsAndATieGoesToTheMemory() {
+    let words = timed(plain(10, from: 900) + adWords() + plain(10, from: 1000))
+    func advertiser(own: Int, seed: Int) -> [String] {
+      KnownAds(ads: [ad(adWords(), seen: own, name: "Own")])
+        .find(in: words, show: "show", seeds: KnownAds(ads: [ad(adWords(), seen: seed, name: "Seed")]))
+        .map(\.ad.advertiser)
+    }
+    XCTAssertEqual(advertiser(own: 2, seed: 5), ["Seed"])
+    XCTAssertEqual(advertiser(own: 5, seed: 2), ["Own"])
+    XCTAssertEqual(advertiser(own: 3, seed: 3), ["Own"])
+  }
+
+  func testAWholeHitBeatsAnOpeningThatOverlapsItWhateverTheSeen() {
+    // The transcript ends 30 words into the long ad: that one is an opening (to 45 seconds), and
+    // the short ad, which is its first 20 words, is whole inside it.
+    let words = timed(plain(30, from: 900) + Array(adWords().prefix(30)))
+    let long = ad(adWords(), seen: 99, name: "Long", length: 30)
+    let short = ad(Array(adWords().prefix(20)), seen: 1, name: "Short", length: 10)
+    let ownShort = KnownAds(ads: [short]).find(in: words, show: "show", seeds: KnownAds(ads: [long]))
+    XCTAssertEqual(ownShort.map(\.ad.advertiser), ["Short"])
+    let ownLong = KnownAds(ads: [long]).find(in: words, show: "show", seeds: KnownAds(ads: [short]))
+    XCTAssertEqual(ownLong.map(\.ad.advertiser), ["Short"])
+    XCTAssertEqual(KnownAds(ads: [long]).find(in: words, show: "show").first?.match,
+      .opening(start: 15, expectedEnd: 45))
+  }
+
+  func testTwoOpeningsOfTheSameAdKeepTheOneSeenMoreOften() {
+    let words = timed(plain(30, from: 900) + Array(adWords().prefix(30)))
+    let own = KnownAds(ads: [ad(adWords(), seen: 2, name: "Own")])
+    let seed = KnownAds(ads: [ad(adWords(), seen: 4, name: "Seed")])
+    XCTAssertEqual(own.find(in: words, show: "show", seeds: seed).map(\.ad.advertiser), ["Seed"])
+    XCTAssertEqual(seed.find(in: words, show: "show", seeds: own).map(\.ad.advertiser), ["Seed"])
+  }
+
+  func testTheSameAdFoundByBothAtTwoPlacesGivesOneHitPerPlace() {
+    let own = KnownAds(ads: [ad(adWords(40), name: "Own")])
+    let seed = KnownAds(ads: [ad(adWords(40), name: "Seed")])
+    let twice = timed(adWords(40) + plain(60, from: 900) + adWords(40) + plain(10, from: 1000))
+    let hits = own.find(in: twice, show: "show", seeds: seed)
+    XCTAssertEqual(hits.map(\.match.start), [0.0, 50.0])
+  }
+
+  func testAnAllScopeAdInTheMemoryIsLearnedPrunedAndForgottenLikeOthers() {
+    // learn: counted again only by an ad of the same showId, like any other.
+    var known = KnownAds(ads: [ad(adWords(), show: "show", scope: "all", seen: 1)])
+    let texts = plain(30) + adWords() + plain(30, from: 500)
+    known.learn(from: file([found(15, 45)]), transcript: transcript(texts), show: "show", now: now)
+    XCTAssertEqual(known.ads.count, 1)
+    XCTAssertEqual(known.ads.first?.seen, 2)
+    XCTAssertEqual(known.ads.first?.scope, "all")
+    // prune: it counts for its showId and ages out by lastSeen.
+    known.prune(now: now.addingTimeInterval(61 * day))
+    XCTAssertEqual(known.ads, [])
+    // forget: only the ads of that showId are forgotten, so another show's all ad stays.
+    var other = KnownAds(ads: [ad(adWords(), show: "elsewhere", scope: "all")])
+    XCTAssertEqual(other.forget(start: 15, end: 45, in: timed(texts), show: "show"), 0)
+    XCTAssertEqual(other.forget(start: 15, end: 45, in: timed(texts), show: "elsewhere"), 1)
+  }
+
   // MARK: The file
 
   func testTheMemoryIsSavedAndReadBack() throws {
