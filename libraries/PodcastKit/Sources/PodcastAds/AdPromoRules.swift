@@ -4,12 +4,14 @@
 // episode: a live tour or tickets, a paid subscription or membership, another show or its
 // trailer, a book or an app. The sponsor rules (AdHeadRules) miss these because no outside brand
 // pays for them. These rules run without a model: a line with a promo cue only counts when
-// proof is a line or two away: a web address, a code or an offer, or a second cue that is a
-// different phrase (cues from two different groups make the promo sure). The same phrase said
-// twice ("the live show", "the live show") proves nothing, and neither does a soft call such as
-// "go to" or "visit", so plain talk ("we were on tour, I had to go to the hospital") is left
-// alone. The word lists are a first version, to be tuned against episodes that people have
-// marked. Foundation only.
+// proof is a line or two away: a web address, a code or an offer, a cue from another group, or a
+// second, different cue phrase when one of the two speaks to the listener ("get your tickets",
+// "come see us"). A web address or cues from two groups make the promo sure. The same phrase
+// said twice ("the live show", "the live show") proves nothing, two phrases people also use in
+// plain talk ("a live show", "buy tickets at the door") prove nothing, and neither does a soft
+// call such as "go to" or "visit" ("we were on tour, I had to go to the hospital"). The word
+// lists are a first version, to be tuned against episodes that people have marked. Foundation
+// only.
 import Foundation
 
 public enum AdPromoRules {
@@ -25,9 +27,10 @@ public enum AdPromoRules {
     patterns.compactMap { try? NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
   }
 
-  /// One cue phrase. A strong cue asks the listener to do something or sells outright ("get your
-  /// tickets", "become a member"); a weak one is also how people talk about their week ("the
-  /// live show", "our tour", "early access").
+  /// One cue phrase. A strong cue speaks to the listener or about the show's own thing ("get
+  /// your tickets", "come see us", "check out our new series", "become a member today"); a weak
+  /// one is also how people talk about their week or about someone else's show ("buy tickets",
+  /// "the live show", "become a member", "check out the series", "early access").
   private struct Cue {
     var pattern: NSRegularExpression
     var strong: Bool
@@ -42,33 +45,38 @@ public enum AdPromoRules {
   private static let cueGroups: [[Cue]] = [
     cues(
       strong: [
-        #"\b(get|grab|buy|book) (your |those )?tickets\b"#,
-        #"\btickets (are |go )?(on sale|available)\b"#, #"\btickets at\b"#,
+        #"\b(get|grab|buy|book) (your|those) tickets\b"#,
+        #"\btickets (are |go )?(on sale|available)\b"#,
         #"\bjoin us (live|in person|on stage)\b"#, #"\bcome see (us|the show)\b"#,
-        #"\bsee (us|the show) live\b"#,
+        #"\bsee us live\b"#,
       ],
       weak: [
+        #"\b(get|grab|buy|book) tickets\b"#, #"\btickets at\b"#, #"\bsee the show live\b"#,
         #"\blive (show|shows|taping|event|events|tour|on stage)\b"#, #"\bour (live )?tour\b"#,
         #"\bwe(['’]re| are) (going|heading) on tour\b"#,
       ]),
     cues(
       strong: [
-        #"\b(become|becoming) a (subscriber|member|supporter|patron)\b"#,
+        #"\b(become|becoming) a (paid |paying )?(subscriber|supporter|patron)\b"#,
+        #"\b(become|becoming) a member (today|now|of (the|this|our) (show|podcast|program|community))\b"#,
         #"\bsubscribe to (the|our) [\w' ]{0,30}?\b(times|post|journal|atlantic|new yorker|economist|magazine|plus|premium)\b"#,
         #"\bsupport (our|this) (journalism|reporting|work)\b"#, #"\bsubscribe (today|now) at\b"#,
       ],
       weak: [
+        #"\b(become|becoming) a member\b"#,
         #"\bour (subscribers|members) (get|can|have|also)\b"#,
         #"\b(ad[- ]free|bonus episodes?|early access)\b"#,
       ]),
     cues(
       strong: [
         #"\b(listen|follow|search for|find) [^.?!]{0,60}wherever you (get|listen to) (your )?podcasts\b"#,
-        #"\bcheck out (our|the) (new |other |latest )?(podcast|series)\b"#,
-        #"\bcheck out (our (new |other |latest )?|the (new |other |latest ))show\b"#,
-        #"\bhere['’]s (a|the) (preview|trailer)\b"#,
+        #"\bcheck out (our|the) (new |other |latest )?podcast\b"#,
+        #"\bcheck out our (new |other |latest )?(series|show)\b"#,
+        #"\bhere['’]s (a|the) preview\b"#,
       ],
       weak: [
+        #"\bcheck out the (new |other |latest )?series\b"#,
+        #"\bcheck out the (new |other |latest )show\b"#, #"\bhere['’]s (a|the) trailer\b"#,
         #"\b(new|another) (podcast|show|series) from\b"#,
         #"\bfrom the (makers|creators|team|people) (of|behind)\b"#,
         #"\bnew episodes (every|each|drop|are out|out)\b"#,

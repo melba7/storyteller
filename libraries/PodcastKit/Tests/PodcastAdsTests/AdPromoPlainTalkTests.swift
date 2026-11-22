@@ -171,6 +171,47 @@ final class AdPromoPlainTalkTests: XCTestCase {
     XCTAssertEqual(found.first?.confidence, .unsure)
   }
 
+  func testEverydayWordsForTicketsAndMembershipAreNotAPromo() {
+    assertNoPromo([
+      "We went to see a live show at the Fillmore with my cousin.",
+      "I had to buy tickets at the door because the site was down.",
+      "It was worth it.",
+    ])
+    assertNoPromo([
+      "My sister told me to become a member of the gym.",
+      "Members get early access to the pool in the morning.",
+      "I still said no.",
+    ])
+  }
+
+  func testTalkAboutSomeoneElsesShowIsNotAPromo() {
+    assertNoPromo([
+      "I finally got to see the show live in New York.",
+      "The live show is so much better than the film.",
+      "You have to go.",
+    ])
+    assertNoPromo([
+      "You should check out the series if you have not yet.",
+      "It is a new series from the people who made the first one.",
+      "Here's the trailer, it gives nothing away.",
+    ])
+  }
+
+  func testAskingTheListenerStillProvesAPromo() {
+    func found(_ texts: [String]) -> [AdRange] {
+      AdPromoRules.find(lines: AdChunker.number(makeTranscript(texts).lines))
+    }
+    XCTAssertEqual(
+      found(["Become a member today.", "Members get early access to every episode.", "Now, the news."])
+        .map(\.confidence), [.unsure])
+    XCTAssertEqual(
+      found(["Check out our new series.", "It is a new series from this team.", "Now, the news."])
+        .map(\.confidence), [.unsure])
+    XCTAssertEqual(
+      found(["Come see us live this fall.", "The live show has two new stories.", "Now, the news."])
+        .map(\.confidence), [.unsure])
+  }
+
   func testOneStrongPhraseAloneIsNotAPromo() {
     assertNoPromo([
       "My sister told me to become a member of the gym.",
