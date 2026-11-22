@@ -30,6 +30,7 @@ let package = Package(
         .library(name: "PodcastAudioMatch", targets: ["PodcastAudioMatch"]),
         .executable(name: "podcast-transcribe", targets: ["podcast-transcribe"]),
         .executable(name: "podcast-ads", targets: ["podcast-ads"]),
+        .executable(name: "podcast-teach", targets: ["podcast-teach"]),
     ],
     targets: [
         // RSS 2.0 with the iTunes tags: the show, its episodes, durations, dates and notes.
@@ -88,5 +89,11 @@ let package = Package(
                 "PodcastDownloads", "PodcastAudioMatch",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
+        // `swift run podcast-teach score|sounds <teaching folder>`: the Mac teaching run's
+        // scorecard and its library of ad sounds, made with the phone's own code. Foundation
+        // only, so it builds and runs on Linux too.
+        .executableTarget(
+            name: "podcast-teach",
+            dependencies: ["PodcastAds", "PodcastAudioMatch", "PodcastTranscripts"]),
     ]
 )
