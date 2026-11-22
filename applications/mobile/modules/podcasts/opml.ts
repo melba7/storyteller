@@ -70,14 +70,21 @@ function skipTo(reader: Reader, end: string, what: string) {
   reader.at = found + end.length
 }
 
+// Read from `lastIndex`, so a large file is never cut into pieces.
+const NAME_END = /[\s/>]/g
+const ATTRIBUTE_NAME = /[^\s=/>]+/y
+
 /** Reads `name="value" ...` up to the tag's end. Returns the attributes and whether it closed. */
 function readTag(reader: Reader): {
   name: string
   attrs: Map<string, string>
   selfClosing: boolean
 } {
-  const nameEnd = /[\s/>]/.exec(reader.text.slice(reader.at))
-  const length = nameEnd ? nameEnd.index : reader.text.length - reader.at
+  NAME_END.lastIndex = reader.at
+  const nameEnd = NAME_END.exec(reader.text)
+  const length = nameEnd
+    ? nameEnd.index - reader.at
+    : reader.text.length - reader.at
   const name = reader.text.slice(reader.at, reader.at + length)
   if (name === "") throw damaged(reader, "a tag has no name")
   reader.at += length
@@ -95,7 +102,8 @@ function readTag(reader: Reader): {
       reader.at += 2
       return { name, attrs, selfClosing: true }
     }
-    const key = /^[^\s=/>]+/.exec(reader.text.slice(reader.at))?.[0]
+    ATTRIBUTE_NAME.lastIndex = reader.at
+    const key = ATTRIBUTE_NAME.exec(reader.text)?.[0]
     if (!key) throw damaged(reader, `a stray "${next}" inside <${name}>`)
     reader.at += key.length
     skipSpace(reader)

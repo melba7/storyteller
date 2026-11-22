@@ -48,3 +48,19 @@ export const CLEAR_HISTORY_SQL = "UPDATE episodes SET history_at = NULL"
  */
 export const LAST_LISTENED_SQL =
   "SELECT * FROM episodes WHERE history_at IS NOT NULL ORDER BY history_at DESC LIMIT 1"
+
+/**
+ * Per show: its newest dated episode's date, whether that episode is done with (played or
+ * archived, so the Library badge does not count it), and how many unplayed, unarchived
+ * episodes came out at or after the show was followed.
+ */
+export const SHOW_ACTIVITY_SQL = `SELECT s.id AS show_id,
+       MAX(e.published_at) AS newest_at,
+       (SELECT CASE WHEN n.played = 1 OR n.archived = 1 THEN 1 ELSE 0 END FROM episodes n
+         WHERE n.show_id = s.id AND n.published_at IS NOT NULL
+         ORDER BY n.published_at DESC LIMIT 1) AS newest_played,
+       COUNT(CASE WHEN e.played = 0 AND e.archived = 0
+         AND e.published_at >= s.added_at THEN 1 END)
+         AS unplayed_since
+     FROM shows s LEFT JOIN episodes e ON e.show_id = s.id
+     GROUP BY s.id`

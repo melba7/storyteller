@@ -150,9 +150,9 @@ describe("newEpisodes", () => {
 
   it("counts nothing as new on a show's first refresh, and nothing undated", () => {
     expect(newEpisodes("S", [fetched("a", 10)], ["i1"], [], NOW)).toEqual([])
-    expect(newEpisodes("S", [fetched("u", null)], ["i1"], [stored(5)], NOW)).toEqual(
-      [],
-    )
+    expect(
+      newEpisodes("S", [fetched("u", null)], ["i1"], [stored(5)], NOW),
+    ).toEqual([])
   })
 
   it("counts a dated episode when the stored ones have no dates", () => {

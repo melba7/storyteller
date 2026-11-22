@@ -137,6 +137,25 @@ describe("keep the newest", () => {
   })
 })
 
+describe("keep the newest N and a half-listened episode", () => {
+  it("leaves an unplayed episode with a saved place, which still takes its slot", () => {
+    const list = [
+      episode("n1", { publishedAt: 4 * DAY }),
+      episode("n2", { publishedAt: 3 * DAY }),
+      episode("half", { publishedAt: 2 * DAY, positionSeconds: 300 }),
+      episode("done", {
+        publishedAt: 1 * DAY,
+        played: true,
+        positionSeconds: 300,
+      }),
+      episode("n3", { publishedAt: 0 }),
+    ]
+    expect(
+      episodesToArchive(list, settings({ keepNewest: 2 }), none).sort(),
+    ).toEqual(["done", "n3"])
+  })
+})
+
 describe("exceptions", () => {
   const all = settings({ archiveAfterPlayed: "now" })
   const played = (id: string) =>

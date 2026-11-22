@@ -38,7 +38,8 @@ export async function setPlayed(
   const db = await database()
   const flag = played ? 1 : 0
   await db.transaction(async (tx) => {
-    for (const id of ids) await tx.execute(SET_PLAYED_SQL, [flag, flag, flag, Date.now(), id])
+    for (const id of ids)
+      await tx.execute(SET_PLAYED_SQL, [flag, flag, flag, Date.now(), id])
   })
   notifyLibraryChanged()
 }

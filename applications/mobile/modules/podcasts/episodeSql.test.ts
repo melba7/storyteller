@@ -10,6 +10,7 @@ import {
   SET_STARRED_SQL,
   STAR_ORDER_SQL,
   RECORD_LISTEN_SQL,
+  SHOW_ACTIVITY_SQL,
 } from "./episodeSql"
 import { migrationStatements } from "./schema"
 import { addEpisode, addShow, openTestDatabase } from "./testDatabase"
@@ -68,11 +69,14 @@ describe("marking played", () => {
   it("starts the clean-up clock once, and not for unplayed", () => {
     const db = setup()
     db.prepare("UPDATE episodes SET last_played_at = 50 WHERE id = 'b'").run()
-    for (const id of ["a", "b"]) db.prepare(SET_PLAYED_SQL).run(1, 1, 1, 800, id)
+    for (const id of ["a", "b"])
+      db.prepare(SET_PLAYED_SQL).run(1, 1, 1, 800, id)
     db.prepare(SET_PLAYED_SQL).run(0, 0, 0, 900, "c")
     expect(
       db
-        .prepare("SELECT id, last_played_at, history_at FROM episodes ORDER BY id")
+        .prepare(
+          "SELECT id, last_played_at, history_at FROM episodes ORDER BY id",
+        )
         .all(),
     ).toEqual([
       { id: "a", last_played_at: 800, history_at: null },
@@ -184,5 +188,21 @@ describe("the episode to restore in the mini player", () => {
     db.prepare(RECORD_LISTEN_SQL).run(5, 0, 1000, 1000, "a")
     db.prepare(CLEAR_HISTORY_SQL).run()
     expect(db.prepare(LAST_LISTENED_SQL).all()).toEqual([])
+  })
+})
+
+describe("the Library activity", () => {
+  it("counts an archived newest episode as done, like a played one", () => {
+    const db = setup()
+    const newest = () =>
+      (db.prepare(SHOW_ACTIVITY_SQL).get() as { newest_played: number })
+        .newest_played
+    expect(newest()).toBe(0)
+    db.prepare("UPDATE episodes SET archived = 1 WHERE id = 'c'").run()
+    expect(newest()).toBe(1)
+    db.prepare(
+      "UPDATE episodes SET archived = 0, played = 1 WHERE id = 'c'",
+    ).run()
+    expect(newest()).toBe(1)
   })
 })

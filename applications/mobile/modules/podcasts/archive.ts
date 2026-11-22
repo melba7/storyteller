@@ -38,7 +38,8 @@ function playedDelay(
  * - after playing: played episodes, once their delay has passed since the last listen (an
  *   episode with no listen time archives only "right away");
  * - after N days unplayed: episodes never started that came out that many days ago;
- * - keep the newest N: every episode past the N newest (archived ones do not count).
+ * - keep the newest N: every episode past the N newest (archived ones do not count), except
+ *   one that is unplayed with a saved place.
  * Archived episodes, the loaded episode and queued ones are left alone.
  */
 export function episodesToArchive(
@@ -78,6 +79,8 @@ export function episodesToArchive(
 
   if (settings.keepNewest !== null) {
     for (const episode of sortEpisodes([...live]).slice(settings.keepNewest)) {
+      // An episode the listener is halfway through is not put away under them.
+      if (!episode.played && episode.positionSeconds > 0) continue
       chosen.add(episode.id)
     }
   }

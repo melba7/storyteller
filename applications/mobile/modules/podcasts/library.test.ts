@@ -139,8 +139,18 @@ describe("mergeEpisodes", () => {
 describe("mergeEpisodes with changed guids", () => {
   it("moves a stored row to the new guid when the audio address matches", () => {
     const result = mergeEpisodes(
-      [stored("old", { audioUrl: "https://cdn.example.com/x.mp3", title: "A" })],
-      [fetched("new", { audioUrl: "https://cdn.example.com/x.mp3", title: "B" })],
+      [
+        stored("old", {
+          audioUrl: "https://cdn.example.com/x.mp3",
+          title: "A",
+        }),
+      ],
+      [
+        fetched("new", {
+          audioUrl: "https://cdn.example.com/x.mp3",
+          title: "B",
+        }),
+      ],
     )
     expect(result.insert).toEqual([])
     expect(result.update.map((u) => [u.id, u.episode.guid])).toEqual([
@@ -150,8 +160,20 @@ describe("mergeEpisodes with changed guids", () => {
 
   it("matches by title and date when the audio address changed too", () => {
     const result = mergeEpisodes(
-      [stored("old", { title: "Same", publishedAt: 5, audioUrl: "https://a/1" })],
-      [fetched("new", { title: "Same", publishedAt: 5, audioUrl: "https://b/1" })],
+      [
+        stored("old", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://a/1",
+        }),
+      ],
+      [
+        fetched("new", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://b/1",
+        }),
+      ],
     )
     expect(result.insert).toEqual([])
     expect(result.update[0]?.id).toBe("id-old")
@@ -159,10 +181,24 @@ describe("mergeEpisodes with changed guids", () => {
 
   it("does not match on the title alone or the date alone", () => {
     const result = mergeEpisodes(
-      [stored("old", { title: "Same", publishedAt: 5, audioUrl: "https://a/1" })],
       [
-        fetched("n1", { title: "Same", publishedAt: 6, audioUrl: "https://b/1" }),
-        fetched("n2", { title: "Other", publishedAt: 5, audioUrl: "https://b/2" }),
+        stored("old", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://a/1",
+        }),
+      ],
+      [
+        fetched("n1", {
+          title: "Same",
+          publishedAt: 6,
+          audioUrl: "https://b/1",
+        }),
+        fetched("n2", {
+          title: "Other",
+          publishedAt: 5,
+          audioUrl: "https://b/2",
+        }),
       ],
     )
     expect(result.insert.map((e) => e.guid)).toEqual(["n1", "n2"])
@@ -172,7 +208,10 @@ describe("mergeEpisodes with changed guids", () => {
   it("never takes a row whose guid is still in the feed", () => {
     const result = mergeEpisodes(
       [stored("a", { audioUrl: "https://x/1" })],
-      [fetched("a", { audioUrl: "https://x/2" }), fetched("b", { audioUrl: "https://x/1" })],
+      [
+        fetched("a", { audioUrl: "https://x/2" }),
+        fetched("b", { audioUrl: "https://x/1" }),
+      ],
     )
     expect(result.insert.map((e) => e.guid)).toEqual(["b"])
   })

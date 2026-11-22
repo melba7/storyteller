@@ -29,6 +29,20 @@ const NESTED = `<?xml version="1.0"?>
   </body>
 </opml>`
 
+describe("a very large file", () => {
+  it("is read quickly", () => {
+    const outlines = Array.from(
+      { length: 5000 },
+      (_, at) =>
+        `<outline type="rss" text="Show ${at}" xmlUrl="https://example.com/${at}.xml"/>`,
+    ).join("\n")
+    const xml = `<?xml version="1.0"?><opml version="2.0"><body>${outlines}</body></opml>`
+    const started = Date.now()
+    expect(parseOpml(xml).feeds).toHaveLength(5000)
+    expect(Date.now() - started).toBeLessThan(1000)
+  })
+})
+
 describe("parseOpml", () => {
   it("reads the feed addresses and names", () => {
     expect(parseOpml(FLAT)).toEqual({
