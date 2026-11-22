@@ -171,6 +171,8 @@ extension PodcastPlayer {
     ) { [weak self] _ in
       Task { @MainActor in
         ChapterState.shared.jumping = false
+        // The jump may have landed on or just past an ad's start, where no marker will fire.
+        self?.adSkipping.refresh()
         self?.publish()
       }
     }

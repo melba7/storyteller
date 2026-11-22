@@ -5,6 +5,7 @@
 // itself when one ends, with the screen locked and no JavaScript running.
 
 import Foundation
+import PodcastAds
 import PodcastPlayback
 
 enum UpNextFile {
@@ -50,17 +51,19 @@ extension PodcastPlayer {
         played: false, autoplay: true, type: next.type, showId: next.showId,
         chaptersUrl: next.chaptersUrl,
         // As the app asks when the listener plays an episode: through its own download while
-        // Skip ads is on for the show (its own choice, else the listener's), so its ads can be
-        // skipped (PodcastPlayer+Stream.swift checks the rest).
+        // any sort of ad is skipped for the show (its own choices, else the listener's), so its
+        // ads can be skipped (PodcastPlayer+Stream.swift checks the rest).
         playThroughDownload: skipAds(forShow: next.showId), language: next.language,
-        queueURL: next.url))
+        notes: next.notes, showLink: next.showLink, queueURL: next.url))
     return true
   }
 
-  /// Whether ads are skipped for a show: its own choice where it has one, else the listener's.
+  /// Whether any sort of ad is skipped for a show: the listener's switches, with the show's own
+  /// choices for ads and plugs where it has them.
   func skipAds(forShow showId: String?) -> Bool {
-    let own = showId.flatMap { ShowSettingsFile.load(from: ShowSettingsStore.url)[$0] }?.skipAds
-    return own ?? AdSkipDefaults.settings.skipAds
+    let own = showId.flatMap { ShowSettingsFile.load(from: ShowSettingsStore.url)[$0] }
+    return AdSkipDefaults.settings.overridden(skipAds: own?.skipAds, skipOwnPlugs: own?.skipPlugs)
+      .skipsAnySort
   }
 
   // MARK: Changing the queue
