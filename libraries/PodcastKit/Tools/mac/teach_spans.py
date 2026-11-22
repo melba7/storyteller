@@ -3,8 +3,10 @@
 Standard library only. This is a line-for-line port of AdWordModel+Spans.swift in PodcastAds: smooth
 the ad probability over the neighbouring lines (a quarter, a half, a quarter), open a span where it
 reaches `start`, keep it open while it stays at `stay` (bridging one weak line), and drop spans
-shorter than 8 seconds unless their score is at least 0.9. The sort of a span is the class with the
-most probability over its lines. Change nothing here without changing it there.
+shorter than 8 seconds unless their score is at least 0.9. Every line has its own class (the one
+other than "none" with the highest probability, the first winning a tie; a weak bridged line takes
+the class of the line before it), and a kept span is cut into pieces where that class changes.
+Each piece has its own sort and its own score. Change nothing here without changing it there.
 
 The check on the held-out shelf uses it, so its precision is about what the phone would cut:
 a cut second is right only when the line's true sort is one the phone skips under its default
@@ -20,9 +22,19 @@ CERTAIN_SCORE = 0.9
 SKIPPED_SORTS = ("sponsor", "network_promo", "host_ask")
 
 
+def top_class(row):
+    """The index of the class other than "none" with the highest probability (the first wins a tie)."""
+    best = 1
+    for c in range(2, len(CLASSES)):
+        if row[c] > row[best]:
+            best = c
+    return best
+
+
 def decode(rows, starts, ends, thresholds=THRESHOLDS):
-    """The spans as (first index, last index, sort, score) for the per-line probability rows (five
-    numbers each, "none" first) and the start and end second of every line."""
+    """The pieces as (first index, last index, sort, score) for the per-line probability rows (five
+    numbers each, "none" first) and the start and end second of every line. A span that changes its
+    top class is cut into one piece for each run of one class."""
     n = len(rows)
     p = [1 - row[0] for row in rows]
     s = []
@@ -44,16 +56,23 @@ def decode(rows, starts, ends, thresholds=THRESHOLDS):
                 j += 2
             else:
                 break
-        best, best_sum = 1, float("-inf")
-        for c in range(1, len(CLASSES)):
-            total = 0.0
-            for row in rows[i:j + 1]:
-                total += row[c]
-            if total > best_sum:
-                best, best_sum = c, total
-        score = sum(s[i:j + 1]) / (j - i + 1)
-        if ends[j] - starts[i] >= MIN_SECONDS or score >= CERTAIN_SCORE:
-            found.append((i, j, CLASSES[best], score))
+        # Each line has its own class; a weak bridged line takes the class of the line before it.
+        sorts = []
+        for k in range(i, j + 1):
+            if k > i and s[k] < thresholds["stay"]:
+                sorts.append(sorts[-1])
+            else:
+                sorts.append(top_class(rows[k]))
+        whole = sum(s[i:j + 1]) / (j - i + 1)
+        if ends[j] - starts[i] >= MIN_SECONDS or whole >= CERTAIN_SCORE:
+            start = i
+            while start <= j:
+                stop = start
+                while stop < j and sorts[stop + 1 - i] == sorts[start - i]:
+                    stop += 1
+                score = sum(s[start:stop + 1]) / (stop - start + 1)
+                found.append((start, stop, CLASSES[sorts[start - i]], score))
+                start = stop + 1
         i = j + 1
     return found
 

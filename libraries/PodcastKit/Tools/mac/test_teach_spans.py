@@ -79,6 +79,53 @@ class DecodeTests(unittest.TestCase):
         self.assertAlmostEqual(found[0][3], 0.8, places=12)
 
 
+# The model of AdModelSplitTests.swift: "theme" lines are intro or credits, "acme" lines a sponsor,
+# "plug" lines a host ask, and any other line is plain talk.
+SPLIT_LEVELS = {bucket("#bias"): [4.0, 0, 0, 0, 0], bucket("u:theme"): [-4.0, 0, 0, 0, 6.0],
+                bucket("u:acme"): [-4.0, 6.0, 0, 0, 0], bucket("u:plug"): [-4.0, 0, 0, 6.0, 0]}
+THEME_THEN_SPONSOR = ["plain"] * 2 + ["theme"] * 3 + ["acme"] * 4 + ["plain"] * 2
+
+
+def split_decoded(words):
+    rows = [softmax_of([bucket("#bias"), bucket("u:" + w)], SPLIT_LEVELS) for w in words]
+    starts = [10.0 * i for i in range(len(words))]
+    return spans.decode(rows, starts, [t + 9.0 for t in starts])
+
+
+class SplitTests(unittest.TestCase):
+    def test_a_span_is_cut_where_the_top_class_changes(self):
+        found = split_decoded(THEME_THEN_SPONSOR)
+        self.assertEqual([f[2] for f in found], ["intro_credits", "sponsor"])
+        self.assertEqual(numbers(found), [[3, 5], [6, 9]])
+
+    def test_a_bridged_weak_line_joins_the_class_before_it(self):
+        found = split_decoded(["plain"] + ["acme"] * 3 + ["plain"] + ["acme"] * 3 + ["plain"])
+        self.assertEqual([f[2] for f in found], ["sponsor"])
+        self.assertEqual(numbers(found), [[2, 8]])
+
+    def test_each_piece_has_its_own_score(self):
+        found = split_decoded(THEME_THEN_SPONSOR)
+        self.assertNotAlmostEqual(found[0][3], found[1][3], places=3)
+        self.assertGreater(found[0][3], 0.6)
+
+    def test_the_minimum_applies_to_the_whole_span_not_to_a_piece(self):
+        # Two lines of each class are 4 seconds each, but the whole span is long enough.
+        rows = [softmax_of([bucket("#bias"), bucket("u:" + w)], SPLIT_LEVELS)
+                for w in ["plain", "theme", "theme", "acme", "acme", "plain"]]
+        starts = [3.0 * i for i in range(6)]
+        found = spans.decode(rows, starts, [t + 2.9 for t in starts])
+        self.assertEqual([f[2] for f in found], ["intro_credits", "sponsor"])
+
+    def test_the_cut_seconds_follow_the_pieces(self):
+        # Credits then a sponsor: only the sponsor piece is cut, whatever the whole span was.
+        words = THEME_THEN_SPONSOR
+        rows = [softmax_of([bucket("#bias"), bucket("u:" + w)], SPLIT_LEVELS) for w in words]
+        starts = [10.0 * i for i in range(len(words))]
+        classes = [0, 0, 4, 4, 4, 1, 1, 1, 1, 0, 0]
+        self.assertEqual(spans.span_scores(rows, classes, starts, [t + 10.0 for t in starts]),
+                         (40.0, 40.0, 40.0))
+
+
 class ScoreTests(unittest.TestCase):
     AD = [0.02, 0.92, 0.02, 0.02, 0.02]
     NONE = [0.9, 0.025, 0.025, 0.025, 0.025]
