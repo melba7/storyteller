@@ -102,6 +102,14 @@ final class AdHeadRulesTests: XCTestCase {
     XCTAssertEqual(AdHeadRules.find(lines: head).map(\.startLine), [1, 7])
   }
 
+  func testAnAdTouchingLongerCreditsIsNotTakenOverByThem() {
+    let ad = FoundAd(
+      start: 100, end: 130, kind: .ad, advertiser: "A", confidence: .sure, firstWords: "")
+    let credits = FoundAd(
+      start: 130, end: 190, kind: .credits, advertiser: "", confidence: .sure, firstWords: "")
+    XCTAssertEqual(AdHeadRules.merge([ad, credits]).map(\.kind), [.ad, .credits])
+  }
+
   func testAdsFromTwoSourcesAreOneListWithoutDoubles() {
     func ad(_ start: Double, _ end: Double, _ name: String, _ sure: AdConfidence) -> FoundAd {
       FoundAd(start: start, end: end, kind: .ad, advertiser: name, confidence: sure, firstWords: "")
@@ -174,6 +182,30 @@ final class AdHeadRulesTests: XCTestCase {
     XCTAssertEqual(AdHeadRules.counted(answer, atStep: 15), [sure])
     XCTAssertEqual(AdHeadRules.counted(answer, atStep: 60), answer)
     XCTAssertEqual(AdHeadRules.counted(answer, atStep: 180), answer)
+  }
+
+  func testAShowThatOpensWithAnAdCountsUnsureAnswersAtEveryStep() {
+    let sure = range(2, 4)
+    let unsure = range(6, 8, .unsure)
+    let guess = range(9, 9, .guess)
+    let answer = [sure, unsure, guess]
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 30, opensWithAd: true), answer)
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 15, opensWithAd: true), answer)
+    XCTAssertEqual(AdHeadRules.counted(answer, atStep: 30, opensWithAd: false), [sure])
+  }
+
+  func testTheFirstLookIsTheFirstStepAndTheUsualStepsGoOnAfterIt() {
+    XCTAssertEqual(AdHeadRules.steps(firstLook: nil), AdHeadRules.steps)
+    XCTAssertEqual(AdHeadRules.steps(firstLook: 50), [50, 90, 120, 150, 180])
+    XCTAssertEqual(AdHeadRules.steps(firstLook: 45), [45, 60, 90, 120, 150, 180])
+    XCTAssertEqual(AdHeadRules.steps(firstLook: 5), [15, 30, 60, 90, 120, 150, 180])
+    XCTAssertEqual(AdHeadRules.steps(firstLook: 400), [90, 120, 150, 180])
+  }
+
+  func testTheFirstLookIsAModelStepToo() {
+    XCTAssertEqual(AdHeadRules.modelSteps(firstLook: nil), AdHeadRules.modelSteps)
+    XCTAssertEqual(AdHeadRules.modelSteps(firstLook: 50), [30, 50, 60, 120, 180])
+    XCTAssertEqual(AdHeadRules.modelSteps(firstLook: 400), [30, 60, 90, 120, 180])
   }
 
   // MARK: A shorter carry-on and two signals (E4)

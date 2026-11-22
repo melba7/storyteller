@@ -44,7 +44,7 @@ public enum AdsRunner {
       ads: AdCleanup.run(ranges: result.ranges, transcript: transcript),
       refusedPieces: result.refused > 0 ? result.refused : nil)
     // Skips the listener took back while only the partial file existed stay undone.
-    file.undone = store.loadPartial(detector: detector.name)?.undone ?? []
+    file.undone = store.undoneSoFar(detector: detector.name)
     try store.save(file)
     store.removeScratch(detector: detector.name)
     return .finished(file)

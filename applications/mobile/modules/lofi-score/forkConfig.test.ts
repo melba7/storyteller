@@ -46,6 +46,7 @@ describe("withLofiScorePods", () => {
       "PodcastAds",
       "PodcastAdsOnDevice",
       "PodcastChapters",
+      "PodcastAudioMatch",
     ])
     expect(options.ios.extraPods[1]).toEqual({
       name: "LofiScoreCore",
@@ -53,7 +54,7 @@ describe("withLofiScorePods", () => {
     })
   })
 
-  it("adds the podcast feed reader's, player rules', downloads', transcripts', speech, ads and chapters pods from PodcastKit", () => {
+  it("adds the podcast feed reader's, player rules', downloads', transcripts', speech, ads, chapters and audio matching pods from PodcastKit", () => {
     const plugins = withLofiScorePods([
       ["expo-build-properties", { ios: { extraPods: [] } }],
     ])
@@ -61,7 +62,7 @@ describe("withLofiScorePods", () => {
       string,
       { ios: { extraPods: { name: string; path: string }[] } },
     ]
-    expect(options.ios.extraPods.slice(-8)).toEqual([
+    expect(options.ios.extraPods.slice(-9)).toEqual([
       { name: "PodcastFeed", path: "../../../libraries/PodcastKit" },
       { name: "PodcastPlayback", path: "../../../libraries/PodcastKit" },
       { name: "PodcastDownloads", path: "../../../libraries/PodcastKit" },
@@ -70,6 +71,7 @@ describe("withLofiScorePods", () => {
       { name: "PodcastAds", path: "../../../libraries/PodcastKit" },
       { name: "PodcastAdsOnDevice", path: "../../../libraries/PodcastKit" },
       { name: "PodcastChapters", path: "../../../libraries/PodcastKit" },
+      { name: "PodcastAudioMatch", path: "../../../libraries/PodcastKit" },
     ])
   })
 

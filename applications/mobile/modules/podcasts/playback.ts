@@ -350,7 +350,11 @@ export function createPlayback(deps: PlaybackDeps) {
   }
 
   /** Starts the episode, at its saved place. The same episode again resumes it. */
-  async function playEpisode(episode: StoredEpisode, show: Show | null) {
+  async function playEpisode(
+    episode: StoredEpisode,
+    show: Show | null,
+    startChosen = false,
+  ) {
     if (!deps.native) {
       set({ error: "Podcasts need the iOS app." })
       return
@@ -406,6 +410,7 @@ export function createPlayback(deps: PlaybackDeps) {
         audioType: episode.audioType,
         chaptersUrl: episode.chaptersUrl,
         playThroughDownload: throughDownload,
+        ...(startChosen ? { startChosen: true } : {}),
         language: show?.language ?? null,
         notes: episode.notes,
         showLink: show?.link ?? null,
@@ -428,6 +433,7 @@ export function createPlayback(deps: PlaybackDeps) {
     await playEpisode(
       { ...episode, positionSeconds: Math.max(0, seconds), played: false },
       show,
+      true,
     )
   }
 
@@ -519,21 +525,38 @@ export function createPlayback(deps: PlaybackDeps) {
     persist(view.position)
   }
 
-  /** After a library change (a rename): the loaded episode's title and picture are read again. */
+  /**
+   * After a library change (a rename, a show's settings): the loaded episode's title and
+   * picture, and its show's settings, are read again.
+   */
   async function refreshEpisode() {
     const current = view.episode
     if (!current || isPreviewId(current.id)) return
     try {
-      const fresh = await deps.getEpisode(current.id)
-      if (!fresh || view.episode?.id !== current.id) return
-      if (fresh.title === current.title && fresh.imageUrl === current.imageUrl)
-        return
+      const [fresh, freshShow] = await Promise.all([
+        deps.getEpisode(current.id),
+        deps.getShow(current.showId),
+      ])
+      if (view.episode?.id !== current.id) return
+      const loaded = view.episode
+      const renamed =
+        fresh !== null &&
+        (fresh.title !== loaded.title || fresh.imageUrl !== loaded.imageUrl)
+      const shown = view.show
+      const settingsChanged =
+        freshShow !== null &&
+        shown !== null &&
+        shown.id === freshShow.id &&
+        JSON.stringify(freshShow.settings) !== JSON.stringify(shown.settings)
+      if (!renamed && !settingsChanged) return
       set({
-        episode: {
-          ...view.episode,
-          title: fresh.title,
-          imageUrl: fresh.imageUrl,
-        },
+        episode: renamed
+          ? { ...loaded, title: fresh.title, imageUrl: fresh.imageUrl }
+          : loaded,
+        show:
+          settingsChanged && shown !== null
+            ? { ...shown, settings: freshShow.settings }
+            : shown,
       })
     } catch (cause) {
       deps.report?.(cause)

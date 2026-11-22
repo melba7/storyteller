@@ -42,8 +42,10 @@ interface ListProps {
 
 /**
  * A list whose rows are dragged by their handle (or moved with VoiceOver's Move up and Move
- * down), shared by the arrange screen and Up Next. It reports the new order through
- * `onChange` while the row is dragged; the caller keeps the order.
+ * down), shared by the arrange screen and Up Next. The dragged row's new place is kept here
+ * while the finger is down, so a late change from the caller cannot put an older order back.
+ * The new order is reported once through `onChange` when the row is let go; the caller keeps
+ * the order.
  */
 export function DragList({
   ids,
@@ -65,30 +67,41 @@ export function DragList({
   const translation = useSharedValue(0)
   const latest = useRef(ids)
   latest.current = ids
+  // The order while a row is dragged; null otherwise, when the caller's order is shown.
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
+  const dragged = useRef<string[] | null>(null)
+  const shown = dragOrder ?? ids
 
   function begin(id: string) {
-    start.current = latest.current.indexOf(id)
+    const at = latest.current.indexOf(id)
+    if (at < 0) return
+    start.current = at
     moved.current = false
+    dragged.current = [...latest.current]
     setDragging(id)
   }
 
   function over(id: string, distance: number) {
-    const from = latest.current.indexOf(id)
-    const to = dropIndex(
-      start.current,
-      distance,
-      rowHeight,
-      latest.current.length,
-    )
+    const order = dragged.current
+    if (order === null) return
+    const from = order.indexOf(id)
+    if (from < 0) return
+    const to = dropIndex(start.current, distance, rowHeight, order.length)
     if (from !== to) {
       moved.current = true
-      onChange(moveShow(latest.current, from, to))
+      dragged.current = moveShow(order, from, to)
+      setDragOrder(dragged.current)
     }
   }
 
   function end() {
-    if (moved.current) onDrop?.()
+    if (moved.current && dragged.current !== null) {
+      onChange(dragged.current)
+      onDrop?.()
+    }
     moved.current = false
+    dragged.current = null
+    setDragOrder(null)
     setDragging(null)
     translation.set(0)
   }
@@ -106,12 +119,12 @@ export function DragList({
       contentInsetAdjustmentBehavior="automatic"
     >
       {header}
-      {ids.map((id, index) => (
+      {shown.map((id, index) => (
         <DragRow
           key={id}
           index={index}
           height={rowHeight}
-          label={label(id, index, ids.length)}
+          label={label(id, index, shown.length)}
           actions={actions}
           dragging={dragging === id}
           shift={(index - start.current) * rowHeight}

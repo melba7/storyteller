@@ -150,13 +150,29 @@ enum SkipLogFile {
     }
   }
 
+  /// The skip lines and then the diary lines, as the copy for sharing holds them. Call it on
+  /// the queue.
+  private static func sharedText() -> String {
+    AdDiary.shared(skipLog: read(url), diary: read(diaryURL))
+  }
+
+  /// The text of the copy for sharing, read on the log's queue, or nil when nothing is logged.
+  /// The app's JavaScript writes it to the linked folder for the Mac.
+  static func readText() async -> String? {
+    await withCheckedContinuation { continuation in
+      queue.async {
+        let text = sharedText()
+        continuation.resume(returning: text.isEmpty ? nil : text)
+      }
+    }
+  }
+
   /// A copy of the log in the caches folder, for the share sheet (the sharing code reads only
   /// the app's own document and caches folders). It holds the skip lines and then the ad
   /// finder's diary lines. Nil when nothing is logged yet.
   static func copyForSharing() -> URL? {
     queue.sync { () -> URL? in
-      let text = AdDiary.shared(
-        skipLog: SkipLogFile.read(SkipLogFile.url), diary: SkipLogFile.read(SkipLogFile.diaryURL))
+      let text = sharedText()
       guard !text.isEmpty else { return nil }
       let copy = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("skip-log.jsonl")

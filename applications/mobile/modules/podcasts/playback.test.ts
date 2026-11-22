@@ -485,6 +485,22 @@ describe("playFrom", () => {
     expect(native.play).toHaveBeenCalledTimes(1)
   })
 
+  it("loads an episode that is not loaded with the start marked as chosen", async () => {
+    const { playback, native } = setup()
+    await playback.playFrom(episode(), show, 95)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ savedPosition: 95, startChosen: true }),
+    )
+  })
+
+  it("leaves startChosen out of a plain play", async () => {
+    const { playback, native } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.not.objectContaining({ startChosen: expect.anything() }),
+    )
+  })
+
   it("only seeks when the episode is already playing", async () => {
     const { playback, native, state } = setup()
     await playback.playEpisode(episode(), show)
@@ -848,6 +864,26 @@ describe("a renamed episode", () => {
     deps.getEpisode.mockResolvedValue(episode({ title: "Renamed" }))
     await playback.refreshEpisode()
     expect(playback.getView().episode?.title).toBe("Renamed")
+  })
+
+  it("shows the show's new ad choices while the episode is loaded", async () => {
+    const { playback, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    deps.getShow.mockResolvedValue({
+      ...show,
+      settings: { ...DEFAULT_SHOW_SETTINGS, skipAds: false },
+    })
+    await playback.refreshEpisode()
+    expect(playback.getView().show?.settings.skipAds).toBe(false)
+    expect(playback.getView().episode?.title).toBe("Episode one")
+  })
+
+  it("leaves the player's show alone when the show is gone", async () => {
+    const { playback, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    deps.getShow.mockResolvedValue(null)
+    await playback.refreshEpisode()
+    expect(playback.getView().show?.id).toBe("s1")
   })
 })
 

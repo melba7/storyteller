@@ -378,6 +378,21 @@ final class AtmosphereHostTests: XCTestCase {
         XCTAssertEqual(missing, .missing)
     }
 
+    func testWritingALinkedFileNeedsALinkedFolder() async throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
+        try write(Data([0]), to: "Linked/Atmosphere/Rain/rain.m4a")
+        let (host, _) = makeHost(defaults: defaults)
+        host.start()
+        let unlinked = await host.writeLinkedFile("Podcasts/phone-notes.jsonl", data: Data("a\n".utf8))
+        XCTAssertEqual(unlinked, .notLinked)
+        _ = try await host.linkSoundsFolder(folder.appendingPathComponent("Linked"))
+        let linked = await host.writeLinkedFile("Podcasts/phone-notes.jsonl", data: Data("a\n".utf8))
+        XCTAssertEqual(linked, .written)
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("Linked/Podcasts/phone-notes.jsonl")), Data("a\n".utf8))
+        let refused = await host.writeLinkedFile("../x", data: Data("a".utf8))
+        XCTAssertEqual(refused, .unwritable("The file's path is not allowed."))
+    }
+
     func testALinkedFolderBringsAScoreToTheOpenBook() async throws {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: "lofi-atmosphere-\(UUID().uuidString)"))
         try prepareBook(scored: false)

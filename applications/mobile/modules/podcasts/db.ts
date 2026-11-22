@@ -14,7 +14,11 @@ import { Platform } from "react-native"
 import { rememberUnsubscribed } from "./appleMemory"
 import { notifyLibraryChanged } from "./changes"
 import { deleteDownloads } from "./downloadsNative"
-import { RECORD_LISTEN_SQL } from "./episodeSql"
+import {
+  LAST_LISTENED_SQL,
+  RECORD_LISTEN_SQL,
+  SHOW_ACTIVITY_SQL,
+} from "./episodeSql"
 import {
   type Show,
   type StoredEpisode,
@@ -70,23 +74,12 @@ export async function listShows(): Promise<Show[]> {
 }
 
 /**
- * Per show: when its newest dated episode came out, whether that episode is played, and how
+ * Per show: when its newest dated episode came out, whether that episode is played or archived, and how
  * many unplayed, unarchived episodes came out at or after the show was followed. Episodes with no date
  * never count as newer. One query for the whole library, for ordering and badges.
  */
 export async function listShowActivity(): Promise<ActivityByShow> {
-  const found = await rows(
-    `SELECT s.id AS show_id,
-       MAX(e.published_at) AS newest_at,
-       (SELECT n.played FROM episodes n
-         WHERE n.show_id = s.id AND n.published_at IS NOT NULL
-         ORDER BY n.published_at DESC LIMIT 1) AS newest_played,
-       COUNT(CASE WHEN e.played = 0 AND e.archived = 0
-         AND e.published_at >= s.added_at THEN 1 END)
-         AS unplayed_since
-     FROM shows s LEFT JOIN episodes e ON e.show_id = s.id
-     GROUP BY s.id`,
-  )
+  const found = await rows(SHOW_ACTIVITY_SQL)
   const activity: ActivityByShow = {}
   for (const row of found) {
     const newest = row["newest_at"]
@@ -174,9 +167,7 @@ export async function savePlayback(
 
 /** The episode played most recently, for the mini player after the app restarts. */
 export async function lastPlayedEpisode(): Promise<StoredEpisode | null> {
-  const found = await rows(
-    "SELECT * FROM episodes WHERE last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT 1",
-  )
+  const found = await rows(LAST_LISTENED_SQL)
   return found[0] ? episodeFromRow(found[0]) : null
 }
 

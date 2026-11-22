@@ -4,6 +4,8 @@
 // `Podcasts/known-ads.json`. The file is read the first time something needs it, and only from a
 // background task: the head scan, the ad finder and the queue below. A missing or broken file
 // starts an empty memory. Undo comes from the main actor, so forgetting only queues its work.
+// Finding also looks at the ads the Mac taught (PodcastTeaching's seeds), which are never kept in
+// this file.
 import Foundation
 import PodcastAds
 import PodcastDownloads
@@ -43,9 +45,11 @@ final class PodcastKnownAds: @unchecked Sendable {
     }
   }
 
-  /// The remembered ads of `show` that these words contain.
+  /// The remembered ads of `show` that these words contain, and the ads the Mac taught (the seeds
+  /// of PodcastTeaching). Where one of each is the same stretch, the one seen more often wins.
   func find(in words: [TranscriptWord], show: String) -> [KnownAdHit] {
-    access { $0.find(in: words, show: show) }
+    let seeds = PodcastTeaching.shared.files.seeds
+    return access { $0.find(in: words, show: show, seeds: seeds) }
   }
 
   /// Remembers the sure ads of a final ads file (the one on disk, which holds what the listener
@@ -60,7 +64,9 @@ final class PodcastKnownAds: @unchecked Sendable {
 
   /// The listener undid these ads of an episode: the remembered ads that are the same words are
   /// forgotten. `heard` are the words of a stream's head scan, used for the ads they reach; the
-  /// others are looked up in the episode's transcript. It returns at once.
+  /// others are looked up in the episode's transcript. It returns at once. Only the phone's own
+  /// memory forgets: an ad the Mac taught is in the Mac's file (the seeds), which the phone does
+  /// not change, so it is found again until the Mac stops teaching it.
   func forget(episodeId: String, ads: [(start: Double, end: Double)], heard: [TranscriptWord]) {
     queue.async { [self] in
       guard let show = EpisodeShows.shared.show(for: episodeId) else { return }

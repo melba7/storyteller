@@ -1,7 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { randomUUID } from "expo-crypto"
 import { Stack, useRouter, useSegments } from "expo-router"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ActivityIndicator, Alert, ScrollView } from "react-native"
 
 import { Button } from "@/components/ui/button"
@@ -62,6 +62,7 @@ export function PlaylistEditor({ id }: { id: string }) {
   const [longer, setLonger] = useState("")
   const [problem, setProblem] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const saveStarted = useRef(false)
 
   useEffect(() => {
     if (draft) return
@@ -112,12 +113,15 @@ export function PlaylistEditor({ id }: { id: string }) {
   }
 
   async function save() {
+    // A second tap before the screen re-draws is ignored, so one playlist is made, not two.
+    if (saveStarted.current) return
     const trouble = playlistProblem(
       finished.title,
       finished.rules,
       finished.autoDownload,
     )
     if (trouble) return setProblem(trouble)
+    saveStarted.current = true
     setSaving(true)
     try {
       await savePlaylist(finished)
@@ -125,6 +129,7 @@ export function PlaylistEditor({ id }: { id: string }) {
     } catch (cause) {
       setProblem(readableError(cause))
       setSaving(false)
+      saveStarted.current = false
     }
   }
 

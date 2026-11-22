@@ -4,12 +4,38 @@
 // an ad when the head scan finds it. For an episode that plays through its own download, starts
 // at 0:00, was never checked and is of a show that is not known to start clean, Play waits a
 // moment for the first look (the 15 second step's rules and the memory of ads), so an ad that
-// holds 0:00 is left before it is heard. The wait never lasts past `longest`. Foundation only.
+// holds 0:00 is left before it is heard. The wait never lasts past `longest` (3 seconds), or
+// `longestForAdOpeners` (5 seconds) for a show that usually opens with an ad. Whether the show
+// starts clean, and how long to wait, follow what the Mac taught where it knows the show
+// (`ShowHabits`), else what the phone saw itself. Foundation only.
 import Foundation
 
 public struct StartHold: Equatable, Sendable {
   /// The wait never lasts longer than this many seconds from the tap.
   public static let longest = 3.0
+  /// A show that usually opens with an ad is waited for a little longer.
+  public static let longestForAdOpeners = 5.0
+
+  /// The longest wait for a show, by whether it usually opens with an ad.
+  public static func longest(usuallyOpensWithAd: Bool) -> Double {
+    usuallyOpensWithAd ? longestForAdOpeners : longest
+  }
+
+  /// The longest wait for `show` by what the Mac taught: longer for a show that usually opens with
+  /// an ad. A show that is not known (nil) gets the usual wait.
+  public static func longest(habits: ShowHabits, show: String?) -> Double {
+    longest(usuallyOpensWithAd: show.map { habits.usuallyOpensWithAd(show: $0) } ?? false)
+  }
+
+  /// Whether the show starts clean (no wait). What the Mac taught wins where it knows the show: a
+  /// show that usually opens with an ad does not, a show it saw start clean does. Where it knows
+  /// nothing, `own` decides, which is what the phone saw itself (`ShowStarts`).
+  public static func startsClean(habits: ShowHabits, show: String?, own: Bool) -> Bool {
+    guard let show else { return own }
+    if habits.usuallyOpensWithAd(show: show) { return false }
+    if habits.startsClean(show: show) { return true }
+    return own
+  }
   /// An episode that starts later than this many seconds is not waited for (it resumes).
   public static let startsUnder = 1.0
 
@@ -52,9 +78,10 @@ public struct StartHold: Equatable, Sendable {
   public mutating func scanEnded() -> Release? { release(.scanEnded) }
   public mutating func tappedAgain() -> Release? { release(.secondTap) }
 
-  /// `elapsed` seconds have gone by since the tap.
-  public mutating func tick(elapsed: Double) -> Release? {
-    elapsed >= Self.longest ? release(.timeout) : nil
+  /// `elapsed` seconds have gone by since the tap. The wait ends at `longest` seconds, which is
+  /// longer for a show that usually opens with an ad (`longest(usuallyOpensWithAd:)`).
+  public mutating func tick(elapsed: Double, longest: Double = StartHold.longest) -> Release? {
+    elapsed >= longest ? release(.timeout) : nil
   }
 
   /// The reason, when this is the one that ended the wait.

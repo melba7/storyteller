@@ -172,7 +172,15 @@ describe("queueItem", () => {
       position: 300,
       chaptersUrl: null,
       language: null,
+      notes: "",
+      showLink: null,
     })
+  })
+  it("carries the notes, cut to 4,000 characters, and the show's link", () => {
+    const noted = { ...episode, notes: "x".repeat(5000) }
+    const item = queueItem(noted, { ...show, link: "https://show.test" })
+    expect(item.notes).toBe("x".repeat(4000))
+    expect(item.showLink).toBe("https://show.test")
   })
   it("carries the show's language, so the next episode is transcribed in it", () => {
     expect(queueItem(episode, { ...show, language: "de" }).language).toBe("de")

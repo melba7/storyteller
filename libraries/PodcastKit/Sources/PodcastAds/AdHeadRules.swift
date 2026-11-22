@@ -34,8 +34,28 @@ public enum AdHeadRules {
   public static let sureOnlyStep = 30.0
 
   /// The model's answer at `step`, as far as it counts.
-  public static func counted(_ answer: [AdRange], atStep step: Double) -> [AdRange] {
-    step <= sureOnlyStep ? answer.filter { $0.confidence == .sure } : answer
+  /// For a show that usually opens with an ad (`opensWithAd`), unsure answers count at every step.
+  public static func counted(
+    _ answer: [AdRange], atStep step: Double, opensWithAd: Bool = false
+  ) -> [AdRange] {
+    step <= sureOnlyStep && !opensWithAd ? answer.filter { $0.confidence == .sure } : answer
+  }
+
+  /// The first look of a show that usually opens with an ad, kept inside 15...90 seconds.
+  private static func firstStep(_ firstLook: Double) -> Double { min(max(firstLook, 15), 90) }
+
+  /// The steps for a show with a known first look: that first look, then the usual steps that are
+  /// at least 15 seconds later. Nil gives the usual steps.
+  public static func steps(firstLook: Double?) -> [Double] {
+    guard let firstLook else { return steps }
+    let first = firstStep(firstLook)
+    return [first] + steps.filter { $0 >= first + 15 }
+  }
+
+  /// The model steps for a show with a known first look: the usual ones and the first look.
+  public static func modelSteps(firstLook: Double?) -> Set<Double> {
+    guard let firstLook else { return modelSteps }
+    return modelSteps.union([firstStep(firstLook)])
   }
 
   /// The steps for a head of `seconds`: the phone's steps up to it, and the end itself when it
@@ -209,30 +229,12 @@ public enum AdHeadRules {
     return ""
   }
 
-  /// Ads from several sources (the rules, the model, a file kept earlier) as one list: ads that
-  /// overlap or touch become one, the surer confidence and the longer one's kind and name stand.
-  /// `touching` is how far apart two ads may be and still join (negative: only ads that overlap
-  /// by more than that).
+  /// Ads from several sources (the rules, the model, a file kept earlier) as one list. This is
+  /// `AdJoin.join`: ads of one kind that overlap or touch become one, and ads of different kinds
+  /// are never joined (the higher-ranking kind keeps its stretch). `touching` is how far apart
+  /// two ads of one kind may be and still join (negative: only ads that overlap by more than that).
   public static func merge(_ ads: [FoundAd], touching: Double = 0.5) -> [FoundAd] {
-    var result: [FoundAd] = []
-    for ad in ads.sorted(by: { $0.start < $1.start }) {
-      guard var last = result.popLast() else {
-        result.append(ad)
-        continue
-      }
-      if ad.start <= last.end + touching {
-        let longer = ad.duration > last.duration ? ad : last
-        last.kind = longer.kind
-        last.advertiser = longer.advertiser.isEmpty ? (last.advertiser.isEmpty ? ad.advertiser : last.advertiser) : longer.advertiser
-        last.confidence = max(last.confidence, ad.confidence)
-        last.end = max(last.end, ad.end)
-        result.append(last)
-      } else {
-        result.append(last)
-        result.append(ad)
-      }
-    }
-    return result
+    AdJoin.join(ads, touching: touching)
   }
 
   // MARK: Sponsors in the notes

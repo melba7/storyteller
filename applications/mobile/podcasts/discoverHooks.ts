@@ -40,14 +40,17 @@ export function useChart(chart: string): Query<ChartShow[]> & {
     let current = true
     // Another chart starts empty; a retry of the same chart keeps its copy on screen.
     setState((before) => startChartLoad(before, chart, round.quiet))
-    keptChart(chart, store).then((kept) => {
-      if (!current || !kept) return
-      setState((before) =>
-        before.data
-          ? before
-          : { chart, data: kept.shows, loading: false, error: null },
-      )
-    })
+    keptChart(chart, store).then(
+      (kept) => {
+        if (!current || !kept) return
+        setState((before) =>
+          before.data
+            ? before
+            : { chart, data: kept.shows, loading: false, error: null },
+        )
+      },
+      () => {},
+    )
     loadChart(chart, store).then(
       (data) => {
         if (current) setState({ chart, data, loading: false, error: null })

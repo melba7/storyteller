@@ -36,7 +36,7 @@ final class PodcastSpeechWarm: @unchecked Sendable {
   }
 
   private func warmIfWanted() {
-    guard AdSkipDefaults.settings.skipAds else { return }
+    guard AdSkipDefaults.settings.skipsAnySort else { return }
     let go = lock.withLock { () -> Bool in
       guard !loaded, !working else { return false }
       working = true

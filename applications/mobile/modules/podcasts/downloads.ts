@@ -4,7 +4,7 @@
 // order of the Downloads list and how a change from Swift updates what the screens know.
 // The wrappers over the native module are in downloadsNative.ts, so tests can import this
 // file without the native module.
-import type { DownloadChange, DownloadInfo } from "./index"
+import type { AdSkipSettings, DownloadChange, DownloadInfo } from "./index"
 import { isLocalEpisodeId } from "./localFiles"
 import { isPreviewId } from "./preview"
 
@@ -223,6 +223,24 @@ export function skipAdsFor(
   main: boolean,
 ): boolean {
   return show ?? main
+}
+
+/**
+ * Whether any sort of ad is skipped for a show. The show's own choice replaces the main switch
+ * for sponsor ads and for the hosts' plugs. Promos follow the main switch, but a show whose own
+ * ad choice is off keeps its promos too. Credits follow the main switch.
+ * Ads are skipped only in a file on the phone, so this is what asks for the download.
+ */
+export function skippingAnyFor(
+  show: { skipAds: boolean | null; skipPlugs: boolean | null } | undefined,
+  main: AdSkipSettings,
+): boolean {
+  return (
+    skipAdsFor(show?.skipAds, main.skipAds) ||
+    skipAdsFor(show?.skipPlugs, main.skipOwnPlugs) ||
+    (main.skipPromos && show?.skipAds !== false) ||
+    main.skipCredits
+  )
 }
 
 /**

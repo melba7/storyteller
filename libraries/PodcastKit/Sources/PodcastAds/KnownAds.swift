@@ -21,11 +21,14 @@ public struct KnownAd: Codable, Sendable, Equatable {
   public var length: Double
   public var seen: Int
   public var lastSeen: Date
+  /// Nil or "show": only in its own show. "all": in any show (a taught ad, see `AdLibrary`).
+  public var scope: String?
 
   public init(
     showId: String, advertiser: String, kind: AdKind, text: String, length: Double, seen: Int,
-    lastSeen: Date
+    lastSeen: Date, scope: String? = nil
   ) {
+    self.scope = scope
     self.showId = showId
     self.advertiser = advertiser
     self.kind = kind
@@ -166,14 +169,15 @@ public struct KnownAds: Codable, Sendable, Equatable {
 
   // MARK: Finding
 
-  /// The remembered ads of `show` that `words` (a transcript's words, timed) contain, by start.
+  /// The remembered ads of `show`, and those of any show (scope "all"), that `words` (a
+  /// transcript's words, timed) contain, by start.
   public func find(in words: [TranscriptWord], show: String) -> [KnownAdHit] {
     let timed = words.compactMap { word in
       Self.normalise(word.text).map { (text: $0, start: word.start, end: word.end) }
     }
     let index = RunIndex(timed.map(\.text))
     var hits: [KnownAdHit] = []
-    for ad in ads where ad.showId == show {
+    for ad in ads where ad.showId == show || ad.scope == "all" {
       let runs = Self.runs(of: ad.words)
       for chain in Self.chains(of: runs, in: index) {
         let start = timed[chain.first].start
@@ -187,6 +191,44 @@ public struct KnownAds: Codable, Sendable, Equatable {
       }
     }
     return hits.sorted { $0.match.start < $1.match.start }
+  }
+
+  /// The hits of this memory and of `seeds` (the taught ads) together, by start. Where a hit of
+  /// one overlaps a hit of the other in time (an opening lasts to its expected end), one is kept:
+  /// a whole match beats an opening; of the same sort the ad seen more often wins, and on a tie
+  /// the memory's own.
+  public func find(in words: [TranscriptWord], show: String, seeds: KnownAds) -> [KnownAdHit] {
+    let own = find(in: words, show: show)
+    var kept = own
+    for seed in seeds.find(in: words, show: show) {
+      let overlapped = kept.indices.filter { at in
+        own.contains(kept[at]) && Self.overlap(kept[at], seed)
+      }
+      if overlapped.contains(where: { !Self.seedWins(seed, over: kept[$0]) }) { continue }
+      for at in overlapped.reversed() { kept.remove(at: at) }
+      kept.append(seed)
+    }
+    return kept.sorted { $0.match.start < $1.match.start }
+  }
+
+  private static func span(_ hit: KnownAdHit) -> (Double, Double) {
+    switch hit.match {
+    case .whole(let start, let end): return (start, end)
+    case .opening(let start, let expectedEnd): return (start, expectedEnd)
+    }
+  }
+
+  private static func overlap(_ a: KnownAdHit, _ b: KnownAdHit) -> Bool {
+    let (aStart, aEnd) = span(a), (bStart, bEnd) = span(b)
+    return aStart < bEnd && bStart < aEnd
+  }
+
+  private static func seedWins(_ seed: KnownAdHit, over own: KnownAdHit) -> Bool {
+    switch (seed.match, own.match) {
+    case (.whole, .opening): return true
+    case (.opening, .whole): return false
+    default: return seed.ad.seen > own.ad.seen
+    }
   }
 
   /// Whether two lists of words are one ad: the runs of one are found, as a whole, in the other.

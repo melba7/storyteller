@@ -97,7 +97,10 @@ function Lines({
   const playingHere = view.episode?.id === episode.id
   const playing = playingHere ? lineAt(lines, view.position) : -1
 
+  // The line last asked for, so a retry goes to where the list should be now.
+  const wanted = useRef(-1)
   const scrollTo = useCallback((index: number) => {
+    wanted.current = index
     listRef.current?.scrollToIndex({
       index,
       viewPosition: FOLLOW_POSITION,
@@ -235,7 +238,7 @@ function Lines({
             offset: info.averageItemLength * info.index,
             animated: false,
           })
-          setTimeout(() => scrollTo(info.index), 50)
+          setTimeout(() => scrollTo(wanted.current), 50)
         }}
         renderItem={({ item, index }) => (
           <Row

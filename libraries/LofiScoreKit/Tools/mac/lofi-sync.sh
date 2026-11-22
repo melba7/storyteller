@@ -200,7 +200,7 @@ fi
 
 # 3. The iCloud copy, which the phone's linked sounds folder follows.
 if [ -d "$ICLOUD" ] && [ -d "$MUSIC" ]; then
-  if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/" 2>> "$LOGS/sync.log"; then
+  if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' --exclude '.*.tmp' --exclude 'Podcasts/phone-notes.jsonl' --exclude 'Podcasts/phone-diary.jsonl' "$MUSIC/" "$ICLOUD/" 2>> "$LOGS/sync.log"; then
     say "iCloud copy up to date"
   elif tail -n 3 "$LOGS/sync.log" 2>/dev/null | grep -q "Operation not permitted"; then
     # macOS keeps background jobs out of iCloud Drive until the interpreter

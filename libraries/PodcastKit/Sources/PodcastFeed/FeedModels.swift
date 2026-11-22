@@ -17,11 +17,15 @@ public struct PodcastFeed: Sendable, Equatable {
   /// The channel's `podcast:funding` tags: at most `FeedLimits.funding`.
   public var funding: [FeedFunding]
   public var episodes: [FeedEpisode]
+  /// The channel's `itunes:new-feed-url`: where the show says its feed has moved to. Only an
+  /// http or https address is kept.
+  public var newFeedURL: URL?
 
   public init(
     title: String, author: String? = nil, description: String = "", imageURL: URL? = nil,
     link: URL? = nil, language: String? = nil, categories: [String] = [],
-    people: [FeedPerson] = [], funding: [FeedFunding] = [], episodes: [FeedEpisode] = []
+    people: [FeedPerson] = [], funding: [FeedFunding] = [], episodes: [FeedEpisode] = [],
+    newFeedURL: URL? = nil
   ) {
     self.title = title
     self.author = author
@@ -33,6 +37,7 @@ public struct PodcastFeed: Sendable, Equatable {
     self.people = people
     self.funding = funding
     self.episodes = episodes
+    self.newFeedURL = newFeedURL
   }
 }
 

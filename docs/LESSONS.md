@@ -117,3 +117,28 @@ One line per lesson.
 - A value that the native player reports before the audio loads (the feed's
   length) is a guess: a rule that compares the place with it, like "played",
   must not read a place past it as the end (2026-11-18, found by Opus).
+- An agent's worktree starts from `origin/main`, not from the branch being
+  worked on: every builder brief starts with `git merge --ff-only <branch>`, and
+  its commits come back by cherry-pick (2026-11-22).
+- Two tools that share a file must be tested against the same text: the Mac
+  wrote shows as `feed` while the phone's reader needed `show` and `id`, and
+  each side's own tests passed (2026-11-22, found before it shipped).
+- The Mac's auto mode also refuses a script that fetches when it is started
+  through the device shell. Leave a `.command` for Mo (2026-11-22).
+- Two sides of one contract need one written rule before either is fixed: a
+  removal by count, a carried-over switch and a span rule each had to change in
+  Swift, TypeScript or Python at once, and the briefs carried the exact rule to
+  every fixer (2026-11-22).
+- A fixer told to make old tests pass can loosen the rule instead: check the fix
+  against the finding, not against the tests. The promo rule came back accepting
+  the same phrase twice as proof (2026-11-22).
+- Fork CI runs on pull requests into main, pushes to main and by hand, not on a
+  plain branch push: open the draft pull request early to get the iOS build, and
+  put `[skip ci]` on a push that must not cancel a build that is running
+  (2026-11-22).
+- Matching a stored row by one value alone (an audio address, a count of lines)
+  breaks on the odd feed or the odd moment: ask what else must be the same
+  (2026-11-22).
+- A launcher is only tested when every exit code of the tool it starts has been
+  run through it: the gathering treated "size limit reached" as a failure and
+  stopped before writing anything down on Mo's first real run (2026-11-22).

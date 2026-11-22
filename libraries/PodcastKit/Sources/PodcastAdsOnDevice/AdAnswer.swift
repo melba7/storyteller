@@ -9,7 +9,9 @@ import PodcastAds
   @Generable
   enum AnswerKind {
     case ad
+    case promo
     case ownPlug
+    case credits
   }
 
   @available(iOS 26.0, macOS 26.0, *)
@@ -20,7 +22,7 @@ import PodcastAds
     case guess
   }
 
-  /// One run of lines the model says is an ad or a plug.
+  /// One run of lines the model says is an ad, a promo, a plug or credits.
   @available(iOS 26.0, macOS 26.0, *)
   @Generable
   struct AdSegment {
@@ -33,7 +35,7 @@ import PodcastAds
     @Guide(description: "The advertiser or the show being promoted, as the lines say it. Empty when they do not say.")
     var advertiser: String
 
-    @Guide(description: "ad for a sponsor, commercial or other show's promo; ownPlug for the hosts promoting their own things.")
+    @Guide(description: "ad for a sponsor or commercial; promo for the show or its network selling its own shows, events, tickets or subscriptions; ownPlug for the hosts asking for support; credits for closing credits.")
     var kind: AnswerKind
 
     @Guide(description: "sure when promotional words show it, unsure when they are thin, guess when it is only a feeling.")
@@ -43,7 +45,7 @@ import PodcastAds
   @available(iOS 26.0, macOS 26.0, *)
   @Generable
   struct AdAnswer {
-    @Guide(description: "Every ad or plug in these lines, in order. Empty when there is none.", .maximumCount(8))
+    @Guide(description: "Every ad, promo, plug or credits in these lines, in order. Empty when there is none.", .maximumCount(8))
     var segments: [AdSegment]
   }
 
@@ -57,7 +59,14 @@ import PodcastAds
       return AdRange(
         startLine: first, endLine: last,
         advertiser: advertiser.trimmingCharacters(in: .whitespacesAndNewlines),
-        kind: kind == .ad ? .ad : .ownPlug,
+        kind: { () -> AdKind in
+          switch kind {
+          case .ad: return .ad
+          case .promo: return .promo
+          case .ownPlug: return .ownPlug
+          case .credits: return .credits
+          }
+        }(),
         confidence: { () -> AdConfidence in
           switch confidence {
           case .sure: return .sure

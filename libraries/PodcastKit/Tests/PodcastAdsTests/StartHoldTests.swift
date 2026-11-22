@@ -36,6 +36,18 @@ final class StartHoldTests: XCTestCase {
     XCTAssertEqual(StartHold.longest, 3.0)
   }
 
+  func testAShowThatOpensWithAnAdIsWaitedForFiveSeconds() {
+    XCTAssertEqual(StartHold.longestForAdOpeners, 5.0)
+    XCTAssertEqual(StartHold.longest(usuallyOpensWithAd: false), 3.0)
+    XCTAssertEqual(StartHold.longest(usuallyOpensWithAd: true), 5.0)
+    var hold = StartHold()
+    XCTAssertNil(hold.tick(elapsed: 3.5, longest: StartHold.longestForAdOpeners))
+    XCTAssertNil(hold.tick(elapsed: 4.99, longest: 5.0))
+    XCTAssertEqual(hold.tick(elapsed: 5.0, longest: 5.0), .timeout)
+    var plain = StartHold()
+    XCTAssertEqual(plain.tick(elapsed: 3.0), .timeout, "the default stays three seconds")
+  }
+
   func testTheFirstVerdictReleasesTheWaitAtOnce() {
     var hold = StartHold()
     XCTAssertNil(hold.tick(elapsed: 1.0))

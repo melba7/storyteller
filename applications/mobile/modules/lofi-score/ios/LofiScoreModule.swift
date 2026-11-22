@@ -197,6 +197,17 @@ public final class LofiScoreModule: Module {
       }
     }
 
+    // Writes a small text file into the linked folder, replacing the one there: "written",
+    // "notLinked", "folderGone" or "unwritable" (with `message`).
+    AsyncFunction("writeLinkedFolderFile") { (path: String, text: String) async -> [String: Any] in
+      switch await LofiScoreRuntime.shared.host.writeLinkedFile(path, data: Data(text.utf8)) {
+      case .written: return ["status": "written"]
+      case .notLinked: return ["status": "notLinked"]
+      case .folderGone: return ["status": "folderGone"]
+      case .unwritable(let message): return ["status": "unwritable", "message": message]
+      }
+    }
+
     AsyncFunction("removeImportedSounds") { () async -> [String: Any] in
       let host = LofiScoreRuntime.shared.host
       await host.removeImportedSounds()

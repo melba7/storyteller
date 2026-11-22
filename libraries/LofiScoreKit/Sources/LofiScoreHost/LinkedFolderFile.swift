@@ -63,6 +63,56 @@ public enum LinkedFolderFile {
         return .found(data)
     }
 
+    /// What writing one file found.
+    public enum WriteOutcome: Equatable, Sendable {
+        case written
+        /// No folder is linked (said by the host, never by `write`).
+        case notLinked
+        /// The linked folder cannot be opened (it was moved or deleted).
+        case folderGone
+        case unwritable(String)
+    }
+
+    /// Writes `data` as the file at `path` below `folder`, replacing what is there and making the
+    /// subfolders. The path follows the rules of `fetch` (it may not leave the folder), the data
+    /// may be at most `sizeLimit` bytes, and the file is written atomically through a file
+    /// coordinator (so iCloud never sees half a file), inside the folder's security scope. A
+    /// folder that is gone is never made again.
+    public static func write(
+        _ path: String, data: Data, in folder: URL, fileManager: FileManager = .default
+    ) -> WriteOutcome {
+        let parts = path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
+        guard !parts.isEmpty, !path.hasPrefix("/"), !parts.contains(where: { $0.isEmpty || $0 == "." || $0 == ".." }) else {
+            return .unwritable("The file's path is not allowed.")
+        }
+        guard data.count <= sizeLimit else { return .unwritable("The file is too large.") }
+        #if canImport(Darwin)
+        let scoped = folder.startAccessingSecurityScopedResource()
+        defer { if scoped { folder.stopAccessingSecurityScopedResource() } }
+        #endif
+        var isFolder: ObjCBool = false
+        guard fileManager.fileExists(atPath: folder.path, isDirectory: &isFolder), isFolder.boolValue else {
+            return .folderGone
+        }
+        let file = parts.reduce(folder) { $0.appendingPathComponent($1) }
+        do {
+            try fileManager.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            #if canImport(Darwin)
+            var coordinationError: NSError?
+            var writeError: Error?
+            NSFileCoordinator().coordinate(writingItemAt: file, options: [.forReplacing], error: &coordinationError) { url in
+                do { try data.write(to: url, options: .atomic) } catch { writeError = error }
+            }
+            if let error = coordinationError ?? writeError { throw error }
+            #else
+            try data.write(to: file, options: .atomic)
+            #endif
+            return .written
+        } catch {
+            return .unwritable(error.localizedDescription)
+        }
+    }
+
     /// The file at `path` below `folder`, or nil when it is not there, not downloaded from
     /// iCloud yet, too large, or the path would leave the folder. Starts and stops the
     /// security-scoped access to the folder around the read. Never throws: a missing file is

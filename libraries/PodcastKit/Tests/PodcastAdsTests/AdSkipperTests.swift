@@ -32,7 +32,7 @@ final class AdSkipperTests: XCTestCase {
       listener.overridden(skipAds: nil, skipOwnPlugs: nil), listener)
     XCTAssertEqual(
       listener.overridden(skipAds: false, skipOwnPlugs: nil),
-      AdSkipSettings(skipAds: false, skipOwnPlugs: false))
+      AdSkipSettings(skipAds: false, skipOwnPlugs: false, skipPromos: false))
     XCTAssertEqual(
       listener.overridden(skipAds: nil, skipOwnPlugs: true),
       AdSkipSettings(skipAds: true, skipOwnPlugs: true))

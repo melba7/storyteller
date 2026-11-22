@@ -33,6 +33,7 @@ import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
 import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 import { filterDownloaded, playlistDownloads } from "./playlistRules"
+import { runTeachingSync } from "./teachingRun"
 import { listUpNext, queueEpisode } from "./upNextNative"
 
 let running: Promise<void> | null = null
@@ -42,7 +43,9 @@ type Added = Awaited<ReturnType<typeof refreshAllShows>>["added"]
 async function startNew(added: Added, settings: AutomaticSettings) {
   const shows = await listShows()
   const downloads = new Map(shows.map((s) => [s.id, s.settings.autoDownload]))
-  for (const episode of episodesToDownload(added, settings, downloads)) {
+  // A show unfollowed during or after the refresh is not in the list: nothing of it downloads.
+  const followed = added.filter((episode) => downloads.has(episode.showId))
+  for (const episode of episodesToDownload(followed, settings, downloads)) {
     try {
       const show = await getShow(episode.showId)
       await startDownload(
@@ -51,6 +54,7 @@ async function startNew(added: Added, settings: AutomaticSettings) {
         episode.audioType,
         true,
         show?.language ?? null,
+        episode.showId,
       )
     } catch (cause) {
       console.warn("Couldn't start an automatic download", cause)
@@ -99,6 +103,7 @@ async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
         episode.audioType,
         true,
         languages.get(episode.showId) ?? null,
+        episode.showId,
       )
     } catch (cause) {
       console.warn("Couldn't start a playlist download", cause)
@@ -215,6 +220,8 @@ export function runAutomatic(): Promise<void> {
       // First, so a show followed on the Mac is in the library when the feeds are read, but
       // the feeds do not wait more than 30 seconds for it.
       await syncApplePodcastsBriefly()
+      // The Mac's teaching files come in and the phone's notes go out, in the background.
+      runTeachingSync()
       // The new episodes are kept as each show is read, so a run that is cut short (the
       // background task's time ran out) still follows them up next time.
       let todo = await loadFollowUps()
@@ -250,6 +257,7 @@ export function runAutomatic(): Promise<void> {
 export async function runIfDue(): Promise<void> {
   if (!refreshDue(await loadLastRun(), Date.now())) {
     await syncApplePodcastsBriefly()
+    runTeachingSync()
     // In full at startup, so the player has every show's settings even on a quiet open.
     await syncShowSettings().catch((cause) =>
       console.warn("Couldn't save the show settings for the player", cause),

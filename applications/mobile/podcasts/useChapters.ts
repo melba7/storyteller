@@ -14,6 +14,7 @@ import { readableError } from "@/modules/podcasts/nativeError"
 // fresh by its onChaptersChange event. One copy is shared by every screen.
 let current: { episodeId: string; chapters: PodcastChapter[] } | null = null
 let started = false
+let listening = false
 const listeners = new Set<() => void>()
 
 function publish(info: ChaptersInfo) {
@@ -24,8 +25,12 @@ function publish(info: ChaptersInfo) {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onChaptersChange", publish)
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onChaptersChange", publish)
+  }
   Podcasts.getChapters().then(publish, () => {
     started = false
   })

@@ -2,12 +2,15 @@
 //
 // A short wait before a never-checked stream starts (PodcastAds' StartHold). When Skip ads is on
 // and an episode plays through its own download from 0:00, with nothing saved for it and a show
-// that is not known to start clean, Play waits for the first of: the head scan's first look
+// that is not known to start clean (what the Mac taught wins where it knows the show, else what the
+// phone saw itself; StartHold.startsClean), Play waits for the first of: the head scan's first look
 // (the 15 second step's rules and the memory of ads; also reported when the show's own opening
 // words were heard), the scan ending, 3 seconds from the tap, or a second tap on Play. An ad
 // that holds 0:00 is then left (the player reads the ads before the wait ends), and the audio
-// starts after it. The 3 second timer is the player's own, so nothing the scan does, or fails
-// to do, can keep the audio from starting.
+// starts after it. The timer is the player's own (3 seconds, 5 for a show that usually opens with
+// an ad, StartHold.longest), so nothing the scan does, or fails to do, can keep the audio from
+// starting. Play runs on the main actor, so the habits it reads are a copy that a background task
+// filled when the stream's head was made (PodcastHabits): no file is read here.
 import AVFoundation
 import Foundation
 import PodcastAds
@@ -18,24 +21,31 @@ import UIKit
 final class PodcastStartHold {
   let episodeId: String
   private var hold = StartHold()
+  /// The seconds after which the timer ends the wait.
+  private let longest: Double
   private var timer: Task<Void, Never>?
   private let onRelease: @MainActor (StartHold.Release) -> Void
 
-  init(episodeId: String, onRelease: @escaping @MainActor (StartHold.Release) -> Void) {
+  init(
+    episodeId: String, longest: Double,
+    onRelease: @escaping @MainActor (StartHold.Release) -> Void
+  ) {
     self.episodeId = episodeId
+    self.longest = longest
     self.onRelease = onRelease
   }
 
-  /// Starts the timer that ends the wait after `StartHold.longest` seconds, whatever happens.
+  /// Starts the timer that ends the wait after `longest` seconds, whatever happens.
   func begin() {
+    let longest = self.longest
     timer = Task { @MainActor [weak self] in
       do {
-        try await Task.sleep(nanoseconds: UInt64(StartHold.longest * 1_000_000_000))
+        try await Task.sleep(nanoseconds: UInt64(longest * 1_000_000_000))
       } catch {
         return  // cancelled: the wait ended another way
       }
       guard let self else { return }
-      finish(hold.tick(elapsed: StartHold.longest))
+      finish(hold.tick(elapsed: longest, longest: longest))
     }
   }
 
@@ -69,7 +79,9 @@ extension PodcastPlayer {
       return false
     }
     let show = current?.showId
-    let startsClean = show.map { PodcastShowStarts.shared.startsClean(show: $0) } ?? false
+    let habits = PodcastHabits.shared.current  // a copy: nothing is read from a file here
+    let ownStart = show.map { PodcastShowStarts.shared.startsClean(show: $0) } ?? false
+    let startsClean = StartHold.startsClean(habits: habits, show: show, own: ownStart)
     let wanted = StartHold.wanted(
       skipAds: adSkipping.skipsAds, playsOwnDownload: !playsPlainAddress,
       // While a seek is on its way the playhead still reads the old place, so where it is going
@@ -84,7 +96,9 @@ extension PodcastPlayer {
       // screen.
       appActive: UIApplication.shared.applicationState == .active)
     guard wanted else { return false }
-    let hold = PodcastStartHold(episodeId: id) { [weak self] reason in self?.startHoldOver(reason) }
+    let hold = PodcastStartHold(
+      episodeId: id, longest: StartHold.longest(habits: habits, show: show)
+    ) { [weak self] reason in self?.startHoldOver(reason) }
     startHold = hold
     // The listener wants to play: an ad found now, with the playhead inside it, is left at once.
     wantsToPlay = true

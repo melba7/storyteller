@@ -69,6 +69,8 @@ final class PodcastPlayer {
     observeSession()
     // Starts watching the network, so "on Wi-Fi now" is known by the first play.
     _ = PodcastNetwork.shared
+    // What is known about how shows start is read now, so the first stream's start hold has it.
+    PodcastHabits.shared.warm()
   }
 
   // MARK: Loading
@@ -99,6 +101,8 @@ final class PodcastPlayer {
     /// The address to keep in Up Next when `url` is a local file (an episode started from the
     /// queue plays its download), so the item can go back to the queue and be fetched again.
     var queueURL: String?
+    /// The listener chose the place to start from, so an ad that holds it is played.
+    var startChosen = false
   }
 
   /// The listener chose this episode. The one playing goes back to the top of Up Next.
@@ -120,7 +124,8 @@ final class PodcastPlayer {
       id: episode.id, url: episode.queueURL ?? episode.url.absoluteString, type: episode.type,
       title: episode.title, showTitle: episode.showTitle, artworkUrl: episode.artworkUrl,
       duration: episode.duration, position: episode.savedPosition, showId: episode.showId,
-      chaptersUrl: episode.chaptersUrl, language: episode.language)
+      chaptersUrl: episode.chaptersUrl, language: episode.language, notes: episode.notes,
+      showLink: episode.showLink)
     wantsToPlay = false
     player.pause()
     removeItemObservers()
@@ -160,7 +165,7 @@ final class PodcastPlayer {
       audioSeconds: ListeningStats.introSkipped(
         savedPosition: episode.savedPosition, duration: episode.duration,
         played: episode.played, intro: showState.settings.introSeconds))
-    adSkipping.begin(episode.id, startingAt: start)
+    adSkipping.begin(episode.id, startingAt: start, chosen: episode.startChosen)
     // The episode that plays is transcribed and checked for ads before the others.
     PodcastTranscriber.shared.prefer(episode.id)
     PodcastAdFinder.shared.prefer(episode.id)
@@ -188,7 +193,7 @@ final class PodcastPlayer {
     // a resume past the feed's length is a seek on its way (the clock is behind it), and a scrub
     // back after the end is a seek on its way too (the place is behind it). Neither starts over.
     if let duration = currentDuration, position >= duration - 0.5, place >= duration - 0.5 {
-      seek(to: 0)
+      startOver()
     }
     rewindAfterLongPause()
     player.defaultRate = Float(speed.value)

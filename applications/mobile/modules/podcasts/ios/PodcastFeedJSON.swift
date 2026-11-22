@@ -18,6 +18,7 @@ enum PodcastFeedJSON {
     if let imageURL = feed.imageURL { object["imageUrl"] = imageURL.absoluteString }
     if let link = feed.link { object["link"] = link.absoluteString }
     if let language = feed.language { object["language"] = language }
+    if let newFeedURL = feed.newFeedURL { object["newFeedUrl"] = newFeedURL.absoluteString }
     return object
   }
 

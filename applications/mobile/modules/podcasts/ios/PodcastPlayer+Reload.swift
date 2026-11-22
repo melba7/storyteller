@@ -27,7 +27,7 @@ extension PodcastPlayer {
         chaptersUrl: item.chaptersUrl,
         // As the app asks when the listener plays an episode (see startNextInQueue).
         playThroughDownload: skipAds(forShow: item.showId), language: item.language,
-        queueURL: item.url))
+        notes: item.notes, showLink: item.showLink, queueURL: item.url))
     return true
   }
 }

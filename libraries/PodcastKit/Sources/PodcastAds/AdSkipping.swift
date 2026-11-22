@@ -1,28 +1,46 @@
 // LOFI-FORK: when the player skips an ad (see FORK.md). Plain values, no AVFoundation.
 import Foundation
 
-/// The listener's two switches, both on until they turn them off.
+/// The listener's four switches: sponsor ads, the hosts' own plugs and the show's promos are on
+/// until they turn them off; credits are off until they turn them on.
 public struct AdSkipSettings: Equatable, Sendable {
   /// Skip sponsor reads and other produced ads.
   public var skipAds: Bool
-  /// Skip the hosts' own plugs (Patreon, merch, their other shows).
+  /// Skip the hosts' own plugs (Patreon, merch, asking for a review).
   public var skipOwnPlugs: Bool
+  /// Skip the show's or its network's promos for something of its own (another show, a live
+  /// event, tickets, a subscription, an app).
+  public var skipPromos: Bool
+  /// Skip the standing opening and the closing credits.
+  public var skipCredits: Bool
 
-  public init(skipAds: Bool = true, skipOwnPlugs: Bool = true) {
+  public init(
+    skipAds: Bool = true, skipOwnPlugs: Bool = true, skipPromos: Bool = true,
+    skipCredits: Bool = false
+  ) {
     self.skipAds = skipAds
     self.skipOwnPlugs = skipOwnPlugs
+    self.skipPromos = skipPromos
+    self.skipCredits = skipCredits
   }
 
-  /// These switches with a show's own choices where it has them (nil keeps the listener's).
+  /// These switches with a show's own choices where it has them (nil keeps the listener's). A
+  /// show overrides the first two. Promos used to be ads, so a show that turns ad skipping off
+  /// (`false`) does not have its promos skipped either; a show's choice of on, or none, leaves
+  /// the promo switch as the listener set it. The credits switch stays the listener's.
   public func overridden(skipAds show: Bool?, skipOwnPlugs showPlugs: Bool?) -> AdSkipSettings {
-    AdSkipSettings(skipAds: show ?? skipAds, skipOwnPlugs: showPlugs ?? skipOwnPlugs)
+    AdSkipSettings(
+      skipAds: show ?? skipAds, skipOwnPlugs: showPlugs ?? skipOwnPlugs,
+      skipPromos: show == false ? false : skipPromos, skipCredits: skipCredits)
   }
 
-  /// Whether an ad of this kind may be skipped under these switches.
+  /// Whether a stretch of this kind may be skipped under these switches.
   public func allows(_ kind: AdKind) -> Bool {
     switch kind {
     case .ad: return skipAds
     case .ownPlug: return skipOwnPlugs
+    case .promo: return skipPromos
+    case .credits: return skipCredits
     }
   }
 }
@@ -31,7 +49,8 @@ public struct AdSkipSettings: Equatable, Sendable {
 public struct AdSkip: Equatable, Sendable {
   public var ad: FoundAd
   public var target: Double
-  /// The ads that follow `ad` at once (an ad and then the hosts' plug), skipped with it.
+  /// The stretches that follow `ad` at once (an ad and then the hosts' plug), skipped with it. Only
+  /// kinds the switches allow are ever in it.
   public var chained: [FoundAd]
 
   public init(ad: FoundAd, target: Double, chained: [FoundAd] = []) {
@@ -242,6 +261,21 @@ public struct AdSkipper: Sendable {
       !enteredBySeek.contains(ad.start)
     else { return nil }
     return makeSkip(ad, duration: duration, now: now)
+  }
+
+  /// The last skip that can still be undone and when it was made (the `now` it was made with).
+  public var lastSkip: (skip: AdSkip, at: Double)? { last }
+
+  /// A skip that was made by hand (the Skip ad button), so Undo takes it back like any other.
+  public mutating func noteSkip(_ skip: AdSkip, now: Double) { last = (skip, now) }
+
+  /// Where the player lands when it moves the playhead to `position` on its own and does not want
+  /// to land inside an ad that is skipped: the end of that ad and of the ads that follow it at
+  /// once, or `position` when no such ad holds it.
+  public func landing(for position: Double, duration: Double?) -> Double {
+    guard position.isFinite, let ad = ads.first(where: { $0.start <= position && position < $0.end })
+    else { return position }
+    return max(position, Self.target(for: chain(after: ad).last ?? ad, duration: duration))
   }
 
   /// The listener tapped Undo: the ad that was just skipped, to be played from its start, or nil

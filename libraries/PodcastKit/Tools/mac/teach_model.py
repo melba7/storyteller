@@ -1,0 +1,68 @@
+"""The model file of the teaching run: which buckets are kept and the text of ad-model.json.
+
+Standard library only. Used by teach_train.py (which re-exports these names).
+
+Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import json
+import os
+import tempfile
+
+from teach_features import BUCKETS, CLASSES
+from teach_spans import THRESHOLDS  # the cut-offs the file carries are the ones the check uses
+
+MAX_BUCKETS = 40000
+MAX_BYTES = 4500000
+
+
+def ranked_buckets(flat, limit):
+    """[(bucket, five rounded weights)] with the biggest weights first, at most `limit`, leaving
+    out buckets whose rounded weights are all zero."""
+    found = []
+    for b in range(BUCKETS):
+        k = b * 5
+        if flat[k] or flat[k + 1] or flat[k + 2] or flat[k + 3] or flat[k + 4]:
+            five = [round(flat[k + c], 4) + 0.0 for c in range(5)]
+            if any(five):
+                found.append((b, five))
+    found.sort(key=lambda item: (-max(abs(v) for v in item[1]), item[0]))
+    return found[:limit]
+
+
+def build_model(flat, trained, check, max_buckets=MAX_BUCKETS, max_bytes=MAX_BYTES):
+    """The text of ad-model.json. `check(weights)` returns the heldOut numbers for the weights that
+    are kept. When the text would pass max_bytes, fewer buckets are kept."""
+    ranked = ranked_buckets(flat, max_buckets)
+
+    def render(count):
+        kept = dict(sorted(ranked[:count]))
+        data = {"version": 1, "buckets": BUCKETS, "classes": CLASSES, "thresholds": THRESHOLDS,
+                "weights": {str(b): five for b, five in kept.items()},
+                "trained": dict(trained, heldOut=check(kept))}
+        return json.dumps(data, separators=(",", ":"))
+
+    text = render(len(ranked))
+    if len(text.encode("utf-8")) <= max_bytes:
+        return text
+    low, high = 0, len(ranked) - 1
+    while low < high:
+        middle = (low + high + 1) // 2
+        if len(render(middle).encode("utf-8")) <= max_bytes:
+            low = middle
+        else:
+            high = middle - 1
+    return render(low)
+
+
+def write_text(path, text):
+    """Writes the text through a temporary file in the same folder."""
+    handle, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".", suffix=".part")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+        raise

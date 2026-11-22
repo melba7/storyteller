@@ -61,7 +61,7 @@ func printPlay(_ result: PlayCheckResult) {
   if result.verdicts.isEmpty { print("No ads found.") }
   for verdict in result.verdicts {
     let ad = verdict.ad
-    let kind = ad.kind == .ad ? "ad" : "own plug"
+    let kind = ad.kind.label
     let who = ad.advertiser.isEmpty ? "" : " \(ad.advertiser)"
     let outcome =
       verdict.skipped
@@ -205,7 +205,7 @@ do {
 
   if file.ads.isEmpty { print("No ads found.") }
   for ad in file.ads {
-    let kind = ad.kind == .ad ? "ad" : "own plug"
+    let kind = ad.kind.label
     let who = ad.advertiser.isEmpty ? "" : " \(ad.advertiser)"
     print(
       "[\(clock(ad.start)) - \(clock(ad.end))] \(Int(ad.duration.rounded())) s, \(kind), \(ad.confidence.rawValue)\(who): \(ad.firstWords)"

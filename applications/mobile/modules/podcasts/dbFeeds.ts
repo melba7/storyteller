@@ -12,6 +12,7 @@ import { notifyLibraryChanged } from "./changes"
 import { database, getShow, listEpisodes, listShows, rows } from "./db"
 import { MARK_PLAYED_FROM_APPLE_SQL } from "./episodeSql"
 import { feedChanged } from "./feedChanges"
+import { movedFeedUrl } from "./feedMove"
 import { normalizeFeedUrl } from "./feedUrl"
 import { Podcasts, type PodcastFeedData } from "./index"
 import {
@@ -82,11 +83,12 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
 
 function updateEpisode(id: string, episode: FetchedEpisode) {
   return [
-    `UPDATE episodes SET title = ?, published_at = ?, duration_seconds = ?, notes = ?,
+    `UPDATE episodes SET guid = ?, title = ?, published_at = ?, duration_seconds = ?, notes = ?,
        audio_url = ?, audio_type = ?, audio_bytes = ?, image_url = ?, season = ?, number = ?,
        transcript_url = ?, transcript_type = ?, chapters_url = ?, people = ?
      WHERE id = ?`,
     [
+      episode.guid,
       episode.title,
       episode.publishedAt,
       episode.durationSeconds,
@@ -171,6 +173,9 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
   if (!show || isLocalFeedUrl(show.feedUrl)) return []
   const feed = await fetchFeed(show.feedUrl)
   const stored = await listEpisodes(id)
+  // A feed that announced a new address is followed there, so the show keeps matching the
+  // Mac's teaching table and Apple Podcasts.
+  const movedTo = movedFeedUrl(show, feed.newFeedUrl, await listShows())
   const { insert, update } = mergeEpisodes(
     stored,
     feed.episodes.map(fetchedEpisode),
@@ -188,7 +193,8 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     // feedChanged (feedChanges.ts) compares these same values: a new column needs a line there.
     await tx.execute(
       `UPDATE shows SET title = ?, author = ?, description = ?, image_url = ?, link = ?,
-         language = ?, refreshed_at = ?, categories = ?, funding = ?, people = ?
+         language = ?, refreshed_at = ?, categories = ?, funding = ?, people = ?,
+         feed_url = ?
        WHERE id = ?`,
       [
         feed.title,
@@ -201,6 +207,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
         JSON.stringify(feed.categories ?? []),
         toJson(fundingFromJson(toJson(feed.funding))),
         toJson(peopleFromJson(toJson(feed.people))),
+        movedTo ?? show.feedUrl,
         id,
       ],
     )
@@ -226,6 +233,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
   )
   // A feed that says nothing new does not make every open screen read the library again.
   if (
+    movedTo !== null ||
     feedChanged(show, feed, { inserted: insert.length, updated: update.length })
   ) {
     notifyLibraryChanged()
@@ -235,6 +243,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     insert.filter((_, at) => !arrived[at]),
     ids.filter((_, at) => !arrived[at]),
     stored,
+    Date.now(),
   )
 }
 

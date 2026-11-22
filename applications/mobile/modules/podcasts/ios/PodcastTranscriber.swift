@@ -54,6 +54,8 @@ final class PodcastTranscriber: @unchecked Sendable {
   /// A download was installed: transcribe it.
   func downloaded(_ episodeId: String) {
     scan()
+    // The taught sounds are looked for in the new file at once, even when no transcript can start.
+    PodcastAdFinder.shared.scan()
   }
 
   /// A download was deleted (its folder, and the transcript with it).

@@ -125,3 +125,5 @@ export const SEARCH_HREF = "/podcasts/(tabs)/(search)"
 /** The account sheet (Profile) and the Stats page inside it. */
 export const ACCOUNT_HREF = "/podcasts/account"
 export const ACCOUNT_STATS_HREF = "/podcasts/account/stats"
+/** The "Ad skipping results" page, also inside the account sheet. */
+export const ACCOUNT_AD_RESULTS_HREF = "/podcasts/account/ad-results"

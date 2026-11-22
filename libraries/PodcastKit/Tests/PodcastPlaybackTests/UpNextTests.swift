@@ -36,6 +36,26 @@ final class UpNextTests: XCTestCase {
     XCTAssertEqual(q.items.last?.position, 120)
   }
 
+  func testAddingACopyWithoutNotesKeepsTheNotesAndShowLinkOfTheQueuedItem() {
+    var q = UpNextQueue(items: [
+      QueueItem(
+        id: "a", url: "u", title: "A", notes: "Brought to you by Acme", showLink: "https://a.test")
+    ])
+    q.add(item("a", position: 50), at: .next)
+    XCTAssertEqual(q.items.first?.position, 50)
+    XCTAssertEqual(q.items.first?.notes, "Brought to you by Acme")
+    XCTAssertEqual(q.items.first?.showLink, "https://a.test")
+  }
+
+  func testAddingWithNewNotesReplacesTheOldOnes() {
+    var q = UpNextQueue(items: [
+      QueueItem(id: "a", url: "u", title: "A", notes: "old", showLink: "x")
+    ])
+    q.add(QueueItem(id: "a", url: "u", title: "A", notes: "new", showLink: "y"), at: .last)
+    XCTAssertEqual(q.items.first?.notes, "new")
+    XCTAssertEqual(q.items.first?.showLink, "y")
+  }
+
   func testTheEpisodePlayingNowIsNotQueued() {
     var q = queue("a")
     q.add(item("p"), at: .next, playingId: "p")
@@ -194,5 +214,22 @@ final class QueueItemLanguageTests: XCTestCase {
     let old = Data(
       #"{"items":[{"id":"a","url":"u","type":"","title":"A","showTitle":"","position":0}]}"#.utf8)
     XCTAssertNil(try JSONDecoder().decode(UpNextQueue.self, from: old).items.first?.language)
+  }
+}
+
+final class QueueItemNotesTests: XCTestCase {
+  func testNotesAndShowLinkSurviveSavingAndOldFilesStillRead() throws {
+    let item = QueueItem(
+      id: "a", url: "https://x/a.mp3", title: "A", notes: "Sponsored by Acme",
+      showLink: "https://x.example")
+    let data = try JSONEncoder().encode(UpNextQueue(items: [item]))
+    let back = try JSONDecoder().decode(UpNextQueue.self, from: data).items.first
+    XCTAssertEqual(back?.notes, "Sponsored by Acme")
+    XCTAssertEqual(back?.showLink, "https://x.example")
+    let old = Data(
+      #"{"items":[{"id":"a","url":"u","type":"","title":"A","showTitle":"","position":0}]}"#.utf8)
+    let older = try JSONDecoder().decode(UpNextQueue.self, from: old).items.first
+    XCTAssertNil(older?.notes)
+    XCTAssertNil(older?.showLink)
   }
 }

@@ -136,6 +136,131 @@ describe("mergeEpisodes", () => {
   })
 })
 
+describe("mergeEpisodes with changed guids", () => {
+  it("moves a stored row to the new guid when the audio address matches", () => {
+    const result = mergeEpisodes(
+      [
+        stored("old", {
+          audioUrl: "https://cdn.example.com/x.mp3",
+          title: "A",
+        }),
+      ],
+      [
+        fetched("new", {
+          audioUrl: "https://cdn.example.com/x.mp3",
+          title: "B",
+        }),
+      ],
+    )
+    expect(result.insert).toEqual([])
+    expect(result.update.map((u) => [u.id, u.episode.guid])).toEqual([
+      ["id-old", "new"],
+    ])
+  })
+
+  it("matches by title and date when the audio address changed too", () => {
+    const result = mergeEpisodes(
+      [
+        stored("old", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://a/1",
+        }),
+      ],
+      [
+        fetched("new", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://b/1",
+        }),
+      ],
+    )
+    expect(result.insert).toEqual([])
+    expect(result.update[0]?.id).toBe("id-old")
+  })
+
+  it("does not match on the title alone or the date alone", () => {
+    const result = mergeEpisodes(
+      [
+        stored("old", {
+          title: "Same",
+          publishedAt: 5,
+          audioUrl: "https://a/1",
+        }),
+      ],
+      [
+        fetched("n1", {
+          title: "Same",
+          publishedAt: 6,
+          audioUrl: "https://b/1",
+        }),
+        fetched("n2", {
+          title: "Other",
+          publishedAt: 5,
+          audioUrl: "https://b/2",
+        }),
+      ],
+    )
+    expect(result.insert.map((e) => e.guid)).toEqual(["n1", "n2"])
+    expect(result.update).toEqual([])
+  })
+
+  it("keeps both when only the audio address is the same", () => {
+    // A feed whose items all point at one stream: yesterday's item is not today's.
+    const stream = "https://radio.example.com/live.mp3"
+    const result = mergeEpisodes(
+      [stored("mon", { title: "Monday", publishedAt: 1, audioUrl: stream })],
+      [fetched("tue", { title: "Tuesday", publishedAt: 2, audioUrl: stream })],
+    )
+    expect(result.insert.map((e) => e.guid)).toEqual(["tue"])
+    expect(result.update).toEqual([])
+  })
+
+  it("never takes a row whose guid is still in the feed", () => {
+    const result = mergeEpisodes(
+      [stored("a", { audioUrl: "https://x/1" })],
+      [
+        fetched("a", { audioUrl: "https://x/2" }),
+        fetched("b", { audioUrl: "https://x/1" }),
+      ],
+    )
+    expect(result.insert.map((e) => e.guid)).toEqual(["b"])
+  })
+
+  it("matches a stored row once, and prefers the audio address to the title", () => {
+    const result = mergeEpisodes(
+      [
+        stored("o1", { title: "T", publishedAt: 5, audioUrl: "https://a/1" }),
+        stored("o2", { title: "T", publishedAt: 5, audioUrl: "https://a/2" }),
+      ],
+      [
+        fetched("n2", { title: "T", publishedAt: 5, audioUrl: "https://a/2" }),
+        fetched("n1", { title: "T", publishedAt: 5, audioUrl: "https://a/1" }),
+        fetched("n3", { title: "T", publishedAt: 5, audioUrl: "https://a/3" }),
+      ],
+    )
+    expect(result.update.map((u) => [u.id, u.episode.guid]).sort()).toEqual([
+      ["id-o1", "n1"],
+      ["id-o2", "n2"],
+    ])
+    expect(result.insert.map((e) => e.guid)).toEqual(["n3"])
+  })
+
+  it("still stores two episodes with the same title and date", () => {
+    const twins = [
+      fetched("a", { title: "T", publishedAt: 5, audioUrl: "https://a/1" }),
+      fetched("b", { title: "T", publishedAt: 5, audioUrl: "https://a/2" }),
+    ]
+    expect(mergeEpisodes([], twins).insert).toHaveLength(2)
+    const again = mergeEpisodes(
+      [stored("a", twins[0]), stored("b", twins[1])],
+      twins,
+    )
+    expect(again.insert).toEqual([])
+    expect(again.update).toEqual([])
+  })
+})
+
 describe("sortEpisodes", () => {
   it("puts the newest first and the undated last", () => {
     const sorted = sortEpisodes([

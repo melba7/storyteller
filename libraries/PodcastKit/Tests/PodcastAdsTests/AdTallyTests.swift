@@ -1,0 +1,124 @@
+import XCTest
+
+@testable import PodcastAds
+
+/// The count of what happened with the ads, for each show.
+final class AdTallyTests: XCTestCase {
+  private func object(_ text: String) throws -> [String: Any] {
+    try XCTUnwrap(try JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+  }
+
+  func testEachKindIsCountedForItsShow() {
+    var tally = AdTally()
+    tally.count(.skipped, show: "s1", seconds: 60, at: 1000)
+    tally.count(.skipped, show: "s1", seconds: 30, at: 2000)
+    tally.count(.undone, show: "s1", seconds: 30, at: 3000)
+    tally.count(.trimmed, show: "s1", at: 4000)
+    tally.count(.missed, show: "s2", at: 5000)
+    XCTAssertEqual(
+      tally.shows["s1"], AdTally.Counts(skipped: 2, undone: 1, trimmed: 1, missed: 0, seconds: 60))
+    XCTAssertEqual(
+      tally.shows["s2"], AdTally.Counts(skipped: 0, undone: 0, trimmed: 0, missed: 1, seconds: 0))
+  }
+
+  func testSinceIsTheFirstCountAndStaysThere() {
+    var tally = AdTally()
+    XCTAssertNil(tally.since)
+    tally.count(.missed, show: "s", at: 1000)
+    tally.count(.missed, show: "s", at: 9000)
+    XCTAssertEqual(tally.since, 1000)
+  }
+
+  func testAnUndoneSkipNeverTakesTheSecondsBelowZero() {
+    var tally = AdTally()
+    tally.count(.skipped, show: "s", seconds: 20, at: 1)
+    tally.count(.undone, show: "s", seconds: 50, at: 2)
+    XCTAssertEqual(tally.shows["s"]?.seconds, 0)
+  }
+
+  func testAShowThatIsNotKnownCountsUnderTheEmptyId() {
+    var tally = AdTally()
+    tally.count(.skipped, show: nil, seconds: 10, at: 1)
+    tally.count(.skipped, show: "", seconds: 10, at: 2)
+    XCTAssertEqual(tally.shows[""]?.skipped, 2)
+    XCTAssertEqual(tally.shows.count, 1)
+  }
+
+  func testTheJSONTextIsTheContracts() throws {
+    let empty = try object(AdTally().json)
+    XCTAssertTrue(empty["since"] is NSNull)
+    XCTAssertEqual((empty["shows"] as? [String: Any])?.count, 0)
+
+    var tally = AdTally()
+    tally.count(.skipped, show: "s1", seconds: 45.5, at: 1234)
+    let fields = try object(tally.json)
+    XCTAssertEqual(fields["since"] as? Double, 1234)
+    let show = try XCTUnwrap((fields["shows"] as? [String: Any])?["s1"] as? [String: Any])
+    XCTAssertEqual(Set(show.keys), ["skipped", "undone", "trimmed", "missed", "seconds"])
+    XCTAssertEqual(show["skipped"] as? Int, 1)
+    XCTAssertEqual(show["seconds"] as? Double, 45.5)
+  }
+
+  func testItSavesAndLoadsAndABadFileIsEmpty() throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "tally-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let file = folder.appendingPathComponent("Podcasts/ad-tally.json")
+    XCTAssertEqual(AdTally.load(from: file), AdTally())
+    var tally = AdTally()
+    tally.count(.skipped, show: "s1", seconds: 12, at: 7)
+    try tally.save(to: file)
+    XCTAssertEqual(AdTally.load(from: file), tally)
+    try Data("not json".utf8).write(to: file)
+    XCTAssertEqual(AdTally.load(from: file), AdTally())
+  }
+
+  func testAFileWithMissingFieldsStillLoads() {
+    let text = #"{"since": 5, "shows": {"s": {"skipped": 2}}}"#
+    let tally = AdTally.decode(Data(text.utf8))
+    XCTAssertEqual(tally.since, 5)
+    XCTAssertEqual(tally.shows["s"]?.skipped, 2)
+    XCTAssertEqual(tally.shows["s"]?.seconds, 0)
+  }
+
+  func testSecondsAreWhatTheSkipTookOutOfTheListening() {
+    XCTAssertEqual(AdTally.seconds(from: 100, to: 130), 30)
+    // Left from the middle of an ad: only the rest counts.
+    XCTAssertEqual(AdTally.seconds(from: 115, to: 130), 15)
+    XCTAssertEqual(AdTally.seconds(from: 130, to: 100), 0)
+    XCTAssertEqual(AdTally.seconds(from: .nan, to: 100), 0)
+  }
+
+  func testAnAdFoundAgainLongerIsNotCountedTwice() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 115))
+    XCTAssertFalse(noted.isNew(episode: "e", start: 100, end: 130), "the same ad, longer")
+    XCTAssertFalse(noted.isNew(episode: "e", start: 110, end: 140), "still the same stretch")
+    XCTAssertTrue(noted.isNew(episode: "e", start: 140, end: 150), "the next ad")
+    XCTAssertTrue(noted.isNew(episode: "f", start: 140, end: 150), "another episode")
+  }
+
+  func testUndoGivesBackWhatTheSkipCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 130))
+    noted.counted(seconds: 20)  // found at 110: only the rest of the ad was jumped
+    XCTAssertEqual(noted.takeCounted(), 20)
+    XCTAssertEqual(noted.takeCounted(), 0, "a second Undo has nothing to give back")
+  }
+
+  func testAnAdFoundAgainLongerKeepsWhatTheFirstSkipCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 115))
+    noted.counted(seconds: 5)
+    XCTAssertFalse(noted.isNew(episode: "e", start: 100, end: 130))  // adds nothing
+    XCTAssertEqual(noted.takeCounted(), 5)
+  }
+
+  func testANewSkipForgetsWhatTheLastOneCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 130))
+    noted.counted(seconds: 20)
+    XCTAssertTrue(noted.isNew(episode: "e", start: 200, end: 210))
+    XCTAssertEqual(noted.takeCounted(), 0)
+  }
+}

@@ -32,6 +32,9 @@ struct PlaybackLoadOptions: Record {
   /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
   @Field var notes: String?
   @Field var showLink: String?
+  /// The listener chose the place to start from (Play from on a row, a bookmark, a search
+  /// result), so an ad that holds it is played and not skipped.
+  @Field var startChosen: Bool = false
 }
 
 /// An episode to put in Up Next.
@@ -47,6 +50,9 @@ struct UpNextItemOptions: Record {
   @Field var showId: String?
   @Field var chaptersUrl: String?
   @Field var language: String?
+  /// The episode's notes (4,000 characters at most) and the show's web page.
+  @Field var notes: String?
+  @Field var showLink: String?
 }
 
 public final class PodcastsModule: Module {
@@ -100,7 +106,7 @@ public final class PodcastsModule: Module {
         duration: options.duration, played: options.played, autoplay: options.autoplay,
         type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
         playThroughDownload: options.playThroughDownload, language: options.language,
-        notes: options.notes, showLink: options.showLink)
+        notes: options.notes, showLink: options.showLink, startChosen: options.startChosen)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -147,7 +153,7 @@ public final class PodcastsModule: Module {
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
         position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
-        language: item.language)
+        language: item.language, notes: item.notes, showLink: item.showLink)
       EpisodeShows.shared.remember(item.showId, for: item.id)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
@@ -260,8 +266,12 @@ public final class PodcastsModule: Module {
     // Starts downloading an episode; carries on with the app closed. `type` is the feed's
     // audio type, used to name the file. `automatic` marks a new episode the app fetches by
     // itself: those always wait for Wi-Fi. `language` is the feed's, for the transcript.
+    // `showId` is the episode's show, so the ads the phone knows for it are found in a download
+    // that is checked before it is ever played.
     AsyncFunction("download") {
-      (episodeId: String, url: String, type: String, automatic: Bool, language: String?) throws in
+      (episodeId: String, url: String, type: String, automatic: Bool, language: String?,
+       showId: String?) throws in
+      if let showId, !showId.isEmpty { EpisodeShows.shared.remember(showId, for: episodeId) }
       PodcastTranscriber.shared.noteLanguage(language, for: episodeId)
       do {
         try PodcastDownloader.shared.download(
@@ -337,6 +347,24 @@ public final class PodcastsModule: Module {
       await PodcastTranscriber.shared.search(query)
     }
 
+    // MARK: Teaching
+
+    // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json or
+    // ad-sounds.json) when its SHA-256 is right and it reads as that file. True when it was kept;
+    // the episodes are looked at again then.
+    AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in
+      let kept = PodcastTeaching.shared.install(name: name, text: text, sha256: sha256)
+      if kept { PodcastAdFinder.shared.teachingChanged() }
+      return kept
+    }
+    // Which feed is which show, `{"<feed key>": "<show id>"}`, so the Mac's files name shows as
+    // the app does.
+    AsyncFunction("setTeachingShows") { (json: String) in
+      if PodcastTeaching.shared.setShows(json: json) { PodcastAdFinder.shared.teachingChanged() }
+    }
+    // What was taught: the installed files, the model's numbers and how many ads and sounds.
+    AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }
+
     // MARK: Ads
 
     // Where every transcribed episode's ad finding is, and one episode's saved ads as JSON.
@@ -345,14 +373,46 @@ public final class PodcastsModule: Module {
       PodcastAdFinder.shared.adsJSON(episodeId)
     }
 
-    // The two switches for skipping ads and the hosts' own plugs (both on until turned off).
+    // The four switches: ads, the hosts' own plugs and promos are on until turned off, credits
+    // are off until turned on.
     AsyncFunction("getAdSkipSettings") { () -> [String: Bool] in
       let settings = AdSkipDefaults.settings
-      return ["skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs]
+      return [
+        "skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs,
+        "skipPromos": settings.skipPromos, "skipCredits": settings.skipCredits,
+      ]
     }
-    AsyncFunction("setAdSkipSettings") { (skipAds: Bool, skipOwnPlugs: Bool) async in
-      AdSkipDefaults.settings = AdSkipSettings(skipAds: skipAds, skipOwnPlugs: skipOwnPlugs)
+    AsyncFunction("setAdSkipSettings") {
+      (skipAds: Bool, skipOwnPlugs: Bool, skipPromos: Bool, skipCredits: Bool) async in
+      AdSkipDefaults.settings = AdSkipSettings(
+        skipAds: skipAds, skipOwnPlugs: skipOwnPlugs, skipPromos: skipPromos,
+        skipCredits: skipCredits)
       await MainActor.run { PodcastPlayer.shared.adSkipping.refresh() }
+    }
+    // The Skip ad button: moves the playhead past the ad it is in, or 30 seconds ahead. Returns
+    // where it went and whether an ad was known there, or null when nothing is loaded.
+    AsyncFunction("skipAdNow") { () async -> [String: Any]? in
+      await MainActor.run { () -> [String: Any]? in
+        guard let result = PodcastPlayer.shared.adSkipping.skipAdNow() else { return nil }
+        return ["to": result.to, "known": result.known]
+      }
+    }
+    // What the player noticed about ads for the Mac, as JSON lines ("" when none); the app saves
+    // them to the linked folder and then removes the first `count` lines it saved, at most those
+    // written at `upToAt` (milliseconds) or earlier, so a note made since stays.
+    AsyncFunction("readPendingAdNotes") { () async -> String in
+      await PodcastAdNotes.shared.readPending()
+    }
+    AsyncFunction("removePendingAdNotes") { (count: Int, upToAt: Double) async in
+      await PodcastAdNotes.shared.removePending(count, upToAt: upToAt)
+    }
+    // The count of skips, undos, trims and misses for each show, as JSON text.
+    AsyncFunction("getAdTally") { () async -> String in
+      await PodcastAdNotes.shared.tallyJSON()
+    }
+    // The skip log and the ad finder's diary as "Send skip log" shares them, or null.
+    AsyncFunction("readSkipLogText") { () async -> String? in
+      await SkipLogFile.readText()
     }
     // Takes back the skip that was just made: back to the ad's start, playing, and the skip is
     // recorded as wrong. False when it is too late.

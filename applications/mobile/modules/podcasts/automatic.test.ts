@@ -115,6 +115,8 @@ describe("newEpisodes", () => {
   })
 
   const stored = (publishedAt: number | null) => ({ publishedAt })
+  const NOW = 1000
+  const DAY = 86_400_000
 
   it("pairs each inserted episode with the id it was saved under", () => {
     expect(
@@ -123,6 +125,7 @@ describe("newEpisodes", () => {
         [fetched("x", 10), fetched("y", 20)],
         ["id1", "id2"],
         [stored(5)],
+        NOW,
       ).map((e) => [e.id, e.publishedAt, e.audioUrl]),
     ).toEqual([
       ["id1", 10, "https://cdn.example.com/x.mp3"],
@@ -131,7 +134,7 @@ describe("newEpisodes", () => {
   })
 
   it("has nothing when nothing was inserted", () => {
-    expect(newEpisodes("S", [], [], [stored(1)])).toEqual([])
+    expect(newEpisodes("S", [], [], [stored(1)], NOW)).toEqual([])
   })
 
   it("counts only episodes newer than the newest stored one", () => {
@@ -140,23 +143,46 @@ describe("newEpisodes", () => {
       [fetched("old", 50), fetched("same", 100), fetched("new", 101)],
       ["i1", "i2", "i3"],
       [stored(100), stored(40), stored(null)],
+      NOW,
     )
     expect(picked.map((e) => e.id)).toEqual(["i3"])
   })
 
   it("counts nothing as new on a show's first refresh, and nothing undated", () => {
-    expect(newEpisodes("S", [fetched("a", 10)], ["i1"], [])).toEqual([])
-    expect(newEpisodes("S", [fetched("u", null)], ["i1"], [stored(5)])).toEqual(
-      [],
-    )
+    expect(newEpisodes("S", [fetched("a", 10)], ["i1"], [], NOW)).toEqual([])
+    expect(
+      newEpisodes("S", [fetched("u", null)], ["i1"], [stored(5)], NOW),
+    ).toEqual([])
   })
 
   it("counts a dated episode when the stored ones have no dates", () => {
     expect(
-      newEpisodes("S", [fetched("a", 10)], ["i1"], [stored(null)]).map(
+      newEpisodes("S", [fetched("a", 10)], ["i1"], [stored(null)], NOW).map(
         (e) => e.id,
       ),
     ).toEqual(["i1"])
+  })
+
+  it("ignores a stored date far in the future when finding the newest", () => {
+    const picked = newEpisodes(
+      "S",
+      [fetched("new", 500)],
+      ["i1"],
+      [stored(100), stored(NOW + 365 * DAY)],
+      NOW,
+    )
+    expect(picked.map((e) => e.id)).toEqual(["i1"])
+  })
+
+  it("still counts a stored date up to a day ahead", () => {
+    const picked = newEpisodes(
+      "S",
+      [fetched("new", 500)],
+      ["i1"],
+      [stored(100), stored(NOW + DAY / 2)],
+      NOW,
+    )
+    expect(picked).toEqual([])
   })
 })
 
