@@ -849,6 +849,26 @@ describe("a renamed episode", () => {
     await playback.refreshEpisode()
     expect(playback.getView().episode?.title).toBe("Renamed")
   })
+
+  it("shows the show's new ad choices while the episode is loaded", async () => {
+    const { playback, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    deps.getShow.mockResolvedValue({
+      ...show,
+      settings: { ...DEFAULT_SHOW_SETTINGS, skipAds: false },
+    })
+    await playback.refreshEpisode()
+    expect(playback.getView().show?.settings.skipAds).toBe(false)
+    expect(playback.getView().episode?.title).toBe("Episode one")
+  })
+
+  it("leaves the player's show alone when the show is gone", async () => {
+    const { playback, deps } = setup()
+    await playback.playEpisode(episode(), show)
+    deps.getShow.mockResolvedValue(null)
+    await playback.refreshEpisode()
+    expect(playback.getView().show?.id).toBe("s1")
+  })
 })
 
 // MARK: Telling the lists

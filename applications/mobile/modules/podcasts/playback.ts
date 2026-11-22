@@ -519,21 +519,36 @@ export function createPlayback(deps: PlaybackDeps) {
     persist(view.position)
   }
 
-  /** After a library change (a rename): the loaded episode's title and picture are read again. */
+  /**
+   * After a library change (a rename, a show's settings): the loaded episode's title and
+   * picture, and its show's settings, are read again.
+   */
   async function refreshEpisode() {
     const current = view.episode
     if (!current || isPreviewId(current.id)) return
     try {
-      const fresh = await deps.getEpisode(current.id)
-      if (!fresh || view.episode?.id !== current.id) return
-      if (fresh.title === current.title && fresh.imageUrl === current.imageUrl)
-        return
+      const [fresh, freshShow] = await Promise.all([
+        deps.getEpisode(current.id),
+        deps.getShow(current.showId),
+      ])
+      if (view.episode?.id !== current.id) return
+      const loaded = view.episode
+      const renamed =
+        fresh !== null &&
+        (fresh.title !== loaded.title || fresh.imageUrl !== loaded.imageUrl)
+      const settingsChanged =
+        freshShow !== null &&
+        view.show?.id === freshShow.id &&
+        JSON.stringify(freshShow.settings) !==
+          JSON.stringify(view.show.settings)
+      if (!renamed && !settingsChanged) return
       set({
-        episode: {
-          ...view.episode,
-          title: fresh.title,
-          imageUrl: fresh.imageUrl,
-        },
+        episode: renamed
+          ? { ...loaded, title: fresh.title, imageUrl: fresh.imageUrl }
+          : loaded,
+        show: settingsChanged
+          ? { ...view.show, settings: freshShow.settings }
+          : view.show,
       })
     } catch (cause) {
       deps.report?.(cause)
