@@ -6,8 +6,6 @@
 // the database or the folder (phoneNotesSync.ts does).
 import type { LinkedFileRead } from "@/modules/lofi-score"
 
-import { adKindOf } from "./ads"
-
 export const NOTES_FILE = "Podcasts/phone-notes.jsonl"
 export const DIARY_FILE = "Podcasts/phone-diary.jsonl"
 
@@ -16,6 +14,7 @@ export const MAX_NOTE_LINES = 2000
 
 const WHAT = ["skipped", "undone", "trimmed", "missed"] as const
 type What = (typeof WHAT)[number]
+const KINDS = ["ad", "ownPlug", "promo", "credits"] as const
 
 /** A note as the native side keeps it, before the app adds what the database knows. */
 export type PendingNote = {
@@ -26,6 +25,7 @@ export type PendingNote = {
   show: string
   start: number
   end: number | null
+  /** A sort of ad, or "" when the note has none (a missed ad). */
   kind: string
 }
 
@@ -65,7 +65,7 @@ function readNote(line: string): PendingNote | null {
     show: typeof show === "string" ? show : "",
     start,
     end,
-    kind: adKindOf(value["kind"]),
+    kind: KINDS.find((name) => name === value["kind"]) ?? "",
   }
 }
 
@@ -106,13 +106,32 @@ export function noteLine(
   })
 }
 
-/** The notes file with `added` lines after the old ones, keeping the newest 2,000. */
+/**
+ * The notes file with `added` lines after the old ones, keeping the newest 2,000. A line that is
+ * already in the old text is not added again (a write that was not followed by the removal).
+ */
 export function mergeNoteLines(old: string, added: readonly string[]): string {
-  const lines = [
-    ...old.split("\n").filter((line) => line.trim() !== ""),
-    ...added,
-  ].slice(-MAX_NOTE_LINES)
+  const kept = old.split("\n").filter((line) => line.trim() !== "")
+  const known = new Set(kept)
+  const lines = [...kept, ...added.filter((line) => !known.has(line))].slice(
+    -MAX_NOTE_LINES,
+  )
   return lines.length === 0 ? "" : `${lines.join("\n")}\n`
+}
+
+/**
+ * The time of the newest note, in milliseconds: what the native side is told when the written
+ * notes are removed, so a note added since the read stays. `fallback` is for lines that did not
+ * parse (the time the notes were read).
+ */
+export function newestNoteAt(
+  notes: readonly PendingNote[],
+  fallback: number,
+): number {
+  return notes.reduce(
+    (newest, note) => Math.max(newest, note.at),
+    notes.length === 0 ? fallback : 0,
+  )
 }
 
 /** A short mark of a text (its length and a checksum), to tell whether it changed since a write. */

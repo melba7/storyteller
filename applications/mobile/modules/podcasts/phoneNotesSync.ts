@@ -20,6 +20,7 @@ import {
   type PendingNote,
   diaryStamp,
   mergeNoteLines,
+  newestNoteAt,
   noteLine,
   oldNotesText,
   parsePendingNotes,
@@ -79,6 +80,7 @@ async function lines(notes: readonly PendingNote[]): Promise<string[]> {
 /** Adds the pending notes to the notes file; they are removed only once it is written. */
 async function writeNotes(): Promise<void> {
   if (!Podcasts || !LofiScore) return
+  const readAt = Date.now()
   const pending = await Podcasts.readPendingAdNotes()
   const { notes, count } = parsePendingNotes(pending)
   if (count === 0) return
@@ -88,7 +90,8 @@ async function writeNotes(): Promise<void> {
   if (old === null) return
   const text = mergeNoteLines(old, await lines(notes))
   const result = await LofiScore.writeLinkedFolderFile(NOTES_FILE, text)
-  if (result.status === "written") await Podcasts.removePendingAdNotes(count)
+  if (result.status === "written")
+    await Podcasts.removePendingAdNotes(count, newestNoteAt(notes, readAt))
 }
 
 /** Writes the skip log and the diary when their text is not what was last written. */

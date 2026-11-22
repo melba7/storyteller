@@ -6,6 +6,7 @@ import {
   diaryStamp,
   oldNotesText,
   mergeNoteLines,
+  newestNoteAt,
   noteLine,
   parsePendingNotes,
 } from "./phoneNotes"
@@ -52,12 +53,16 @@ describe("parsePendingNotes", () => {
     expect(parsePendingNotes(`\n${pending()}\n\n`).count).toBe(1)
   })
 
-  it("takes a kind it does not know for an ad, and a missing show for none", () => {
+  it("keeps a missing or unknown kind empty, and a missing show for none", () => {
     const [note] = parsePendingNotes(
       pending({ kind: "weird", show: undefined }),
     ).notes
-    expect(note?.kind).toBe("ad")
+    expect(note?.kind).toBe("")
     expect(note?.show).toBe("")
+    expect(parsePendingNotes(pending({ kind: null })).notes[0]?.kind).toBe("")
+    expect(parsePendingNotes(pending({ kind: "promo" })).notes[0]?.kind).toBe(
+      "promo",
+    )
   })
 })
 
@@ -114,8 +119,25 @@ describe("mergeNoteLines", () => {
     expect(lines.at(-1)).toBe("new2")
   })
 
+  it("skips added lines that are already in the old text", () => {
+    expect(mergeNoteLines('{"a":1}\n{"a":2}\n', ['{"a":2}', '{"a":3}'])).toBe(
+      '{"a":1}\n{"a":2}\n{"a":3}\n',
+    )
+    expect(mergeNoteLines('{"a":1}\n', ['{"a":1}'])).toBe('{"a":1}\n')
+  })
+
   it("ignores blank lines in the old file", () => {
     expect(mergeNoteLines("\n\nx\n\n", ["y"])).toBe("x\ny\n")
+  })
+})
+
+describe("newestNoteAt", () => {
+  it("is the latest time of the notes, or the fallback when none was read", () => {
+    const notes = parsePendingNotes(
+      [pending({ at: 5 }), pending({ at: 9 }), pending({ at: 7 })].join("\n"),
+    ).notes
+    expect(newestNoteAt(notes, 100)).toBe(9)
+    expect(newestNoteAt([], 100)).toBe(100)
   })
 })
 
