@@ -69,7 +69,7 @@ public enum AdEdgeReport {
   public static func lines(for trace: AdTrace, number: Int, transcript: Transcript) -> [String] {
     let ad = trace.ad
     let lines = transcript.lines
-    let kind = ad.kind == .ad ? "ad" : "own plug"
+    let kind = ad.kind.label
     let who = ad.advertiser.isEmpty ? "" : ", \(ad.advertiser)"
     var text = [
       "Ad \(number): \(clock(ad.start)) to \(clock(ad.end)) (\(Int(ad.duration.rounded())) s), "

@@ -3,15 +3,25 @@ import Foundation
 
 /// What a stretch of speech is.
 public enum AdKind: String, Codable, Sendable, Equatable {
-  /// A sponsor read, a produced ad, or a promo for another show.
+  /// A sponsor read or a produced ad.
   case ad
-  /// The hosts promoting their own things (Patreon, merch, their other shows).
+  /// The hosts asking for support (Patreon, merch, a review).
   case ownPlug
   /// The show, its network or its publisher selling something of its own that is not this
   /// episode: another show or its trailer, a live event, tickets, a subscription, an app.
   case promo
   /// The standing opening and the closing credits.
   case credits
+
+  /// The kind in plain words, for reports and logs.
+  public var label: String {
+    switch self {
+    case .ad: return "ad"
+    case .ownPlug: return "own plug"
+    case .promo: return "promo"
+    case .credits: return "credits"
+    }
+  }
 }
 
 /// How sure the detector is. Sure and unsure ads are skipped (the listener can undo a skip) and

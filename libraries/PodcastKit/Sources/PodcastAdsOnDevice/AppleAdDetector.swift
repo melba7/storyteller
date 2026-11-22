@@ -56,7 +56,7 @@ public enum AppleAds {
   public struct AppleAdDetector: PrewarmableAdDetector {
     public let name = "apple-on-device"
     /// Bumped when the instructions or what this file does with answers changes.
-    public let version = "1"
+    public let version = "2"
     /// The window is 4,096 tokens for the instructions, the lines and the answer together;
     /// about 2,500 are kept for the lines (about ten minutes of speech).
     public let tokenBudget = 2500
@@ -135,27 +135,38 @@ public enum AppleAds {
 
     static let instructions = """
       You find advertising in a podcast episode's transcript. The transcript is given as numbered \
-      lines. Answer with the runs of lines that are an ad or the hosts' own plug, and nothing else.
+      lines. Answer with the runs of lines that are an ad, a promo, the hosts' own plug or \
+      credits, and nothing else.
 
-      An AD is a sponsor read by the hosts, a produced commercial, a spot the hosting platform or \
-      network inserted ("Hosted on ...", "Acast powers ..."), or a promo for a different show. It \
-      has promotional words you can point to: a sponsor's name, a web address, a promo code, a \
-      product pitch or a call to action. Include the lead-in ("let's take a break", "this episode \
-      is brought to you by") and keep going to the last web address, because sponsors repeat it. \
-      The ad ends when the show comes back, not when the pitch ends.
+      An AD is a sponsor read by the hosts, a produced commercial, or a spot the hosting platform \
+      inserted ("Hosted on ...", "Acast powers ..."). It has promotional words you can point to: \
+      a sponsor's name, a web address, a promo code, a product pitch or a call to action. Include \
+      the lead-in ("let's take a break", "this episode is brought to you by") and keep going to \
+      the last web address, because sponsors repeat it. The ad ends when the show comes back, not \
+      when the pitch ends.
 
-      An OWN PLUG is the hosts promoting their own things: Patreon, merch, a newsletter, their \
-      other shows, asking listeners to subscribe or leave a review.
+      A PROMO is the show, its network or its publisher selling something of its own that is not \
+      this episode: another podcast or its trailer, a live show or tour, tickets, a book, an app, \
+      a paid subscription or membership, a conference.
 
-      NOT an ad: a guest talking about their own work in an interview, brand names mentioned in \
-      passing in real discussion, topic changes, jokes about sponsors without a pitch.
+      An OWN PLUG is the hosts asking for support: Patreon, merch, a newsletter, asking listeners \
+      to subscribe, follow, rate or leave a review.
+
+      CREDITS are the closing credits: who produced, edited and mixed the episode, who wrote the \
+      music.
+
+      NOT any of these: a guest talking about their own work in an interview, brand names \
+      mentioned in passing in real discussion, a preview of what comes later in this episode, \
+      topic changes, jokes about sponsors without a pitch.
 
       Say how sure you are. SURE: you can point to specific promotional words. UNSURE: it looks \
-      like an ad but the words are thin. GUESS: little more than a feeling. When in doubt, \
-      prefer saying nothing, because a wrong ad costs the listener part of the show.
+      like an ad or a promo but the words are thin. GUESS: little more than a feeling. A promo for \
+      a live show, tickets or a subscription is at least UNSURE, also when a host reads it in \
+      their own voice. For anything else in doubt, prefer saying nothing, because a wrong ad \
+      costs the listener part of the show.
 
       The lines may start or end inside an ad: give the lines you can see. Use only the numbers \
-      in brackets. Give no segment when there is no ad.
+      in brackets. Give no segment when there is none.
       """
   }
 #endif
