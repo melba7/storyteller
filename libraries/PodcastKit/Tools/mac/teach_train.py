@@ -1,0 +1,399 @@
+#!/usr/bin/env python3
+"""Trains the small model that lets the phone spot ads by itself, from the ads Claude marked in the
+teaching run, and writes it as ad-model.json.
+
+Standard library only. It reads <folder>/episodes.json, <folder>/transcripts/<id>.txt and
+<folder>/<labels>/<id>.json (written by teach_label.py), and writes <folder>/shelf.json and
+<folder>/ad-model.json. How a line becomes words, features and buckets is the contract with the
+phone and lives in teach_features.py.
+
+  teach_train.py [--folder F] [--labels labels] [--epochs 5] [--seed 1] [--min-episodes 20]
+
+- Every transcript line of an episode that has a transcript and a label is one example. Its class is
+  the sort of the segment covering it (confidence high or medium); other lines are "none". A line
+  that only a low-confidence segment covers is left out, in training and in the check.
+- The shelf is a set of held-out episodes: for each show (by feed) with at least 3 usable episodes,
+  its newest one. It is never trained on, stays on the shelf in later runs, and a show with one on
+  the shelf gets no second. The file shelf.json is rewritten only when it changes.
+- Training is softmax regression on the hashed features with AdaGrad (rate 0.5), L2 of 1e-6 on the
+  weights an example touches, and each example's loss weighted by min(5, none count / class count).
+  It is deterministic for a given --seed.
+- After training the shelf is scored and the precision and recall are printed and saved in the
+  model under trained.heldOut: "anyAd" (not "none", predicted when the chance of "none" is below
+  0.5) and "classes" (the four ad sorts, predicted as the most likely class). A ratio with nothing
+  to divide by is null.
+- The model keeps at most 40,000 buckets (those with the biggest weights) and stays under 4.5 MB.
+- With fewer than --min-episodes training episodes nothing is trained or written.
+
+Exit code: 0 it worked (also with too little data), 2 a set-up problem.
+
+Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import argparse
+import json
+import math
+import os
+import random
+import sys
+import tempfile
+import time
+from array import array
+
+import teach_collect as collect
+import teach_label as teach
+import teach_segments as seg
+from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities, softmax_of
+
+MIN_EPISODES = 20
+MAX_BUCKETS = 40000
+MAX_BYTES = 4500000
+THRESHOLDS = {"start": 0.6, "stay": 0.4, "sure": 0.85}
+RATE = 0.5
+EPSILON = 1e-8
+L2 = 1e-6
+SHELF_MINIMUM = 3
+SHELF_FILE = "shelf.json"
+MODEL_FILE = "ad-model.json"
+CLASS_COUNT = len(CLASSES)
+
+
+# MARK: Examples
+
+def whole(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
+def line_classes(segments, count):
+    """For each of `count` lines the class index of the segment covering it, 0 for none, or None
+    when only a low-confidence segment covers it. Segments are dicts with first, last (1-based),
+    sort and confidence. A segment with an unknown sort is ignored; the first strong one wins."""
+    classes = [0] * count
+    strong = [False] * count
+    low = [False] * count
+    for one in segments:
+        if one["sort"] not in CLASSES[1:]:
+            continue
+        sure = one["confidence"] in ("high", "medium")
+        for n in range(max(one["first"], 1), min(one["last"], count) + 1):
+            if sure and not strong[n - 1]:
+                classes[n - 1] = CLASSES.index(one["sort"])
+                strong[n - 1] = True
+            elif not sure:
+                low[n - 1] = True
+    return [None if low[i] and not strong[i] else classes[i] for i in range(count)]
+
+
+def valid_label(one):
+    """True when a decoded label has the shape this tool needs."""
+    if not isinstance(one, dict) or not isinstance(one.get("segments"), list):
+        return False
+    length = one.get("length")
+    if isinstance(length, bool) or not isinstance(length, (int, float)):
+        return False
+    return all(isinstance(s, dict) and whole(s.get("first")) and whole(s.get("last"))
+               and isinstance(s.get("sort"), str) and isinstance(s.get("confidence"), str)
+               for s in one["segments"])
+
+
+def load_episode(folder, labels, entry, say):
+    """One episode as {id, feed, published, classes, buckets} with a class (or None) and the
+    buckets of every transcript line, or None when it has no transcript or label. A file that
+    cannot be read is skipped with one line."""
+    identifier = entry["id"]
+    transcript = os.path.join(folder, "transcripts", identifier + ".txt")
+    label = os.path.join(folder, labels, identifier + ".json")
+    if not os.path.exists(transcript) or not os.path.exists(label):
+        return None
+    try:
+        with open(label, encoding="utf-8") as f:
+            one = json.load(f)
+        if not valid_label(one):
+            raise ValueError("it is not a valid label")
+        with open(transcript, encoding="utf-8") as f:
+            lines = seg.read_transcript(f.read())
+        if not lines:
+            raise ValueError("the transcript has no lines")
+    except (OSError, ValueError) as error:
+        say("Skipping %s: %s." % (identifier, error))
+        return None
+    return {"id": identifier, "feed": entry["feed"], "published": entry["published"],
+            "classes": line_classes(one["segments"], len(lines)),
+            "buckets": episode_buckets(lines, one["length"])}
+
+
+# MARK: Shelf
+
+def choose_shelf(entries, usable, shelf):
+    """The shelf ids after this run: the old ones, then the newest usable episode of each show
+    with at least 3 usable episodes that has none on the shelf yet."""
+    chosen = list(dict.fromkeys(shelf))
+    shelved_feeds = {e["feed"] for e in entries if e["id"] in chosen}
+    by_feed = {}
+    for e in entries:
+        if e["id"] in usable:
+            by_feed.setdefault(e["feed"], []).append(e)
+    for feed, group in by_feed.items():
+        if feed in shelved_feeds or len(group) < SHELF_MINIMUM:
+            continue
+        newest = group[0]
+        for e in group[1:]:
+            if (e["published"] if e["published"] is not None else -math.inf) > \
+                    (newest["published"] if newest["published"] is not None else -math.inf):
+                newest = e
+        chosen.append(newest["id"])
+    return chosen
+
+
+def read_shelf(folder):
+    """The ids in shelf.json, [] when there is none. Raises Problem when it is damaged."""
+    path = os.path.join(folder, SHELF_FILE)
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        data = None
+    if not isinstance(data, dict) or data.get("version") != 1 \
+            or not isinstance(data.get("episodes"), list) \
+            or not all(isinstance(x, str) for x in data["episodes"]):
+        raise teach.Problem("%s is damaged. Fix or remove it, and run again." % path)
+    return data["episodes"]
+
+
+# MARK: Training
+
+def new_weights():
+    return array("d", [0.0]) * (BUCKETS * CLASS_COUNT)
+
+
+def class_weights(counts):
+    """How much each class's loss counts: min(5, none count / class count), 1 for none."""
+    return [1.0] + [min(5.0, counts[0] / counts[c]) if counts[c] and counts[0] else 5.0
+                    for c in range(1, CLASS_COUNT)]
+
+
+def train(examples, epochs, seed, say=print):
+    """Softmax regression with AdaGrad. examples is [(class index, buckets)]. Returns the flat
+    weights, five per bucket."""
+    counts = [0] * CLASS_COUNT
+    for cls, _ in examples:
+        counts[cls] += 1
+    cost = class_weights(counts)
+    w = new_weights()
+    g2 = new_weights()
+    rng = random.Random(seed)
+    order = list(range(len(examples)))
+    exp, log, sqrt = math.exp, math.log, math.sqrt
+    for number in range(1, epochs + 1):
+        started = time.monotonic()
+        rng.shuffle(order)
+        total = 0.0
+        for index in order:
+            cls, active = examples[index]
+            z0 = z1 = z2 = z3 = z4 = 0.0
+            for b in active:
+                k = b * 5
+                z0 += w[k]
+                z1 += w[k + 1]
+                z2 += w[k + 2]
+                z3 += w[k + 3]
+                z4 += w[k + 4]
+            top = max(z0, z1, z2, z3, z4)
+            e = [exp(z0 - top), exp(z1 - top), exp(z2 - top), exp(z3 - top), exp(z4 - top)]
+            norm = sum(e)
+            weight = cost[cls]
+            total += -weight * log(max(e[cls] / norm, 1e-12))
+            slope = [weight * v / norm for v in e]
+            slope[cls] -= weight
+            for b in active:
+                k = b * 5
+                for c in range(5):
+                    g = slope[c] + L2 * w[k + c]
+                    g2[k + c] += g * g
+                    w[k + c] -= RATE * g / (sqrt(g2[k + c]) + EPSILON)
+        say("Pass %d of %d: mean loss %.4f, %.1f seconds."
+            % (number, epochs, total / max(len(order), 1), time.monotonic() - started))
+    return w
+
+
+# MARK: Check
+
+def ratio(part, whole_count):
+    return round(part / whole_count, 4) if whole_count else None
+
+
+def scores(true_positive, predicted, actual):
+    return {"precision": ratio(true_positive, predicted), "recall": ratio(true_positive, actual)}
+
+
+def evaluate(weights, episodes):
+    """Scores every shelf line. weights maps a bucket to five numbers; episodes are as load_episode
+    returns them. Lines with a class of None are left out."""
+    lines = 0
+    hit = predicted = actual = 0
+    per = [[0, 0, 0] for _ in CLASSES]
+    for episode in episodes:
+        for cls, active in zip(episode["classes"], episode["buckets"]):
+            if cls is None:
+                continue
+            lines += 1
+            p = softmax_of(active, weights)
+            guess = p.index(max(p))
+            predicted += p[0] < 0.5
+            actual += cls != 0
+            hit += p[0] < 0.5 and cls != 0
+            per[guess][1] += 1
+            per[cls][2] += 1
+            per[cls][0] += guess == cls
+    return {"episodes": len(episodes), "lines": lines, "anyAd": scores(hit, predicted, actual),
+            "classes": {CLASSES[c]: scores(*per[c]) for c in range(1, CLASS_COUNT)}}
+
+
+# MARK: Model file
+
+def ranked_buckets(flat, limit):
+    """[(bucket, five rounded weights)] with the biggest weights first, at most `limit`, leaving
+    out buckets whose rounded weights are all zero."""
+    found = []
+    for b in range(BUCKETS):
+        k = b * 5
+        if flat[k] or flat[k + 1] or flat[k + 2] or flat[k + 3] or flat[k + 4]:
+            five = [round(flat[k + c], 4) + 0.0 for c in range(5)]
+            if any(five):
+                found.append((b, five))
+    found.sort(key=lambda item: (-max(abs(v) for v in item[1]), item[0]))
+    return found[:limit]
+
+
+def build_model(flat, trained, check, max_buckets=MAX_BUCKETS, max_bytes=MAX_BYTES):
+    """The text of ad-model.json. `check(weights)` returns the heldOut numbers for the weights that
+    are kept. When the text would pass max_bytes, fewer buckets are kept."""
+    ranked = ranked_buckets(flat, max_buckets)
+
+    def render(count):
+        kept = dict(sorted(ranked[:count]))
+        data = {"version": 1, "buckets": BUCKETS, "classes": CLASSES, "thresholds": THRESHOLDS,
+                "weights": {str(b): five for b, five in kept.items()},
+                "trained": dict(trained, heldOut=check(kept))}
+        return json.dumps(data, separators=(",", ":"))
+
+    text = render(len(ranked))
+    if len(text.encode("utf-8")) <= max_bytes:
+        return text
+    low, high = 0, len(ranked) - 1
+    while low < high:
+        middle = (low + high + 1) // 2
+        if len(render(middle).encode("utf-8")) <= max_bytes:
+            low = middle
+        else:
+            high = middle - 1
+    return render(low)
+
+
+def write_text(path, text):
+    """Writes the text through a temporary file in the same folder."""
+    handle, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".", suffix=".part")
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(temporary, path)
+    except BaseException:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+        raise
+
+
+# MARK: Run
+
+def positive(text):
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a whole number" % text)
+    if number < 1:
+        raise argparse.ArgumentTypeError("%r is not 1 or more" % text)
+    return number
+
+
+def whole_number(text):
+    try:
+        return int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a whole number" % text)
+
+
+def percent(value):
+    return "n/a" if value is None else "%.0f%%" % (value * 100)
+
+
+def check_lines(held):
+    lines = ["Check on %d held-out episodes (%d lines): any ad precision %s, recall %s."
+             % (held["episodes"], held["lines"], percent(held["anyAd"]["precision"]),
+                percent(held["anyAd"]["recall"]))]
+    for name, one in held["classes"].items():
+        lines.append("  %s: precision %s, recall %s."
+                     % (name, percent(one["precision"]), percent(one["recall"])))
+    return lines
+
+
+def main(argv, say=print, now=None):
+    parser = argparse.ArgumentParser(prog="teach_train.py")
+    parser.add_argument("--folder", default=teach.DEFAULT_FOLDER)
+    parser.add_argument("--labels", default="labels")
+    parser.add_argument("--epochs", type=positive, default=5)
+    parser.add_argument("--seed", type=whole_number, default=1)
+    parser.add_argument("--min-episodes", type=positive, default=MIN_EPISODES)
+    try:
+        options = parser.parse_args(argv)
+    except SystemExit as stop:
+        return stop.code if isinstance(stop.code, int) else 2
+    now = now or (lambda: int(time.time() * 1000))
+    folder = os.path.expanduser(options.folder)
+    try:
+        if not os.path.exists(os.path.join(folder, collect.MANIFEST)):
+            raise teach.Problem("There is no episodes.json in %s. Run the gather step first." % folder)
+        try:
+            entries = collect.load_manifest(folder)
+        except collect.ManifestError as error:
+            raise teach.Problem(str(error))
+        old_shelf = read_shelf(folder)
+        episodes = {}
+        for entry in entries:
+            found = load_episode(folder, options.labels, entry, say)
+            if found:
+                episodes[entry["id"]] = found
+        shelf = choose_shelf(entries, set(episodes), old_shelf)
+        if shelf != old_shelf:
+            teach.write_json(os.path.join(folder, SHELF_FILE), {"version": 1, "episodes": shelf})
+        on_shelf = set(shelf)
+        shelved = [e for i, e in episodes.items() if i in on_shelf]
+        learning = [e for i, e in episodes.items() if i not in on_shelf]
+        if len(learning) < options.min_episodes:
+            say("Only %d episodes are marked and not on the shelf; at least %d are needed to train, "
+                "so no model was written." % (len(learning), options.min_episodes))
+            return 0
+        examples = [(c, b) for e in learning for c, b in zip(e["classes"], e["buckets"])
+                    if c is not None]
+        say("Training on %d episodes (%d lines), with %d on the shelf."
+            % (len(learning), len(examples), len(shelved)))
+        flat = train(examples, options.epochs, options.seed, say)
+        trained = {"writtenAt": now(), "episodes": len(learning), "lines": len(examples),
+                   "shelf": len(shelved)}
+        text = build_model(flat, trained, lambda kept: evaluate(kept, shelved))
+        path = os.path.join(folder, MODEL_FILE)
+        write_text(path, text)
+    except teach.Problem as error:
+        say(str(error))
+        return 2
+    except OSError as error:
+        say("The teaching folder cannot be used: %s" % error)
+        return 2
+    model = json.loads(text)
+    for line in check_lines(model["trained"]["heldOut"]):
+        say(line)
+    say("Wrote %s with %d buckets." % (path, len(model["weights"])))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
