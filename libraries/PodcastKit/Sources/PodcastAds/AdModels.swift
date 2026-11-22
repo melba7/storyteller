@@ -7,6 +7,11 @@ public enum AdKind: String, Codable, Sendable, Equatable {
   case ad
   /// The hosts promoting their own things (Patreon, merch, their other shows).
   case ownPlug
+  /// The show, its network or its publisher selling something of its own that is not this
+  /// episode: another show or its trailer, a live event, tickets, a subscription, an app.
+  case promo
+  /// The standing opening and the closing credits.
+  case credits
 }
 
 /// How sure the detector is. Sure and unsure ads are skipped (the listener can undo a skip) and

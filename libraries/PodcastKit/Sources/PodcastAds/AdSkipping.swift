@@ -23,6 +23,8 @@ public struct AdSkipSettings: Equatable, Sendable {
     switch kind {
     case .ad: return skipAds
     case .ownPlug: return skipOwnPlugs
+    case .promo: return skipAds
+    case .credits: return false
     }
   }
 }
