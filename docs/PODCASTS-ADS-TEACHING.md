@@ -183,6 +183,9 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
   names.
 - `fetchFeed`'s answer carries `newFeedUrl` when the feed names a new address
   (http or https only). The app moves the show to it (`feedMove.ts`).
+- `download` takes the episode's show id as its last argument, so an episode
+  that is downloaded and checked before it is ever played still gets the ads the
+  phone knows for its show.
 
 Native module `LofiScore` (`modules/lofi-score`):
 

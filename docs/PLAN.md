@@ -11,8 +11,8 @@ iPhone Duo fit done (PR #51); I3 waits on Mo's Mac test | Ad skipping accuracy
 milestones built (PR #52, TestFlight 31.1) | Player, ads and smoothness (S1 to
 S15, from Mo's 31.1 report): all built and checked, waiting on the iOS build and
 the phone | The Mac teaches, the phone skips alone (T1 to T9, Mo's ask
-2026-11-22): T1 to T6 built and tested, T7 (the app wiring) and the checks in
-progress
+2026-11-22): all built, checked by Opus and fixed (PR #54); waiting on Mo's
+first teaching run, the merge and the phone
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1193,14 +1193,29 @@ design and the contracts are in `docs/PODCASTS-ADS-TEACHING.md`.
       episodes to gather first (`teach_feedback.py`), a weak model is not
       published, `teaching.json` lists what was published, one finish script,
       files to double-click, and a weekly launchd job.
-- [ ] **T7 The app**: the finder and the stream's first minutes run the local
+- [x] **T7 The app**: the finder and the stream's first minutes run the local
       layers first and keep their ads whatever Apple's model does; the wait
       before the audio follows the show's habits; four switches; a Skip ad
       button; notes and the diary go to the linked folder; the teaching files
       come from it; an "Ad skipping results" page.
-- [ ] **T8 Opus check of the round**, then fixes.
-- [ ] **T9 Opus bug check of the whole Podcasts section** (Mo's ask), then
-      fixes.
+  - Status: built and passing `check.sh`; compiled in Fork CI (PR #54); not yet
+    run on a phone.
+- [x] **T8 Opus check of the round**, then fixes. Opus read the Mac tools twice
+      and the new package code once: 13 serious problems (the promo rules cut
+      ordinary talk, credits were skipped as part of an ad, an Undo and a trim
+      were lost when an episode was checked again, a sound match cut the sound's
+      full length after one second, the scorecard scored episodes against their
+      own ads) and 25 smaller ones. All fixed with tests.
+- [x] **T9 Opus bug check of the whole Podcasts section** (Mo's ask), then
+      fixes. Five parts (player, finder, data, playback and ads, screens): 2
+      serious problems (known ads from the Mac never reached a downloaded
+      episode; new teaching never reached an episode already checked), about 20
+      medium and 25 small ones. Fixed in six passes, then Opus checked the fixes
+      themselves (no compile error, 3 medium and 5 small problems, all fixed).
+      Left as they are: skips on a stream of a variable-rate MP3 after the first
+      seek (cannot be confirmed without a phone), one lock for the three writers
+      of an episode's unfinished ads file, and a one-frame flicker after a drop
+      in a hand-filled playlist.
 - [ ] **Waits on Mo**: the first teaching run on the Mac ("Gather episodes for
       teaching", then the OK for Claude to mark them), the merge, and the phone
       steps after the TestFlight build.
@@ -1220,6 +1235,17 @@ design and the contracts are in `docs/PODCASTS-ADS-TEACHING.md`.
 - Podcasts: since the Books look, Appearance's Dark and Extra Dark are both
   black and differ only in their accent colour.
 
+- Podcasts ads: an ad the Mac taught (from the library or by its sound) that the
+  listener undoes is skipped again in the next episode, until the Mac's next
+  teaching run has read the phone's note. The phone could keep its own list of
+  stretches that are not ads. Lines that only the small model marked become
+  "sure" when they join a sure rule line. A download made before this round that
+  was never played or queued does not know its show, so the known ads do not
+  reach it. `PodcastPower` does not look at the phone's heat while every
+  download is checked again after a detector change. A feed that moves does not
+  move its pending "finished in Apple Podcasts" list for that one refresh.
+  `dbFeeds.ts`, `PodcastPlayer.swift` and `PodcastPlayer+Ads.swift` are over 300
+  lines.
 - Podcasts ads: the head scan stops at three minutes; decide from the diary
   whether it should go on. A missed-ad tap jumps 30 seconds; it could end where
   the small model thinks the stretch ends and teach the phone's memory at once.
