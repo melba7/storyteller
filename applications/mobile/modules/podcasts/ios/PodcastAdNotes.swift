@@ -58,11 +58,12 @@ final class PodcastAdNotes: @unchecked Sendable {
     }
   }
 
-  /// Drops the first `count` lines, the ones the app has saved. Notes made since stay.
-  func removePending(_ count: Int) async {
+  /// Drops the first `count` lines, the ones the app has saved, and only those written at
+  /// `upToAt` (milliseconds) or earlier. Notes made since stay.
+  func removePending(_ count: Int, upToAt: Double) async {
     await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
       queue.async {
-        let kept = PendingNotes.dropping(count, from: Self.read(Self.notesURL))
+        let kept = PendingNotes.dropping(count, upToAt: upToAt, from: Self.read(Self.notesURL))
         Self.write(kept, to: Self.notesURL, what: "the pending ad notes")
         continuation.resume()
       }

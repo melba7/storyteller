@@ -32,6 +32,9 @@ struct PlaybackLoadOptions: Record {
   /// The episode's notes and the show's web page, for the sponsors the ad rules look for.
   @Field var notes: String?
   @Field var showLink: String?
+  /// The listener chose the place to start from (Play from on a row, a bookmark, a search
+  /// result), so an ad that holds it is played and not skipped.
+  @Field var startChosen: Bool = false
 }
 
 /// An episode to put in Up Next.
@@ -47,6 +50,9 @@ struct UpNextItemOptions: Record {
   @Field var showId: String?
   @Field var chaptersUrl: String?
   @Field var language: String?
+  /// The episode's notes (4,000 characters at most) and the show's web page.
+  @Field var notes: String?
+  @Field var showLink: String?
 }
 
 public final class PodcastsModule: Module {
@@ -100,7 +106,7 @@ public final class PodcastsModule: Module {
         duration: options.duration, played: options.played, autoplay: options.autoplay,
         type: options.audioType, showId: options.showId, chaptersUrl: options.chaptersUrl,
         playThroughDownload: options.playThroughDownload, language: options.language,
-        notes: options.notes, showLink: options.showLink)
+        notes: options.notes, showLink: options.showLink, startChosen: options.startChosen)
       await MainActor.run { PodcastPlayer.shared.load(episode) }
     }
 
@@ -147,7 +153,7 @@ public final class PodcastsModule: Module {
         id: item.id, url: item.url, type: item.type, title: item.title,
         showTitle: item.showTitle, artworkUrl: item.artworkUrl, duration: item.duration,
         position: item.position, showId: item.showId, chaptersUrl: item.chaptersUrl,
-        language: item.language)
+        language: item.language, notes: item.notes, showLink: item.showLink)
       EpisodeShows.shared.remember(item.showId, for: item.id)
       await MainActor.run { PodcastPlayer.shared.addToUpNext(queued, at: place) }
     }
@@ -389,12 +395,13 @@ public final class PodcastsModule: Module {
       }
     }
     // What the player noticed about ads for the Mac, as JSON lines ("" when none); the app saves
-    // them to the linked folder and then removes the first `count` lines it saved.
+    // them to the linked folder and then removes the first `count` lines it saved, at most those
+    // written at `upToAt` (milliseconds) or earlier, so a note made since stays.
     AsyncFunction("readPendingAdNotes") { () async -> String in
       await PodcastAdNotes.shared.readPending()
     }
-    AsyncFunction("removePendingAdNotes") { (count: Int) async in
-      await PodcastAdNotes.shared.removePending(count)
+    AsyncFunction("removePendingAdNotes") { (count: Int, upToAt: Double) async in
+      await PodcastAdNotes.shared.removePending(count, upToAt: upToAt)
     }
     // The count of skips, undos, trims and misses for each show, as JSON text.
     AsyncFunction("getAdTally") { () async -> String in
