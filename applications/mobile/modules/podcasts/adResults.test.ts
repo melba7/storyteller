@@ -10,7 +10,7 @@ import {
 } from "./adResults"
 import { parseTeachingState } from "./teaching"
 
-const tally = (shows: Record<string, Record<string, number>>) =>
+const tally = (shows: Record<string, Record<string, unknown>>) =>
   JSON.stringify({ since: 1_700_000_000_000, shows })
 
 const SHOWS = [
@@ -26,7 +26,7 @@ describe("parseTally", () => {
         a: { skipped: 41, undone: 2, trimmed: 1, missed: 3, seconds: 5400 },
       }),
     )
-    expect(parsed.a).toEqual({
+    expect(parsed["a"]).toEqual({
       skipped: 41,
       undone: 2,
       trimmed: 1,
@@ -39,7 +39,7 @@ describe("parseTally", () => {
     const parsed = parseTally(
       tally({ a: { skipped: "3", undone: -1, missed: 1.5, seconds: 90 } }),
     )
-    expect(parsed.a).toEqual({
+    expect(parsed["a"]).toEqual({
       skipped: 0,
       undone: 0,
       trimmed: 0,

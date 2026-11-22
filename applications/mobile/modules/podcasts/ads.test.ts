@@ -465,7 +465,7 @@ describe("what a skip note says", () => {
 
   it("names the sort that was skipped", () => {
     const text = (kind?: string) =>
-      skipNoteText(skipNote({ ...event, kind }, 0))
+      skipNoteText(skipNote(kind === undefined ? event : { ...event, kind }, 0))
     expect(text("ad")).toBe("Skipped ad (1:05)")
     expect(text("promo")).toBe("Skipped promo (1:05)")
     expect(text("ownPlug")).toBe("Skipped the hosts' plug (1:05)")
