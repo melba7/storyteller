@@ -263,6 +263,21 @@ public struct AdSkipper: Sendable {
     return makeSkip(ad, duration: duration, now: now)
   }
 
+  /// The last skip that can still be undone and when it was made (the `now` it was made with).
+  public var lastSkip: (skip: AdSkip, at: Double)? { last }
+
+  /// A skip that was made by hand (the Skip ad button), so Undo takes it back like any other.
+  public mutating func noteSkip(_ skip: AdSkip, now: Double) { last = (skip, now) }
+
+  /// Where the player lands when it moves the playhead to `position` on its own and does not want
+  /// to land inside an ad that is skipped: the end of that ad and of the ads that follow it at
+  /// once, or `position` when no such ad holds it.
+  public func landing(for position: Double, duration: Double?) -> Double {
+    guard position.isFinite, let ad = ads.first(where: { $0.start <= position && position < $0.end })
+    else { return position }
+    return max(position, Self.target(for: chain(after: ad).last ?? ad, duration: duration))
+  }
+
   /// The listener tapped Undo: the ad that was just skipped, to be played from its start, or nil
   /// when nothing was skipped lately. The ad is not skipped again.
   public mutating func undo(now: Double) -> FoundAd? { undoSkip(now: now)?.ad }

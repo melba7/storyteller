@@ -80,4 +80,21 @@ final class AdTallyTests: XCTestCase {
     XCTAssertEqual(tally.shows["s"]?.skipped, 2)
     XCTAssertEqual(tally.shows["s"]?.seconds, 0)
   }
+
+  func testSecondsAreWhatTheSkipTookOutOfTheListening() {
+    XCTAssertEqual(AdTally.seconds(from: 100, to: 130), 30)
+    // Left from the middle of an ad: only the rest counts.
+    XCTAssertEqual(AdTally.seconds(from: 115, to: 130), 15)
+    XCTAssertEqual(AdTally.seconds(from: 130, to: 100), 0)
+    XCTAssertEqual(AdTally.seconds(from: .nan, to: 100), 0)
+  }
+
+  func testAnAdFoundAgainLongerIsNotCountedTwice() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 115))
+    XCTAssertFalse(noted.isNew(episode: "e", start: 100, end: 130), "the same ad, longer")
+    XCTAssertFalse(noted.isNew(episode: "e", start: 110, end: 140), "still the same stretch")
+    XCTAssertTrue(noted.isNew(episode: "e", start: 140, end: 150), "the next ad")
+    XCTAssertTrue(noted.isNew(episode: "f", start: 140, end: 150), "another episode")
+  }
 }

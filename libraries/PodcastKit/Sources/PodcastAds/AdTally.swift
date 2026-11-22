@@ -106,3 +106,36 @@ public struct AdTally: Codable, Equatable, Sendable {
     try Data(json.utf8).write(to: file, options: .atomic)
   }
 }
+
+extension AdTally {
+  /// The seconds a skip took out of the listening: from where the playhead left to where it
+  /// landed. An ad left from its middle counts only the rest of it.
+  public static func seconds(from place: Double, to target: Double) -> Double {
+    guard place.isFinite, target.isFinite else { return 0 }
+    return max(0, target - place)
+  }
+}
+
+/// The last skip that was noted in an episode, so an ad that is left in progress and then found
+/// again longer is not counted and noted a second time.
+public struct NotedSkip: Equatable, Sendable {
+  private var episode: String?
+  private var start = 0.0
+  private var end = 0.0
+
+  public init() {}
+
+  /// Whether a skip of `start` to `end` in `episode` is a new one to note and count. A skip that
+  /// overlaps the last noted one of the same episode is not (the stretch is widened to hold it).
+  public mutating func isNew(episode: String, start: Double, end: Double) -> Bool {
+    if self.episode == episode, start < self.end, self.start < end {
+      self.start = min(self.start, start)
+      self.end = max(self.end, end)
+      return false
+    }
+    self.episode = episode
+    self.start = start
+    self.end = end
+    return true
+  }
+}

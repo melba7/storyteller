@@ -71,4 +71,27 @@ final class PhoneNoteTests: XCTestCase {
     XCTAssertEqual(PendingNotes.dropping(1, from: ""), "")
     XCTAssertEqual(PendingNotes.dropping(1, from: "a\n\nb\n"), "b\n")
   }
+
+  private func line(at: Double) -> String {
+    PhoneNote(at: at, what: .missed, episode: "e", show: nil, start: 1, end: nil, kind: nil).line
+  }
+
+  private func text(_ times: [Double]) -> String {
+    times.map { line(at: $0) }.joined(separator: "\n") + "\n"
+  }
+
+  func testDroppingByTimeKeepsANoteWrittenAfterTheRead() {
+    let all = text([10, 20, 30])
+    // The app read the first two and saw 20 as the newest: the third came in since.
+    XCTAssertEqual(PendingNotes.dropping(3, upToAt: 20, from: all), text([30]))
+    XCTAssertEqual(PendingNotes.dropping(1, upToAt: 20, from: all), text([20, 30]))
+    XCTAssertEqual(PendingNotes.dropping(3, upToAt: 99, from: all), "")
+    XCTAssertEqual(PendingNotes.dropping(3, upToAt: 5, from: all), all)
+    XCTAssertEqual(PendingNotes.dropping(0, upToAt: 99, from: all), all)
+  }
+
+  func testDroppingByTimeSurvivesTheCapPushingOldLinesOut() {
+    // At the cap the oldest line went out when a new one came in: a count alone would eat the new one.
+    XCTAssertEqual(PendingNotes.dropping(3, upToAt: 30, from: text([20, 30, 40])), text([40]))
+  }
 }

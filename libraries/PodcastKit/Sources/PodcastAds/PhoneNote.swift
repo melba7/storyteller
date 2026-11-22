@@ -78,4 +78,22 @@ public enum PendingNotes {
     let lines = text.split(separator: "\n", omittingEmptySubsequences: true).dropFirst(max(0, count))
     return lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
   }
+
+  /// The text without its first `count` lines at most, and only those whose `at` is `upToAt`
+  /// (milliseconds) or earlier: the lines the app has saved. A note written since stays, also
+  /// when the cap pushed older lines out meanwhile. A line that cannot be read is dropped with
+  /// the ones before it. Blank lines go.
+  public static func dropping(_ count: Int, upToAt: Double, from text: String) -> String {
+    struct Stamp: Decodable { var at: Double }
+    var lines = text.split(separator: "\n", omittingEmptySubsequences: true)[...]
+    var left = max(0, count)
+    while left > 0, let first = lines.first {
+      if let stamp = try? JSONDecoder().decode(Stamp.self, from: Data(first.utf8)), stamp.at > upToAt {
+        break
+      }
+      lines = lines.dropFirst()
+      left -= 1
+    }
+    return lines.isEmpty ? "" : lines.joined(separator: "\n") + "\n"
+  }
 }
