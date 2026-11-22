@@ -19,7 +19,7 @@ describe("the Skip ad button", () => {
 })
 
 describe("missedAdNote", () => {
-  it("shows nothing when the phone knew the ad", () => {
+  it("shows nothing when the phone knew the ad (the skip event has its own note)", () => {
     expect(missedAdNote({ to: 500, known: true }, 1000)).toBeNull()
   })
 

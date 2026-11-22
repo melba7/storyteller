@@ -25,7 +25,9 @@ export type MissedAdNote = { text: string; shownAt: number }
 
 /**
  * The note for the answer to a tap on Skip ad (`skipAdNow`): nothing when the phone knew the
- * ad (it is skipped, and the usual note and Undo take it from there) or when nothing is loaded.
+ * ad or when nothing is loaded. For a known ad the player skips it like any other skip and
+ * sends `onAdSkipped`, so the usual "Skipped ad" note and its Undo come from that event, and no
+ * second note is made here.
  */
 export function missedAdNote(
   answer: { to: number; known: boolean } | null,

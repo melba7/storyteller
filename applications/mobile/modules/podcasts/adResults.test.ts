@@ -119,6 +119,22 @@ describe("resultsFor", () => {
     )
   })
 
+  it("names a previewed show and the added files for what they are", () => {
+    const results = resultsFor(
+      parseTally(
+        tally({
+          "preview:https://example.com/rss": { skipped: 3 },
+          "": { skipped: 2 },
+        }),
+      ),
+      SHOWS,
+    )
+    expect(results.rows.map((row) => row.text)).toEqual([
+      "A show you previewed: 3 skipped",
+      "Your files: 2 skipped",
+    ])
+  })
+
   it("says 1 and not 1s, and leaves out a show with nothing to say", () => {
     const results = resultsFor(
       parseTally(

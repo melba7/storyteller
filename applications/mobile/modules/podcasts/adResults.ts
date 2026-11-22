@@ -3,6 +3,7 @@
 // The "Ad skipping results" page: what the phone skipped (totals, then a row for each show) and
 // what the Mac taught it. These are the rules for the words; Swift counts (`getAdTally`) and
 // keeps what is installed (`getTeachingState`). Nothing here needs the native module.
+import { isPreviewId } from "./preview"
 import { formatDuration } from "./stats"
 import type { TeachingState } from "./teaching"
 
@@ -17,6 +18,15 @@ export type ShowTally = {
 }
 
 export const NO_LONGER_FOLLOWED = "A show you no longer follow"
+const PREVIEWED = "A show you previewed"
+const YOUR_FILES = "Your files"
+
+/** What a tally's id stands for when it is not a followed show. */
+function unfollowedName(id: string): string {
+  if (id === "") return YOUR_FILES
+  if (isPreviewId(id)) return PREVIEWED
+  return NO_LONGER_FOLLOWED
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -75,7 +85,8 @@ export type AdResults = {
 /**
  * The totals and the rows. A show with nothing skipped, taken back or missed is left out.
  * The shows with the most missed and taken back come first, then the most skipped, then by
- * title. A show that is not in `shows` any more is "A show you no longer follow".
+ * title. A show that is not in `shows` any more is "A show you no longer follow"; a previewed show and
+ * the added files have their own names.
  */
 export function resultsFor(
   tally: Readonly<Record<string, ShowTally>>,
@@ -84,7 +95,7 @@ export function resultsFor(
   const titles = new Map(shows.map((show) => [show.id, show.title]))
   const listed = Object.entries(tally)
     .filter(([, t]) => t.skipped + t.undone + t.missed > 0)
-    .map(([id, t]) => ({ id, t, title: titles.get(id) ?? NO_LONGER_FOLLOWED }))
+    .map(([id, t]) => ({ id, t, title: titles.get(id) ?? unfollowedName(id) }))
     .sort(
       (a, b) =>
         b.t.missed + b.t.undone - (a.t.missed + a.t.undone) ||
