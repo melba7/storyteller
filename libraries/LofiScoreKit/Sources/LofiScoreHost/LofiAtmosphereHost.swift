@@ -393,6 +393,20 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
         }
     }
 
+    /// Writes one small file into the linked folder (``LinkedFolderFile/write(_:data:in:fileManager:)``),
+    /// on the same queue as the reads. `notLinked` when no folder is linked.
+    public func writeLinkedFile(_ path: String, data: Data) async -> LinkedFolderFile.WriteOutcome {
+        let bookmark = await onQueue { [self] in settings.linkedFolderBookmark }
+        guard let bookmark else { return .notLinked }
+        let resolve = environment.resolveBookmark
+        return await withCheckedContinuation { continuation in
+            reads.async {
+                guard let folder = try? resolve(bookmark) else { return continuation.resume(returning: .folderGone) }
+                continuation.resume(returning: LinkedFolderFile.write(path, data: data, in: folder))
+            }
+        }
+    }
+
     /// Copies whatever is new in the linked sounds folder (``SoundsFolderImport/sync(_:into:fileManager:)``)
     /// and reloads what it touched: the sounds, or the open book's text when a score for it
     /// may have arrived. Nil when no folder is linked. Errors (the folder gone, iCloud not

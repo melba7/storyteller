@@ -59,4 +59,43 @@ final class LinkedFolderFileTests: XCTestCase {
         try big.write(to: folder.appendingPathComponent("Podcasts/big.json"))
         XCTAssertEqual(LinkedFolderFile.fetch("Podcasts/big.json", in: folder), .unreadable("The file is too large."))
     }
+
+    // MARK: Writing a small file
+
+    func testWriteMakesTheSubfolderAndReplacesTheFile() throws {
+        XCTAssertEqual(LinkedFolderFile.write("Podcasts/phone-notes.jsonl", data: Data("a\n".utf8), in: folder), .written)
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("Podcasts/phone-notes.jsonl")), Data("a\n".utf8))
+        XCTAssertEqual(LinkedFolderFile.write("New/Deeper/x.txt", data: Data("b".utf8), in: folder), .written)
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("New/Deeper/x.txt")), Data("b".utf8))
+        XCTAssertEqual(LinkedFolderFile.write("Podcasts/phone-notes.jsonl", data: Data("c\n".utf8), in: folder), .written)
+        XCTAssertEqual(try Data(contentsOf: folder.appendingPathComponent("Podcasts/phone-notes.jsonl")), Data("c\n".utf8))
+        // Nothing else is left beside it (the atomic write's temporary file is gone).
+        let names = try fileManager.contentsOfDirectory(atPath: folder.appendingPathComponent("Podcasts").path)
+        XCTAssertEqual(names, ["phone-notes.jsonl"])
+    }
+
+    func testWriteRefusesPathsOutOfTheFolder() {
+        let refused = LinkedFolderFile.WriteOutcome.unwritable("The file's path is not allowed.")
+        for path in ["../lofi-linked-out.txt", "Podcasts/../../lofi-linked-out.txt", "/tmp/lofi-linked-out.txt", "", "Podcasts//x"] {
+            XCTAssertEqual(LinkedFolderFile.write(path, data: Data("x".utf8), in: folder), refused, path)
+        }
+        XCTAssertFalse(fileManager.fileExists(atPath: folder.deletingLastPathComponent().appendingPathComponent("lofi-linked-out.txt").path))
+    }
+
+    func testWriteSaysWhenTheFolderIsGoneAndRefusesHugeData() {
+        XCTAssertEqual(LinkedFolderFile.write("Podcasts/x", data: Data("x".utf8), in: folder.appendingPathComponent("gone")), .folderGone)
+        XCTAssertFalse(fileManager.fileExists(atPath: folder.appendingPathComponent("gone").path))
+        XCTAssertEqual(
+            LinkedFolderFile.write("Podcasts/big", data: Data(count: LinkedFolderFile.sizeLimit + 1), in: folder),
+            .unwritable("The file is too large."))
+        XCTAssertEqual(LinkedFolderFile.write("Podcasts/exact", data: Data(count: LinkedFolderFile.sizeLimit), in: folder), .written)
+    }
+
+    func testWriteSaysWhyItCouldNotWrite() throws {
+        // A file where the subfolder should be.
+        try Data("x".utf8).write(to: folder.appendingPathComponent("Blocked"))
+        let outcome = LinkedFolderFile.write("Blocked/x.txt", data: Data("x".utf8), in: folder)
+        guard case .unwritable(let message) = outcome else { return XCTFail("\(outcome)") }
+        XCTAssertFalse(message.isEmpty)
+    }
 }
