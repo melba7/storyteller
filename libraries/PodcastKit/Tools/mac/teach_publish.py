@@ -27,7 +27,6 @@ import os
 import sys
 import tempfile
 
-import teach_label
 import teach_store
 from apple_podcasts_export import default_folders
 

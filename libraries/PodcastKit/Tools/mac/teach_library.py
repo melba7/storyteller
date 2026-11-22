@@ -31,8 +31,6 @@ import statistics
 import sys
 import time
 
-import teach_collect
-import teach_label
 import teach_store
 import teach_segments as seg
 
@@ -133,7 +131,7 @@ def read_candidates(folder, labels, say):
     """([candidate], how many labels were read) in the order of episodes.json, then segment
     order."""
     found, read = [], 0
-    for entry in teach_collect.load_manifest(folder):
+    for entry in teach_store.load_manifest(folder):
         more, ok = episode_candidates(entry, folder, labels, say)
         found += more
         read += 1 if ok else 0
@@ -173,7 +171,7 @@ def make_entry(members):
 
 
 def document(ads, written):
-    """The bytes of ad-library.json, exactly as teach_label.write_json writes them."""
+    """The bytes of ad-library.json, exactly as teach_store.write_json writes them."""
     value = {"version": 1, "writtenAt": written, "ads": ads}
     return json.dumps(value, indent=1, ensure_ascii=False).encode("utf-8")
 
@@ -212,7 +210,7 @@ def main(argv, say=print, now=time.time, max_bytes=MAX_BYTES):
     folder = os.path.expanduser(options.folder)
     try:
         candidates, labels = read_candidates(folder, options.labels, say)
-    except (teach_label.Problem, teach_collect.ManifestError) as error:
+    except (teach_store.Problem, teach_store.ManifestError) as error:
         say(str(error))
         return 2
     if labels == 0:
@@ -221,7 +219,7 @@ def main(argv, say=print, now=time.time, max_bytes=MAX_BYTES):
     groups = group(candidates)
     written = int(now() * 1000)
     ads = entries_of(groups, options.most, max_bytes, written)
-    teach_label.write_json(os.path.join(folder, "ad-library.json"),
+    teach_store.write_json(os.path.join(folder, "ad-library.json"),
                            {"version": 1, "writtenAt": written, "ads": ads})
     several = sum(1 for e in ads if e["scope"] == "all")
     say("Looked at %d stretches in %d labelled episodes. Kept %d different ads, %d of them in "
