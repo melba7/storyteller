@@ -315,6 +315,18 @@ in `FORK.md`.
 | 2026-11-18 | `isPlayed` (JS and Swift) is false for a place over 1 s past the length: that length is the feed's, not the audio's                        | Switching away before load marked the episode played       |
 | 2026-11-18 | Chapter moves, the chapter sleep and the plain-address fallback read `place`; Play restarts a finished episode only if the place agrees    | A seek on its way must count as where the listener is      |
 | 2026-11-18 | `publish` notes a failed item itself, so a failed clock's 0 is never sent as the place                                                     | The failure notice and the tick run in no fixed order      |
+| 2026-11-22 | The phone skips ads alone: nothing needs the Mac or iCloud when Play is pressed; the Mac only teaches (Mo's rule)                          | Needing the Mac at listen time has many failure points     |
+| 2026-11-22 | `LocalAds` (word rules, small model) and sounds run before Apple's model and add their ads to the files (`LocalAdsFile`); no wrapper       | The finder did nothing when Apple's model was off or busy  |
+| 2026-11-22 | A final ads file from the local finders alone has an empty `detectorVersion`: it stands until Apple's model can be asked, then is redone   | Skips start at once, the better answer comes later         |
+| 2026-11-22 | Four sorts (ad, own plug, promo, credits), each with a switch; credits off by default; Apple detector version 2                            | "Come to a show" was neither an ad nor an own plug         |
+| 2026-11-22 | `AdJoin.join` never joins two kinds: where they overlap the higher keeps its stretch (ad, promo, own plug, credits)                        | Longer credits took over an ad; credits are not skipped    |
+| 2026-11-22 | The small model: hashed words, five classes, trained on the Mac from Claude's marks, shipped as JSON weights (no CoreML)                   | Fast, testable on both sides, checkable before use         |
+| 2026-11-22 | Claude marks teaching episodes by line number via `claude -p` after a typed "yes"; a model under 0.85 held-out precision stays home        | Cost is Mo's call; a model that cuts the show is worse     |
+| 2026-11-22 | Start habits: an ad-opener gets a first look over its usual opening, a 5 s wait and unsure answers counted; a clean starter no wait        | The first seconds play before anything is known            |
+| 2026-11-22 | Sound prints: the low 32 bits of every 8th MP3 frame's hash; four anchors in a row confirm; no decoding                                    | A repeated inserted ad is known with exact edges at once   |
+| 2026-11-22 | The Mac names shows by feed address; the app sends a feed key to show id table and the phone converts on reading                           | The Mac never sees the phone's show ids                    |
+| 2026-11-22 | The phone writes `phone-notes.jsonl` and `phone-diary.jsonl` to the linked folder; the Mac only gathers episodes with misses first         | Inserted ads differ per download, so times do not carry    |
+| 2026-11-22 | The scorecard scores whole marked episodes in seconds, on shelf episodes the model never saw, one line per layer                           | A number to trust beats a replay of the phone's timing     |
 
 ## Known problems
 
