@@ -242,14 +242,14 @@ describe("parseAdsFile", () => {
 
 describe("the promo switch of an older build", () => {
   it("takes the stored Skip ads value when the promos key is missing", () => {
-    expect(
-      readAdSkipSettings({ skipAds: false, skipOwnPlugs: false }),
-    ).toEqual({
-      skipAds: false,
-      skipOwnPlugs: false,
-      skipPromos: false,
-      skipCredits: false,
-    })
+    expect(readAdSkipSettings({ skipAds: false, skipOwnPlugs: false })).toEqual(
+      {
+        skipAds: false,
+        skipOwnPlugs: false,
+        skipPromos: false,
+        skipCredits: false,
+      },
+    )
     expect(readAdSkipSettings({ skipAds: true }).skipPromos).toBe(true)
   })
 
@@ -276,7 +276,11 @@ describe("effectiveAdSettings", () => {
         skipAds: false,
         skipPlugs: null,
       }),
-    ).toEqual({ ...DEFAULT_AD_SKIP_SETTINGS, skipAds: false, skipPromos: false })
+    ).toEqual({
+      ...DEFAULT_AD_SKIP_SETTINGS,
+      skipAds: false,
+      skipPromos: false,
+    })
   })
 
   it("keeps the main switches for a show with no choices", () => {
@@ -563,14 +567,12 @@ describe("the four switches", () => {
 
   it("fills what the phone did not say from the defaults", () => {
     expect(readAdSkipSettings(null)).toEqual(DEFAULT_AD_SKIP_SETTINGS)
-    expect(readAdSkipSettings({ skipAds: true, skipOwnPlugs: false })).toEqual(
-      {
-        skipAds: true,
-        skipOwnPlugs: false,
-        skipPromos: true,
-        skipCredits: false,
-      },
-    )
+    expect(readAdSkipSettings({ skipAds: true, skipOwnPlugs: false })).toEqual({
+      skipAds: true,
+      skipOwnPlugs: false,
+      skipPromos: true,
+      skipCredits: false,
+    })
     expect(
       readAdSkipSettings({
         skipAds: true,
