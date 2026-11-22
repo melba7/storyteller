@@ -21,7 +21,8 @@ How the numbers are worked out:
   and end of the openings in seconds, null when there are none), breaks (the median number of ad
   blocks in an episode) and adSeconds (the median total length of the ads in an episode).
 
-Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem.
+Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem (no episodes.json,
+or a damaged one).
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -30,7 +31,7 @@ import os
 import sys
 import time
 
-import teach_label as teach
+from teach_store import FOLDER, Problem, require_manifest, write_json
 
 AD_SORTS = ("sponsor", "network_promo")
 AD_CONFIDENCE = ("high", "medium")
@@ -136,13 +137,13 @@ def table(shows):
 
 def main(argv, say=print):
     parser = argparse.ArgumentParser(prog="teach_habits.py")
-    parser.add_argument("--folder", default=teach.DEFAULT_FOLDER)
+    parser.add_argument("--folder", default=FOLDER)
     parser.add_argument("--labels", default="labels")
     options = parser.parse_args(argv)
     folder = os.path.expanduser(options.folder)
     try:
-        episodes = teach.read_episodes(folder)
-    except teach.Problem as error:
+        episodes = require_manifest(folder)
+    except Problem as error:
         say(str(error))
         return 2
     titles = {}
@@ -154,8 +155,8 @@ def main(argv, say=print):
         say("No labels yet. Run \"Mark ads in the teaching episodes\" first.")
         return 0
     shows = summarize(labels, titles)
-    teach.write_json(os.path.join(folder, "habits.json"),
-                     {"version": 1, "writtenAt": int(time.time() * 1000), "shows": shows})
+    write_json(os.path.join(folder, "habits.json"),
+               {"version": 1, "writtenAt": int(time.time() * 1000), "shows": shows})
     for row in table(shows):
         say(row)
     say("Saved habits.json for %d shows from %d episodes." % (len(shows), len(labels)))

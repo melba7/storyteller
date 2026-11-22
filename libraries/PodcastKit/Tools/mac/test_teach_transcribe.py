@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-import teach_collect as tc
+import teach_store as store
 import teach_transcribe as tt
 
 
@@ -57,7 +57,7 @@ class Base(unittest.TestCase):
             if item["file"]:
                 with open(os.path.join(self.folder, item["file"]), "wb") as handle:
                     handle.write(b"x")
-        tc.save_manifest(self.folder, entries)
+        store.save_manifest(self.folder, entries)
 
     def transcript(self, item):
         return os.path.join(self.folder, "transcripts", item["id"] + ".txt")
@@ -212,6 +212,13 @@ class MainTests(Base):
         self.add([entry(1)])
         os.chmod(self.tool, 0o644)
         self.assertEqual(self.main(), 2)
+
+    def test_a_second_run_in_the_same_folder_is_refused_with_exit_2(self):
+        self.add([entry(1)])
+        runner = FakeRunner()
+        with store.run_lock(self.folder):
+            self.assertEqual(self.main(runner=runner), 2)
+        self.assertEqual((runner.calls, self.lines), ([], [store.BUSY]))
 
     def test_stopping_after_failures_is_3(self):
         entries = [entry(n) for n in range(1, 5)]

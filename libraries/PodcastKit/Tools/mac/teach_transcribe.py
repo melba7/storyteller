@@ -6,14 +6,18 @@ Standard library only. It reads episodes.json in the teaching folder (default ~/
 Lofi/PodcastTeaching) and, for each episode that has audio and no transcript yet, runs the Swift
 tool `podcast-transcribe` (Apple's speech recognition, on this Mac, nothing is sent anywhere) and
 saves its lines as transcripts/<id>.txt. A transcript is only saved when the tool finished, so a
-stopped run carries on where it was. Three failures in a row stop the run, because then
-something is wrong with the tool, not with an episode.
+stopped run carries on where it was. Three failures in a row of episodes that had never failed
+stop the run, because then something is wrong with the tool, not with an episode.
 
-  teach_transcribe.py --tool PATH [--folder F] [--locale en-US] [--limit N]
+Failures are remembered in failures.json: episodes that never failed come first, an episode that
+failed three times is left out (--retry-failed asks for those again) and the closing lines say how
+many. Only one run works in the folder at a time.
+
+  teach_transcribe.py --tool PATH [--folder F] [--locale en-US] [--limit N] [--retry-failed]
 
 Exit codes: 0 everything pending was done (or nothing was), 2 something is not set up (no
-episodes.json, a damaged one, or the tool is missing or not a program), 3 it stopped early
-because of failures.
+episodes.json, a damaged one, the tool is missing or not a program, or another run is working in
+the folder), 3 it stopped early because of failures.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -22,11 +26,11 @@ import subprocess
 import sys
 import time
 
-import teach_collect as collect
+from teach_failures import IN_A_ROW, Failures, given_up_line
+from teach_store import FOLDER, MANIFEST, Busy, ManifestError, load_manifest, run_lock
 
 LOCALE = "en-US"
 TIMEOUT = 3 * 60 * 60
-STOP_AFTER = 3
 TAIL_LINES = 5
 
 
@@ -74,16 +78,19 @@ def how_long(seconds):
     return "%d h %d min" % (minutes // 60, minutes % 60) if minutes % 60 else "%d h" % (minutes // 60)
 
 
-def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic, say=print):
-    """Transcribes the pending episodes, at most `limit` of them (None for all). Answers
-    {"done", "failed", "left", "stopped"}: `left` is how many are still pending and `stopped` is
-    True when three failures in a row ended the run."""
-    episodes = collect.load_manifest(folder)
-    todo = pending(folder, episodes)
+def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic, say=print,
+        retry_failed=False):
+    """Transcribes the pending episodes, never-failed ones first, at most `limit` of them (None for
+    all). Answers {"done", "failed", "left", "given_up", "stopped"}: `left` is how many of this
+    run's episodes are still pending, `given_up` how many were left out after three failures and
+    `stopped` is True when three failures in a row ended the run."""
+    episodes = load_manifest(folder)
+    failures = Failures(folder, "transcribe")
+    todo, given_up = failures.split(pending(folder, episodes), retry_failed, lambda entry: entry["id"])
     if limit is not None:
         todo = todo[:limit]
     os.makedirs(os.path.join(folder, "transcripts"), exist_ok=True)
-    result = {"done": 0, "failed": 0, "left": len(todo), "stopped": False}
+    result = {"done": 0, "failed": 0, "left": len(todo), "given_up": len(given_up), "stopped": False}
     total_bytes = sum(entry["bytes"] for entry in todo)
     started = clock()
     handled = 0
@@ -96,11 +103,14 @@ def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic
                            os.path.join(folder, "transcripts", entry["id"] + ".txt"), locale, runner=runner)
         except RuntimeError as error:
             result["failed"] += 1
-            in_a_row += 1
+            if failures.count(entry["id"]) == 0:
+                in_a_row += 1
+            failures.failed(entry["id"])
             say("  failed: %s" % error)
         else:
             result["done"] += 1
             in_a_row = 0
+            failures.succeeded(entry["id"])
         handled += entry["bytes"]
         result["left"] = len(todo) - number
         now = clock()
@@ -109,9 +119,9 @@ def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic
             rate = handled / (now - started)
             line += "; about %s left" % how_long((total_bytes - handled) / rate)
         say(line)
-        if in_a_row >= STOP_AFTER:
+        if in_a_row >= IN_A_ROW:
             result["stopped"] = True
-            say("Stopping: %d episodes in a row failed, so something is wrong with the tool." % STOP_AFTER)
+            say("Stopping: %d episodes in a row failed, so something is wrong with the tool." % IN_A_ROW)
             break
     return result
 
@@ -119,27 +129,35 @@ def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic
 def main(argv=None, runner=subprocess.run, clock=time.monotonic, say=print):
     parser = argparse.ArgumentParser(description="Transcribes the gathered episodes.")
     parser.add_argument("--tool", required=True)
-    parser.add_argument("--folder", default=collect.FOLDER)
+    parser.add_argument("--folder", default=FOLDER)
     parser.add_argument("--locale", default=LOCALE)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--retry-failed", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     tool = os.path.expanduser(args.tool)
     if not os.path.isfile(tool) or not os.access(tool, os.X_OK):
         say("The transcribing program is missing or cannot be run: %s" % tool)
         return 2
-    if not os.path.exists(os.path.join(folder, collect.MANIFEST)):
-        say("There is no %s in %s yet. Gather the episodes first (teach_collect.py)." % (collect.MANIFEST, folder))
+    if not os.path.exists(os.path.join(folder, MANIFEST)):
+        say("There is no %s in %s yet. Gather the episodes first (teach_collect.py)." % (MANIFEST, folder))
         return 2
     try:
-        result = run(folder, tool, args.locale, args.limit, runner=runner, clock=clock, say=say)
-    except collect.ManifestError as error:
+        with run_lock(folder):
+            result = run(folder, tool, args.locale, args.limit, runner=runner, clock=clock, say=say,
+                         retry_failed=args.retry_failed)
+    except Busy as error:
+        say(str(error))
+        return 2
+    except ManifestError as error:
         say(str(error))
         return 2
     except OSError as error:
         say("Could not write to %s: %s" % (folder, error))
         return 2
     say("\n%d transcribed, %d failed, %d still to do." % (result["done"], result["failed"], result["left"]))
+    if result["given_up"]:
+        say(given_up_line(result["given_up"]))
     return 3 if result["stopped"] else 0
 
 

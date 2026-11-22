@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 import teach_habits as habits
+from teach_testing import entry
 
 
 def span(start, end, sort="sponsor", confidence="high"):
@@ -99,8 +100,7 @@ class MainTests(unittest.TestCase):
 
     def episodes(self, content=None):
         data = content if content is not None else {
-            "version": 1, "episodes": [{"id": "aaaaaaaaaaaa", "feed": "feedA", "show": "Show A",
-                                        "title": "t"}]}
+            "version": 1, "episodes": [entry(0xaaaaaaaaaaaa, feed="feedA", show="Show A", title="t")]}
         with open(os.path.join(self.dir, "episodes.json"), "w") as f:
             f.write(data if isinstance(data, str) else json.dumps(data))
 
@@ -154,7 +154,13 @@ class MainTests(unittest.TestCase):
 
     def test_set_up_problems_are_exit_two(self):
         self.assertEqual(self.main(), 2)
+        self.assertIn("Run the gather step first", self.said[-1])
         self.episodes("not json")
+        self.assertEqual(self.main(), 2)
+
+    def test_an_episode_list_with_short_entries_is_refused(self):
+        self.episodes({"version": 1, "episodes": [{"id": "aaaaaaaaaaaa", "feed": "feedA",
+                                                   "show": "Show A", "title": "t"}]})
         self.assertEqual(self.main(), 2)
 
 
