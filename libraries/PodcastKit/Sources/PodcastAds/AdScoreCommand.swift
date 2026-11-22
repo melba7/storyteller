@@ -81,7 +81,12 @@ public enum AdScoreCommand {
     let title = "Scorecard for \(folder.lastPathComponent): \(which)"
 
     let model = options.noModel ? nil : AdWordModel.load(from: folder.appendingPathComponent("ad-model.json"))
-    let library = options.noLibrary ? KnownAds() : TeachingFolder.library(in: folder, now: now)
+    let scoringShelf = !options.all && !shelf.isEmpty
+    let libraryRead =
+      options.noLibrary
+      ? (known: KnownAds(), file: "")
+      : TeachingFolder.library(in: folder, now: now, scoringShelf: scoringShelf)
+    let library = libraryRead.known
     let habits = TeachingFolder.habits(in: folder)
 
     var detectors: [(name: String, local: LocalAds, library: KnownAds?)] = [
@@ -100,13 +105,18 @@ public enum AdScoreCommand {
         })
     }
     let layers = zip(detectors, cards).map {
-      (name: $0.0.name, caughtShare: share($0.1.total.caught, $0.1.total.ads))
+      LayerResult(
+        name: $0.0.name, caughtShare: share($0.1.total.caught, $0.1.total.ads),
+        cutSeconds: $0.1.total.cutSeconds)
     }
     guard let card = cards.last else { return 0 }
 
     let historyURL = folder.appendingPathComponent(ScorecardHistory.fileName)
     var history = ScorecardHistory.load(from: historyURL)
-    out(AdScoreReport.text(card, title: title, layers: layers, previous: history.runs.last))
+    let reportNotes = libraryRead.file.isEmpty ? [] : ["Library: \(libraryRead.file)"]
+    out(
+      AdScoreReport.text(
+        card, title: title, results: layers, notes: reportNotes, previous: history.runs.last))
     history.append(
       ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, total: card.total))
     do {
@@ -127,7 +137,7 @@ public enum AdScoreCommand {
   static func find(
     _ episode: TeachingEpisode, _ transcript: Transcript, _ local: LocalAds, _ library: KnownAds?
   ) -> [FoundAd] {
-    let ads = local.ads(transcript: transcript, episodeDuration: episode.transcript.duration)
+    let ads = local.ads(transcript: transcript, episodeDuration: episode.episodeLength)
     guard let library else { return AdJoin.join(ads) }
     let hits = KnownAds().find(in: transcript.words, show: episode.feed, seeds: library)
     let use = KnownAdUse.from(hits, words: transcript.words)

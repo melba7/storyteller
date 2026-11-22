@@ -52,6 +52,21 @@ public struct ScorecardHistory: Codable, Sendable, Equatable {
   }
 }
 
+/// How one layer of the finders did on its own: the share of ads caught and the show seconds cut
+/// by mistake.
+public struct LayerResult: Sendable, Equatable {
+  public var name: String
+  /// 0 to 1.
+  public var caughtShare: Double
+  public var cutSeconds: Double
+
+  public init(name: String, caughtShare: Double, cutSeconds: Double) {
+    self.name = name
+    self.caughtShare = caughtShare
+    self.cutSeconds = cutSeconds
+  }
+}
+
 public enum AdScoreReport {
   static let mostShows = 25
 
@@ -61,8 +76,26 @@ public enum AdScoreReport {
     _ card: Scorecard, title: String, layers: [(name: String, caughtShare: Double)],
     previous: ScorecardRun?
   ) -> String {
+    text(card, title: title, results: nil, layers: layers, notes: [], previous: previous)
+  }
+
+  /// The same, with what each layer cuts by mistake too, and `notes` (plain lines) under the
+  /// title.
+  public static func text(
+    _ card: Scorecard, title: String, results: [LayerResult], notes: [String] = [],
+    previous: ScorecardRun?
+  ) -> String {
+    text(
+      card, title: title, results: results, layers: results.map { ($0.name, $0.caughtShare) },
+      notes: notes, previous: previous)
+  }
+
+  private static func text(
+    _ card: Scorecard, title: String, results: [LayerResult]?,
+    layers: [(name: String, caughtShare: Double)], notes: [String], previous: ScorecardRun?
+  ) -> String {
     let total = card.total
-    var out = [title, ""]
+    var out = [title] + notes + [""]
     if total.ads == 0 {
       out.append("No marked ads in these episodes.")
     } else {
@@ -95,14 +128,20 @@ public enum AdScoreReport {
     if !layers.isEmpty {
       var parts: [String] = []
       var last: Int?
-      for layer in layers {
+      for (index, layer) in layers.enumerated() {
         let now = Int((layer.caughtShare * 100).rounded())
         var gain = ""
         if let last { gain = " (\(now >= last ? "+" : "")\(now - last) points)" }
-        parts.append("\(layer.name) \(now)%\(gain)")
+        if let results {
+          parts.append(
+            "\(layer.name) \(now)% caught\(gain), \(time(results[index].cutSeconds)) cut by mistake")
+        } else {
+          parts.append("\(layer.name) \(now)%\(gain)")
+        }
         last = now
       }
-      out.append("What each layer adds: " + parts.joined(separator: ", ") + ".")
+      out.append(
+        "What each layer adds: " + parts.joined(separator: results == nil ? ", " : "; ") + ".")
     }
     if let before = previous?.total {
       out.append(

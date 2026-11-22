@@ -51,7 +51,7 @@ final class AdScoreTests: XCTestCase {
     XCTAssertEqual(AdScore.showSeconds(episode, AdSkipSettings()), 80, accuracy: 1e-9)
   }
 
-  func testCreditsAreNotCountedByDefaultButNeutral() {
+  func testCreditsAreNotCountedByDefault() {
     let episode = scoreEpisode(truth: [(0, 10, "intro_credits")])
     let found = [foundAd(0, 10, kind: .credits)]
     let off = AdScore.score(episode: episode, found: found)
@@ -60,10 +60,10 @@ final class AdScoreTests: XCTestCase {
     XCTAssertEqual(off.openingAds, 0)
     XCTAssertEqual(off.bySort["intro_credits"]?.ads, 1)
     XCTAssertEqual(off.bySort["intro_credits"]?.caught, 1)
-    // A sponsor-kind skip over the credits is not a mistake: the stretch is neutral.
+    // A sponsor-kind skip over credits the listener keeps cuts show: only "maybe" is neutral.
     let over = AdScore.score(episode: episode, found: [foundAd(0, 10)])
-    XCTAssertEqual(over.cutSeconds, 0, accuracy: 1e-9)
-    XCTAssertEqual(over.wrongSkips, 0)
+    XCTAssertEqual(over.cutSeconds, 10, accuracy: 1e-9)
+    XCTAssertEqual(over.wrongSkips, 1)
 
     let on = AdScore.score(
       episode: episode, found: found, settings: AdSkipSettings(skipCredits: true))

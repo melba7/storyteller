@@ -87,9 +87,11 @@ public enum AdScore {
     episode.truth.filter { AdKind(sort: $0.sort).map(settings.allows) ?? false }
   }
 
-  /// The stretches that count neither as ad nor as show.
+  /// The stretches that count neither as ad nor as show: only the ones marked with low
+  /// confidence. A stretch of a sort the settings do not skip is show to the listener, so a skip
+  /// over it is a mistake.
   static func neutral(_ episode: TeachingEpisode, _ settings: AdSkipSettings) -> [TeachingTruth] {
-    episode.maybe + episode.truth.filter { !(AdKind(sort: $0.sort).map(settings.allows) ?? false) }
+    episode.maybe
   }
 
   private static func pairs(_ truth: [TeachingTruth]) -> [(start: Double, end: Double)] {

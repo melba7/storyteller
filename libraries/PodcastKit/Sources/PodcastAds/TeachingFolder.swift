@@ -30,11 +30,22 @@ public struct TeachingEpisode: Sendable, Equatable {
   public var maybe: [TeachingTruth]
   /// Whether the small model was never trained on this episode.
   public var onShelf: Bool
+  /// The episode's length in `episodes.json`, when it has one above zero.
+  public var seconds: Double?
+
+  /// The episode's length as the end-of-episode feature of the word model sees it, by the one
+  /// rule the Mac and the phone share: `seconds` when it is a number above zero, otherwise the
+  /// start of the last line.
+  public var episodeLength: Double {
+    if let seconds, seconds.isFinite, seconds > 0 { return seconds }
+    return transcript.lines.last?.start ?? 0
+  }
 
   public init(
     id: String, feed: String, show: String, title: String, transcript: Transcript,
-    truth: [TeachingTruth], maybe: [TeachingTruth], onShelf: Bool
+    truth: [TeachingTruth], maybe: [TeachingTruth], onShelf: Bool, seconds: Double? = nil
   ) {
+    self.seconds = seconds
     self.id = id
     self.feed = feed
     self.show = show
@@ -157,7 +168,10 @@ public enum TeachingFolder {
         notes.append("The transcript of \(id) could not be read, so the episode was skipped.")
         continue
       }
-      let transcript = transcript(fromText: text, duration: nil)
+      let seconds = (entry["seconds"] as? NSNumber).map(\.doubleValue).flatMap {
+        $0.isFinite && $0 > 0 ? $0 : nil
+      }
+      let transcript = transcript(fromText: text, duration: seconds)
       guard !transcript.lines.isEmpty else {
         notes.append("The transcript of \(id) has no lines, so the episode was skipped.")
         continue
@@ -185,7 +199,7 @@ public enum TeachingFolder {
         TeachingEpisode(
           id: id, feed: (entry["feed"] as? String) ?? "", show: (entry["show"] as? String) ?? "",
           title: (entry["title"] as? String) ?? "", transcript: transcript, truth: truth,
-          maybe: maybe, onShelf: shelf.contains(id)))
+          maybe: maybe, onShelf: shelf.contains(id), seconds: seconds))
     }
     return result
   }
@@ -206,6 +220,19 @@ public enum TeachingFolder {
     guard let data = try? Data(contentsOf: folder.appendingPathComponent(AdLibraryFile.fileName))
     else { return KnownAds() }
     return MacFiles.library(data: data, now: now, showOf: MacFiles.feedAsShow)
+  }
+
+  /// The library to score with, and the name of the file it came from. When only the shelf
+  /// episodes are scored, `ad-library-score.json` (the library built without the shelf's ads)
+  /// is read if it exists; otherwise, and for `--all`, `ad-library.json`.
+  public static func library(
+    in folder: URL, now: Date, scoringShelf: Bool
+  ) -> (known: KnownAds, file: String) {
+    let score = "ad-library-score.json"
+    if scoringShelf, let data = try? Data(contentsOf: folder.appendingPathComponent(score)) {
+      return (MacFiles.library(data: data, now: now, showOf: MacFiles.feedAsShow), score)
+    }
+    return (library(in: folder, now: now), AdLibraryFile.fileName)
   }
 
   /// The habits of `habits.json` with the feed address as the show's id. Empty when there is no
