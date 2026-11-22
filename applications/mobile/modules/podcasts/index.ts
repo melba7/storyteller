@@ -104,6 +104,11 @@ export type PlaybackLoadOptions = {
    * player may still stream, for example with Wi-Fi only on and no Wi-Fi.
    */
   playThroughDownload?: boolean
+  /**
+   * The start is the listener's own choice ("Play from" an ad, a bookmark or a transcript
+   * line), so an ad that holds it is not skipped. Left out for every other load.
+   */
+  startChosen?: boolean
   /** The feed's language, for the transcript of the download that plays. */
   language?: string | null
   /** The episode's notes and the show's web page: sponsors named there help the ad rules. */
@@ -235,6 +240,9 @@ export type UpNextItem = {
   chaptersUrl?: string | null
   /** The show's language, for the transcript; missing in a queue saved before this. */
   language?: string | null
+  /** The episode's notes (the first 4,000 characters) and the show's web page, for the ad rules. */
+  notes?: string | null
+  showLink?: string | null
 }
 
 /** The queue changed. `items` is the whole queue, in play order. */
@@ -407,8 +415,12 @@ type PodcastsNativeModule = {
   skipAdNow(): Promise<{ to: number; known: boolean } | null>
   /** The notes not yet sent to the Mac (skips, undos, trims, missed ads), as JSON lines. "" when none. */
   readPendingAdNotes(): Promise<string>
-  /** Drops the first `count` pending notes, once they are written to the linked folder. */
-  removePendingAdNotes(count: number): Promise<void>
+  /**
+   * Drops the first `count` pending notes, once they are written to the linked folder, but only
+   * the lines whose `at` (milliseconds) is not later than `upToAt`: a note added since the read
+   * stays.
+   */
+  removePendingAdNotes(count: number, upToAt: number): Promise<void>
   /** What the phone skipped, undid, trimmed and missed, per show, as JSON text (see adResults.ts). */
   getAdTally(): Promise<string>
   /** The skip log and the ad finder's diary as text, or null when there is none. */

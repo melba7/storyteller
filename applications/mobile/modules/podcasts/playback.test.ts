@@ -485,6 +485,22 @@ describe("playFrom", () => {
     expect(native.play).toHaveBeenCalledTimes(1)
   })
 
+  it("loads an episode that is not loaded with the start marked as chosen", async () => {
+    const { playback, native } = setup()
+    await playback.playFrom(episode(), show, 95)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.objectContaining({ savedPosition: 95, startChosen: true }),
+    )
+  })
+
+  it("leaves startChosen out of a plain play", async () => {
+    const { playback, native } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(native.load).toHaveBeenCalledWith(
+      expect.not.objectContaining({ startChosen: expect.anything() }),
+    )
+  })
+
   it("only seeks when the episode is already playing", async () => {
     const { playback, native, state } = setup()
     await playback.playEpisode(episode(), show)

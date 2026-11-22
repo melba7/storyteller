@@ -350,7 +350,11 @@ export function createPlayback(deps: PlaybackDeps) {
   }
 
   /** Starts the episode, at its saved place. The same episode again resumes it. */
-  async function playEpisode(episode: StoredEpisode, show: Show | null) {
+  async function playEpisode(
+    episode: StoredEpisode,
+    show: Show | null,
+    startChosen = false,
+  ) {
     if (!deps.native) {
       set({ error: "Podcasts need the iOS app." })
       return
@@ -406,6 +410,7 @@ export function createPlayback(deps: PlaybackDeps) {
         audioType: episode.audioType,
         chaptersUrl: episode.chaptersUrl,
         playThroughDownload: throughDownload,
+        ...(startChosen ? { startChosen: true } : {}),
         language: show?.language ?? null,
         notes: episode.notes,
         showLink: show?.link ?? null,
@@ -428,6 +433,7 @@ export function createPlayback(deps: PlaybackDeps) {
     await playEpisode(
       { ...episode, positionSeconds: Math.max(0, seconds), played: false },
       show,
+      true,
     )
   }
 
@@ -536,19 +542,21 @@ export function createPlayback(deps: PlaybackDeps) {
       const renamed =
         fresh !== null &&
         (fresh.title !== loaded.title || fresh.imageUrl !== loaded.imageUrl)
+      const shown = view.show
       const settingsChanged =
         freshShow !== null &&
-        view.show?.id === freshShow.id &&
-        JSON.stringify(freshShow.settings) !==
-          JSON.stringify(view.show.settings)
+        shown !== null &&
+        shown.id === freshShow.id &&
+        JSON.stringify(freshShow.settings) !== JSON.stringify(shown.settings)
       if (!renamed && !settingsChanged) return
       set({
         episode: renamed
           ? { ...loaded, title: fresh.title, imageUrl: fresh.imageUrl }
           : loaded,
-        show: settingsChanged
-          ? { ...view.show, settings: freshShow.settings }
-          : view.show,
+        show:
+          settingsChanged && shown !== null
+            ? { ...shown, settings: freshShow.settings }
+            : shown,
       })
     } catch (cause) {
       deps.report?.(cause)
