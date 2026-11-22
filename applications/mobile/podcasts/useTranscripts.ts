@@ -13,6 +13,7 @@ import { listTranscripts } from "@/modules/podcasts/transcriptsNative"
 // onTranscriptChange event. One copy is shared by every screen.
 let current: TranscriptMap = {}
 let started = false
+let listening = false
 const listeners = new Set<() => void>()
 
 function publish(next: TranscriptMap) {
@@ -23,10 +24,14 @@ function publish(next: TranscriptMap) {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onTranscriptChange", (change) =>
-    publish(applyTranscriptChange(current, change)),
-  )
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onTranscriptChange", (change) =>
+      publish(applyTranscriptChange(current, change)),
+    )
+  }
   listTranscripts().then(
     (list) => publish({ ...transcriptMapFromList(list), ...current }),
     (cause: unknown) => {

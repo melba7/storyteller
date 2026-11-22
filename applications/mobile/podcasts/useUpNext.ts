@@ -19,6 +19,9 @@ import {
 // onUpNextChange event. One copy is shared by every screen.
 let current: readonly UpNextItem[] = []
 let started = false
+let listening = false
+// Counts the changes Swift sent, so a read that began before one does not overwrite it.
+let changes = 0
 const listeners = new Set<() => void>()
 
 function publish(next: readonly UpNextItem[]) {
@@ -36,12 +39,25 @@ function reread() {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onUpNextChange", (change) => publish(change.items))
-  listUpNext().then(publish, (cause: unknown) => {
-    started = false
-    console.warn("Couldn't read Up Next", cause)
-  })
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onUpNextChange", (change) => {
+      changes += 1
+      publish(change.items)
+    })
+  }
+  const seen = changes
+  listUpNext().then(
+    (items) => {
+      if (changes === seen) publish(items)
+    },
+    (cause: unknown) => {
+      started = false
+      console.warn("Couldn't read Up Next", cause)
+    },
+  )
 }
 
 function subscribe(listener: () => void): () => void {

@@ -27,6 +27,7 @@ import { readableError } from "@/modules/podcasts/nativeError"
 // onDownloadChange event. One copy is shared by every screen.
 let current: DownloadMap = {}
 let started = false
+let listening = false
 const listeners = new Set<() => void>()
 
 function publish(next: DownloadMap) {
@@ -37,10 +38,14 @@ function publish(next: DownloadMap) {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onDownloadChange", (change) =>
-    publish(applyChange(current, change)),
-  )
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onDownloadChange", (change) =>
+      publish(applyChange(current, change)),
+    )
+  }
   listDownloads().then(
     (list) => publish({ ...mapFromList(list), ...current }),
     (cause: unknown) => {

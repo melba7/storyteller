@@ -22,6 +22,7 @@ let current: AdsMap = {}
 // list of ads reads its file again.
 let undoneCount = 0
 let started = false
+let listening = false
 const listeners = new Set<() => void>()
 
 function publish(next: AdsMap) {
@@ -32,11 +33,15 @@ function publish(next: AdsMap) {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onAdsChange", (change) =>
-    publish(applyAdsChange(current, change)),
-  )
-  Podcasts.addListener("onAdUndone", adsEdited)
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onAdsChange", (change) =>
+      publish(applyAdsChange(current, change)),
+    )
+    Podcasts.addListener("onAdUndone", adsEdited)
+  }
   listAds().then(
     (list) => publish({ ...adsMapFromList(list), ...current }),
     (cause: unknown) => {
@@ -76,9 +81,9 @@ export function useAdsFile(episodeId: string): AdsFile | null {
   const undone = useSyncExternalStore(subscribe, () => undoneCount)
   const [kept, setKept] = useState<KeptAds | null>(null)
   // The full pass keeps the ads found so far on show (the partial file is read meanwhile).
+  // Every change Swift sends for the episode (a new count, a trim) is a new `info`, so the file is read again.
   const reads = readsAdsFile(info)
   const state = info?.state
-  const count = info?.count
   useEffect(() => {
     if (!reads) {
       setKept(null)
@@ -99,7 +104,7 @@ export function useAdsFile(episodeId: string): AdsFile | null {
     return () => {
       cancelled = true
     }
-  }, [episodeId, reads, state, count, undone])
+  }, [episodeId, reads, info, undone])
   // A file read for the episode shown before this one is never handed on.
   return kept !== null && kept.episodeId === episodeId ? kept.file : null
 }

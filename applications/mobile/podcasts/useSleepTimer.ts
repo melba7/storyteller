@@ -10,6 +10,7 @@ import { NO_SLEEP_TIMER, readSleepState } from "@/modules/podcasts/sleepTimer"
 // onSleepTimerChange event. One copy is shared by every screen.
 let current: SleepTimerState = NO_SLEEP_TIMER
 let started = false
+let listening = false
 const listeners = new Set<() => void>()
 
 function publish(next: SleepTimerState) {
@@ -20,10 +21,14 @@ function publish(next: SleepTimerState) {
 function start() {
   if (started || Podcasts === null) return
   started = true
-  // Listening comes first, so a change during the first read is not lost.
-  Podcasts.addListener("onSleepTimerChange", (state) =>
-    publish(readSleepState(state)),
-  )
+  // Listening comes first, so a change during the first read is not lost. It is added once,
+  // even when a failed first read lets this run again.
+  if (!listening) {
+    listening = true
+    Podcasts.addListener("onSleepTimerChange", (state) =>
+      publish(readSleepState(state)),
+    )
+  }
   Podcasts.getSleepTimer().then(
     (state) => publish(readSleepState(state)),
     () => {
