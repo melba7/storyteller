@@ -25,30 +25,44 @@ Exit code: 0 it worked (also with no notes), 2 a set-up problem.
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
 import json
+import math
 import os
 import sys
 import time
 
 import teach_store
 from apple_podcasts_export import default_folders
+from teach_feed import is_web_address
 
 NOTES = os.path.join("Podcasts", "phone-notes.jsonl")
 WANTED = "wanted.json"
 MOST = 40
 WHAT = ("skipped", "undone", "trimmed", "missed")
+LINE_LIMIT = 64 * 1024
+FILE_LIMIT = 8 * 1024 * 1024
 
 
 # MARK: Reading
 
 def number(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool)
+    """True for a finite number (not a bool, NaN, an infinity or a whole number too big for one)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def read_note(line):
-    """The note a line holds, or None when the line is not a valid note."""
+    """The note a line holds, or None when the line is not a valid note: not JSON (a line nested so
+    deeply that Python gives up counts too), longer than 64 KB, or with a time that is not a
+    finite number, or with a feed or audio address that is not http or https."""
+    if len(line) > LINE_LIMIT:
+        return None
     try:
         one = json.loads(line)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
     if not isinstance(one, dict) or one.get("v") != 1 or one.get("what") not in WHAT:
         return None
@@ -61,12 +75,17 @@ def read_note(line):
             return None
     if not one["feed"] or not (one["guid"] or one["address"]):
         return None
+    if not is_web_address(one["feed"]) or (one["address"] and not is_web_address(one["address"])):
+        return None
     return one
 
 
 def read_notes(path):
     """([valid notes], the number of lines that were not valid). Blank lines are not counted.
-    Raises OSError."""
+    Raises OSError, and ValueError (with the sentence to show) for a file over 8 MB."""
+    if os.path.getsize(path) > FILE_LIMIT:
+        raise ValueError("the notes file is bigger than %d MB, which is too big to read. Move it "
+                         "away or make it smaller, and run this again." % (FILE_LIMIT // 1024 // 1024))
     with open(path, "rb") as handle:
         lines = handle.read().splitlines()
     notes, bad = [], 0
@@ -74,7 +93,7 @@ def read_notes(path):
         if not raw.strip():
             continue
         try:
-            one = read_note(raw.decode("utf-8"))
+            one = read_note(raw.decode("utf-8")) if len(raw) <= LINE_LIMIT else None
         except UnicodeDecodeError:
             one = None
         if one is None:
@@ -84,12 +103,21 @@ def read_notes(path):
     return notes, bad
 
 
-def find_notes(defaults):
-    """The path of the notes: the iCloud copy first (the last folder), then the Mac's own."""
+def find_notes(defaults, denied=None):
+    """The path of the notes: the iCloud copy first (the last folder), then the Mac's own. A copy
+    that macOS does not let this read (permissions) is added to the list `denied`, when given, and
+    the next one is tried."""
     for folder in reversed(defaults()):
         path = os.path.join(folder, NOTES)
-        if os.path.exists(path):
-            return path
+        try:
+            os.stat(path)
+        except PermissionError:
+            if denied is not None:
+                denied.append(path)
+            continue
+        except OSError:
+            continue
+        return path
     return None
 
 
@@ -149,7 +177,24 @@ def main(argv, say=print, defaults=default_folders, now=lambda: int(time.time() 
     except SystemExit as stop:
         return stop.code if isinstance(stop.code, int) else 2
     folder = os.path.expanduser(options.folder)
-    path = os.path.expanduser(options.notes) if options.notes else find_notes(defaults)
+    denied = []
+    path = os.path.expanduser(options.notes) if options.notes else find_notes(defaults, denied)
+    if path is not None and options.notes:
+        try:
+            os.stat(path)
+        except PermissionError:
+            denied.append(path)
+        except OSError:
+            pass
+    if denied and (path is None or path in denied):
+        say("macOS did not let this read the phone's notes at %s (a permission problem), so "
+            "nothing was learned. Give /bin/bash Full Disk Access once: System Settings > Privacy "
+            "& Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and "
+            "switch it on. Nothing was written." % denied[0])
+        return 2
+    if denied and path is not None:
+        say("macOS did not let this read the notes at %s (a permission problem), so the copy at %s "
+            "was used instead. It may be older." % (denied[0], path))
     if path is None or not os.path.exists(path):
         if options.notes:
             say("There is no notes file at %s, so there is nothing to learn from. Nothing was "
@@ -160,6 +205,9 @@ def main(argv, say=print, defaults=default_folders, now=lambda: int(time.time() 
         return 0
     try:
         notes, bad = read_notes(path)
+    except ValueError as error:
+        say(str(error))
+        return 2
     except OSError as error:
         say("The notes in %s could not be read: %s" % (path, error))
         return 2

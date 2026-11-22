@@ -210,9 +210,9 @@ if [ "$COPY" = 1 ] && [ -d "$MUSIC" ]; then
   # deleted there, and the lists go last so they never name a file that is not there yet.
   ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs/Storyteller Lofi/LofiMusic"
   if [ -d "$ICLOUD" ]; then
-    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' \
+    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' --exclude '.*.tmp' --exclude 'Podcasts/phone-notes.jsonl' --exclude 'Podcasts/phone-diary.jsonl' \
          --exclude sounds.json --exclude variants.json "$MUSIC/" "$ICLOUD/" \
-       && rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/"; then
+       && rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' --exclude '.*.tmp' --exclude 'Podcasts/phone-notes.jsonl' --exclude 'Podcasts/phone-diary.jsonl' "$MUSIC/" "$ICLOUD/"; then
       echo "iCloud copy up to date ($ICLOUD). The phone picks it up when the app opens, or tap Settings > Atmosphere Sounds > Check for new files now."
     else
       echo "Could not update the iCloud copy at $ICLOUD; copy $MUSIC there by hand."

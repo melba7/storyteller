@@ -37,20 +37,17 @@ import math
 import os
 import random
 import sys
-import tempfile
 import time
 from array import array
 
 import teach_segments as seg
 import teach_store
+from teach_model import MAX_BUCKETS, MAX_BYTES, THRESHOLDS, build_model, ranked_buckets, write_text  # noqa: F401
 from teach_overlap import same_episode_ids
 from teach_shelf import SHELF_FILE, check_lines, choose_shelf, evaluate, read_shelf
 from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities  # noqa: F401
 
 MIN_EPISODES = 20
-MAX_BUCKETS = 40000
-MAX_BYTES = 4500000
-THRESHOLDS = {"start": 0.6, "stay": 0.4, "sure": 0.85}
 RATE = 0.5
 EPSILON = 1e-8
 L2 = 1e-6
@@ -178,62 +175,6 @@ def train(examples, epochs, seed, say=print):
         say("Pass %d of %d: mean loss %.4f, %.1f seconds."
             % (number, epochs, total / max(len(order), 1), time.monotonic() - started))
     return w
-
-
-# MARK: Model file
-
-def ranked_buckets(flat, limit):
-    """[(bucket, five rounded weights)] with the biggest weights first, at most `limit`, leaving
-    out buckets whose rounded weights are all zero."""
-    found = []
-    for b in range(BUCKETS):
-        k = b * 5
-        if flat[k] or flat[k + 1] or flat[k + 2] or flat[k + 3] or flat[k + 4]:
-            five = [round(flat[k + c], 4) + 0.0 for c in range(5)]
-            if any(five):
-                found.append((b, five))
-    found.sort(key=lambda item: (-max(abs(v) for v in item[1]), item[0]))
-    return found[:limit]
-
-
-def build_model(flat, trained, check, max_buckets=MAX_BUCKETS, max_bytes=MAX_BYTES):
-    """The text of ad-model.json. `check(weights)` returns the heldOut numbers for the weights that
-    are kept. When the text would pass max_bytes, fewer buckets are kept."""
-    ranked = ranked_buckets(flat, max_buckets)
-
-    def render(count):
-        kept = dict(sorted(ranked[:count]))
-        data = {"version": 1, "buckets": BUCKETS, "classes": CLASSES, "thresholds": THRESHOLDS,
-                "weights": {str(b): five for b, five in kept.items()},
-                "trained": dict(trained, heldOut=check(kept))}
-        return json.dumps(data, separators=(",", ":"))
-
-    text = render(len(ranked))
-    if len(text.encode("utf-8")) <= max_bytes:
-        return text
-    low, high = 0, len(ranked) - 1
-    while low < high:
-        middle = (low + high + 1) // 2
-        if len(render(middle).encode("utf-8")) <= max_bytes:
-            low = middle
-        else:
-            high = middle - 1
-    return render(low)
-
-
-def write_text(path, text):
-    """Writes the text through a temporary file in the same folder."""
-    handle, temporary = tempfile.mkstemp(dir=os.path.dirname(path), prefix=".", suffix=".part")
-    try:
-        with os.fdopen(handle, "w", encoding="utf-8") as f:
-            f.write(text)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(temporary, path)
-    except BaseException:
-        if os.path.exists(temporary):
-            os.remove(temporary)
-        raise
 
 
 # MARK: Run

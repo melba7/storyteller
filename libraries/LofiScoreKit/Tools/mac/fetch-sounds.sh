@@ -51,7 +51,7 @@ done
 if [ "$COPY" = 1 ] && [ -d "$MUSIC" ] && [ -d "$ROOT/Atmosphere" ]; then
   rsync -a --exclude skipped.csv "$ROOT/Atmosphere/" "$MUSIC/Atmosphere/" && say "copied Atmosphere into $MUSIC"
   if [ -d "$ICLOUD" ]; then
-    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' "$MUSIC/" "$ICLOUD/"; then
+    if rsync -a --exclude .DS_Store --exclude '.*.part' --exclude '.imported.json' --exclude '.*.tmp' --exclude 'Podcasts/phone-notes.jsonl' --exclude 'Podcasts/phone-diary.jsonl' "$MUSIC/" "$ICLOUD/"; then
       say "iCloud copy up to date; the phone picks the new sounds up from its linked folder"
     else
       say "could not update the iCloud copy"

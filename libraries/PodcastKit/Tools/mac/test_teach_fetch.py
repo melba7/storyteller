@@ -15,6 +15,25 @@ import teach_fetch as tf
 from teach_testing import FakeResponse, ShortResponse, opener
 
 
+class AddressSchemeTests(unittest.TestCase):
+    def test_only_http_and_https_addresses_are_fetched(self):
+        for address in ("file:///etc/hosts", "ftp://a/f", "data:text/plain,hi", "a/feed", ""):
+            seen = []
+            with self.assertRaises(ValueError, msg=address):
+                tf.fetch_feed(address, open_url=lambda *a, **k: seen.append(a))
+            with self.assertRaises(ValueError, msg=address):
+                tf.download(address, os.path.join(tempfile.mkdtemp(), "x.mp3"),
+                            open_url=lambda *a, **k: seen.append(a))
+            self.assertEqual(seen, [], address)
+
+    def test_a_redirect_to_another_scheme_is_not_followed(self):
+        handler = tf.RedirectHandler()
+        request = urllib.request.Request("https://a/feed")
+        self.assertIsNone(handler.redirect_request(request, None, 302, "Found", {}, "file:///etc/hosts"))
+        self.assertIsNone(handler.redirect_request(request, None, 302, "Found", {}, "ftp://a/x"))
+        self.assertIsNotNone(handler.redirect_request(request, None, 302, "Found", {}, "https://b/x"))
+
+
 class FetchFeedTests(unittest.TestCase):
     def test_returns_bytes_and_asks_for_identity(self):
         open_url = opener(b"<rss/>", content_type="application/rss+xml")

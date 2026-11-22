@@ -15,6 +15,7 @@ import urllib.request
 import zlib
 
 import probe_shows as probe
+from teach_feed import is_web_address
 
 FEED_LIMIT = 64_000_000
 MAX_FILE = 600_000_000
@@ -32,6 +33,8 @@ class RedirectHandler(urllib.request.HTTPRedirectHandler):
     """Python 3.9 does not follow HTTP 308 (permanent redirect, method kept); this treats it like 307."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not is_web_address(newurl):
+            return None  # never follow a redirect to file:, ftp: and the like
         return super().redirect_request(req, fp, 307 if code == 308 else code, msg, headers, newurl)
 
     http_error_308 = urllib.request.HTTPRedirectHandler.http_error_302
@@ -63,6 +66,10 @@ def quote_address(address):
 
 
 def make_request(address):
+    """The request for an address. Only http and https addresses are fetched: anything else (file:,
+    ftp:, data: and so on) raises ValueError."""
+    if not is_web_address(address):
+        raise ValueError("%s is not an http or https address, so it is not fetched" % address[:80])
     return urllib.request.Request(quote_address(address), headers={
         "User-Agent": probe.USER_AGENT, "Accept-Encoding": "identity"})
 

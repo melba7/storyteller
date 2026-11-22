@@ -105,6 +105,48 @@ class SyntaxTests(unittest.TestCase):
                 self.assertNotIn("'", body[1], name)
 
 
+class SyncExcludeTests(unittest.TestCase):
+    """The copies of LofiMusic into iCloud must not carry temporary files or overwrite the phone's
+    own notes (the files of the other tools in libraries/LofiScoreKit/Tools/mac)."""
+    FILES = ("lofi-sync.sh", "fetch-sounds.sh", "make-atmosphere.sh")
+    EXCLUDES = ("'.*.tmp'", "'Podcasts/phone-notes.jsonl'", "'Podcasts/phone-diary.jsonl'")
+
+    def test_every_music_to_icloud_copy_leaves_out_temporary_files_and_the_phones_notes(self):
+        folder = os.path.join(HERE, "..", "..", "..", "LofiScoreKit", "Tools", "mac")
+        for name in self.FILES:
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                text = f.read()
+            # A command may continue on the next line after a backslash.
+            commands = [c for c in re.sub(r"\\\n", " ", text).split("\n") if "rsync -a" in c
+                        and '"$MUSIC/" "$ICLOUD/"' in c]
+            self.assertTrue(commands, name)
+            for command in commands:
+                for exclude in self.EXCLUDES:
+                    self.assertEqual(command.count("--exclude " + exclude), command.count("rsync -a"),
+                                     name)
+
+    @unittest.skipUnless(shutil.which("rsync"), "rsync is not installed")
+    def test_rsync_with_those_excludes_skips_them(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        source, target = os.path.join(root, "a"), os.path.join(root, "b")
+        os.makedirs(os.path.join(source, "Podcasts"))
+        os.makedirs(os.path.join(target, "Podcasts"))
+        for name in ("Podcasts/phone-notes.jsonl", "Podcasts/phone-diary.jsonl", ".x.json.tmp",
+                     "Podcasts/ad-model.json"):
+            with open(os.path.join(source, name), "w") as f:
+                f.write("mac")
+        with open(os.path.join(target, "Podcasts", "phone-notes.jsonl"), "w") as f:
+            f.write("phone")
+        command = ["rsync", "-a"] + [a for e in self.EXCLUDES for a in ("--exclude", e.strip("'"))]
+        subprocess.run(command + [source + "/", target + "/"], check=True)
+        with open(os.path.join(target, "Podcasts", "phone-notes.jsonl")) as f:
+            self.assertEqual(f.read(), "phone")
+        self.assertFalse(os.path.exists(os.path.join(target, "Podcasts", "phone-diary.jsonl")))
+        self.assertFalse(os.path.exists(os.path.join(target, ".x.json.tmp")))
+        self.assertTrue(os.path.exists(os.path.join(target, "Podcasts", "ad-model.json")))
+
+
 class Setup(unittest.TestCase):
     def setUp(self):
         self.root = tempfile.mkdtemp()
