@@ -481,7 +481,14 @@ where the phone knew no ad ("missed"). `teach_feedback.py` reads that file (the
 iCloud copy first, then the Mac's own copy), prints a small table per show and
 writes `wanted.json`: the episodes with at least one "missed" or "undone" note,
 the most recent first, at most 40. Lines that are not valid notes are counted
-and skipped. When the phone has sent no notes yet it says so and writes nothing.
+and skipped: not JSON, over 64 KB, a time that is not a finite number, or a feed
+or audio address that is not http or https. A notes file over 8 MB is not read
+(it says so). A wanted episode is used only when its feed matches a show you
+follow (the same feed key as the phone's: no scheme, no `www.`, lower-case
+host, no fragment, no closing slash); it is gathered under the followed show's
+own feed address. When the phone has sent no notes yet it says so and writes
+nothing, and when macOS does not let the tool read the notes it says that
+instead.
 
 The next gather plans the wanted episodes before the newest episodes of each
 show, at most 20 in one run (`--wanted 20`), even when that is more than the
