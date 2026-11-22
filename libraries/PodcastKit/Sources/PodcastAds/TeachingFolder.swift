@@ -79,39 +79,6 @@ private struct LabelSegment: Decodable {
 
 private struct LabelFile: Decodable { var segments: [Lossy<LabelSegment>] }
 
-/// One show of `habits.json`.
-private struct HabitsEntry: Decodable {
-  var feed: String?
-  var episodes: Int?
-  var opensWithAd: Int?
-  var openingEnds: Double?
-
-  private enum Keys: String, CodingKey { case feed, episodes, opensWithAd, openingEnds }
-
-  init(from decoder: Decoder) throws {
-    let box = try decoder.container(keyedBy: Keys.self)
-    feed = try? box.decode(String.self, forKey: .feed)
-    episodes = try? box.decode(Int.self, forKey: .episodes)
-    opensWithAd = try? box.decode(Int.self, forKey: .opensWithAd)
-    openingEnds = try? box.decode(Double.self, forKey: .openingEnds)
-  }
-}
-
-private struct HabitsFile: Decodable { var shows: [Lossy<HabitsEntry>] }
-
-/// A show as `ShowHabits` reads it.
-private struct PhoneShow: Encodable {
-  var id: String
-  var episodes: Int
-  var opensWithAd: Int
-  var openingEnds: Double?
-}
-
-private struct PhoneHabits: Encodable {
-  var version = 1
-  var shows: [PhoneShow]
-}
-
 public enum TeachingFolder {
   /// How long the last line of a text file lasts when the episode's length is not known.
   static let lastLineSeconds = 5.0
@@ -236,34 +203,17 @@ public enum TeachingFolder {
   /// The taught ads of `ad-library.json` as remembered ads whose show is the feed address.
   /// Empty when there is no such file.
   public static func library(in folder: URL, now: Date) -> KnownAds {
-    guard let data = try? Data(contentsOf: folder.appendingPathComponent(AdLibraryFile.fileName)),
-      let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-      let ads = root["ads"] as? [Any]
+    guard let data = try? Data(contentsOf: folder.appendingPathComponent(AdLibraryFile.fileName))
     else { return KnownAds() }
-    let rewritten = ads.compactMap { item -> [String: Any]? in
-      guard var entry = item as? [String: Any] else { return nil }
-      entry["show"] = (entry["feed"] as? String) ?? ""
-      return entry
-    }
-    let version = root["version"] ?? AdLibraryFile.currentVersion
-    guard let phone = try? JSONSerialization.data(withJSONObject: ["version": version, "ads": rewritten])
-    else { return KnownAds() }
-    return AdLibrary.seeds(from: phone, now: now)
+    return MacFiles.library(data: data, now: now, showOf: MacFiles.feedAsShow)
   }
 
   /// The habits of `habits.json` with the feed address as the show's id. Empty when there is no
   /// such file.
   public static func habits(in folder: URL) -> ShowHabits {
-    guard let data = try? Data(contentsOf: folder.appendingPathComponent("habits.json")),
-      let file = try? JSONDecoder().decode(HabitsFile.self, from: data)
-    else { return ShowHabits() }
-    let shows = file.shows.compactMap { item -> PhoneShow? in
-      guard let entry = item.value, let feed = entry.feed, let episodes = entry.episodes,
-        let opens = entry.opensWithAd
-      else { return nil }
-      return PhoneShow(id: feed, episodes: episodes, opensWithAd: opens, openingEnds: entry.openingEnds)
+    guard let data = try? Data(contentsOf: folder.appendingPathComponent("habits.json")) else {
+      return ShowHabits()
     }
-    guard let phone = try? JSONEncoder().encode(PhoneHabits(shows: shows)) else { return ShowHabits() }
-    return ShowHabits(data: phone) ?? ShowHabits()
+    return MacFiles.habits(data: data, showOf: MacFiles.feedAsShow) ?? ShowHabits()
   }
 }

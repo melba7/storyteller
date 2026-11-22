@@ -34,6 +34,13 @@ public enum AdsRules {
   ) -> AdsStatus {
     if let finding { return .finding(percent: finding) }
     if let file, file.detectorVersion == detectorVersion { return finished(file) }
+    // The local finders' own result is the finished one while the model cannot be asked. When it
+    // can be asked, that result is old, as any file of another version is.
+    if let file, file.detectorVersion == LocalAdsFile.localVersion,
+      unavailable != nil || failure != nil
+    {
+      return finished(file)
+    }
     // The ads found so far are said before a failure, since the player skips them anyway. The
     // episode is still not tried again in a loop: `wantsRun(_:failure:)` says so.
     if let partial, partial.detectorVersion == detectorVersion, !partial.ads.isEmpty {
@@ -62,6 +69,19 @@ public enum AdsRules {
   /// status shows (a failed run with ads found so far shows them). Its retry clears the failure.
   public static func wantsRun(_ status: AdsStatus, failure: String?) -> Bool {
     failure == nil && wantsRun(status)
+  }
+
+  /// Whether a whole transcript is queued only so the local finders make its result: it has no
+  /// final file yet, the model cannot be asked, and no run of the model failed (that one waits for
+  /// its retry). `wantsRun(_:failure:)` is false for these, since the model has nothing to do.
+  public static func wantsLocalRun(
+    _ status: AdsStatus, failure: String?, hasFinal: Bool, unavailable: AdUnavailable?
+  ) -> Bool {
+    guard failure == nil, !hasFinal, unavailable != nil else { return false }
+    switch status {
+    case .waiting, .partialFound, .notPossible: return true
+    default: return false
+    }
   }
 
   /// Whether the work may go on now: the app is on the screen, a podcast is playing (iOS keeps
