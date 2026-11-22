@@ -97,4 +97,28 @@ final class AdTallyTests: XCTestCase {
     XCTAssertTrue(noted.isNew(episode: "e", start: 140, end: 150), "the next ad")
     XCTAssertTrue(noted.isNew(episode: "f", start: 140, end: 150), "another episode")
   }
+
+  func testUndoGivesBackWhatTheSkipCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 130))
+    noted.counted(seconds: 20)  // found at 110: only the rest of the ad was jumped
+    XCTAssertEqual(noted.takeCounted(), 20)
+    XCTAssertEqual(noted.takeCounted(), 0, "a second Undo has nothing to give back")
+  }
+
+  func testAnAdFoundAgainLongerKeepsWhatTheFirstSkipCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 115))
+    noted.counted(seconds: 5)
+    XCTAssertFalse(noted.isNew(episode: "e", start: 100, end: 130))  // adds nothing
+    XCTAssertEqual(noted.takeCounted(), 5)
+  }
+
+  func testANewSkipForgetsWhatTheLastOneCounted() {
+    var noted = NotedSkip()
+    XCTAssertTrue(noted.isNew(episode: "e", start: 100, end: 130))
+    noted.counted(seconds: 20)
+    XCTAssertTrue(noted.isNew(episode: "e", start: 200, end: 210))
+    XCTAssertEqual(noted.takeCounted(), 0)
+  }
 }

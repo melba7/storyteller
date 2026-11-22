@@ -197,7 +197,8 @@ final class PodcastAdSkipping {
       episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
       heard: owner.streamDownload?.head.memory.words ?? [])
     PodcastSkipLogger.shared.undone()
-    note(.undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: skip.end - ad.start)
+    // What the skip put on the tally is what comes off it: only the seconds really jumped.
+    note(.undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: lastNoted.takeCounted())
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -250,9 +251,9 @@ final class PodcastAdSkipping {
     // and noted once. The seconds are what this leave took out of the listening.
     if lastNoted.isNew(episode: episodeId, start: skip.ad.start, end: skip.end) {
       StatsStore.shared.countAd(.skipped)
-      note(
-        .skipped, start: skip.ad.start, end: skip.end, kind: skip.ad.kind,
-        seconds: AdTally.seconds(from: from, to: skip.target))
+      let jumped = AdTally.seconds(from: from, to: skip.target)
+      note(.skipped, start: skip.ad.start, end: skip.end, kind: skip.ad.kind, seconds: jumped)
+      lastNoted.counted(seconds: jumped)
     }
     owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)

@@ -52,7 +52,11 @@ extension PodcastPlayer {
       enabled: PlaybackSettingsStore.current.rewindAfterPause)
     // The player's own move: a rewind is not a listener's seek, so it neither saves a trim nor
     // lands inside an ad that is skipped (that ad's end is where it lands then).
-    if back > 0 { movePlayheadByPlayer(to: adSkipping.landing(for: place - back)) }
+    // An ad the listener chose to hear lands at its end, which is after `place`: no move then.
+    if back > 0 {
+      let landing = adSkipping.landing(for: place - back)
+      if landing < place { movePlayheadByPlayer(to: landing) }
+    }
   }
 
   /// The next button on the headphones or lock screen.

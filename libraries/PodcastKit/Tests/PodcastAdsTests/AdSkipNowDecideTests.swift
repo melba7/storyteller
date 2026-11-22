@@ -34,6 +34,15 @@ final class AdSkipNowDecideTests: XCTestCase {
     XCTAssertEqual(decide(130.4, file([]), last: skipped, age: 3.5), .miss(to: 160.4))
   }
 
+  func testATapWellBeforeTheLastSkipsTargetStillJumps() {
+    let skipped = AdSkip(ad: ad(100, 130), target: 130)
+    // The listener went back to 20 two seconds after the skip: the tap is a real one.
+    XCTAssertEqual(decide(20, file([]), last: skipped, age: 2), .miss(to: 50))
+    // Half a second before the target is still the listener catching up with the skip.
+    XCTAssertEqual(decide(129.6, file([]), last: skipped, age: 2), .nothing(at: 129.6))
+    XCTAssertEqual(decide(130.5, file([]), last: skipped, age: 2), .nothing(at: 130.5))
+  }
+
   func testInsideAKnownAdItIsASkipOfThatAd() {
     let first = ad(100, 160)
     let plug = ad(160.4, 175, kind: .ownPlug)

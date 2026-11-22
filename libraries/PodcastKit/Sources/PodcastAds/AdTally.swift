@@ -122,6 +122,7 @@ public struct NotedSkip: Equatable, Sendable {
   private var episode: String?
   private var start = 0.0
   private var end = 0.0
+  private var countedSeconds = 0.0
 
   public init() {}
 
@@ -136,6 +137,20 @@ public struct NotedSkip: Equatable, Sendable {
     self.episode = episode
     self.start = start
     self.end = end
+    countedSeconds = 0
     return true
+  }
+
+  /// Notes the seconds the last new skip added to the tally. Call it only for a skip `isNew`
+  /// said was new; a skip that was not new adds nothing.
+  public mutating func counted(seconds: Double) {
+    countedSeconds += seconds.isFinite ? max(0, seconds) : 0
+  }
+
+  /// The seconds to take off the tally when the last skip is undone: exactly what it added,
+  /// once. Zero when nothing was added or it was already given back.
+  public mutating func takeCounted() -> Double {
+    defer { countedSeconds = 0 }
+    return countedSeconds
   }
 }

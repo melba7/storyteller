@@ -61,6 +61,8 @@ public enum AdSkipNow {
   /// its target is the listener catching up with it, not asking for another skip.
   public static let justSkippedSeconds = 3.0
   public static let justAfterReach = 3.0
+  /// A tap this far before the last skip's target still counts as catching up with it.
+  public static let justBeforeReach = 0.5
 
   /// What a tap on Skip ad does.
   public enum Action: Equatable, Sendable {
@@ -81,7 +83,9 @@ public enum AdSkipNow {
     lastSkip: AdSkip?, lastSkipAge: Double
   ) -> Action {
     let place = position.isFinite ? position : 0
-    if let lastSkip, lastSkipAge <= justSkippedSeconds, place < lastSkip.target + justAfterReach {
+    if let lastSkip, lastSkipAge <= justSkippedSeconds,
+      place >= lastSkip.target - justBeforeReach, place < lastSkip.target + justAfterReach
+    {
       return .nothing(at: place)
     }
     let trims = file?.trims ?? []
