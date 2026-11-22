@@ -80,7 +80,7 @@ extension PodcastAdFinder {
   /// first three minutes) is looked at. A failure is shown in the status and asked again after
   /// the next piece of transcript; the full pass runs when the transcript is done.
   private func findPartial(_ id: String) async {
-    guard let downloads = PodcastDownloader.shared.store, let detector,
+    guard let downloads = PodcastDownloader.shared.store,
       let (ads, transcripts) = stores(for: id, in: downloads)
     else { return }
     let isPlaying = lock.withLock { urgent == id }
@@ -93,9 +93,18 @@ extension PodcastAdFinder {
       PodcastTimeline.mark(
         id, "first partial pass started: \(isPlaying ? "playing episode" : "head only")")
     }
+    // The phone's own finders go first, on the words looked at, whatever the model can do.
+    let local = localAds(
+      id, ads: ads, partial: partial, limit: isPlaying ? nil : PrepRules.headSeconds)
+    if addLocalToPartial(local, ads: ads, duration: partial.duration) { refreshIfPlaying(id) }
+    guard let model = askableDetector() else {
+      // Nothing more to ask: the list and the seek bar show the local ads.
+      scan()
+      return
+    }
     do {
       let outcome = try await AdsRunner.runPartial(
-        partial: partial, detector: detector, store: ads,
+        partial: partial, detector: model, store: ads,
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
         limit: isPlaying ? nil : PrepRules.headSeconds,
         shouldContinue: { [weak self] in self?.mayContinue(step) ?? false })
@@ -104,6 +113,8 @@ extension PodcastAdFinder {
         PodcastTimeline.mark(
           id, "partial pass: \(found.ads.count) ads, \(found.refusedPieces ?? 0) pieces refused")
         lock.withLock { partialFailures[id] = nil }
+        // The model's answers replaced the local ads inside the stretch it asked about: again.
+        addLocalToPartial(local, ads: ads, duration: partial.duration)
         // The ads the phone remembers join what the model found, in the stretch it looked at.
         let head = PrepRules.headSeconds
         let looked = isPlaying ? partial.words : partial.words.filter { $0.end <= head }

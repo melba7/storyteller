@@ -37,6 +37,11 @@ final class PodcastAdFinder: @unchecked Sendable {
   private var retryScheduled = false
   /// Episodes whose head was queued for a pass already, so a scan does not queue it again.
   var headAsked: Set<String> = []
+  /// The ads the taught sounds found in each downloaded file in this launch, by the download's
+  /// SHA-256, so a growing transcript does not read the file again (PodcastAdFinder+Local.swift).
+  var soundLooks: [String: [FoundAd]] = [:]
+  /// The downloads whose file is being read for sounds now.
+  var soundLooking: Set<String> = []
   var worker: Task<Void, Never>?
   /// The app is on the screen, a podcast is playing, or iOS gave a background turn.
   var appActive = false
@@ -115,6 +120,8 @@ final class PodcastAdFinder: @unchecked Sendable {
           detectorVersion: detector?.version ?? "", finding: nil, unavailable: unavailable,
           failure: lock.withLock { partialFailures[id] })
         present.insert(id)
+        // The taught sounds are looked for in the file at once, whatever the model can do.
+        lookForSounds(id, ads: ads)
         switch status {
         case .partialFound, .notPossible:
           set(id, status)
@@ -128,14 +135,18 @@ final class PodcastAdFinder: @unchecked Sendable {
       var finding: Int?
       if case .finding(let percent)? = lock.withLock({ statuses[id] }) { finding = percent }
       let failure = lock.withLock { failures[id] }
+      let final = ads.load(detector: Self.detectorName)
       let status = AdsRules.status(
-        file: ads.load(detector: Self.detectorName),
-        partial: ads.loadPartial(detector: Self.detectorName),
+        file: final, partial: ads.loadPartial(detector: Self.detectorName),
         detectorVersion: detector?.version ?? "",
         finding: finding, unavailable: unavailable, failure: failure)
       set(id, status)
       // A failed episode shows the ads found so far, but waits for its retry (it is not queued).
-      if AdsRules.wantsRun(status, failure: failure) {
+      // With no model to ask, the episode is queued once so the local finders make its result.
+      if AdsRules.wantsRun(status, failure: failure)
+        || AdsRules.wantsLocalRun(
+          status, failure: failure, hasFinal: final != nil, unavailable: unavailable)
+      {
         // Nothing found yet: its head is checked before any episode's rest (PrepQueue).
         let wantsHead = ads.best(detector: Self.detectorName) == nil
         lock.withLock {
@@ -162,7 +173,7 @@ final class PodcastAdFinder: @unchecked Sendable {
     }
   }
 
-  private func set(_ id: String, _ status: AdsStatus) {
+  func set(_ id: String, _ status: AdsStatus) {
     let send = lock.withLock { () -> ((String, [String: Any]) -> Void)? in
       guard statuses[id] != status else { return nil }
       statuses[id] = status
@@ -197,59 +208,14 @@ final class PodcastAdFinder: @unchecked Sendable {
     kick()
   }
 
-  func find(_ id: String) async {
-    guard let downloads = PodcastDownloader.shared.store, let detector,
-      let (ads, transcripts) = stores(for: id, in: downloads)
-    else { return }
-    guard let transcript = transcripts.loadTranscript() else {
-      PodcastTimeline.mark(id, "full pass: the transcript could not be read")
-      return fail(id, "The transcript could not be read")
+  /// Something was taught or the table of shows changed: the sounds are looked for again and
+  /// every episode is looked at again.
+  func teachingChanged() {
+    lock.withLock {
+      soundLooks.removeAll()
+      soundLooking.removeAll()
     }
-    set(id, .finding(percent: 0))
-    do {
-      let outcome = try await AdsRunner.run(
-        transcript: transcript, detector: detector, store: ads,
-        osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
-        progress: { [weak self] done, total in
-          guard let self else { return }
-          if done == 0 { PodcastTimeline.mark(id, "full pass started: \(total) pieces") }
-          set(id, .finding(percent: AdsRules.percent(done: done, total: total)))
-          // Each piece is saved as a partial file: the playing episode skips its ads at once.
-          if lock.withLock({ urgent == id }) {
-            Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
-          }
-        },
-        shouldContinue: { [weak self] in self?.mayContinue(PrepStep(id: id, stage: .rest)) ?? false })
-      switch outcome {
-      case .finished(let found):
-        lock.withLock { failureCounts[id] = nil }
-        // Chapters named like an ad break (with words that sell inside) add to what was found.
-        let file = await withChapterAds(id, ads: ads, finished: found, transcript: transcript)
-        set(id, AdsRules.finished(file))
-        PodcastTimeline.mark(
-          id, "full pass ended: \(file.ads.count) ads, \(file.refusedPieces ?? 0) pieces refused")
-        // The sure ads are remembered by their words, so a repeat is found at once.
-        learnRemembered(id, ads: ads, finished: file, transcript: transcript)
-        // The words the show opens with are learned from the episode's first minutes.
-        learnOpening(id, ads: ads, finished: file, transcript: transcript)
-        // An episode that is playing now starts skipping the new ads.
-        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
-      case .stopped:
-        PodcastTimeline.mark(id, "full pass stopped to make way")
-        pause(id)
-      }
-    } catch AdDetectorError.unavailable(let reason) {
-      PodcastTimeline.mark(id, "full pass failed: model unavailable, \(reason.reason)")
-      fail(id, reason.reason, retry: reason.passesByItself)
-    } catch is CancellationError {
-      PodcastTimeline.mark(id, "full pass cancelled")
-      pause(id)
-    } catch {
-      if downloads.entry(for: id) == nil { return removed(id) }
-      // The error's type name and case name, not its words.
-      PodcastTimeline.mark(id, "full pass failed: \(AdDiary.note(for: error))")
-      fail(id, Self.reason(for: error))
-    }
+    scan()
   }
 
   /// Forgets why earlier tries failed, so the next scan tries those episodes again. Called when
@@ -264,16 +230,22 @@ final class PodcastAdFinder: @unchecked Sendable {
 
   /// Shows why this episode's ads could not be found, and asks again after a growing wait, a
   /// few times (PodcastAdFinder+Retry.swift). `retry` is false when waiting cannot help.
-  private func fail(_ id: String, _ reason: String, retry: Bool = true) {
+  func fail(_ id: String, _ reason: String, retry: Bool = true) {
+    noteFailure(id, reason, retry: retry)
+    set(id, .notPossible(reason: reason))
+  }
+
+  /// Notes why the model's pass failed, so it is not tried again in a loop, and asks again after a
+  /// wait unless `retry` is false. The status is left to the caller.
+  func noteFailure(_ id: String, _ reason: String, retry: Bool = true) {
     PodcastTimeline.mark(
       id, retry ? "ad finding failed, will try again" : "ad finding failed, will not try again")
     lock.withLock { failures[id] = reason }
-    set(id, .notPossible(reason: reason))
     if retry { retryLater(id) }
   }
 
   /// Back to the front of the queue; its download may be gone.
-  private func pause(_ id: String) {
+  func pause(_ id: String) {
     guard PodcastDownloader.shared.store?.entry(for: id) != nil else { return removed(id) }
     lock.withLock {
       if !waiting.contains(id) {
