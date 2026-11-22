@@ -52,6 +52,9 @@ extension PodcastPlayer {
       }
     }
     loader.head.setLanguage(episode.language)
+    // The feed's length of the episode, when it gives one: the small model reads how far into
+    // the episode a line is.
+    loader.head.setEpisodeDuration(episode.duration)
     loader.head.setSponsors(
       AdHeadRules.sponsors(
         inNotes: episode.notes ?? "", showLink: episode.showLink.flatMap(URL.init(string:))))
