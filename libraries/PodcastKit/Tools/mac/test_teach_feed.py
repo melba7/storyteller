@@ -148,5 +148,18 @@ class AudioNameTests(unittest.TestCase):
             self.assertTrue(FILE_PATTERN.match(name), name)
 
 
+class FeedTitleTests(unittest.TestCase):
+    def test_the_title_of_the_show(self):
+        self.assertEqual(tf.feed_title(feed(dated("A", 1, "https://a/1.mp3"))), "Show")
+
+    def test_no_title_is_empty(self):
+        self.assertEqual(tf.feed_title("<rss><channel></channel></rss>"), "")
+        self.assertEqual(tf.feed_title("<rss></rss>"), "")
+
+    def test_a_feed_that_is_not_xml_is_an_error(self):
+        with self.assertRaises(tf.FeedError):
+            tf.feed_title("not xml at all <<<")
+
+
 if __name__ == "__main__":
     unittest.main()

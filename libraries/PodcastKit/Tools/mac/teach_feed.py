@@ -152,3 +152,10 @@ def audio_name(identifier, address, kind=None):
     if ext not in AUDIO_EXTENSIONS:
         ext = AUDIO_TYPES.get((kind or "").split(";")[0].strip().lower(), "mp3")
     return "audio/%s.%s" % (identifier, ext)
+
+
+def feed_title(data):
+    """The title of the show a feed is for, "" when it has none. Raises FeedError when the feed
+    cannot be read as XML."""
+    channel = parse_feed(data).find("channel")
+    return (channel.findtext("title") or "").strip() if channel is not None else ""

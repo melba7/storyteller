@@ -18,7 +18,14 @@ Running it again carries on: finished episodes are never downloaded again, faile
 once more (with the address the feed gives now), and new episodes are added at the end. An episode
 that is bigger than the file limit is marked "skipped: ..." and not tried again.
 
-  teach_collect.py [--folder F] [--shows FILE] [--per-show 4] [--max-gb 12] [--keep-free-gb 15] [--list]
+  teach_collect.py [--folder F] [--shows FILE] [--per-show 4] [--wanted 20] [--max-gb 12]
+                   [--keep-free-gb 15] [--list]
+
+When the folder has a wanted.json (teach_feedback.py writes it from the phone's notes), the episodes
+in it are planned before the newest episodes of each show, whatever --per-show says, at most
+--wanted of them in one run. A wanted episode is looked up in its show's feed by guid (or by audio
+address when it has no guid); a feed that is not among the followed shows is read too. One that is
+no longer in its feed, or already gathered, is left out. A damaged wanted.json is ignored.
 
 --list only reads the feeds and says what a run would download. Exit codes: 0 it ran, 2 the shows
 file cannot be read, the folder cannot be written, episodes.json is damaged or another run is
@@ -33,50 +40,77 @@ import time
 
 import probe_shows as probe
 import teach_fetch as fetching
-from teach_feed import audio_name, episode_id, feed_episodes
+import teach_wanted
+from teach_wanted import wanted_entries
+from teach_feed import audio_name, episode_id, feed_episodes, feed_title
 from teach_store import (FIELDS, FOLDER, MANIFEST, Busy, ManifestError, check_entry,  # noqa: F401
                          load_manifest, run_lock, save_manifest)
 
 PER_SHOW = 4
+WANTED = teach_wanted.MOST
 MAX_GB = 12
 KEEP_FREE_GB = 15
 GB = 1_000_000_000
 SKIPPED = "skipped:"
+ALL = 1_000_000
 
 
 # MARK: Episodes
 
+def new_entry(title, feed, episode):
+    """A full entry of episodes.json for an episode of a feed, not downloaded yet."""
+    return {"id": episode_id(feed, episode["guid"], episode["address"]), "feed": feed, "show": title,
+            "guid": episode["guid"], "title": episode["title"], "published": episode["published"],
+            "seconds": episode["seconds"], "address": episode["address"], "size": episode["size"],
+            "file": None, "bytes": 0, "sha256": None, "host": None, "error": None}
+
+
 def plan(shows, known_ids, per_show, fetch=fetching.fetch_feed, pause=probe.PAUSE, sleep=time.sleep,
-         say=print, stats=None):
-    """The new episodes (not in `known_ids`) of every show, in round-robin order: every show's
-    newest first (shows in file order), then every show's second newest, and so on, so a size cap
-    still covers every show. A feed that cannot be fetched or read is skipped with one line and
-    does not count as read. `stats`, when given, gets "shows_read", the number of feeds that were
-    read, and "listed", {id: {"address", "size", "type"}} for every episode the feeds list now
+         say=print, stats=None, wanted=(), wanted_most=WANTED):
+    """The new episodes (not in `known_ids`) to download. First the wanted ones (see teach_wanted.py,
+    at most `wanted_most`, whatever `per_show` says), then those of every show in round-robin
+    order: every show's newest first (shows in file order), then every show's second newest, and so
+    on, so a size cap still covers every show. A feed that cannot be fetched or read is skipped
+    with one line and does not count as read. A wanted episode whose feed is not among `shows` has
+    its feed fetched too. `stats`, when given, gets "shows_read", the number of followed feeds that
+    were read, and "listed", {id: {"address", "size", "type"}} for every episode the feeds list now
     (known or new)."""
-    columns, listed = [], {}
-    for index, show in enumerate(shows):
+    columns, listed, lookups = [], {}, {}
+
+    def make(title, feed, episode):
+        entry = new_entry(title, feed, episode)
+        listed[entry["id"]] = {key: episode[key] for key in ("address", "size", "type")}
+        return entry
+
+    wanted_feeds = {item["feed"] for item in wanted}
+    followed = {show["feed"] for show in shows}
+    extra = [{"feed": address, "title": address} for address in dict.fromkeys(
+        item["feed"] for item in wanted) if address not in followed]
+    for index, show in enumerate(list(shows) + extra):
         if index:
             sleep(pause)
+        is_followed = index < len(shows)
         try:
-            episodes = feed_episodes(fetch(show["feed"]), per_show)
+            data = fetch(show["feed"])
+            episodes = feed_episodes(data, per_show) if is_followed else []
+            if show["feed"] in wanted_feeds:
+                lookups[show["feed"]] = (show["title"] if is_followed else
+                                         feed_title(data) or show["feed"],
+                                         feed_episodes(data, ALL))
         except Exception as error:  # a dead feed must not stop the others
-            say("Skipped %s: its feed could not be read (%s)"
-                % (show["title"], str(error) or error.__class__.__name__))
+            if is_followed:
+                say("Skipped %s: its feed could not be read (%s)"
+                    % (show["title"], str(error) or error.__class__.__name__))
             continue
         column = []
         for episode in episodes:
-            identifier = episode_id(show["feed"], episode["guid"], episode["address"])
-            listed[identifier] = {key: episode[key] for key in ("address", "size", "type")}
-            column.append({
-                "id": identifier, "feed": show["feed"], "show": show["title"], "guid": episode["guid"],
-                "title": episode["title"], "published": episode["published"], "seconds": episode["seconds"],
-                "address": episode["address"], "size": episode["size"], "file": None, "bytes": 0,
-                "sha256": None, "host": None, "error": None})
-        columns.append(column)
+            column.append(make(show["title"], show["feed"], episode))
+        if is_followed:
+            columns.append(column)
+    first = wanted_entries(wanted, lookups, known_ids, wanted_most, say, make)
     if stats is not None:
         stats.update(shows_read=len(columns), listed=listed)
-    entries, taken = [], set(known_ids)
+    entries, taken = list(first), set(known_ids) | {entry["id"] for entry in first}
     for rank in range(per_show):
         for column in columns:
             if rank < len(column) and column[rank]["id"] not in taken:
@@ -102,7 +136,8 @@ def refresh(entries, listed):
 
 def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.fetch_feed,
             download=fetching.download, free_space=lambda path: shutil.disk_usage(path).free,
-            pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE):
+            pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE,
+            wanted=(), wanted_most=WANTED):
     """Adds the new episodes to episodes.json and downloads every entry that has no file yet, in
     list order. Stops before a download that would take the audio on disk over `max_bytes`, or
     when the free disk space, less the file about to come (the feed's size, when known), is under
@@ -113,7 +148,8 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     entries = load_manifest(folder)
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     stats = {}
-    new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, pause, sleep, say, stats)
+    new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, pause, sleep, say, stats,
+               wanted, wanted_most)
     refresh(entries, stats["listed"])
     entries.extend(new)
     save_manifest(folder, entries)
@@ -163,12 +199,13 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     return result
 
 
-def list_command(folder, shows, per_show, fetch, sleep, say):
+def list_command(folder, shows, per_show, fetch, sleep, say, wanted_most=WANTED):
     """Says what a run would download, without writing anything."""
     entries = load_manifest(folder)
     stats = {}
     entries = [e for e in entries if not e["file"] and not is_skipped(e)] + plan(
-        shows, {entry["id"] for entry in entries}, per_show, fetch, probe.PAUSE, sleep, say, stats)
+        shows, {entry["id"] for entry in entries}, per_show, fetch, probe.PAUSE, sleep, say, stats,
+        teach_wanted.load_wanted(folder, say), wanted_most)
     known = sum(entry["size"] or 0 for entry in entries)
     unknown = sum(1 for entry in entries if not entry["size"])
     say("Read %d show%s. A run would download %d episodes, %.1f GB in the sizes the feeds give; "
@@ -184,6 +221,7 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
     parser.add_argument("--per-show", type=int, default=PER_SHOW)
     parser.add_argument("--max-gb", type=float, default=MAX_GB)
     parser.add_argument("--keep-free-gb", type=float, default=KEEP_FREE_GB)
+    parser.add_argument("--wanted", type=int, default=WANTED)
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
@@ -194,12 +232,13 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
         return 2
     try:
         if args.list:
-            return list_command(folder, shows, args.per_show, fetch, sleep, say)
+            return list_command(folder, shows, args.per_show, fetch, sleep, say, args.wanted)
         with run_lock(folder):
             say("Reading the feeds of %d shows..." % len(shows))
             result = collect(folder, shows, args.per_show, int(args.max_gb * GB),
                              int(args.keep_free_gb * GB), fetch=fetch, download=download,
-                             sleep=sleep, say=say)
+                             sleep=sleep, say=say, wanted=teach_wanted.load_wanted(folder, say),
+                             wanted_most=args.wanted)
     except Busy as error:
         say(str(error))
         return 2
