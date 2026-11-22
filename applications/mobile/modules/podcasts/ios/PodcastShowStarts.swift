@@ -1,8 +1,10 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // Whether each show's episodes start with an ad (PodcastAds' ShowStarts), kept in
-// `Podcasts/show-starts.json`: a few hundred bytes per show, read the first time it is asked.
-// A missing or broken file starts empty, which means no show is known to start clean.
+// `Podcasts/show-starts.json`: a few hundred bytes per show, read by `warm()` from a background
+// task when a stream's head is made (or when a scan records what it found), never on the main
+// actor, which only asks `startsClean`. A missing or broken file starts empty, which means no show
+// is known to start clean.
 import Foundation
 import PodcastAds
 
@@ -20,9 +22,18 @@ final class PodcastShowStarts: @unchecked Sendable {
 
   private init() {}
 
-  /// Whether the show's last five checked episodes had no ad in their first 30 seconds.
+  /// Whether the show's last five checked episodes had no ad in their first 30 seconds. This is
+  /// asked on the main actor (Play), so it never reads the file and never waits for the lock: when
+  /// the file is not read yet, or is being written, no show is known to start clean.
   func startsClean(show: String) -> Bool {
-    lock.withLock { current().startsClean(show: show) }
+    guard lock.try() else { return false }
+    defer { lock.unlock() }
+    return starts?.startsClean(show: show) ?? false
+  }
+
+  /// Reads the file, if it was not read. Called from a background task, before Play can be pressed.
+  func warm() {
+    lock.withLock { _ = current() }
   }
 
   /// Notes what a stream's head scan found. A scan that did not reach far enough says nothing.

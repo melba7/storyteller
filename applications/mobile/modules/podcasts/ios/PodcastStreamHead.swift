@@ -3,11 +3,15 @@
 // The first minutes of a stream, checked for ads while the rest still downloads. As soon as
 // about 15 seconds of audio are on disk the start of the file is copied to a small file, cut at
 // a whole MP3 frame, and transcribed by an analyzer that was made ready ahead; the copy grows in
-// steps (15, 30, 60 seconds, then every 30) to about 3 minutes. After each step the text rules
-// (AdHeadRules) run at once, and after the 30, 60, 120 and 180 second steps the on-device model
-// is asked, with a session that was asked to prewarm when play started and, after each answer,
-// another one for the next time. At the 30 second step only its sure answers count (an unsure
-// one waits for the 60 second step). The ads found are saved as the episode's partial ads file,
+// steps (15, 30, 60 seconds, then every 30) to about 3 minutes. After each step the ads the phone
+// remembers are looked for, then the local layers (word rules, promo rules and the small model
+// the Mac taught, LocalAds) and the sounds the Mac taught run at once on the words and bytes so
+// far (PodcastStreamHead+Local.swift). After the 30, 60, 120 and 180 second steps the on-device
+// model is asked, with a session that was asked to prewarm when play started and, after each
+// answer, another one for the next time. At the 30 second step only its sure answers count (an
+// unsure one waits for the 60 second step). For a show the Mac taught usually opens with an ad,
+// the first look covers its usual opening and unsure answers count from the first step
+// (HeadPlan). The ads found are saved as the episode's partial ads file,
 // which the player already reads, and the player is told to read it again.
 //
 // The file is not whole, so there is no SHA-256 to name the ads by. Until the download is filed
@@ -23,16 +27,12 @@ import PodcastSpeech
 import PodcastTranscripts
 
 final class PodcastStreamHead: @unchecked Sendable {
-  /// Seconds of audio after which each step ends.
-  static let targets = AdHeadRules.steps
-  /// The steps after which the model is asked.
-  static let modelSteps = AdHeadRules.modelSteps
-
   let episodeId: String
   private let store: DownloadStore
   private let lock = NSLock()
   private var language: String?
   private var sponsors: [SponsorName] = []
+  private var episodeDuration: Double?
   private var source: URL?
   private var key: String
   private var isFiled = false
@@ -65,6 +65,8 @@ final class PodcastStreamHead: @unchecked Sendable {
     var continuation: AsyncStream<Int64>.Continuation!
     arrivals = AsyncStream(Int64.self, bufferingPolicy: .bufferingNewest(1)) { continuation = $0 }
     feed = continuation
+    // The taught habits are read now, off the main thread, so Play never has to (PodcastHabits).
+    PodcastHabits.shared.warm()
   }
 
   // MARK: What the download tells us
@@ -73,6 +75,12 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   /// The advertisers the episode's notes name, which the quick rules also look for.
   func setSponsors(_ names: [SponsorName]) { lock.withLock { sponsors = names } }
+
+  /// The episode's length in seconds, when the feed or the player knows it; the small model reads
+  /// where in the episode a line falls by it. Nil is allowed.
+  func setEpisodeDuration(_ seconds: Double?) {
+    lock.withLock { episodeDuration = seconds.flatMap { $0 > 0 && $0.isFinite ? $0 : nil } }
+  }
 
   /// The staging file exists: the scan can begin.
   func begin(staged: URL) {
@@ -257,7 +265,11 @@ final class PodcastStreamHead: @unchecked Sendable {
     var modelAds: [FoundAd] = []
     var first = true
     var told = false  // the player is told once, after the first step
-    var steps = HeadSteps(steps: Self.targets)
+    // What the Mac taught about this show sets the steps (PodcastTeaching reads its files on this
+    // background task, the first time it is asked).
+    let plan = HeadPlan(
+      habits: PodcastTeaching.shared.files.habits, show: EpisodeShows.shared.show(for: episodeId))
+    var steps = HeadSteps(steps: plan.steps)
     while let target = steps.target {
       try Task.checkCancellation()
       let need = max(Int64(tag) + Int64(target * rate) + 4096, waitFor)
@@ -325,14 +337,12 @@ final class PodcastStreamHead: @unchecked Sendable {
       if let jump = remembered.jumpTo { steps.jump(to: jump, reached: fed) }
       // The show's own opening words, when this show has some: where they start, the show begins.
       let begun = opening.look(in: words, episodeId: episodeId)
-      let startedRules = Date()
-      let sponsors = lock.withLock { self.sponsors }
-      let ranges = AdHeadRules.find(lines: AdChunker.number(lines), sponsors: sponsors)
-      let ruleAds = AdCleanup.run(ranges: ranges, transcript: transcript)
-      PodcastTimeline.mark(
-        episodeId,
-        "rules: \(ruleAds.count) ads in \(Int(Date().timeIntervalSince(startedRules) * 1000)) ms")
-      save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
+      // The local layers and the taught sounds (PodcastStreamHead+Local.swift).
+      let (sponsors, duration) = lock.withLock { (self.sponsors, self.episodeDuration) }
+      let localAds = findLocal(
+        lines: lines, transcript: transcript, sponsors: sponsors, episodeDuration: duration,
+        audio: data.prefix(cut.bytes))
+      save(AdHeadRules.merge(remembered.ads + localAds + modelAds), covered: fed)
       // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
       if !told {
         told = true
@@ -341,25 +351,26 @@ final class PodcastStreamHead: @unchecked Sendable {
       }
 
       let warmOne: AdDetector? = detector
-      if Self.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {
+      if plan.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {
         detector = nil  // a warm session is used once
         let startedModel = Date()
         do {
           let piece = TranscriptPiece(lines: AdChunker.number(lines))
           let answer = try await model.findAds(in: piece)
-          // At the first model step only the sure answers count; the next step hears more.
+          // At the first model step only the sure answers count (the next step hears more), except
+          // for a show that usually opens with an ad.
           modelAds = AdCleanup.run(
-            ranges: AdHeadRules.counted(answer, atStep: target), transcript: transcript)
+            ranges: plan.counted(answer, atStep: target), transcript: transcript)
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
-          save(AdHeadRules.merge(remembered.ads + ruleAds + modelAds), covered: fed)
+          save(AdHeadRules.merge(remembered.ads + localAds + modelAds), covered: fed)
         } catch {
           // The error's type name and case name for the diary, not its words.
           PodcastTimeline.mark(episodeId, "model: no answer (\(AdDiary.note(for: error)))")
         }
         // The next model step gets a session that is made and asked to prewarm now.
-        if Self.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }
+        if plan.modelSteps.contains(where: { $0 > target }) { detector = Self.warmDetector() }
       }
       steps.advance()
     }

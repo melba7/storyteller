@@ -5,7 +5,9 @@
 // at 0:00, was never checked and is of a show that is not known to start clean, Play waits a
 // moment for the first look (the 15 second step's rules and the memory of ads), so an ad that
 // holds 0:00 is left before it is heard. The wait never lasts past `longest` (3 seconds), or
-// `longestForAdOpeners` (5 seconds) for a show that usually opens with an ad. Foundation only.
+// `longestForAdOpeners` (5 seconds) for a show that usually opens with an ad. Whether the show
+// starts clean, and how long to wait, follow what the Mac taught where it knows the show
+// (`ShowHabits`), else what the phone saw itself. Foundation only.
 import Foundation
 
 public struct StartHold: Equatable, Sendable {
@@ -17,6 +19,22 @@ public struct StartHold: Equatable, Sendable {
   /// The longest wait for a show, by whether it usually opens with an ad.
   public static func longest(usuallyOpensWithAd: Bool) -> Double {
     usuallyOpensWithAd ? longestForAdOpeners : longest
+  }
+
+  /// The longest wait for `show` by what the Mac taught: longer for a show that usually opens with
+  /// an ad. A show that is not known (nil) gets the usual wait.
+  public static func longest(habits: ShowHabits, show: String?) -> Double {
+    longest(usuallyOpensWithAd: show.map { habits.usuallyOpensWithAd(show: $0) } ?? false)
+  }
+
+  /// Whether the show starts clean (no wait). What the Mac taught wins where it knows the show: a
+  /// show that usually opens with an ad does not, a show it saw start clean does. Where it knows
+  /// nothing, `own` decides, which is what the phone saw itself (`ShowStarts`).
+  public static func startsClean(habits: ShowHabits, show: String?, own: Bool) -> Bool {
+    guard let show else { return own }
+    if habits.usuallyOpensWithAd(show: show) { return false }
+    if habits.startsClean(show: show) { return true }
+    return own
   }
   /// An episode that starts later than this many seconds is not waited for (it resumes).
   public static let startsUnder = 1.0
