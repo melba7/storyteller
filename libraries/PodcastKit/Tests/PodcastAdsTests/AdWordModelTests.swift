@@ -185,7 +185,9 @@ final class AdWordModelTests: XCTestCase {
     let m = model(weights: referenceWeights)
     XCTAssertEqual(m.probabilities(lines: [], duration: nil), [])
     XCTAssertEqual(m.spans(lines: [], duration: nil), [])
-    let blank = model(weights: [:])
+    // One weight bucket that none of the lines touch counts as an untrained model.
+    let untouched = String(AdWordModel.bucket("u:zzzzqqq", buckets: 262144))
+    let blank = model(weights: [untouched: [0.0, 0.0, 0.0, 0.0, 0.0]])
     let rows = blank.probabilities(lines: referenceLines, duration: 150)
     XCTAssertEqual(rows.count, 9)
     for row in rows { for value in row { XCTAssertEqual(value, 0.2, accuracy: 1e-12) } }
@@ -240,6 +242,7 @@ final class AdWordModelTests: XCTestCase {
     bad(file(weights: ok, extra: ["buckets": 2048.5]), "buckets not whole")
     bad(file(weights: ok, extra: ["classes": Array(five.reversed())]), "classes in another order")
     bad(file(weights: ok, extra: ["classes": Array(five.dropLast())]), "four classes")
+    bad(file(weights: [:]), "no weights would call every line an ad")
     bad(file(weights: ["x": [0, 0, 0, 0, 0]]), "key not a number")
     bad(file(weights: ["1.5": [0, 0, 0, 0, 0]]), "key not whole")
     bad(file(weights: ["-1": [0, 0, 0, 0, 0]]), "key negative")
@@ -258,8 +261,9 @@ final class AdWordModelTests: XCTestCase {
   }
 
   func testTheDefaultThresholdsApplyWhenMissing() {
+    let one: [String: Any] = ["7": [0.0, 0.0, 0.0, 0.0, 0.0]]
     // With the default stay of 0.4 a start of 0.5 is fine, and 0.3 is not allowed for stay > start.
-    XCTAssertNotNil(AdWordModel(data: file(weights: [:], extra: ["thresholds": ["start": 0.5]])))
-    XCTAssertNil(AdWordModel(data: file(weights: [:], extra: ["thresholds": ["start": 0.3]])))
+    XCTAssertNotNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.5]])))
+    XCTAssertNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.3]])))
   }
 }

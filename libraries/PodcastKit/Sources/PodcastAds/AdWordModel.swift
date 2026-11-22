@@ -41,7 +41,7 @@ public struct AdWordModel: Sendable, Equatable {
   public init?(data: Data) {
     guard let file = try? JSONDecoder().decode(FileContents.self, from: data),
       file.version == 1, (1024...4_194_304).contains(file.buckets),
-      file.classes == Self.classes
+      file.classes == Self.classes, !file.weights.isEmpty  // no weights would call every line an ad
     else { return nil }
 
     var cutoffs = Thresholds()

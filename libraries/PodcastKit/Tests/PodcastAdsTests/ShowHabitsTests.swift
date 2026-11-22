@@ -45,6 +45,15 @@ final class ShowHabitsTests: XCTestCase {
     XCTAssertNil(habits(2, 2, ends: 40).openingEnd(show: "s"))
   }
 
+  func testTheFirstLookIsTheOpeningEndPlusTenSeconds() {
+    XCTAssertEqual(habits(5, 5, ends: 40).firstLook(show: "s"), 50)
+    XCTAssertEqual(habits(5, 5, ends: 1).firstLook(show: "s"), 15)
+    XCTAssertEqual(habits(5, 5, ends: 900).firstLook(show: "s"), 310)
+    XCTAssertNil(habits(5, 5, ends: nil).firstLook(show: "s"))
+    XCTAssertNil(habits(5, 1, ends: 40).firstLook(show: "s"))
+    XCTAssertNil(ShowHabits().firstLook(show: "s"))
+  }
+
   func testImpossibleNumbersMakeTheShowSayNothing() {
     let bad = [
       habits(-3, 0), habits(5, 6), habits(5, -1), habits(5, 5, ends: .infinity),

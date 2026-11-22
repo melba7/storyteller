@@ -56,6 +56,12 @@ public struct ShowHabits: Codable, Sendable, Equatable {
     return min(max(ends, 5), 300)
   }
 
+  /// How far a head scan should look first for a show that usually opens with an ad: the end of
+  /// its usual opening plus 10 seconds. Nil for any other show.
+  public func firstLook(show: String) -> Double? {
+    openingEnd(show: show).map { $0 + 10 }
+  }
+
   /// The habits in `data`, nil when it is not this format or version.
   public init?(data: Data) {
     guard let read = try? JSONDecoder().decode(ShowHabits.self, from: data),
