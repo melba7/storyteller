@@ -83,11 +83,12 @@ function insertEpisode(id: string, showId: string, episode: FetchedEpisode) {
 
 function updateEpisode(id: string, episode: FetchedEpisode) {
   return [
-    `UPDATE episodes SET title = ?, published_at = ?, duration_seconds = ?, notes = ?,
+    `UPDATE episodes SET guid = ?, title = ?, published_at = ?, duration_seconds = ?, notes = ?,
        audio_url = ?, audio_type = ?, audio_bytes = ?, image_url = ?, season = ?, number = ?,
        transcript_url = ?, transcript_type = ?, chapters_url = ?, people = ?
      WHERE id = ?`,
     [
+      episode.guid,
       episode.title,
       episode.publishedAt,
       episode.durationSeconds,

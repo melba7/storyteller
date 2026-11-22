@@ -103,6 +103,11 @@ function unchanged(stored: StoredEpisode, fetched: FetchedEpisode): boolean {
  * Which fetched episodes to insert (new guids) and which stored ones to update (same
  * guid, something changed). A guid the feed repeats counts once, the first time. An
  * episode that left the feed is never deleted.
+ *
+ * A fetched episode with an unknown guid first looks for a stored episode whose guid is no
+ * longer in the feed and that has the same audio address, or else the same title and date.
+ * That row takes the new guid (the update carries it), so a host that rewrites its guids
+ * does not store every episode twice. A stored row is taken at most once.
  */
 export function mergeEpisodes(
   existing: StoredEpisode[],
@@ -113,17 +118,43 @@ export function mergeEpisodes(
 } {
   const byGuid = new Map(existing.map((episode) => [episode.guid, episode]))
   const seen = new Set<string>()
-  const insert: FetchedEpisode[] = []
+  const fresh: FetchedEpisode[] = []
   const update: { id: string; episode: FetchedEpisode }[] = []
   for (const episode of fetched) {
     if (seen.has(episode.guid)) continue
     seen.add(episode.guid)
     const stored = byGuid.get(episode.guid)
-    if (!stored) insert.push(episode)
+    if (!stored) fresh.push(episode)
     else if (!unchanged(stored, episode))
       update.push({ id: stored.id, episode })
   }
-  return { insert, update }
+  const gone = existing.filter((episode) => !seen.has(episode.guid))
+  const moved = new Set<FetchedEpisode>()
+  const take = (
+    episode: FetchedEpisode,
+    matches: (stored: StoredEpisode) => boolean,
+  ) => {
+    const at = gone.findIndex(matches)
+    if (at < 0) return
+    const [stored] = gone.splice(at, 1)
+    if (stored) update.push({ id: stored.id, episode })
+    moved.add(episode)
+  }
+  for (const episode of fresh) {
+    if (episode.audioUrl === "") continue
+    take(episode, (stored) => stored.audioUrl === episode.audioUrl)
+  }
+  for (const episode of fresh) {
+    if (moved.has(episode) || episode.title === "") continue
+    if (episode.publishedAt === null) continue
+    take(
+      episode,
+      (stored) =>
+        stored.title === episode.title &&
+        stored.publishedAt === episode.publishedAt,
+    )
+  }
+  return { insert: fresh.filter((episode) => !moved.has(episode)), update }
 }
 
 // MARK: Sorting and reading
