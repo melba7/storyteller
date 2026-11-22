@@ -61,7 +61,10 @@ final class AdSoundScannerTests: XCTestCase {
     let hits = scan([ad], Array(adIds[40...]) + Snd.ids(2000..<2050))
     XCTAssertEqual(hits.count, 1)
     XCTAssertEqual(hits[0].start, 0)
-    XCTAssertEqual(hits[0].end, ad.seconds, accuracy: 1e-9)
+    // Only frames 40 to 99 of the sound were there: the hit ends where the matching stopped (one
+    // step after the last anchor that matched), not after the sound's whole length.
+    XCTAssertEqual(hits[0].end, Snd.time(60), accuracy: 8 * Snd.duration)
+    XCTAssertLessThan(hits[0].end, ad.seconds)
   }
 
   func testRepeatedIdenticalFramesStartNoTrail() {

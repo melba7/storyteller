@@ -67,7 +67,14 @@ public enum LocalAdsFile {
       sha256: store.sha256, detector: detector, detectorVersion: detectorVersion,
       osVersion: osVersion, duration: duration, ads: [],
       undone: store.undoneSoFar(detector: detector))
-    let modelAds = afterFailure ? partial?.ads ?? [] : []
+    // After a failed run, what the model found stays: the pieces done now, and the ads of an
+    // older model result that is being replaced (a local-only final file has none to keep).
+    var modelAds = afterFailure ? partial?.ads ?? [] : []
+    if afterFailure, let older = store.load(detector: detector),
+      older.detectorVersion != localVersion
+    {
+      modelAds += older.ads
+    }
     file.ads = AdJoin.join((found + modelAds).filter { !file.isUndone($0) })
     try store.save(file)
     if !afterFailure { store.removeScratch(detector: detector) }

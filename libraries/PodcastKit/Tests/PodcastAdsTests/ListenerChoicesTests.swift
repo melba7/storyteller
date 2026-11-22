@@ -89,6 +89,35 @@ final class ListenerChoicesTests: XCTestCase {
     XCTAssertEqual(undone.count, 2, "no skip is listed twice")
   }
 
+  func testAFailedModelRunKeepsTheOlderModelResultAndItsUndone() throws {
+    var old = AdsFile(
+      sha256: "aa", detector: "local", detectorVersion: "1", osVersion: "26", duration: 3000,
+      ads: [ad(100, 130), ad(1200, 1230), ad(2400, 2430)])
+    old.undone = [UndoneAd(start: 2400, end: 2430)]
+    try store.save(old)
+    let partial = AdsFile(
+      sha256: "aa", detector: "local", detectorVersion: "2", osVersion: "26", duration: 3000,
+      ads: [ad(100, 130)], coveredUntil: 600)
+    try store.savePartial(partial)
+    let saved = try LocalAdsFile.saveFinal(
+      [ad(100, 130)], store: store, detector: "local", detectorVersion: LocalAdsFile.localVersion,
+      osVersion: "26", duration: 3000, afterFailure: true)
+    XCTAssertEqual(saved.ads.map(\.start), [100, 1200])
+    XCTAssertEqual(saved.undone, [UndoneAd(start: 2400, end: 2430)])
+    let skipper = AdSkipper(file: store.best(detector: "local"), settings: AdSkipSettings())
+    XCTAssertEqual(skipper.ads.map(\.start), [100, 1200])
+  }
+
+  func testAFailedModelRunDoesNotKeepALocalOnlyFinalFilesAds() throws {
+    _ = try LocalAdsFile.saveFinal(
+      [ad(500, 530)], store: store, detector: "local", detectorVersion: LocalAdsFile.localVersion,
+      osVersion: "26", duration: 3000)
+    let saved = try LocalAdsFile.saveFinal(
+      [ad(100, 130)], store: store, detector: "local", detectorVersion: LocalAdsFile.localVersion,
+      osVersion: "26", duration: 3000, afterFailure: true)
+    XCTAssertEqual(saved.ads.map(\.start), [100])
+  }
+
   func testANewAdBesideAnUndoneOneIsNotJoinedToIt() {
     XCTAssertTrue(addToPartial([ad(100, 130)], covered: 200))
     XCTAssertTrue(store.markUndone(detector: "local", adStart: 100))

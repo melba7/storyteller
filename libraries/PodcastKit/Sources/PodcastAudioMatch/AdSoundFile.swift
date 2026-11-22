@@ -21,7 +21,7 @@ public enum AdSoundFile {
     while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
       found += scanner.feed(reader.feed([UInt8](chunk)))
     }
-    return ordered(found)
+    return ordered(found + scanner.finish())
   }
 
   /// The taught sounds in `data`, the first bytes of a stream or a whole file held in memory.
@@ -38,7 +38,7 @@ public enum AdSoundFile {
       found += scanner.feed(reader.feed([UInt8](data[at..<end])))
       at = end
     }
-    return ordered(found)
+    return ordered(found + scanner.finish())
   }
 
   private static func ordered(_ hits: [AdSoundHit]) -> [AdSoundHit] {

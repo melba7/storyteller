@@ -24,7 +24,9 @@ public struct AdSoundBuilder: Sendable {
 
   private var sounds: [AdSound] = []
   private var episodes: [Set<String>] = []  // for each sound, the episodes it was seen in
-  private var scanner: AdSoundScanner?  // over the sounds so far; made when needed
+  private var scanner: AdSoundScanner?  // over the sounds so far; made when needed, then added to
+  /// How far the frame counts of two stretches of one sound may differ: a few anchors.
+  static let frameTolerance = 4 * AdSoundLibrary.step
 
   public init() {}
 
@@ -44,14 +46,14 @@ public struct AdSoundBuilder: Sendable {
         if episodes[index].insert(episode).inserted { sounds[index].seen += 1 }
         continue
       }
-      sounds.append(
-        AdSound(
-          sort: stretch.sort, who: stretch.who, frames: slice.count, seconds: seconds, seen: 1,
-          anchors: stride(from: 0, to: slice.count, by: AdSoundLibrary.step).map {
-            UInt32(truncatingIfNeeded: slice[$0].hash)
-          }))
+      let sound = AdSound(
+        sort: stretch.sort, who: stretch.who, frames: slice.count, seconds: seconds, seen: 1,
+        anchors: stride(from: 0, to: slice.count, by: AdSoundLibrary.step).map {
+          UInt32(truncatingIfNeeded: slice[$0].hash)
+        })
+      sounds.append(sound)
       episodes.append([episode])
-      scanner = nil
+      scanner?.add(sound)
     }
   }
 
@@ -66,21 +68,28 @@ public struct AdSoundBuilder: Sendable {
     return low
   }
 
-  /// The sound already added that covers at least half of the frames, if there is one.
+  /// The sound already added that is this stretch again, if there is one: it covers at least
+  /// half of the frames, and has nearly as many frames as the stretch (a 30 second cut of a
+  /// 60 second sound is another sound).
   private mutating func knownSound(_ slice: [MP3Frame], seconds: Double) -> Int? {
     guard !sounds.isEmpty, let first = slice.first else { return nil }
     if scanner == nil { scanner = AdSoundScanner(library: AdSoundLibrary(sounds: sounds)) }
     var scan = scanner!
     // The times count from the stretch's own start, so a sound that began earlier starts at 0.
-    let hits = scan.feed(slice.map { var frame = $0; frame.start -= first.start; return frame })
-    let covered = hits.map { (sound: $0.sound, seconds: min($0.end, seconds) - max($0.start, 0)) }
+    let hits =
+      scan.feed(slice.map { var frame = $0; frame.start -= first.start; return frame })
+      + scan.finish()
+    let covered = hits.filter {
+      abs(sounds[$0.sound].frames - slice.count) <= Self.frameTolerance
+    }.map { (sound: $0.sound, seconds: min($0.end, seconds) - max($0.start, 0)) }
     guard let best = covered.max(by: { $0.seconds < $1.seconds }), best.seconds * 2 >= seconds
     else { return nil }
     return best.sound
   }
 
-  /// The library, the most seen sounds first, cut to fit `maxBytes` when written.
-  public func library(maxBytes: Int = AdSoundLibrary.maxBytes) -> AdSoundLibrary {
+  /// The library, the most seen sounds first, cut to fit `maxBytes` when written. The default is
+  /// what the Mac publishes (`AdSoundLibrary.publishBytes`), less than the phone accepts.
+  public func library(maxBytes: Int = AdSoundLibrary.publishBytes) -> AdSoundLibrary {
     let ordered = sounds.enumerated().sorted { ($0.element.seen, $1.offset) > ($1.element.seen, $0.offset) }
       .map(\.element)
     func fits(_ count: Int) -> Bool {

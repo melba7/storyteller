@@ -32,7 +32,14 @@ public struct AdSoundLibrary: Sendable, Equatable {
   public static let currentVersion = 1
   public static let fileName = "ad-sounds.json"
   public static let step = 8
+  /// The most bytes the phone reads.
   public static let maxBytes = 5_000_000
+  /// The most bytes the Mac publishes (`teach_publish.py` refuses a larger file).
+  public static let publishBytes = 4_500_000
+  /// The most frames a sound may have: ten minutes of the shortest MP3 frames (24 ms).
+  static let maxFrames = 25_000
+  /// The most episodes a sound may claim to have been seen in.
+  static let maxSeen = 1_000_000
   static let sorts: Set<String> = ["sponsor", "network_promo", "host_ask", "intro_credits"]
   static let minAnchors = 8
 
@@ -79,7 +86,8 @@ public struct AdSoundLibrary: Sendable, Equatable {
 
   /// The sound of one entry of the file, or nil when it breaks a rule of the format.
   private static func sound(_ wire: Wire) -> AdSound? {
-    guard sorts.contains(wire.sort), wire.frames >= 1, wire.seconds.isFinite,
+    guard sorts.contains(wire.sort), (1...maxFrames).contains(wire.frames),
+      (0...maxSeen).contains(wire.seen), wire.seconds.isFinite,
       (1...600).contains(wire.seconds), let bytes = Data(base64Encoded: wire.anchors),
       bytes.count % 4 == 0, bytes.count / 4 >= minAnchors,
       bytes.count / 4 == (wire.frames + step - 1) / step
