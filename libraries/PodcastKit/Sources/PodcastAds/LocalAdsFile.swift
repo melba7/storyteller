@@ -24,7 +24,7 @@ public enum LocalAdsFile {
       ?? AdsFile(
         sha256: store.sha256, detector: detector, detectorVersion: detectorVersion,
         osVersion: osVersion, duration: duration, ads: [])
-    let ads = AdJoin.join(file.ads + added)
+    let ads = joined(file, adding: added)
     let reach = max(file.coveredUntil ?? covered, covered)
     guard existing == nil || ads != file.ads || reach != file.coveredUntil else { return false }
     file.ads = ads
@@ -32,11 +32,19 @@ public enum LocalAdsFile {
     return (try? store.savePartial(file)) != nil
   }
 
+  /// The file's ads and `added` joined. Ads the listener undid take no part in the join (a new
+  /// ad beside one would be joined to it and lost with it); they stay in the list as they were.
+  private static func joined(_ file: AdsFile, adding added: [FoundAd]) -> [FoundAd] {
+    let undone = file.ads.filter { file.isUndone($0) }
+    let live = file.ads.filter { !file.isUndone($0) }
+    return (AdJoin.join(live + added) + undone).sorted { $0.start < $1.start }
+  }
+
   /// Adds `found` to the episode's final ads file. The file as it is now, or nil when there is none.
   @discardableResult
   public static func addToFinal(_ found: [FoundAd], store: AdsStore, detector: String) -> AdsFile? {
     guard var file = store.load(detector: detector) else { return nil }
-    let ads = AdJoin.join(file.ads + found.filter { !file.isUndone($0) })
+    let ads = joined(file, adding: found.filter { !file.isUndone($0) })
     guard ads != file.ads else { return file }
     let before = file
     file.ads = ads
@@ -57,7 +65,8 @@ public enum LocalAdsFile {
     let partial = store.loadPartial(detector: detector)
     var file = AdsFile(
       sha256: store.sha256, detector: detector, detectorVersion: detectorVersion,
-      osVersion: osVersion, duration: duration, ads: [], undone: partial?.undone ?? [])
+      osVersion: osVersion, duration: duration, ads: [],
+      undone: store.undoneSoFar(detector: detector))
     let modelAds = afterFailure ? partial?.ads ?? [] : []
     file.ads = AdJoin.join((found + modelAds).filter { !file.isUndone($0) })
     try store.save(file)

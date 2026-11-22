@@ -45,10 +45,18 @@ extension Array where Element == AdTrim {
 
 extension FoundAd {
   /// This ad cut short by the trims that are for it: it ends at the earliest of its own end and
-  /// theirs. An ad is never made longer.
+  /// theirs. An ad is never made longer. An ad that starts inside a trimmed stretch and runs past
+  /// its new end (the rest of what the listener went back into, found as a second ad when
+  /// another ad was joined to the first) is cut there too.
   func trimmed(by trims: [AdTrim]) -> FoundAd {
     var ad = self
-    for trim in trims where trim.applies(to: self) { ad.end = min(ad.end, trim.end) }
+    for trim in trims {
+      if trim.applies(to: self) {
+        ad.end = min(ad.end, trim.end)
+      } else if start >= trim.adStart - 0.5, start < trim.end, end > trim.end {
+        ad.end = trim.end
+      }
+    }
     return ad
   }
 }
@@ -137,14 +145,28 @@ public struct AdsStore: Sendable {
       to: url(detector: file.detector), options: .atomic)
   }
 
-  /// `file` with the trims already saved for this detector (in its final or partial file). A
-  /// detector that writes a file does not know them, and the listener's trims must outlive it.
+  /// `file` with the trims and undone skips already saved for this detector (in its final or
+  /// partial file). A detector that writes a file does not know them, and the listener's choices
+  /// must outlive it.
   func carryingTrims(_ file: AdsFile) -> AdsFile {
     var carried = file
     for earlier in [load(detector: file.detector), loadPartial(detector: file.detector)] {
       for trim in earlier?.trims ?? [] { carried.addTrim(trim) }
+      for undone in earlier?.undone ?? [] where !carried.undone.contains(undone) {
+        carried.undone.append(undone)
+      }
     }
     return carried
+  }
+
+  /// What the listener undid for this detector so far, in its final file and its partial file.
+  /// A file that is written again starts from this list, so an undone skip is never forgotten.
+  func undoneSoFar(detector: String) -> [UndoneAd] {
+    var list: [UndoneAd] = []
+    for earlier in [load(detector: detector), loadPartial(detector: detector)] {
+      for undone in earlier?.undone ?? [] where !list.contains(undone) { list.append(undone) }
+    }
+    return list
   }
 
   /// The detector's result for this file, or nil when there is none, it cannot be read, or it
@@ -165,13 +187,14 @@ public struct AdsStore: Sendable {
     return String(data: data, encoding: .utf8)
   }
 
-  /// Records that the listener undid the skip of the ad starting at `start`. False when
-  /// there is no such ad in the file. Undoing twice is recorded once.
+  /// Records that the listener undid the skip of the ad starting at `start` (or the ad that now
+  /// covers that place, when a join moved its start). False when there is no such ad in the file. Undoing twice is recorded once.
   @discardableResult
   public func markUndone(detector: String, adStart start: Double) -> Bool {
     let isFinal = load(detector: detector) != nil
     guard var file = best(detector: detector),
       let ad = file.ads.first(where: { abs($0.start - start) < 0.5 })
+        ?? file.ads.first(where: { $0.start - 0.5 <= start && start < $0.end })
     else { return false }
     if !file.isUndone(ad) { file.undone.append(UndoneAd(start: ad.start, end: ad.end)) }
     return (try? (isFinal ? save(file) : savePartial(file))) != nil
