@@ -9,7 +9,7 @@ Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
 
-from teach_feed import episode_id
+from teach_feed import episode_id, feed_key, is_web_address
 
 WANTED = "wanted.json"
 MOST = 20
@@ -38,6 +38,30 @@ def load_wanted(folder, say):
         say("The list of wanted episodes in %s is damaged (%s), so it was ignored." % (path, error))
         return []
     return [item for item in data["episodes"] if usable(item)]
+
+
+def followed_only(wanted, shows, say):
+    """The wanted entries whose feed is a followed show (matched by feed key), each with that show's
+    own feed address. Entries with an address that is not http or https, or whose feed is not
+    followed, are counted and left out with one line."""
+    own = {}
+    for show in shows:
+        own.setdefault(feed_key(show["feed"]), show["feed"])
+    kept, unsafe, unfollowed = [], 0, 0
+    for item in wanted:
+        if not is_web_address(item["feed"]) or (item["address"] and not is_web_address(item["address"])):
+            unsafe += 1
+        elif feed_key(item["feed"]) not in own:
+            unfollowed += 1
+        else:
+            kept.append(dict(item, feed=own[feed_key(item["feed"])]))
+    if unsafe:
+        say("Left out %d wanted episode%s whose address is not an http or https address."
+            % (unsafe, "" if unsafe == 1 else "s"))
+    if unfollowed:
+        say("Left out %d wanted episode%s whose feed is not one of the shows you follow."
+            % (unfollowed, "" if unfollowed == 1 else "s"))
+    return kept
 
 
 def find(episodes, item):

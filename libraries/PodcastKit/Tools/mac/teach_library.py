@@ -59,9 +59,9 @@ def words_of(text):
     return found[:WORD_LIMIT]
 
 
-def runs(normalised):
-    """The set of 3-word runs of a list of normalised words."""
-    return {tuple(normalised[i:i + 3]) for i in range(len(normalised) - 2)}
+def runs(normalised, size=3):
+    """The set of `size`-word runs (3 by default) of a list of normalised words."""
+    return {tuple(normalised[i:i + size]) for i in range(len(normalised) - size + 1)}
 
 
 def same_ad(one, other):

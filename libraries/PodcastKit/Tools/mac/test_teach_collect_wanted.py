@@ -62,7 +62,7 @@ class PlanWantedTests(unittest.TestCase):
         self.assertEqual(entry["id"], tc.episode_id(A, "ga1", "https://cdn/a1.mp3"))
         tc.check_entry(entry)
 
-    def test_a_feed_that_is_not_followed_is_fetched_too_and_named_by_itself(self):
+    def test_a_feed_that_is_not_followed_is_not_fetched_and_the_entry_is_left_out(self):
         feeds = FeedsWithGuids().feeds
         asked = []
         plain = fetcher(feeds)
@@ -71,12 +71,36 @@ class PlanWantedTests(unittest.TestCase):
             asked.append(address)
             return plain(address)
 
-        entries = tc.plan(SHOWS, set(), 1, counting, 0, lambda s: None, lambda m: None, None,
+        lines = []
+        entries = tc.plan(SHOWS, set(), 1, counting, 0, lambda s: None, lines.append, None,
                           wanted=[want(OTHER, "gfar1"), want(OTHER, "gfar2")], wanted_most=20)
-        self.assertEqual([e["title"] for e in entries[:2]], ["far1", "far2"])
-        self.assertEqual(entries[0]["show"], "Show")  # the feed's own title, from teach_testing.feed
-        self.assertEqual(sorted(asked), sorted([s["feed"] for s in SHOWS] + [OTHER]))
-        tc.check_entry(entries[0])
+        self.assertEqual([e["title"] for e in entries], ["a3", "b3", "c3"])
+        self.assertEqual(sorted(asked), sorted(s["feed"] for s in SHOWS))
+        self.assertEqual(len(lines), 1)
+        self.assertIn("Left out 2 wanted episodes whose feed is not one of the shows you follow",
+                      lines[0])
+
+    def test_the_phones_spelling_of_a_feed_finds_the_followed_show_and_its_own_id(self):
+        # The phone writes no scheme or a different case, and a closing slash; the show keeps the
+        # followed spelling, so the episode has the id it would have as a newest one.
+        for spelling in ("http://F/a/", "https://www.f/a", "HTTPS://f/a#x"):
+            entries = self.plan([want(spelling, "ga1", address="https://cdn/a1.mp3")])
+            self.assertEqual(entries[0]["feed"], A, spelling)
+            self.assertEqual(entries[0]["id"], tc.episode_id(A, "ga1", "https://cdn/a1.mp3"))
+
+    def test_the_same_episode_is_not_planned_twice_under_two_spellings(self):
+        known = [tc.episode_id(A, "ga1", "https://cdn/a1.mp3")]
+        entries = self.plan([want("http://www.f/a/", "ga1")], known=known)
+        self.assertEqual([e["title"] for e in entries], ["a3", "b3", "c3"])
+
+    def test_an_address_that_is_not_http_or_https_is_left_out_and_counted(self):
+        lines = []
+        entries = self.plan([want("file:///etc/feed", "ga1"),
+                             want(A, "ga1", address="ftp://cdn/a1.mp3"), want(A, "ga2")],
+                            lines=lines)
+        self.assertEqual([e["title"] for e in entries][:1], ["a2"])
+        self.assertEqual(lines, ["Left out 2 wanted episodes whose address is not an http or "
+                                 "https address."])
 
     def test_a_followed_feed_is_fetched_only_once(self):
         feeds = FeedsWithGuids().feeds
@@ -123,22 +147,17 @@ class PlanWantedTests(unittest.TestCase):
 
     def test_a_wanted_feed_that_cannot_be_read_is_said_and_the_rest_goes_on(self):
         feeds = FeedsWithGuids().feeds
-        feeds[OTHER] = None
+        feeds[B] = None
         lines = []
-        entries = self.plan([want(OTHER, "gfar1", title="Far one"), want(A, "ga1")], feeds=feeds,
+        entries = self.plan([want(B, "gb1", title="B one"), want(A, "ga1")], feeds=feeds,
                             lines=lines)
         self.assertEqual(entries[0]["title"], "a1")
-        self.assertEqual(len(lines), 1)
-        self.assertIn("Far one", lines[0])
-        self.assertIn("could not be read", lines[0])
+        self.assertEqual(len(lines), 2)
+        self.assertIn("B one", lines[1])
+        self.assertIn("could not be read", lines[1])
 
     def test_without_wanted_the_plan_is_as_before(self):
         self.assertEqual([e["title"] for e in self.plan([])], ["a3", "b3", "c3"])
-
-    def test_the_pause_also_comes_between_the_extra_feeds(self):
-        naps = []
-        self.plan([want(OTHER, "gfar1")], naps=naps)
-        self.assertEqual(naps, [1.0, 1.0, 1.0])
 
 
 class LoadWantedTests(unittest.TestCase):
@@ -203,6 +222,10 @@ class CollectWantedTests(unittest.TestCase):
             handle.write(b"x")
         return {"bytes": 1, "sha256": "ab" * 32, "host": "cdn"}
 
+    def follow_the_far_show(self):
+        with open(self.shows, "w", encoding="utf-8") as handle:
+            json.dump({"shows": SHOWS[:1] + [{"feed": OTHER, "title": "Far"}]}, handle)
+
     def wanted(self, *episodes):
         os.makedirs(self.folder, exist_ok=True)
         with open(os.path.join(self.folder, "wanted.json"), "w", encoding="utf-8") as f:
@@ -214,6 +237,7 @@ class CollectWantedTests(unittest.TestCase):
                        sleep=lambda s: None, say=self.lines.append)
 
     def test_the_wanted_episodes_are_downloaded_first_and_added_to_the_list(self):
+        self.follow_the_far_show()
         self.wanted(want(A, "ga1"), want(OTHER, "gfar2"))
         self.assertEqual(self.run_main(), 0, self.lines)
         self.assertEqual(self.downloaded, ["https://cdn/a1.mp3", "https://far/2.mp3", "https://cdn/a3.mp3"])
@@ -230,9 +254,10 @@ class CollectWantedTests(unittest.TestCase):
     def test_the_default_is_20(self):
         self.feeds[OTHER] = feed(*[dated("far%d" % n, n % 28 + 1, "https://far/%d.mp3" % n,
                                          guid="gfar%d" % n) for n in range(30)])
+        self.follow_the_far_show()
         self.wanted(*[want(OTHER, "gfar%d" % n) for n in range(30)])
         self.run_main("--list")
-        self.assertTrue(any("21 episodes" in line for line in self.lines), self.lines)
+        self.assertTrue(any("22 episodes" in line for line in self.lines), self.lines)
 
     def test_a_damaged_wanted_file_is_ignored_with_one_line_and_the_run_goes_on(self):
         os.makedirs(self.folder)

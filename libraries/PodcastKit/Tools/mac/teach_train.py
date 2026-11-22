@@ -3,8 +3,8 @@
 teaching run, and writes it as ad-model.json.
 
 Standard library only. It reads <folder>/episodes.json, <folder>/transcripts/<id>.txt and
-<folder>/<labels>/<id>.json (written by teach_label.py), and writes <folder>/shelf.json and
-<folder>/ad-model.json. How a line becomes words, features and buckets is the contract with the
+<folder>/<labels>/<id>.json (written by teach_label.py), and writes <folder>/ad-model.json and
+then <folder>/shelf.json, so an old model never sits beside a newer shelf. How a line becomes words, features and buckets is the contract with the
 phone and lives in teach_features.py.
 
   teach_train.py [--folder F] [--labels labels] [--epochs 5] [--seed 1] [--min-episodes 20]
@@ -14,14 +14,17 @@ phone and lives in teach_features.py.
   that only a low-confidence segment covers is left out, in training and in the check.
 - The shelf is a set of held-out episodes: for each show (by feed) with at least 3 usable episodes,
   its newest one. It is never trained on, stays on the shelf in later runs, and a show with one on
-  the shelf gets no second. The file shelf.json is rewritten only when it changes.
+  the shelf gets no second. The file shelf.json is rewritten only when it changes, and only after
+  the model is written. An episode that repeats a shelf episode (same feed key and guid, same audio
+  SHA-256, or more than half of its 5-word runs the same, see teach_overlap.py) is left out of
+  training, and the tool says how many.
 - Training is softmax regression on the hashed features with AdaGrad (rate 0.5), L2 of 1e-6 on the
   weights an example touches, and each example's loss weighted by min(5, none count / class count).
   It is deterministic for a given --seed.
-- After training the shelf is scored and the precision and recall are printed and saved in the
-  model under trained.heldOut: "anyAd" (not "none", predicted when the chance of "none" is below
-  0.5) and "classes" (the four ad sorts, predicted as the most likely class). A ratio with nothing
-  to divide by is null.
+- After training the shelf is scored and the numbers are printed and saved in the model under
+  trained.heldOut: "episodes", "shows", "predictedAdSeconds" (what teach_publish.py needs before it
+  publishes), "anyAd" (precision and recall in seconds of the spans the phone would cut, see
+  teach_spans.py), and per line "lineAnyAd" and "classes". A ratio with nothing to divide by is null.
 - The model keeps at most 40,000 buckets (those with the biggest weights) and stays under 4.5 MB.
 - With fewer than --min-episodes training episodes nothing is trained or written.
 
@@ -40,6 +43,7 @@ from array import array
 
 import teach_segments as seg
 import teach_store
+from teach_overlap import same_episode_ids
 from teach_shelf import SHELF_FILE, check_lines, choose_shelf, evaluate, read_shelf
 from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities  # noqa: F401
 
@@ -223,6 +227,8 @@ def write_text(path, text):
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as f:
             f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(temporary, path)
     except BaseException:
         if os.path.exists(temporary):
@@ -276,11 +282,16 @@ def main(argv, say=print, now=None):
             if found:
                 episodes[entry["id"]] = found
         shelf = choose_shelf(entries, set(episodes), old_shelf)
-        if shelf != old_shelf:
-            teach_store.write_json(os.path.join(folder, SHELF_FILE), {"version": 1, "episodes": shelf})
         on_shelf = set(shelf)
         shelved = [e for i, e in episodes.items() if i in on_shelf]
         learning = [e for i, e in episodes.items() if i not in on_shelf]
+        repeats = set(same_episode_ids(folder, {e["id"]: e for e in entries},
+                                       [e["id"] for e in shelved], [e["id"] for e in learning]))
+        if repeats:
+            learning = [e for e in learning if e["id"] not in repeats]
+            say("Left %d episode%s out of training because %s the same as one on the shelf."
+                % (len(repeats), "" if len(repeats) == 1 else "s",
+                   "it is" if len(repeats) == 1 else "they are"))
         if len(learning) < options.min_episodes:
             say("Only %d episodes are marked and not on the shelf; at least %d are needed to train, "
                 "so no model was written." % (len(learning), options.min_episodes))
@@ -295,6 +306,8 @@ def main(argv, say=print, now=None):
         text = build_model(flat, trained, lambda kept: evaluate(kept, shelved))
         path = os.path.join(folder, MODEL_FILE)
         write_text(path, text)
+        if shelf != old_shelf:
+            teach_store.write_json(os.path.join(folder, SHELF_FILE), {"version": 1, "episodes": shelf})
     except teach_store.Problem as error:
         say(str(error))
         return 2

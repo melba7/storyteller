@@ -23,9 +23,11 @@ that is bigger than the file limit is marked "skipped: ..." and not tried again.
 
 When the folder has a wanted.json (teach_feedback.py writes it from the phone's notes), the episodes
 in it are planned before the newest episodes of each show, whatever --per-show says, at most
---wanted of them in one run. A wanted episode is looked up in its show's feed by guid (or by audio
-address when it has no guid); a feed that is not among the followed shows is read too. One that is
-no longer in its feed, or already gathered, is left out. A damaged wanted.json is ignored.
+--wanted of them in one run. A wanted episode is matched to a followed show by its feed key (see teach_feed.feed_key), so the
+phone's spelling of a feed finds the show, and is planned under the show's own feed address and id.
+It is looked up in the show's feed by guid (or by audio address when it has no guid). One whose
+feed is not followed, whose address is not http or https, that is no longer in its feed, or that is
+already gathered, is left out and counted. A damaged wanted.json is ignored.
 
 --list only reads the feeds and says what a run would download. Exit codes: 0 it ran, 2 the shows
 file cannot be read, the folder cannot be written, episodes.json is damaged or another run is
@@ -42,7 +44,7 @@ import probe_shows as probe
 import teach_fetch as fetching
 import teach_wanted
 from teach_wanted import wanted_entries
-from teach_feed import audio_name, episode_id, feed_episodes, feed_title
+from teach_feed import audio_name, episode_id, feed_episodes
 from teach_store import (FIELDS, FOLDER, MANIFEST, Busy, ManifestError, check_entry,  # noqa: F401
                          load_manifest, run_lock, save_manifest)
 
@@ -71,8 +73,8 @@ def plan(shows, known_ids, per_show, fetch=fetching.fetch_feed, pause=probe.PAUS
     at most `wanted_most`, whatever `per_show` says), then those of every show in round-robin
     order: every show's newest first (shows in file order), then every show's second newest, and so
     on, so a size cap still covers every show. A feed that cannot be fetched or read is skipped
-    with one line and does not count as read. A wanted episode whose feed is not among `shows` has
-    its feed fetched too. `stats`, when given, gets "shows_read", the number of followed feeds that
+    with one line and does not count as read. A wanted episode is matched to a followed show by feed key
+    and planned under that show's own spelling and id; one whose feed is not followed is left out. `stats`, when given, gets "shows_read", the number of followed feeds that
     were read, and "listed", {id: {"address", "size", "type"}} for every episode the feeds list now
     (known or new)."""
     columns, listed, lookups = [], {}, {}
@@ -82,31 +84,24 @@ def plan(shows, known_ids, per_show, fetch=fetching.fetch_feed, pause=probe.PAUS
         listed[entry["id"]] = {key: episode[key] for key in ("address", "size", "type")}
         return entry
 
+    wanted = teach_wanted.followed_only(wanted, shows, say)
     wanted_feeds = {item["feed"] for item in wanted}
-    followed = {show["feed"] for show in shows}
-    extra = [{"feed": address, "title": address} for address in dict.fromkeys(
-        item["feed"] for item in wanted) if address not in followed]
-    for index, show in enumerate(list(shows) + extra):
+    for index, show in enumerate(shows):
         if index:
             sleep(pause)
-        is_followed = index < len(shows)
         try:
             data = fetch(show["feed"])
-            episodes = feed_episodes(data, per_show) if is_followed else []
+            episodes = feed_episodes(data, per_show)
             if show["feed"] in wanted_feeds:
-                lookups[show["feed"]] = (show["title"] if is_followed else
-                                         feed_title(data) or show["feed"],
-                                         feed_episodes(data, ALL))
+                lookups[show["feed"]] = (show["title"], feed_episodes(data, ALL))
         except Exception as error:  # a dead feed must not stop the others
-            if is_followed:
-                say("Skipped %s: its feed could not be read (%s)"
-                    % (show["title"], str(error) or error.__class__.__name__))
+            say("Skipped %s: its feed could not be read (%s)"
+                % (show["title"], str(error) or error.__class__.__name__))
             continue
         column = []
         for episode in episodes:
             column.append(make(show["title"], show["feed"], episode))
-        if is_followed:
-            columns.append(column)
+        columns.append(column)
     first = wanted_entries(wanted, lookups, known_ids, wanted_most, say, make)
     if stats is not None:
         stats.update(shows_read=len(columns), listed=listed)

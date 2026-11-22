@@ -27,6 +27,36 @@ NUMBER_REFERENCE = re.compile(r"&#(?:([0-9]+)|x([0-9A-Fa-f]+));")
 DECLARED_ENCODING = re.compile(rb"^\s*<\?xml[^>]*?encoding\s*=\s*[\"']([A-Za-z0-9._-]+)[\"']")
 
 
+FEED_SCHEME = re.compile(r"^(?:[a-z][a-z0-9+.-]*:)?//([^/?]*)(.*)$", re.IGNORECASE)
+TRAILING_SLASHES = re.compile(r"/+(?=\?|\Z)")
+
+
+def feed_key(address):
+    """One key for every spelling of a feed address: no scheme, no `www.`, the host in lower case,
+    no fragment and no closing slash. The path and query keep their case. It is the same key as
+    `feedKey` in applePodcasts.ts and FeedKey.swift, so the phone and the Mac meet through it."""
+    text = address.strip()
+    if "#" in text:
+        text = text[:text.index("#")]
+    found = FEED_SCHEME.match(text)
+    if found:
+        host, rest = found.group(1), found.group(2)
+    else:
+        host = re.split(r"[/?]", text)[0]
+        rest = text[len(host):]
+    host = host.lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host + TRAILING_SLASHES.sub("", rest, count=1)
+
+
+def is_web_address(address):
+    """True for an address that starts with http:// or https:// (in any case) and names a host.
+    Anything else (file:, ftp:, feed:, no scheme) is not fetched."""
+    found = re.match(r"^https?://([^/?#\s]+)", address, re.IGNORECASE) if isinstance(address, str) else None
+    return bool(found)
+
+
 class FeedError(ValueError):
     """The feed is not XML, even after cleaning."""
 

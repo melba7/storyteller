@@ -148,6 +148,51 @@ class AudioNameTests(unittest.TestCase):
             self.assertTrue(FILE_PATTERN.match(name), name)
 
 
+class FeedKeyTests(unittest.TestCase):
+    """The same cases as FeedKeyTests.swift and feedKey in applePodcasts.test.ts."""
+
+    def test_spellings_of_one_address_match(self):
+        key = tf.feed_key("https://example.com/feed.xml")
+        for spelling in ("http://example.com/feed.xml", "HTTPS://Example.COM/feed.xml#top",
+                         "https://www.example.com/feed.xml", "feed://example.com/feed.xml"):
+            self.assertEqual(tf.feed_key(spelling), key, spelling)
+        self.assertEqual(tf.feed_key("https://example.com/feed/"),
+                         tf.feed_key("https://example.com/feed"))
+        self.assertEqual(tf.feed_key("https://example.com/feed/?a=1"),
+                         tf.feed_key("https://example.com/feed?a=1"))
+
+    def test_different_feeds_stay_apart(self):
+        self.assertNotEqual(tf.feed_key("https://example.com/a"), tf.feed_key("https://example.com/b"))
+        self.assertNotEqual(tf.feed_key("https://example.com/feed?show=1"),
+                            tf.feed_key("https://example.com/feed?show=2"))
+        self.assertNotEqual(tf.feed_key("https://example.com/Feed"),
+                            tf.feed_key("https://example.com/feed"))
+
+    def test_the_key_itself(self):
+        self.assertEqual(tf.feed_key("https://www.Show-B.test/rss/"), "show-b.test/rss")
+        self.assertEqual(tf.feed_key("  https://Example.com/Feed?A=1#x  "), "example.com/Feed?A=1")
+        self.assertEqual(tf.feed_key("//example.com/a//"), "example.com/a")
+
+    def test_an_address_with_no_scheme_is_kept_by_its_host_and_path(self):
+        self.assertEqual(tf.feed_key("Example.com/feed/"), "example.com/feed")
+        self.assertEqual(tf.feed_key("www.example.com?x=1"), "example.com?x=1")
+        self.assertEqual(tf.feed_key(""), "")
+
+    def test_a_key_is_its_own_key(self):
+        for address in ("https://www.Show-B.test/rss/", "example.com/feed?a=1", "feed://x.test/"):
+            key = tf.feed_key(address)
+            self.assertEqual(tf.feed_key(key), key)
+
+
+class WebAddressTests(unittest.TestCase):
+    def test_only_http_and_https_with_a_host(self):
+        for good in ("http://a.test/x", "HTTPS://a.test", "https://a.test:8080/feed?x=1"):
+            self.assertTrue(tf.is_web_address(good), good)
+        for bad in ("file:///etc/passwd", "ftp://a.test/x", "feed://a.test/x", "a.test/feed",
+                    "https://", "https:///x", "", "javascript:alert(1)", None, 5):
+            self.assertFalse(tf.is_web_address(bad), bad)
+
+
 class FeedTitleTests(unittest.TestCase):
     def test_the_title_of_the_show(self):
         self.assertEqual(tf.feed_title(feed(dated("A", 1, "https://a/1.mp3"))), "Show")

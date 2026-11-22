@@ -60,7 +60,10 @@ class Folder:
             if ads[0] <= n <= ads[1]:
                 lines.append(rng.choice(ADS).format(b=brand))
             else:
-                lines.append(rng.choice(CHAT).format(w=rng.choice(WORDS)))
+                # A word nobody else has makes every chat line its own, as real talk is: two
+                # episodes of one show do not share half their 5-word runs.
+                chat = rng.choice(CHAT).format(w=rng.choice(WORDS))
+                lines.append(chat + " " + "".join(rng.choice("abcdefghijklmnop") for _ in range(8)))
         os.makedirs(os.path.join(self.path, "transcripts"), exist_ok=True)
         with open(os.path.join(self.path, "transcripts", identifier + ".txt"), "w") as f:
             f.write("\n".join("%s %s" % (stamp(10 * (n - 1)), t) for n, t in enumerate(lines, 1)))
@@ -326,6 +329,51 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(held["episodes"], 1)
         self.assertEqual(held["lines"], 40)
         self.assertGreater(held["anyAd"]["recall"], 0.5)
+        # What the publish step needs to trust the check.
+        self.assertEqual((held["shows"], held["predictedAdSeconds"] > 0), (1, True))
+        self.assertIn("lineAnyAd", held)
+
+
+class ShelfAfterModelTests(unittest.TestCase):
+    def test_the_shelf_is_not_saved_when_no_model_follows(self):
+        folder = Folder(self)
+        for n in range(3):
+            folder.add("a", n)
+        code, _ = run(folder, "--min-episodes", "3")
+        self.assertEqual(code, 0)
+        self.assertFalse(os.path.exists(folder.file("ad-model.json")))
+        self.assertFalse(os.path.exists(folder.file("shelf.json")))
+
+    def test_the_shelf_is_not_saved_when_the_model_cannot_be_written(self):
+        folder = toy_folder(self)
+        os.makedirs(folder.file("ad-model.json"))  # a folder in the way
+        code, _ = run(folder, "--min-episodes", "2")
+        self.assertEqual(code, 2)
+        self.assertFalse(os.path.exists(folder.file("shelf.json")))
+
+
+class RepeatedEpisodeTests(unittest.TestCase):
+    def test_an_episode_that_repeats_a_shelf_episode_is_left_out_and_counted(self):
+        folder = Folder(self)
+        for n in range(3):
+            folder.add("https://a.test/feed", n)
+        shelved = folder.add("https://a.test/feed", 50)
+        again = folder.add("http://www.a.test/feed/", 1)
+        for one in folder.entries:  # the same episode under two spellings of its feed
+            if one["id"] in (shelved, again):
+                one["guid"] = "same"
+        folder.save()
+        code, said = run(folder, "--min-episodes", "3")
+        self.assertEqual(code, 0, said)
+        self.assertIn("Left 1 episode out of training because it is the same as one on the shelf.",
+                      said)
+        self.assertEqual(folder.read("shelf.json")["episodes"], [shelved])
+        self.assertEqual(folder.read("ad-model.json")["trained"]["episodes"], 3)
+
+    def test_nothing_is_said_when_nothing_repeats(self):
+        folder = toy_folder(self)
+        _, said = run(folder, "--min-episodes", "2")
+        self.assertFalse([s for s in said if s.startswith("Left ")])
 
 
 class RunTests(unittest.TestCase):
