@@ -1,6 +1,7 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
 import { Stack, useRouter } from "expo-router"
 import { StatusBar } from "expo-status-bar"
+import { ChartBar } from "lucide-react-native"
 import { useEffect, useState } from "react"
 import { ScrollView } from "react-native"
 
@@ -15,6 +16,7 @@ import {
 } from "@/modules/podcasts/automaticSettings"
 import { getWifiOnly, setWifiOnly } from "@/modules/podcasts/downloadsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+import { ACCOUNT_AD_RESULTS_HREF } from "@/modules/podcasts/routes"
 
 import { AdSkipSwitches } from "./AdSkipSwitches"
 import { AddAudioFilesRow } from "./AddAudioFilesRow"
@@ -24,7 +26,7 @@ import { NotifyRow } from "./NotifyRow"
 import { OpmlSection } from "./OpmlSection"
 import { PlaybackSection } from "./PlaybackSection"
 import { BelowBar, ScreenBar } from "./ScreenBar"
-import { SettingsGroup, SwitchRow } from "./SettingsGroup"
+import { LinkRow, SettingsGroup, SwitchRow } from "./SettingsGroup"
 import { SkipLogRow } from "./SkipLogRow"
 import { StatsCard } from "./StatsCard"
 import { useStatusBarStyle } from "./usePodcastsTheme"
@@ -126,6 +128,13 @@ export function Profile() {
           </SettingsGroup>
           <SettingsGroup title="Ad skipping">
             <AdSkipSwitches />
+            <LinkRow
+              icon={ChartBar}
+              title="Ad skipping results"
+              body="What your phone skipped, show by show, and what your Mac taught it."
+              label="Ad skipping results"
+              onPress={() => router.push(ACCOUNT_AD_RESULTS_HREF)}
+            />
             <SkipLogRow />
           </SettingsGroup>
         </ScrollView>

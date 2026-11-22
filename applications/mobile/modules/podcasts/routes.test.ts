@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  ACCOUNT_AD_RESULTS_HREF,
   ACCOUNT_HREF,
   arrangeHref,
   bookmarksHref,
@@ -128,5 +129,9 @@ describe("preview and category links", () => {
 describe("the account sheet", () => {
   it("is its own stack over the tabs", () => {
     expect(ACCOUNT_HREF).toBe("/podcasts/account")
+  })
+
+  it("has the Ad skipping results page inside it", () => {
+    expect(ACCOUNT_AD_RESULTS_HREF).toBe("/podcasts/account/ad-results")
   })
 })
