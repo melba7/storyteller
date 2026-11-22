@@ -129,4 +129,53 @@ final class AdPromoPlainTalkTests: XCTestCase {
     XCTAssertEqual(found.map(\.startLine), [1])
     XCTAssertEqual(found.first?.confidence, .sure)
   }
+
+  // Two cue lines are proof only when they are different phrases and one of them asks for
+  // something. People say "the live show" twice, or "our tour" and "the live show", in plain talk.
+
+  func testTheSamePhraseTwiceIsNotAPromo() {
+    assertNoPromo([
+      "We did a live show in Austin last month.",
+      "That live show was the best crowd we ever had.",
+      "Anyway, back to the story.",
+    ])
+    assertNoPromo([
+      "The game is in early access right now.",
+      "Early access games are always a gamble.",
+      "So what did you think?",
+    ])
+  }
+
+  func testTwoWeakPhrasesAreNotAPromo() {
+    assertNoPromo([
+      "On our tour last year the bus broke down twice.",
+      "The live show in Denver nearly did not happen.",
+      "It was a mess.",
+    ])
+    assertNoPromo([
+      "The studio gave early access to a few reviewers.",
+      "They also promised bonus episodes of the making-of series.",
+      "We will see.",
+    ])
+  }
+
+  func testAStrongPhraseWithAnotherPhraseIsAPromo() {
+    let found = AdPromoRules.find(
+      lines: AdChunker.number(
+        makeTranscript([
+          "Our tour starts this fall.", "Get your tickets before they are gone.",
+          "Anyway, the budget vote.",
+        ]).lines))
+    XCTAssertEqual(found.map(\.startLine), [1])
+    XCTAssertEqual(found.map(\.endLine), [2])
+    XCTAssertEqual(found.first?.confidence, .unsure)
+  }
+
+  func testOneStrongPhraseAloneIsNotAPromo() {
+    assertNoPromo([
+      "My sister told me to become a member of the gym.",
+      "I said no.",
+      "Anyway.",
+    ])
+  }
 }
