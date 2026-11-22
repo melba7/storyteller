@@ -10,6 +10,9 @@ import { type Show, type StoredEpisode, formatDuration } from "./library"
 import { badgeLabel } from "./libraryView"
 import { resumeStart } from "./playbackRules"
 
+/** How much of an episode's notes goes into a queue item. */
+export const QUEUE_NOTES_LIMIT = 4000
+
 /** The queue item for an episode: what the player needs to start it without JavaScript. */
 export function queueItem(
   episode: StoredEpisode,
@@ -23,6 +26,8 @@ export function queueItem(
     chaptersUrl: episode.chaptersUrl,
     title: episode.title,
     language: show?.language ?? null,
+    notes: episode.notes.slice(0, QUEUE_NOTES_LIMIT),
+    showLink: show?.link ?? null,
     showTitle: show?.title ?? "",
     artworkUrl: episode.imageUrl ?? show?.imageUrl ?? null,
     duration: episode.durationSeconds,
