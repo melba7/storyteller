@@ -40,8 +40,16 @@ final class PodcastAdFinder: @unchecked Sendable {
   /// The ads the taught sounds found in each downloaded file in this launch, by the download's
   /// SHA-256, so a growing transcript does not read the file again (PodcastAdFinder+Local.swift).
   var soundLooks: [String: [FoundAd]] = [:]
-  /// The downloads whose file is being read for sounds now.
+  /// The downloads whose file is being read for sounds now, or waits to be.
   var soundLooking: Set<String> = []
+  /// The files waiting to be read for sounds, which are read one after another
+  /// (PodcastAdFinder+Local.swift).
+  var soundQueue: [(id: String, ads: AdsStore)] = []
+  var soundRunning = false
+  /// How many sounds files were installed when the sound looks were last cleared.
+  var soundsSeen = 0
+  /// Episodes whose local-only final file is made again, because new teaching came.
+  var localRerun: Set<String> = []
   var worker: Task<Void, Never>?
   /// The app is on the screen, a podcast is playing, or iOS gave a background turn.
   var appActive = false
@@ -65,6 +73,7 @@ final class PodcastAdFinder: @unchecked Sendable {
       waiting.removeAll { $0 == episodeId }
       partialWanted.remove(episodeId)
       headAsked.remove(episodeId)
+      localRerun.remove(episodeId)
       failures[episodeId] = nil
       failureCounts[episodeId] = nil
       partialFailures[episodeId] = nil
@@ -143,7 +152,8 @@ final class PodcastAdFinder: @unchecked Sendable {
       set(id, status)
       // A failed episode shows the ads found so far, but waits for its retry (it is not queued).
       // With no model to ask, the episode is queued once so the local finders make its result.
-      if AdsRules.wantsRun(status, failure: failure)
+      let rerun = failure == nil && finding == nil && lock.withLock { localRerun.contains(id) }
+      if AdsRules.wantsRun(status, failure: failure) || rerun
         || AdsRules.wantsLocalRun(
           status, failure: failure, hasFinal: final != nil, unavailable: unavailable)
       {
@@ -208,14 +218,33 @@ final class PodcastAdFinder: @unchecked Sendable {
     kick()
   }
 
-  /// Something was taught or the table of shows changed: the sounds are looked for again and
-  /// every episode is looked at again.
+  /// Something was taught or the table of shows changed: every episode is looked at again, and
+  /// the ones whose result is local only are made again with the new teaching. The sounds are
+  /// looked for again only when a new sounds file came, not for a change of the table of shows.
   func teachingChanged() {
+    let installs = PodcastTeaching.shared.soundsInstalls
+    let localOnly = localOnlyEpisodes()
     lock.withLock {
-      soundLooks.removeAll()
-      soundLooking.removeAll()
+      if installs != soundsSeen {
+        soundsSeen = installs
+        soundLooks.removeAll()
+        soundLooking.removeAll()
+      }
+      localRerun.formUnion(localOnly)
     }
     scan()
+  }
+
+  /// The episodes with a whole transcript whose final ads file was made without the model.
+  private func localOnlyEpisodes() -> [String] {
+    guard let downloads = PodcastDownloader.shared.store else { return [] }
+    return downloads.entries().compactMap { entry -> String? in
+      guard let (ads, transcripts) = stores(for: entry.episodeId, in: downloads),
+        transcripts.hasTranscript,
+        ads.load(detector: Self.detectorName)?.detectorVersion == LocalAdsFile.localVersion
+      else { return nil }
+      return entry.episodeId
+    }
   }
 
   /// Forgets why earlier tries failed, so the next scan tries those episodes again. Called when

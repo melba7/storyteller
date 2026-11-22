@@ -15,10 +15,14 @@ extension PodcastAdFinder {
   /// The ads the phone finds by itself in a whole transcript: the words (rules and the small
   /// model) and the sounds of the downloaded file, joined. No sponsor names are passed: the
   /// finder has no cheap way to the episode's notes (the head scan has them from the player).
+  /// The ads the memory knows (PodcastKnownAds) are joined with the words' ads, so they reach every
+  /// file the local ads go into, as in the scorecard.
   func localAds(_ id: String, ads: AdsStore, transcript: Transcript) -> [FoundAd] {
     let words = PodcastTeaching.shared.files.local.ads(
       transcript: transcript, episodeDuration: transcript.duration)
-    return joined(id, words: words, sounds: soundLook(id, sha256: ads.sha256))
+    return joined(
+      id, words: words + remembered(id, words: transcript.words),
+      sounds: soundLook(id, sha256: ads.sha256))
   }
 
   /// The same for a transcript that is still being made, or its head (`limit` seconds).
@@ -26,7 +30,17 @@ extension PodcastAdFinder {
     _ id: String, ads: AdsStore, partial: PartialTranscript, limit: Double?
   ) -> [FoundAd] {
     let words = PodcastTeaching.shared.files.local.ads(partial: partial, limit: limit)
-    return joined(id, words: words, sounds: soundLook(id, sha256: ads.sha256))
+    let looked = limit.map { limit in partial.words.filter { $0.end <= limit } } ?? partial.words
+    return joined(
+      id, words: words + remembered(id, words: looked), sounds: soundLook(id, sha256: ads.sha256))
+  }
+
+  /// The ads the memory of ads finds whole in `words`, for the episode's show. None when the show
+  /// is not known. An ad whose end is only a guess is left out.
+  private func remembered(_ id: String, words: [TranscriptWord]) -> [FoundAd] {
+    guard let show = EpisodeShows.shared.show(for: id) else { return [] }
+    let use = KnownAdUse.from(PodcastKnownAds.shared.find(in: words, show: show), words: words)
+    return use.ads.filter { !use.provisional.contains($0) }
   }
 
   /// Joins the two lists and notes in the diary how many came from each (the numbers only).
@@ -72,21 +86,43 @@ extension PodcastAdFinder {
   }
 
   /// A download that has no transcript yet: its sounds are looked for in the background, once in
-  /// this launch, and what they find goes into its partial ads file. Returns at once.
+  /// this launch, and what they find goes into its partial ads file. The files are read one after
+  /// another, never several at once. Returns at once.
   func lookForSounds(_ id: String, ads: AdsStore) {
-    let begin = lock.withLock { () -> Bool in
-      guard soundLooks[ads.sha256] == nil else { return false }
-      return soundLooking.insert(ads.sha256).inserted
+    let start = lock.withLock { () -> Bool in
+      guard soundLooks[ads.sha256] == nil, soundLooking.insert(ads.sha256).inserted else {
+        return false
+      }
+      soundQueue.append((id: id, ads: ads))
+      guard !soundRunning else { return false }
+      soundRunning = true
+      return true
     }
-    guard begin else { return }
+    guard start else { return }
     Task.detached(priority: .utility) { [self] in
-      let found = soundLook(id, sha256: ads.sha256)
-      lock.withLock { _ = soundLooking.remove(ads.sha256) }
-      guard !found.isEmpty else { return }
-      PodcastTimeline.mark(id, "local finders: 0 ads from words, \(found.count) from sounds")
-      guard addLocalToPartial(found, ads: ads, duration: 0) else { return }
-      refreshIfPlaying(id)
-      scan()
+      while let next = nextSoundLook() { lookedForSounds(next.id, ads: next.ads) }
     }
+  }
+
+  /// The next file waiting to be read for sounds, or nil (and the reader stops) when none waits.
+  private func nextSoundLook() -> (id: String, ads: AdsStore)? {
+    lock.withLock {
+      guard !soundQueue.isEmpty else {
+        soundRunning = false
+        return nil
+      }
+      return soundQueue.removeFirst()
+    }
+  }
+
+  /// Reads one download's file for sounds and adds what they find to its partial ads file.
+  private func lookedForSounds(_ id: String, ads: AdsStore) {
+    let found = soundLook(id, sha256: ads.sha256)
+    lock.withLock { _ = soundLooking.remove(ads.sha256) }
+    guard !found.isEmpty else { return }
+    PodcastTimeline.mark(id, "local finders: 0 ads from words, \(found.count) from sounds")
+    guard addLocalToPartial(found, ads: ads, duration: 0) else { return }
+    refreshIfPlaying(id)
+    scan()
   }
 }

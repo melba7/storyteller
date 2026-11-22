@@ -15,11 +15,13 @@ extension PodcastAdFinder {
     guard let downloads = PodcastDownloader.shared.store,
       let (ads, transcripts) = stores(for: id, in: downloads)
     else { return }
+    // At once, so a scan that runs meanwhile does not queue the episode a second time.
+    set(id, .finding(percent: 0))
+    lock.withLock { _ = localRerun.remove(id) }
     guard let transcript = transcripts.loadTranscript() else {
       PodcastTimeline.mark(id, "full pass: the transcript could not be read")
       return fail(id, "The transcript could not be read")
     }
-    set(id, .finding(percent: 0))
     let local = localAds(id, ads: ads, transcript: transcript)
     guard let model = askableDetector() else {
       PodcastTimeline.mark(id, "full pass without the model")
@@ -94,6 +96,7 @@ extension PodcastAdFinder {
         duration: transcript.duration, afterFailure: true)
     } catch {
       PodcastTimeline.mark(id, "local result could not be saved: \(AdDiary.note(for: error))")
+      set(id, .notPossible(reason: "The ads could not be saved"))
       return
     }
     let file = await withChapterAds(id, ads: ads, finished: saved, transcript: transcript)

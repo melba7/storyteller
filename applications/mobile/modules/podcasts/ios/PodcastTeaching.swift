@@ -27,8 +27,13 @@ final class PodcastTeaching: @unchecked Sendable {
 
   private let lock = NSLock()
   private var taught: Taught?
+  private var soundsInstallCount = 0
 
   private init() {}
+
+  /// How many times a new sounds file was installed in this launch. The finder looks at it to know
+  /// when the files it read for sounds are to be read again.
+  var soundsInstalls: Int { lock.withLock { soundsInstallCount } }
 
   /// The model, the taught ads, the habits and the local finders made of them.
   var files: TeachingFiles { read().files }
@@ -62,6 +67,7 @@ final class PodcastTeaching: @unchecked Sendable {
         ? AdSoundLibrary.install(data: data, folder: folder)
         : TeachingFiles.install(name: name, data: data, folder: folder)
       guard kept else { return false }
+      if name == AdSoundLibrary.fileName { soundsInstallCount += 1 }
       var state = TeachingState.load(from: folder)
       state.record(name: name, sha256: actual, at: Date())
       do {
@@ -75,15 +81,20 @@ final class PodcastTeaching: @unchecked Sendable {
   }
 
   /// Saves which feed is which show (`{"<feed key>": "<show id>"}`). A text that is not such an
-  /// object changes nothing.
-  func setShows(json: String) {
-    guard let table = TeachingShows.parse(json) else { return }
-    lock.withLock {
+  /// object, or a table that is the one saved already, changes nothing. True when the table
+  /// changed.
+  @discardableResult
+  func setShows(json: String) -> Bool {
+    guard let table = TeachingShows.parse(json) else { return false }
+    return lock.withLock {
+      guard table != TeachingShows.load(from: Self.folder) else { return false }
       do {
         try TeachingShows.save(table, to: Self.folder)
         taught = nil
+        return true
       } catch {
         NSLog("Podcasts: the table of shows could not be saved: \(error)")
+        return false
       }
     }
   }
