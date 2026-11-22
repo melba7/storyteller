@@ -11,11 +11,13 @@ export const STAR_ORDER_SQL =
   "SELECT * FROM episodes WHERE starred_at IS NOT NULL ORDER BY starred_at DESC"
 
 /**
- * Params: played (1 or 0), the same again, episode id. Marking played keeps the place;
- * marking unplayed forgets it.
+ * Params: played (1 or 0), the same again, the same again, the time now, episode id. Marking
+ * played keeps the place and starts the clean-up clock (`last_played_at`) if none is running,
+ * so "delete played" and "archive after played" apply; it leaves the history alone. Marking
+ * unplayed forgets the place.
  */
 export const SET_PLAYED_SQL =
-  "UPDATE episodes SET played = ?, position_seconds = CASE WHEN ? = 1 THEN position_seconds ELSE 0 END WHERE id = ?"
+  "UPDATE episodes SET played = ?, position_seconds = CASE WHEN ? = 1 THEN position_seconds ELSE 0 END, last_played_at = CASE WHEN ? = 1 THEN COALESCE(last_played_at, ?) ELSE last_played_at END WHERE id = ?"
 
 /**
  * Saves where the listener is and when they listened. Params: place, played (1 or 0),
@@ -38,3 +40,11 @@ export const HISTORY_SQL =
 
 /** Empties the history. Where each episode was left, and whether it was played, stay. */
 export const CLEAR_HISTORY_SQL = "UPDATE episodes SET history_at = NULL"
+
+/**
+ * The episode listened to last, for the mini player after a restart. It reads `history_at`,
+ * which only real listening writes, so an episode marked played in Apple Podcasts or by hand
+ * never takes its place. Clearing the history leaves the mini player empty.
+ */
+export const LAST_LISTENED_SQL =
+  "SELECT * FROM episodes WHERE history_at IS NOT NULL ORDER BY history_at DESC LIMIT 1"

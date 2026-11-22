@@ -14,7 +14,7 @@ import { Platform } from "react-native"
 import { rememberUnsubscribed } from "./appleMemory"
 import { notifyLibraryChanged } from "./changes"
 import { deleteDownloads } from "./downloadsNative"
-import { RECORD_LISTEN_SQL } from "./episodeSql"
+import { LAST_LISTENED_SQL, RECORD_LISTEN_SQL } from "./episodeSql"
 import {
   type Show,
   type StoredEpisode,
@@ -174,9 +174,7 @@ export async function savePlayback(
 
 /** The episode played most recently, for the mini player after the app restarts. */
 export async function lastPlayedEpisode(): Promise<StoredEpisode | null> {
-  const found = await rows(
-    "SELECT * FROM episodes WHERE last_played_at IS NOT NULL ORDER BY last_played_at DESC LIMIT 1",
-  )
+  const found = await rows(LAST_LISTENED_SQL)
   return found[0] ? episodeFromRow(found[0]) : null
 }
 

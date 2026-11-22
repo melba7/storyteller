@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest"
 import {
   CLEAR_HISTORY_SQL,
   HISTORY_SQL,
+  LAST_LISTENED_SQL,
   MARK_PLAYED_FROM_APPLE_SQL,
   SET_PLAYED_SQL,
   SET_STARRED_SQL,
@@ -56,7 +57,7 @@ describe("marking played", () => {
   it("marks played, keeping the place", () => {
     const db = setup()
     db.prepare("UPDATE episodes SET position_seconds = 30 WHERE id = 'a'").run()
-    db.prepare(SET_PLAYED_SQL).run(1, 1, "a")
+    db.prepare(SET_PLAYED_SQL).run(1, 1, 1, 800, "a")
     expect(
       db
         .prepare("SELECT played, position_seconds FROM episodes WHERE id = 'a'")
@@ -64,12 +65,28 @@ describe("marking played", () => {
     ).toEqual({ played: 1, position_seconds: 30 })
   })
 
+  it("starts the clean-up clock once, and not for unplayed", () => {
+    const db = setup()
+    db.prepare("UPDATE episodes SET last_played_at = 50 WHERE id = 'b'").run()
+    for (const id of ["a", "b"]) db.prepare(SET_PLAYED_SQL).run(1, 1, 1, 800, id)
+    db.prepare(SET_PLAYED_SQL).run(0, 0, 0, 900, "c")
+    expect(
+      db
+        .prepare("SELECT id, last_played_at, history_at FROM episodes ORDER BY id")
+        .all(),
+    ).toEqual([
+      { id: "a", last_played_at: 800, history_at: null },
+      { id: "b", last_played_at: 50, history_at: null },
+      { id: "c", last_played_at: null, history_at: null },
+    ])
+  })
+
   it("marks unplayed and forgets the place", () => {
     const db = setup()
     db.prepare(
       "UPDATE episodes SET position_seconds = 30, played = 1 WHERE id = 'a'",
     ).run()
-    db.prepare(SET_PLAYED_SQL).run(0, 0, "a")
+    db.prepare(SET_PLAYED_SQL).run(0, 0, 0, 800, "a")
     expect(
       db
         .prepare("SELECT played, position_seconds FROM episodes WHERE id = 'a'")
@@ -149,5 +166,23 @@ describe("marking played from Apple Podcasts", () => {
     expect(
       db.prepare(MARK_PLAYED_FROM_APPLE_SQL).run(900, "show-1", "g1").changes,
     ).toBe(0)
+  })
+})
+
+describe("the episode to restore in the mini player", () => {
+  it("is the one listened to last, not one marked played in Apple Podcasts", () => {
+    const db = setup()
+    db.prepare(RECORD_LISTEN_SQL).run(5, 0, 1000, 1000, "a")
+    db.prepare(MARK_PLAYED_FROM_APPLE_SQL).run(5000, "show-1", "b")
+    db.prepare(SET_PLAYED_SQL).run(1, 1, 1, 6000, "c")
+    expect(ids(db.prepare(LAST_LISTENED_SQL).all())).toEqual(["a"])
+  })
+
+  it("is empty when nothing was listened to or the history was cleared", () => {
+    const db = setup()
+    expect(db.prepare(LAST_LISTENED_SQL).all()).toEqual([])
+    db.prepare(RECORD_LISTEN_SQL).run(5, 0, 1000, 1000, "a")
+    db.prepare(CLEAR_HISTORY_SQL).run()
+    expect(db.prepare(LAST_LISTENED_SQL).all()).toEqual([])
   })
 })
