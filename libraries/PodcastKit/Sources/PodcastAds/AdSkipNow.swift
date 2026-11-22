@@ -11,6 +11,16 @@ public enum AdSkipNow {
   /// ... and never to within this long of the end of the episode.
   public static let endMargin = 1.0
 
+  /// Like `target(position:duration:ads:)` for an ads file (nil when the episode has none): all
+  /// its ads, cut short by the listener's trims, with undone ones and every kind included.
+  public static func target(
+    position: Double, duration: Double?, file: AdsFile?
+  ) -> (to: Double, known: FoundAd?) {
+    let trims = file?.trims ?? []
+    let ads = (file?.ads ?? []).map { $0.trimmed(by: trims) }.filter { $0.end > $0.start }
+    return target(position: position, duration: duration, ads: ads)
+  }
+
   /// The place to go from `position`. When the playhead is inside one of `ads` (from
   /// `leadSeconds` before its start to its end), that is the end of the ad and of the ads that
   /// follow it within half a second, and `known` is the first of them. Otherwise it is

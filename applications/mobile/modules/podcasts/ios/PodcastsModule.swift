@@ -345,14 +345,45 @@ public final class PodcastsModule: Module {
       PodcastAdFinder.shared.adsJSON(episodeId)
     }
 
-    // The two switches for skipping ads and the hosts' own plugs (both on until turned off).
+    // The four switches: ads, the hosts' own plugs and promos are on until turned off, credits
+    // are off until turned on.
     AsyncFunction("getAdSkipSettings") { () -> [String: Bool] in
       let settings = AdSkipDefaults.settings
-      return ["skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs]
+      return [
+        "skipAds": settings.skipAds, "skipOwnPlugs": settings.skipOwnPlugs,
+        "skipPromos": settings.skipPromos, "skipCredits": settings.skipCredits,
+      ]
     }
-    AsyncFunction("setAdSkipSettings") { (skipAds: Bool, skipOwnPlugs: Bool) async in
-      AdSkipDefaults.settings = AdSkipSettings(skipAds: skipAds, skipOwnPlugs: skipOwnPlugs)
+    AsyncFunction("setAdSkipSettings") {
+      (skipAds: Bool, skipOwnPlugs: Bool, skipPromos: Bool, skipCredits: Bool) async in
+      AdSkipDefaults.settings = AdSkipSettings(
+        skipAds: skipAds, skipOwnPlugs: skipOwnPlugs, skipPromos: skipPromos,
+        skipCredits: skipCredits)
       await MainActor.run { PodcastPlayer.shared.adSkipping.refresh() }
+    }
+    // The Skip ad button: moves the playhead past the ad it is in, or 30 seconds ahead. Returns
+    // where it went and whether an ad was known there, or null when nothing is loaded.
+    AsyncFunction("skipAdNow") { () async -> [String: Any]? in
+      await MainActor.run { () -> [String: Any]? in
+        guard let result = PodcastPlayer.shared.adSkipping.skipAdNow() else { return nil }
+        return ["to": result.to, "known": result.known]
+      }
+    }
+    // What the player noticed about ads for the Mac, as JSON lines ("" when none); the app saves
+    // them to the linked folder and then removes the first `count` lines it saved.
+    AsyncFunction("readPendingAdNotes") { () async -> String in
+      await PodcastAdNotes.shared.readPending()
+    }
+    AsyncFunction("removePendingAdNotes") { (count: Int) async in
+      await PodcastAdNotes.shared.removePending(count)
+    }
+    // The count of skips, undos, trims and misses for each show, as JSON text.
+    AsyncFunction("getAdTally") { () async -> String in
+      await PodcastAdNotes.shared.tallyJSON()
+    }
+    // The skip log and the ad finder's diary as "Send skip log" shares them, or null.
+    AsyncFunction("readSkipLogText") { () async -> String? in
+      await SkipLogFile.readText()
     }
     // Takes back the skip that was just made: back to the ad's start, playing, and the skip is
     // recorded as wrong. False when it is too late.

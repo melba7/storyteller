@@ -55,6 +55,19 @@ final class AdSkipNowTests: XCTestCase {
     XCTAssertNotNil(result.known)
   }
 
+  func testAFileGivesItsAdsWithTheTrimsAndWhateverWasUndone() {
+    let file = AdsFile(
+      sha256: "x", detector: "d", detectorVersion: "1", osVersion: "26", duration: 3000,
+      ads: [ad(100, 160), ad(200, 260)], undone: [UndoneAd(start: 200, end: 260)],
+      trims: [AdTrim(adStart: 100, end: 140)])
+    // The first ad ends where the listener trimmed it, and the undone one is still an ad here.
+    XCTAssertEqual(AdSkipNow.target(position: 110, duration: 3000, file: file).to, 140)
+    let undone = AdSkipNow.target(position: 210, duration: 3000, file: file)
+    XCTAssertEqual(undone.to, 260)
+    XCTAssertNotNil(undone.known)
+    XCTAssertEqual(AdSkipNow.target(position: 500, duration: 3000, file: nil).to, 530)
+  }
+
   func testAnUnreadablePlayheadIsTreatedAsTheStart() {
     XCTAssertEqual(AdSkipNow.target(position: .nan, duration: 1000, ads: []).to, 30)
   }

@@ -13,23 +13,30 @@ import PodcastAds
 import PodcastDownloads
 import PodcastTranscripts
 
-/// The listener's two switches, kept in the app's defaults so the player reads them with no
+/// The listener's four switches, kept in the app's defaults so the player reads them with no
 /// JavaScript running.
 enum AdSkipDefaults {
   private static let adsKey = "podcasts.ads.skipAds"
   private static let plugsKey = "podcasts.ads.skipOwnPlugs"
+  private static let promosKey = "podcasts.ads.skipPromos"
+  private static let creditsKey = "podcasts.ads.skipCredits"
 
-  /// Both are on until the listener turns them off.
+  /// Ads, the hosts' plugs and promos are on until the listener turns them off; credits are off
+  /// until they turn them on.
   static var settings: AdSkipSettings {
     get {
       let defaults = UserDefaults.standard
       return AdSkipSettings(
         skipAds: defaults.object(forKey: adsKey) as? Bool ?? true,
-        skipOwnPlugs: defaults.object(forKey: plugsKey) as? Bool ?? true)
+        skipOwnPlugs: defaults.object(forKey: plugsKey) as? Bool ?? true,
+        skipPromos: defaults.object(forKey: promosKey) as? Bool ?? true,
+        skipCredits: defaults.object(forKey: creditsKey) as? Bool ?? false)
     }
     set {
       UserDefaults.standard.set(newValue.skipAds, forKey: adsKey)
       UserDefaults.standard.set(newValue.skipOwnPlugs, forKey: plugsKey)
+      UserDefaults.standard.set(newValue.skipPromos, forKey: promosKey)
+      UserDefaults.standard.set(newValue.skipCredits, forKey: creditsKey)
     }
   }
 }
@@ -91,6 +98,8 @@ final class PodcastAdSkipping {
       }
       StatsStore.shared.countAd(.tooFar)
       PodcastSkipLogger.shared.trimmed(trim)
+      let kind = skipper.ads.first { $0.start == trim.adStart }?.kind
+      note(.trimmed, start: trim.adStart, end: trim.end, kind: kind)
     }
     PodcastSkipLogger.shared.seeked(to: position, knownAds: skipper.ads)
     skipper.seeked(to: position)
@@ -150,6 +159,7 @@ final class PodcastAdSkipping {
       episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
       heard: owner.streamDownload?.head.memory.words ?? [])
     PodcastSkipLogger.shared.undone()
+    note(.undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: skip.end - ad.start)
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -196,13 +206,52 @@ final class PodcastAdSkipping {
     owner.noteSaved(.ads, audioSeconds: skip.target - (place ?? owner.position))
     StatsStore.shared.countAd(.skipped)
     PodcastSkipLogger.shared.skipped(skip, episodeId: episodeId)
+    note(
+      .skipped, start: skip.ad.start, end: skip.end, kind: skip.ad.kind,
+      seconds: skip.end - skip.ad.start)
     owner.movePlayhead(to: skip.target)
     owner.publish(positionOverride: skip.target)
     owner.sink?(
       "onAdSkipped",
       [
         "episodeId": episodeId, "start": skip.ad.start, "end": skip.end,
-        "length": skip.end - skip.ad.start,
+        "length": skip.end - skip.ad.start, "kind": skip.ad.kind.rawValue,
       ])
+  }
+
+  /// Tells the Mac's notes and the tally what happened to the loaded episode's ads.
+  private func note(
+    _ what: PhoneNote.What, start: Double, end: Double?, kind: AdKind?, seconds: Double = 0
+  ) {
+    guard let episodeId else { return }
+    PodcastAdNotes.shared.record(
+      what, episode: episodeId, show: owner.current?.showId, start: start, end: end, kind: kind,
+      seconds: seconds)
+  }
+
+  /// The listener tapped Skip ad. Goes to the end of the ad the playhead is in (or about to
+  /// enter) and the ads that follow it at once, or 30 seconds ahead when no ad is known there,
+  /// and says where and whether an ad was known. Nil when nothing is loaded.
+  ///
+  /// It moves the playhead as a listener's seek does (`PodcastPlayer.seek`), so the skipper is
+  /// told. `seeked(to:)` then finds no way to read this as the listener going back into the
+  /// ad: the target is never behind the playhead, and `backSeek` only trims a seek that lands
+  /// before where the last skip landed and inside that skipped stretch, where a target at the
+  /// end of an ad (already trimmed by the file's trims) or ahead of the playhead is not. The
+  /// target is the end of the ads, so the ads it left are not "entered by the seek" and nothing
+  /// skips again: the one case that plays an ad is a 30 second jump that lands inside another
+  /// known ad, which the listener's own seek would do as well.
+  func skipAdNow() -> (to: Double, known: Bool)? {
+    guard episodeId != nil, owner.current != nil else { return nil }
+    let place = owner.place
+    let file = store?.best(detector: PodcastAdFinder.detectorName)
+    let result = AdSkipNow.target(position: place, duration: owner.currentDuration, file: file)
+    if let known = result.known {
+      note(.skipped, start: known.start, end: result.to, kind: known.kind, seconds: result.to - place)
+    } else {
+      note(.missed, start: place, end: result.to, kind: nil)
+    }
+    owner.seek(to: result.to)
+    return (result.to, result.known != nil)
   }
 }
