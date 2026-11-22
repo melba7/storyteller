@@ -40,6 +40,7 @@ from array import array
 
 import teach_collect as collect
 import teach_label as teach
+import teach_store
 import teach_segments as seg
 from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities, softmax_of
 
@@ -338,7 +339,7 @@ def check_lines(held):
 
 def main(argv, say=print, now=None):
     parser = argparse.ArgumentParser(prog="teach_train.py")
-    parser.add_argument("--folder", default=teach.DEFAULT_FOLDER)
+    parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--labels", default="labels")
     parser.add_argument("--epochs", type=positive, default=5)
     parser.add_argument("--seed", type=whole_number, default=1)

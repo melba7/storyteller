@@ -33,6 +33,7 @@ import time
 
 import teach_collect
 import teach_label
+import teach_store
 import teach_segments as seg
 
 DEFAULT_MOST = 1500
@@ -201,7 +202,7 @@ def positive_whole(text):
 
 def main(argv, say=print, now=time.time, max_bytes=MAX_BYTES):
     parser = argparse.ArgumentParser(prog="teach_library.py")
-    parser.add_argument("--folder", default=teach_label.DEFAULT_FOLDER)
+    parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--labels", default="labels")
     parser.add_argument("--most", type=positive_whole, default=DEFAULT_MOST)
     try:

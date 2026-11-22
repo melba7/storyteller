@@ -28,6 +28,7 @@ import sys
 import tempfile
 
 import teach_label
+import teach_store
 from apple_podcasts_export import default_folders
 
 LIMIT = 4500000
@@ -87,7 +88,7 @@ def put(folder, name, data, writer):
 
 def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default_folders):
     parser = argparse.ArgumentParser(prog="teach_publish.py")
-    parser.add_argument("--folder", default=teach_label.DEFAULT_FOLDER)
+    parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--to", action="append", metavar="FOLDER")
     try:
         options = parser.parse_args(argv)
