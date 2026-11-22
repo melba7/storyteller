@@ -14,7 +14,8 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
 
   teach_publish.py [--folder F] [--to FOLDER ...] [--min-precision 0.85]
 
-A weak model is not published: ad-model.json is copied only when its check on the held-out shelf
+A model the phone would refuse (see teach_phone_rule.py) is not published either. A weak model is
+not published: ad-model.json is copied only when its check on the held-out shelf
 rests on at least 5 episodes from at least 3 shows and 600 seconds of predicted ads, and
 trained.heldOut.anyAd.precision (in seconds of the spans the phone would cut) is at least
 --min-precision. Otherwise the tool says which bar was missed and with what numbers, leaves a model
@@ -43,6 +44,7 @@ import tempfile
 import time
 
 import teach_store
+from teach_phone_rule import refusals
 from apple_podcasts_export import default_folders
 
 LIMIT = 4500000
@@ -104,6 +106,12 @@ def weak_model(data, minimum):
     check must rest on enough held-out episodes, shows and predicted ad seconds, and its precision
     (in seconds of the spans the phone would cut) must reach `minimum`."""
     reasons = []
+    try:
+        refused = refusals(json.loads(data))
+    except ValueError:
+        refused = ["it is not JSON"]
+    if refused:
+        reasons.append("the phone would refuse the file, because " + "; and ".join(refused))
     episodes = number_of(held_out(data, "episodes")) or 0
     shows = number_of(held_out(data, "shows")) or 0
     seconds = number_of(held_out(data, "predictedAdSeconds")) or 0

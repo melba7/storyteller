@@ -8,16 +8,21 @@ import tempfile
 import unittest
 
 import teach_publish as publish
+from teach_features import CLASSES, bucket
 
 NAMES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
          ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"))
 ENOUGH = {"episodes": 6, "shows": 4, "predictedAdSeconds": 900}
-GOOD = {"version": 1, "trained": {"heldOut": dict(ENOUGH, anyAd={"precision": 0.9, "recall": 0.5})}}
+# The part of a model file the phone reads; publishing now checks it as the phone does.
+BODY = {"buckets": 262144, "classes": CLASSES,
+        "weights": {str(bucket("#bias", 262144)): [4.0, 0, 0, 0, 0]}}
+GOOD = dict(BODY, version=1,
+            trained={"heldOut": dict(ENOUGH, anyAd={"precision": 0.9, "recall": 0.5})})
 
 
 def model(precision, **held):
-    return {"version": 1, "trained": {"heldOut": dict(ENOUGH, anyAd={"precision": precision},
-                                                      **held)}}
+    return dict(BODY, version=1, trained={"heldOut": dict(ENOUGH, anyAd={"precision": precision},
+                                                          **held)})
 
 
 def read(path):
