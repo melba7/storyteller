@@ -29,9 +29,13 @@ mkdir -p "$LOG_FOLDER" || finish "Could not make $LOG_FOLDER." 2
 
 MODEL=()
 [ -n "$1" ] && MODEL=(--model "$1")
+# "Mark ads when the gathering is done" asks for the yes before it waits and sets TEACH_YES, so the
+# marking does not ask a second time in the night.
+YES=()
+[ -n "$TEACH_YES" ] && YES=(--yes)
 
 echo "=== $(date '+%Y-%m-%d %H:%M') mark ads ===" >> "$LOG"
-caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" "${MODEL[@]}" 2>&1 | tee -a "$LOG"
+caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" "${MODEL[@]}" "${YES[@]}" 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 
 # You did not type yes: nothing was marked, so there is nothing to work out.

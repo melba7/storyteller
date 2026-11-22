@@ -1216,9 +1216,10 @@ design and the contracts are in `docs/PODCASTS-ADS-TEACHING.md`.
       seek (cannot be confirmed without a phone), one lock for the three writers
       of an episode's unfinished ads file, and a one-frame flicker after a drop
       in a hand-filled playlist.
-- [ ] **Waits on Mo**: the first teaching run on the Mac ("Gather episodes for
-      teaching", then the OK for Claude to mark them), the merge, and the phone
-      steps after the TestFlight build.
+- [ ] **Waits on Mo**: the phone steps after the TestFlight build. Mo started
+      the first teaching run on the Mac on 2026-11-22 and asked for the marking
+      to start by itself when the gathering is done ("Mark ads when the
+      gathering is done"), and gave the OK for the merge.
 
 ## Later
 

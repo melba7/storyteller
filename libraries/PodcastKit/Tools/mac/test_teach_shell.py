@@ -16,7 +16,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SHELL_FILES = sorted(glob.glob(os.path.join(HERE, "*.command")) + glob.glob(os.path.join(HERE, "*.sh")))
 NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.command",
              "Score the ad skipping.command", "Install weekly teaching.command",
-             "Stop weekly teaching.command", "Mark ads in the teaching episodes.command"]
+             "Stop weekly teaching.command", "Mark ads in the teaching episodes.command",
+             "Mark ads when the gathering is done.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write

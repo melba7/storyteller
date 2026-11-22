@@ -402,7 +402,12 @@ and `Teach the phone again.command` says so and stops.
    do and waits for you to type `yes`. Anything else marks nothing, and nothing
    else runs. It stops by itself when the allowance is used up, and you can
    double-click it again later. When the marking is over (also when it stopped
-   early) it runs the steps after marking, described below.
+   early) it runs the steps after marking, described below. To leave the Mac
+   alone for the night, double-click
+   `Mark ads when the gathering is done.command` instead, while the gathering is
+   still working: it asks for the `yes` at once, waits until the gathering has
+   finished (also when it failed or only waits for Return), and then does the
+   same without asking again.
 3. `Teach the phone again.command`. Reads the phone's notes, then runs the steps
    after marking on what is marked so far. It marks nothing new and uses no
    Claude allowance. Use it after you have listened for a while, or to send the
