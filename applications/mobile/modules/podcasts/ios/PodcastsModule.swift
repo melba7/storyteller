@@ -266,8 +266,12 @@ public final class PodcastsModule: Module {
     // Starts downloading an episode; carries on with the app closed. `type` is the feed's
     // audio type, used to name the file. `automatic` marks a new episode the app fetches by
     // itself: those always wait for Wi-Fi. `language` is the feed's, for the transcript.
+    // `showId` is the episode's show, so the ads the phone knows for it are found in a download
+    // that is checked before it is ever played.
     AsyncFunction("download") {
-      (episodeId: String, url: String, type: String, automatic: Bool, language: String?) throws in
+      (episodeId: String, url: String, type: String, automatic: Bool, language: String?,
+       showId: String?) throws in
+      if let showId, !showId.isEmpty { EpisodeShows.shared.remember(showId, for: episodeId) }
       PodcastTranscriber.shared.noteLanguage(language, for: episodeId)
       do {
         try PodcastDownloader.shared.download(
@@ -356,8 +360,7 @@ public final class PodcastsModule: Module {
     // Which feed is which show, `{"<feed key>": "<show id>"}`, so the Mac's files name shows as
     // the app does.
     AsyncFunction("setTeachingShows") { (json: String) in
-      PodcastTeaching.shared.setShows(json: json)
-      PodcastAdFinder.shared.teachingChanged()
+      if PodcastTeaching.shared.setShows(json: json) { PodcastAdFinder.shared.teachingChanged() }
     }
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }
