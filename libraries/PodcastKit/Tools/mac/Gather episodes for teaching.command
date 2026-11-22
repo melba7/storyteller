@@ -4,7 +4,8 @@
 # Swift code the app uses (PodcastKit's podcast-transcribe, Apple's SpeechAnalyzer) (step 2). Needs
 # macOS 26 and Xcode 26. Double-click it again to carry on where it stopped: finished downloads and
 # finished transcripts are kept. Everything it prints is also added to
-# ~/Storyteller Lofi/logs/podcast-teaching.log.
+# ~/Storyteller Lofi/logs/podcast-teaching.log. Only one run can work in the folder at a time.
+# (python3 -u keeps what it prints from being held back while it is also copied to the log.)
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FOLDER="$HOME/Storyteller Lofi/PodcastTeaching"
 LOG="$HOME/Storyteller Lofi/logs/podcast-teaching.log"
@@ -15,6 +16,7 @@ finish() {
   exit "${2:-0}"
 }
 
+command -v python3 > /dev/null || finish "python3 is missing. Install Apple's command line tools: open Terminal and run xcode-select --install" 1
 mkdir -p "$(dirname "$LOG")" || finish "Could not make the folder for the log." 1
 # Everything below is shown here and added to the log; pipefail keeps the Python exit codes.
 set -o pipefail
@@ -29,7 +31,7 @@ echo "this file again later to carry on."
 echo
 
 echo "Step 1 of 2: downloading episodes" | tee -a "$LOG"
-caffeinate -i python3 "$HERE/teach_collect.py" --folder "$FOLDER" 2>&1 | tee -a "$LOG"
+caffeinate -i python3 -u "$HERE/teach_collect.py" --folder "$FOLDER" 2>&1 | tee -a "$LOG"
 if [ "$?" -ne 0 ]; then
   finish "Step 1 did not work (see above)." 1
 fi
@@ -54,7 +56,7 @@ if [ "$?" -ne 0 ]; then
 fi
 TOOL="$(swift build -c release --show-bin-path)/podcast-transcribe"
 
-caffeinate -i python3 "$HERE/teach_transcribe.py" --folder "$FOLDER" --tool "$TOOL" 2>&1 | tee -a "$LOG"
+caffeinate -i python3 -u "$HERE/teach_transcribe.py" --folder "$FOLDER" --tool "$TOOL" 2>&1 | tee -a "$LOG"
 CODE="$?"
 if [ "$CODE" -eq 3 ]; then
   finish "Step 2 stopped early because several episodes in a row failed (see above). Fix that, then double-click again to carry on." 1

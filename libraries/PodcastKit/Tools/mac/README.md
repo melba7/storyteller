@@ -46,6 +46,8 @@ the app is not added again.
 - `Time the first minute of an episode.command` and
   `Compare two downloads of an episode.command`: see "How fast can the first ads
   be found".
+- `Gather episodes for teaching.command` and
+  `Mark ads in the teaching episodes.command`: see "Teaching run".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -369,6 +371,45 @@ pages found only listed old Panoply and Slate shows for Megaphone, and the Acast
 feed pattern above is from Acast's help page). Choose shows you listen to, look
 at their feeds, and use the table. Shows that come from a network with a sales
 team (public radio, big talk shows) are the most likely to have inserted ads.
+
+## Teaching run
+
+Two files to double-click collect the examples the ad detector is taught from.
+Each window shows what it does, and everything is also added to
+`~/Storyteller Lofi/logs/podcast-teaching.log`. Both can be stopped with
+Control-C and started again: they carry on where they were. Only one of them can
+work at a time; a second window says so and stops.
+
+- `Gather episodes for teaching.command` has two steps. Step 1 reads the feed of
+  every show you follow and downloads the newest four episodes of each, up to
+  12 GB, keeping 15 GB of the disk free. Step 2 writes down what is said in
+  them with the Swift code the app uses (needs macOS 26 and Xcode 26; it can
+  take hours, so keep the Mac plugged in).
+- `Mark ads in the teaching episodes.command` has Claude mark every ad and
+  promotion in the written-down episodes, then works out each show's habits (for
+  example whether it often starts with an ad). It uses your Claude plan and
+  shares its usage allowance, so it says what it is about to do and waits for
+  you to type `yes`. Anything else marks nothing. It stops by itself when the
+  allowance is used up, and you can double-click it again later.
+
+Everything is in `~/Storyteller Lofi/PodcastTeaching`:
+
+- `episodes.json`: the list of episodes and what happened to each one (step 1
+  writes it).
+- `audio/`: the downloaded files. A file that is over 600 MB is marked
+  "skipped" in the list and not tried again.
+- `transcripts/`: one text file per episode (step 2).
+- `labels/`: one file per episode with the stretches Claude marked.
+- `habits.json`: what is usual for each show.
+- `failures.json`: which episodes failed in step 2 or in the marking. Episodes
+  that never failed go first. One that failed three times is left out, and the
+  last lines of the window say how many. To try those once more, run the step
+  in Terminal with `--retry-failed`, for example
+  `python3 teach_label.py --retry-failed` in the folder with these tools.
+- `.lock`: how a second run notices the first. Leave it alone.
+
+The tests are `python3 -m unittest discover -s libraries/PodcastKit/Tools/mac`;
+they use fake feeds and a fake `claude`, so they cost nothing and send nothing.
 
 ## Tests
 
