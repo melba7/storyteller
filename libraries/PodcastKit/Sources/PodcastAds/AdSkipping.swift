@@ -25,11 +25,13 @@ public struct AdSkipSettings: Equatable, Sendable {
   }
 
   /// These switches with a show's own choices where it has them (nil keeps the listener's). A
-  /// show overrides only the first two; the promo and credits switches stay the listener's.
+  /// show overrides the first two. Promos used to be ads, so a show that turns ad skipping off
+  /// (`false`) does not have its promos skipped either; a show's choice of on, or none, leaves
+  /// the promo switch as the listener set it. The credits switch stays the listener's.
   public func overridden(skipAds show: Bool?, skipOwnPlugs showPlugs: Bool?) -> AdSkipSettings {
     AdSkipSettings(
-      skipAds: show ?? skipAds, skipOwnPlugs: showPlugs ?? skipOwnPlugs, skipPromos: skipPromos,
-      skipCredits: skipCredits)
+      skipAds: show ?? skipAds, skipOwnPlugs: showPlugs ?? skipOwnPlugs,
+      skipPromos: show == false ? false : skipPromos, skipCredits: skipCredits)
   }
 
   /// Whether a stretch of this kind may be skipped under these switches.

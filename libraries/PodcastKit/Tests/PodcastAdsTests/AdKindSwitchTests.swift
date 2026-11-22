@@ -41,6 +41,22 @@ final class AdKindSwitchTests: XCTestCase {
     XCTAssertFalse(AdSkipSettings(skipPromos: false).allows(.promo))
   }
 
+  func testAShowThatTurnsAdSkippingOffDoesNotSkipItsPromosEither() {
+    let listener = AdSkipSettings(skipAds: true, skipOwnPlugs: true, skipPromos: true)
+    XCTAssertFalse(listener.overridden(skipAds: false, skipOwnPlugs: nil).skipPromos)
+    XCTAssertTrue(listener.overridden(skipAds: true, skipOwnPlugs: nil).skipPromos)
+    XCTAssertTrue(listener.overridden(skipAds: nil, skipOwnPlugs: false).skipPromos)
+    XCTAssertTrue(listener.overridden(skipAds: nil, skipOwnPlugs: nil).skipPromos)
+    let promo = FoundAd(
+      start: 100, end: 160, kind: .promo, advertiser: "", confidence: .sure, firstWords: "")
+    let file = AdsFile(
+      sha256: "aa", detector: "d", detectorVersion: "", osVersion: "", duration: 600, ads: [promo])
+    let off = AdSkipper(
+      file: file, settings: listener.overridden(skipAds: false, skipOwnPlugs: nil))
+    XCTAssertEqual(off.ads, [])
+    XCTAssertEqual(AdSkipper(file: file, settings: listener).ads, [promo])
+  }
+
   func testOverriddenKeepsPromosAndCredits() {
     let listener = AdSkipSettings(
       skipAds: true, skipOwnPlugs: true, skipPromos: false, skipCredits: true)
