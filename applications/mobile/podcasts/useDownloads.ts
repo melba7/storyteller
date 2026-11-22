@@ -141,8 +141,17 @@ export function pressDownload(
               episode.audioType,
               false,
               show?.language ?? null,
+              episode.showId,
             ),
-          () => startDownload(episode.id, episode.audioUrl, episode.audioType),
+          () =>
+            startDownload(
+              episode.id,
+              episode.audioUrl,
+              episode.audioType,
+              false,
+              null,
+              episode.showId,
+            ),
         )
         .catch((cause: unknown) => tell("Couldn't download", cause))
       return

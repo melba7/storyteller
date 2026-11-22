@@ -65,6 +65,7 @@ export async function runBulk(
             episode.audioType,
             false,
             show?.language ?? null,
+            episode.showId,
           )
         }
         return

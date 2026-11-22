@@ -378,6 +378,7 @@ type PodcastsNativeModule = {
     type: string,
     automatic: boolean,
     language: string | null,
+    showId: string | null,
   ): Promise<void>
   /**
    * Copies an audio file from the Files app in and installs it like a finished download. The

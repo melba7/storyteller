@@ -54,6 +54,7 @@ async function startNew(added: Added, settings: AutomaticSettings) {
         episode.audioType,
         true,
         show?.language ?? null,
+        episode.showId,
       )
     } catch (cause) {
       console.warn("Couldn't start an automatic download", cause)
@@ -102,6 +103,7 @@ async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
         episode.audioType,
         true,
         languages.get(episode.showId) ?? null,
+        episode.showId,
       )
     } catch (cause) {
       console.warn("Couldn't start a playlist download", cause)

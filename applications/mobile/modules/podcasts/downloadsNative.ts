@@ -19,8 +19,9 @@ export async function startDownload(
   type: string,
   automatic = false,
   language: string | null = null,
+  showId: string | null = null,
 ): Promise<void> {
-  await Podcasts?.download(episodeId, url, type, automatic, language)
+  await Podcasts?.download(episodeId, url, type, automatic, language, showId)
 }
 
 export async function cancelDownload(episodeId: string): Promise<void> {

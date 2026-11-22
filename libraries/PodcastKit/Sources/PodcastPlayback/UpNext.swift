@@ -77,6 +77,13 @@ public struct UpNextQueue: Sendable, Equatable, Codable {
   /// details). The episode playing now is not queued.
   public mutating func add(_ item: QueueItem, at place: QueuePlace, playingId: String? = nil) {
     guard item.id != playingId else { return }
+    var item = item
+    if let old = items.first(where: { $0.id == item.id }) {
+      // A copy that carries no notes or show link (Swift's own list item does not) keeps the
+      // ones already stored.
+      item.notes = item.notes ?? old.notes
+      item.showLink = item.showLink ?? old.showLink
+    }
     items.removeAll { $0.id == item.id }
     switch place {
     case .next: items.insert(item, at: 0)

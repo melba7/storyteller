@@ -36,6 +36,26 @@ final class UpNextTests: XCTestCase {
     XCTAssertEqual(q.items.last?.position, 120)
   }
 
+  func testAddingACopyWithoutNotesKeepsTheNotesAndShowLinkOfTheQueuedItem() {
+    var q = UpNextQueue(items: [
+      QueueItem(
+        id: "a", url: "u", title: "A", notes: "Brought to you by Acme", showLink: "https://a.test")
+    ])
+    q.add(item("a", position: 50), at: .next)
+    XCTAssertEqual(q.items.first?.position, 50)
+    XCTAssertEqual(q.items.first?.notes, "Brought to you by Acme")
+    XCTAssertEqual(q.items.first?.showLink, "https://a.test")
+  }
+
+  func testAddingWithNewNotesReplacesTheOldOnes() {
+    var q = UpNextQueue(items: [
+      QueueItem(id: "a", url: "u", title: "A", notes: "old", showLink: "x")
+    ])
+    q.add(QueueItem(id: "a", url: "u", title: "A", notes: "new", showLink: "y"), at: .last)
+    XCTAssertEqual(q.items.first?.notes, "new")
+    XCTAssertEqual(q.items.first?.showLink, "y")
+  }
+
   func testTheEpisodePlayingNowIsNotQueued() {
     var q = queue("a")
     q.add(item("p"), at: .next, playingId: "p")
