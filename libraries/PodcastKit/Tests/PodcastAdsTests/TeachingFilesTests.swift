@@ -14,7 +14,7 @@ final class TeachingFilesTests: XCTestCase {
   private func modelData(weight: Double = 1) -> Data {
     let json: [String: Any] = [
       "version": 1, "buckets": 2048, "classes": AdWordModel.classes,
-      "weights": ["5": [0.0, weight, 0.0, 0.0, 0.0]],
+      "weights": ["5": [0.0, weight, 0.0, 0.0, 0.0], "359": [4.0, 0.0, 0.0, 0.0, 0.0]],
     ]
     return try! JSONSerialization.data(withJSONObject: json, options: [.sortedKeys])
   }

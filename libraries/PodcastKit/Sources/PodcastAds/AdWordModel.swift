@@ -54,7 +54,8 @@ public struct AdWordModel: Sendable, Equatable {
       default: break
       }
     }
-    guard cutoffs.stay <= cutoffs.start else { return nil }
+    // A start below 0.5 would open a span on a line the model thinks is more likely plain talk.
+    guard cutoffs.start >= 0.5, cutoffs.stay <= cutoffs.start else { return nil }
 
     var table: [Int: [Double]] = [:]
     table.reserveCapacity(file.weights.count)
@@ -65,9 +66,20 @@ public struct AdWordModel: Sendable, Equatable {
       else { return nil }
       table[index] = row
     }
+    // A line with no known word has only the bias. A file whose bias does not call that line
+    // plain talk (a missing bias row, say) would call every ordinary line an ad.
+    let bias = table[Self.bucket("#bias", buckets: file.buckets)] ?? [Double](repeating: 0, count: Self.classes.count)
+    guard Self.plainProbability(bias) >= 0.5 else { return nil }
     self.buckets = file.buckets
     self.thresholds = cutoffs
     self.weights = table
+  }
+
+  /// The probability of "none" for these five scores.
+  private static func plainProbability(_ scores: [Double]) -> Double {
+    let top = scores.max() ?? 0
+    let exps = scores.map { exp($0 - top) }
+    return exps[0] / exps.reduce(0, +)
   }
 
   /// Loads the model at `url`, or nil when there is no file or it cannot be trusted.

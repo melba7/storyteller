@@ -12,13 +12,19 @@ final class LocalAdsTests: XCTestCase {
     }
   }
 
-  /// A model that calls every line an ad (a sponsor) except those with the word "plain".
+  /// A model that calls every line an ad (a sponsor) except those with the word "plain". The
+  /// bias calls a bare line plain talk (a model file must), and the early-minutes feature
+  /// "#t0" turns the lines of these tests (all in the first two minutes) into sponsor lines.
   private var model: AdWordModel {
     let key = String(AdWordModel.bucket("u:plain", buckets: 262144))
     let bias = String(AdWordModel.bucket("#bias", buckets: 262144))
+    let early = String(AdWordModel.bucket("#t0", buckets: 262144))
     let json: [String: Any] = [
       "version": 1, "buckets": 262144, "classes": AdWordModel.classes,
-      "weights": [bias: [-4.0, 4.0, 0.0, 0.0, 0.0], key: [8.0, -8.0, 0.0, 0.0, 0.0]],
+      "weights": [
+        bias: [4.0, 0.0, 0.0, 0.0, 0.0], early: [-8.0, 8.0, 0.0, 0.0, 0.0],
+        key: [8.0, -8.0, 0.0, 0.0, 0.0],
+      ],
     ]
     return AdWordModel(data: try! JSONSerialization.data(withJSONObject: json))!
   }

@@ -185,35 +185,41 @@ final class AdWordModelTests: XCTestCase {
     let m = model(weights: referenceWeights)
     XCTAssertEqual(m.probabilities(lines: [], duration: nil), [])
     XCTAssertEqual(m.spans(lines: [], duration: nil), [])
-    // One weight bucket that none of the lines touch counts as an untrained model.
+    // One weight bucket that none of the lines touch (and no bias row) is an untrained model:
+    // it would call every line an ad, so the file is refused.
     let untouched = String(AdWordModel.bucket("u:zzzzqqq", buckets: 262144))
-    let blank = model(weights: [untouched: [0.0, 0.0, 0.0, 0.0, 0.0]])
-    let rows = blank.probabilities(lines: referenceLines, duration: 150)
+    XCTAssertNil(AdWordModel(data: file(weights: [untouched: [0.0, 0.0, 0.0, 0.0, 0.0]])))
+    // A model with only a neutral bias is the same, and a small bias for "none" is fine.
+    let bias = String(AdWordModel.bucket("#bias", buckets: 262144))
+    XCTAssertNil(AdWordModel(data: file(weights: [bias: [0.0, 0.0, 0.0, 0.0, 0.0]])))
+    XCTAssertNil(AdWordModel(data: file(weights: [bias: [0.0, 0.5, 0.0, 0.0, 0.0]])))
+    // A bias that favours "none" gives plain talk on lines of unknown words, and no spans.
+    let plain = model(weights: [bias: [3.0, 0.0, 0.0, 0.0, 0.0]])
+    let rows = plain.probabilities(lines: referenceLines, duration: 150)
     XCTAssertEqual(rows.count, 9)
-    for row in rows { for value in row { XCTAssertEqual(value, 0.2, accuracy: 1e-12) } }
-    // Equal probabilities mean an ad probability of 0.8 everywhere, so by the contract the whole
-    // transcript is one span, and the earliest class wins the tie.
-    let all = blank.spans(lines: referenceLines, duration: 150)
-    XCTAssertEqual(all.count, 1)
-    XCTAssertEqual([all[0].firstLine, all[0].lastLine], [1, 9])
-    XCTAssertEqual(all[0].sort, "sponsor")
-    XCTAssertEqual(all[0].score, 0.8, accuracy: 1e-12)
+    for row in rows { XCTAssertGreaterThan(row[0], 0.5) }
+    XCTAssertEqual(plain.spans(lines: referenceLines, duration: 150), [])
   }
 
   func testTheEndOfTheEpisodeIsAFeature() {
     let key = String(AdWordModel.bucket("#end", buckets: 262144))
-    let m = model(weights: [key: [0.0, 4.0, 0.0, 0.0, 0.0]])
+    let bias = String(AdWordModel.bucket("#bias", buckets: 262144))
+    let m = model(weights: [bias: [3.0, 0.0, 0.0, 0.0, 0.0], key: [0.0, 4.0, 0.0, 0.0, 0.0]])
     let line = [NumberedLine(number: 1, start: 100, end: 105, text: "hello")]
-    XCTAssertEqual(m.probabilities(lines: line, duration: 150)[0][1], exp(4) / (exp(4) + 4), accuracy: 1e-9)
-    XCTAssertEqual(m.probabilities(lines: line, duration: nil)[0][1], 0.2, accuracy: 1e-12)
-    XCTAssertEqual(m.probabilities(lines: line, duration: 300)[0][1], 0.2, accuracy: 1e-12)
+    let plain: Double = exp(3.0) / (exp(3.0) + 4.0)
+    XCTAssertEqual(
+      m.probabilities(lines: line, duration: 150)[0][1], exp(4.0) / (exp(3.0) + exp(4.0) + 3.0),
+      accuracy: 1e-9)
+    XCTAssertEqual(m.probabilities(lines: line, duration: nil)[0][1], 1.0 / (exp(3.0) + 4.0), accuracy: 1e-12)
+    XCTAssertEqual(m.probabilities(lines: line, duration: nil)[0][0], plain, accuracy: 1e-12)
+    XCTAssertEqual(m.probabilities(lines: line, duration: 300)[0][1], 1.0 / (exp(3.0) + 4.0), accuracy: 1e-12)
   }
 
   // MARK: Loading
 
   func testALoadedFileIsAcceptedWithOptionalParts() {
     let data = file(
-      weights: ["3916": [-1.0, 0.0, 1.0, 0.0, 0.0]],
+      weights: ["3916": [-1.0, 0.0, 1.0, 0.0, 0.0], "211303": [3.0, 0.0, 0.0, 0.0, 0.0]],
       extra: ["trained": ["writtenAt": 1_795_000_000_000, "episodes": 180, "x": [1, 2]]])
     XCTAssertNotNil(AdWordModel(data: data))
     XCTAssertEqual(AdWordModel(data: data), AdWordModel(data: data))
@@ -261,9 +267,11 @@ final class AdWordModelTests: XCTestCase {
   }
 
   func testTheDefaultThresholdsApplyWhenMissing() {
-    let one: [String: Any] = ["7": [0.0, 0.0, 0.0, 0.0, 0.0]]
+    let one: [String: Any] = ["211303": [3.0, 0.0, 0.0, 0.0, 0.0]]
     // With the default stay of 0.4 a start of 0.5 is fine, and 0.3 is not allowed for stay > start.
     XCTAssertNotNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.5]])))
     XCTAssertNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.3]])))
+    XCTAssertNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.0, "stay": 0.0]])))
+    XCTAssertNil(AdWordModel(data: file(weights: one, extra: ["thresholds": ["start": 0.45, "stay": 0.4]])))
   }
 }
