@@ -19,6 +19,8 @@ export type PodcastFeedData = {
   people?: PodcastPerson[]
   /** The channel's `podcast:funding` tags (at most 5). */
   funding?: PodcastFunding[]
+  /** The channel's `itunes:new-feed-url`, left out when the feed has none. */
+  newFeedUrl?: string
   /** In feed order. */
   episodes: PodcastFeedEpisode[]
 }
