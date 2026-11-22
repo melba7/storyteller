@@ -233,6 +233,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
   )
   // A feed that says nothing new does not make every open screen read the library again.
   if (
+    movedTo !== null ||
     feedChanged(show, feed, { inserted: insert.length, updated: update.length })
   ) {
     notifyLibraryChanged()

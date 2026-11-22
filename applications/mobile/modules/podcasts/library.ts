@@ -105,9 +105,11 @@ function unchanged(stored: StoredEpisode, fetched: FetchedEpisode): boolean {
  * episode that left the feed is never deleted.
  *
  * A fetched episode with an unknown guid first looks for a stored episode whose guid is no
- * longer in the feed and that has the same audio address, or else the same title and date.
- * That row takes the new guid (the update carries it), so a host that rewrites its guids
- * does not store every episode twice. A stored row is taken at most once.
+ * longer in the feed and that has the same audio address with the same title or date, or
+ * else the same title and date. That row takes the new guid (the update carries it), so a
+ * host that rewrites its guids does not store every episode twice. The audio address alone
+ * is not enough: a feed can point every item at one stream. A stored row is taken at most
+ * once.
  */
 export function mergeEpisodes(
   existing: StoredEpisode[],
@@ -142,7 +144,13 @@ export function mergeEpisodes(
   }
   for (const episode of fresh) {
     if (episode.audioUrl === "") continue
-    take(episode, (stored) => stored.audioUrl === episode.audioUrl)
+    take(
+      episode,
+      (stored) =>
+        stored.audioUrl === episode.audioUrl &&
+        (stored.title === episode.title ||
+          stored.publishedAt === episode.publishedAt),
+    )
   }
   for (const episode of fresh) {
     if (moved.has(episode) || episode.title === "") continue

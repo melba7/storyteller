@@ -205,6 +205,17 @@ describe("mergeEpisodes with changed guids", () => {
     expect(result.update).toEqual([])
   })
 
+  it("keeps both when only the audio address is the same", () => {
+    // A feed whose items all point at one stream: yesterday's item is not today's.
+    const stream = "https://radio.example.com/live.mp3"
+    const result = mergeEpisodes(
+      [stored("mon", { title: "Monday", publishedAt: 1, audioUrl: stream })],
+      [fetched("tue", { title: "Tuesday", publishedAt: 2, audioUrl: stream })],
+    )
+    expect(result.insert.map((e) => e.guid)).toEqual(["tue"])
+    expect(result.update).toEqual([])
+  })
+
   it("never takes a row whose guid is still in the feed", () => {
     const result = mergeEpisodes(
       [stored("a", { audioUrl: "https://x/1" })],
