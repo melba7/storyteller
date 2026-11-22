@@ -23,11 +23,17 @@ public struct QueueItem: Sendable, Equatable, Codable {
   /// The show's language, so the next episode is transcribed in it when it plays through its
   /// own download. Files saved before this existed have none.
   public var language: String?
+  /// The episode's notes (cut to 4,000 characters by the app) and the show's web page, so the ad
+  /// rules still know the sponsors when the episode starts from the queue or is loaded again.
+  /// Files saved before this existed have none.
+  public var notes: String?
+  public var showLink: String?
 
   public init(
     id: String, url: String, type: String = "", title: String, showTitle: String = "",
     artworkUrl: String? = nil, duration: Double? = nil, position: Double = 0, showId: String? = nil,
-    chaptersUrl: String? = nil, language: String? = nil
+    chaptersUrl: String? = nil, language: String? = nil, notes: String? = nil,
+    showLink: String? = nil
   ) {
     self.id = id
     self.url = url
@@ -40,6 +46,8 @@ public struct QueueItem: Sendable, Equatable, Codable {
     self.showId = showId
     self.chaptersUrl = chaptersUrl
     self.language = language
+    self.notes = notes
+    self.showLink = showLink
   }
 }
 

@@ -196,3 +196,20 @@ final class QueueItemLanguageTests: XCTestCase {
     XCTAssertNil(try JSONDecoder().decode(UpNextQueue.self, from: old).items.first?.language)
   }
 }
+
+final class QueueItemNotesTests: XCTestCase {
+  func testNotesAndShowLinkSurviveSavingAndOldFilesStillRead() throws {
+    let item = QueueItem(
+      id: "a", url: "https://x/a.mp3", title: "A", notes: "Sponsored by Acme",
+      showLink: "https://x.example")
+    let data = try JSONEncoder().encode(UpNextQueue(items: [item]))
+    let back = try JSONDecoder().decode(UpNextQueue.self, from: data).items.first
+    XCTAssertEqual(back?.notes, "Sponsored by Acme")
+    XCTAssertEqual(back?.showLink, "https://x.example")
+    let old = Data(
+      #"{"items":[{"id":"a","url":"u","type":"","title":"A","showTitle":"","position":0}]}"#.utf8)
+    let older = try JSONDecoder().decode(UpNextQueue.self, from: old).items.first
+    XCTAssertNil(older?.notes)
+    XCTAssertNil(older?.showLink)
+  }
+}
