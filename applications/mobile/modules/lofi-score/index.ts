@@ -103,6 +103,11 @@ export type LinkedFileRead =
   | { status: "notLinked" | "folderGone" | "missing" | "notDownloaded" }
   | { status: "unreadable"; message: string }
 
+/** What writing a small file into the linked sounds folder came to. */
+export type LinkedFileWrite =
+  | { status: "written" | "notLinked" | "folderGone" }
+  | { status: "unwritable"; message: string }
+
 export type LofiLinkedFolder = {
   name: string
   /** Seconds since 1970, when the folder was last looked at. */
@@ -248,6 +253,11 @@ type LofiScoreNativeModule = {
   readLinkedFolderFile(path: string): Promise<string | null>
   /** The same read, saying why there is nothing when there is nothing. */
   readLinkedFolderFileStatus(path: string): Promise<LinkedFileRead>
+  /**
+   * Writes a small text file below the linked sounds folder (such as
+   * `Podcasts/phone-notes.jsonl`), replacing the one there.
+   */
+  writeLinkedFolderFile(path: string, text: string): Promise<LinkedFileWrite>
   /** Deletes the imported sounds and forgets the linked folder. */
   removeImportedSounds(): Promise<LofiStatus>
   setAtmosphereEnabled(enabled: boolean): Promise<LofiStatus>

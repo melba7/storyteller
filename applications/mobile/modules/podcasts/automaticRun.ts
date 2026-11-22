@@ -33,6 +33,7 @@ import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
 import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 import { filterDownloaded, playlistDownloads } from "./playlistRules"
+import { runTeachingSync } from "./teachingRun"
 import { listUpNext, queueEpisode } from "./upNextNative"
 
 let running: Promise<void> | null = null
@@ -215,6 +216,8 @@ export function runAutomatic(): Promise<void> {
       // First, so a show followed on the Mac is in the library when the feeds are read, but
       // the feeds do not wait more than 30 seconds for it.
       await syncApplePodcastsBriefly()
+      // The Mac's teaching files come in and the phone's notes go out, in the background.
+      runTeachingSync()
       // The new episodes are kept as each show is read, so a run that is cut short (the
       // background task's time ran out) still follows them up next time.
       let todo = await loadFollowUps()
@@ -250,6 +253,7 @@ export function runAutomatic(): Promise<void> {
 export async function runIfDue(): Promise<void> {
   if (!refreshDue(await loadLastRun(), Date.now())) {
     await syncApplePodcastsBriefly()
+    runTeachingSync()
     // In full at startup, so the player has every show's settings even on a quiet open.
     await syncShowSettings().catch((cause) =>
       console.warn("Couldn't save the show settings for the player", cause),
