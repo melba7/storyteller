@@ -52,9 +52,7 @@ export function PlayerNowPlaying({
   const { episode, show } = view
   const adsFile = useAdsFile(episode?.id ?? "")
   const settings = useEffectiveAdSettings(show)
-  const marks = adsFile
-    ? adMarks(adRows(adsFile, settings), view.duration)
-    : []
+  const marks = adsFile ? adMarks(adRows(adsFile, settings), view.duration) : []
   if (!episode) return null
   const date = dateWords(episode.publishedAt)
 

@@ -83,7 +83,6 @@ export function useAdsFile(episodeId: string): AdsFile | null {
   // The full pass keeps the ads found so far on show (the partial file is read meanwhile).
   // Every change Swift sends for the episode (a new count, a trim) is a new `info`, so the file is read again.
   const reads = readsAdsFile(info)
-  const state = info?.state
   useEffect(() => {
     if (!reads) {
       setKept(null)
@@ -96,7 +95,7 @@ export function useAdsFile(episodeId: string): AdsFile | null {
         const read = json === null ? null : parseAdsFile(json)
         setKept((last) => ({
           episodeId,
-          file: adsFileAfterRead(state, last, episodeId, read),
+          file: adsFileAfterRead(info?.state, last, episodeId, read),
         }))
       },
       (cause: unknown) => console.warn("Couldn't read the ads", cause),

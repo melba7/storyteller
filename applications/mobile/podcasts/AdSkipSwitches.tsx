@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react"
 
 import { AD_SWITCHES } from "@/modules/podcasts/adSwitches"
-import { DEFAULT_AD_SKIP_SETTINGS } from "@/modules/podcasts/ads"
 import {
   getAdSkipSettings,
   setAdSkipSettings,
@@ -33,27 +32,35 @@ export function AdSkipSwitches() {
   const [settings, setSettings] = useState<AdSkipSettings | null>(null)
   const unavailable = useAdsUnavailable()
 
+  // When the read fails the switches stay hidden, so no tap can write defaults over what is
+  // saved; the read is tried again after a few seconds.
+  const [attempt, setAttempt] = useState(0)
+
   useEffect(() => {
     let live = true
+    let retry: ReturnType<typeof setTimeout> | null = null
     getAdSkipSettings().then(
       (value) => {
         if (live) setSettings(value)
       },
       () => {
-        if (live) setSettings(DEFAULT_AD_SKIP_SETTINGS)
+        if (live) retry = setTimeout(() => setAttempt((n) => n + 1), 3000)
       },
     )
     return () => {
       live = false
+      if (retry !== null) clearTimeout(retry)
     }
-  }, [])
+  }, [attempt])
 
   function change(patch: Partial<AdSkipSettings>) {
-    const before = settings
-    if (before === null) return
-    const next = { ...before, ...patch }
+    if (settings === null) return
+    const next = { ...settings, ...patch }
     setSettings(next)
-    setAdSkipSettings(next).catch(() => setSettings(before))
+    // After a failure the switches show what is saved, not what was tapped.
+    setAdSkipSettings(next).catch(() => {
+      getAdSkipSettings().then(setSettings, () => setSettings(null))
+    })
   }
 
   return (

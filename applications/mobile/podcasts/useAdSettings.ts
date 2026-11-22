@@ -47,8 +47,5 @@ export function useEffectiveAdSettings(
   show: Pick<Show, "settings"> | null,
 ): AdSkipSettings {
   const main = useMainAdSettings()
-  return effectiveAdSettings(
-    main ?? DEFAULT_AD_SKIP_SETTINGS,
-    show?.settings,
-  )
+  return effectiveAdSettings(main ?? DEFAULT_AD_SKIP_SETTINGS, show?.settings)
 }

@@ -9,6 +9,7 @@ import {
 } from "@/modules/podcasts/ads"
 import { backAfterSkip, undoAdSkip } from "@/modules/podcasts/adsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+import { usePlayerValue } from "@/modules/podcasts/playerInstance"
 
 import { adsEdited } from "./useAds"
 
@@ -45,9 +46,14 @@ function subscribe(listener: () => void): () => void {
   }
 }
 
-/** The note to show now, or null. It goes by itself after six seconds. */
+/**
+ * The note to show now, or null. It goes by itself after six seconds, and it is not shown over
+ * another episode than the one it was made for.
+ */
 export function useSkipNote(): SkipNote | null {
-  return useSyncExternalStore(subscribe, () => current)
+  const note = useSyncExternalStore(subscribe, () => current)
+  const loadedId = usePlayerValue((view) => view.episode?.id ?? null)
+  return note !== null && note.episodeId === loadedId ? note : null
 }
 
 /** Undo: back to the ad's start, playing. The note goes when Swift says it was undone. */

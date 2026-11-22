@@ -70,13 +70,18 @@ export function Profile() {
     const before = automatic ?? DEFAULT_SETTINGS
     const next = { ...before, ...patch }
     setAutomatic(next)
-    saveSettings(next).catch(() => setAutomatic(before))
+    // After a failure the switches show what is saved, not what was tapped.
+    saveSettings(next).catch(() => {
+      loadSettings().then(setAutomatic, () => setAutomatic(before))
+    })
   }
 
   function change(on: boolean) {
     const before = wifiOnly
     setWifi(on)
-    setWifiOnly(on).catch(() => setWifi(before))
+    setWifiOnly(on).catch(() => {
+      getWifiOnly().then(setWifi, () => setWifi(before))
+    })
   }
 
   return (
