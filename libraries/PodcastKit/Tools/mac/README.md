@@ -432,7 +432,12 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
   how well it did on the shelf.
-- `ad-library.json`: the ads that came back in several episodes.
+- `ad-library.json`: every ad Claude marked with high confidence (at least 25
+  words, 8 to 300 seconds), each different ad once, the ones met in most
+  episodes first. An ad met in one episode only is in it too. The phone gets it.
+- `ad-library-score.json`: the same, built without the shelf episodes. It stays
+  here, and is for scoring only, so the scorecard's "plus the library" row does
+  not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
 - `scorecard.json`: every scorecard `podcast-teach score` has made.
 - `wanted.json`: the episodes to fetch first next time (see below).

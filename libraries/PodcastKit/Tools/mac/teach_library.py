@@ -4,7 +4,8 @@ recognise a repeated ad at once by its words.
 
 Standard library only. It reads <folder>/episodes.json, every <folder>/<labels>/<id>.json that
 teach_label.py wrote and the matching <folder>/transcripts/<id>.txt, and writes
-<folder>/ad-library.json (publish it to the phone with teach_publish.py).
+<folder>/ad-library.json (publish it to the phone with teach_publish.py) and
+<folder>/ad-library-score.json.
 
   teach_library.py [--folder F] [--labels labels] [--most 1500]
 
@@ -18,6 +19,11 @@ How it works:
 - Candidates are grouped in the order of episodes.json, then segment order. A candidate joins the
   first group whose first member it is the same as, otherwise it starts a group. Each group is one
   entry of the library: the more episodes it was met in, the earlier it comes.
+- Every group is kept, also an ad that was met in one episode only: the phone should know the
+  newest ads.
+- ad-library.json is built from all marked episodes. ad-library-score.json has the same shape but is
+  built only from the episodes that are not on the shelf (shelf.json), so the scorecard's "plus the
+  library" row does not know the shelf ads' own words. It is not published.
 - The file stays under 4.5 MB (the phone refuses files over 5 MB): entries are dropped from the end.
 
 Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem.
@@ -33,6 +39,7 @@ import time
 
 import teach_store
 import teach_segments as seg
+from teach_shelf import read_shelf
 
 DEFAULT_MOST = 1500
 MAX_BYTES = 4500000
@@ -216,17 +223,26 @@ def main(argv, say=print, now=time.time, max_bytes=MAX_BYTES):
     if labels == 0:
         say("No labels yet. Run \"Mark ads in the teaching episodes\" first.")
         return 0
-    groups = group(candidates)
+    try:
+        shelf = set(read_shelf(folder))
+    except teach_store.Problem as error:
+        say(str(error))
+        return 2
     written = int(now() * 1000)
-    ads = entries_of(groups, options.most, max_bytes, written)
+    ads = entries_of(group(candidates), options.most, max_bytes, written)
+    unshelved = [item for item in candidates if item["episode"] not in shelf]
+    scored = entries_of(group(unshelved), options.most, max_bytes, written)
     teach_store.write_json(os.path.join(folder, "ad-library.json"),
                            {"version": 1, "writtenAt": written, "ads": ads})
+    teach_store.write_json(os.path.join(folder, "ad-library-score.json"),
+                           {"version": 1, "writtenAt": written, "ads": scored})
     several = sum(1 for e in ads if e["scope"] == "all")
     say("Looked at %d stretches in %d labelled episodes. Kept %d different ads, %d of them in "
         "more than one show." % (len(candidates), labels, len(ads), several))
     for e in ads[:LISTED]:
         say("  %s (%s): seen in %d episodes" % (e["who"] or "no name", e["sort"], e["seen"]))
-    say("Saved ad-library.json.")
+    say("Saved ad-library.json, and ad-library-score.json without the %d shelf episode%s' ads for "
+        "the scorecard." % (len(shelf), "" if len(shelf) == 1 else "s"))
     return 0
 
 

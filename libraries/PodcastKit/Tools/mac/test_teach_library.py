@@ -336,6 +336,33 @@ class MainTests(Folder):
         self.assertIn("Acme", report)
         self.assertEqual([n for n in os.listdir(self.folder) if n.endswith(".part")], [])
 
+    def test_the_score_library_leaves_out_the_shelf_episodes(self):
+        words = word_list("w", 40)
+        self.ad("aaaaaaaaaaaa", words, feed="f1", who="Acme")
+        self.ad("bbbbbbbbbbbb", words, feed="f2", who="Acme")
+        self.ad("cccccccccccc", word_list("z", 40), feed="f1", who="OnShelf")
+        with open(os.path.join(self.folder, "shelf.json"), "w") as f:
+            json.dump({"version": 1, "episodes": ["cccccccccccc"]}, f)
+        self.assertEqual(self.run_main(), 0, self.messages)
+        self.assertEqual([(a["who"], a["seen"]) for a in self.written()["ads"]],
+                         [("Acme", 2), ("OnShelf", 1)])
+        with open(os.path.join(self.folder, "ad-library-score.json")) as f:
+            scored = json.load(f)
+        self.assertEqual(scored["version"], 1)
+        self.assertEqual([(a["who"], a["seen"]) for a in scored["ads"]], [("Acme", 2)])
+
+    def test_without_a_shelf_both_libraries_are_the_same(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 40))
+        self.run_main()
+        with open(os.path.join(self.folder, "ad-library-score.json")) as f:
+            self.assertEqual(json.load(f)["ads"], self.written()["ads"])
+
+    def test_a_damaged_shelf_is_a_set_up_problem(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 40))
+        with open(os.path.join(self.folder, "shelf.json"), "w") as f:
+            f.write("nope")
+        self.assertEqual(self.run_main(), 2)
+
     def test_labels_with_nothing_to_learn_still_write_an_empty_library(self):
         self.ad("aaaaaaaaaaaa", word_list("w", 5))
         self.assertEqual(self.run_main(), 0)
