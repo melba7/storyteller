@@ -242,6 +242,7 @@ async function readFeedAgain(id: string): Promise<NewEpisode[]> {
     insert.filter((_, at) => !arrived[at]),
     ids.filter((_, at) => !arrived[at]),
     stored,
+    Date.now(),
   )
 }
 

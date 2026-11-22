@@ -43,7 +43,9 @@ type Added = Awaited<ReturnType<typeof refreshAllShows>>["added"]
 async function startNew(added: Added, settings: AutomaticSettings) {
   const shows = await listShows()
   const downloads = new Map(shows.map((s) => [s.id, s.settings.autoDownload]))
-  for (const episode of episodesToDownload(added, settings, downloads)) {
+  // A show unfollowed during or after the refresh is not in the list: nothing of it downloads.
+  const followed = added.filter((episode) => downloads.has(episode.showId))
+  for (const episode of episodesToDownload(followed, settings, downloads)) {
     try {
       const show = await getShow(episode.showId)
       await startDownload(

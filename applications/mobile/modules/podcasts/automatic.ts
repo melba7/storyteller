@@ -100,18 +100,25 @@ export function mergeFollowUps(
  * episode is new only when it came out after the newest episode stored before the refresh, so
  * old episodes a feed gains (changed guids, a longer feed) are not. A show with nothing stored
  * yet has nothing new, and an undated episode is never new. `stored` is the show's episodes
- * before the refresh.
+ * before the refresh. A stored date more than a day after `now` (a mistyped year) is left out
+ * of the newest, so one such episode does not hide every later one.
  */
 export function newEpisodes(
   showId: string,
   inserted: readonly FetchedEpisode[],
   ids: readonly string[],
   stored: readonly { publishedAt: number | null }[],
+  now: number,
 ): NewEpisode[] {
   if (stored.length === 0) return []
+  const latest = now + 24 * 60 * 60 * 1000
   const newest = Math.max(
     -Infinity,
-    ...stored.map((episode) => episode.publishedAt ?? -Infinity),
+    ...stored.map((episode) =>
+      episode.publishedAt !== null && episode.publishedAt <= latest
+        ? episode.publishedAt
+        : -Infinity,
+    ),
   )
   return inserted.flatMap((episode, index) => {
     const id = ids[index]
