@@ -53,7 +53,7 @@ public enum AdScoreRun {
         episode: episode, found: detect(episode, episode.transcript), settings: settings)
       let openings = AdScore.openings(episode, settings)
       if !openings.isEmpty {
-        let look = firstLook(habits, show: episode.feed) ?? defaultLook
+        let look = firstLook(habits, show: episode.feed)
         let head = head(of: episode.transcript, seconds: look)
         let spans = AdScore.skipped(detect(episode, head), settings)
         score.openingKnown = openings.filter { opening in
@@ -118,13 +118,9 @@ public enum AdScoreRun {
     return total
   }
 
-  /// How far into the episode the first look goes for a show that usually opens with an ad: where
-  /// its opening usually ends plus 10 seconds, kept inside 15...90. This stands in for
-  /// `ShowHabits.firstLook(show:)`, which another change adds; swap it for that when it is there.
-  private static func firstLook(_ habits: ShowHabits, show: String) -> Double? {
-    guard habits.usuallyOpensWithAd(show: show), let end = habits.openingEnd(show: show) else {
-      return nil
-    }
-    return min(max(end + 10, 15), 90)
+  /// How far into the episode the phone's first look goes: the first step of its head scan for
+  /// this show (`AdHeadRules.steps(firstLook:)`), so the scorecard looks where the phone looks.
+  static func firstLook(_ habits: ShowHabits, show: String) -> Double {
+    AdHeadRules.steps(firstLook: habits.firstLook(show: show)).first ?? defaultLook
   }
 }
