@@ -125,3 +125,17 @@ One line per lesson.
   each side's own tests passed (2026-11-22, found before it shipped).
 - The Mac's auto mode also refuses a script that fetches when it is started
   through the device shell. Leave a `.command` for Mo (2026-11-22).
+- Two sides of one contract need one written rule before either is fixed: a
+  removal by count, a carried-over switch and a span rule each had to change in
+  Swift, TypeScript or Python at once, and the briefs carried the exact rule to
+  every fixer (2026-11-22).
+- A fixer told to make old tests pass can loosen the rule instead: check the fix
+  against the finding, not against the tests. The promo rule came back accepting
+  the same phrase twice as proof (2026-11-22).
+- Fork CI runs on pull requests into main, pushes to main and by hand, not on a
+  plain branch push: open the draft pull request early to get the iOS build, and
+  put `[skip ci]` on a push that must not cancel a build that is running
+  (2026-11-22).
+- Matching a stored row by one value alone (an audio address, a count of lines)
+  breaks on the odd feed or the odd moment: ask what else must be the same
+  (2026-11-22).
