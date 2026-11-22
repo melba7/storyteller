@@ -38,11 +38,10 @@ import tempfile
 import time
 from array import array
 
-import teach_collect as collect
-import teach_label as teach
-import teach_store
 import teach_segments as seg
-from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities, softmax_of
+import teach_store
+from teach_shelf import SHELF_FILE, check_lines, choose_shelf, evaluate, read_shelf
+from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities  # noqa: F401
 
 MIN_EPISODES = 20
 MAX_BUCKETS = 40000
@@ -51,8 +50,6 @@ THRESHOLDS = {"start": 0.6, "stay": 0.4, "sure": 0.85}
 RATE = 0.5
 EPSILON = 1e-8
 L2 = 1e-6
-SHELF_MINIMUM = 3
-SHELF_FILE = "shelf.json"
 MODEL_FILE = "ad-model.json"
 CLASS_COUNT = len(CLASSES)
 
@@ -121,46 +118,6 @@ def load_episode(folder, labels, entry, say):
             "buckets": episode_buckets(lines, one["length"])}
 
 
-# MARK: Shelf
-
-def choose_shelf(entries, usable, shelf):
-    """The shelf ids after this run: the old ones, then the newest usable episode of each show
-    with at least 3 usable episodes that has none on the shelf yet."""
-    chosen = list(dict.fromkeys(shelf))
-    shelved_feeds = {e["feed"] for e in entries if e["id"] in chosen}
-    by_feed = {}
-    for e in entries:
-        if e["id"] in usable:
-            by_feed.setdefault(e["feed"], []).append(e)
-    for feed, group in by_feed.items():
-        if feed in shelved_feeds or len(group) < SHELF_MINIMUM:
-            continue
-        newest = group[0]
-        for e in group[1:]:
-            if (e["published"] if e["published"] is not None else -math.inf) > \
-                    (newest["published"] if newest["published"] is not None else -math.inf):
-                newest = e
-        chosen.append(newest["id"])
-    return chosen
-
-
-def read_shelf(folder):
-    """The ids in shelf.json, [] when there is none. Raises Problem when it is damaged."""
-    path = os.path.join(folder, SHELF_FILE)
-    if not os.path.exists(path):
-        return []
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, ValueError):
-        data = None
-    if not isinstance(data, dict) or data.get("version") != 1 \
-            or not isinstance(data.get("episodes"), list) \
-            or not all(isinstance(x, str) for x in data["episodes"]):
-        raise teach.Problem("%s is damaged. Fix or remove it, and run again." % path)
-    return data["episodes"]
-
-
 # MARK: Training
 
 def new_weights():
@@ -215,39 +172,6 @@ def train(examples, epochs, seed, say=print):
         say("Pass %d of %d: mean loss %.4f, %.1f seconds."
             % (number, epochs, total / max(len(order), 1), time.monotonic() - started))
     return w
-
-
-# MARK: Check
-
-def ratio(part, whole_count):
-    return round(part / whole_count, 4) if whole_count else None
-
-
-def scores(true_positive, predicted, actual):
-    return {"precision": ratio(true_positive, predicted), "recall": ratio(true_positive, actual)}
-
-
-def evaluate(weights, episodes):
-    """Scores every shelf line. weights maps a bucket to five numbers; episodes are as load_episode
-    returns them. Lines with a class of None are left out."""
-    lines = 0
-    hit = predicted = actual = 0
-    per = [[0, 0, 0] for _ in CLASSES]
-    for episode in episodes:
-        for cls, active in zip(episode["classes"], episode["buckets"]):
-            if cls is None:
-                continue
-            lines += 1
-            p = softmax_of(active, weights)
-            guess = p.index(max(p))
-            predicted += p[0] < 0.5
-            actual += cls != 0
-            hit += p[0] < 0.5 and cls != 0
-            per[guess][1] += 1
-            per[cls][2] += 1
-            per[cls][0] += guess == cls
-    return {"episodes": len(episodes), "lines": lines, "anyAd": scores(hit, predicted, actual),
-            "classes": {CLASSES[c]: scores(*per[c]) for c in range(1, CLASS_COUNT)}}
 
 
 # MARK: Model file
@@ -323,20 +247,6 @@ def whole_number(text):
         raise argparse.ArgumentTypeError("%r is not a whole number" % text)
 
 
-def percent(value):
-    return "n/a" if value is None else "%.0f%%" % (value * 100)
-
-
-def check_lines(held):
-    lines = ["Check on %d held-out episodes (%d lines): any ad precision %s, recall %s."
-             % (held["episodes"], held["lines"], percent(held["anyAd"]["precision"]),
-                percent(held["anyAd"]["recall"]))]
-    for name, one in held["classes"].items():
-        lines.append("  %s: precision %s, recall %s."
-                     % (name, percent(one["precision"]), percent(one["recall"])))
-    return lines
-
-
 def main(argv, say=print, now=None):
     parser = argparse.ArgumentParser(prog="teach_train.py")
     parser.add_argument("--folder", default=teach_store.FOLDER)
@@ -351,12 +261,12 @@ def main(argv, say=print, now=None):
     now = now or (lambda: int(time.time() * 1000))
     folder = os.path.expanduser(options.folder)
     try:
-        if not os.path.exists(os.path.join(folder, collect.MANIFEST)):
-            raise teach.Problem("There is no episodes.json in %s. Run the gather step first." % folder)
+        if not os.path.exists(os.path.join(folder, teach_store.MANIFEST)):
+            raise teach_store.Problem("There is no episodes.json in %s. Run the gather step first." % folder)
         try:
-            entries = collect.load_manifest(folder)
-        except collect.ManifestError as error:
-            raise teach.Problem(str(error))
+            entries = teach_store.load_manifest(folder)
+        except teach_store.ManifestError as error:
+            raise teach_store.Problem(str(error))
         old_shelf = read_shelf(folder)
         episodes = {}
         for entry in entries:
@@ -365,7 +275,7 @@ def main(argv, say=print, now=None):
                 episodes[entry["id"]] = found
         shelf = choose_shelf(entries, set(episodes), old_shelf)
         if shelf != old_shelf:
-            teach.write_json(os.path.join(folder, SHELF_FILE), {"version": 1, "episodes": shelf})
+            teach_store.write_json(os.path.join(folder, SHELF_FILE), {"version": 1, "episodes": shelf})
         on_shelf = set(shelf)
         shelved = [e for i, e in episodes.items() if i in on_shelf]
         learning = [e for i, e in episodes.items() if i not in on_shelf]
@@ -383,7 +293,7 @@ def main(argv, say=print, now=None):
         text = build_model(flat, trained, lambda kept: evaluate(kept, shelved))
         path = os.path.join(folder, MODEL_FILE)
         write_text(path, text)
-    except teach.Problem as error:
+    except teach_store.Problem as error:
         say(str(error))
         return 2
     except OSError as error:

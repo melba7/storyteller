@@ -167,29 +167,6 @@ class ExampleTests(unittest.TestCase):
 
 
 class ShelfTests(unittest.TestCase):
-    def test_newest_of_each_show_with_three_or_more(self):
-        entries = [entry("%012x" % n, feed, pub) for n, (feed, pub) in enumerate(
-            [("a", 10), ("a", 30), ("a", 20), ("b", 5), ("b", 6)], 1)]
-        usable = {e["id"] for e in entries}
-        self.assertEqual(train.choose_shelf(entries, usable, []), ["%012x" % 2])
-
-    def test_undated_counts_oldest_and_ties_go_to_the_first(self):
-        entries = [entry("%012x" % n, "a", pub) for n, pub in enumerate([None, 7, 7], 1)]
-        self.assertEqual(train.choose_shelf(entries, {e["id"] for e in entries}, []), ["%012x" % 2])
-        entries = [entry("%012x" % n, "a", pub) for n, pub in enumerate([None, None, None], 1)]
-        self.assertEqual(train.choose_shelf(entries, {e["id"] for e in entries}, []), ["%012x" % 1])
-
-    def test_only_usable_episodes_count(self):
-        entries = [entry("%012x" % n, "a", n) for n in range(1, 4)]
-        self.assertEqual(train.choose_shelf(entries, {"%012x" % 1, "%012x" % 2}, []), [])
-
-    def test_a_shelved_episode_stays_and_its_show_gets_no_second(self):
-        entries = [entry("%012x" % n, "a", n) for n in range(1, 5)]
-        usable = {e["id"] for e in entries}
-        shelf = train.choose_shelf(entries[:3], usable, [])
-        self.assertEqual(shelf, ["%012x" % 3])
-        self.assertEqual(train.choose_shelf(entries, usable, shelf), shelf)
-
     def test_a_new_show_joins_later(self):
         folder = Folder(self)
         for n in range(3):
@@ -328,37 +305,6 @@ class ModelFileTests(unittest.TestCase):
 
 
 class CheckTests(unittest.TestCase):
-    def example(self, classes):
-        return {"id": "x", "classes": classes, "buckets": [[1]] * len(classes)}
-
-    def test_precision_and_recall(self):
-        # One bucket per line decides the prediction: lines 0..5 use buckets 1..6.
-        weights = {1: [5, 0, 0, 0, 0], 2: [0, 5, 0, 0, 0], 3: [0, 5, 0, 0, 0],
-                   4: [0, 0, 5, 0, 0], 5: [0, 5, 0, 0, 0], 6: [5, 0, 0, 0, 0]}
-        example = {"id": "x", "classes": [0, 1, 1, 2, 0, 3],
-                   "buckets": [[1], [2], [3], [4], [5], [6]]}
-        result = train.evaluate(weights, [example])
-        self.assertEqual(result["episodes"], 1)
-        self.assertEqual(result["lines"], 6)
-        # Predicted ads: lines 1, 2, 3, 4 (not none). Real ads: 1, 2, 3, 5.
-        self.assertEqual(result["anyAd"], {"precision": 0.75, "recall": 0.75})
-        self.assertEqual(result["classes"]["sponsor"], {"precision": 0.6667, "recall": 1.0})
-        self.assertEqual(result["classes"]["network_promo"], {"precision": 1.0, "recall": 1.0})
-        self.assertEqual(result["classes"]["host_ask"], {"precision": None, "recall": 0.0})
-        self.assertEqual(result["classes"]["intro_credits"], {"precision": None, "recall": None})
-
-    def test_left_out_lines_are_not_scored(self):
-        weights = {1: [5, 0, 0, 0, 0]}
-        result = train.evaluate(weights, [{"id": "x", "classes": [0, None, None, 0],
-                                           "buckets": [[1]] * 4}])
-        self.assertEqual(result["lines"], 2)
-
-    def test_no_shelf(self):
-        result = train.evaluate({}, [])
-        self.assertEqual(result["episodes"], 0)
-        self.assertEqual(result["lines"], 0)
-        self.assertEqual(result["anyAd"], {"precision": None, "recall": None})
-
     def test_the_run_saves_the_check(self):
         folder = Folder(self)
         for n in range(5):
