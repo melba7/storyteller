@@ -38,7 +38,7 @@ public enum MP3Frames {
   private static let bitrates2 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160]
   private static let rates = [44100, 48000, 32000]
 
-  private struct Header {
+  struct Header {
     var length: Int
     var duration: Double
     var bitrate: Int
@@ -49,7 +49,7 @@ public enum MP3Frames {
   }
 
   /// The frame header at `at`, or nil when the four bytes there are not a Layer III header.
-  private static func header(_ bytes: [UInt8], _ at: Int) -> Header? {
+  static func header(_ bytes: [UInt8], _ at: Int) -> Header? {
     guard at >= 0, at + 4 <= bytes.count, bytes[at] == 0xFF, bytes[at + 1] & 0xE0 == 0xE0
     else { return nil }
     let versionBits = Int(bytes[at + 1] >> 3) & 3  // 0: 2.5, 1: reserved, 2: MPEG-2, 3: MPEG-1
@@ -74,7 +74,7 @@ public enum MP3Frames {
 
   /// Whether the frame at `at` holds an Xing or Info tag: those four letters come right after the
   /// header, the checksum (if there is one) and the side information.
-  private static func hasInfoTag(_ bytes: [UInt8], _ at: Int, _ head: Header) -> Bool {
+  static func hasInfoTag(_ bytes: [UInt8], _ at: Int, _ head: Header) -> Bool {
     let sideInfo = head.version == 1 ? (head.channels == 1 ? 17 : 32) : (head.channels == 1 ? 9 : 17)
     let tag = at + 4 + (head.crc ? 2 : 0) + sideInfo
     guard tag + 4 <= at + head.length else { return false }
@@ -91,10 +91,19 @@ public enum MP3Frames {
     return 10 + size + (bytes[5] & 0x10 != 0 ? 10 : 0)
   }
 
-  private static func hash(_ bytes: [UInt8], _ range: Range<Int>) -> UInt64 {
+  static func hash(_ bytes: [UInt8], _ range: Range<Int>) -> UInt64 {
     var h: UInt64 = 0xcbf2_9ce4_8422_2325
     for k in range { h = (h ^ UInt64(bytes[k])) &* 0x0000_0100_0000_01B3 }
     return h
+  }
+
+  /// The frame whose header `head` was read at `at` in `bytes`.
+  static func makeFrame(_ bytes: [UInt8], at: Int, head: Header, start: Double) -> MP3Frame {
+    MP3Frame(
+      offset: at, length: head.length, start: start, duration: head.duration,
+      hash: hash(bytes, at..<at + head.length), bitrate: head.bitrate,
+      sampleRate: head.sampleRate, channels: head.channels,
+      hasInfoTag: hasInfoTag(bytes, at, head), mainDataBegin: MP3SideInfo.mainDataBegin(bytes, at: at))
   }
 
   /// The frames in `bytes`. A header after junk counts only when the next frame's header
@@ -119,13 +128,7 @@ public enum MP3Frames {
         continue
       }
       if result.frames.isEmpty { result.bitrate = head.bitrate }
-      result.frames.append(
-        MP3Frame(
-          offset: at, length: head.length, start: time, duration: head.duration,
-          hash: hash(bytes, at..<at + head.length), bitrate: head.bitrate,
-          sampleRate: head.sampleRate, channels: head.channels,
-          hasInfoTag: hasInfoTag(bytes, at, head),
-          mainDataBegin: MP3SideInfo.mainDataBegin(bytes, at: at)))
+      result.frames.append(makeFrame(bytes, at: at, head: head, start: time))
       time += head.duration
       at += head.length
       synced = true
