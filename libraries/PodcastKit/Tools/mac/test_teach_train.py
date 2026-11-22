@@ -131,14 +131,26 @@ class ExampleTests(unittest.TestCase):
         self.assertEqual(len(found["buckets"]), 40)
         self.assertEqual(said, [])
 
-    def test_the_end_feature_uses_the_label_length(self):
+    def test_the_end_feature_uses_the_episode_seconds_when_known(self):
         folder = Folder(self)
         folder.add("f", 1)
+        folder.entries[0]["seconds"] = 500
         found = train.load_episode(folder.path, "labels", folder.entries[0], print)
         end = ft.bucket("#end")
-        # Length 400: lines starting at 290 s or later are within 120 s of the end.
-        self.assertNotIn(end, found["buckets"][28])
-        self.assertIn(end, found["buckets"][29])
+        # Length 500: lines starting at 380 s or later (line 40 starts at 390) are near the end.
+        self.assertNotIn(end, found["buckets"][37])
+        self.assertIn(end, found["buckets"][39])
+
+    def test_without_episode_seconds_the_end_is_the_last_lines_start(self):
+        for seconds in (None, 0, -5, True, "400"):
+            folder = Folder(self)
+            folder.add("f", 1)
+            folder.entries[0]["seconds"] = seconds
+            found = train.load_episode(folder.path, "labels", folder.entries[0], print)
+            end = ft.bucket("#end")
+            # The last line starts at 390 s, so lines from 270 s (line 28) are within 120 s of it.
+            self.assertNotIn(end, found["buckets"][26], seconds)
+            self.assertIn(end, found["buckets"][28], seconds)
 
     def test_missing_files_are_skipped_quietly(self):
         folder = Folder(self)

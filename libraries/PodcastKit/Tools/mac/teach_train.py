@@ -93,8 +93,8 @@ def valid_label(one):
 
 
 def load_episode(folder, labels, entry, say):
-    """One episode as {id, feed, published, classes, buckets} with a class (or None) and the
-    buckets of every transcript line, or None when it has no transcript or label. A file that
+    """One episode as {id, feed, published, starts, ends, classes, buckets} with the start and end
+    second, a class (or None) and the buckets of every transcript line, or None when it has no transcript or label. A file that
     cannot be read is skipped with one line."""
     identifier = entry["id"]
     transcript = os.path.join(folder, "transcripts", identifier + ".txt")
@@ -113,9 +113,11 @@ def load_episode(folder, labels, entry, say):
     except (OSError, ValueError) as error:
         say("Skipping %s: %s." % (identifier, error))
         return None
+    starts = [t for t, _ in lines]
+    ends = starts[1:] + [starts[-1] + seg.LAST_LINE_SECONDS]
     return {"id": identifier, "feed": entry["feed"], "published": entry["published"],
-            "classes": line_classes(one["segments"], len(lines)),
-            "buckets": episode_buckets(lines, one["length"])}
+            "starts": starts, "ends": ends, "classes": line_classes(one["segments"], len(lines)),
+            "buckets": episode_buckets(lines, seg.episode_length(entry, lines))}
 
 
 # MARK: Training

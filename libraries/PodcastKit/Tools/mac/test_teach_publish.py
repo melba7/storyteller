@@ -11,11 +11,13 @@ import teach_publish as publish
 
 NAMES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
          ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"))
-GOOD = {"version": 1, "trained": {"heldOut": {"anyAd": {"precision": 0.9, "recall": 0.5}}}}
+ENOUGH = {"episodes": 6, "shows": 4, "predictedAdSeconds": 900}
+GOOD = {"version": 1, "trained": {"heldOut": dict(ENOUGH, anyAd={"precision": 0.9, "recall": 0.5})}}
 
 
-def model(precision):
-    return {"version": 1, "trained": {"heldOut": {"anyAd": {"precision": precision}}}}
+def model(precision, **held):
+    return {"version": 1, "trained": {"heldOut": dict(ENOUGH, anyAd={"precision": precision},
+                                                      **held)}}
 
 
 def read(path):
@@ -278,6 +280,40 @@ class WeakModelTests(Setup):
             self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")), value)
             self.assertEqual(len(self.messages), 4, value)
             self.assertIn("no precision", [m for m in self.messages if "ad-model" in m][0])
+
+    def test_a_check_on_too_few_episodes_or_shows_is_weak(self):
+        self.all_sources()
+        self.source("ad-model.json", model(0.99, episodes=1, shows=1))
+        self.assertEqual(self.main(self.one), 0, self.messages)
+        self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")))
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-library.json")))
+        said = [m for m in self.messages if "ad-model.json" in m][0]
+        self.assertIn("The small model was not published: its check needs 5 held-out episodes "
+                      "from 3 shows and has 1 from 1", said)
+
+    def test_enough_episodes_but_too_few_shows_is_weak(self):
+        self.source("ad-model.json", model(0.99, episodes=9, shows=2))
+        self.main(self.one)
+        self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")))
+        self.assertIn("has 9 from 2", self.messages[0])
+
+    def test_too_few_predicted_ad_seconds_is_weak(self):
+        self.source("ad-model.json", model(0.99, predictedAdSeconds=599))
+        self.main(self.one)
+        self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")))
+        self.assertIn("needs 600 seconds of predicted ads and has 599", self.messages[0])
+
+    def test_exactly_the_bars_is_enough(self):
+        self.source("ad-model.json", model(0.85, episodes=5, shows=3, predictedAdSeconds=600))
+        self.main(self.one)
+        self.assertTrue(os.path.exists(self.published(self.one, "ad-model.json")))
+
+    def test_a_model_from_before_the_size_check_is_weak(self):
+        self.source("ad-model.json", {"version": 1, "trained": {"heldOut": {
+            "anyAd": {"precision": 0.99}}}})
+        self.main(self.one)
+        self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")))
+        self.assertIn("has 0 from 0", self.messages[0])
 
     def test_a_model_already_there_is_left_alone(self):
         self.source("ad-model.json", model(0.9))

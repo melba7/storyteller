@@ -17,6 +17,14 @@ class LabelEpisodeTests(unittest.TestCase):
     def lines(self, count):
         return seg.read_transcript(transcript(count))
 
+    def test_the_length_is_the_episode_seconds_when_known(self):
+        ask = lambda prompt: {"text": answer((2, 4)), "cost": 0.1}
+        known = dict(entry(1), seconds=600)
+        self.assertEqual(label.label_episode(known, self.lines(10), "m", ask)["length"], 600)
+        for seconds in (None, 0, -1):
+            odd = dict(entry(1), seconds=seconds)
+            self.assertEqual(label.label_episode(odd, self.lines(10), "m", ask)["length"], 9.0)
+
     def test_one_part(self):
         asked = []
 

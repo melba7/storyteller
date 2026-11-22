@@ -82,7 +82,7 @@ def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time)
         dropped += lost
     return {"version": 1, "prompt": seg.PROMPT_VERSION, "model": model, "episode": entry["id"],
             "feed": entry["feed"], "show": entry["show"], "lines": len(lines),
-            "length": lines[-1][0], "segments": seg.with_times(seg.merge(segments), lines),
+            "length": seg.episode_length(entry, lines), "segments": seg.with_times(seg.merge(segments), lines),
             "dropped": dropped, "cost": cost, "writtenAt": int(now() * 1000)}
 
 

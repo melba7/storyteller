@@ -3,13 +3,15 @@
 Standard library only. The shelf is a set of episodes the model is never trained on: for each show
 (by feed) with at least 3 usable episodes, its newest one. It is kept in shelf.json, stays on the
 shelf in later runs, and a show with one on the shelf gets no second. After training, the shelf is
-scored and the precision and recall are saved in the model (see teach_train.py).
+scored and the precision and recall, in seconds of the spans the phone would cut, are saved in the
+model (see teach_train.py).
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import math
 import os
 
+import teach_spans as spans
 import teach_store
 from teach_features import CLASSES, softmax_of
 
@@ -69,17 +71,22 @@ def scores(true_positive, predicted, actual):
 
 
 def evaluate(weights, episodes):
-    """Scores every shelf line. weights maps a bucket to five numbers; episodes are as load_episode
-    returns them. Lines with a class of None are left out."""
+    """Scores the shelf. weights maps a bucket to five numbers; episodes are as load_episode returns
+    them (with the start and end second of every line). The numbers in "anyAd" are what the phone
+    would cut, in seconds (see teach_spans.py); "lineAnyAd" and "classes" are per line, on the raw
+    probabilities. Lines with a class of None are left out of the per-line numbers."""
     lines = 0
     hit = predicted = actual = 0
     per = [[0, 0, 0] for _ in CLASSES]
+    cut = right = real = 0.0
     for episode in episodes:
+        rows = []
         for cls, active in zip(episode["classes"], episode["buckets"]):
+            p = softmax_of(active, weights)
+            rows.append(p)
             if cls is None:
                 continue
             lines += 1
-            p = softmax_of(active, weights)
             guess = p.index(max(p))
             predicted += p[0] < 0.5
             actual += cls != 0
@@ -87,7 +94,12 @@ def evaluate(weights, episodes):
             per[guess][1] += 1
             per[cls][2] += 1
             per[cls][0] += guess == cls
-    return {"episodes": len(episodes), "lines": lines, "anyAd": scores(hit, predicted, actual),
+        one = spans.span_scores(rows, episode["classes"], episode["starts"], episode["ends"])
+        cut, right, real = cut + one[0], right + one[1], real + one[2]
+    shows = {episode.get("feed", episode["id"]) for episode in episodes}
+    return {"episodes": len(episodes), "shows": len(shows), "lines": lines,
+            "predictedAdSeconds": round(cut, 1), "adSeconds": round(real, 1),
+            "anyAd": scores(right, cut, real), "lineAnyAd": scores(hit, predicted, actual),
             "classes": {CLASSES[c]: scores(*per[c]) for c in range(1, CLASS_COUNT)}}
 
 
@@ -96,9 +108,10 @@ def percent(value):
 
 
 def check_lines(held):
-    lines = ["Check on %d held-out episodes (%d lines): any ad precision %s, recall %s."
-             % (held["episodes"], held["lines"], percent(held["anyAd"]["precision"]),
-                percent(held["anyAd"]["recall"]))]
+    lines = ["Check on %d held-out episodes from %d shows (%d lines): the phone "
+             "would cut %d seconds of them, precision %s, recall %s."
+             % (held["episodes"], held["shows"], held["lines"], round(held["predictedAdSeconds"]),
+                percent(held["anyAd"]["precision"]), percent(held["anyAd"]["recall"]))]
     for name, one in held["classes"].items():
         lines.append("  %s: precision %s, recall %s."
                      % (name, percent(one["precision"]), percent(one["recall"])))

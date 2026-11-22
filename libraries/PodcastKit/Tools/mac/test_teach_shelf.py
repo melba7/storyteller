@@ -51,41 +51,61 @@ class ShelfTests(unittest.TestCase):
 
 
 class CheckTests(unittest.TestCase):
-    def example(self, classes):
-        return {"id": "x", "classes": classes, "buckets": [[1]] * len(classes)}
+    # One bucket per line decides the prediction: lines 0..5 use buckets 1..6.
+    WEIGHTS = {1: [5, 0, 0, 0, 0], 2: [0, 5, 0, 0, 0], 3: [0, 5, 0, 0, 0],
+               4: [0, 0, 5, 0, 0], 5: [0, 5, 0, 0, 0], 6: [5, 0, 0, 0, 0]}
 
-    def test_precision_and_recall(self):
-        # One bucket per line decides the prediction: lines 0..5 use buckets 1..6.
-        weights = {1: [5, 0, 0, 0, 0], 2: [0, 5, 0, 0, 0], 3: [0, 5, 0, 0, 0],
-                   4: [0, 0, 5, 0, 0], 5: [0, 5, 0, 0, 0], 6: [5, 0, 0, 0, 0]}
-        example = {"id": "x", "classes": [0, 1, 1, 2, 0, 3],
-                   "buckets": [[1], [2], [3], [4], [5], [6]]}
-        result = shelving.evaluate(weights, [example])
+    def example(self, classes, buckets, feed="a"):
+        starts = [10.0 * i for i in range(len(classes))]
+        return {"id": "x", "feed": feed, "classes": classes, "buckets": buckets, "starts": starts,
+                "ends": [t + 10.0 for t in starts]}
+
+    def test_per_line_precision_and_recall(self):
+        example = self.example([0, 1, 1, 2, 0, 3], [[1], [2], [3], [4], [5], [6]])
+        result = shelving.evaluate(self.WEIGHTS, [example])
         self.assertEqual(result["episodes"], 1)
+        self.assertEqual(result["shows"], 1)
         self.assertEqual(result["lines"], 6)
         # Predicted ads: lines 1, 2, 3, 4 (not none). Real ads: 1, 2, 3, 5.
-        self.assertEqual(result["anyAd"], {"precision": 0.75, "recall": 0.75})
+        self.assertEqual(result["lineAnyAd"], {"precision": 0.75, "recall": 0.75})
         self.assertEqual(result["classes"]["sponsor"], {"precision": 0.6667, "recall": 1.0})
         self.assertEqual(result["classes"]["network_promo"], {"precision": 1.0, "recall": 1.0})
         self.assertEqual(result["classes"]["host_ask"], {"precision": None, "recall": 0.0})
         self.assertEqual(result["classes"]["intro_credits"], {"precision": None, "recall": None})
 
-    def test_left_out_lines_are_not_scored(self):
+    def test_any_ad_is_the_seconds_the_phone_would_cut(self):
+        # Lines 2 to 5 are predicted ads and make one span, but line 5 is 30 s long and is not an
+        # ad, so 60 s are cut and 30 s of them are right. Lines 2, 3, 4 and 6 are real ads (40 s).
+        example = self.example([0, 1, 1, 2, 0, 3], [[1], [2], [3], [4], [5], [6]])
+        example["ends"][4] = example["starts"][4] + 30.0
+        result = shelving.evaluate(self.WEIGHTS, [example])
+        self.assertEqual(result["predictedAdSeconds"], 60.0)
+        self.assertEqual(result["anyAd"], {"precision": 0.5, "recall": 0.75})
+
+    def test_the_shelf_size_is_counted(self):
+        one = self.example([0, 1], [[1], [2]], feed="a")
+        two = dict(self.example([0, 1], [[1], [2]], feed="b"), id="y")
+        three = dict(self.example([0, 1], [[1], [2]], feed="b"), id="z")
+        result = shelving.evaluate(self.WEIGHTS, [one, two, three])
+        self.assertEqual((result["episodes"], result["shows"]), (3, 2))
+
+    def test_left_out_lines_are_not_scored_per_line(self):
         weights = {1: [5, 0, 0, 0, 0]}
-        result = shelving.evaluate(weights, [{"id": "x", "classes": [0, None, None, 0],
-                                           "buckets": [[1]] * 4}])
+        result = shelving.evaluate(weights, [self.example([0, None, None, 0], [[1]] * 4)])
         self.assertEqual(result["lines"], 2)
 
     def test_no_shelf(self):
         result = shelving.evaluate({}, [])
         self.assertEqual(result["episodes"], 0)
+        self.assertEqual(result["shows"], 0)
         self.assertEqual(result["lines"], 0)
+        self.assertEqual(result["predictedAdSeconds"], 0)
         self.assertEqual(result["anyAd"], {"precision": None, "recall": None})
 
     def test_the_closing_lines_say_n_a_for_nothing_to_divide(self):
         held = shelving.evaluate({}, [])
         lines = shelving.check_lines(held)
-        self.assertIn("any ad precision n/a, recall n/a", lines[0])
+        self.assertIn("precision n/a, recall n/a", lines[0])
         self.assertEqual(len(lines), 5)
 
 

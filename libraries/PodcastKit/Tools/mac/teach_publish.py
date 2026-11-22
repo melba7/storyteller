@@ -14,9 +14,12 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
 
   teach_publish.py [--folder F] [--to FOLDER ...] [--min-precision 0.85]
 
-A weak model is not published: ad-model.json is copied only when trained.heldOut.anyAd.precision
-in it is at least --min-precision. Otherwise the tool says so in one sentence, leaves a model that
-is already at the destination alone and still publishes the other files (this is not a failure).
+A weak model is not published: ad-model.json is copied only when its check on the held-out shelf
+rests on at least 5 episodes from at least 3 shows and 600 seconds of predicted ads, and
+trained.heldOut.anyAd.precision (in seconds of the spans the phone would cut) is at least
+--min-precision. Otherwise the tool says which bar was missed and with what numbers, leaves a model
+that is already at the destination alone and still publishes the other files (this is not a
+failure).
 
 Without --to the destinations are the ones apple_podcasts_export.py writes to: the LofiMusic
 folder under ~/Storyteller Lofi and its copy in iCloud Drive. A source that does not exist is
@@ -47,6 +50,9 @@ FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.jso
 MODEL = "ad-model.json"
 LIST = "teaching.json"
 MIN_PRECISION = 0.85
+MIN_EPISODES = 5
+MIN_SHOWS = 3
+MIN_AD_SECONDS = 600
 
 
 def checked(path, limit=LIMIT):
@@ -68,13 +74,22 @@ def checked(path, limit=LIMIT):
     return data
 
 
+def held_out(data, *keys):
+    """The value at trained.heldOut.<keys> in a model's JSON bytes, or None when it is missing."""
+    value = json.loads(data)
+    for key in ("trained", "heldOut") + keys:
+        value = value.get(key) if isinstance(value, dict) else None
+    return value
+
+
+def number_of(value):
+    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+
+
 def precision_of(data):
     """The number at trained.heldOut.anyAd.precision in a model's JSON bytes, or None when it is
     missing, null or not a number."""
-    value = json.loads(data)
-    for key in ("trained", "heldOut", "anyAd", "precision"):
-        value = value.get(key) if isinstance(value, dict) else None
-    return value if isinstance(value, (int, float)) and not isinstance(value, bool) else None
+    return number_of(held_out(data, "anyAd", "precision"))
 
 
 def percent(value):
@@ -82,15 +97,27 @@ def percent(value):
 
 
 def weak_model(data, minimum):
-    """A sentence saying why the model is not good enough to publish, or None when it is."""
+    """A sentence saying why the model is not good enough to publish, or None when it is. The
+    check must rest on enough held-out episodes, shows and predicted ad seconds, and its precision
+    (in seconds of the spans the phone would cut) must reach `minimum`."""
+    reasons = []
+    episodes = number_of(held_out(data, "episodes")) or 0
+    shows = number_of(held_out(data, "shows")) or 0
+    seconds = number_of(held_out(data, "predictedAdSeconds")) or 0
+    if episodes < MIN_EPISODES or shows < MIN_SHOWS:
+        reasons.append("its check needs %d held-out episodes from %d shows and has %d from %d"
+                       % (MIN_EPISODES, MIN_SHOWS, episodes, shows))
+    if seconds < MIN_AD_SECONDS:
+        reasons.append("its check needs %d seconds of predicted ads and has %d"
+                       % (MIN_AD_SECONDS, seconds))
     precision = precision_of(data)
     if precision is None:
-        return ("the model has no precision number from the check on held-out episodes, so it "
-                "cannot be trusted yet (%s is needed)" % percent(minimum))
-    if precision < minimum:
-        return ("the model is not good enough yet: it found ads with a precision of %s, and %s "
-                "is needed" % (percent(precision), percent(minimum)))
-    return None
+        reasons.append("it has no precision number from the check on held-out episodes (%s is "
+                       "needed)" % percent(minimum))
+    elif precision < minimum:
+        reasons.append("it found ads with a precision of %s, and %s is needed"
+                       % (percent(precision), percent(minimum)))
+    return "; ".join(reasons) or None
 
 
 def write_atomically(path, data):
@@ -185,8 +212,8 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
         if target == MODEL:
             reason = weak_model(data, options.min_precision)
             if reason:
-                say("%s: not copied, %s. A model already in the phone's folder is left as it is."
-                    % (target, reason))
+                say("%s: The small model was not published: %s. A model already in the phone's "
+                    "folder is left as it is." % (target, reason))
                 continue
         for number, destination in enumerate(destinations):
             try:

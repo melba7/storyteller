@@ -65,6 +65,16 @@ def read_transcript(text):
     return lines
 
 
+def episode_length(entry, lines):
+    """The episode's length in seconds: its `seconds` in episodes.json when that is a number above
+    zero, otherwise the start of the last line. The phone's scorecard uses the same rule."""
+    seconds = entry.get("seconds")
+    if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) \
+            and 0 < seconds < float("inf"):
+        return seconds
+    return lines[-1][0]
+
+
 def parts(lines, limit=PART_CHARS):
     """[(first, last)] line-number ranges that cover every line once, in order, each with at most
     `limit` characters of text. A line longer than the limit is a part by itself."""
