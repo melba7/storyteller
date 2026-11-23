@@ -156,6 +156,38 @@ final class ShowTuningTests: XCTestCase {
     XCTAssertEqual(empty.ask, [])
   }
 
+  // MARK: Where it runs
+
+  func testTheFinderNamesAreTheOnesTheFileUsesAndTheFindersMustPutInSource() {
+    XCTAssertEqual(ShowTuning.ownSound, "own-sound")
+    XCTAssertEqual(ShowTuning.repeatSound, "repeat-sound")
+    XCTAssertEqual(ShowTuning.repeatWords, "repeat-words")
+    XCTAssertEqual(ShowTuning.meaning, "meaning")
+    XCTAssertEqual(
+      ShowTuning.finderNames,
+      [ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords, ShowTuning.meaning])
+  }
+
+  func testItRunsOnEachFindersOwnListBeforeTheJoinBecauseAJoinedAdLosesItsSource() {
+    // Two finders find nearly the same stretch. Both ask by default.
+    let words = ad(100, "repeat-words")
+    let sound = ad(101, "repeat-sound")
+    let own = ShowTuning()
+    // Right: apply to each finder's own list, and join only what may skip.
+    let mine = own.apply(to: [words], show: "a")
+    let theirs = own.apply(to: [sound], show: "a")
+    XCTAssertEqual(mine.skip + theirs.skip, [], "no skip")
+    XCTAssertEqual(mine.ask.count + theirs.ask.count, 2, "two questions")
+    XCTAssertEqual(AdJoin.join(mine.skip + theirs.skip), [])
+    // Wrong: after the join the ad has no source, counts as an old finder's and skips.
+    let joined = AdJoin.join([words, sound])
+    XCTAssertEqual(joined.count, 1)
+    XCTAssertNil(joined[0].source, "two finders' names are not kept")
+    let late = own.apply(to: joined, show: "a")
+    XCTAssertEqual(late.skip.count, 1, "this is why the order matters")
+    XCTAssertEqual(late.ask.count, 0)
+  }
+
   // MARK: The stricter of two modes
 
   func testStricterIsOffThenAskThenSkip() {

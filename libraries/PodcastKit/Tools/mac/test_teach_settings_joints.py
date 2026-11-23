@@ -1,4 +1,4 @@
-"""Tests for teach_settings.py: the joints rows. No files, no network.
+"""Tests for teach_settings.py: the joints rows, and the steady files. No files, no network.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import unittest
 
@@ -6,55 +6,110 @@ from teach_settings_testing import (
     FEED_A, FEED_B, JOINTS, MEANING, STEADY, choose, rows_of, row, show, total)
 
 
+def pair(joints, steady=None, episodes=3):
+    """The row before (1000 s of ads, 500 s heard, 100 s of show cut by mistake) then a joints row that
+    has `joints` = (heard, cut), and a steady row with `steady` = (heard, cut) when it is given."""
+    def whole(heard, cut):
+        return total(episodes, ad=1000, heard=heard, cut=cut)
+    rows = [row(MEANING, whole=whole(500, 100)), row(JOINTS, whole=whole(*joints))]
+    if steady:
+        rows.append(row(STEADY, whole=whole(*steady)))
+    return choose(rows_of(*rows))[0]
+
+
 class JointsTests(unittest.TestCase):
     def test_joints_are_on_by_default_and_steady_ones_off(self):
         default, shows, _ = choose([])
         self.assertEqual((default["joints"], default["steadyJoints"], shows), (True, False, []))
 
+    def test_joints_stay_on_when_heard_seconds_fall_and_wrong_ones_rise_by_at_most_one_in_a_hundred(self):
+        self.assertTrue(pair((490, 100))["joints"])
+        self.assertTrue(pair((490, 90))["joints"])
+        self.assertTrue(pair((490, 101))["joints"], "1 in 100 more is allowed")
+        self.assertTrue(pair((499.5, 100))["joints"])
+
+    def test_joints_are_off_everywhere_when_wrong_seconds_rise_by_more(self):
+        self.assertFalse(pair((490, 102))["joints"])
+        self.assertFalse(pair((490, 109))["joints"], "10 s found, 9 s cut by mistake on 100 s")
+        self.assertFalse(pair((400, 150))["joints"])
+
+    def test_joints_that_change_nothing_or_lose_ground_are_off(self):
+        self.assertFalse(pair((500, 100))["joints"])
+        self.assertFalse(pair((510, 100))["joints"], "more heard than before")
+
+    def test_joints_with_fewer_than_three_marked_episodes_change_nothing(self):
+        self.assertTrue(pair((500, 100), episodes=2)["joints"])
+
+    def test_without_a_joints_row_or_a_row_before_it_nothing_changes(self):
+        self.assertTrue(choose(rows_of(row(MEANING, whole=total(heard=500))))[0]["joints"])
+        self.assertTrue(choose(rows_of(row(JOINTS, whole=total(heard=500))))[0]["joints"])
+
     def test_joints_that_cost_more_than_they_gain_on_a_show_are_off_for_that_show(self):
-        base = row(MEANING, show(FEED_A, "Show A", heard=30), show(FEED_B, heard=30))
-        joints = row(JOINTS, show(FEED_A, "Show A", heard=29, cut=8), show(FEED_B, heard=21))
+        # Over all shows the joints find 10 s and cut 8 s more of 2000 s already cut: fine overall.
+        base = row(MEANING, show(FEED_A, "Show A", ad=1000, heard=500, cut=1000),
+                   show(FEED_B, ad=1000, heard=500, cut=1000))
+        joints = row(JOINTS, show(FEED_A, "Show A", ad=1000, heard=499, cut=1008),
+                     show(FEED_B, ad=1000, heard=491, cut=1000))
         default, shows, lines = choose(rows_of(base, joints))
         self.assertTrue(default["joints"])
         self.assertEqual(shows, [{"feed": FEED_A, "joints": False}])
         self.assertTrue(any("Show A" in line and "joints" in line for line in lines), lines)
 
-    def test_joints_that_cost_more_than_they_gain_overall_are_off_everywhere(self):
-        base = row(MEANING, show(FEED_A, heard=30))
-        joints = row(JOINTS, show(FEED_A, heard=29, cut=8))
-        default, shows, _ = choose(rows_of(base, joints))
-        self.assertEqual((default["joints"], default["steadyJoints"], shows), (False, False, []))
 
-    def steady(self, before_joints, before_steady, cut_joints, cut_steady):
-        base = row(MEANING, whole=total(ad=1000, heard=500))
-        joints = row(JOINTS, whole=total(ad=1000, heard=100, cut=cut_joints, before=before_joints))
-        steady = row(STEADY, whole=total(ad=1000, heard=100, cut=cut_steady, before=before_steady))
-        return choose(rows_of(base, joints, steady))[0]["steadyJoints"]
-
-    def test_steady_files_join_in_when_they_hear_less_before_the_skip_for_about_the_same_wrong(self):
-        self.assertTrue(self.steady(40, 30, 100, 100))
-        self.assertTrue(self.steady(40, 30, 100, 101))
-        self.assertTrue(self.steady(40, 0, 0, 0))
+class SteadyTests(unittest.TestCase):
+    def test_steady_files_join_in_when_they_hear_less_in_all_for_about_the_same_wrong(self):
+        self.assertTrue(pair((490, 100), (480, 100))["steadyJoints"])
+        self.assertTrue(pair((490, 100), (480, 101))["steadyJoints"])
+        self.assertTrue(pair((490, 0), (480, 0))["steadyJoints"])
 
     def test_steady_files_stay_out_when_they_hear_as_much_or_cost_more(self):
-        self.assertFalse(self.steady(40, 40, 100, 100))
-        self.assertFalse(self.steady(40, 45, 100, 100))
-        self.assertFalse(self.steady(40, 30, 100, 102))
-        self.assertFalse(self.steady(40, 30, 0, 1))
+        self.assertFalse(pair((490, 100), (490, 100))["steadyJoints"])
+        self.assertFalse(pair((490, 100), (495, 100))["steadyJoints"])
+        self.assertFalse(pair((490, 100), (480, 102))["steadyJoints"])
+        self.assertFalse(pair((490, 0), (480, 1))["steadyJoints"])
+
+    def test_less_heard_before_the_skip_does_not_count_when_more_is_heard_in_all(self):
+        # 5 s less heard before the skip but 20 s more heard in all.
+        base = row(MEANING, whole=total(ad=1000, heard=500, cut=100))
+        joints = row(JOINTS, whole=total(ad=1000, heard=490, cut=100, before=40))
+        steady = row(STEADY, whole=total(ad=1000, heard=510, cut=100, before=35))
+        self.assertFalse(choose(rows_of(base, joints, steady))[0]["steadyJoints"])
 
     def test_steady_files_need_both_rows(self):
-        base = row(MEANING, whole=total(ad=1000, heard=500))
-        only_steady = row(STEADY, whole=total(ad=1000, heard=100, before=1))
-        only_joints = row(JOINTS, whole=total(ad=1000, heard=100, before=9))
+        base = row(MEANING, whole=total(ad=1000, heard=500, cut=100))
+        only_steady = row(STEADY, whole=total(ad=1000, heard=400, cut=100))
+        only_joints = row(JOINTS, whole=total(ad=1000, heard=400, cut=100))
         self.assertFalse(choose(rows_of(base, only_steady))[0]["steadyJoints"])
         self.assertFalse(choose(rows_of(base, only_joints))[0]["steadyJoints"])
 
     def test_steady_files_need_joints_to_be_on(self):
-        base = row(MEANING, whole=total(heard=30))
-        joints = row(JOINTS, whole=total(heard=29, cut=8, before=40))
-        steady = row(STEADY, whole=total(heard=29, cut=8, before=10))
-        default = choose(rows_of(base, joints, steady))[0]
+        default = pair((500, 100), (400, 100))
         self.assertEqual((default["joints"], default["steadyJoints"]), (False, False))
+
+    def test_a_show_where_the_steady_row_does_worse_than_the_joints_row_is_off_for_steady(self):
+        base = row(MEANING, show(FEED_A, ad=1000, heard=500, cut=1000), show(FEED_B, "Show B", ad=1000, heard=500, cut=1000))
+        joints = row(JOINTS, show(FEED_A, ad=1000, heard=400, cut=1000), show(FEED_B, "Show B", ad=1000, heard=400, cut=1000))
+        steady = row(STEADY, show(FEED_A, ad=1000, heard=390, cut=1000),
+                     show(FEED_B, "Show B", ad=1000, heard=405, cut=1000))
+        default, shows, lines = choose(rows_of(base, joints, steady))
+        self.assertTrue(default["steadyJoints"], "5 s more heard over all shows is a gain of 5 s")
+        self.assertEqual(shows, [{"feed": FEED_B, "steadyJoints": False}])
+        self.assertTrue(any("Show B" in line and "steady" in line for line in lines), lines)
+
+    def test_a_show_with_joints_off_needs_no_steady_entry(self):
+        base = row(MEANING, show(FEED_A, ad=1000, heard=500, cut=1000), show(FEED_B, ad=1000, heard=500, cut=1000))
+        joints = row(JOINTS, show(FEED_A, ad=1000, heard=505, cut=1000), show(FEED_B, ad=1000, heard=300, cut=1000))
+        steady = row(STEADY, show(FEED_A, ad=1000, heard=520, cut=1000), show(FEED_B, ad=1000, heard=280, cut=1000))
+        default, shows, _ = choose(rows_of(base, joints, steady))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, True))
+        self.assertEqual(shows, [{"feed": FEED_A, "joints": False}])
+
+    def test_steady_files_are_not_judged_per_show_when_they_are_off_overall(self):
+        base = row(MEANING, show(FEED_A, ad=1000, heard=500, cut=1000))
+        joints = row(JOINTS, show(FEED_A, ad=1000, heard=400, cut=1000))
+        steady = row(STEADY, show(FEED_A, ad=1000, heard=420, cut=1000))
+        default, shows, _ = choose(rows_of(base, joints, steady))
+        self.assertEqual((default["steadyJoints"], shows), (False, []))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,8 @@ import XCTest
 /// The phone reads the text the Mac's teach_settings.py writes. `macText` is the file that script
 /// wrote (through `write_json`, keys in order) for a made scorecard with three shows and notes: the
 /// "repeat-words" row was bad over all shows, the joints were bad on show C, "own-sound" was bad on
-/// show A, the notes had the meaning model undone twice on show B, and steady files heard less.
+/// show A, the notes had the meaning model undone twice on show B, and steady files found more over
+/// all shows but not on show B.
 final class ShowTuningMacTests: XCTestCase {
   static let macText = """
     {
@@ -35,7 +36,8 @@ final class ShowTuningMacTests: XCTestCase {
        "feed": "https://www.Show-B.test/rss/",
        "finders": {
         "meaning": "ask"
-       }
+       },
+       "steadyJoints": false
       }
      ],
      "version": 1,
@@ -58,8 +60,10 @@ final class ShowTuningMacTests: XCTestCase {
     for show in ["a-id", "b-id", "c-id", "d-id", "never-heard-of"] {
       XCTAssertEqual(set.level(forFinder: "repeat-words", show: show), .off, show)
       XCTAssertEqual(set.level(forFinder: "repeat-sound", show: show), .ask, show)
-      XCTAssertTrue(set.steadyJoints(show: show), show)
       XCTAssertEqual(set.level(forSort: "host_ask", show: show), .skip, show)
+    }
+    for show in ["a-id", "c-id", "d-id", "never-heard-of"] {
+      XCTAssertTrue(set.steadyJoints(show: show), show)
     }
     XCTAssertEqual(set.askThreshold, 0.35)
     // The shows with a line of their own.
@@ -67,6 +71,8 @@ final class ShowTuningMacTests: XCTestCase {
     XCTAssertEqual(set.level(forFinder: "meaning", show: "a-id"), .skip)
     XCTAssertEqual(set.level(forFinder: "meaning", show: "b-id"), .ask, "found through the feed key")
     XCTAssertEqual(set.level(forFinder: "own-sound", show: "b-id"), .skip)
+    XCTAssertFalse(set.steadyJoints(show: "b-id"), "its own steadyJoints key")
+    XCTAssertTrue(set.joints(show: "b-id"))
     XCTAssertFalse(set.joints(show: "c-id"))
     XCTAssertTrue(set.joints(show: "a-id"))
     XCTAssertTrue(set.joints(show: "d-id"))
@@ -83,7 +89,7 @@ final class ShowTuningMacTests: XCTestCase {
       Set(try XCTUnwrap(block["finders"] as? [String: String]).keys), Set(ShowTuning.finderNames))
     let shows = try XCTUnwrap(root["shows"] as? [[String: Any]])
     XCTAssertEqual(shows.count, 3)
-    XCTAssertTrue(shows.allSatisfy { Set($0.keys).isSubset(of: ["feed", "finders", "sorts", "joints"]) })
+    XCTAssertTrue(shows.allSatisfy { Set($0.keys).isSubset(of: ["feed", "finders", "sorts", "joints", "steadyJoints"]) })
     XCTAssertTrue(shows.allSatisfy { $0["feed"] is String })
   }
 

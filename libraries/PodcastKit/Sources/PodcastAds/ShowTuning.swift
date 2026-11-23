@@ -20,8 +20,20 @@ import Foundation
 //
 // HOW THE PHONE USES IT. The phone takes the STRICTER of the finder guard's mode and the mode
 // here (`stricter`: off before ask before skip), so a finder the guard has silenced stays
-// silent whatever the file says. `apply` sorts a list of ads into the ones to skip and the ones
-// to only ask about; the caller turns the second list into questions.
+// silent whatever the file says.
+//
+// WHERE `apply` MUST RUN. On EACH new finder's own list of ads, BEFORE `AdJoin.join` and
+// `AdCleanup`, never on a joined list. Only the `skip` list goes on to be joined; the `ask` list
+// becomes questions. The reason is the `source`: `AdJoin` clears it when the parts of a joined ad
+// come from different finders, and `AdCleanup` builds new ads without it, and an ad with no source
+// counts as an older finder's ad, which skips. So a joined list of "repeat-words" and
+// "repeat-sound" ads would skip even where both finders only ask. ShowTuningTests pins the order.
+//
+// THE NAMES. Each new finder must put the constant of this type in its ads' `source`: `ownSound`
+// and `repeatSound` are used as they are. `repeatWords` and `meaning` repeat the strings of
+// `RepeatedWords.source` and the meaning model's `MeaningAds.source`, which are in other packages
+// of this round and cannot be imported here; the wiring package must check that they are equal.
+// A finder whose `source` is not one of the four is not held back by finder levels.
 
 /// The Mac's settings for each show, read from `show-settings.json`.
 public struct ShowTuning: Sendable, Equatable {
@@ -29,8 +41,12 @@ public struct ShowTuning: Sendable, Equatable {
   public static let currentVersion = 1
   /// A file bigger than this reads as the built-in default (the limit of every teaching file).
   public static let maxBytes = TeachingFiles.maxBytes
-  /// The finders the file can set.
-  public static let finderNames = ["own-sound", "repeat-sound", "repeat-words", "meaning"]
+  /// The names of the finders the file can set. A finder puts its name in `FoundAd.source`.
+  public static let ownSound = "own-sound"
+  public static let repeatSound = "repeat-sound"
+  public static let repeatWords = "repeat-words"
+  public static let meaning = "meaning"
+  public static let finderNames = [ownSound, repeatSound, repeatWords, meaning]
   /// The word model's classes, which the file can set for each kind of ad.
   public static let sortNames = ["sponsor", "network_promo", "host_ask", "intro_credits"]
   public static let defaultAsk = 0.35
@@ -56,9 +72,7 @@ public struct ShowTuning: Sendable, Equatable {
 
   /// What the phone does when there is no file: the Mac's default block.
   static let builtIn = Choices(
-    finders: [
-      "own-sound": .skip, "repeat-sound": .ask, "repeat-words": .ask, "meaning": .skip,
-    ],
+    finders: [ownSound: .skip, repeatSound: .ask, repeatWords: .ask, meaning: .skip],
     sorts: [:], joints: true, steadyJoints: false)
 
   /// The built-in default with the file's default block on top.
@@ -108,10 +122,11 @@ public struct ShowTuning: Sendable, Equatable {
 
   // MARK: Applying
 
-  /// Sorts `ads` for `show`. An ad whose finder (`source`) or sort is off is dropped; one whose
-  /// finder or sort only asks goes to `ask`, the rest to `skip`; the stricter of the two levels
-  /// decides. An ad with no source, or the source of something that is not one of the four
-  /// finders ("tap"), is not touched by finder levels. Order and ads are kept as they were.
+  /// Sorts `ads` for `show`. Call it on one finder's own list, before `AdJoin` (see the header). An
+  /// ad whose finder (`source`) or sort is off is dropped; one whose finder or sort only asks goes
+  /// to `ask`, the rest to `skip`; the stricter of the two levels decides. An ad with no source,
+  /// or the source of something that is not one of the four finders ("tap"), is not touched by
+  /// finder levels. Order and ads are kept as they were.
   public func apply(to ads: [FoundAd], show: String) -> (skip: [FoundAd], ask: [FoundAd]) {
     var skip: [FoundAd] = []
     var ask: [FoundAd] = []

@@ -2,8 +2,7 @@
 
 Standard library only. A run has `rows`, one per finder (each stands on the row before it), and a row
 has `total` and `shows[]` (`feed`, `show`, `total`). Of a total only the numbers this needs are read:
-how many episodes, and the right seconds (adSeconds - heardSeconds), the wrong seconds (cutSeconds)
-and the seconds of the caught ads heard before the skip (heardBeforeSeconds, 0 in an older file).
+how many episodes, the right seconds (adSeconds - heardSeconds) and the wrong seconds (cutSeconds).
 Anything of the wrong shape is skipped, never raised.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -18,13 +17,19 @@ from teach_store import Problem
 SCORECARD = "scorecard.json"
 SCORECARD_LIMIT = 16 * 1024 * 1024
 
-Figures = collections.namedtuple("Figures", "episodes right wrong before")
+Figures = collections.namedtuple("Figures", "episodes right wrong")
 Show = collections.namedtuple("Show", "feed name figures")
 Row = collections.namedtuple("Row", "name total shows")
 
 
 def number(value):
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    """True for a finite number (not a bool, NaN, an infinity or a whole number too big for a float)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def figures(total):
@@ -34,8 +39,7 @@ def figures(total):
     kept = [total.get(key) for key in ("episodes", "adSeconds", "heardSeconds", "cutSeconds")]
     if not all(number(value) for value in kept) or kept[0] < 0:
         return None
-    before = total.get("heardBeforeSeconds")
-    return Figures(int(kept[0]), kept[1] - kept[2], kept[3], before if number(before) else 0)
+    return Figures(int(kept[0]), kept[1] - kept[2], kept[3])
 
 
 def added(first, second):

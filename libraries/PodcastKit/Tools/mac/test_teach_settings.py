@@ -31,11 +31,11 @@ class DefaultTests(unittest.TestCase):
         self.assertEqual(default["finders"]["own-sound"], "skip")
         self.assertTrue(any("repeat-words" in line and "every show" in line for line in lines), lines)
 
-    def test_a_finder_that_is_wrong_a_little_less_than_right_stays_as_it_is(self):
+    def test_a_finder_that_is_wrong_a_little_less_than_right_only_asks(self):
         base = row("Phone", show(FEED_A, heard=40))
         fine = row(OWN, show(FEED_A, heard=20, cut=19))
         default, shows, _ = choose(rows_of(base, fine))
-        self.assertEqual(default["finders"]["own-sound"], "skip")
+        self.assertEqual(default["finders"]["own-sound"], "ask", "under 85 percent right, not off")
         self.assertEqual(shows, [])
 
     def test_the_overall_row_needs_three_marked_episodes_too(self):
@@ -47,59 +47,62 @@ class DefaultTests(unittest.TestCase):
 
 class ScorecardRuleTests(unittest.TestCase):
     def base(self):
-        return row("Phone", show(FEED_A, "Show A", heard=40, cut=5), show(FEED_B, "Show B", heard=40, cut=5))
+        # B has 1000 s of ads, so a finder can gain a lot there and not be bad over all shows.
+        return row("Phone", show(FEED_A, "Show A", heard=40, cut=5),
+                   show(FEED_B, "Show B", ad=1000, heard=900, cut=5))
 
     def test_more_wrong_than_right_seconds_on_a_show_makes_the_finder_ask_there(self):
-        # On A the finder gains 2 right seconds and 10 wrong ones; on B 20 right and none wrong.
-        added = row(OWN, show(FEED_A, "Show A", heard=38, cut=15), show(FEED_B, "Show B", heard=20, cut=5))
+        # On A the finder gains 2 right seconds and 10 wrong ones; on B 200 right and none wrong.
+        added = row(OWN, show(FEED_A, "Show A", heard=38, cut=15),
+                    show(FEED_B, "Show B", ad=1000, heard=700, cut=5))
         default, shows, lines = choose(rows_of(self.base(), added))
         self.assertEqual(default["finders"]["own-sound"], "skip")
         self.assertEqual(shows, [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
         self.assertTrue(any("Show A" in line and "own-sound" in line for line in lines), lines)
         self.assertFalse(any("Show B" in line for line in lines), lines)
 
-    def test_as_many_wrong_as_right_seconds_is_not_more(self):
-        # On A the finder adds 10 right and 10 wrong seconds. On B it adds 20 right and none wrong.
-        added = row(OWN, show(FEED_A, heard=30, cut=15), show(FEED_B, heard=20, cut=5))
-        default, shows, _ = choose(rows_of(self.base(), added))
-        self.assertEqual((default["finders"]["own-sound"], shows), ("skip", []))
-        # Over all shows too: 10 and 10.
-        even = row(OWN, show(FEED_A, heard=30, cut=15), show(FEED_B, heard=40, cut=5))
-        self.assertEqual(choose(rows_of(self.base(), even))[0]["finders"]["own-sound"], "skip")
+    def test_as_many_wrong_as_right_seconds_is_not_more_so_it_asks_and_is_not_off(self):
+        # Over all shows the finder adds 10 right and 10 wrong seconds (50 percent right).
+        even = row(OWN, show(FEED_A, heard=30, cut=15), show(FEED_B, ad=1000, heard=900, cut=5))
+        default, shows, _ = choose(rows_of(self.base(), even))
+        self.assertEqual((default["finders"]["own-sound"], shows), ("ask", []))
+        # One wrong second more and it is off.
+        more = row(OWN, show(FEED_A, heard=30, cut=16), show(FEED_B, ad=1000, heard=900, cut=5))
+        self.assertEqual(choose(rows_of(self.base(), more))[0]["finders"]["own-sound"], "off")
 
     def test_a_row_that_loses_right_seconds_without_adding_wrong_ones_is_worse(self):
         # The row after hears 5 s more of the ads than the row before (it can happen to joints that
         # move a border), and cuts nothing more. On B it gains.
-        lost = row(OWN, show(FEED_A, heard=45, cut=5), show(FEED_B, heard=0, cut=5))
+        lost = row(OWN, show(FEED_A, heard=45, cut=5), show(FEED_B, ad=1000, heard=0, cut=5))
         self.assertEqual(choose(rows_of(self.base(), lost))[1], [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
 
     def test_a_finder_that_only_adds_right_seconds_changes_nothing(self):
-        added = row(OWN, show(FEED_A, heard=0, cut=5), show(FEED_B, heard=0, cut=5))
+        added = row(OWN, show(FEED_A, heard=0, cut=5), show(FEED_B, ad=1000, heard=0, cut=5))
         self.assertEqual(choose(rows_of(self.base(), added))[1], [])
 
     def test_the_rows_are_cumulative_so_a_finder_is_judged_on_what_it_added(self):
         # The row before already holds 50 s of show cut by mistake. The next row's raw wrong
-        # seconds (60) are far above its raw right seconds (40), but the finder added 30 right
-        # seconds against 10 wrong ones: fine.
+        # seconds (51) are above its raw right seconds (40), but the finder added 30 right
+        # seconds against 1 wrong one: fine.
         before = row("Phone", show(FEED_A, heard=90, cut=50), show(FEED_B, heard=90, cut=50))
-        added = row(OWN, show(FEED_A, heard=60, cut=60), show(FEED_B, heard=60, cut=60))
+        added = row(OWN, show(FEED_A, heard=60, cut=51), show(FEED_B, heard=60, cut=51))
         self.assertEqual(choose(rows_of(before, added))[1], [])
         # The other way round. On A the raw right seconds (90) are far above the raw wrong ones
         # (20), but the finder added 5 right seconds against 20 wrong ones. B gained a lot, so the
         # row is not bad over all shows.
-        before = row("Phone", show(FEED_A, heard=15), show(FEED_B, heard=70))
-        added = row(OWN, show(FEED_A, heard=10, cut=20), show(FEED_B, heard=10))
+        before = row("Phone", show(FEED_A, heard=15), show(FEED_B, ad=1000, heard=900))
+        added = row(OWN, show(FEED_A, heard=10, cut=20), show(FEED_B, ad=1000, heard=10))
         default, shows, _ = choose(rows_of(before, added))
         self.assertEqual(default["finders"]["own-sound"], "skip")
         self.assertEqual(shows, [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
 
     def test_each_finder_stands_on_the_row_before_it(self):
         rows = rows_of(
-            row("Phone", show(FEED_A, heard=50), show(FEED_B, heard=95)),
-            row(OWN, show(FEED_A, heard=40), show(FEED_B, heard=85)),  # +10 right each, none wrong
-            row(SOUNDS, show(FEED_A, heard=40, cut=3), show(FEED_B, heard=65, cut=3)),  # A: 0 right, 3 wrong
-            row(WORDS, show(FEED_A, heard=30, cut=3), show(FEED_B, heard=55, cut=3)),  # +10 right each
-            row(MEANING, show(FEED_A, heard=30, cut=40), show(FEED_B, heard=5, cut=3)))  # A: 37 wrong
+            row("Phone", show(FEED_A, heard=50), show(FEED_B, ad=1000, heard=990)),
+            row(OWN, show(FEED_A, heard=40), show(FEED_B, ad=1000, heard=980)),  # +10 right each
+            row(SOUNDS, show(FEED_A, heard=40, cut=3), show(FEED_B, ad=1000, heard=960, cut=3)),  # A: 0 right, 3 wrong
+            row(WORDS, show(FEED_A, heard=30, cut=3), show(FEED_B, ad=1000, heard=950, cut=3)),  # +10 right each
+            row(MEANING, show(FEED_A, heard=30, cut=40), show(FEED_B, ad=1000, heard=5, cut=3)))  # A: 37 wrong
         default, shows, _ = choose(rows)
         self.assertEqual(default["finders"], {"own-sound": "skip", "repeat-sound": "ask",
                                               "repeat-words": "ask", "meaning": "skip"})
@@ -107,20 +110,20 @@ class ScorecardRuleTests(unittest.TestCase):
         self.assertEqual(shows, [{"feed": FEED_A, "finders": {"meaning": "ask"}}])
 
     def test_fewer_than_three_marked_episodes_change_nothing_for_that_show(self):
-        base = row("Phone", show(FEED_A, episodes=2, heard=40), show(FEED_B, heard=40))
-        bad = row(OWN, show(FEED_A, episodes=2, heard=40, cut=30), show(FEED_B, heard=0))
+        base = row("Phone", show(FEED_A, episodes=2, heard=40), show(FEED_B, ad=1000, heard=900))
+        bad = row(OWN, show(FEED_A, episodes=2, heard=40, cut=30), show(FEED_B, ad=1000, heard=0))
         notes = [note("undone", "own-sound"), note("undone", "own-sound"),
                  note("denied", "own-sound"), note("denied", "own-sound")]
         self.assertEqual(choose(rows_of(base, bad), notes)[1], [])
 
     def test_three_marked_episodes_are_enough(self):
-        base = row("Phone", show(FEED_A, episodes=3, heard=40), show(FEED_B, heard=40))
-        bad = row(OWN, show(FEED_A, episodes=3, heard=40, cut=30), show(FEED_B, heard=0))
+        base = row("Phone", show(FEED_A, episodes=3, heard=40), show(FEED_B, ad=1000, heard=900))
+        bad = row(OWN, show(FEED_A, episodes=3, heard=40, cut=30), show(FEED_B, ad=1000, heard=0))
         self.assertEqual(choose(rows_of(base, bad))[1], [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
 
     def test_a_show_that_is_missing_from_the_row_before_is_not_judged(self):
-        base = row("Phone", show(FEED_B, heard=40))
-        bad = row(OWN, show(FEED_A, heard=40, cut=30), show(FEED_B, heard=0))
+        base = row("Phone", show(FEED_B, ad=1000, heard=900))
+        bad = row(OWN, show(FEED_A, heard=40, cut=30), show(FEED_B, ad=1000, heard=0))
         self.assertEqual(choose(rows_of(base, bad))[1], [])
 
     def test_a_row_with_no_row_before_it_is_not_judged(self):
@@ -130,8 +133,8 @@ class ScorecardRuleTests(unittest.TestCase):
 
     def test_a_feed_spelt_two_ways_is_one_show(self):
         spelt = "http://www.A.example/feed/"
-        base = row("Phone", show(spelt, heard=40), show(FEED_B, heard=40))
-        bad = row(OWN, show(spelt, heard=40, cut=30), show(FEED_B, heard=0))
+        base = row("Phone", show(spelt, heard=40), show(FEED_B, ad=1000, heard=900))
+        bad = row(OWN, show(spelt, heard=40, cut=30), show(FEED_B, ad=1000, heard=0))
         notes = [note("undone", "meaning", feed="https://a.example/feed")] * 2
         shows = choose(rows_of(base, bad), notes)[1]
         self.assertEqual(shows, [{"feed": spelt, "finders": {"meaning": "ask", "own-sound": "ask"}}])
@@ -209,8 +212,8 @@ class NoteRuleTests(unittest.TestCase):
         self.assertEqual(self.chosen(*[note("denied", "repeat-sound")] * 2), {"repeat-sound": "off"})
 
     def test_the_scorecard_and_the_notes_together_take_the_stricter_level(self):
-        base = row("Phone", show(FEED_A, heard=40), show(FEED_B, heard=40))
-        bad = row(OWN, show(FEED_A, heard=40, cut=30), show(FEED_B, heard=0))
+        base = row("Phone", show(FEED_A, heard=40), show(FEED_B, ad=1000, heard=900))
+        bad = row(OWN, show(FEED_A, heard=40, cut=30), show(FEED_B, ad=1000, heard=0))
         notes = [note("denied", "own-sound")] * 2
         self.assertEqual(choose(rows_of(base, bad), notes)[1],
                          [{"feed": FEED_A, "finders": {"own-sound": "off"}}])

@@ -37,15 +37,22 @@ class ReadingTests(unittest.TestCase):
         found = rows.rows_in(card(row("a", whole=bad), row("b", whole=worse), row("c", whole=total())))
         self.assertEqual([r.name for r in found], ["c"])
 
-    def test_a_total_saved_before_the_heard_before_number_reads_with_zero(self):
-        old = total()
-        del old["heardBeforeSeconds"]
-        self.assertEqual(rows.rows_in(card(row("a", whole=old)))[0].total.before, 0)
+    def test_a_number_too_big_for_a_float_is_not_a_number_and_leaves_the_row_out(self):
+        self.assertFalse(rows.number(10 ** 400))
+        self.assertFalse(rows.number(-(10 ** 400)))
+        self.assertTrue(rows.number(10 ** 300))
+        huge = total()
+        huge["cutSeconds"] = 10 ** 400
+        found = rows.rows_in(card(row("a", whole=huge), row("b", show(FEED_A, heard=5), whole=total())))
+        self.assertEqual([r.name for r in found], ["b"])
+        big_show = show(FEED_A)
+        big_show["total"]["adSeconds"] = 10 ** 400
+        self.assertEqual(rows.rows_in(card(row("c", big_show, whole=total())))[0].shows, {})
 
-    def test_the_figures_are_right_wrong_and_before(self):
-        whole = total(3, ad=120, heard=30, cut=7, before=5)
+    def test_the_figures_are_right_and_wrong(self):
+        whole = total(3, ad=120, heard=30, cut=7)
         found = rows.rows_in(card(row("a", whole=whole)))[0].total
-        self.assertEqual((found.episodes, found.right, found.wrong, found.before), (3, 90, 7, 5))
+        self.assertEqual((found.episodes, found.right, found.wrong), (3, 90, 7))
 
     def test_a_feed_that_comes_twice_in_a_row_is_added_up(self):
         found = rows.rows_in(card(row("a", show(FEED_A, heard=10), show(FEED_A + "/", heard=5))))[0]

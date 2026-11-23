@@ -36,11 +36,11 @@ class Setup(unittest.TestCase):
             f.write(body if isinstance(body, str) else json.dumps(body))
 
     def own_sound_is_bad_on_a(self):
-        """A scorecard where the finder "own-sound" costs 30 s of wrong skips on show A and finds 40 s
+        """A scorecard where the finder "own-sound" costs 30 s of wrong skips on show A and finds 900 s
         of ad on show B, so it is bad on A and not bad over all shows."""
         self.scorecard(card(
-            row("Phone", show(FEED_A, "Show A", heard=40), show(FEED_B, "Show B", heard=40)),
-            row(OWN, show(FEED_A, "Show A", heard=40, cut=30), show(FEED_B, "Show B", heard=0))))
+            row("Phone", show(FEED_A, "Show A", heard=40), show(FEED_B, "Show B", ad=1000, heard=900)),
+            row(OWN, show(FEED_A, "Show A", heard=40, cut=30), show(FEED_B, "Show B", ad=1000, heard=0))))
 
     def put_notes(self, folder, notes):
         directory = os.path.join(folder, "Podcasts")
@@ -91,9 +91,10 @@ class WritingTests(Setup):
         self.assertEqual(first, json.dumps(json.loads(first), indent=1, sort_keys=True, ensure_ascii=False))
 
     def test_the_shows_come_in_order_of_their_feed_address(self):
-        base = row("Phone", show(FEED_B, heard=40), show(FEED_A, heard=40), show("https://c.example/f", heard=40))
+        base = row("Phone", show(FEED_B, heard=40), show(FEED_A, heard=40),
+                   show("https://c.example/f", ad=1000, heard=900))
         bad = row(OWN, show(FEED_B, heard=40, cut=15), show(FEED_A, heard=40, cut=15),
-                  show("https://c.example/f", heard=0))
+                  show("https://c.example/f", ad=1000, heard=0))
         self.scorecard(card(base, bad))
         self.run_main()
         self.assertEqual([s["feed"] for s in self.written()["shows"]], [FEED_A, FEED_B])
@@ -142,17 +143,16 @@ class SharedTextTests(Setup):
 
     def test_the_file_is_the_text_the_phones_test_reads(self):
         a, b, c = "https://show-a.test/feed", "https://www.Show-B.test/rss/", "https://c.test/f"
+
+        def three(a_figures, b_figures, c_figures):
+            return [show(a, "Show A", **a_figures), show(b, "Show B", ad=300, **b_figures),
+                    show(c, "Show C", **c_figures)]
         self.scorecard(card(
-            row("Phone's own finders", show(a, "Show A", heard=40), show(b, "Show B", heard=60),
-                show(c, "Show C", heard=40)),
-            row(OWN, show(a, "Show A", heard=40, cut=30), show(b, "Show B", heard=20),
-                show(c, "Show C", heard=20)),
-            row(WORDS, show(a, "Show A", heard=40, cut=50), show(b, "Show B", heard=20, cut=20),
-                show(c, "Show C", heard=20, cut=20)),
-            row(JOINTS, show(a, "Show A", heard=30, cut=50, before=9),
-                show(b, "Show B", heard=10, cut=20, before=9), show(c, "Show C", heard=21, cut=26, before=9)),
-            row(STEADY, show(a, "Show A", heard=30, cut=50, before=5),
-                show(b, "Show B", heard=10, cut=20, before=5), show(c, "Show C", heard=21, cut=26, before=5))))
+            row("Phone's own finders", *three({"heard": 40}, {"heard": 250}, {"heard": 40})),
+            row(OWN, *three({"heard": 40, "cut": 30}, {"heard": 20}, {"heard": 20})),
+            row(WORDS, *three({"heard": 40, "cut": 50}, {"heard": 20, "cut": 20}, {"heard": 20, "cut": 20})),
+            row(JOINTS, *three({"heard": 30, "cut": 50}, {"heard": 10, "cut": 20}, {"heard": 21, "cut": 20})),
+            row(STEADY, *three({"heard": 27, "cut": 50}, {"heard": 12, "cut": 20}, {"heard": 18, "cut": 20}))))
         notes = self.put_notes(self.root, [note("undone", "meaning", feed="http://show-b.test/rss")] * 2)
         self.assertEqual(self.run_main("--notes", notes), 0)
         self.assertEqual(self.text(), self.swift_text())
@@ -187,6 +187,14 @@ class ScorecardTests(Setup):
             self.assertEqual(self.run_main(), 2, body[:20])
             self.assertEqual(self.text(), "old")
             self.assertIn("scorecard.json", self.said_text())
+
+    def test_a_number_too_big_for_a_float_in_the_scorecard_is_not_a_crash(self):
+        whole = total()
+        whole["cutSeconds"] = 10 ** 400
+        huge = row(OWN, show(FEED_A, heard=40), show(FEED_B, heard=40), whole=whole)
+        self.scorecard(card(row("Phone", show(FEED_A, heard=40), show(FEED_B, heard=40)), huge))
+        self.assertEqual(self.run_main(), 0)
+        self.assertEqual(self.written()["shows"], [])
 
     def test_a_scorecard_over_the_limit_is_not_read(self):
         self.scorecard(" " * (SCORECARD_LIMIT + 1))
@@ -255,7 +263,7 @@ class NotesTests(Setup):
     def test_a_notes_file_the_mac_will_not_let_us_read_is_said(self):
         self.own_sound_is_bad_on_a()
         path = self.put_notes(self.root, self.undone())
-        with mock.patch("teach_settings.teach_feedback.read_notes", side_effect=PermissionError("no")):
+        with mock.patch("teach_feedback.read_notes", side_effect=PermissionError("no")):
             self.assertEqual(self.run_main("--notes", path), 0)
         self.assertEqual(self.written()["shows"], [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
         self.assertIn("could not be read", self.said_text())
