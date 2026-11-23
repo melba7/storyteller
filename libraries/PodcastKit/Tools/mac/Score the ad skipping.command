@@ -1,6 +1,6 @@
 #!/bin/bash
 # Double-click in Finder. Builds the podcast-teach tool (Swift, needs Xcode 26) and has it score the
-# ad skipping on the teaching folder (podcast-teach score): the report it prints is what this
+# ad skipping on the teaching folder (podcast-teach score --stream): the report it prints is what this
 # window shows, and it is added to scorecard.json in ~/Storyteller Lofi/PodcastTeaching. It does
 # not use your Claude plan's usage allowance.
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
@@ -47,7 +47,7 @@ if [ -d "$FOLDER/labels-snapped" ]; then
   echo "Scoring against the labels in labels-snapped. Episodes marked since the last \"Teach the phone again\" are not in it yet: double-click that first to include them."
   echo
 fi
-"$TOOL" score "$FOLDER" "${LABELS[@]}" 2>&1 | tee -a "$LOG"
+"$TOOL" score "$FOLDER" "${LABELS[@]}" --stream 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 case "$CODE" in
   0) finish "Done. The scorecard is above, and added to $FOLDER/scorecard.json." ;;

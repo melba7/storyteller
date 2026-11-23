@@ -73,6 +73,8 @@ public struct ScorecardRow: Codable, Sendable, Equatable {
   public var shows: [ShowScore]
   /// The owner's bar for the same found ads. Nil in a file saved before the bar existed.
   public var bar: BarTotals?
+  /// The same row played as a stream (`podcast-teach score --stream`). Nil without it.
+  public var stream: StreamNumbers?
 
   public init(name: String, total: ScoreTotals, shows: [ShowScore], bar: BarTotals? = nil) {
     self.name = name

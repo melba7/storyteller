@@ -14,10 +14,12 @@ public enum AdScoreCommand {
     public var exam = false
     /// Where to write what the last row found for each scored episode; empty for nowhere.
     public var dump = ""
+    /// Also replay every episode as a stream played from the start (StreamScore.swift).
+    public var stream = false
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -29,6 +31,7 @@ public enum AdScoreCommand {
       case "--no-model": options.noModel = true
       case "--no-library": options.noLibrary = true
       case "--exam": options.exam = true
+      case "--stream": options.stream = true
       case "--dump":
         index += 1
         guard index < arguments.count, !arguments[index].isEmpty else {
@@ -142,12 +145,21 @@ public enum AdScoreCommand {
     let audio = TeachingAudio.files(in: folder)
     let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
     let finalAds = ScoreEpisodeAds()
+    let appleSaved: AppleAnswers?
+    switch AppleAnswers.load(in: folder) {
+    case .failure(let problem):
+      err(problem.message)
+      return 2
+    case .success(let loaded): appleSaved = loaded
+    }
+    let apple = AppleScoreRow.answers(appleSaved, episodes: chosen)
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
     // episode of a show, so the labelled episodes that are not scored come first and only teach.
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
     let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
+    let allLayers = layers + (apple.map { [AppleScoreRow.layer($0)] } ?? [])
     let made = AdScoreRun.runLayers(
-      episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: layers)
+      episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
       cards.append(card)
       rows.append(ScorecardRow(name: layer.name, card: card))
@@ -170,8 +182,35 @@ public enum AdScoreCommand {
     text += "\n\n" + after.joined(separator: "\n")
     let bar = AdBarReport.lines(rows)
     if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
+    var saved = rows
+    if let apple, let card = made.last {
+      let row = ScorecardRow(name: AppleScoreRow.name, card: card)
+      text += "\n\n" + AppleScoreRow.lines(row, answered: apple.count, of: chosen.count).joined(separator: "\n")
+      saved.append(row)
+    }
+    if options.stream {
+      let detect: (TeachingEpisode, Transcript) -> [FoundAd] = { episode, transcript in
+        let input = AdScoreInput(episode: episode, transcript: transcript, audio: audio[episode.id])
+        var soFar = base(episode, transcript)
+        for layer in layers { soFar = layer.apply(input, soFar: soFar) }
+        return soFar
+      }
+      let streamed = StreamScore.run(
+        episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple,
+        whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
+      var shown = [(name: String, ready: BarTotals?, stream: StreamNumbers)]()
+      shown.append((rows.last?.name ?? "", rows.last?.bar, streamed.finders))
+      saved[rows.count - 1].stream = streamed.finders
+      if let more = streamed.withModel, let row = saved.last, saved.count == rows.count + 1 {
+        shown.append((row.name, row.bar, more))
+        saved[rows.count].stream = more
+      }
+      text += "\n\n" + StreamReport.lines(shown).joined(separator: "\n")
+    }
     out(text)
-    history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
+    history.append(
+      ScorecardRun(
+        at: Int64(now.timeIntervalSince1970 * 1000), title: title, total: card.total, rows: saved))
     do {
       try history.save(to: historyURL)
     } catch {

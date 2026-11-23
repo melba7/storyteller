@@ -6,6 +6,7 @@
 //   swift run -c release podcast-teach meaning <teaching folder> [options]
 //   swift run -c release podcast-teach fit <examples file> <output file> [options]
 //   swift run -c release podcast-teach joints <teaching folder>
+//   swift run -c release podcast-teach apple <teaching folder> [options]
 //
 // "score" replays the phone's ad finders on the marked episodes of the teaching folder and
 // prints a scorecard (Score.swift). "sounds" makes the library of ad sounds from the marked
@@ -14,7 +15,8 @@
 // Mac, because the numbers for a line come from Apple's sentence embedding. "fit" fits the word
 // model's weights for the Python trainer (Fit.swift); it needs only Foundation. "joints" finds the
 // joints of each episode's MP3 file once and saves them in joints.json (Joints.swift), so "score"
-// needs no audio for its joint rows.
+// needs no audio for its joint rows. "apple" asks Apple's on-device model about the episodes and
+// keeps its answers for the scorecard (Apple.swift).
 import Foundation
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -25,11 +27,12 @@ case "sounds": exit(SoundsCommand.run(Array(arguments.dropFirst())))
 case "meaning": exit(MeaningTool.run(Array(arguments.dropFirst())))
 case "fit": exit(FitTool.run(Array(arguments.dropFirst())))
 case "joints": exit(JointsCommand.run(Array(arguments.dropFirst())))
+case "apple": exit(await AppleTool.run(Array(arguments.dropFirst())))
 default:
   FileHandle.standardError.write(
     Data(
       """
-      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder>
+      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder> | podcast-teach apple <teaching folder>
 
       """.utf8))
   exit(2)
