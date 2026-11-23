@@ -4,8 +4,9 @@
 // kept in the ads file as `asks`). When the playhead enters one that is still open, the app is
 // told once (the event `onAdAsk`) and shows "Ad? Skip" with two answers. "Yes" skips the stretch
 // like any other skip, with its note, tally and Undo; "no" stops the phone asking about it. Both
-// are noted for the Mac with the name of the finder that asked, and the finder is told to learn
-// from a yes. A question is only shown on the screen: with the phone locked the stretch plays.
+// are noted for the Mac with the name of the finder that asked, and the finder is told what the
+// answer was (`PodcastAdFinder.learnAnswered`). A question is only shown on the screen: with the
+// phone locked the stretch plays.
 //
 // Nothing polls. Like the skip markers, a boundary time observer is set at the start of each
 // open question, and the saved file is read again by `PodcastAdSkipping.refresh()` (which also
@@ -109,8 +110,9 @@ extension PodcastAdSkipping {
   /// that could not be saved.
   ///
   /// The question's own `source` (the finder that made it) is read before the answer, because a
-  /// yes replaces it with "tap". It goes into the note's `by`, which is how the Mac and the
-  /// finder's guard learn which finder was right.
+  /// yes replaces it with "tap". It goes into the note's `by`, which is how the Mac learns which
+  /// finder was right, and to the finder (`learnAnswered`, after a yes and after a no that was
+  /// saved), which does the learning of its own: the known ads, its guard and the repeated words.
   func answerQuestion(episodeId id: String, start: Double, isAd: Bool) -> Bool {
     guard id == episodeId, let store,
       let file = store.best(detector: PodcastAdFinder.detectorName),
@@ -121,8 +123,10 @@ extension PodcastAdSkipping {
       store: store, detector: PodcastAdFinder.detectorName, askStart: ask.start, isAd: isAd)
     guard isAd else {
       // Nothing was saved, so nothing is noted: the question may be asked again.
-      guard answered != nil else { return false }
-      note(.denied, start: ask.start, end: ask.end, kind: ask.kind, by: finder)
+      guard let answered else { return false }
+      note(.denied, start: answered.start, end: answered.end, kind: answered.kind, by: finder)
+      PodcastAdFinder.shared.learnAnswered(
+        id, source: finder, start: answered.start, end: answered.end, isAd: false)
       refresh()
       return true
     }
@@ -132,7 +136,10 @@ extension PodcastAdSkipping {
     ad.confidence = .sure
     ad.source = AdAsking.source
     note(.confirmed, start: ad.start, end: ad.end, kind: ad.kind, by: finder)
-    if answered != nil { PodcastAdFinder.shared.learnAnswered(id) }
+    if answered != nil {
+      PodcastAdFinder.shared.learnAnswered(
+        id, source: finder, start: ad.start, end: ad.end, isAd: true)
+    }
     // A yes after the stretch is over teaches but has nothing left to skip.
     let place = owner.place
     if place < ad.end {
