@@ -311,7 +311,7 @@ episodes, which the model never saw in training. Each run is added to
 The scorecard lists the layers in the order the phone adds them, and each row is
 the row before plus one more layer: the existing layers, then "Plus the meaning
 model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
-words", "Plus joints", "Plus joints (steady files too)" and, always last, "Plus
+words", "Plus joints", "Plus joints (steady files too)" and, last of the finders, "Plus
 per-show settings" (with the built-in settings when there is no file yet). The
 row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
 what is turned on or off. The learning rows (own sounds, repeats) first learn
@@ -322,6 +322,36 @@ repeat finders' or the meaning model's), a note on habits and what was left out.
 The meaning model is published only when its row adds right seconds for host_ask
 and network_promo and at least 85% of the added seconds are right, and the
 scorecard is not older than the model.
+
+### The stream replay and Apple's model in the scorecard
+
+`podcast-teach score <folder> --stream` adds one block after the bar. It replays
+every episode as a stream played from the start by a listener who taps play and
+never touches the phone, because on a stream the phone learns the ads while the
+episode already plays, and a whole transcript is its best case. It follows the
+phone's own scans: the head steps of the show, then the whole-file pass's pieces
+from 0, with the finders run on the first seconds of the transcript at each
+step. A real `AdSkipper` decides every jump, and the jumps are scored by the same
+bar as found ads. The speeds are assumptions, not measurements, and the block
+prints them: a standard pace (1 s to the first byte, 40 s of audio downloaded and
+12 s transcribed per second, 0.5 s per step, a jump costs 1 s, the model 2 s per
+minute of new audio and at least 2 s) and a slow one (4 s of audio downloaded and
+5 s transcribed per second). Without `--stream` nothing changes.
+
+Apple's on-device model only runs on a Mac or a phone. `podcast-teach apple
+<folder> [--exam] [--limit N]` asks it about the episodes a plain `score` run
+scores and keeps the answers (times, kinds and how sure, never any text) in
+`apple-model.json`, one episode at a time, so a run that is stopped carries on
+where it was. The scorecard then gets one more row after all the others,
+"Plus Apple's model (asked on the Mac)": the last row's ads joined with the
+answers, the row before it for an episode with no answer. `teach_settings.py` and
+`teach_publish_gates.py` find rows by name and never take the last one, so the
+new row changes nothing they decide, and the run's saved total stays the
+finders' last row. In the stream replay the model's answers count in a snapshot
+only where the ad ends within the snapshot's reach, at the head's model steps,
+and cost the model's time. Double-click
+`Ask Apple's model about the test episodes.command` to ask; it costs nothing, uses
+no Claude allowance and may take a few hours.
 
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.

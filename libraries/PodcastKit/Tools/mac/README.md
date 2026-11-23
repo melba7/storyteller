@@ -443,6 +443,24 @@ sounds, meaning and score steps read it instead of `labels/`. At the end it
 prints one line per step (worked, nothing to do or failed). It counts as done
 when the copy to the phone worked.
 
+### The stream replay and Apple's model
+
+`Score the ad skipping.command` passes `--stream`, so its report ends with a block
+that replays every episode as a stream played from the start: the phone's head
+scan and whole-file pass at an assumed standard pace and a slow one (the report
+prints the speeds, which are guesses), the player's own skip rules, and the same
+bar as above. It shows what streaming costs against a ready episode.
+
+`Ask Apple's model about the test episodes.command` builds `podcast-teach` and
+runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
+Apple's on-device model about each scored episode that has no answer yet and
+saves each answer at once in `apple-model.json`, so it may be closed and
+double-clicked again to carry on. It costs nothing and uses no Claude allowance,
+but may take a few hours. Needs macOS 26 with Apple Intelligence on. The next
+scorecard then ends with the row "Plus Apple's model (asked on the Mac)" and
+streams it too. The settings and publish steps read rows by name, so the extra
+row changes nothing they decide.
+
 ### What the steps write
 
 Everything is in `~/Storyteller Lofi/PodcastTeaching`:

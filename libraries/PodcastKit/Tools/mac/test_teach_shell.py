@@ -18,7 +18,8 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Score the ad skipping.command", "Install weekly teaching.command",
              "Stop weekly teaching.command", "Mark ads in the teaching episodes.command",
              "Mark ads when the gathering is done.command",
-             "Check ads with a second download.command"]
+             "Check ads with a second download.command",
+             "Ask Apple's model about the test episodes.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
