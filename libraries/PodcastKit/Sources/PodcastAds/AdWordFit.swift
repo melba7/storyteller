@@ -16,6 +16,8 @@ public struct AdWordFitError: Error, Equatable {
 /// for a class with no example). A bucket that occurs in fewer than `minCount` lines is ignored.
 public enum AdWordFit {
   public static let classCount = 5
+  /// The most buckets a file may name; more would need far more memory than a Mac has to spare.
+  public static let maxBuckets = 16_777_216
 
   public struct Settings: Equatable, Sendable {
     public var c = 0.1
@@ -60,6 +62,9 @@ public enum AdWordFit {
       guard header.count == 4, header[0] == "buckets", header[2] == "classes", header[3] == "5",
         let size = Int(header[1]), (1...Int(Int32.max)).contains(size)
       else { return fail("The first line of the examples file must be \"buckets <N> classes 5\".") }
+      guard size <= maxBuckets else {
+        return fail("The examples file names \(size) buckets; the most the fitter takes is \(maxBuckets).")
+      }
       var found = Examples(buckets: size)
       var number = 1
       at += 1

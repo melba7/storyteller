@@ -24,7 +24,7 @@ class FitToolTests(shell.Setup):
         done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
         self.assertEqual(len(self.train_calls()), 1)
         self.assertNotIn("--fit-tool", self.train_calls()[0])
-        self.assertIn("so it will be weaker", done.stdout)
+        self.assertIn("so the model is trained the old way (version 1)", done.stdout)
         self.assertIn("  Model: worked", done.stdout)
 
     def test_a_failing_model_step_is_still_a_failed_step_not_a_stop(self):

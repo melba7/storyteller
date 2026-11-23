@@ -33,8 +33,9 @@ it only has to be a version 1 file with a list of shows, as the phone needs.
 
 Without --to the destinations are the ones apple_podcasts_export.py writes to: the LofiMusic
 folder under ~/Storyteller Lofi and its copy in iCloud Drive. A source that does not exist is
-skipped. A source is checked before it is copied: it must be JSON, an object with "version": 1 and
-at most 4.5 MB (the phone refuses files over 5 MB). A file is written through a temporary file in
+skipped. A source is checked before it is copied: it must be JSON, an object with "version": 1
+(the word model, ad-model.json, may also be "version": 2) and at
+most 4.5 MB (the phone refuses files over 5 MB). A file is written through a temporary file in
 the same folder, and only when its content differs from what is there. A destination folder that
 does not exist or cannot be written is reported and the others are still tried.
 

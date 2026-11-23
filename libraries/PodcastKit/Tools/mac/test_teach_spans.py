@@ -191,17 +191,33 @@ class VersionTwoTests(unittest.TestCase):
                          ["intro_credits"])
         self.assertEqual([f for f in self.found(rows, TWO_STARTS[:6], TWO_ENDS[:6]) if f[2] != "intro_credits"], [])
 
-    def test_the_start_is_widened_over_lines_at_stay_and_stops_at_the_previous_span(self):
+    def test_the_start_is_widened_over_lines_at_stay(self):
         found = self.found()
         self.assertEqual(found[1][0], 3)  # line 3 has only 0.45 of its own
         self.assertEqual(found[4][0], 12)  # line 12 is half credits, half sponsor
 
-    def test_widening_never_reaches_into_the_span_before(self):
+    def test_widening_stops_at_a_line_whose_score_is_zero(self):
         rows = [row(s=.95)] * 3 + [row()] * 2 + [row(s=.45)] + [row(s=.95)] * 3
         found = self.found(rows, TWO_STARTS[:9], TWO_ENDS[:9])
         self.assertEqual([f[:2] for f in found], [(0, 2), (5, 8)])
         rows = [row(s=.95)] * 3 + [row(s=.45)] * 3 + [row(s=.95)] * 3
         self.assertEqual([f[:2] for f in self.found(rows, TWO_STARTS[:9], TWO_ENDS[:9])], [(0, 8)])
+
+    # The same rows and answers are pinned in AdWordModelVersionTwoTests.swift. In the first, line 2
+    # has an own score of 0.45 (at `stay`) but a smoothed one of only 0.35, so only the own score
+    # widens the span over it. In the second the lines are 3 seconds apart: lines 3 and 4 alone are
+    # 5 seconds long and not sure enough, and the span is kept only because widening over line 2
+    # makes it 8 seconds long.
+    def test_the_widening_uses_the_own_score_and_not_the_smoothed_one(self):
+        rows = [row(), row(s=.45), row(s=.5), row(s=1.0), row(s=1.0), row(), row(), row()]
+        found = self.found(rows, TWO_STARTS[:8], TWO_ENDS[:8])
+        self.assertEqual([f[:2] for f in found], [(1, 4)])
+
+    def test_the_kept_rule_is_judged_on_the_widened_span(self):
+        rows = [row(), row(s=.45), row(s=.8), row(s=.8), row(), row(), row()]
+        starts = [i * 3.0 for i in range(7)]
+        found = self.found(rows, starts, [t + 2.0 for t in starts])
+        self.assertEqual([f[:2] for f in found], [(1, 3)])
 
     def test_a_credits_span_is_cut_where_an_ad_span_lies(self):
         found = self.found()
