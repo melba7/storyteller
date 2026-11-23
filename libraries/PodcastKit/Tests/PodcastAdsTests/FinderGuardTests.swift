@@ -5,19 +5,22 @@ import XCTest
 /// The guard's marks, traps and builds. A mark is written before a finder runs and cleared when it
 /// returns; a mark found at the next launch means the finder trapped.
 final class FinderGuardTests: XCTestCase {
+  /// The moment of every call, so a test says how much later something happens.
+  private let now = Date(timeIntervalSince1970: 1_700_000_000)
+
   private func fresh(_ build: String = "100") -> FinderGuard { FinderGuard(appBuild: build) }
 
   /// What a second launch sees: a guard read from the text the first one left on disk.
   private func relaunch(_ guardian: FinderGuard, build: String = "100") -> FinderGuard {
-    FinderGuard.read(guardian.text, appBuild: build)
+    FinderGuard.read(guardian.text(now: now), appBuild: build)
   }
 
   func testAFreshGuardLetsEveryFinderSkip() {
     let guardian = fresh()
     for name in ["own-sound", "repeat-sound", "repeat-words", "meaning", "joints"] {
-      XCTAssertEqual(guardian.mode(finder: name, show: "s", episode: "e"), .skip)
+      XCTAssertEqual(guardian.mode(finder: name, show: "s", episode: "e", now: now), .skip)
     }
-    XCTAssertEqual(guardian.mode(finder: "never-heard-of", show: "", episode: ""), .skip)
+    XCTAssertEqual(guardian.mode(finder: "never-heard-of", show: "", episode: "", now: now), .skip)
   }
 
   func testAMarkSurvivesACrashAndSwitchesTheFinderOffForThatEpisode() {
@@ -29,9 +32,9 @@ final class FinderGuardTests: XCTestCase {
     XCTAssertEqual(traps.map(\.finder), ["own-sound"])
     XCTAssertEqual(traps.map(\.episode), ["e1"])
     XCTAssertEqual(traps.map(\.offEverywhere), [false])
-    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e1"), .off)
-    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e2"), .skip)
-    XCTAssertEqual(second.mode(finder: "meaning", show: "s", episode: "e1"), .skip)
+    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e1", now: now), .off)
+    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e2", now: now), .skip)
+    XCTAssertEqual(second.mode(finder: "meaning", show: "s", episode: "e1", now: now), .skip)
   }
 
   func testTheOffStateOfAnEpisodeStaysOnDisk() {
@@ -40,7 +43,7 @@ final class FinderGuardTests: XCTestCase {
     var second = relaunch(first)
     second.recover()
     let third = relaunch(second)
-    XCTAssertEqual(third.mode(finder: "meaning", show: "s", episode: "e1"), .off)
+    XCTAssertEqual(third.mode(finder: "meaning", show: "s", episode: "e1", now: now), .off)
   }
 
   func testAMarkIsClearedWhenTheFinderReturns() {
@@ -49,8 +52,8 @@ final class FinderGuardTests: XCTestCase {
     first.end(finder: "own-sound", episode: "e1")
     var second = relaunch(first)
     XCTAssertEqual(second.recover(), [])
-    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e1"), .skip)
-    XCTAssertTrue(first.text.contains(#""marks":[]"#))
+    XCTAssertEqual(second.mode(finder: "own-sound", show: "s", episode: "e1", now: now), .skip)
+    XCTAssertTrue(first.text(now: now).contains(#""marks":[]"#))
   }
 
   func testEndOnlyClearsItsOwnMark() {
@@ -80,7 +83,7 @@ final class FinderGuardTests: XCTestCase {
     XCTAssertEqual(second.recover().count, 1)
     var third = relaunch(second)
     XCTAssertEqual(third.recover(), [])
-    XCTAssertEqual(third.mode(finder: "own-sound", show: "s", episode: "e2"), .skip)
+    XCTAssertEqual(third.mode(finder: "own-sound", show: "s", episode: "e2", now: now), .skip)
   }
 
   func testASecondTrapByTheSameFinderSwitchesItOffEverywhere() {
@@ -92,10 +95,10 @@ final class FinderGuardTests: XCTestCase {
     guardian = relaunch(guardian)
     XCTAssertEqual(guardian.recover().map(\.offEverywhere), [true])
     for (show, episode) in [("s", "e3"), ("other", "e4"), ("", "")] {
-      XCTAssertEqual(guardian.mode(finder: "own-sound", show: show, episode: episode), .off)
+      XCTAssertEqual(guardian.mode(finder: "own-sound", show: show, episode: episode, now: now), .off)
     }
-    XCTAssertEqual(guardian.mode(finder: "meaning", show: "s", episode: "e3"), .skip)
-    XCTAssertEqual(relaunch(guardian).mode(finder: "own-sound", show: "s", episode: "e9"), .off)
+    XCTAssertEqual(guardian.mode(finder: "meaning", show: "s", episode: "e3", now: now), .skip)
+    XCTAssertEqual(relaunch(guardian).mode(finder: "own-sound", show: "s", episode: "e9", now: now), .off)
   }
 
   func testTwoMarksOfOneFinderInOneCrashAreOneTrap() {
@@ -106,9 +109,9 @@ final class FinderGuardTests: XCTestCase {
     let traps = guardian.recover()
     XCTAssertEqual(traps.count, 2)
     XCTAssertEqual(traps.map(\.offEverywhere), [false, false])
-    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e1"), .off)
-    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e2"), .off)
-    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e3"), .skip)
+    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e1", now: now), .off)
+    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e2", now: now), .off)
+    XCTAssertEqual(guardian.mode(finder: "repeat-words", show: "s", episode: "e3", now: now), .skip)
   }
 
   func testANewBuildResetsWhatTheCrashesSwitchedOff() {
@@ -119,13 +122,13 @@ final class FinderGuardTests: XCTestCase {
       guardian.recover()
     }
     guardian.begin(finder: "meaning", episode: "e5")
-    XCTAssertEqual(guardian.mode(finder: "own-sound", show: "s", episode: "e3"), .off)
+    XCTAssertEqual(guardian.mode(finder: "own-sound", show: "s", episode: "e3", now: now), .off)
     // The same build keeps it off. A new build starts clean: no trap, no mark, no episode off.
-    XCTAssertEqual(relaunch(guardian, build: "100").mode(finder: "own-sound", show: "s", episode: "e3"), .off)
+    XCTAssertEqual(relaunch(guardian, build: "100").mode(finder: "own-sound", show: "s", episode: "e3", now: now), .off)
     var newer = relaunch(guardian, build: "101")
     XCTAssertEqual(newer.appBuild, "101")
-    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e3"), .skip)
-    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e1"), .skip)
+    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e3", now: now), .skip)
+    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e1", now: now), .skip)
     XCTAssertEqual(newer.recover(), [], "a mark of the old build is not a trap of the new one")
     // The new build is written down, so the next launch of it is not "new" again.
     newer.begin(finder: "own-sound", episode: "e7")
@@ -135,11 +138,11 @@ final class FinderGuardTests: XCTestCase {
 
   func testAnswersOutliveANewBuild() {
     var guardian = fresh("100")
-    guardian.undone(finder: "own-sound", show: "s")
-    guardian.undone(finder: "own-sound", show: "s")
-    XCTAssertEqual(guardian.mode(finder: "own-sound", show: "s", episode: "e"), .ask)
+    guardian.undone(finder: "own-sound", show: "s", now: now)
+    guardian.undone(finder: "own-sound", show: "s", now: now)
+    XCTAssertEqual(guardian.mode(finder: "own-sound", show: "s", episode: "e", now: now), .ask)
     let newer = relaunch(guardian, build: "101")
-    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e"), .ask)
+    XCTAssertEqual(newer.mode(finder: "own-sound", show: "s", episode: "e", now: now), .ask)
   }
 
   // MARK: Names that are not names
@@ -149,7 +152,7 @@ final class FinderGuardTests: XCTestCase {
     guardian.begin(finder: "", episode: "e1")
     guardian.begin(finder: "  \n", episode: "e1")
     XCTAssertEqual(guardian, fresh())
-    XCTAssertEqual(guardian.mode(finder: "", show: "s", episode: "e1"), .skip)
+    XCTAssertEqual(guardian.mode(finder: "", show: "s", episode: "e1", now: now), .skip)
   }
 
   func testATrapWithNoEpisodeStillCountsForTheFinder() {
@@ -159,7 +162,7 @@ final class FinderGuardTests: XCTestCase {
       guardian = relaunch(guardian)
       guardian.recover()
     }
-    XCTAssertEqual(guardian.mode(finder: "joints", show: "s", episode: "anything"), .off)
+    XCTAssertEqual(guardian.mode(finder: "joints", show: "s", episode: "anything", now: now), .off)
   }
 
   func testNamesAreCutToTheirLimitSoALongNameStillMatches() {
@@ -167,9 +170,9 @@ final class FinderGuardTests: XCTestCase {
     let long = String(repeating: "x", count: 5000)
     guardian.begin(finder: long, episode: long)
     guardian = relaunch(guardian)
-    XCTAssertLessThan(guardian.text.utf8.count, 1000)
+    XCTAssertLessThan(guardian.text(now: now).utf8.count, 1000)
     guardian.recover()
-    XCTAssertEqual(guardian.mode(finder: long, show: "s", episode: long), .off)
+    XCTAssertEqual(guardian.mode(finder: long, show: "s", episode: long, now: now), .off)
   }
 
   // MARK: The file
@@ -182,10 +185,10 @@ final class FinderGuardTests: XCTestCase {
     XCTAssertEqual(FinderGuard.load(from: url, appBuild: "100"), fresh(), "a missing file is empty")
     var guardian = fresh()
     guardian.begin(finder: "meaning", episode: "e1")
-    guardian.undone(finder: "own-sound", show: "s")
-    try guardian.save(to: url)
+    guardian.undone(finder: "own-sound", show: "s", now: now)
+    try guardian.save(to: url, now: now)
     XCTAssertEqual(FinderGuard.load(from: url, appBuild: "100"), guardian)
-    XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), guardian.text)
+    XCTAssertEqual(try String(contentsOf: url, encoding: .utf8), guardian.text(now: now))
   }
 
   func testAFileThatIsTooBigIsNotRead() throws {

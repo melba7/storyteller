@@ -61,16 +61,43 @@ final class PhoneNoteKindsTests: XCTestCase {
     XCTAssertNil(fields["by"], "no finder, no field")
   }
 
-  /// The one line the Mac's Python test reads as well (`MacFixtures.confirmedNote`): both sides
-  /// are tested against the same text.
-  func testTheSharedConfirmedLineIsWhatThePhoneWrites() throws {
+  /// The pending line (`MacFixtures.confirmedPendingNote`) is what the phone writes.
+  func testTheSharedPendingLineIsWhatThePhoneWrites() throws {
     let note = PhoneNote(
       at: 1_700_000_000_000, what: .confirmed, episode: "e1", show: "s1", start: 125.5, end: 180,
       kind: .ad, by: "repeat-words")
-    XCTAssertEqual(note.line, MacFixtures.confirmedNote)
+    XCTAssertEqual(note.line, MacFixtures.confirmedPendingNote)
     let back = try JSONDecoder().decode(
-      PhoneNote.self, from: Data(MacFixtures.confirmedNote.utf8))
+      PhoneNote.self, from: Data(MacFixtures.confirmedPendingNote.utf8))
     XCTAssertEqual(back, note)
+    XCTAssertFalse(MacFixtures.confirmedPendingNote.contains("\n"))
+  }
+
+  /// The line the Mac reads (`MacFixtures.confirmedNote`) is written by JavaScript
+  /// (`noteLine` in phoneNotes.ts), so Swift cannot make it, and it has no episode or show id,
+  /// which a `PhoneNote` needs to decode. What can be checked here is that it carries the same
+  /// note as the pending line and every key `teach_feedback.read_note` needs.
+  func testTheSharedFolderLineHasWhatTheMacReadsAndTheSameNote() throws {
+    let folder = try object(MacFixtures.confirmedNote)
+    let pending = try object(MacFixtures.confirmedPendingNote)
+    XCTAssertEqual(
+      Set(folder.keys),
+      ["v", "at", "what", "feed", "guid", "title", "address", "start", "end", "kind", "by"])
+    XCTAssertEqual(folder["v"] as? Int, 1)
+    XCTAssertEqual(folder["what"] as? String, "confirmed")
+    for key in ["feed", "guid", "title", "address", "kind"] {
+      XCTAssertTrue(folder[key] is String, key)
+    }
+    XCTAssertTrue((folder["feed"] as? String)?.hasPrefix("https://") == true)
+    XCTAssertTrue((folder["address"] as? String)?.hasPrefix("https://") == true)
+    XCTAssertTrue(folder["at"] is Double || folder["at"] is Int)
+    XCTAssertTrue(folder["start"] is Double)
+    // The note itself is the pending one: same time, kind, stretch and finder.
+    for key in ["v", "at", "what", "start", "end", "kind", "by"] {
+      XCTAssertEqual(String(describing: folder[key]), String(describing: pending[key]), key)
+    }
+    XCTAssertNil(folder["episode"])
+    XCTAssertNil(folder["show"])
     XCTAssertFalse(MacFixtures.confirmedNote.contains("\n"))
   }
 
