@@ -89,12 +89,16 @@ extension PodcastAdFinder {
     return found
   }
 
-  /// The taught sounds' ads: from the one pass when a new sound finder may run, else as before.
+  /// The taught sounds' ads: from the one pass when a new sound finder may run and the pass read
+  /// the whole file, else as before. A pass that was stopped (the time of a new finder ran out, or
+  /// one of its marks could not be written) gives only the Mac's hits so far, and an old finder's
+  /// result must not be cut short by that: the file is read again, as today.
   private func taughtSoundAds(_ id: String, sha256: String, file: URL) -> [FoundAd] {
     guard let modes = newModes(id) else { return PodcastTeaching.shared.soundAds(inFile: file) }
     let pass = newSoundPass(id, modes: modes)
     guard !pass.consumers.subtracting([.mac]).isEmpty,
-      let result = runSoundPass(id, sha256: sha256, file: file, pass: pass)
+      let result = runSoundPass(id, sha256: sha256, file: file, pass: pass),
+      result.ran.isSuperset(of: pass.consumers)
     else { return PodcastTeaching.shared.soundAds(inFile: file) }
     return NewAds.ads(ofSounds: result.mac)
   }
