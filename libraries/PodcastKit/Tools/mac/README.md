@@ -436,13 +436,14 @@ item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
 sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
 finds the joints of each episode's audio once (`podcast-teach joints`, see
-`joints.json` below), scores the ad skipping, chooses the per-show settings (`teach_settings.py`), and
-copies the results to the folders the phone reads. Every step prints a heading
-("Step N of 8"; the joints belong to step 6, with the score). A step that fails is said plainly and the later steps still
-run, except that the Swift steps are left out together when `podcast-teach` does
-not build. The meaning step ending with a set-up problem (no shelf, no vector
-for any line, no usable model) or the settings step ending without a scorecard
-does not stop the run. When `labels-snapped/` exists the habits, model, library,
+`joints.json` below), scores the ad skipping, chooses the per-show settings
+(`teach_settings.py`), and copies the results to the folders the phone reads.
+Every step prints a heading ("Step N of 8"; the joints belong to step 6, with
+the score). A step that fails is said plainly and the later steps still run,
+except that the Swift steps are left out together when `podcast-teach` does not
+build. The meaning step ending with a set-up problem (no shelf, no vector for
+any line, no usable model) or the settings step ending without a scorecard does
+not stop the run. When `labels-snapped/` exists the habits, model, library,
 sounds, meaning and score steps read it instead of `labels/`. At the end it
 prints one line per step (worked, nothing to do or failed). It counts as done
 when the copy to the phone worked.
@@ -554,15 +555,15 @@ in a row failed.
 
 ### The stream replay and Apple's model
 
-`Score the ad skipping.command` passes `--stream`, so its report ends with a block
-that replays every episode as a stream played from the start: the phone's head
-scan and whole-file pass at an assumed standard pace and a slow one (the report
-prints the speeds, which are guesses), the player's own skip rules, and the same
-bar as above. "Ready" there means the same player with the finished file known
-before play, so it shows what streaming costs. The head scan waits for Apple's model in
-every row (a phone with Apple Intelligence on is assumed), and the first 3
-minutes are also shown at speech speeds of 6 and 25 times real time, since the
-phone's real speed is not measured yet.
+`Score the ad skipping.command` passes `--stream`, so its report ends with a
+block that replays every episode as a stream played from the start: the phone's
+head scan and whole-file pass at an assumed standard pace and a slow one (the
+report prints the speeds, which are guesses), the player's own skip rules, and
+the same bar as above. "Ready" there means the same player with the finished
+file known before play, so it shows what streaming costs. The head scan waits
+for Apple's model in every row (a phone with Apple Intelligence on is assumed),
+and the first 3 minutes are also shown at speech speeds of 6 and 25 times real
+time, since the phone's real speed is not measured yet.
 
 `Ask Apple's model about the test episodes.command` builds `podcast-teach` and
 runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
@@ -570,13 +571,13 @@ Apple's on-device model about each scored episode that has no answer yet and
 saves each answer at once in `apple-model.json`, so it may be closed and
 double-clicked again to carry on. It costs nothing and uses no Claude allowance,
 but may take a few hours. Needs macOS 26 with Apple Intelligence on. When it
-stops with exit 2 the window says to read what the tool printed above (no model, a
-model still downloading, a damaged or foreign `apple-model.json`, or a folder
+stops with exit 2 the window says to read what the tool printed above (no model,
+a model still downloading, a damaged or foreign `apple-model.json`, or a folder
 problem), and when every episode already had an answer it says so. A damaged
-`apple-model.json` only leaves the row out of the scorecard, with a note. The next
-scorecard then ends with the row "Plus Apple's model (asked on the Mac)" and
-streams it too. The settings and publish steps read rows by name, so the extra
-row changes nothing they decide.
+`apple-model.json` only leaves the row out of the scorecard, with a note. The
+next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
+and streams it too. The settings and publish steps read rows by name, so the
+extra row changes nothing they decide.
 
 ### What the steps write
 
@@ -591,20 +592,20 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `habits.json`: what is usual for each show.
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
-  how well it did on the shelf.
-  With `--fit-tool` (teach-finish.sh builds `podcast-teach` first and passes it) the
-  model is version 2: word pairs of the two lines before and after as features, fitted
-  by `podcast-teach fit`, and decoded with a second decoder in which the ad score
-  leaves credits out, credits get a second pass, and an ad's start widens back. A
-  widened line whose smoothed score is under `stay` takes the kind of the line before
-  it, as bridged lines do. Without the fit tool the trainer writes a version 1 file.
-  Warning: an app older than the build that reads version 2 refuses a version 2 file
-  and keeps the model it has, so update the phone's app before using the Mac's
-  version 2 trainer.
-- `ad-library.json`: every ad Claude marked with high confidence (at
-  least 25 words, 8 to 300 seconds), each different ad once, the ones met in
-  most episodes first. An ad met in one episode only is in it too. An entry
-  keeps the first 600 words of the ad. The phone gets it.
+  how well it did on the shelf. With `--fit-tool` (teach-finish.sh builds
+  `podcast-teach` first and passes it) the model is version 2: word pairs of the
+  two lines before and after as features, fitted by `podcast-teach fit`, and
+  decoded with a second decoder in which the ad score leaves credits out,
+  credits get a second pass, and an ad's start widens back. A widened line whose
+  smoothed score is under `stay` takes the kind of the line before it, as
+  bridged lines do. Without the fit tool the trainer writes a version 1 file.
+  Warning: an app older than the build that reads version 2 refuses a version 2
+  file and keeps the model it has, so update the phone's app before using the
+  Mac's version 2 trainer.
+- `ad-library.json`: every ad Claude marked with high confidence (at least 25
+  words, 8 to 300 seconds), each different ad once, the ones met in most
+  episodes first. An ad met in one episode only is in it too. An entry keeps the
+  first 600 words of the ad. The phone gets it.
 - `ad-library-score.json`: the same, built without the shelf episodes. It stays
   here, and is for scoring only, so the scorecard's "plus the library" row does
   not know the shelf ads' own words.
@@ -623,8 +624,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
   whole at every run, so a hand edit is lost at the next "Teach the phone
   again". It only ever makes the phone stricter than its built-in default.
-  Joints in steady files (`steadyJoints`, which also pulls a late start back to a
-  joint up to 60 s before it) are turned on when the scorecard's "Plus joints
+  Joints in steady files (`steadyJoints`, which also pulls a late start back to
+  a joint up to 60 s before it) are turned on when the scorecard's "Plus joints
   (steady files too)" row passes at least 3 more of the owner's breaks than the
   row before it and adds at most 1 skip with no ad; a scorecard with no bar is
   judged by seconds as before.
