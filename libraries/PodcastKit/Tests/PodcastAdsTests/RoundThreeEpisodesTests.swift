@@ -74,11 +74,32 @@ final class RoundThreeEpisodesTests: XCTestCase {
 
   // MARK: A yes
 
-  func testAYesIsSkippedInEpisodeThreeAndSurvivesEveryLaterWrite() throws {
+  func testAYesIsSkippedInEpisodeThreeAtOnce() throws {
     var phone = RoundPhone(folder: folder)
     try phone.finish(one)
     let second = try phone.finish(two).file
-    let ask = try XCTUnwrap(phone.answer(two, askStart: try question(second, near: two.start("plug")).start, isAd: true))
+    let ask = try XCTUnwrap(
+      phone.answer(two, askStart: try question(second, near: two.start("plug")).start, isAd: true))
+    // The file of episode two is not written again. The answer alone has taught the memory of ads
+    // the plug's words, so episode three skips it for sure, with no question about it.
+    let third = try phone.finish(three)
+    // What the listener said yes to began a few words into the plug (the first changed word), so
+    // the skip does too: the same stretch of words, to the word.
+    let begins = three.start("plug") + (ask.start - two.start("plug"))
+    XCTAssertTrue(RoundPhone.skips(third.file, begins, three.end("plug"), slack: 1))
+    let plug = try XCTUnwrap(third.file.ads.first { $0.start <= begins + 1 && $0.end >= three.end("plug") - 1 })
+    XCTAssertEqual(plug.confidence, .sure)
+    XCTAssertFalse(RoundPhone.touches(third.file, three.start("quiz"), three.end("quiz")), "the quiz is only asked")
+    XCTAssertFalse(AdAsking.open(in: third.file).contains { $0.start < three.end("plug") && three.start("plug") < $0.end })
+    XCTAssertEqual(third.older.count, 2, "the sponsor read, and the plug from the memory of ads")
+  }
+
+  func testAYesIsRebuiltAsATapAdOnEveryWriteOfEpisodeTwosFileEvenAfterAJoin() throws {
+    var phone = RoundPhone(folder: folder)
+    try phone.finish(one)
+    let second = try phone.finish(two).file
+    let ask = try XCTUnwrap(
+      phone.answer(two, askStart: try question(second, near: two.start("plug")).start, isAd: true))
     // The yes is in the file as a sure "tap" ad over the plug, and is recorded in the question.
     var saved = try XCTUnwrap(phone.store(two).load(detector: RoundShow.detector))
     XCTAssertTrue(RoundPhone.skips(saved, ask.start, ask.end, slack: 0.5))
@@ -92,23 +113,17 @@ final class RoundThreeEpisodesTests: XCTestCase {
       firstWords: "x")
     saved = try XCTUnwrap(LocalAdsFile.addToFinal([touching], store: phone.store(two), detector: RoundShow.detector))
     XCTAssertNil(saved.ads.first { $0.start <= ask.start + 0.5 && $0.end >= ask.end }?.source)
-    // The finder's next pass writes a file that does not hold the tap ad. The yes comes back.
-    let later = try phone.finish(two).file
+    // A finder that knows nothing of the answer writes a fresh final file with no tap ad in it.
+    // Every write goes through `AdsStore`, which puts the yes back where nothing covers it.
+    let fresh = LocalAds().ads(transcript: two.transcript, episodeDuration: two.transcript.duration)
+    XCTAssertFalse(fresh.contains { $0.start < ask.end && ask.start < $0.end }, "nothing of it covers the plug")
+    _ = try LocalAdsFile.saveFinal(
+      fresh + [touching], store: phone.store(two), detector: RoundShow.detector,
+      detectorVersion: "1", osVersion: "26", duration: two.transcript.duration)
+    let later = try XCTUnwrap(phone.store(two).load(detector: RoundShow.detector))
     XCTAssertTrue(RoundPhone.skips(later, ask.start, ask.end, slack: 0.5), "\(later.ads)")
+    XCTAssertEqual(later.ads.first { $0.source == "tap" }?.confidence, .sure)
     XCTAssertEqual(AdAsking.open(in: later).count, 1, "and it is not asked again")
-
-    // Episode three: the memory of ads knows the plug by its words now, so it is skipped for sure,
-    // to the word, with no question about it.
-    let third = try phone.finish(three)
-    // What the listener said yes to began a few words into the plug (the first changed word), so
-    // the skip does too: the same stretch of words, to the word.
-    let begins = three.start("plug") + (ask.start - two.start("plug"))
-    XCTAssertTrue(RoundPhone.skips(third.file, begins, three.end("plug"), slack: 1))
-    let plug = try XCTUnwrap(third.file.ads.first { $0.start <= begins + 1 && $0.end >= three.end("plug") - 1 })
-    XCTAssertEqual(plug.confidence, .sure)
-    XCTAssertFalse(RoundPhone.touches(third.file, three.start("quiz"), three.end("quiz")), "the quiz is only asked")
-    XCTAssertFalse(AdAsking.open(in: third.file).contains { $0.start < three.end("plug") && three.start("plug") < $0.end })
-    XCTAssertEqual(third.older.count, 2, "the sponsor read, and the plug from the memory of ads")
   }
 
   func testWithoutTheYesThePlugIsOnlyAskedAgainInEpisodeThree() throws {
