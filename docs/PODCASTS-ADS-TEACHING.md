@@ -108,11 +108,12 @@ join, because a joined ad loses its `source`.
   cannot lose it; a no goes to `AdsFile.denied`, never to `undone`. Ads that are
   `unsure` are still skipped with Undo, as before.
 - **The finder guard** (`FinderGuard`). A mark on disk before a new finder runs
-  tells the next launch that the finder crashed. A crash, or two undone skips
-  among the last five answers on a show (answers older than 30 days do not
-  count), make the finder ask instead of skip. Two "not an ad" answers out of
-  five turn it off for that show. The guard can only make a finder stricter than
-  the Mac's file does.
+  tells the next launch that the finder crashed. A crash turns that finder off
+  for that episode, and a second crash in the same app build turns it off
+  everywhere until the next build. Two undone skips among the last five answers
+  on a show (answers older than 30 days do not count) make the finder ask
+  instead of skip, and two "not an ad" answers out of five turn it off for that
+  show. The guard can only make a finder stricter than the Mac's file does.
 - **Learning from answers.** Each saved answer goes to the ad finder
   (`learnAnswered`). A yes is remembered by its words, its sound is learned and
   the guard hears the finder was right. A no tells the guard it was wrong and a
@@ -121,8 +122,8 @@ join, because a joined ad loses its `source`.
   ads, after the joint snap, that were not undone or trimmed.
 - **Limits.** About 20 MB of new data on the phone: prints of the last three
   episodes of 60 shows (12 MB in Caches) and hashes of repeated words (about 7
-  MB). A show whose own Skip ads switch is off gets no new finder, joints,
-  prints or questions.
+  MB). A show that skips nothing (every sort switched off) gets no new finder,
+  joints, prints or questions.
 - **What the phone keeps.** In `Podcasts/` of Application Support:
   `own-ad-sounds.json` (the phone's own sound prints), `repeat-words.json`
   (hashes of repeated words), `finder-guard.json` (the guard's marks and

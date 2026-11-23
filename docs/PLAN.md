@@ -1282,8 +1282,7 @@ levels, not thresholds, because a show has about four marked episodes.
   `show-settings.json` is edited by hand); new finders for episodes that
   finished before the update; a habit counted twice for an episode that was
   streamed and then downloaded; deny-by-words for transcripts over 64 MB;
-  `PodcastAdFinder+Memory.swift` `learnRemembered` is unused; questions on the
-  lock screen.
+  questions on the lock screen.
 - Podcasts ads: the sound scan of a stream's bytes as they arrive after the
   first three minutes (a mid-roll in a streamed episode is found only when
   transcription reaches it); questions from the head scan and on the lock
