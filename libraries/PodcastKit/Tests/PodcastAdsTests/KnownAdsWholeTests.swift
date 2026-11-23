@@ -103,6 +103,27 @@ final class KnownAdsWholeTests: XCTestCase {
     XCTAssertEqual(hits.count, 1)
   }
 
+  func testAnAdSplitAcrossTwoBandsByAnAsideIsOneMatchWhenItsOpeningWasHeardDifferently() {
+    // The opening is misheard, so the opening search finds nothing. An eight-word aside after the
+    // 40th word shifts the rest by eight words: the ad's runs lie in two neighbouring bands, and
+    // neither band alone holds three fifths of them.
+    let words = adWords()
+    let texts = plain(35) + reading(0..<20)[0..<40] + plain(8, from: 700) + Array(words[40...])
+      + plain(30, from: 500)
+    let hits = known(words).find(in: timed(texts), show: "show")
+    XCTAssertEqual(whole(hits).count, 1)
+    XCTAssertEqual(hits.count, 1)
+  }
+
+  func testTheSameStretchFoundAtTwoDistancesIsOneMatch() {
+    // An ad made of one block three times over also matches itself shifted by a whole block, in
+    // bands far apart from the aligned one. Those matches lie on the same words.
+    let block = Array(adWords(40))
+    let words = block + block + block
+    let heard = KnownAds.Heard(timed(plain(30) + words + plain(30, from: 500)))
+    XCTAssertEqual(KnownAds.sturdy(words, in: heard).count, 1)
+  }
+
   func testAnOpeningFoundTheOldWayAndWholeByTheNewWayAreReportedOnce() {
     let heard = timed(plain(30) + adWords() + plain(30, from: 500))
     XCTAssertEqual(known(adWords()).find(in: heard, show: "show").count, 1)

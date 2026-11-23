@@ -66,8 +66,7 @@ public struct KnownAdHit: Equatable, Sendable {
 public struct KnownAds: Codable, Sendable, Equatable {
   public static let currentVersion = 1
   public static let fileName = "known-ads.json"
-  /// The name in `FoundAd.source` of an ad that was found whole, with edges exact to the word.
-  /// `AdJoin` lets such an ad set the edges of a looser span that overlaps it.
+  /// The name in `FoundAd.source` of an ad that was found whole, as a remembered ad.
   public static let source = "known-ad"
 
   /// An ad is learned only when it is sure, was not undone or trimmed, lasts `shortest` to

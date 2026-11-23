@@ -25,9 +25,13 @@ def entry(episode, feed="f1", show="Show"):
             "bytes": 0, "sha256": None, "host": None, "error": None}
 
 
-def segment(first, last, start=0.0, end=60.0, sort="sponsor", who="Acme", confidence="high"):
-    return {"first": first, "last": last, "start": start, "end": end, "sort": sort, "who": who,
-            "delivery": "host", "confidence": confidence, "why": ""}
+def segment(first, last, start=0.0, end=60.0, sort="sponsor", who="Acme", confidence="high",
+            origin=None):
+    one = {"first": first, "last": last, "start": start, "end": end, "sort": sort, "who": who,
+           "delivery": "host", "confidence": confidence, "why": ""}
+    if origin:
+        one["origin"] = origin
+    return one
 
 
 class Folder(unittest.TestCase):
@@ -123,10 +127,15 @@ class CandidateTests(Folder):
         self.ad("aaaaaaaaaaaa", word_list("w", 25), start=0, end=8)
         self.assertEqual(len(self.candidates()), 1)
 
-    def test_confidence_must_be_high_or_medium(self):
+    def test_confidence_must_be_high(self):
         self.ad("aaaaaaaaaaaa", word_list("w", 40), confidence="medium")
-        self.assertEqual(len(self.candidates()), 1)
         self.ad("bbbbbbbbbbbb", word_list("w", 40), confidence="low")
+        self.assertEqual(self.candidates(), [])
+
+    def test_a_stretch_the_snap_copied_is_left_out(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 40), origin="copy")
+        self.assertEqual(self.candidates(), [])
+        self.ad("bbbbbbbbbbbb", word_list("v", 40))
         self.assertEqual(len(self.candidates()), 1)
 
     def test_a_long_ad_keeps_up_to_600_words(self):
