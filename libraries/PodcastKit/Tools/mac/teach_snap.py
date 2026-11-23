@@ -12,8 +12,11 @@ so their times are exact to a frame. For each label in <folder>/labels this tool
   end (and the transcript lines they cover). When Claude cut one ad into several labels, they
   are joined into one: the one that overlaps most keeps its sort and its "who".
 - A stretch of 10 s or more that Claude's labels do not cover by half is added as a "sponsor" with
-  "confidence": "copy" and "who": "". It is a guess that it is a sponsor; it could be a network
-  promo. Shorter ones are left out.
+  "confidence": "high" (a difference between two copies of one episode is measured, not guessed)
+  and "who": "", and an extra key "origin": "copy" that says where it came from. That it is a
+  sponsor is a guess; it could be a network promo. Shorter stretches are left out. The tools that
+  read labels (training, habits, library, sounds, score) read the keys they know and ignore
+  "origin". A label of Claude's that moves keeps its own confidence and gains no key.
 - An episode with no truth file, or whose two downloads agreed (a truth file with no stretch), is
   copied as it was, byte for byte.
 
@@ -105,7 +108,8 @@ def snap_label(label, stretches, lines):
             figures["unplaced"] += 1
         else:
             figures["added"] += 1
-            new = {"sort": "sponsor", "who": "", "delivery": "unsure", "confidence": "copy", "why": WHY}
+            new = {"sort": "sponsor", "who": "", "delivery": "unsure", "confidence": "high", "origin": "copy",
+                   "why": WHY}
             result.append(placed(new, lines, start, end))
     if not claimed and not figures["added"]:
         return None, figures

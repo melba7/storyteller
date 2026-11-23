@@ -82,6 +82,14 @@ class SnapTests(Base):
         for key in ("sort", "who", "delivery", "confidence", "why"):
             self.assertEqual(found[0][key], segment(7, 12, 30.0, 60.0)[key])
 
+    def test_a_label_of_claudes_that_moves_keeps_its_confidence_and_gains_no_key(self):
+        self.label([segment(7, 12, 30.0, 60.0, confidence="low")])
+        self.truth(("0:33.480", "1:02.120"))
+        self.run_main()
+        found = self.snapped()["segments"][0]
+        self.assertEqual(found["confidence"], "low")
+        self.assertEqual(set(found), set(segment(7, 12, 30.0, 60.0)))
+
     def test_everything_else_in_the_label_stays(self):
         label = self.label([segment(7, 12, 30.0, 60.0)])
         self.truth(("0:33.480", "1:02.120"))
@@ -106,7 +114,8 @@ class SnapTests(Base):
         found = self.snapped()["segments"]
         self.assertEqual([(s["start"], s["end"]) for s in found], [(30.0, 60.0), (200.0, 230.0)])
         added = found[1]
-        self.assertEqual((added["sort"], added["confidence"], added["who"]), ("sponsor", "copy", ""))
+        self.assertEqual((added["sort"], added["confidence"], added["who"]), ("sponsor", "high", ""))
+        self.assertEqual(added["origin"], "copy")
         self.assertEqual((added["first"], added["last"]), (41, 46))
         self.assertIn(added["delivery"], ("host", "spot", "unsure"))
         self.assertTrue(added["why"])
@@ -149,8 +158,8 @@ class SnapTests(Base):
         self.run_main()
         found = self.snapped()["segments"]
         # The later stretch is only 15 s of its 35 s inside the label, so it was not marked.
-        self.assertEqual([(s["start"], s["end"], s["confidence"]) for s in found],
-                         [(20.0, 45.0, "high"), (45.0, 80.0, "copy")])
+        self.assertEqual([(s["start"], s["end"], s.get("origin")) for s in found],
+                         [(20.0, 45.0, None), (45.0, 80.0, "copy")])
 
     def test_the_figures_say_how_many_borders_moved_and_by_how_much(self):
         self.label([segment(7, 12, 30.0, 60.0)])
