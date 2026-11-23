@@ -48,16 +48,6 @@ final class AdScoreNotesTests: XCTestCase {
     XCTAssertTrue(lines[0].hasSuffix("Joints do not pay: no more of the ad time is skipped."), lines[0])
   }
 
-  func testTheSteadyRowIsJudgedAgainstThePlainJointsRow() {
-    let lines = AdScoreNotes.rowLines([
-      row("Plus repeated words", heard: 100, cut: 50), row(ScoreRows.joints, heard: 80, cut: 50),
-      row(ScoreRows.steadyJoints, heard: 70, cut: 50),
-    ])
-    XCTAssertEqual(lines.count, 2)
-    XCTAssertTrue(lines[1].hasPrefix("Joints in steady files too: right seconds 3 min 50 s (3 min 40 s before)"), lines[1])
-    XCTAssertTrue(lines[1].hasSuffix("Steady files should be used too."), lines[1])
-  }
-
   func testTheSettingsHoldWhenTheyKeepTheRightSecondsAndCutNoMore() {
     let lines = AdScoreNotes.rowLines([
       row(ScoreRows.steadyJoints, heard: 80, cut: 60), row(ScoreRows.settings, heard: 80, cut: 30),

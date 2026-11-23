@@ -4,9 +4,6 @@ import Foundation
 import PodcastTranscripts
 
 enum AdScoreNotes {
-  /// Wrong seconds may rise by one in a hundred and the joints still pay (as `teach_settings.py`
-  /// judges them).
-  private static let wrongAllowed = 1.01
   private static let epsilon = 1e-6
 
   private static func time(_ seconds: Double) -> String { AdScoreReport.time(seconds) }
@@ -28,14 +25,12 @@ enum AdScoreNotes {
       let before = rows[index - 1]
       switch row.name {
       case ScoreRows.joints:
-        lines.append(
-          jointsLine(
-            "Joints", row, before, pays: "Joints pay.", fails: "Joints do not pay"))
+        lines.append(plainJointsLine(row, before, steady: rows.first { $0.name == ScoreRows.steadyJoints }))
       case ScoreRows.steadyJoints:
-        lines.append(
-          jointsLine(
-            "Joints in steady files too", row, before, pays: "Steady files should be used too.",
-            fails: "Steady files should not be used too"))
+        let at = rows.firstIndex { $0.name == ScoreRows.joints }
+        let plain = at.map { rows[$0] }
+        let anchor = at.flatMap { $0 > 0 ? rows[$0 - 1] : nil } ?? before
+        lines.append(steadyJointsLine(row, plain: plain, anchor: anchor))
       case ScoreRows.settings:
         lines.append(settingsLine(row, before))
       default:
@@ -80,25 +75,74 @@ enum AdScoreNotes {
     return "\(row.name): found \(more(right, "right seconds")) and \(more(wrong, "wrong seconds")). \(verdict)"
   }
 
-  /// The gate of idea 5: more right seconds, and the wrong seconds not up by more than one in a
-  /// hundred.
-  private static func jointsLine(
-    _ label: String, _ row: ScorecardRow, _ before: ScorecardRow, pays: String, fails: String
+  /// The rule of `teach_settings.py` (`joints_pay`): a joints row pays against the row before
+  /// "Plus joints" when it finds more right seconds and its wrong seconds are at most 101 percent
+  /// of that row's. The same numbers, without a margin.
+  private static func pays(_ row: ScorecardRow, _ before: ScorecardRow) -> Bool {
+    right(row) - right(before) > epsilon && row.total.cutSeconds * 100 <= before.total.cutSeconds * 101
+  }
+
+  /// Why a row does not pay against `before`, in a plain half sentence.
+  /// `plainRow` is for a steady row set against the plain joints row.
+  private static func whyNot(_ row: ScorecardRow, _ before: ScorecardRow, plainRow: Bool = false) -> String {
+    right(row) - right(before) <= epsilon
+      ? "no more of the ad time is skipped" + (plainRow ? " than with the plain joints row" : "")
+      : "show time cut by mistake rose by more than one in a hundred" + (plainRow ? " over the plain joints row" : "")
+  }
+
+  /// The Mac decides about joints only over this many marked episodes.
+  private static let notJudged =
+    "The Mac judges joints only over 3 or more marked episodes, so it leaves them as they are."
+
+  /// "Joints" against the row before it. The Mac keeps joints on when this row pays or the steady
+  /// row (`steady`) pays against the same row, and says so.
+  private static func plainJointsLine(
+    _ row: ScorecardRow, _ before: ScorecardRow, steady: ScorecardRow?
   ) -> String {
-    let gained = right(row) - right(before)
     let verdict: String
-    if gained <= epsilon {
-      verdict = "\(fails): no more of the ad time is skipped."
-    } else if row.total.cutSeconds > before.total.cutSeconds * wrongAllowed + epsilon {
-      verdict = "\(fails): show time cut by mistake rose by more than one in a hundred."
+    if row.total.episodes < 3 {
+      verdict = notJudged
+    } else if pays(row, before) {
+      verdict = "Joints pay."
+    } else if let steady, pays(steady, before) {
+      verdict = "The plain row does not pay by itself; joints stay on because the steady row pays."
     } else {
-      verdict = pays
+      verdict = "Joints do not pay: \(whyNot(row, before))."
     }
-    return "\(label): right seconds \(time(right(row))) (\(time(right(before))) before), "
+    return jointsFigures("Joints", row, before) + verdict
+  }
+
+  /// "Joints in steady files too", judged against the row before "Plus joints" like the plain row;
+  /// when the plain row pays as well, it must also find more than the plain row for at most 101
+  /// percent of its wrong seconds.
+  private static func steadyJointsLine(
+    _ row: ScorecardRow, plain: ScorecardRow?, anchor: ScorecardRow
+  ) -> String {
+    let verdict: String
+    let used = "Steady files should be used too."
+    if (plain ?? row).total.episodes < 3 {
+      verdict = notJudged
+    } else if !pays(row, anchor) {
+      verdict = "Steady files should not be used too: \(whyNot(row, anchor))."
+    } else if let plain, pays(plain, anchor) {
+      let better =
+        right(row) - right(plain) > epsilon && row.total.cutSeconds * 100 <= plain.total.cutSeconds * 101
+      verdict =
+        better
+        ? used
+        : "Steady files should not be used too: \(whyNot(row, plain, plainRow: true))."
+    } else {
+      verdict = used
+    }
+    return jointsFigures("Joints in steady files too", row, anchor) + verdict
+  }
+
+  private static func jointsFigures(_ label: String, _ row: ScorecardRow, _ before: ScorecardRow) -> String {
+    "\(label): right seconds \(time(right(row))) (\(time(right(before))) before), "
       + "wrong seconds \(time(row.total.cutSeconds)) (\(time(before.total.cutSeconds)) before), "
       + "caught ads heard before the skip \(time(row.total.heardBeforeSeconds)) "
       + "(\(time(before.total.heardBeforeSeconds))) and after it \(time(row.total.heardAfterSeconds)) "
-      + "(\(time(before.total.heardAfterSeconds))). \(verdict)"
+      + "(\(time(before.total.heardAfterSeconds))). "
   }
 
   /// The settings row must not be worse than the row above it in right seconds and must be better
