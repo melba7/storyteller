@@ -70,7 +70,7 @@ def scores(true_positive, predicted, actual):
     return {"precision": ratio(true_positive, predicted), "recall": ratio(true_positive, actual)}
 
 
-def evaluate(weights, episodes):
+def evaluate(weights, episodes, version=1):
     """Scores the shelf. weights maps a bucket to five numbers; episodes are as load_episode returns
     them (with the start and end second of every line). The numbers in "anyAd" are what the phone
     would cut, in seconds (see teach_spans.py); "lineAnyAd" and "classes" are per line, on the raw
@@ -94,7 +94,8 @@ def evaluate(weights, episodes):
             per[guess][1] += 1
             per[cls][2] += 1
             per[cls][0] += guess == cls
-        one = spans.span_scores(rows, episode["classes"], episode["starts"], episode["ends"])
+        one = spans.span_scores(rows, episode["classes"], episode["starts"], episode["ends"],
+                               version=version)
         cut, right, real = cut + one[0], right + one[1], real + one[2]
     shows = {episode.get("feed", episode["id"]) for episode in episodes}
     return {"episodes": len(episodes), "shows": len(shows), "lines": lines,

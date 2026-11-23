@@ -8,6 +8,7 @@ then <folder>/shelf.json, so an old model never sits beside a newer shelf. How a
 phone and lives in teach_features.py.
 
   teach_train.py [--folder F] [--labels labels] [--epochs 5] [--seed 1] [--min-episodes 20]
+                  [--fit-tool PATH]
 
 - Every transcript line of an episode that has a transcript and a label is one example. Its class is
   the sort of the segment covering it (confidence high or medium); other lines are "none". A line
@@ -18,16 +19,23 @@ phone and lives in teach_features.py.
   the model is written. An episode that repeats a shelf episode (same feed key and guid, same audio
   SHA-256, or more than half of its 5-word runs the same, see teach_overlap.py) is left out of
   training, and the tool says how many.
-- Training is softmax regression on the hashed features with AdaGrad (rate 0.5), L2 of 1e-6 on the
-  weights an example touches, and each example's loss weighted by min(5, none count / class count).
-  The bias bucket is fixed at plain talk (teach_model.BIAS_NONE) and never trained: the many words of
-  plain talk used to carry its weight, which left a bias that said "ad" and a model the phone refuses.
-  It is deterministic for a given --seed.
+- The file is version 2: the features of version 1 plus the word pairs of the neighbouring lines, in
+  4194304 buckets, and the version 2 decoder for the check (see teach_features.py and teach_spans.py).
+- With --fit-tool (the built `podcast-teach`) the weights are fitted by `podcast-teach fit` (L-BFGS,
+  L2 with c 0.1, buckets in fewer than 3 lines ignored, each example's loss weighted by
+  min(5, none count / class count); see teach_fit.py). The fitted bias is kept, with the "none"
+  number raised when it would not call an empty line plain talk. A tool that fails is a set-up
+  problem (exit 2). Without it the built-in AdaGrad loop (rate 0.5, L2 of 1e-6 on the weights an
+  example touches, the same class weights) is used, and the result is weaker; its bias bucket is
+  fixed at plain talk (teach_model.BIAS_NONE) and never trained, because the many words of plain talk
+  used to carry its weight, which left a bias that said "ad" and a model the phone refuses. That loop
+  is deterministic for a given --seed.
 - After training the shelf is scored and the numbers are printed and saved in the model under
   trained.heldOut: "episodes", "shows", "predictedAdSeconds" (what teach_publish.py needs before it
   publishes), "anyAd" (precision and recall in seconds of the spans the phone would cut, see
   teach_spans.py), and per line "lineAnyAd" and "classes". A ratio with nothing to divide by is null.
-- The model keeps at most 40,000 buckets (those with the biggest weights) and stays under 4.5 MB.
+- The model keeps at most 80,000 buckets (those with the biggest weights, the bias always) with weights
+  rounded to 4 places, and stays under 4.5 MB.
 - With fewer than --min-episodes training episodes nothing is trained or written.
 
 Exit code: 0 it worked (also with too little data), 2 a set-up problem.
@@ -44,17 +52,19 @@ from array import array
 
 import teach_segments as seg
 import teach_store
-from teach_model import (BIAS_BUCKET, BIAS_NONE, MAX_BUCKETS, MAX_BYTES, THRESHOLDS,  # noqa: F401
-                         build_model, ranked_buckets, write_text)
+import teach_fit
+from teach_model import (BIAS_BUCKET, BIAS_NONE, MAX_BUCKETS, MAX_BUCKETS_V2, MAX_BYTES,  # noqa: F401
+                         THRESHOLDS, build_model, ranked_buckets, write_text)
 from teach_overlap import same_episode_ids
 from teach_shelf import SHELF_FILE, check_lines, choose_shelf, evaluate, read_shelf
-from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities  # noqa: F401
+from teach_features import BUCKETS, BUCKETS_V2, CLASSES, bucket, episode_buckets, probabilities  # noqa: F401
 
 MIN_EPISODES = 20
 RATE = 0.5
 EPSILON = 1e-8
 L2 = 1e-6
 MODEL_FILE = "ad-model.json"
+MODEL_VERSION = 2
 CLASS_COUNT = len(CLASSES)
 
 
@@ -96,10 +106,11 @@ def valid_label(one):
                for s in one["segments"])
 
 
-def load_episode(folder, labels, entry, say):
+def load_episode(folder, labels, entry, say, version=1, size=BUCKETS):
     """One episode as {id, feed, published, starts, ends, classes, buckets} with the start and end
-    second, a class (or None) and the buckets of every transcript line, or None when it has no transcript or label. A file that
-    cannot be read is skipped with one line."""
+    second, a class (or None) and the buckets of every transcript line, or None when it has no
+    transcript or label. A file that cannot be read is skipped with one line. `version` and `size`
+    are those of the model file (see teach_features.py)."""
     identifier = entry["id"]
     transcript = os.path.join(folder, "transcripts", identifier + ".txt")
     label = os.path.join(folder, labels, identifier + ".json")
@@ -121,13 +132,13 @@ def load_episode(folder, labels, entry, say):
     ends = starts[1:] + [starts[-1] + seg.LAST_LINE_SECONDS]
     return {"id": identifier, "feed": entry["feed"], "published": entry["published"],
             "starts": starts, "ends": ends, "classes": line_classes(one["segments"], len(lines)),
-            "buckets": episode_buckets(lines, seg.episode_length(entry, lines))}
+            "buckets": episode_buckets(lines, seg.episode_length(entry, lines), version, size)}
 
 
 # MARK: Training
 
-def new_weights():
-    return array("d", [0.0]) * (BUCKETS * CLASS_COUNT)
+def new_weights(size=BUCKETS):
+    return array("d", [0.0]) * (size * CLASS_COUNT)
 
 
 def class_weights(counts):
@@ -136,16 +147,17 @@ def class_weights(counts):
                     for c in range(1, CLASS_COUNT)]
 
 
-def train(examples, epochs, seed, say=print):
+def train(examples, epochs, seed, say=print, size=BUCKETS):
     """Softmax regression with AdaGrad. examples is [(class index, buckets)]. Returns the flat
     weights, five per bucket."""
+    bias_bucket = bucket("#bias", size)
     counts = [0] * CLASS_COUNT
     for cls, _ in examples:
         counts[cls] += 1
     cost = class_weights(counts)
-    w = new_weights()
-    g2 = new_weights()
-    bias_k = BIAS_BUCKET * 5
+    w = new_weights(size)
+    g2 = new_weights(size)
+    bias_k = bias_bucket * 5
     w[bias_k] = BIAS_NONE
     rng = random.Random(seed)
     order = list(range(len(examples)))
@@ -172,7 +184,7 @@ def train(examples, epochs, seed, say=print):
             slope = [weight * v / norm for v in e]
             slope[cls] -= weight
             for b in active:
-                if b == BIAS_BUCKET:
+                if b == bias_bucket:
                     continue
                 k = b * 5
                 for c in range(5):
@@ -182,6 +194,24 @@ def train(examples, epochs, seed, say=print):
         say("Pass %d of %d: mean loss %.4f, %.1f seconds."
             % (number, epochs, total / max(len(order), 1), time.monotonic() - started))
     return w
+
+
+def fitted_weights(tool, folder, examples, size, say):
+    """The flat weights of the fit by the tool at `tool`, and what to save about it. The bias is the
+    fitted one, raised when it would not call an empty line plain talk."""
+    bias_bucket = bucket("#bias", size)
+    bias, rows, iterations, objective = teach_fit.run_fit(tool, folder, examples, size,
+                                                          bias_bucket, say)
+    row, raised = teach_fit.plain_bias(bias)
+    if raised:
+        say("The fitted bias called an empty line %.0f%% plain talk, so the first bias number was "
+            "raised to %s (the phone refuses a model whose bias says less than 50%%)."
+            % (teach_fit.plain_probability([round(v, 4) for v in bias]) * 100, row[0]))
+    flat = new_weights(size)
+    for b, five in rows.items():
+        flat[b * 5:b * 5 + 5] = array("d", five)
+    flat[bias_bucket * 5:bias_bucket * 5 + 5] = array("d", row)
+    return flat, {"fitter": "lbfgs", "iterations": iterations, "objective": round(objective, 4)}
 
 
 # MARK: Run
@@ -210,6 +240,8 @@ def main(argv, say=print, now=None):
     parser.add_argument("--epochs", type=positive, default=5)
     parser.add_argument("--seed", type=whole_number, default=1)
     parser.add_argument("--min-episodes", type=positive, default=MIN_EPISODES)
+    parser.add_argument("--fit-tool", default=None,
+                        help="the built podcast-teach, which fits the weights")
     try:
         options = parser.parse_args(argv)
     except SystemExit as stop:
@@ -226,7 +258,7 @@ def main(argv, say=print, now=None):
         old_shelf = read_shelf(folder)
         episodes = {}
         for entry in entries:
-            found = load_episode(folder, options.labels, entry, say)
+            found = load_episode(folder, options.labels, entry, say, MODEL_VERSION, BUCKETS_V2)
             if found:
                 episodes[entry["id"]] = found
         shelf = choose_shelf(entries, set(episodes), old_shelf)
@@ -248,10 +280,18 @@ def main(argv, say=print, now=None):
                     if c is not None]
         say("Training on %d episodes (%d lines), with %d on the shelf."
             % (len(learning), len(examples), len(shelved)))
-        flat = train(examples, options.epochs, options.seed, say)
-        trained = {"writtenAt": now(), "episodes": len(learning), "lines": len(examples),
-                   "shelf": len(shelved)}
-        text = build_model(flat, trained, lambda kept: evaluate(kept, shelved))
+        extra = {}
+        if options.fit_tool:
+            flat, extra = fitted_weights(options.fit_tool, folder, examples, BUCKETS_V2, say)
+        else:
+            say("No --fit-tool was given, so the built-in AdaGrad loop trains the model; its result "
+                "is weaker than the fit by podcast-teach.")
+            flat = train(examples, options.epochs, options.seed, say, BUCKETS_V2)
+            extra = {"fitter": "adagrad"}
+        trained = dict({"writtenAt": now(), "episodes": len(learning), "lines": len(examples),
+                        "shelf": len(shelved)}, **extra)
+        text = build_model(flat, trained, lambda kept: evaluate(kept, shelved, MODEL_VERSION),
+                           MAX_BUCKETS_V2, MAX_BYTES, MODEL_VERSION, BUCKETS_V2)
         path = os.path.join(folder, MODEL_FILE)
         write_text(path, text)
         if shelf != old_shelf:

@@ -38,8 +38,10 @@ class RefusalTests(unittest.TestCase):
     def test_not_an_object(self):
         self.refused([], "not an object")
 
-    def test_the_version_must_be_1(self):
-        self.refused(changed(version=2), "version")
+    def test_the_version_must_be_1_or_2(self):
+        self.assertEqual(rule.refusals(changed(version=2)), [])
+        self.refused(changed(version=3), "version")
+        self.refused(changed(version=0), "version")
         self.refused(changed(version=True), "version")
         self.refused(changed(version="1"), "version")
 
@@ -113,7 +115,7 @@ class RefusalTests(unittest.TestCase):
         self.assertEqual(rule.refusals(changed(weights=weights)), [])
 
     def test_every_reason_is_listed(self):
-        value = changed(version=2, classes=[], weights={})
+        value = changed(version=3, classes=[], weights={})
         self.assertGreaterEqual(len(rule.refusals(value)), 3)
 
     def test_the_input_is_not_changed(self):
