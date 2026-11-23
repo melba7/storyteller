@@ -19,9 +19,9 @@ enum AdScoreNotes {
 
   // MARK: What the joints and the settings did (ideas 5 and 7)
 
-  /// One line for the joints row, one for the steady row and one for the settings row, each
-  /// against the row before it in `rows`. A row that is not there, or has nothing before it, gets
-  /// no line.
+  /// One line for each finder row (own sounds, repeated sounds, repeated words, the meaning model),
+  /// one for the joints row, one for the steady row and one for the settings row, each against the
+  /// row before it in `rows`. A row that is not there, or has nothing before it, gets no line.
   static func rowLines(_ rows: [ScorecardRow]) -> [String] {
     var lines: [String] = []
     for (index, row) in rows.enumerated() where index > 0 {
@@ -38,10 +38,46 @@ enum AdScoreNotes {
             fails: "Steady files should not be used too"))
       case ScoreRows.settings:
         lines.append(settingsLine(row, before))
-      default: break
+      default:
+        if let finder = finders[row.name] { lines.append(finderLine(row, before, finder: finder)) }
       }
     }
     return lines
+  }
+
+  /// The finder of each row, by the name `show-settings.json` uses.
+  private static let finders = [
+    ScoreRows.ownSounds: ShowTuning.ownSound, ScoreRows.repeatedSounds: ShowTuning.repeatSound,
+    ScoreRows.repeatedWords: ShowTuning.repeatWords, ScoreRows.meaning: ShowTuning.meaning,
+  ]
+  /// What `teach_settings.py` asks of a finder before it judges it, and its two rules, over what
+  /// the row added to the row before it: more wrong than right seconds turns the finder off for
+  /// every show, and under 85 percent of the added seconds being ad turns a finder that skips by
+  /// default into one that only asks.
+  private static let judgedOverEpisodes = 3
+  private static let precisionPercent = 85.0
+
+  /// What a finder row added to the row before it, and what the Mac will do about it the next time
+  /// it chooses the settings (the same rule, read from the same numbers).
+  private static func finderLine(_ row: ScorecardRow, _ before: ScorecardRow, finder: String) -> String {
+    let right = Self.right(row) - Self.right(before)
+    let wrong = row.total.cutSeconds - before.total.cutSeconds
+    let more = { (seconds: Double, noun: String) in
+      seconds < 0 ? "\(time(-seconds)) fewer \(noun)" : "\(time(seconds)) more \(noun)"
+    }
+    let verdict: String
+    if row.total.episodes < judgedOverEpisodes {
+      verdict = "The Mac judges a finder only over \(judgedOverEpisodes) or more marked episodes, so it stays as it is."
+    } else if wrong - right > epsilon {
+      verdict = "The next Teach the phone again turns it off for every show."
+    } else if right + wrong > epsilon, right * 100 < precisionPercent * (right + wrong),
+      ShowTuning().level(forFinder: finder, show: "") == .skip
+    {
+      verdict = "The next Teach the phone again makes it only ask on every show."
+    } else {
+      verdict = "It stays as it is overall."
+    }
+    return "\(row.name): found \(more(right, "right seconds")) and \(more(wrong, "wrong seconds")). \(verdict)"
   }
 
   /// The gate of idea 5: more right seconds, and the wrong seconds not up by more than one in a

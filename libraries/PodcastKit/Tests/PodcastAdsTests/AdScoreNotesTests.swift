@@ -7,9 +7,11 @@ import XCTest
 /// questions the phone would ask, and how the phone's own habits compare with the Mac's.
 final class AdScoreNotesTests: XCTestCase {
   private func row(
-    _ name: String, ad: Double = 300, heard: Double, cut: Double, before: Double = 0, after: Double = 0
+    _ name: String, ad: Double = 300, heard: Double, cut: Double, before: Double = 0, after: Double = 0,
+    episodes: Int = 3
   ) -> ScorecardRow {
     var total = ScoreTotals()
+    total.episodes = episodes
     total.adSeconds = ad
     total.heardSeconds = heard
     total.cutSeconds = cut
@@ -80,6 +82,76 @@ final class AdScoreNotesTests: XCTestCase {
     XCTAssertEqual(AdScoreNotes.rowLines([]), [])
     XCTAssertEqual(AdScoreNotes.rowLines([row(ScoreRows.joints, heard: 1, cut: 0)]), [])
     XCTAssertEqual(AdScoreNotes.rowLines([row("Word rules", heard: 1, cut: 0)]), [])
+  }
+
+  // MARK: What each finder row did
+
+  /// A row before it with 100 right seconds (300 of ad, 200 heard) and 10 wrong, and a finder row
+  /// that adds `right` right seconds and `wrong` wrong seconds to it.
+  private func finder(
+    _ name: String, right: Double, wrong: Double, episodes: Int = 3
+  ) -> [ScorecardRow] {
+    [
+      row("Plus promo rules", heard: 200, cut: 10),
+      row(name, heard: 200 - right, cut: 10 + wrong, episodes: episodes),
+    ]
+  }
+
+  func testAFinderThatCutsMoreShowThanItFindsOfAdIsTurnedOffByTheMac() {
+    let lines = AdScoreNotes.rowLines(finder(ScoreRows.repeatedWords, right: 4, wrong: 10))
+    XCTAssertEqual(
+      lines,
+      ["Plus repeated words: found 4 s more right seconds and 10 s more wrong seconds. The next Teach the phone again turns it off for every show."])
+  }
+
+  func testAFinderUnderEightyFivePercentAndSkippingByDefaultOnlyAsksAfterTheNextTeach() {
+    // 8 of 10 added seconds are ad: 80 percent. Own sounds and the meaning model skip by default.
+    for name in [ScoreRows.ownSounds, ScoreRows.meaning] {
+      let lines = AdScoreNotes.rowLines(finder(name, right: 8, wrong: 2))
+      XCTAssertEqual(
+        lines,
+        ["\(name): found 8 s more right seconds and 2 s more wrong seconds. The next Teach the phone again makes it only ask on every show."])
+    }
+  }
+
+  func testAFinderThatAlreadyOnlyAsksOrIsPreciseStaysAsItIs() {
+    // The repeat finders only ask by default, so low precision changes nothing.
+    for name in [ScoreRows.repeatedSounds, ScoreRows.repeatedWords] {
+      let lines = AdScoreNotes.rowLines(finder(name, right: 8, wrong: 2))
+      XCTAssertTrue(lines[0].hasSuffix("It stays as it is overall."), lines[0])
+    }
+    // Exactly 85 percent is not under it (the Mac's rule is right * 100 < 85 * (right + wrong)).
+    let precise = AdScoreNotes.rowLines(finder(ScoreRows.ownSounds, right: 17, wrong: 3))
+    XCTAssertTrue(precise[0].hasSuffix("It stays as it is overall."), precise[0])
+    // Equal right and wrong seconds are not worse; they are imprecise.
+    let even = AdScoreNotes.rowLines(finder(ScoreRows.ownSounds, right: 5, wrong: 5))
+    XCTAssertTrue(even[0].hasSuffix("makes it only ask on every show."), even[0])
+  }
+
+  func testAFinderThatAddsNothingStaysAsItIs() {
+    let lines = AdScoreNotes.rowLines(finder(ScoreRows.meaning, right: 0, wrong: 0))
+    XCTAssertEqual(
+      lines, ["Plus the meaning model: found 0 s more right seconds and 0 s more wrong seconds. It stays as it is overall."])
+  }
+
+  func testAFinderOverFewerThanThreeEpisodesIsNotJudgedByTheMac() {
+    let lines = AdScoreNotes.rowLines(finder(ScoreRows.repeatedWords, right: 1, wrong: 30, episodes: 2))
+    XCTAssertTrue(
+      lines[0].hasSuffix("The Mac judges a finder only over 3 or more marked episodes, so it stays as it is."),
+      lines[0])
+  }
+
+  func testAFinderThatLostRightSecondsIsSaidSoAndTheFinderLinesComeBeforeTheJointsLines() {
+    let lines = AdScoreNotes.rowLines([
+      row("Plus promo rules", heard: 100, cut: 0), row(ScoreRows.ownSounds, heard: 110, cut: 5),
+      row(ScoreRows.joints, heard: 90, cut: 5),
+    ])
+    XCTAssertEqual(lines.count, 2)
+    XCTAssertTrue(lines[0].hasPrefix("Plus the phone's own sounds: found 10 s fewer right seconds and 5 s more wrong seconds."), lines[0])
+    XCTAssertTrue(lines[0].hasSuffix("turns it off for every show."), lines[0])
+    XCTAssertTrue(lines[1].hasPrefix("Joints:"), lines[1])
+    // A finder row that is first in the list has no row before it to be set against.
+    XCTAssertEqual(AdScoreNotes.rowLines([row(ScoreRows.ownSounds, heard: 1, cut: 0)]), [])
   }
 
   // MARK: Questions

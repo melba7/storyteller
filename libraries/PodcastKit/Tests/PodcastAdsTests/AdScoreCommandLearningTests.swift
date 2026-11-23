@@ -70,6 +70,9 @@ final class AdScoreCommandLearningTests: XCTestCase {
     let words = rows.first { $0.name == ScoreRows.repeatedWords }
     XCTAssertEqual(right(words), 20, accuracy: 5)
     XCTAssertEqual(words?.total.episodes, 1)
+    // The row has its own line in the print, set against the row before it.
+    XCTAssertTrue(output.contains("Plus repeated words: found 2"), output)
+    XCTAssertTrue(output.contains("more wrong seconds."), output)
   }
 
   func testWithNothingOlderToLearnFromTheRepeatedWordsRowAddsNothing() throws {
