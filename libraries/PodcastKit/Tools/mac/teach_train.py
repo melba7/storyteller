@@ -18,6 +18,9 @@ phone and lives in teach_features.py.
   the model is written. An episode that repeats a shelf episode (same feed key and guid, same audio
   SHA-256, or more than half of its 5-word runs the same, see teach_overlap.py) is left out of
   training, and the tool says how many.
+- The sealed exam (exam.json, see teach_exam.py) is invisible here: an exam episode is never trained
+  on and never put on the shelf, an episode that repeats one is left out of training like one that
+  repeats a shelf episode, and the tool says how many exam episodes it left out.
 - Training is softmax regression on the hashed features with AdaGrad (rate 0.5), L2 of 1e-6 on the
   weights an example touches, and each example's loss weighted by min(5, none count / class count).
   The bias bucket is fixed at plain talk (teach_model.BIAS_NONE) and never trained: the many words of
@@ -44,6 +47,7 @@ from array import array
 
 import teach_segments as seg
 import teach_store
+from teach_exam import read_exam
 from teach_model import (BIAS_BUCKET, BIAS_NONE, MAX_BUCKETS, MAX_BYTES, THRESHOLDS,  # noqa: F401
                          build_model, ranked_buckets, write_text)
 from teach_overlap import same_episode_ids
@@ -224,8 +228,11 @@ def main(argv, say=print, now=None):
         except teach_store.ManifestError as error:
             raise teach_store.Problem(str(error))
         old_shelf = read_shelf(folder)
+        sealed = set(read_exam(folder))
         episodes = {}
         for entry in entries:
+            if entry["id"] in sealed:
+                continue
             found = load_episode(folder, options.labels, entry, say)
             if found:
                 episodes[entry["id"]] = found
@@ -233,13 +240,18 @@ def main(argv, say=print, now=None):
         on_shelf = set(shelf)
         shelved = [e for i, e in episodes.items() if i in on_shelf]
         learning = [e for i, e in episodes.items() if i not in on_shelf]
-        repeats = set(same_episode_ids(folder, {e["id"]: e for e in entries},
-                                       [e["id"] for e in shelved], [e["id"] for e in learning]))
+        by_id = {e["id"]: e for e in entries}
+        kept_apart = [e["id"] for e in shelved] + [i for i in sorted(sealed) if i in by_id]
+        repeats = set(same_episode_ids(folder, by_id, kept_apart, [e["id"] for e in learning]))
         if repeats:
             learning = [e for e in learning if e["id"] not in repeats]
-            say("Left %d episode%s out of training because %s the same as one on the shelf."
+            say("Left %d episode%s out of training because %s the same as one on the shelf%s."
                 % (len(repeats), "" if len(repeats) == 1 else "s",
-                   "it is" if len(repeats) == 1 else "they are"))
+                   "it is" if len(repeats) == 1 else "they are",
+                   " or in the exam" if sealed else ""))
+        if sealed & set(by_id):
+            count = len(sealed & set(by_id))
+            say("Left %d exam episode%s out of learning." % (count, "" if count == 1 else "s"))
         if len(learning) < options.min_episodes:
             say("Only %d episodes are marked and not on the shelf; at least %d are needed to train, "
                 "so no model was written." % (len(learning), options.min_episodes))

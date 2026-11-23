@@ -34,9 +34,10 @@ class CostTests(RunHelpers, unittest.TestCase):
     def test_answers_that_could_not_be_read_cost_too(self):
         teaching = Teaching(self, 4)
         result, _ = self.go(teaching, self.fake_ask(cost=0.6, text="no json"), cap=1.5)
-        # Two bad answers per episode, 1.2 an episode: the second episode takes it past the cap.
-        self.assertEqual((result["failed"], result["stop"]), (2, "cap"))
-        self.assertAlmostEqual(result["cost"], 2.4)
+        # Two bad answers per episode, 1.2 an episode. The cap is checked before every call, so the
+        # second episode's retry is not asked once its first answer (1.8 in all) is over the cap.
+        self.assertEqual((result["failed"], result["stop"]), (1, "cap"))
+        self.assertAlmostEqual(result["cost"], 1.8)
 
     def test_a_usage_limit_answer_that_cost_something_is_counted(self):
         teaching = Teaching(self, 2)

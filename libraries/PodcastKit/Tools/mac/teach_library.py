@@ -24,6 +24,7 @@ How it works:
 - ad-library.json is built from all marked episodes. ad-library-score.json has the same shape but is
   built only from the episodes that are not on the shelf (shelf.json), so the scorecard's "plus the
   library" row does not know the shelf ads' own words. It is not published.
+- Episodes of the sealed exam (exam.json, see teach_exam.py) are left out of both files.
 - The file stays under 4.5 MB (the phone refuses files over 5 MB): entries are dropped from the end.
 
 Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem.
@@ -39,6 +40,7 @@ import time
 
 import teach_store
 import teach_segments as seg
+from teach_exam import read_exam
 from teach_shelf import read_shelf
 
 DEFAULT_MOST = 1500
@@ -136,9 +138,12 @@ def episode_candidates(entry, folder, labels, say):
 
 def read_candidates(folder, labels, say):
     """([candidate], how many labels were read) in the order of episodes.json, then segment
-    order."""
+    order. The episodes of the sealed exam (exam.json) are left out."""
     found, read = [], 0
+    sealed = set(read_exam(folder))
     for entry in teach_store.load_manifest(folder):
+        if entry["id"] in sealed:
+            continue
         more, ok = episode_candidates(entry, folder, labels, say)
         found += more
         read += 1 if ok else 0

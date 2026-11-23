@@ -18,7 +18,10 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Score the ad skipping.command", "Install weekly teaching.command",
              "Stop weekly teaching.command", "Mark ads in the teaching episodes.command",
              "Mark ads when the gathering is done.command",
-             "Check ads with a second download.command"]
+             "Check ads with a second download.command",
+             "Gather more episodes for teaching.command",
+             "Mark the new episodes at night.command",
+             "Gather the exam episodes.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
@@ -26,6 +29,10 @@ PYTHON = """#!/bin/bash
 script="$(basename "$1")"
 shift
 echo "python3 $script $*" >> "$CALLS"
+# The counting helpers are run for real when the test gives the real python3 (REAL_PYTHON).
+case "$script" in teach_exam.py|teach_failures.py)
+  [ -n "$REAL_PYTHON" ] && exec "$REAL_PYTHON" "$TOOLS/$script" "$@" ;;
+esac
 case " $FAIL " in *" $script "*) echo "$script: pretending to fail"; exit 1 ;; esac
 for pair in $CODES; do
   [ "${pair%%=*}" = "$script" ] && { echo "$script: ending with ${pair#*=}"; exit "${pair#*=}"; }

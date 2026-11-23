@@ -31,6 +31,10 @@ class UsageLimit(RuntimeError):
     """Claude says the usage or rate limit is reached, or that it is not signed in."""
 
 
+class SignedOut(UsageLimit):
+    """Claude is not signed in: waiting would not help."""
+
+
 class ClaudeError(RuntimeError):
     """A failed run; `cost` is what the run cost anyway, in dollars (0 when unknown)."""
     cost = 0.0
@@ -49,10 +53,16 @@ def find_claude(environment, extra_folders=EXTRA_FOLDERS):
     return None
 
 
+def is_signed_out(message):
+    """True when the text says Claude is not signed in (as opposed to a usage limit). Give it the
+    same text the usage-limit check reads: all of the output, not a cut of it."""
+    return any(word in message.lower() for word in SIGNED_OUT)
+
+
 def is_usage_limit(message):
     """True for not-signed-in wording and for usage or rate limit wording, as the Swift code
     decides (401 and 429), but not for other uses of the word "limit"."""
-    return any(word in message.lower() for word in SIGNED_OUT) or USAGE_LIMIT.search(message) is not None
+    return is_signed_out(message) or USAGE_LIMIT.search(message) is not None
 
 
 def printed_result(output):
@@ -99,14 +109,17 @@ def ask_claude(system, prompt, model, claude, runner=subprocess.run, timeout=RUN
         raw = "%s\n%s" % (done.stdout or "", done.stderr or "")
         detail = (done.stderr or done.stdout or "")[-300:].strip()
         message = "claude exited %s without a result: %s" % (done.returncode, detail)
-        raise failure(UsageLimit if is_usage_limit(raw) else ClaudeError, message)
+        kind = SignedOut if is_signed_out(raw) else UsageLimit if is_usage_limit(raw) else ClaudeError
+        raise failure(kind, message)
     text = result.get("result")
     cost = result.get("total_cost_usd")
     cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else 0.0
     if result.get("is_error") is True or done.returncode != 0:
         message = text if isinstance(text, str) else result.get("subtype") or \
             "claude -p failed (exit %s)" % done.returncode
-        raise failure(UsageLimit if is_usage_limit(message) else ClaudeError, message, cost)
+        kind = SignedOut if is_signed_out(message) else UsageLimit if is_usage_limit(message) \
+            else ClaudeError
+        raise failure(kind, message, cost)
     if not isinstance(text, str):
         raise failure(ClaudeError, "claude printed no answer text", cost)
     return {"text": text, "cost": cost}
