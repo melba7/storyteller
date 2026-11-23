@@ -33,6 +33,9 @@ final class AdAskingTests: XCTestCase {
       ads: ads, undone: undone, coveredUntil: coveredUntil, asks: asks, denied: denied)
   }
 
+  /// The question as it is stored after a "yes".
+  private func answered(_ ask: FoundAd) -> FoundAd { AdAsking.answered(ask) }
+
   private func tempFolder() throws -> URL {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -104,26 +107,41 @@ final class AdAskingTests: XCTestCase {
     let before = file(ads: [ad(30, 60), ad(500, 540)], asks: [ask(100, 130), ask(300, 330)])
     let after = try XCTUnwrap(AdAsking.answer(before, askStart: 100, isAd: true))
     XCTAssertEqual(after.ads.map(\.start), [30, 100, 500], "in order of start")
-    let tapped = after.ads[1]
+    let tapped = try XCTUnwrap(after.ads.dropFirst().first)
     XCTAssertEqual(tapped.confidence, .sure)
     XCTAssertEqual(tapped.source, "tap")
     XCTAssertEqual(AdAsking.source, "tap")
     XCTAssertEqual(tapped.end, 130)
     XCTAssertEqual(tapped.kind, .promo, "the question's kind stays")
     XCTAssertEqual(tapped.firstWords, "words at 100.0")
-    XCTAssertEqual(after.asks, before.asks, "the list keeps every question, answered or not")
+    XCTAssertEqual(
+      after.asks, [answered(ask(100, 130)), ask(300, 330)],
+      "the list keeps every question; a yes is recorded in the question itself")
     XCTAssertEqual(AdAsking.open(in: after).map(\.start), [300], "the other question waits")
     XCTAssertEqual(after.undone, [])
     XCTAssertNil(after.denied)
-    XCTAssertEqual(after.ads[0], before.ads[0])
-    XCTAssertEqual(after.ads[2], before.ads[1])
+    XCTAssertEqual(after.ads.first, before.ads.first)
+    XCTAssertEqual(after.ads.last, before.ads.last)
   }
 
   func testAnAnsweredQuestionStaysInTheListButIsNotOpen() throws {
     // It stays so that the cap of three questions an episode counts it.
     let after = try XCTUnwrap(AdAsking.answer(file(asks: [ask(100, 130)]), askStart: 100, isAd: true))
-    XCTAssertEqual(after.asks, [ask(100, 130)])
+    XCTAssertEqual(after.asks, [answered(ask(100, 130))])
     XCTAssertEqual(AdAsking.open(in: after), [])
+  }
+
+  func testAQuestionThatIsNotAGuessIsAnAnsweredYesAndIsNotOpenEvenWithNoAdOverIt() {
+    // The yes is recorded in the question, so it counts even when the ad it made was lost.
+    XCTAssertEqual(AdAsking.open(in: file(asks: [answered(ask(100, 130))])), [])
+    XCTAssertEqual(AdAsking.answered(ask(100, 130)).confidence, .sure)
+    XCTAssertEqual(ask(100, 130).confidence, .guess, "a question that is asked is a guess")
+  }
+
+  func testAddingMakesAnAnsweredLookingQuestionAGuessAgain() {
+    XCTAssertEqual(
+      AdAsking.adding([answered(ask(100, 130))], to: file()).asks, [ask(100, 130)],
+      "a caller cannot hand in a question that already reads as answered")
   }
 
   // MARK: No
@@ -255,40 +273,5 @@ final class AdAskingTests: XCTestCase {
     var loud = ask(100, 130)
     loud.confidence = .sure
     XCTAssertEqual(AdAsking.adding([loud], to: file()).asks?.first?.confidence, .guess)
-  }
-
-  // MARK: Through the store
-
-  func testAnAnswerIsSavedInTheFinalFile() throws {
-    let store = AdsStore(folder: try tempFolder(), sha256: "abc")
-    try store.save(file(ads: [ad(30, 60)], asks: [ask(100, 130)]))
-    let answered = AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: true)
-    XCTAssertEqual(answered, ask(100, 130), "the question that was answered")
-    let saved = try XCTUnwrap(store.load(detector: "local"))
-    XCTAssertEqual(saved.ads.map(\.start), [30, 100])
-    XCTAssertEqual(saved.ads[1].source, "tap")
-    XCTAssertEqual(saved.asks, [ask(100, 130)], "kept, and no longer open")
-    XCTAssertEqual(AdAsking.open(in: saved), [])
-    XCTAssertNil(store.loadPartial(detector: "local"), "no partial file was made")
-  }
-
-  func testAnAnswerIsSavedInThePartialFileWhileTheEpisodeIsStillBeingChecked() throws {
-    let store = AdsStore(folder: try tempFolder(), sha256: "abc")
-    try store.savePartial(file(asks: [ask(100, 130)], coveredUntil: 600))
-    XCTAssertNotNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: false))
-    XCTAssertNil(store.load(detector: "local"), "no final file was made")
-    let partial = try XCTUnwrap(store.loadPartial(detector: "local"))
-    XCTAssertEqual(partial.denied, [UndoneAd(start: 100, end: 130)])
-    XCTAssertEqual(partial.undone, [])
-    XCTAssertEqual(partial.coveredUntil, 600)
-  }
-
-  func testAStoreWithNoOpenQuestionAnswersNilAndWritesNothing() throws {
-    let folder = try tempFolder()
-    let store = AdsStore(folder: folder, sha256: "abc")
-    XCTAssertNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: true))
-    try store.save(file(ads: [ad(30, 60)]))
-    XCTAssertNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: true))
-    XCTAssertEqual(store.load(detector: "local")?.ads, [ad(30, 60)])
   }
 }

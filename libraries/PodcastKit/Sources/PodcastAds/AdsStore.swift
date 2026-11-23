@@ -160,16 +160,23 @@ public struct AdsStore: Sendable {
 
   /// `file` with the trims, undone skips, questions, "no" answers and confirmed ads already saved
   /// for this detector (in its final or partial file). A detector that writes a file does not
-  /// know them, and the listener's choices must outlive it (`AdAsking.carrying`).
+  /// know them, and the listener's choices must outlive it. The undone skips of both files are
+  /// carried before the questions are (`AdAsking.carrying`), which looks at them.
   func carryingTrims(_ file: AdsFile) -> AdsFile {
     var carried = file
-    for earlier in [load(detector: file.detector), loadPartial(detector: file.detector)] {
-      for trim in earlier?.trims ?? [] { carried.addTrim(trim) }
-      for undone in earlier?.undone ?? [] where !carried.undone.contains(undone) {
+    let earlier = [load(detector: file.detector), loadPartial(detector: file.detector)].compactMap { $0 }
+    for saved in earlier {
+      for trim in saved.trims ?? [] { carried.addTrim(trim) }
+      // A stretch that is not a real one (a damaged file) is not carried; a NaN is never equal
+      // to itself, so `contains` would not find it and it would be added on every write.
+      for undone in saved.undone
+      where undone.start.isFinite && undone.end.isFinite && undone.end > undone.start
+        && !carried.undone.contains(undone)
+      {
         carried.undone.append(undone)
       }
-      if let earlier { carried = AdAsking.carrying(earlier, into: carried) }
     }
+    for saved in earlier { carried = AdAsking.carrying(saved, into: carried) }
     return carried
   }
 

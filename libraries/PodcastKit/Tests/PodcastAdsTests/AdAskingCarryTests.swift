@@ -69,7 +69,7 @@ final class AdAskingCarryTests: XCTestCase {
     let saved = try XCTUnwrap(store.load(detector: "local"))
     XCTAssertEqual(saved.ads.map(\.start), [100, 500])
     XCTAssertEqual(saved.ads.first?.source, "tap")
-    XCTAssertEqual(saved.asks, [ask(100, 130), ask(300, 330)])
+    XCTAssertEqual(saved.asks, [AdAsking.answered(ask(100, 130)), ask(300, 330)])
     XCTAssertEqual(AdAsking.open(in: saved), [ask(300, 330)])
   }
 
@@ -141,15 +141,17 @@ final class AdAskingCarryTests: XCTestCase {
     XCTAssertEqual(AdAsking.open(in: after), [])
   }
 
-  func testATapAdTheListenerUndidStaysUndone() throws {
+  func testAYesTheListenerUndidStaysUndoneAndClosed() throws {
     try store.savePartial(file(asks: [ask(100, 130)], covered: 0))
     XCTAssertNotNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: true))
     XCTAssertTrue(store.markUndone(detector: "local", adStart: 100))
-    try checkpoint(ads: [ad(400, 450)], covered: 200)
-    let after = try XCTUnwrap(store.loadPartial(detector: "local"))
-    let tapped = try XCTUnwrap(after.ads.first { $0.source == "tap" })
-    XCTAssertTrue(after.isUndone(tapped), "so the player does not skip it again")
-    XCTAssertEqual(AdAsking.open(in: after), [])
+    for covered in [200.0, 300] {
+      try checkpoint(ads: [ad(400, 450)], covered: covered)
+      let after = try XCTUnwrap(store.loadPartial(detector: "local"))
+      XCTAssertEqual(after.undone, [UndoneAd(start: 100, end: 130)], "covered \(covered)")
+      XCTAssertEqual(after.ads, [ad(400, 450)], "the undone yes is not made an ad again")
+      XCTAssertEqual(AdAsking.open(in: after), [], "and the question stays closed")
+    }
   }
 
   // MARK: A no
@@ -176,7 +178,7 @@ final class AdAskingCarryTests: XCTestCase {
     try checkpoint(ads: [ad(33, 90)], covered: 100)
     let after = try XCTUnwrap(store.loadPartial(detector: "local"))
     XCTAssertEqual(after.ads, [ad(33, 90)])
-    XCTAssertFalse(after.isUndone(after.ads[0]))
+    XCTAssertFalse(after.ads.contains { after.isUndone($0) })
     XCTAssertEqual(after.denied, [UndoneAd(start: 12, end: 35)], "carried through the checkpoint")
   }
 
