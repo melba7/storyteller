@@ -328,9 +328,9 @@ scorecard is not older than the model.
 A set of about 60 newer episodes is kept apart as an exam. Their ids are in
 `exam.json` in the teaching folder. The rule: an exam episode is invisible to
 every step that learns. Only gathering, writing down, marking, second downloads
-and the scorer, when it is asked, may use it. The word model, the shelf, the
-library of ads (both files) and the habits leave it out (the Swift steps `sounds` and `meaning` do not read
-`exam.json` yet), and a training episode
+and the scorer, when it is asked, may use it. Every learning step leaves it out: the word
+model, the shelf, the library of ads (both files), the habits and the Swift steps
+`sounds` and `meaning`. A training episode
 that repeats an exam episode is left out of training too. The exam is gathered
 only from episodes newer than everything gathered before, so it tests the
 phone on episodes it could not have learned from. Fifteen of its episodes are
@@ -340,6 +340,14 @@ same episode differ, which is the ceiling for any score against Claude's marks.
 teaching.command` and `Mark the new episodes at night.command` gather and mark
 the other 500 or so episodes only at night, over several nights, within a cost
 cap (see `Tools/mac/README.md`).
+
+Marking happens only in the night window: no call to Claude starts outside it,
+also not a retry after a wait for the usage allowance, and a retry asks only for
+the parts of an episode that are still missing. The cost cap is a budget kept
+across runs in `marking-spend.json`, so double-clicking again carries on with what
+is left and never starts a fresh cap. The exam launcher says how many exam
+episodes have audio and a transcript, and says "Done" only when all of them are
+marked once and 15 of them twice; otherwise it says what is left.
 
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
