@@ -2,7 +2,10 @@
 // itself, cleanly enough that nobody has to tap (see FORK.md). In seconds. Foundation only.
 import Foundation
 
-/// Why a break fails the bar. Only the first cause that applies is counted, in this order.
+/// Why a break fails the bar. Only the first cause that applies is counted, in this order:
+/// missed, starts late (more than 5 s heard before the first skip), stops early (more than 5 s
+/// heard after the last), gap inside (too much heard in total, with part of it heard between the
+/// skips; with none, the bigger edge is named instead), starts early, lands too far.
 public enum BarCause: String, Codable, Sendable, CaseIterable {
   /// No skip reaches the break.
   case missed
@@ -10,7 +13,9 @@ public enum BarCause: String, Codable, Sendable, CaseIterable {
   case startsLate
   /// The last skip that reaches it ends more than `AdBar.heardSeconds` before it ends.
   case stopsEarly
-  /// Too much of the break is heard, although the skips start and end in time: a gap inside.
+  /// Too much of the break is heard between its first and last skip: a gap inside. When nothing
+  /// is heard between them, too much heard in total is blamed on the bigger edge, as `startsLate`
+  /// or `stopsEarly`.
   case gapInside
   /// The skips cut more than `AdBar.cutSeconds` of show before the break.
   case startsEarly
@@ -109,7 +114,13 @@ public enum AdBar {
   ) -> BarTotals {
     var total = BarTotals()
     total.episodeSeconds = duration
-    let skips = join(rawSkips, within: 0)
+    // Everything is cut to the episode first, the way the existing scorer does it.
+    func clipped(_ raw: [Span]) -> [Span] {
+      Spans(raw, limit: duration).items
+    }
+    let counted = clipped(counted)
+    let neutral = clipped(neutral)
+    let skips = join(clipped(rawSkips), within: 0)
     let breaks = join(counted, within: joinSeconds)
     let marked = join(counted + neutral, within: 0)
     for span in breaks where span.end - span.start >= shortestBreak - slack {
@@ -140,7 +151,10 @@ public enum AdBar {
       } else if stopsEarly > heardSeconds + slack {
         cause = .stopsEarly
       } else if heard > heardSeconds + slack {
-        cause = .gapInside
+        // Part of the break heard between the first and the last skip is a gap; otherwise the
+        // bigger of the two heard edges is the cause.
+        let between = heard - late - stopsEarly
+        cause = between > slack ? .gapInside : (late >= stopsEarly ? .startsLate : .stopsEarly)
       } else if before > cutSeconds + slack {
         cause = .startsEarly
       } else if after > cutSeconds + slack {

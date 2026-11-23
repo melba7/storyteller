@@ -15,6 +15,18 @@ public enum AdSoundCommand {
   /// The sorts that are read as sound. Host asks are read live and do not repeat as sound.
   private static let sorts: Set<String> = ["sponsor", "network_promo", "intro_credits"]
 
+  /// The ids in `exam.json` (`{"episodes": ["id", ...]}`): none when there is no file, nil when
+  /// the file cannot be read, because the exam must not be learned from by mistake.
+  private static func examIds(_ folder: URL) -> Set<String>? {
+    let url = folder.appendingPathComponent("exam.json")
+    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    guard let data = try? Data(contentsOf: url),
+      let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+      let ids = root["episodes"] as? [Any], ids.allSatisfy({ $0 is String })
+    else { return nil }
+    return Set(ids.compactMap { $0 as? String })
+  }
+
   /// `<teaching folder> [--labels NAME]`. Writes `ad-sounds.json` into the folder and says what it
   /// did through `say`. Returns 0 when it worked (also with nothing to do) and 2 for a set-up problem.
   public static func run(_ arguments: [String], say: (String) -> Void = { print($0) }) -> Int32 {
@@ -41,6 +53,10 @@ public enum AdSoundCommand {
       return 2
     }
 
+    guard let exam = examIds(folder) else {
+      say("exam.json in \(folderPath) is not in the expected shape, so nothing was learned.")
+      return 2
+    }
     var tally = Tally()
     var builder = AdSoundBuilder()
     for episode in episodes {
@@ -48,6 +64,8 @@ public enum AdSoundCommand {
         tally.unreadable += 1
         continue
       }
+      // The sealed exam never teaches anything.
+      if exam.contains(id) { continue }
       guard let file = episode["file"] as? String else {
         tally.noAudio += 1
         continue

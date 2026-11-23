@@ -89,7 +89,12 @@ public enum AdScoreCommand {
       return 2
     }
     guard !labelled.isEmpty else {
-      out("No episode in \(folder.path) has both a transcript and a label yet.")
+      if !exam.isEmpty {
+        out(
+          "The only marked episodes in \(folder.path) are on the exam (exam.json); --exam scores them.")
+      } else {
+        out("No episode in \(folder.path) has both a transcript and a label yet.")
+      }
       return 0
     }
 
@@ -149,7 +154,8 @@ public enum AdScoreCommand {
     }
     guard let card = cards.last else { return 0 }
 
-    let historyURL = folder.appendingPathComponent(ScorecardHistory.fileName)
+    let historyURL = folder.appendingPathComponent(
+      options.exam ? ScorecardHistory.examFileName : ScorecardHistory.fileName)
     var history = ScorecardHistory.load(from: historyURL)
     let reportNotes = (libraryRead.file.isEmpty ? [] : ["Library: \(libraryRead.file)"]) + plan.notes
     var text = AdScoreReport.text(
@@ -165,6 +171,13 @@ public enum AdScoreCommand {
     let bar = AdBarReport.lines(rows)
     if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
     out(text)
+    history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
+    do {
+      try history.save(to: historyURL)
+    } catch {
+      err("The scorecard could not be saved to \(historyURL.path): \(error.localizedDescription)")
+      return 2
+    }
     if !options.dump.isEmpty {
       do {
         try AdScoreDump.write(
@@ -174,13 +187,6 @@ public enum AdScoreCommand {
         err("The dump could not be written to \(options.dump): \(error.localizedDescription)")
         return 2
       }
-    }
-    history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
-    do {
-      try history.save(to: historyURL)
-    } catch {
-      err("The scorecard could not be saved to \(historyURL.path): \(error.localizedDescription)")
-      return 2
     }
     return 0
   }

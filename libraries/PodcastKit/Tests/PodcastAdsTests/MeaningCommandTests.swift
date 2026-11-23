@@ -193,6 +193,27 @@ final class MeaningCommandTests: XCTestCase {
     XCTAssertEqual(trained["episodes"] as? Int, 7)
   }
 
+  func testAnExamEpisodeIsNeverTrainedOn() throws {
+    // The same folder twice: once the exam episode t1 is marked, once it has no label at all.
+    // What is saved must not depend on it.
+    let marked = try folder()
+    let unmarked = try folder()
+    for made in [marked, unmarked] {
+      try Data("{\"episodes\": [\"t1\"]}".utf8).write(
+        to: made.folder.appendingPathComponent("exam.json"))
+    }
+    try FileManager.default.removeItem(at: unmarked.folder.appendingPathComponent("labels/t1.json"))
+    let first = run(["--min-episodes", "4"], marked.folder, embedder: marked.embedder)
+    let second = run(["--min-episodes", "4"], unmarked.folder, embedder: unmarked.embedder)
+    XCTAssertEqual(first.code, 0, first.err.joined())
+    XCTAssertEqual(second.code, 0, second.err.joined())
+    let trained = try XCTUnwrap(try written(marked.folder)["trained"] as? [String: Any])
+    XCTAssertEqual(trained["episodes"] as? Int, 7)
+    XCTAssertEqual(
+      try Data(contentsOf: marked.folder.appendingPathComponent("ad-meaning.json")),
+      try Data(contentsOf: unmarked.folder.appendingPathComponent("ad-meaning.json")))
+  }
+
   func testTheLabelsFolderCanBeNamed() throws {
     let made = try folder(labels: "labels-snapped")
     let plain = run(["--min-episodes", "4"], made.folder, embedder: made.embedder)

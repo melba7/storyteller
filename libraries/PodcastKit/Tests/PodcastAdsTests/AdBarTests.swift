@@ -109,13 +109,22 @@ final class AdBarTests: XCTestCase {
     XCTAssertEqual(result.noAdSkips, 0)
   }
 
+  /// The episode of thirty lines (300 seconds), which holds the marks of the next test.
+  private func longBar(_ truth: [(Double, Double)], found: [(Double, Double)]) -> BarTotals {
+    let episode = TeachingEpisode(
+      id: "e1", feed: "feed1", show: "Show One", title: "Title", transcript: makeTranscript(talk(30)),
+      truth: truth.map { TeachingTruth(start: $0.0, end: $0.1, sort: "sponsor") }, maybe: [],
+      onShelf: true)
+    return AdBar.score(episode: episode, found: found.map { foundAd($0.0, $0.1) })
+  }
+
   func testFirstThreeMinutesAreCountedApart() {
-    let result = bar(
+    let result = longBar(
       [(170, 180), (185, 200), (230, 250)], found: [(170, 180), (230, 250)])
     XCTAssertEqual(result.breaks, 3)
     XCTAssertEqual(result.earlyBreaks, 1)
     XCTAssertEqual(result.earlyPassed, 1)
-    let late = bar([(179, 200), (230, 250)], found: [(230, 250)])
+    let late = longBar([(179, 200), (230, 250)], found: [(230, 250)])
     XCTAssertEqual(late.breaks, 2)
     XCTAssertEqual(late.earlyBreaks, 1)
     XCTAssertEqual(late.earlyPassed, 0)
@@ -138,5 +147,37 @@ final class AdBarTests: XCTestCase {
     XCTAssertEqual(total.episodeSeconds, 200)
     XCTAssertEqual(total.noAdPerHour, 1 / (200.0 / 3600), accuracy: 1e-9)
     XCTAssertEqual(total.rate, 0.5, accuracy: 1e-9)
+  }
+
+  // MARK: Clipped to the episode (100 seconds long)
+
+  func testSkipsAndMarksAreCutToTheEpisode() {
+    // A skip from before the start over a break at the start cuts no show.
+    XCTAssertEqual(bar([(0, 20)], found: [(-10, 20)]).passed, 1)
+    // A skip past the end over a break at the end.
+    XCTAssertEqual(bar([(85, 100)], found: [(85, 110)]).passed, 1)
+    // A skip wholly after the end is no skip at all.
+    let after = bar([(20, 40)], found: [(20, 40), (100, 110)])
+    XCTAssertEqual(after.noAdSkips, 0)
+    XCTAssertEqual(after.noAdSeconds, 0)
+    // A mark that runs past the end is cut to it: 3 seconds of 80 to 100 are heard.
+    let result = bar([(80, 104.8)], found: [(83, 100)])
+    XCTAssertEqual(result.passed, 1)
+    let heardThree = bar([(80, 104.8)], found: [(86, 100)])
+    XCTAssertEqual(heardThree.count(.startsLate), 1)
+  }
+
+  // MARK: The cause when the heard time is too long
+
+  func testGapInsideIsOnlyForAGap() {
+    func cause(_ found: [(Double, Double)]) -> [String: Int] {
+      bar([(20, 40)], found: found).causes
+    }
+    // One skip, 4 s heard at each edge: nothing is heard between, so the bigger edge is named.
+    XCTAssertEqual(cause([(24, 36)]), ["startsLate": 1])
+    XCTAssertEqual(cause([(24, 38)]), ["startsLate": 1])
+    XCTAssertEqual(cause([(22, 36)]), ["stopsEarly": 1])
+    // A gap between the skips is still a gap inside, even with heard edges.
+    XCTAssertEqual(cause([(22, 26), (34, 38)]), ["gapInside": 1])
   }
 }
