@@ -152,15 +152,33 @@ class FitToolTests(Setup):
 
 
 class WithoutTheToolTests(unittest.TestCase):
-    def test_the_built_in_loop_says_its_result_is_weaker_and_still_writes_version_2(self):
+    def test_the_built_in_loop_writes_a_version_1_file(self):
         folder = toy_folder(self, 8)
         code, said = run(folder, "--min-episodes", "3")
         self.assertEqual(code, 0)
-        self.assertEqual(len([s for s in said if "weaker" in s]), 1)
         model = folder.read("ad-model.json")
-        self.assertEqual((model["version"], model["buckets"]), (2, 4194304))
-        self.assertEqual(model["trained"]["fitter"], "adagrad")
+        self.assertEqual((model["version"], model["buckets"]), (1, 262144))
+        self.assertNotIn("fitter", model["trained"])
         self.assertEqual(refusals(model), [])
+        self.assertEqual(len([s for s in said if s.startswith("Pass ")]), 5)
+        self.assertTrue(all(int(k) < 262144 for k in model["weights"]))
+
+
+class LeftoverFitFileTests(Setup):
+    def test_a_trainer_clears_the_fit_files_a_killed_one_left_and_only_those(self):
+        folder = toy_folder(self, 8)
+        for name in (".fit-abc123.txt", ".fit-x.txt"):
+            with open(folder.file(name), "w") as f:
+                f.write("left over")
+        for name in ("keep.txt", ".fit-notes.json", "fit-abc.txt", ".fitted-1.txt"):
+            with open(folder.file(name), "w") as f:
+                f.write("mine")
+        code, said = run(folder, "--min-episodes", "3")
+        self.assertEqual(code, 0, said)
+        self.assertFalse(os.path.exists(folder.file(".fit-abc123.txt")))
+        self.assertFalse(os.path.exists(folder.file(".fit-x.txt")))
+        for name in ("keep.txt", ".fit-notes.json", "fit-abc.txt", ".fitted-1.txt"):
+            self.assertTrue(os.path.exists(folder.file(name)), name)
 
 
 class ModelFileVersionTwoTests(unittest.TestCase):
@@ -192,10 +210,10 @@ class ModelFileVersionTwoTests(unittest.TestCase):
         self.assertEqual(sorted(model["weights"], key=int), ["9", "10", str(bias)])
 
 
-class CheckVersionTwoTests(unittest.TestCase):
+class CheckVersionTwoTests(Setup):
     def test_the_check_in_the_model_is_made_with_the_version_2_decoder(self):
         folder = toy_folder(self, 8)
-        run(folder, "--min-episodes", "3")
+        run(folder, "--min-episodes", "3", "--fit-tool", self.tool())
         model = folder.read("ad-model.json")
         weights = {int(k): v for k, v in model["weights"].items()}
         shelf = folder.read("shelf.json")["episodes"]

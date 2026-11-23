@@ -19,23 +19,27 @@ phone and lives in teach_features.py.
   the model is written. An episode that repeats a shelf episode (same feed key and guid, same audio
   SHA-256, or more than half of its 5-word runs the same, see teach_overlap.py) is left out of
   training, and the tool says how many.
-- The file is version 2: the features of version 1 plus the word pairs of the neighbouring lines, in
-  4194304 buckets, and the version 2 decoder for the check (see teach_features.py and teach_spans.py).
-- With --fit-tool (the built `podcast-teach`) the weights are fitted by `podcast-teach fit` (L-BFGS,
+- With --fit-tool (the built `podcast-teach`) the file is version 2: the features of version 1 plus
+  the word pairs of the neighbouring lines, in 4194304 buckets, checked with the version 2 decoder
+  (see teach_features.py and teach_spans.py). The weights are fitted by `podcast-teach fit` (L-BFGS,
   L2 with c 0.1, buckets in fewer than 3 lines ignored, each example's loss weighted by
   min(5, none count / class count); see teach_fit.py). The fitted bias is kept, with the "none"
   number raised when it would not call an empty line plain talk. A tool that fails is a set-up
-  problem (exit 2). Without it the built-in AdaGrad loop (rate 0.5, L2 of 1e-6 on the weights an
-  example touches, the same class weights) is used, and the result is weaker; its bias bucket is
-  fixed at plain talk (teach_model.BIAS_NONE) and never trained, because the many words of plain talk
-  used to carry its weight, which left a bias that said "ad" and a model the phone refuses. That loop
-  is deterministic for a given --seed.
+  problem (exit 2). At its start the trainer removes the `.fit-*.txt` files an earlier run killed
+  hard left in the folder.
+- Without it the trainer does what it did before version 2 existed and writes a version 1 file: the
+  version 1 features in 262144 buckets, at most 40,000 of them, and the version 1 decoder for the
+  check. Training is softmax regression with AdaGrad (rate 0.5, L2 of 1e-6 on the weights an example
+  touches, the same class weights). Its bias bucket is fixed at plain talk (teach_model.BIAS_NONE)
+  and never trained, because the many words of plain talk used to carry its weight, which left a
+  bias that said "ad" and a model the phone refuses. That loop is deterministic for a given --seed.
+  Version 2 is not trained this way: AdaGrad on version 2 features scored worse than version 1.
 - After training the shelf is scored and the numbers are printed and saved in the model under
   trained.heldOut: "episodes", "shows", "predictedAdSeconds" (what teach_publish.py needs before it
   publishes), "anyAd" (precision and recall in seconds of the spans the phone would cut, see
   teach_spans.py), and per line "lineAnyAd" and "classes". A ratio with nothing to divide by is null.
-- The model keeps at most 80,000 buckets (those with the biggest weights, the bias always) with weights
-  rounded to 4 places, and stays under 4.5 MB.
+- The model keeps at most 80,000 buckets (version 2) or 40,000 (version 1), those with the biggest
+  weights and the bias always, with weights rounded to 4 places, and stays under 4.5 MB.
 - With fewer than --min-episodes training episodes nothing is trained or written.
 
 Exit code: 0 it worked (also with too little data), 2 a set-up problem.
@@ -64,7 +68,8 @@ RATE = 0.5
 EPSILON = 1e-8
 L2 = 1e-6
 MODEL_FILE = "ad-model.json"
-MODEL_VERSION = 2
+MODEL_VERSION = 1  # of the file the built-in loop writes; the fit tool writes version 2
+FIT_MODEL_VERSION = 2
 CLASS_COUNT = len(CLASSES)
 
 
@@ -216,6 +221,16 @@ def fitted_weights(tool, folder, examples, size, say):
 
 # MARK: Run
 
+def remove_leftover_fits(folder):
+    """Deletes the .fit-*.txt example files (about 90 MB each) a trainer killed hard left behind.
+    Only files of that pattern are touched."""
+    for name in os.listdir(folder):
+        if name.startswith(".fit-") and name.endswith(".txt"):
+            path = os.path.join(folder, name)
+            if os.path.isfile(path) and not os.path.islink(path):
+                os.remove(path)
+
+
 def positive(text):
     try:
         number = int(text)
@@ -255,10 +270,15 @@ def main(argv, say=print, now=None):
             entries = teach_store.load_manifest(folder)
         except teach_store.ManifestError as error:
             raise teach_store.Problem(str(error))
+        if options.fit_tool:
+            version, size, most = FIT_MODEL_VERSION, BUCKETS_V2, MAX_BUCKETS_V2
+        else:
+            version, size, most = MODEL_VERSION, BUCKETS, MAX_BUCKETS
+        remove_leftover_fits(folder)
         old_shelf = read_shelf(folder)
         episodes = {}
         for entry in entries:
-            found = load_episode(folder, options.labels, entry, say, MODEL_VERSION, BUCKETS_V2)
+            found = load_episode(folder, options.labels, entry, say, version, size)
             if found:
                 episodes[entry["id"]] = found
         shelf = choose_shelf(entries, set(episodes), old_shelf)
@@ -280,18 +300,15 @@ def main(argv, say=print, now=None):
                     if c is not None]
         say("Training on %d episodes (%d lines), with %d on the shelf."
             % (len(learning), len(examples), len(shelved)))
-        extra = {}
+        extra = {}  # nothing extra is saved for the built-in loop, as before version 2
         if options.fit_tool:
-            flat, extra = fitted_weights(options.fit_tool, folder, examples, BUCKETS_V2, say)
+            flat, extra = fitted_weights(options.fit_tool, folder, examples, size, say)
         else:
-            say("No --fit-tool was given, so the built-in AdaGrad loop trains the model; its result "
-                "is weaker than the fit by podcast-teach.")
-            flat = train(examples, options.epochs, options.seed, say, BUCKETS_V2)
-            extra = {"fitter": "adagrad"}
+            flat = train(examples, options.epochs, options.seed, say, size)
         trained = dict({"writtenAt": now(), "episodes": len(learning), "lines": len(examples),
                         "shelf": len(shelved)}, **extra)
-        text = build_model(flat, trained, lambda kept: evaluate(kept, shelved, MODEL_VERSION),
-                           MAX_BUCKETS_V2, MAX_BYTES, MODEL_VERSION, BUCKETS_V2)
+        text = build_model(flat, trained, lambda kept: evaluate(kept, shelved, version),
+                           most, MAX_BYTES, version, size)
         path = os.path.join(folder, MODEL_FILE)
         write_text(path, text)
         if shelf != old_shelf:

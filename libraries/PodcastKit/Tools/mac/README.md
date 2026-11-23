@@ -457,6 +457,15 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
   how well it did on the shelf.
+  With `--fit-tool` (teach-finish.sh builds `podcast-teach` first and passes it) the
+  model is version 2: word pairs of the two lines before and after as features, fitted
+  by `podcast-teach fit`, and decoded with a second decoder in which the ad score
+  leaves credits out, credits get a second pass, and an ad's start widens back. A
+  widened line whose smoothed score is under `stay` takes the kind of the line before
+  it, as bridged lines do. Without the fit tool the trainer writes a version 1 file.
+  Warning: an app older than the build that reads version 2 refuses a version 2 file
+  and keeps the model it has, so update the phone's app before using the Mac's
+  version 2 trainer; without the fit tool the trainer still writes a version 1 file.
 - `ad-library.json`: every ad Claude marked with high confidence (at least 25
   words, 8 to 300 seconds), each different ad once, the ones met in most
   episodes first. An ad met in one episode only is in it too. The phone gets it.

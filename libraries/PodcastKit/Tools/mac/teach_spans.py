@@ -118,6 +118,9 @@ def one_pass(p, rows, starts, ends, thresholds, among, widen, blocked):
                 break
         a = i
         if widen:
+            # The check on the previous kept span cannot bind today: a span ends only where the next
+            # two smoothed scores are under `stay`, and a smoothed score is a mix of its neighbours,
+            # so the widening stops before it can reach an earlier span's last line. It is a safety.
             while a > 0 and p[a - 1] >= thresholds["stay"] and a - 1 > (found[-1][1] if found else -1):
                 a -= 1
         sorts = []

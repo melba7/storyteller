@@ -78,6 +78,9 @@ extension AdWordModel {
       }
       var a = i
       if widen {
+        // The check on the previous kept span cannot bind today: a span ends only where the next two
+        // smoothed scores are under `stay`, and a smoothed score is a mix of its neighbours, so the
+        // widening stops before it can reach an earlier span's last line. It is kept as a safety.
         while a > 0, p[a - 1] >= thresholds.stay, a - 1 > (found.last?.last ?? -1) { a -= 1 }
       }
       var sorts: [Int] = []

@@ -131,11 +131,32 @@ final class AdWordModelVersionTwoTests: XCTestCase {
     XCTAssertEqual(found.map(\.sort), ["sponsor"])
   }
 
-  func testWideningStopsAtThePreviousSpan() {
+  func testWideningStopsAtALineWhoseScoreIsZero() {
     let input = Array(repeating: row(0.95), count: 3) + Array(repeating: row(), count: 2) + [row(0.45)]
       + Array(repeating: row(0.95), count: 3)
     let found = AdWordModel.decodeTwo(rows: input, lines: numbered(9), thresholds: .init())
     XCTAssertEqual(found.map { [$0.firstLine, $0.lastLine] }, [[1, 3], [6, 9]])
+  }
+
+  // The same rows and answers are pinned in `test_teach_spans.py` (the two widening tests).
+
+  /// Line 2 has an own score of 0.45 (at `stay`) but a smoothed one of only 0.35, so only the own
+  /// score widens the span over it.
+  func testTheWideningUsesTheOwnScoreAndNotTheSmoothedOne() {
+    let input = [row(), row(0.45), row(0.5), row(1.0), row(1.0), row(), row(), row()]
+    let found = AdWordModel.decodeTwo(rows: input, lines: numbered(8), thresholds: .init())
+    XCTAssertEqual(found.map { [$0.firstLine, $0.lastLine] }, [[2, 5]])
+  }
+
+  /// With lines 3 seconds apart, lines 3 and 4 alone are 5 seconds long and not sure enough, and the
+  /// span is kept only because widening over line 2 makes it 8 seconds long.
+  func testTheKeptRuleIsJudgedOnTheWidenedSpan() {
+    let input = [row(), row(0.45), row(0.8), row(0.8), row(), row(), row()]
+    let close = (0..<input.count).map {
+      NumberedLine(number: $0 + 1, start: Double($0) * 3, end: Double($0) * 3 + 2, text: "")
+    }
+    let found = AdWordModel.decodeTwo(rows: input, lines: close, thresholds: .init())
+    XCTAssertEqual(found.map { [$0.firstLine, $0.lastLine] }, [[2, 4]])
   }
 
   func testBadRowsGiveNoSpans() {

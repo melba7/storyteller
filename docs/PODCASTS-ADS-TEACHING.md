@@ -154,7 +154,7 @@ the phone has linked.
 | `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
 | `teaching.json`      | `teach_publish.py`      | the six files' sizes and SHA-256, read first         |
 
-All are JSON objects with `"version": 1` and stay under 4.5 MB (the phone
+All are JSON objects with `"version": 1` (the word model may be 2) and stay under 4.5 MB (the phone
 refuses a file over 5 MB).
 
 - `ad-model.json`:
@@ -166,6 +166,19 @@ refuses a file over 5 MB).
   right for at least 0.85 of their seconds, and the phone would accept the file.
   `teach_spans.py` decodes spans exactly as `AdWordModel+Spans.swift` does;
   change neither without the other.
+  A model is version 1 (262144 buckets) or version 2 (4194304 buckets). Version 2
+  adds the word pairs of the two lines before and after as features, and decodes
+  with `AdWordModel+SpansTwo.swift` (and `decode_two` in `teach_spans.py`): the ad
+  score leaves credits out, credits get a second pass that never includes a line
+  inside an ad, and an ad's start widens back over lines whose own score is at
+  least `stay`. A widened line whose smoothed score is under `stay` takes the kind
+  of the line before it, as bridged lines do. `teach_train.py` writes version 2
+  only with `--fit-tool` (the built `podcast-teach`, which fits the weights);
+  without it the trainer writes a version 1 file as before.
+  **Warning:** an app older than the build that reads version 2 refuses a version
+  2 file and keeps the model it has, so update the phone's app before using the
+  Mac's version 2 trainer. Without the fit tool the trainer still writes a
+  version 1 file.
 - `ad-library.json`:
   `{"version", "writtenAt", "ads": [{"feed", "scope": "show" | "all", "sort", "who", "text", "length", "seen"}]}`.
   `teach_library.py` also writes `ad-library-score.json`, the same library built

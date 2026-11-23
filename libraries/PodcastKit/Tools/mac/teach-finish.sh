@@ -18,8 +18,8 @@
 #   7. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
 #   8. publish  (teach_publish.py)   copies the results to the folders the phone reads
 # A step that fails is said plainly and the later steps still run, except that the three Swift steps
-# (4, 5 and 6) are left out together when podcast-teach does not build (the model is then trained by
-# the weaker built-in loop). It ends with one line per
+# (4, 5 and 6) are left out together when podcast-teach does not build (the model is then trained the old
+# way, as version 1). It ends with one line per
 # step (worked, nothing to do, failed) and exits 0 when publish worked, 1 otherwise. It holds the
 # teaching folder's run lock for its whole length (it starts itself again under
 # `teach_store.py hold`), so a second window cannot gather, mark or train while it works. When
@@ -129,7 +129,7 @@ say
 say "Step 2 of 8: training the model that spots ads"
 # The fit of the model's weights is done by podcast-teach (Python is too slow for it), so it is built
 # first. The sounds, meaning and score steps below use the same build. When it cannot be built, the
-# model is trained by the weaker built-in loop and the Swift steps are left out.
+# model is trained the old way (a version 1 file) and the Swift steps are left out.
 KIT=""
 for CANDIDATE in "${TEACH_KIT:-$HERE/../..}" "$HOME/Storyteller Lofi/testflight-build/libraries/PodcastKit"; do
   if [ -f "$CANDIDATE/Package.swift" ]; then
@@ -150,7 +150,7 @@ fi
 if [ -n "$TEACH_TOOL" ]; then
   run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" --fit-tool "$TEACH_TOOL" $LABELS
 else
-  say "The model is trained without podcast-teach, so it will be weaker."
+  say "podcast-teach is not built, so the model was trained the old way (version 1)."
   run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" $LABELS
 fi
 
