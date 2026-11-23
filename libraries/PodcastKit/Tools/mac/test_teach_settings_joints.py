@@ -82,10 +82,85 @@ class SteadyTests(unittest.TestCase):
         self.assertFalse(choose(rows_of(base, only_steady))[0]["steadyJoints"])
         self.assertFalse(choose(rows_of(base, only_joints))[0]["steadyJoints"])
 
-    def test_steady_files_need_joints_to_be_on(self):
-        default = pair((500, 100), (400, 100))
+    def test_steady_files_are_off_when_joints_are_off(self):
+        default = pair((500, 100), (500, 100))
         self.assertEqual((default["joints"], default["steadyJoints"]), (False, False))
 
+
+class SteadyOnlyTests(unittest.TestCase):
+    """Most podcast files are steady: the plain joints row finds nothing there and the steady row does."""
+
+    def choose(self, joints, steady=None, episodes=3):
+        base = row(MEANING, whole=total(episodes, ad=1000, heard=500, cut=100))
+        rows = [base, row(JOINTS, whole=total(episodes, ad=1000, heard=joints[0], cut=joints[1]))]
+        if steady:
+            rows.append(row(STEADY, whole=total(episodes, ad=1000, heard=steady[0], cut=steady[1])))
+        return choose(rows_of(*rows))
+
+    def test_a_joints_row_that_finds_nothing_does_not_switch_joints_off_when_the_steady_row_pays(self):
+        # The joints row is equal to the row before it. The steady row catches 60 s more, no more wrong.
+        default, shows, lines = self.choose((500, 100), (440, 100))
+        self.assertEqual((default["joints"], default["steadyJoints"], shows), (True, True, []))
+        self.assertTrue(any("Joints are used in steady files too" in line for line in lines), lines)
+        self.assertFalse(any("Joints are off" in line for line in lines), lines)
+
+    def test_when_neither_row_pays_joints_and_steady_files_are_off(self):
+        default, _, lines = self.choose((500, 100), (500, 100))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (False, False))
+        self.assertTrue(any("Joints are off for every show" in line for line in lines), lines)
+        self.assertFalse(any("steady files too" in line.lower() and "used" in line for line in lines), lines)
+        # No steady row at all: the plain row alone decides, as before.
+        self.assertFalse(self.choose((500, 100))[0]["joints"])
+
+    def test_when_the_plain_row_pays_and_the_steady_row_adds_nothing_steady_files_stay_out(self):
+        default, _, lines = self.choose((440, 100), (440, 100))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, False))
+        self.assertFalse(any("steady files too" in line for line in lines), lines)
+
+    def test_a_steady_row_that_gains_with_too_many_wrong_seconds_does_not_save_the_joints(self):
+        # 60 s more caught, but 102 s cut by mistake on 100 s before: it does not pay, nor does the plain row.
+        default, _, _ = self.choose((500, 100), (440, 102))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (False, False))
+        # One in a hundred more is allowed.
+        default, _, _ = self.choose((500, 100), (440, 101))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, True))
+
+    def test_the_steady_row_has_to_pay_against_the_row_before_the_joints_row_not_against_the_joints_row(self):
+        # The plain row pays a little. The steady row beats it on right seconds but cuts 1 s over the
+        # allowance of the row before: it does not pay, so steady files stay out and joints stay on.
+        default, _, _ = self.choose((490, 100), (440, 102))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, False))
+
+    def test_when_only_the_steady_row_pays_it_is_the_one_that_is_used_even_if_it_is_no_better_than_plain(self):
+        # The plain row finds as much but cuts 10 percent more by mistake, so it does not pay. The
+        # steady row finds the same and cuts no more: joints on, with steady files too.
+        default, _, _ = self.choose((440, 110), (440, 100))
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, True))
+
+    def test_with_both_paying_steady_files_need_more_right_seconds_than_plain_and_not_more_wrong(self):
+        self.assertTrue(self.choose((490, 100), (480, 101))[0]["steadyJoints"])
+        self.assertFalse(self.choose((490, 100), (480, 102))[0]["steadyJoints"])
+        self.assertFalse(self.choose((490, 100), (490, 100))[0]["steadyJoints"])
+
+    def test_the_wrong_allowance_of_steady_files_is_measured_against_the_plain_joints_row(self):
+        # The plain row cuts 50 s by mistake (the row before 100 s). The steady row pays against the row
+        # before, but may cut only one in a hundred more than the plain row: 50.5 s, not 51 s.
+        self.assertTrue(self.choose((490, 50), (480, 50.5))[0]["steadyJoints"])
+        self.assertFalse(self.choose((490, 50), (480, 51))[0]["steadyJoints"])
+
+    def test_fewer_than_three_marked_episodes_change_nothing(self):
+        default, _, _ = self.choose((500, 100), (440, 100), episodes=2)
+        self.assertEqual((default["joints"], default["steadyJoints"]), (True, False))
+
+    def test_a_show_whose_plain_joints_row_is_flat_keeps_joints_when_steady_files_pay(self):
+        base = row(MEANING, show(FEED_A, ad=1000, heard=500, cut=1000), show(FEED_B, ad=1000, heard=500, cut=1000))
+        joints = row(JOINTS, show(FEED_A, ad=1000, heard=500, cut=1000), show(FEED_B, ad=1000, heard=500, cut=1000))
+        steady = row(STEADY, show(FEED_A, ad=1000, heard=450, cut=1000), show(FEED_B, ad=1000, heard=450, cut=1000))
+        default, shows, _ = choose(rows_of(base, joints, steady))
+        self.assertEqual((default["joints"], default["steadyJoints"], shows), (True, True, []))
+
+
+class SteadyPerShowTests(unittest.TestCase):
     def test_a_show_where_the_steady_row_does_worse_than_the_joints_row_is_off_for_steady(self):
         base = row(MEANING, show(FEED_A, ad=1000, heard=500, cut=1000), show(FEED_B, "Show B", ad=1000, heard=500, cut=1000))
         joints = row(JOINTS, show(FEED_A, ad=1000, heard=400, cut=1000), show(FEED_B, "Show B", ad=1000, heard=400, cut=1000))

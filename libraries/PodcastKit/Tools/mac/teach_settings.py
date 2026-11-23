@@ -23,12 +23,15 @@ it. Right seconds are adSeconds - heardSeconds, wrong seconds are cutSeconds. Th
 - Two undone skips of a finder on a show among its last five answers in the notes (the last 30 days)
   make it ask there; two "not an ad" answers among the last five turn it off there. Same rule as the
   phone's own finder guard.
-- Joints stay on over all shows only if the "Plus joints" row has more right seconds than the row
-  before it and at most one in a hundred more wrong seconds; otherwise they are off everywhere. On a
-  show where the row adds more wrong than right seconds they are off for that show.
-- Steady files get joints too only when joints are on and the "Plus joints (steady files too)" row
-  has more right seconds than "Plus joints" and at most one in a hundred more wrong seconds. A show
-  where that row adds more wrong than right seconds over "Plus joints" gets "steadyJoints": false.
+- Joints stay on over all shows when the "Plus joints" row OR the "Plus joints (steady files too)" row
+  has more right seconds than the row before "Plus joints" and at most one in a hundred more wrong
+  seconds (most podcast files are steady, and on those the plain row finds nothing); when neither does
+  they are off everywhere. On a show where the plain row adds more wrong than right seconds they are
+  off for that show.
+- Steady files get joints too ("steadyJoints") when the steady row pays by that test and, if the plain
+  row pays as well, has more right seconds than it and at most one in a hundred more wrong ones. A
+  show where the steady row adds more wrong than right seconds over "Plus joints" gets
+  "steadyJoints": false.
 This tool never raises a finder to "skip": a listener's "yes" does not change this file or a level,
 it only teaches the phone's own memory. Only the settings are written, to the teaching folder; the
 phone's notes are only read. A scorecard without rows (an older file) gives the plain default.
@@ -137,29 +140,47 @@ def choose(rows, notes, now):
             if index > 0:
                 pairs[what] = (row, rows[index - 1])
     for what, (row, before) in pairs.items():
-        if what != "steady-joints" and row.total.episodes >= MIN_EPISODES:
+        if what not in ("joints", "steady-joints") and row.total.episodes >= MIN_EPISODES:
             overall(what, row, before, default, lines)
-    joints, steady = named.get("joints"), named.get("steady-joints")
-    if default["joints"] and joints and steady and joints.total.episodes >= MIN_EPISODES:
-        right, wrong = gained(steady.total, joints.total)
-        if right > EPSILON and steady.total.wrong * 100 <= joints.total.wrong * WRONG_ALLOWED_PERCENT:
-            default["steadyJoints"] = True
-            lines.append("Joints are used in steady files too: they found %s more of the ads and cut %s "
-                         "more of show by mistake." % (signed(right), signed(wrong)))
+    over_joints(named, pairs, default, lines)
     return default, entries(rows, pairs, named, answers(notes, now, FINDERS), default, lines), lines
 
 
+def over_joints(named, pairs, default, lines):
+    """Judges the joints over all shows. Most podcast files are steady, and there the plain "Plus joints"
+    row finds nothing, so joints stay on when EITHER that row OR the "(steady files too)" row pays against
+    the row before "Plus joints"; they go off only when neither does. Steady files are used too when the
+    steady row pays and, if the plain row pays as well, finds more than it for at most the allowed wrong."""
+    joints, steady = named.get("joints"), named.get("steady-joints")
+    if "joints" not in pairs or joints.total.episodes < MIN_EPISODES:
+        return
+    before = pairs["joints"][1]
+    plain_pays = joints_pay(joints, before)
+    steady_pays = bool(steady) and joints_pay(steady, before)
+    if not plain_pays and not steady_pays:
+        right, wrong = gained(joints.total, before.total)
+        text = "Joints are off for every show: over %d marked episodes they found %s more of the ads and " \
+            "cut %s more of show by mistake" % (joints.total.episodes, signed(right), signed(wrong))
+        if steady:
+            right, wrong = gained(steady.total, before.total)
+            text += " (%s and %s with steady files too)" % (signed(right), signed(wrong))
+        default["joints"] = False
+        lines.append(text + ", which is not a clear gain.")
+    elif steady_pays:
+        compared = joints if plain_pays else before
+        right, wrong = gained(steady.total, compared.total)
+        if not plain_pays or (right > EPSILON
+                              and steady.total.wrong * 100 <= joints.total.wrong * WRONG_ALLOWED_PERCENT):
+            default["steadyJoints"] = True
+            lines.append("Joints are used in steady files too: they found %s more of the ads and cut %s "
+                         "more of show by mistake." % (signed(right), signed(wrong)))
+
+
 def overall(what, row, before, default, lines):
-    """Changes the default block for the finder (or the joints) `what`, judged over all shows."""
+    """Changes the default block for the finder `what`, judged over all shows."""
     right, wrong = gained(row.total, before.total)
     episodes = row.total.episodes
-    if what == "joints":
-        if not joints_pay(row, before):
-            default["joints"] = False
-            lines.append("Joints are off for every show: over %d marked episodes they found %s more of the "
-                         "ads and cut %s more of show by mistake, which is not a clear gain."
-                         % (episodes, signed(right), signed(wrong)))
-    elif worse(right, wrong):
+    if worse(right, wrong):
         default["finders"][what] = "off"
         lines.append("%s is off for every show: over %d marked episodes it %s."
                      % (what, episodes, cost(right, wrong)))
