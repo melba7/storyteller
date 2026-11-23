@@ -135,9 +135,10 @@ final class PodcastFinderGuard: @unchecked Sendable {
   /// Waits for iOS to hold time for the app and, once it does, writes the marks of `finders` for
   /// this episode and runs `work` on this thread. The marks are ended and saved when `work`
   /// returns, before the time is given back. Nil, and `work` does not run, when iOS did not grant
-  /// the time or no mark could be written. `work` gets the finders that have a mark (it must run
-  /// no others) and the flag that says the time is up. No mark is on disk while the app waits: a
-  /// suspension or a kill in that gap is no crash of a finder.
+  /// the time (a refusal ends the wait at once) or no mark could be written. `work` gets the
+  /// finders that have a mark (it must run no others) and the flag that says the time is up. No
+  /// mark is on disk while the app waits: a suspension or a kill in that gap is no crash of a
+  /// finder.
   func hold<T>(
     _ finders: [String], episode: String, reason: String? = nil, _ work: (Held) -> T
   ) -> T? {
@@ -158,13 +159,15 @@ final class PodcastFinderGuard: @unchecked Sendable {
       if expired {
         // The time is up: ask the finder to stop, and clear every mark before it is given back.
         expireAll()
+        // Nothing was granted before this: iOS refused, and `hold` need not wait for it.
+        if granted.refuse() { started.signal() }
         return
       }
       guard granted.take() else { return }
       started.signal()
       finished.wait()
     }
-    guard started.wait(timeout: .now() + grantSeconds) == .success else {
+    guard started.wait(timeout: .now() + grantSeconds) == .success, !granted.wasRefused else {
       // The block may have begun just now: it is waiting, so let it go.
       if granted.cancel() { finished.signal() }
       return nil
@@ -258,11 +261,12 @@ private final class Granted: @unchecked Sendable {
   private let lock = NSLock()
   private var begun = false
   private var cancelled = false
+  private var refused = false
 
   /// True once, as long as `cancel` was not called first.
   func take() -> Bool {
     lock.withLock {
-      guard !cancelled, !begun else { return false }
+      guard !cancelled, !begun, !refused else { return false }
       begun = true
       return true
     }
@@ -275,4 +279,16 @@ private final class Granted: @unchecked Sendable {
       return begun
     }
   }
+
+  /// iOS called the activity as expired before it began: nothing was granted. True the first
+  /// time, and only when it had not begun.
+  func refuse() -> Bool {
+    lock.withLock {
+      guard !begun, !cancelled, !refused else { return false }
+      refused = true
+      return true
+    }
+  }
+
+  var wasRefused: Bool { lock.withLock { refused } }
 }

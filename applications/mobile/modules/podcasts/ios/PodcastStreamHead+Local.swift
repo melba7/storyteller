@@ -95,7 +95,10 @@ extension PodcastStreamHead {
       }
       return (old, added, moved)
     }
-    guard let made else { return unchanged }
+    guard let made else {
+      PodcastTimeline.mark(episodeId, "head: no time held")
+      return unchanged
+    }
     if !made.own.isEmpty || made.moved > 0 {
       PodcastTimeline.mark(
         episodeId, "head: \(made.own.count) own sounds, \(made.moved) borders on joints")
