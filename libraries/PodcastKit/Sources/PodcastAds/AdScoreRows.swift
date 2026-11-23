@@ -24,8 +24,9 @@ public struct ScoreExtras: Sendable {
   }
 }
 
-/// The ads the word rules and the word model give for a whole episode, before any join: what tells
-/// the joint rows (which only look at a whole episode) which ads with no source may be pulled back to a joint (`JointPull`).
+/// The ads the word rules and the word model give for a whole episode, before any join. They tell
+/// the joint rows (which only look at a whole episode) which ads with no source may be pulled back
+/// to a joint (`JointPull`).
 public typealias ScoreWords = @Sendable (AdScoreInput) -> [FoundAd]
 
 /// The rows to add after the detectors, in the round's order, and what to say about the rest.
