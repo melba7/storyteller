@@ -292,8 +292,9 @@ Native module `LofiScore` (`modules/lofi-score`):
   or two undone skips.
 - There is no switch for a finder in the app. To go back to how ads were skipped
   before this round, install build 33.1 again from the build list in TestFlight;
-  the files the new finders wrote are only read by the new build, and the old
-  build ignores them.
+  the files the new finders wrote have only new fields, which the old build
+  skips over (it may lose the habits of shows it learned about in the new
+  build).
 
 ## Measuring
 
