@@ -66,7 +66,9 @@ describe("askNoteShown", () => {
   })
 
   it("is shown a moment before the start, because the screen's clock may be behind", () => {
-    expect(askNoteShown(note, "e1", 600 - ASK_LEAD_SECONDS + 0.1)).toBe(true)
+    expect(ASK_LEAD_SECONDS).toBe(2)
+    expect(askNoteShown(note, "e1", 598.5)).toBe(true)
+    expect(askNoteShown(note, "e1", 598)).toBe(true)
   })
 
   it("is gone once the playhead is at or past the end", () => {
@@ -75,7 +77,7 @@ describe("askNoteShown", () => {
   })
 
   it("is gone after a seek back to well before the stretch", () => {
-    expect(askNoteShown(note, "e1", 600 - ASK_LEAD_SECONDS - 0.1)).toBe(false)
+    expect(askNoteShown(note, "e1", 597.9)).toBe(false)
     expect(askNoteShown(note, "e1", 0)).toBe(false)
   })
 

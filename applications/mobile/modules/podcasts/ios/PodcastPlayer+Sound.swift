@@ -158,12 +158,13 @@ final class PodcastSound {
     }
   }
 
-  /// The sure and unsure ads, which the ad skipping owns (it skips both): the final file's, else
-  /// the partial one's.
+  /// The sure and unsure ads, which the ad skipping owns (it skips both), and the questions that
+  /// are still open (a jump over the start of one would lose it): the final file's, else the
+  /// partial one's.
   private func avoidedStretches() -> [ClosedRange<Double>] {
     guard let file = adsStore?.best(detector: PodcastAdFinder.detectorName) else { return [] }
-    return file.ads.filter { $0.confidence >= .unsure && $0.end > $0.start }
-      .map { $0.start...$0.end }
+    return (file.ads.filter { $0.confidence >= .unsure && $0.end > $0.start }
+      + AdAsking.open(in: file)).map { $0.start...$0.end }
   }
 
   // MARK: Markers

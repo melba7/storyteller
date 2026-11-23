@@ -30,6 +30,10 @@ function subscribe(listener: () => void): () => void {
   return notes.subscribe(listener)
 }
 
+// Listens from the moment the app loads this file, not when the full player first opens: an
+// event that comes while nothing listens is dropped, and a question can be asked before then.
+start()
+
 /**
  * The question to show now, or null: only while the playhead is in its stretch of the loaded
  * episode. A note that is over stays out of the store too, so a seek back to it later does not

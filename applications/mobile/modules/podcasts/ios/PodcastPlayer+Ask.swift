@@ -19,6 +19,10 @@ import PodcastAds
 /// An answer names its question by the start the app was told; this much off still counts (the
 /// same as `AdAsking`'s own rule).
 private let askStartTolerance = 0.5
+/// A question is asked from this long (seconds) before its start: a boundary marker can be told
+/// a hair early (the clock's rounding, as `AdSkipper.reached` allows too), and nothing polls, so
+/// a callback that came too early would lose the question for this playback.
+private let askLead = 0.5
 
 /// Watches the questions of the loaded episode and tells the app when the playhead enters one.
 @MainActor
@@ -60,20 +64,18 @@ final class PodcastAsking {
     return AdAsking.live(in: file, at: time)
   }
 
-  /// The playhead was moved to `position` by a seek. A question it is no longer in is announced
-  /// again when it gets in (a seek back before it, or past it and back).
-  func seeked(to position: Double) {
-    guard let file else { return }
-    let inside = AdAsking.open(in: file).filter { $0.start <= position && position < $0.end }
-    announced.formIntersection(inside.map(\.start))
-  }
-
   /// Tells the app about the question the playhead is in, once. While a seek is on its way the
-  /// playhead still reads the old place: the seek's landing looks again.
+  /// playhead still reads the old place: the seek's landing looks again. Only a question that
+  /// holds the playhead stays announced, so every move that leaves one (a seek, Start over, the
+  /// rewind after a long pause) lets it be asked again when the playhead gets in.
   private func look() {
-    guard let episodeId, !owner.seekPending, let ask = live(at: owner.position),
-      !announced.contains(ask.start)
-    else { return }
+    guard let episodeId, !owner.seekPending, let file else { return }
+    let position = owner.position
+    let held = AdAsking.open(in: file).filter {
+      $0.start - askLead <= position && position < $0.end
+    }
+    announced.formIntersection(held.map(\.start))
+    guard let ask = held.first, !announced.contains(ask.start) else { return }
     announced.insert(ask.start)
     owner.sink?(
       "onAdAsk",
@@ -111,13 +113,17 @@ extension PodcastAdSkipping {
   ///
   /// The question's own `source` (the finder that made it) is read before the answer, because a
   /// yes replaces it with "tap". It goes into the note's `by`, which is how the Mac learns which
-  /// finder was right, and to the finder (`learnAnswered`, after a yes and after a no that was
+  /// finder was right, and to the finder (`learnAnswered`, only after a yes or a no that was
   /// saved), which does the learning of its own: the known ads, its guard and the repeated words.
   func answerQuestion(episodeId id: String, start: Double, isAd: Bool) -> Bool {
     guard id == episodeId, let store,
       let file = store.best(detector: PodcastAdFinder.detectorName),
       let ask = AdAsking.open(in: file).first(where: { abs($0.start - start) < askStartTolerance })
-    else { return false }
+    else {
+      // An ad was written over the question since the note appeared: a yes still skips, as the
+      // Skip ad button does, when the playhead is in an ad.
+      return isAd && id == episodeId && skipAdNow(onlyInAd: true) != nil
+    }
     let finder = ask.source
     let answered = AdAsking.answer(
       store: store, detector: PodcastAdFinder.detectorName, askStart: ask.start, isAd: isAd)
@@ -135,8 +141,9 @@ extension PodcastAdSkipping {
     var ad = answered ?? ask
     ad.confidence = .sure
     ad.source = AdAsking.source
-    note(.confirmed, start: ad.start, end: ad.end, kind: ad.kind, by: finder)
+    // What could not be saved is not noted, and the question can be answered again.
     if answered != nil {
+      note(.confirmed, start: ad.start, end: ad.end, kind: ad.kind, by: finder)
       PodcastAdFinder.shared.learnAnswered(
         id, source: finder, start: ad.start, end: ad.end, isAd: true)
     }

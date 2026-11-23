@@ -17,10 +17,11 @@ import PodcastTranscripts
 @MainActor
 final class PodcastAdSkipping {
   // Not private: the answers to questions (PodcastPlayer+Ask.swift) skip and note like any skip.
+  // Only `skipper` is writable from there (a skip is noted on it); the rest is read.
   unowned let owner: PodcastPlayer
   var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
-  var store: AdsStore?
-  var episodeId: String?
+  private(set) var store: AdsStore?
+  private(set) var episodeId: String?
   private var observer: Any?
   /// The last skip that was counted and noted in this episode (see `jump`).
   private var lastNoted = NotedSkip()
@@ -112,7 +113,6 @@ final class PodcastAdSkipping {
     }
     PodcastSkipLogger.shared.seeked(to: position, knownAds: skipper.ads)
     skipper.seeked(to: position)
-    asking.seeked(to: position)
   }
 
   /// Tells the app that the loaded episode's saved ads changed (a trim), so the seek bar's marks
@@ -270,17 +270,14 @@ final class PodcastAdSkipping {
   /// an automatic skip (the playhead is at its end), a skip of the known ad the playhead is in
   /// (with its note, stats and Undo, as an automatic skip), or a jump 30 seconds ahead that
   /// notes a miss. The jump is the player's own move, so it is no seek of the listener's: it
-  /// cannot save a trim of an earlier ad and it leaves an end-of-chapter sleep timer alone. Inside
-  /// a question the phone asked (PodcastPlayer+Ask.swift) the tap is the answer "yes".
-  func skipAdNow() -> (to: Double, known: Bool)? {
+  /// cannot save a trim of an earlier ad and it leaves an end-of-chapter sleep timer alone. Where
+  /// no ad is known and the playhead is inside a question the phone asked (PodcastPlayer+Ask.swift)
+  /// the tap is the answer "yes" instead of a miss. With `onlyInAd`, only the skip of a known ad
+  /// is made and any other tap does nothing and gives nil (the answer "yes" to a question that an
+  /// ad has covered since).
+  func skipAdNow(onlyInAd: Bool = false) -> (to: Double, known: Bool)? {
     guard let episodeId, owner.current != nil else { return nil }
     let place = owner.place
-    // Inside a question the phone asked, the button is the answer "yes, skip it".
-    if let ask = asking.live(at: place),
-      answerQuestion(episodeId: episodeId, start: ask.start, isAd: true)
-    {
-      return (owner.place, true)
-    }
     let recent = skipper.lastSkip
     let action = AdSkipNow.decide(
       position: place, duration: owner.currentDuration,
@@ -288,12 +285,19 @@ final class PodcastAdSkipping {
       lastSkip: recent?.skip, lastSkipAge: recent.map { now - $0.at } ?? .infinity)
     switch action {
     case .nothing(let at):
+      if onlyInAd { return nil }
       return (at, true)
     case .skip(let skip):
       skipper.noteSkip(skip, now: now)
       jump(skip, from: place)
       return (skip.target, true)
     case .miss(let to):
+      if onlyInAd { return nil }
+      if let ask = asking.live(at: place),
+        answerQuestion(episodeId: episodeId, start: ask.start, isAd: true)
+      {
+        return (owner.place, true)
+      }
       note(.missed, start: place, end: to, kind: nil)
       owner.movePlayheadByPlayer(to: to)
       return (to, false)

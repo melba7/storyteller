@@ -52,6 +52,18 @@ beforeEach(() => {
 })
 
 describe("useAskNote", () => {
+  it("listens as soon as the module is loaded, before any screen uses the hook", async () => {
+    await load()
+    expect(listeners.has("onAdAsk")).toBe(true)
+    expect(listeners.has("onAdSkipped")).toBe(true)
+  })
+
+  it("keeps a question asked before the full player was opened", async () => {
+    const { useAskNote } = await load()
+    listeners.get("onAdAsk")?.(asked)
+    expect(useAskNote()).toEqual(asked)
+  })
+
   it("shows nothing until the phone asks", async () => {
     const { useAskNote } = await load()
     expect(useAskNote()).toBeNull()
