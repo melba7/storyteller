@@ -51,14 +51,16 @@ from teach_truth import COPIES, LABELS, save_bytes, truth_path
 
 MAX_EPISODES = 40
 MAX_GB = 3
+MOST_EPISODES = 100_000  # the biggest --max that is taken
+MOST_GB = 1000  # the biggest --max-gb that is taken
 GB = 1_000_000_000
 LIMIT_REACHED = 3
 LEFTOVER = re.compile(r"^[0-9a-f]{12}\.(second|first)\.|\.part$")
 
 
 def positive_int(text):
-    if not re.fullmatch(r"[0-9]{1,9}", text) or int(text) < 1:
-        raise argparse.ArgumentTypeError("%r is not a whole number of 1 or more" % text)
+    if not re.fullmatch(r"[0-9]{1,9}", text) or not 1 <= int(text) <= MOST_EPISODES:
+        raise argparse.ArgumentTypeError("%r is not a whole number from 1 to %d" % (text, MOST_EPISODES))
     return int(text)
 
 
@@ -67,8 +69,8 @@ def positive_number(text):
         value = float(text)
     except ValueError:
         value = math.nan
-    if not math.isfinite(value) or value <= 0:
-        raise argparse.ArgumentTypeError("%r is not a number above 0" % text)
+    if not 0 < value <= MOST_GB:  # also false for nan, and inf is over the most
+        raise argparse.ArgumentTypeError("%r is not a number above 0 and at most %d" % (text, MOST_GB))
     return value
 
 

@@ -296,7 +296,3 @@ class FailureTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-if __name__ == "__main__":
-    unittest.main()

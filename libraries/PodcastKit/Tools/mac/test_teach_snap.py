@@ -114,7 +114,7 @@ class SnapTests(Base):
         found = self.snapped()["segments"]
         self.assertEqual([(s["start"], s["end"]) for s in found], [(30.0, 60.0), (200.0, 230.0)])
         added = found[1]
-        self.assertEqual((added["sort"], added["confidence"], added["who"]), ("sponsor", "high", ""))
+        self.assertEqual((added["sort"], added["confidence"], added["who"]), ("sponsor", "medium", ""))
         self.assertEqual(added["origin"], "copy")
         self.assertEqual((added["first"], added["last"]), (41, 46))
         self.assertIn(added["delivery"], ("host", "spot", "unsure"))
@@ -141,25 +141,15 @@ class SnapTests(Base):
         self.run_main()
         self.assertTrue(teach_train.valid_label(self.snapped()))
 
-    def test_two_labels_of_one_ad_become_one_with_the_biggest_ones_sort(self):
-        self.label([segment(7, 16, 30.0, 50.0, who="Acme"),
-                    segment(17, 18, 50.0, 60.0, sort="host_ask", who="")])
-        self.truth(("0:31.000", "1:01.000"))
-        self.run_main()
-        found = self.snapped()["segments"]
-        self.assertEqual(len(found), 1)
-        self.assertEqual((found[0]["sort"], found[0]["who"]), ("sponsor", "Acme"))
-        self.assertEqual((found[0]["start"], found[0]["end"]), (31.0, 61.0))
-        self.assertIn("joined", self.text())
-
     def test_a_label_that_is_half_in_two_stretches_goes_to_the_earlier_one(self):
         self.label([segment(7, 12, 30.0, 60.0)])
         self.truth(("0:20.000", "0:45.000"), ("0:45.000", "1:20.000"))
         self.run_main()
         found = self.snapped()["segments"]
+        # The label grows to the start of the earlier stretch but is not cut back by 15 s at its end.
         # The later stretch is only 15 s of its 35 s inside the label, so it was not marked.
         self.assertEqual([(s["start"], s["end"], s.get("origin")) for s in found],
-                         [(20.0, 45.0, None), (45.0, 80.0, "copy")])
+                         [(20.0, 60.0, None), (45.0, 80.0, "copy")])
 
     def test_the_figures_say_how_many_borders_moved_and_by_how_much(self):
         self.label([segment(7, 12, 30.0, 60.0)])
@@ -182,142 +172,101 @@ class SnapTests(Base):
         self.assertIn("No border moved", self.text())
 
 
-class UnchangedTests(Base):
-    def test_an_episode_without_a_truth_file_is_copied_byte_for_byte(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.assertEqual(self.run_main(), 0)
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), self.raw("labels", self.id + ".json"))
-        self.assertIn("1 had no second download", self.text())
-
-    def test_a_truth_file_with_no_stretch_leaves_the_label_as_it_was_and_says_why(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.write("copies/%s.truth.txt" % self.id, HEADER + "# The two files have no frame in common\n")
-        self.run_main()
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), self.raw("labels", self.id + ".json"))
-        self.assertIn("the same ads", self.text())
-        self.assertIn("nothing is learned", self.text())
-
-    def test_a_stretch_that_changes_nothing_leaves_the_label_as_it_was(self):
-        self.label([segment(21, 80, 100.0, 400.0)])
-        self.truth(("3:20.000", "3:50.000"))
-        self.run_main()
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), self.raw("labels", self.id + ".json"))
-
-    def test_a_truth_file_that_cannot_be_read_leaves_the_label_as_it_was(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.write("copies/%s.truth.txt" % self.id, "this is not a truth file\n")
-        self.assertEqual(self.run_main(), 0)
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), self.raw("labels", self.id + ".json"))
-        self.assertIn(self.id, self.text())
-        self.assertIn("not two times", self.text())
-
-    def test_a_label_that_cannot_be_read_is_copied_as_it_is_and_said(self):
-        self.write("labels/%s.json" % self.id, "{broken")
-        self.truth(("0:33.480", "1:02.120"))
-        self.assertEqual(self.run_main(), 0)
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), b"{broken")
-        self.assertIn("could not be read", self.text())
-
-    def test_a_label_with_odd_segments_does_not_stop_the_run(self):
-        odd = [None, 5, {"sort": "sponsor"}, {"sort": "sponsor", "start": "a", "end": 3},
-               {"sort": "sponsor", "start": float("inf"), "end": float("inf")},
-               {"sort": "sponsor", "start": 50.0, "end": 40.0}, segment(7, 12, 30.0, 60.0)]
-        self.write("labels/%s.json" % self.id, json.dumps({"segments": odd, "length": 600}))
-        self.truth(("0:33.480", "1:02.120"))
-        self.assertEqual(self.run_main(), 0)
-        found = self.snapped()["segments"]
-        self.assertEqual(found[:6], odd[:6])
-        self.assertEqual((found[-1]["start"], found[-1]["end"]), (33.48, 62.12))
-
-    def test_without_a_transcript_borders_move_but_lines_stay_and_nothing_is_added(self):
-        os.remove(self.folder.path("transcripts", self.id + ".txt"))
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.truth(("0:33.480", "1:02.120"), ("3:20.000", "3:50.000"))
+class NeverJoinTests(Base):
+    def test_labels_in_one_stretch_are_never_joined_only_the_outer_borders_move(self):
+        # A break where every slot differs is one stretch; each advertiser keeps its own label.
+        labels = [segment(61, 66, 300.0, 330.0, who="Acme"), segment(67, 73, 330.0, 365.0, who="Shoe Co"),
+                  segment(74, 79, 365.0, 395.0, sort="network_promo", who="Other Show trailer")]
+        self.label(labels)
+        self.truth(("4:59.200", "6:35.400"))
         self.run_main()
         found = self.snapped()["segments"]
-        self.assertEqual([(s["first"], s["last"], s["start"], s["end"]) for s in found], [(7, 12, 33.48, 62.12)])
+        self.assertEqual([(s["start"], s["end"]) for s in found],
+                         [(299.2, 330.0), (330.0, 365.0), (365.0, 395.4)])
+        for new, old in zip(found, labels):
+            for key in ("sort", "who", "delivery", "confidence", "why"):
+                self.assertEqual(new[key], old[key])
+        self.assertIn("Borders moved: 2 (median 0.6 s)", self.text())
+        self.assertNotIn("joined", self.text())
+        self.assertIn("Stretches Claude had not marked: 0", self.text())
 
-
-class FolderTests(Base):
-    def test_claudes_own_labels_are_never_changed(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        other = "%012x" % 2
-        self.label([segment(1, 3, 0.0, 15.0)], identifier=other)
-        self.truth(("0:33.480", "1:02.120"), ("3:20.000", "3:50.000"))
-        before = {name: hashlib.sha256(self.raw("labels", name)).hexdigest() for name in os.listdir(self.folder.path("labels"))}
-        self.assertEqual(self.run_main(), 0)
-        after = {name: hashlib.sha256(self.raw("labels", name)).hexdigest() for name in os.listdir(self.folder.path("labels"))}
-        self.assertEqual(before, after)
-        self.assertEqual(sorted(os.listdir(self.folder.path("labels-snapped"))), sorted(before))
-
-    def test_every_label_gets_a_snapped_one(self):
-        ids = ["%012x" % n for n in range(1, 6)]
-        for identifier in ids:
-            self.label([segment(7, 12, 30.0, 60.0)], identifier=identifier)
+    def test_two_labels_in_one_stretch_stay_two_with_their_own_sort_and_who(self):
+        self.label([segment(7, 16, 30.0, 50.0, who="Acme"), segment(17, 18, 50.0, 60.0, sort="host_ask", who="")])
+        self.truth(("0:31.000", "1:01.000"))
         self.run_main()
-        self.assertEqual(sorted(os.listdir(self.folder.path("labels-snapped"))), sorted(i + ".json" for i in ids))
+        found = self.snapped()["segments"]
+        self.assertEqual([(s["start"], s["end"], s["sort"], s["who"]) for s in found],
+                         [(31.0, 50.0, "sponsor", "Acme"), (50.0, 61.0, "host_ask", "")])
 
-    def test_files_that_are_not_labels_are_left_alone(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.write("labels/notes.txt", "x")
-        self.write("labels/.%s.part" % self.id, "x")
+
+class InwardTests(Base):
+    """A border may grow to the stretch's, but never moves inward by more than 10 s."""
+
+    def test_a_label_does_not_shrink_to_the_later_of_two_stretches(self):
+        self.label([segment(25, 36, 120.0, 180.0)])
+        self.truth(("2:00.000", "2:20.000"), ("2:25.000", "3:00.000"))
         self.run_main()
-        self.assertEqual(os.listdir(self.folder.path("labels-snapped")), [self.id + ".json"])
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(120.0, 180.0)])
+        self.assertIn("No border moved", self.text())
+        self.assertIn("Stretches Claude had not marked: 0", self.text())
 
-    def test_a_snapped_label_whose_label_is_gone_is_removed(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
+    def test_a_label_does_not_shrink_past_a_baked_in_ad_that_both_downloads_have(self):
+        self.label([segment(25, 38, 120.0, 190.0)])  # a shared ad 2:00 to 2:30, then a slot
+        self.truth(("2:30.000", "3:10.000"))
         self.run_main()
-        os.rename(self.folder.path("labels", self.id + ".json"), self.folder.path("moved.json"))
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(120.0, 190.0)])
+        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), self.raw("labels", self.id + ".json"))
+
+    def test_the_limit_is_10_s_inward_and_does_not_apply_outward(self):
+        self.label([segment(21, 28, 100.0, 140.0)])
+        self.truth(("1:30.000", "2:10.000"))  # the end is 10 s inward: allowed
         self.run_main()
-        self.assertEqual(os.listdir(self.folder.path("labels-snapped")), [])
-
-    def test_running_it_again_gives_the_same_files(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.truth(("0:33.480", "1:02.120"), ("3:20.000", "3:50.000"))
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(90.0, 130.0)])
+        self.truth(("1:30.000", "2:09.000"))  # 11 s inward: the end stays, the start still grows
         self.run_main()
-        first = self.raw("labels-snapped", self.id + ".json")
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(90.0, 140.0)])
+
+    def test_a_stretch_is_checked_against_the_labels_as_they_were_snapped(self):
+        # The label shrinks by 10 s to 100-130, so the 130-150 stretch is no longer inside it. Before
+        # the shrinking it was half inside the label (10 s of 20 s).
+        self.label([segment(21, 28, 100.0, 140.0)])
+        self.truth(("1:40.000", "2:10.000"), ("2:10.000", "2:30.000"))
         self.run_main()
-        self.assertEqual(self.raw("labels-snapped", self.id + ".json"), first)
+        found = self.snapped()["segments"]
+        self.assertEqual([(s["start"], s["end"], s.get("origin")) for s in found],
+                         [(100.0, 130.0, None), (130.0, 150.0, "copy")])
 
-    def test_no_temporary_file_is_left_behind(self):
+
+class RuleTests(Base):
+    def test_a_label_that_overlaps_a_stretch_by_40_percent_does_not_move(self):
         self.label([segment(7, 12, 30.0, 60.0)])
-        self.truth(("0:33.480", "1:02.120"))
+        self.truth(("0:48.000", "1:20.000"))  # 12 s of the label's 30 s
         self.run_main()
-        self.assertEqual([n for n in os.listdir(self.folder.path("labels-snapped")) if n.startswith(".")], [])
+        found = self.snapped()["segments"]
+        self.assertEqual([(s["start"], s["end"], s.get("origin")) for s in found],
+                         [(30.0, 60.0, None), (48.0, 80.0, "copy")])
 
-    def test_other_folder_names_can_be_used(self):
+    def test_a_label_that_overlaps_a_stretch_by_exactly_half_moves(self):
         self.label([segment(7, 12, 30.0, 60.0)])
-        self.assertEqual(self.run_main("--labels", "labels", "--out", "mine"), 0)
-        self.assertTrue(os.path.exists(self.folder.path("mine", self.id + ".json")))
+        self.truth(("0:15.000", "0:45.000"))  # 15 s of the label's 30 s
+        self.run_main()
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(15.0, 60.0)])
 
+    def test_a_stretch_of_300_s_is_used_and_a_longer_one_is_left_out_and_said(self):
+        self.label([])
+        self.truth(("3:20.000", "8:20.000"))
+        self.run_main()
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(200.0, 500.0)])
+        self.truth(("3:20.000", "8:21.000"))
+        self.run_main()
+        self.assertEqual(self.snapped()["segments"], [])
+        self.assertIn("over 300 s", self.text())
 
-class ExitCodeTests(Base):
-    def test_no_labels_folder_gives_2(self):
-        os.rmdir(self.folder.path("labels"))
-        self.assertEqual(self.run_main(), 2)
-        self.assertIn("no labels", self.text().lower())
-        self.assertFalse(os.path.exists(self.folder.path("labels-snapped")))
-
-    def test_an_empty_labels_folder_is_nothing_to_do_and_gives_0(self):
-        self.assertEqual(self.run_main(), 0)
-        self.assertIn("No labels", self.text())
-
-    def test_the_output_folder_may_not_be_the_labels_folder(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        before = self.raw("labels", self.id + ".json")
-        self.assertEqual(self.run_main("--out", "labels"), 2)
-        self.assertEqual(self.raw("labels", self.id + ".json"), before)
-
-    def test_folder_names_must_be_plain(self):
-        for name in ("../x", "a/b", "", ".", "..", "a b"):
-            self.assertEqual(self.run_main("--out", name), 2, name)
-            self.assertEqual(self.run_main("--labels", name), 2, name)
-
-    def test_a_folder_that_cannot_be_written_gives_2(self):
-        self.label([segment(7, 12, 30.0, 60.0)])
-        self.write("labels-snapped", "a file where the folder should be")
-        self.assertEqual(self.run_main(), 2)
-        self.assertIn("Could not write", self.text())
+    def test_a_stretch_over_300_s_moves_no_label_either(self):
+        self.label([segment(25, 26, 120.0, 130.0)])
+        self.truth(("1:40.000", "7:00.000"))
+        self.run_main()
+        self.assertEqual([(s["start"], s["end"]) for s in self.snapped()["segments"]], [(120.0, 130.0)])
 
 
 if __name__ == "__main__":

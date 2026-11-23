@@ -100,7 +100,7 @@ class CodeRulesTests(unittest.TestCase):
     def test_files_stay_under_about_300_lines(self):
         for name in self.TOOLS + ("test_teach_snap.py", "test_teach_truth.py", "test_teach_copies.py",
                                   "test_teach_copies_limits.py", "test_teach_copies_launcher.py",
-                                  "test_teach_snap_readers.py"):
+                                  "test_teach_snap_readers.py", "test_teach_snap_files.py"):
             self.assertLess(len(self.source(name).splitlines()), 340, name)
 
 

@@ -93,11 +93,18 @@ class LimitTests(Base):
     def test_bad_numbers_are_refused_before_anything_happens(self):
         self.add(1)
         for flag, value in (("--max", "0"), ("--max", "-1"), ("--max", "x"), ("--max-gb", "0"),
-                            ("--max-gb", "-2"), ("--max-gb", "nan"), ("--max-gb", "inf"), ("--max-gb", "x")):
+                            ("--max-gb", "-2"), ("--max-gb", "nan"), ("--max-gb", "inf"), ("--max-gb", "x"),
+                            ("--max-gb", "1e300"), ("--max-gb", "1000.5"), ("--max", "100001"),
+                            ("--max", "99999999999999999999")):
             with self.assertRaises(SystemExit) as caught, contextlib.redirect_stderr(io.StringIO()):
                 self.go(flag, value)
             self.assertEqual(caught.exception.code, 2, flag + value)
         self.assertEqual(self.net.calls, [])
+
+    def test_the_biggest_numbers_that_are_allowed_work(self):
+        self.add(1)
+        self.assertEqual(self.go("--max", "100000", "--max-gb", "1000"), 0)
+        self.assertEqual(self.net.calls[0]["max_bytes"], fetching.MAX_FILE)
 
 
 class FailureMemoryTests(Base):
