@@ -30,6 +30,9 @@ public struct TeachingEpisode: Sendable, Equatable {
   public var maybe: [TeachingTruth]
   /// Whether the small model was never trained on this episode.
   public var onShelf: Bool
+  /// Whether the episode is in the sealed exam (`exam.json`): it is left out of every run unless
+  /// the run asks for the exam.
+  public var onExam: Bool
   /// The episode's length in `episodes.json`, when it has one above zero.
   public var seconds: Double?
 
@@ -43,7 +46,8 @@ public struct TeachingEpisode: Sendable, Equatable {
 
   public init(
     id: String, feed: String, show: String, title: String, transcript: Transcript,
-    truth: [TeachingTruth], maybe: [TeachingTruth], onShelf: Bool, seconds: Double? = nil
+    truth: [TeachingTruth], maybe: [TeachingTruth], onShelf: Bool, seconds: Double? = nil,
+    onExam: Bool = false
   ) {
     self.seconds = seconds
     self.id = id
@@ -54,6 +58,7 @@ public struct TeachingEpisode: Sendable, Equatable {
     self.truth = truth
     self.maybe = maybe
     self.onShelf = onShelf
+    self.onExam = onExam
   }
 }
 
@@ -152,6 +157,7 @@ public enum TeachingFolder {
       let entries = root["episodes"] as? [Any]
     else { throw TeachingFolderError(message: "episodes.json is not in the expected shape.") }
     let shelf = shelfIds(in: folder)
+    let exam = try examIds(in: folder)
     var result: [TeachingEpisode] = []
     for case let entry as [String: Any] in entries {
       guard let id = entry["id"] as? String, !id.isEmpty, !id.contains("/"), !id.contains("..") else {
@@ -199,7 +205,8 @@ public enum TeachingFolder {
         TeachingEpisode(
           id: id, feed: (entry["feed"] as? String) ?? "", show: (entry["show"] as? String) ?? "",
           title: (entry["title"] as? String) ?? "", transcript: transcript, truth: truth,
-          maybe: maybe, onShelf: shelf.contains(id), seconds: seconds))
+          maybe: maybe, onShelf: shelf.contains(id), seconds: seconds,
+          onExam: exam.contains(id)))
     }
     return result
   }
@@ -209,6 +216,19 @@ public enum TeachingFolder {
       let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
       let ids = root["episodes"] as? [Any]
     else { return [] }
+    return Set(ids.compactMap { $0 as? String })
+  }
+
+  /// The ids in `exam.json` (`{"episodes": ["id", ...]}`). No file means no exam. A file that
+  /// cannot be read is a set-up problem, because ignoring it would let exam episodes into the
+  /// scores that must not see them.
+  static func examIds(in folder: URL) throws -> Set<String> {
+    let url = folder.appendingPathComponent("exam.json")
+    guard FileManager.default.fileExists(atPath: url.path) else { return [] }
+    guard let data = try? Data(contentsOf: url),
+      let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+      let ids = root["episodes"] as? [Any], ids.allSatisfy({ $0 is String })
+    else { throw TeachingFolderError(message: "exam.json is not in the expected shape.") }
     return Set(ids.compactMap { $0 as? String })
   }
 

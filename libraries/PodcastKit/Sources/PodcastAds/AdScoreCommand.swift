@@ -10,10 +10,14 @@ public enum AdScoreCommand {
     public var all = false
     public var noModel = false
     public var noLibrary = false
+    /// Score only the sealed exam episodes (`exam.json`).
+    public var exam = false
+    /// Where to write what the last row found for each scored episode; empty for nowhere.
+    public var dump = ""
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -24,6 +28,13 @@ public enum AdScoreCommand {
       case "--all": options.all = true
       case "--no-model": options.noModel = true
       case "--no-library": options.noLibrary = true
+      case "--exam": options.exam = true
+      case "--dump":
+        index += 1
+        guard index < arguments.count, !arguments[index].isEmpty else {
+          return .failure(TeachingFolderError(message: "--dump needs a file name."))
+        }
+        options.dump = arguments[index]
       case "--labels":
         index += 1
         guard index < arguments.count, !arguments[index].isEmpty else {
@@ -61,29 +72,38 @@ public enum AdScoreCommand {
     }
     let folder = URL(fileURLWithPath: options.folder)
     var notes: [String] = []
-    let labelled: [TeachingEpisode]
+    let everyone: [TeachingEpisode]
     do {
-      labelled = try TeachingFolder.episodes(in: folder, labels: options.labels, notes: &notes)
+      everyone = try TeachingFolder.episodes(in: folder, labels: options.labels, notes: &notes)
     } catch {
       err("\(error.localizedDescription)")
       return 2
     }
     for note in notes { err(note) }
+    // The exam is invisible unless asked for: out of the scores and out of what teaches the
+    // finders. With --exam it is all that is scored and every other episode only teaches.
+    let exam = everyone.filter(\.onExam)
+    let labelled = options.exam ? everyone : everyone.filter { !$0.onExam }
+    if options.exam && exam.isEmpty {
+      err("--exam was asked for, but no labelled episode is named in exam.json in \(folder.path).")
+      return 2
+    }
     guard !labelled.isEmpty else {
       out("No episode in \(folder.path) has both a transcript and a label yet.")
       return 0
     }
 
     let shelf = labelled.filter(\.onShelf)
-    let chosen = options.all || shelf.isEmpty ? labelled : shelf
+    let chosen = options.exam ? exam : options.all || shelf.isEmpty ? labelled : shelf
     let which =
-      options.all ? "all \(chosen.count) labelled episodes"
+      options.exam ? "the \(chosen.count) sealed exam episodes, every other labelled episode only teaches"
+      : options.all ? "all \(chosen.count) labelled episodes"
       : shelf.isEmpty ? "all \(chosen.count) labelled episodes (there is no shelf yet)"
       : "the \(chosen.count) shelf episodes the model never saw"
     let title = "Scorecard for \(folder.lastPathComponent): \(which)"
 
     let model = options.noModel ? nil : AdWordModel.load(from: folder.appendingPathComponent("ad-model.json"))
-    let scoringShelf = !options.all && !shelf.isEmpty
+    let scoringShelf = options.exam || (!options.all && !shelf.isEmpty)
     let libraryRead =
       options.noLibrary
       ? (known: KnownAds(), file: "")
@@ -142,7 +162,19 @@ public enum AdScoreCommand {
       base(episode, head)
     })
     text += "\n\n" + after.joined(separator: "\n")
+    let bar = AdBarReport.lines(rows)
+    if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
     out(text)
+    if !options.dump.isEmpty {
+      do {
+        try AdScoreDump.write(
+          chosen, found: { finalAds.ads(for: $0.id) ?? [] },
+          to: URL(fileURLWithPath: options.dump))
+      } catch {
+        err("The dump could not be written to \(options.dump): \(error.localizedDescription)")
+        return 2
+      }
+    }
     history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
     do {
       try history.save(to: historyURL)

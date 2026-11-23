@@ -60,6 +60,8 @@ public struct Scorecard: Codable, Sendable, Equatable {
   public var total: ScoreTotals
   /// One per feed, the worst (most ad seconds heard) first.
   public var shows: [ShowScore]
+  /// The owner's bar for these episodes (`AdBar`); nil when it was not worked out.
+  public var bar: BarTotals?
 }
 
 /// One row of the scorecard as `scorecard.json` keeps it: a name, the row's totals and the same
@@ -69,15 +71,18 @@ public struct ScorecardRow: Codable, Sendable, Equatable {
   public var name: String
   public var total: ScoreTotals
   public var shows: [ShowScore]
+  /// The owner's bar for the same found ads. Nil in a file saved before the bar existed.
+  public var bar: BarTotals?
 
-  public init(name: String, total: ScoreTotals, shows: [ShowScore]) {
+  public init(name: String, total: ScoreTotals, shows: [ShowScore], bar: BarTotals? = nil) {
     self.name = name
     self.total = total
     self.shows = shows
+    self.bar = bar
   }
 
   public init(name: String, card: Scorecard) {
-    self.init(name: name, total: card.total, shows: card.shows)
+    self.init(name: name, total: card.total, shows: card.shows, bar: card.bar)
   }
 }
 
@@ -109,10 +114,14 @@ public enum AdScoreRun {
     }
     var scores = [[EpisodeScore]](repeating: [], count: each.count)
     var seconds: [String: Double] = [:]  // the show seconds of each episode, by id
+    var bars = [BarTotals](repeating: BarTotals(), count: each.count)
     for episode in episodes {
       let whole = detect(episode, episode.transcript)
       var made = each.map {
         AdScore.score(episode: episode, found: ads(whole, $0), settings: settings)
+      }
+      for row in each {
+        bars[row] += AdBar.score(episode: episode, found: ads(whole, row), settings: settings)
       }
       let openings = AdScore.openings(episode, settings)
       if !openings.isEmpty {
@@ -129,7 +138,11 @@ public enum AdScoreRun {
       for row in each { scores[row].append(made[row]) }
       seconds[episode.id] = AdScore.showSeconds(episode, settings)
     }
-    return scores.map { card($0, seconds: seconds) }
+    return each.map { row in
+      var made = card(scores[row], seconds: seconds)
+      made.bar = bars[row]
+      return made
+    }
   }
 
   /// The scorecard of one row: the totals and the totals of each show, worst first.
