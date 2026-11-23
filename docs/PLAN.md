@@ -1275,6 +1275,63 @@ levels, not thresholds, because a show has about four marked episodes.
       "Score the ad skipping.command", and reading the new rows. A finder whose
       row is under 0.85 precision stays at ask or off.
 
+### Ad skipping to 95%, round A (Mo's ask, 2026-11-23)
+
+Mo set the aim: 95% of ad breaks skipped by itself while streaming, and the skip
+must not land more than 5 seconds past the ad. The plan and the measurements are
+in the Claude Doc "Ad skipping to 95%: the test and the plan". Mo chose "Round
+A, exam and 500 more episodes": the test (parts 1, 3 and 5), the three fixes
+that cost nothing to run, about 500 more marked episodes and a sealed exam of
+about 60 newer ones with 15 marked twice (about $110 of his Claude plan, marked
+at night). One pull request, one TestFlight build, and Mo sees the numbers
+before anything reaches his phone. Fable plans and does the final check, Sonnet
+builds, Opus checks each part at extra effort.
+
+The bar: an ad break (marked ads within 1 second of each other, counted once, 10
+seconds or longer) passes when the phone skips it with no tap, at most 5 seconds
+of it are heard, and the skip cuts at most 5 seconds of show before it and after
+it. Today 101 of 219 breaks on the 63 shelf episodes pass (46%), with 75 skips
+where there is no ad.
+
+- [ ] **V1 The scorecard measures the bar**: `AdBar` and a bar block under the
+      scorecard for every row, one cause for each failed break, skips with no
+      ad, `--dump`, the sealed exam (`exam.json`, `score --exam`) and
+      `podcast-teach agree` for two markings of one episode.
+  - Done when: the last row on the shelf reads 101 of 219, with starts late 59,
+    stops early 16, gap inside 16, missed 14, starts early 9, lands too far 4.
+- [ ] **V2 Mac tools for the new episodes**: `teach_exam.py` and the rule that
+      an exam episode teaches nothing, `teach_collect.py --exam`,
+      `teach_label.py --only-exam --between 23-7 --wait-hours`, second downloads
+      that take the exam first, and three launchers: "Gather more episodes for
+      teaching", "Mark the new episodes at night", "Gather the exam episodes".
+  - Done when: the tools' tests pass and a `--list` run on the Mac says what it
+    would download.
+- [ ] **V3 A word model that does not memorise** (fix 1): model file version 2
+      with the word pairs of the neighbouring lines, a trainer with real
+      regularisation that drops words seen fewer than 3 times, and a decoder
+      whose ad score leaves credits out and whose start widens back.
+  - Done when: on the shelf the row "Plus the trained model" passes at least 115
+    of 219 with at most 20 skips with no ad (the prototype: 122 of 226 and 10).
+- [ ] **V4 Remembered ads set the edges** (fix 2): the library keeps an ad's
+      whole text, a remembered ad is found from any of its word runs, and a
+      word-model skip that hangs up to 12 seconds over a remembered ad is cut
+      back to it.
+  - Done when: the row "Plus the library" passes more breaks than the row before
+    it and adds no skip with no ad.
+- [ ] **V5 Joints pull a late start back** (fix 3): in steady files too, a skip
+      starts at the nearest joint up to 60 seconds before it.
+  - Done when: the joints row on the Mac's scorecard (it needs the audio) passes
+    more breaks than the row before it; the prototype says about 10 more.
+- [ ] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
+      go down the phone's own path for a playing stream, Apple's model
+      included, and are scored by the bar counting only skips known in time.
+- [ ] **V7 Pass rate from real listening** (test part 5): the results page says
+      how many skips Mo neither took back nor trimmed, against skips plus ads he
+      marked as missed.
+- [ ] **V8 The run**: gather and mark the 500 and the exam on the Mac, teach
+      again, score the shelf, then the exam once, and bring Mo the numbers
+      before the merge and the one TestFlight build.
+
 ## Later
 
 - Podcasts ads (round of 2026-11-23): a rule that promotes a repeat to skip
