@@ -244,10 +244,16 @@ final class OwnAdSoundsTests: XCTestCase {
     var own = OwnAdSounds()
     let one = Own.episode(filler: 10_000, ad: ad)
     own.learn(show: "show", frames: one.frames, stretches: [one.stretch], now: Own.now)
-    // An undone stretch of 200 frames that covers only the first part of the 500 frame print.
-    let two = Own.episode(filler: 20_000, ad: ad)
-    XCTAssertEqual(
-      own.forget(frames: two.frames, start: Snd.time(300), end: Snd.time(300 + 200), now: Own.now), 0)
+    // An undone stretch from 30 seconds before the ad to one second into it: it holds only the
+    // first second of the print (38 of its 500 frames), the rest of it is other audio.
+    let two = Own.episode(filler: 20_000, ad: ad, at: 1500)
+    let from = Snd.time(1500) - 30
+    let to = Snd.time(1500) + 1
+    let slice = OwnAdSounds.cut(two.frames, from: from, to: to)
+    let touched = SoundLookup(own.library).hits(in: slice)
+    XCTAssertEqual(touched.count, 1)  // the print does touch it: a hit of about a second
+    XCTAssertLessThan((touched.first?.end ?? 99) - (touched.first?.start ?? 0), 2)
+    XCTAssertEqual(own.forget(frames: two.frames, start: from, end: to, now: Own.now), 0)
     XCTAssertEqual(own.entries.count, 1)
   }
 

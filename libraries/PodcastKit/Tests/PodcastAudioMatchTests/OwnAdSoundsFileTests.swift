@@ -87,7 +87,28 @@ final class OwnAdSoundsFileTests: XCTestCase {
     let kept = keeper.keep(MP3Frames.parse(Marked.frames(0..<500)).frames)
     XCTAssertEqual(kept.count, 50)
     XCTAssertTrue(keeper.done)
+    XCTAssertTrue(keeper.truncated)
     XCTAssertEqual(OwnAdSoundsFile.mostFrames, 60_000)
+  }
+
+  func testAStretchThatDoesNotFitInTheFrameLimitIsDroppedWhole() throws {
+    let bytes = file(3000)
+    let url = try write(bytes)
+    let first = expected(bytes, [(start: 10, end: 20)])
+    let both = expected(bytes, stretches)
+    func read(_ limit: Int) -> [MP3Frame] {
+      OwnAdSoundsFile.pass(in: url, stretches: stretches, chunkSize: 4096, mostFrames: limit).frames
+    }
+    // The limit falls inside the second stretch: only the first is kept, not a part of the second.
+    XCTAssertEqual(read(600), first)
+    // Inside the first: nothing, not a part of it.
+    XCTAssertTrue(read(200).isEmpty)
+    // A limit that just fits both keeps both, one frame less keeps the first only.
+    XCTAssertEqual(read(both.count), both)
+    XCTAssertEqual(read(both.count - 1), first)
+    // The limit that falls exactly at the end of the first stretch keeps it, and the second is
+    // dropped from its first frame.
+    XCTAssertEqual(read(first.count), first)
   }
 
   func testAStretchBeforeTheStartOfTheFileIsCutAtTheStart() throws {
@@ -102,7 +123,7 @@ final class OwnAdSoundsFileTests: XCTestCase {
     let url = try write(file(1000))
     let bad: [[(start: Double, end: Double)]] = [
       [], [(.nan, 10)], [(0, .nan)], [(.infinity, .infinity)], [(-.infinity, 20)], [(20, 10)],
-      [(10, 10)], [(-5, 3)], [(0, 5)], [(0, 7.9)], [(0, 700)], [(-1e300, 1e300)], [(1e300, 1e301)],
+      [(10, 10)], [(-5, -1)], [(-5, 0)], [(0, 700)], [(-1e300, 1e300)], [(1e300, 1e301)],
     ]
     for stretches in bad {
       let pass = OwnAdSoundsFile.pass(in: url, stretches: stretches, chunkSize: 4096)
@@ -111,6 +132,19 @@ final class OwnAdSoundsFileTests: XCTestCase {
     }
     // A stretch beyond the end of the file is fine: there is nothing in it.
     XCTAssertTrue(OwnAdSoundsFile.frames(in: url, stretches: [(start: 10_000, end: 10_100)]).isEmpty)
+  }
+
+  func testAShortStretchIsKeptBecauseAnUndoneSkipCanBeShort() throws {
+    let bytes = file(1000)
+    let url = try write(bytes)
+    let short = [
+      (start: 0.0, end: 5.0), (start: 0.0, end: 7.9), (start: -5.0, end: 3.0), (start: 12.0, end: 12.5),
+    ]
+    for stretch in short {
+      let read = OwnAdSoundsFile.frames(in: url, stretches: [stretch])
+      XCTAssertEqual(read, expected(bytes, [(start: max(stretch.start, 0), end: stretch.end)]), "\(stretch)")
+      XCTAssertGreaterThan(read.count, 10, "\(stretch)")
+    }
   }
 
   func testAMissingEmptyOrOddFileGivesNoFrames() throws {

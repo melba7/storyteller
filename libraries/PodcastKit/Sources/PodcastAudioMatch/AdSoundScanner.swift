@@ -9,6 +9,10 @@ public struct AdSoundHit: Sendable, Equatable {
   /// Seconds in the file being scanned.
   public var start: Double
   public var end: Double
+  /// How many anchors in a row matched, one for every eighth frame. A hit starts where the whole
+  /// sound would start and ends where the matching stopped, so a hit whose matched anchors cover
+  /// only a small part of its length matched a part of the sound only. It is 0 for a hit made by hand.
+  public var matched: Int = 0
 }
 
 /// Matches frames against the anchors of a library. A frame whose low 32 bits are an anchor
@@ -187,6 +191,6 @@ public struct AdSoundScanner: Sendable {
     let end = min(trail.lastTime + Double(AdSoundLibrary.step) * perFrame, trail.start + sound.seconds)
     return AdSoundHit(
       sound: trail.sound, sort: sound.sort, who: sound.who, start: trail.start,
-      end: max(end, trail.start))
+      end: max(end, trail.start), matched: trail.matched)
   }
 }

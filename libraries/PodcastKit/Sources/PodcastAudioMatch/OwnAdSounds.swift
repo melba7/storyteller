@@ -9,21 +9,30 @@
 // How the phone uses it (the wiring is another package's job):
 //
 //   var own = OwnAdSounds.read(data)       // the file's bytes; missing or damaged reads as empty
-//   own.library                            // an AdSoundLibrary for AdSoundScanner or AdSoundFile.hits
+//   own.library(for: show)                 // an AdSoundLibrary to scan an episode of `show` with
+//   own.library                            // all the prints, for tests and tools
+//   OwnAdSounds.trusted(hits)              // the hits of that scan worth skipping (see below)
 //   own.data                               // the file's bytes; write them after learn and forget
 //   OwnAdSoundsFile.frames(in: url, stretches: [(start: Double, end: Double)]) -> [MP3Frame]
 //                                          // only the frames inside the stretches, read in pieces
 //   own.learn(show: String, frames: [MP3Frame], stretches: [MarkedStretch],
 //             mac: AdSoundLibrary = AdSoundLibrary(), now: Double) -> Int
-//                                          // the stretches the listener let stand; how many were added
+//                                          // sure skips only (see below); how many were added
 //   own.forget(frames: [MP3Frame], start: Double, end: Double, now: Double) -> Int
-//                                          // the listener undid this stretch; how many were dropped
+//                                          // the listener undid this skip; how many were dropped
 //   own.prune(now: Double)                 // age, count and size limits (learn and forget do it too)
 //
-// The stretches are the skipped stretches as they were skipped, with no margin: the print covers all
-// of each, so the next skip begins and ends where this one did. A stretch is learned only when it
-// lasts 8 to 600 seconds. The index of a sound in `library` can change after learn, forget and
-// prune, so make the scanner from `library` again after them.
+// What `learn` is given, as `KnownAds.learn` is: the SURE ads of the final ads file that the
+// existing finders found, or that the listener said yes to (source "tap"), which the listener did
+// not undo and did not trim (AdTrim), and only after the joint snap has put their borders on the
+// frames. Never a skip of a new finder that is only `unsure`: a wrong skip nobody noticed would be
+// learned and refreshed for good. On Undo the phone calls `forget` with the stretch as it was
+// skipped (read the frames with `OwnAdSoundsFile.frames`), before the file is saved again.
+//
+// The stretches are the skipped stretches as they were skipped, with no margin: the print covers
+// all of each, so the next skip begins and ends where this one did. A stretch is learned only
+// when it lasts 8 to 600 seconds. The index of a sound in `library` can change after learn,
+// forget and prune, so make the scanner from `library` again after them.
 import Foundation
 
 /// One of the phone's own sounds: the print, the show it was learned in and when it was last met.
@@ -110,8 +119,10 @@ public struct OwnAdSounds: Sendable, Equatable {
     return made.count
   }
 
-  /// The listener undid the skip of the stretch from `start` to `end`: drops the sounds that
-  /// lie mostly inside it, and keeps its print so the same bytes are not learned again for 60
+  /// The listener undid the skip of the stretch from `start` to `end`: drops every sound that was
+  /// found in it over at least half of the smaller of the sound and the stretch, so a sound that
+  /// matched only a part of itself, or only a short stretch, goes too. It keeps the print of the
+  /// stretch (when it lasts 8 seconds or more) so the same bytes are not learned again for 60
   /// days. `frames` are the frames of that stretch (or of the whole file). Returns how many
   /// sounds were dropped. Save the file afterwards, also when it is 0.
   @discardableResult
@@ -120,12 +131,13 @@ public struct OwnAdSounds: Sendable, Equatable {
     expire(now: now)
     let slice = Self.cut(frames, from: start, to: end)
     guard !slice.isEmpty else { return 0 }
+    let seconds = slice.reduce(0) { $0 + $1.duration }
     var dropped = 0
     if !entries.isEmpty {
       let sounds = entries.map(\.sound)
       let inside = Set(
         SoundLookup(AdSoundLibrary(sounds: sounds)).hits(in: slice)
-          .filter { ($0.end - $0.start) * 2 >= sounds[$0.sound].seconds }.map(\.sound))
+          .filter { ($0.end - $0.start) * 2 >= min(sounds[$0.sound].seconds, seconds) }.map(\.sound))
       entries = entries.enumerated().filter { !inside.contains($0.offset) }.map(\.element)
       dropped = inside.count
     }
