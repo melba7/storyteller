@@ -104,10 +104,14 @@ public struct FoundAd: Codable, Sendable, Equatable {
   public var confidence: AdConfidence
   /// The first words of the ad, to recognise it in a list.
   public var firstWords: String
+  /// The name of the finder that made this ad ("own-sound", "meaning", "tap"), nil for the
+  /// older finders and in a file saved before this field existed. Joining ads keeps it only
+  /// when every part has the same one.
+  public var source: String?
 
   public init(
     start: Double, end: Double, kind: AdKind, advertiser: String, confidence: AdConfidence,
-    firstWords: String
+    firstWords: String, source: String? = nil
   ) {
     self.start = start
     self.end = end
@@ -115,6 +119,7 @@ public struct FoundAd: Codable, Sendable, Equatable {
     self.advertiser = advertiser
     self.confidence = confidence
     self.firstWords = firstWords
+    self.source = source
   }
 
   public var duration: Double { end - start }

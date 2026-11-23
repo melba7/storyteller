@@ -83,11 +83,15 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// The skips the listener found too far. Nil when there are none (and in a file saved before
   /// trims existed).
   public var trims: [AdTrim]?
+  /// What the phone would ask the listener about: stretches it is not sure enough to skip. Nil
+  /// when there are none (and in a file saved before questions existed).
+  public var asks: [FoundAd]?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
-    coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil
+    coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil,
+    asks: [FoundAd]? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -100,6 +104,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.coveredUntil = coveredUntil
     self.refusedPieces = refusedPieces
     self.trims = trims
+    self.asks = asks
   }
 
   /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.

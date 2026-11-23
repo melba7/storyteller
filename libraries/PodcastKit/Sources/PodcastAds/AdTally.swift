@@ -76,6 +76,8 @@ public struct AdTally: Codable, Equatable, Sendable {
       counts.seconds = max(0, counts.seconds - amount)
     case .trimmed: counts.trimmed += 1
     case .missed: counts.missed += 1
+    // Answers to a question are not skips or undone skips: nothing is counted for them.
+    case .confirmed, .denied: break
     }
     shows[show ?? ""] = counts
   }

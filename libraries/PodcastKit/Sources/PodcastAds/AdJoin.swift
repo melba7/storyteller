@@ -43,6 +43,8 @@ public enum AdJoin {
         let other = ad.duration > last.duration ? last : ad
         last.advertiser = longer.advertiser.isEmpty ? other.advertiser : longer.advertiser
         last.confidence = max(last.confidence, ad.confidence)
+        // One finder's name is kept only while every part of the joined ad has that name.
+        if last.source != ad.source { last.source = nil }
         last.end = max(last.end, ad.end)
         result.append(last)
       } else {

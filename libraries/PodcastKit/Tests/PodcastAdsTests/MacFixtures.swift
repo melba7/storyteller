@@ -64,6 +64,12 @@ enum MacFixtures {
     {"version":1,"buckets":262144,"classes":["none","sponsor","network_promo","host_ask","intro_credits"],"thresholds":{"start":0.6,"stay":0.4,"sure":0.85},"weights":{"7":[0.0,2.5,0.0,0.0,0.0],"211303":[4.0,0.0,0.0,0.0,0.0],"9":[0.0,0.0,-1.25,0.0,0.0]},"trained":{"writtenAt":1700000000000,"episodes":12,"lines":400,"shelf":2,"heldOut":{"episodes":2,"lines":40,"anyAd":{"precision":0.8889,"recall":0.8},"classes":{}}}}
     """#
 
+  /// One `confirmed` note with the finder's name, exactly as `PhoneNote.line` writes it (before
+  /// the app adds the feed, guid, title and audio address). `PhoneNoteKindsTests` makes this
+  /// line from a `PhoneNote`; the Mac's Python test reads the same text.
+  static let confirmedNote =
+    #"{"at":1700000000000,"by":"repeat-words","end":180,"episode":"e1","kind":"ad","show":"s1","start":125.5,"v":1,"what":"confirmed"}"#
+
   static var libraryData: Data { Data(library.utf8) }
   static var habitsData: Data { Data(habits.utf8) }
   static var modelData: Data { Data(model.utf8) }
