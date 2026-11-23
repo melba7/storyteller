@@ -172,7 +172,8 @@ class MoreTests(Setup):
             COLLECT + " --per-show 12 --max-gb 40",
             "python3 teach_transcribe.py --folder FOLDER --tool %s/podcast-transcribe" % self.bin,
             "python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes --yes",
-            "python3 teach_habits.py --folder FOLDER", "python3 teach_train.py --folder FOLDER",
+            "python3 teach_habits.py --folder FOLDER",
+            "python3 teach_train.py --folder FOLDER --fit-tool %s/podcast-teach" % self.bin,
             "python3 teach_library.py --folder FOLDER", "python3 teach_settings.py --folder FOLDER",
             "python3 teach_publish.py --folder FOLDER"])
         self.assertEqual(self.source(MORE).count('read -r -p "Type yes'), 1)  # asked once at the start
