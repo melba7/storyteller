@@ -6,6 +6,7 @@
 // `AdSkipper` in PodcastAds. A streamed episode is never skipped, because a stream can carry
 // other ads than the download that was checked. An episode that plays through its own download
 // (PodcastStreamDownload) is the same file, so its ads are skipped once the download is filed.
+// The questions about stretches it is not sure of are asked in PodcastPlayer+Ask.swift.
 
 import AVFoundation
 import Foundation
@@ -13,48 +14,26 @@ import PodcastAds
 import PodcastDownloads
 import PodcastTranscripts
 
-/// The listener's four switches, kept in the app's defaults so the player reads them with no
-/// JavaScript running.
-enum AdSkipDefaults {
-  private static let adsKey = "podcasts.ads.skipAds"
-  private static let plugsKey = "podcasts.ads.skipOwnPlugs"
-  private static let promosKey = "podcasts.ads.skipPromos"
-  private static let creditsKey = "podcasts.ads.skipCredits"
-
-  /// Ads, the hosts' plugs and promos are on until the listener turns them off; credits are off
-  /// until they turn them on. Promos were counted as ads in older builds, so while the promo
-  /// switch was never stored it follows the stored Skip ads switch.
-  static var settings: AdSkipSettings {
-    get {
-      let defaults = UserDefaults.standard
-      return AdSkipSettings(
-        storedAds: defaults.object(forKey: adsKey) as? Bool,
-        plugs: defaults.object(forKey: plugsKey) as? Bool,
-        promos: defaults.object(forKey: promosKey) as? Bool,
-        credits: defaults.object(forKey: creditsKey) as? Bool)
-    }
-    set {
-      UserDefaults.standard.set(newValue.skipAds, forKey: adsKey)
-      UserDefaults.standard.set(newValue.skipOwnPlugs, forKey: plugsKey)
-      UserDefaults.standard.set(newValue.skipPromos, forKey: promosKey)
-      UserDefaults.standard.set(newValue.skipCredits, forKey: creditsKey)
-    }
-  }
-}
-
 @MainActor
 final class PodcastAdSkipping {
-  private unowned let owner: PodcastPlayer
-  private var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
-  private var store: AdsStore?
-  private var episodeId: String?
+  // Not private: the answers to questions (PodcastPlayer+Ask.swift) skip and note like any skip.
+  // Only `skipper` is writable from there (a skip is noted on it); the rest is read.
+  unowned let owner: PodcastPlayer
+  var skipper = AdSkipper(file: nil, settings: AdSkipSettings())
+  private(set) var store: AdsStore?
+  private(set) var episodeId: String?
   private var observer: Any?
   /// The last skip that was counted and noted in this episode (see `jump`).
   private var lastNoted = NotedSkip()
+  /// The questions of the loaded episode, announced when the playhead enters one.
+  private let asking: PodcastAsking
 
-  init(_ owner: PodcastPlayer) { self.owner = owner }
+  init(_ owner: PodcastPlayer) {
+    self.owner = owner
+    asking = PodcastAsking(owner)
+  }
 
-  private var now: Double { ProcessInfo.processInfo.systemUptime }
+  var now: Double { ProcessInfo.processInfo.systemUptime }
 
   /// Whether any sort of ad is skipped for the loaded show (the sponsor, plug, promo or credits
   /// switch, under the show's own choices).
@@ -86,7 +65,9 @@ final class PodcastAdSkipping {
     lastNoted = NotedSkip()
     skipper = AdSkipper(file: nil, settings: settings)
     store = Self.downloadedStore(id)
-    skipper.replace(file: store?.best(detector: PodcastAdFinder.detectorName))
+    let saved = store?.best(detector: PodcastAdFinder.detectorName)
+    skipper.replace(file: saved)
+    asking.begin(id, file: saved)
     // The start is the app's choice, not a seek by the listener, so an ad that begins later is
     // still skipped, and one that holds the start is skipped now.
     var skip: AdSkip?
@@ -160,10 +141,11 @@ final class PodcastAdSkipping {
     // listener seeked into it, or it was undone). While a seek is on its way the playhead still
     // reads the old place, so nothing is left then; the seek's landing looks again.
     let playhead = owner.wantsToPlay && !owner.seekPending ? owner.position : nil
+    let saved = store?.best(detector: PodcastAdFinder.detectorName)
     let leave = skipper.replace(
-      file: store?.best(detector: PodcastAdFinder.detectorName), playhead: playhead,
-      duration: owner.currentDuration, now: now)
+      file: saved, playhead: playhead, duration: owner.currentDuration, now: now)
     setMarkers()
+    asking.update(saved, episode: episodeId)
     if let leave { jump(leave) }
     // Silence trimming keeps out of the ads that are skipped, so it reads them again too.
     owner.sound.refresh()
@@ -192,13 +174,19 @@ final class PodcastAdSkipping {
     StatsStore.shared.undoAdSkip()
     StatsStore.shared.countAd(.undone)
     // An ad the listener did not want skipped is forgotten by the memory too, so it is not found
-    // again by its words in the next episode.
-    PodcastKnownAds.shared.forget(
-      episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
-      heard: owner.streamDownload?.head.memory.words ?? [])
+    // again by its words in the next episode. The finder that made each ad hears of it (and the
+    // guard of its show). Both wait in the finder's queue behind a yes that is still learned.
+    let heard = owner.streamDownload?.head.memory.words ?? []
+    for undone in [ad] + skip.chained {
+      PodcastAdFinder.shared.forgetUndone(
+        episodeId, start: undone.start, end: undone.end, heard: heard, source: undone.source)
+    }
     PodcastSkipLogger.shared.undone()
-    // What the skip put on the tally is what comes off it: only the seconds really jumped.
-    note(.undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: lastNoted.takeCounted())
+    // What the skip put on the tally is what comes off it: only the seconds really jumped. The
+    // note names the finder of the ad; an ad that was confirmed by a tap has lost that name.
+    note(
+      .undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: lastNoted.takeCounted(),
+      by: ad.source == AdAsking.source ? nil : ad.source)
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
@@ -241,7 +229,7 @@ final class PodcastAdSkipping {
   }
 
   /// Seeks to the end of the skipped ad (and the ones that follow it at once) and tells the app.
-  private func jump(_ skip: AdSkip, from place: Double? = nil) {
+  func jump(_ skip: AdSkip, from place: Double? = nil) {
     guard let episodeId else { return }
     let from = place ?? owner.position
     PodcastTimeline.firstSkip(episodeId)
@@ -266,13 +254,14 @@ final class PodcastAdSkipping {
   }
 
   /// Tells the Mac's notes and the tally what happened to the loaded episode's ads.
-  private func note(
-    _ what: PhoneNote.What, start: Double, end: Double?, kind: AdKind?, seconds: Double = 0
+  func note(
+    _ what: PhoneNote.What, start: Double, end: Double?, kind: AdKind?, seconds: Double = 0,
+    by: String? = nil
   ) {
     guard let episodeId else { return }
     PodcastAdNotes.shared.record(
       what, episode: episodeId, show: owner.current?.showId, start: start, end: end, kind: kind,
-      seconds: seconds)
+      seconds: seconds, by: by)
   }
 
   /// The listener tapped Skip ad. Says where the playhead went and whether an ad was known
@@ -280,9 +269,13 @@ final class PodcastAdSkipping {
   /// an automatic skip (the playhead is at its end), a skip of the known ad the playhead is in
   /// (with its note, stats and Undo, as an automatic skip), or a jump 30 seconds ahead that
   /// notes a miss. The jump is the player's own move, so it is no seek of the listener's: it
-  /// cannot save a trim of an earlier ad and it leaves an end-of-chapter sleep timer alone.
-  func skipAdNow() -> (to: Double, known: Bool)? {
-    guard episodeId != nil, owner.current != nil else { return nil }
+  /// cannot save a trim of an earlier ad and it leaves an end-of-chapter sleep timer alone. Where
+  /// no ad is known and the playhead is inside a question the phone asked (PodcastPlayer+Ask.swift)
+  /// the tap is the answer "yes" instead of a miss. With `onlyInAd`, only the skip of a known ad
+  /// is made and any other tap does nothing and gives nil (the answer "yes" to a question that an
+  /// ad has covered since).
+  func skipAdNow(onlyInAd: Bool = false) -> (to: Double, known: Bool)? {
+    guard let episodeId, owner.current != nil else { return nil }
     let place = owner.place
     let recent = skipper.lastSkip
     let action = AdSkipNow.decide(
@@ -291,12 +284,19 @@ final class PodcastAdSkipping {
       lastSkip: recent?.skip, lastSkipAge: recent.map { now - $0.at } ?? .infinity)
     switch action {
     case .nothing(let at):
+      if onlyInAd { return nil }
       return (at, true)
     case .skip(let skip):
       skipper.noteSkip(skip, now: now)
       jump(skip, from: place)
       return (skip.target, true)
     case .miss(let to):
+      if onlyInAd { return nil }
+      if let ask = asking.live(at: place),
+        answerQuestion(episodeId: episodeId, start: ask.start, isAd: true)
+      {
+        return (owner.place, true)
+      }
       note(.missed, start: place, end: to, kind: nil)
       owner.movePlayheadByPlayer(to: to)
       return (to, false)

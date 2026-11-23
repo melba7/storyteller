@@ -142,3 +142,23 @@ One line per lesson.
 - A launcher is only tested when every exit code of the tool it starts has been
   run through it: the gathering treated "size limit reached" as a failure and
   stopped before writing anything down on Mo's first real run (2026-11-22).
+- Anything that must survive the next write cannot live only in a field the join
+  rewrites: `AdJoin` drops an ad's `source`, so a "yes" kept only as a "tap" ad
+  was lost at the next checkpoint and the question came back. Keep it where no
+  join touches it, here inside the question itself (2026-11-23).
+- A limit that drops pieces before they are counted lets the pieces through: a
+  long replay broken into short ones passed both the length cap and the "mostly
+  repeated" guard. Count everything first, then drop (2026-11-23).
+- A new rule needs a test that fails without it: the checkers found guards,
+  limits and a "never matches itself" rule that stayed green when removed. Prove
+  each by deleting the rule in a copy (2026-11-23).
+- Settings that act on an ad by its `source` must run before the join, on each
+  finder's own list, or a joined ad has no source and skips without asking
+  (2026-11-23).
+- iOS files cannot be built in the cloud, but a harness that compiles the real
+  files against the real PodcastKit with stubs for the app's other types finds
+  most compile errors and logic slips before Fork CI (2026-11-23).
+- Mo's plan allowance is shared by the cloud builders and the Mac's marking: a
+  full builder fleet used the window and the marking stopped at once with 0
+  episodes marked. Builders must also commit early, because a limit cut-off
+  loses what is not committed (2026-11-23).

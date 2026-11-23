@@ -61,7 +61,8 @@ public final class PodcastsModule: Module {
 
     Events("onPlaybackState", "onPlaybackEnded", "onPlaybackError", "onDownloadChange",
       "onUpNextChange", "onPlaybackAdvanced", "onTranscriptChange", "onSleepTimerChange",
-      "onAdsChange", "onAdSkipped", "onAdUndone", "onChaptersChange", "onBookmarksPending")
+      "onAdsChange", "onAdSkipped", "onAdUndone", "onAdAsk", "onChaptersChange",
+      "onBookmarksPending")
 
     OnCreate {
       PodcastDownloader.shared.setSink { [weak self] name, body in self?.sendEvent(name, body) }
@@ -349,9 +350,9 @@ public final class PodcastsModule: Module {
 
     // MARK: Teaching
 
-    // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json or
-    // ad-sounds.json) when its SHA-256 is right and it reads as that file. True when it was kept;
-    // the episodes are looked at again then.
+    // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json, ad-sounds.json,
+    // ad-meaning.json or show-settings.json) when its SHA-256 is right and it reads as that file.
+    // True when it was kept; the episodes are looked at again then.
     AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in
       let kept = PodcastTeaching.shared.install(name: name, text: text, sha256: sha256)
       if kept { PodcastAdFinder.shared.teachingChanged() }
@@ -418,6 +419,16 @@ public final class PodcastsModule: Module {
     // recorded as wrong. False when it is too late.
     AsyncFunction("undoAdSkip") { () async -> Bool in
       await MainActor.run { PodcastPlayer.shared.adSkipping.undo() }
+    }
+    // The answer to a question the phone asked with `onAdAsk` (the question starts at `start`
+    // seconds; the number arrives as a Double): yes skips the stretch like any skip, no says it
+    // is not an ad. False when no open question starts there.
+    AsyncFunction("answerAdQuestion") {
+      (episodeId: String, start: Double, isAd: Bool) async -> Bool in
+      await MainActor.run {
+        PodcastPlayer.shared.adSkipping.answerQuestion(
+          episodeId: episodeId, start: start, isAd: isAd)
+      }
     }
 
     // The main colour of a picture as "#rrggbb", or null when it can't be read.

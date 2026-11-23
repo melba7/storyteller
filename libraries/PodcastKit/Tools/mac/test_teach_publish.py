@@ -152,7 +152,7 @@ class PublishTests(Setup):
 
     def test_nothing_to_publish_exits_0(self):
         self.assertEqual(self.main(self.one), 0)
-        self.assertEqual(len(self.messages), 4)
+        self.assertEqual(len(self.messages), 6)  # one "skipped" line for each of the six files
         self.assertEqual(os.listdir(self.one), [])
 
     def test_an_invalid_source_is_refused_and_says_why(self):
@@ -316,7 +316,7 @@ class WeakModelTests(Setup):
             self.source("ad-model.json", value)
             self.assertEqual(self.main(self.one), 0, value)
             self.assertFalse(os.path.exists(self.published(self.one, "ad-model.json")), value)
-            self.assertEqual(len(self.messages), 4, value)
+            self.assertEqual(len(self.messages), 6, value)  # the model's line, five "skipped" ones
             self.assertIn("no precision", [m for m in self.messages if "ad-model" in m][0])
 
     def test_a_check_on_too_few_episodes_or_shows_is_weak(self):

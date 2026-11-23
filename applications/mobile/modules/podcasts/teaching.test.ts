@@ -62,15 +62,47 @@ describe("parseTeachingList", () => {
     ).toBeNull()
   })
 
-  it("keeps only the four known files", () => {
+  it("keeps only the six known files", () => {
     const parsed = parseTeachingList(
       list({
         "ad-model.json": { sha256: SHA_A, bytes: 1 },
+        "ad-meaning.json": { sha256: SHA_B, bytes: 2 },
+        "show-settings.json": { sha256: SHA_B, bytes: 3 },
         "../secret.json": { sha256: SHA_A, bytes: 1 },
         "other.json": { sha256: SHA_A, bytes: 1 },
       }),
     )
-    expect(Object.keys(parsed ?? {})).toEqual(["ad-model.json"])
+    expect(Object.keys(parsed ?? {})).toEqual([
+      "ad-model.json",
+      "ad-meaning.json",
+      "show-settings.json",
+    ])
+  })
+
+  it("reads the meaning model and the settings with their sizes and checksums", () => {
+    const parsed = parseTeachingList(
+      list({
+        "ad-meaning.json": { sha256: SHA_A, bytes: 90000 },
+        "show-settings.json": { sha256: SHA_B, bytes: 800 },
+      }),
+    )
+    expect(parsed).toEqual({
+      "ad-meaning.json": { sha256: SHA_A, bytes: 90000 },
+      "show-settings.json": { sha256: SHA_B, bytes: 800 },
+    })
+  })
+})
+
+describe("TEACHING_NAMES", () => {
+  it("is the six files of the Mac's teach_publish.py, the model files first", () => {
+    expect([...TEACHING_NAMES]).toEqual([
+      "ad-model.json",
+      "ad-library.json",
+      "show-habits.json",
+      "ad-sounds.json",
+      "ad-meaning.json",
+      "show-settings.json",
+    ])
   })
 })
 
@@ -100,6 +132,24 @@ describe("filesToFetch", () => {
     expect(filesToFetch(changed, {}, refused)[0]).toBe("ad-model.json")
   })
 
+  it("fetches the meaning model and the settings like the others", () => {
+    const more = {
+      "ad-meaning.json": { sha256: SHA_A, bytes: 100 },
+      "show-settings.json": { sha256: SHA_B, bytes: MAX_TEACHING_BYTES + 1 },
+    }
+    expect(filesToFetch(more, {})).toEqual(["ad-meaning.json"])
+    expect(filesToFetch(more, { "ad-meaning.json": SHA_A })).toEqual([])
+    expect(
+      filesToFetch(
+        { ...more, "show-settings.json": { sha256: SHA_B, bytes: 9 } },
+        {
+          "ad-meaning.json": SHA_A,
+        },
+      ),
+    ).toEqual(["show-settings.json"])
+    expect(filesToFetch(more, {}, { "ad-meaning.json": SHA_A })).toEqual([])
+  })
+
   it("leaves out what is installed with the same checksum, in any letter case", () => {
     const installed = {
       "ad-model.json": SHA_A.toUpperCase(),
@@ -113,7 +163,7 @@ describe("filesToFetch", () => {
 
   it("asks for nothing when the list has nothing", () => {
     expect(filesToFetch({}, {})).toEqual([])
-    expect(TEACHING_NAMES).toHaveLength(4)
+    expect(TEACHING_NAMES).toHaveLength(6)
   })
 })
 

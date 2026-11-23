@@ -1,7 +1,8 @@
 // LOFI-FORK: the podcasts section's ads (see FORK.md).
 //
-// Thin wrappers over the native module's ad functions. Not imported by any test, because the
-// native module is not there; the rules are in ads.ts.
+// Thin wrappers over the native module's ad functions. The native module is not there in a
+// test, so only `answerAdQuestion` is tested (with the module replaced); the rules are in
+// ads.ts.
 import { SKIP_NOTE_BACK_SECONDS, readAdSkipSettings } from "./ads"
 import { type AdSkipSettings, type AdsInfo, Podcasts } from "./index"
 
@@ -62,4 +63,17 @@ export async function undoAdSkip(): Promise<boolean> {
  */
 export async function backAfterSkip(): Promise<void> {
   await Podcasts?.skipBy(-SKIP_NOTE_BACK_SECONDS)
+}
+
+/**
+ * The answer to a question the phone asked (`onAdAsk`): `isAd` true skips the stretch, false
+ * says it is not an ad. `start` is the question's start as the event sent it. False when no open
+ * question starts there (or there is no player).
+ */
+export async function answerAdQuestion(
+  episodeId: string,
+  start: number,
+  isAd: boolean,
+): Promise<boolean> {
+  return (await Podcasts?.answerAdQuestion(episodeId, start, isAd)) ?? false
 }

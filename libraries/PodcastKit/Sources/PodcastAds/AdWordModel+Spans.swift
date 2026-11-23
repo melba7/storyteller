@@ -23,8 +23,35 @@ extension AdWordModel {
   /// line to the next (a bridged line takes the class of the line before it). Each piece has
   /// its own sort, mean score and "sure" (score at `sure` and 15 seconds long).
   public func spans(lines: [NumberedLine], duration: Double?) -> [Span] {
-    let rows = probabilities(lines: lines, duration: duration)
+    Self.decode(
+      rows: probabilities(lines: lines, duration: duration), lines: lines, thresholds: thresholds)
+  }
+
+  /// The three cut-offs of a model file's `thresholds`, or nil when one is not a number from 0 to
+  /// 1, or the file would open a span on a line more likely plain talk (start under 0.5), or
+  /// would close one before it opens (stay above start). A cut-off the file leaves out keeps its
+  /// default. The word model checks the same things when it reads its file.
+  static func thresholds(from named: [String: Double]?) -> Thresholds? {
+    var cutoffs = Thresholds()
+    for (name, value) in named ?? [:] {
+      guard value.isFinite, (0.0...1.0).contains(value) else { return nil }
+      switch name {
+      case "start": cutoffs.start = value
+      case "stay": cutoffs.stay = value
+      case "sure": cutoffs.sure = value
+      default: break
+      }
+    }
+    guard cutoffs.start >= 0.5, cutoffs.stay <= cutoffs.start else { return nil }
+    return cutoffs
+  }
+
+  /// The decoder on its own, so the word model and the meaning model share it: `rows` holds one
+  /// row of class probabilities for each of `lines` (five numbers, "none" first). Rows that do
+  /// not match the lines in number or in size give no spans.
+  static func decode(rows: [[Double]], lines: [NumberedLine], thresholds: Thresholds) -> [Span] {
     let n = rows.count
+    guard n == lines.count, rows.allSatisfy({ $0.count == classes.count }) else { return [] }
     let p = rows.map { 1 - $0[0] }
     var s = [Double](repeating: 0, count: n)
     for i in 0..<n {
@@ -84,7 +111,7 @@ extension AdWordModel {
   }
 
   /// The index of the class other than "none" with the highest probability on a line.
-  private func topClass(_ row: [Double]) -> Int {
+  private static func topClass(_ row: [Double]) -> Int {
     var best = 1
     for c in 2..<Self.classes.count where row[c] > row[best] { best = c }
     return best

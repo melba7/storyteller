@@ -211,6 +211,18 @@ export type AdSkipped = {
 export type AdUndone = { episodeId: string; start: number }
 
 /**
+ * The playhead entered a stretch the phone is not sure is an ad, once for each question in a
+ * playback. The app shows "Ad? Skip" with two answers (`answerAdQuestion`) until the stretch
+ * ends. `start` and `end` are seconds into the episode; `kind` is the sort it would be.
+ */
+export type AdAsk = {
+  episodeId: string
+  start: number
+  end: number
+  kind: string
+}
+
+/**
  * The four switches for skipping: sponsor ads, the hosts' own plugs and promos are on until
  * turned off, intros and credits are off until turned on.
  */
@@ -286,6 +298,7 @@ export type PodcastsEvents = {
   onAdsChange: (change: AdsChange) => void
   onAdSkipped: (event: AdSkipped) => void
   onAdUndone: (event: AdUndone) => void
+  onAdAsk: (event: AdAsk) => void
   /** The headphones made a bookmark: `readPendingBookmarks` has it. */
   onBookmarksPending: () => void
   onPlaybackState: (state: PlaybackState) => void
@@ -441,6 +454,16 @@ type PodcastsNativeModule = {
    * recorded as wrong. False when it is too late.
    */
   undoAdSkip(): Promise<boolean>
+  /**
+   * The listener's answer to the question that starts at `start` seconds (`onAdAsk`): `isAd`
+   * true skips the stretch (like any skip, with Undo), false says it is not an ad. False when
+   * no open question starts there.
+   */
+  answerAdQuestion(
+    episodeId: string,
+    start: number,
+    isAd: boolean,
+  ): Promise<boolean>
   /**
    * What silence trimming has saved so far, in seconds of audio, kept in Swift so a stats
    * screen can read it.

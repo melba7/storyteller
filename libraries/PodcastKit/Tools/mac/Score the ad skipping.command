@@ -39,7 +39,15 @@ swift build -c release --product podcast-teach 2>&1 | tee -a "$LOG"
 TOOL="$(swift build -c release --show-bin-path)/podcast-teach"
 
 echo
-"$TOOL" score "$FOLDER" 2>&1 | tee -a "$LOG"
+# After a second download the labels in labels-snapped have exact borders, so the joints are scored
+# against those (the finish steps do the same).
+LABELS=()
+if [ -d "$FOLDER/labels-snapped" ]; then
+  LABELS=(--labels labels-snapped)
+  echo "Scoring against the labels in labels-snapped. Episodes marked since the last \"Teach the phone again\" are not in it yet: double-click that first to include them."
+  echo
+fi
+"$TOOL" score "$FOLDER" "${LABELS[@]}" 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 case "$CODE" in
   0) finish "Done. The scorecard is above, and added to $FOLDER/scorecard.json." ;;

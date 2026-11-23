@@ -2,8 +2,9 @@
 # Double-click in Finder. Teaches the phone again from what has been marked so far, without marking
 # anything new. It reads the notes the phone wrote while you listened (teach_feedback.py), which
 # gives the next "Gather episodes for teaching" a list of episodes to fetch first, and then runs
-# the steps after marking (teach-finish.sh): the habits, the model, the library, the sounds, the
-# score and the copy to the phone's folders. It does not use your Claude plan's usage allowance.
+# the steps after marking (teach-finish.sh): the snap to the second download (when there is one),
+# the habits, the model, the library, the sounds, the meaning model, the score, the per-show
+# settings and the copy to the phone's folders. It does not use your Claude plan's usage allowance.
 # (python3 -u keeps what it prints from being held back while it is also copied to the log.)
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -31,8 +32,9 @@ if [ "$?" = 3 ]; then
 fi
 
 echo "This does not use your Claude usage allowance: nothing new is marked."
-echo "It reads what the phone noted, then works out the habits, trains the model, makes the"
-echo "library and the sounds, scores the ad skipping and copies the results to the phone's folders."
+echo "It reads what the phone noted, then works out the habits, trains the models, makes the"
+echo "library and the sounds, scores the ad skipping, chooses the per-show settings and copies the"
+echo "results to the phone's folders."
 echo
 
 echo "=== $(date '+%Y-%m-%d %H:%M') phone notes ===" >> "$LOG"

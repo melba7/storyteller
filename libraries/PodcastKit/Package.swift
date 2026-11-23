@@ -89,11 +89,14 @@ let package = Package(
                 "PodcastDownloads", "PodcastAudioMatch",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
-        // `swift run podcast-teach score|sounds <teaching folder>`: the Mac teaching run's
-        // scorecard and its library of ad sounds, made with the phone's own code. Foundation
-        // only, so it builds and runs on Linux too.
+        // `swift run podcast-teach score|sounds|meaning <teaching folder>`: the Mac teaching
+        // run's scorecard, its library of ad sounds and its meaning model, made with the phone's
+        // own code. It builds and runs on Linux too; only `meaning` needs a Mac (it uses Apple's
+        // sentence embedding through PodcastAdsOnDevice, which is empty on Linux).
         .executableTarget(
             name: "podcast-teach",
-            dependencies: ["PodcastAds", "PodcastAudioMatch", "PodcastTranscripts"]),
+            dependencies: [
+                "PodcastAds", "PodcastAdsOnDevice", "PodcastAudioMatch", "PodcastTranscripts",
+            ]),
     ]
 )

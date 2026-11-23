@@ -1,7 +1,8 @@
 #!/bin/bash
 # Double-click in Finder. Has Claude mark every advertisement and promotion in the transcribed
 # teaching episodes (teach_label.py), then runs the steps after marking (teach-finish.sh): the
-# habits, the model, the library, the sounds, the score and the copy to the phone's folders. Only
+# snap (when there is a second download), habits, models, library, sounds, score, per-show
+# settings and the copy to the phone's folders. Only
 # the marking uses the Claude plan this Mac is signed in to (it shares its usage allowance), and it
 # asks you to type yes before it starts. A stopped run carries on where it was when you double-click
 # again. If you do not type yes, nothing else runs.
@@ -48,7 +49,7 @@ if [ "$CODE" != 0 ] && [ "$CODE" != 3 ]; then
 fi
 
 echo
-echo "Now the steps after marking: habits, model, library, sounds, score and the copy to the phone."
+echo "Now the steps after marking: habits, models, library, sounds, score, settings and the copy to the phone."
 "$HERE/teach-finish.sh"
 AFTER="$?"
 

@@ -1,7 +1,8 @@
 // LOFI-FORK: the podcasts section's notes for the Mac (see FORK.md).
 //
-// The phone notes what happened to ads (skipped, undone, trimmed, missed) and writes the notes
-// into `Podcasts/phone-notes.jsonl` of the linked folder, for the Mac to learn from. These are
+// The phone notes what happened to ads (skipped, undone, trimmed, missed, and the answers
+// "confirmed" and "denied" to its questions) and writes the notes into
+// `Podcasts/phone-notes.jsonl` of the linked folder, for the Mac to learn from. These are
 // the rules for turning the native side's pending notes into those lines. Nothing here touches
 // the database or the folder (phoneNotesSync.ts does).
 import type { LinkedFileRead } from "@/modules/lofi-score"
@@ -12,7 +13,14 @@ export const DIARY_FILE = "Podcasts/phone-diary.jsonl"
 /** The notes file keeps this many of the newest lines. */
 export const MAX_NOTE_LINES = 2000
 
-const WHAT = ["skipped", "undone", "trimmed", "missed"] as const
+const WHAT = [
+  "skipped",
+  "undone",
+  "trimmed",
+  "missed",
+  "confirmed",
+  "denied",
+] as const
 type What = (typeof WHAT)[number]
 const KINDS = ["ad", "ownPlug", "promo", "credits"] as const
 
@@ -27,6 +35,8 @@ export type PendingNote = {
   end: number | null
   /** A sort of ad, or "" when the note has none (a missed ad). */
   kind: string
+  /** The name of the finder that made the ad ("own-sound", "meaning"), or "" when not known. */
+  by: string
 }
 
 /** What the database knows about the episode a note is for. */
@@ -66,6 +76,7 @@ function readNote(line: string): PendingNote | null {
     start,
     end,
     kind: KINDS.find((name) => name === value["kind"]) ?? "",
+    by: typeof value["by"] === "string" ? value["by"] : "",
   }
 }
 
@@ -85,7 +96,8 @@ export function parsePendingNotes(text: string): {
 /**
  * One line of the notes file, keys in the order of docs/PODCASTS-ADS-TEACHING.md. An episode
  * that is gone is written with empty text; `showFeed` is the show's feed address when only the
- * show is still known.
+ * show is still known. `by` comes last and only when the note has one, so a note with no finder
+ * is the line older builds wrote (the Mac reads it as optional, `teach_feedback.read_note`).
  */
 export function noteLine(
   note: PendingNote,
@@ -103,6 +115,7 @@ export function noteLine(
     start: note.start,
     end: note.end,
     kind: note.kind,
+    ...(note.by === "" ? {} : { by: note.by }),
   })
 }
 

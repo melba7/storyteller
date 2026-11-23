@@ -8,8 +8,8 @@
 #   4. has Claude mark the ads in at most 15 episodes, at most $25 of Claude's own cost estimate
 #      (teach_label.py --yes --limit 15 --cap 25). Every episode that is sent counts towards the 15,
 #      also one that fails. This is the only step that uses the Claude plan's usage allowance
-#   5. runs the steps after marking (teach-finish.sh): habits, model, library, sounds, score, and
-#      the copy to the phone's folders
+#   5. runs the steps after marking (teach-finish.sh): snap (when there is a second download),
+#      habits, models, library, sounds, score, per-show settings, and the copy to the phone's folders
 # One run at a time is enforced by the tools' lock on the teaching folder. When another run holds
 # it, this says so and ends quietly (exit 0). A step that fails is said plainly and the next ones
 # still run, because each works from what is already on disk. It exits 0 when every step worked.

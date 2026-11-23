@@ -7,6 +7,10 @@ import Foundation
 public struct PhoneNote: Codable, Equatable, Sendable {
   public enum What: String, Codable, Sendable {
     case skipped, undone, trimmed, missed
+    /// The listener answered a question "yes, skip it": a stretch the phone was unsure of is an ad.
+    case confirmed
+    /// The listener answered a question "not an ad".
+    case denied
   }
 
   public var v: Int
@@ -23,10 +27,13 @@ public struct PhoneNote: Codable, Equatable, Sendable {
   public var end: Double?
   /// The `rawValue` of the ad's `AdKind`, nil when no ad was known there.
   public var kind: AdKind?
+  /// The name of the finder that made the ad this note is about ("own-sound", "meaning"), nil
+  /// when it is not known. Older notes have none.
+  public var by: String?
 
   public init(
     at: Double, what: What, episode: String, show: String?, start: Double, end: Double?,
-    kind: AdKind?
+    kind: AdKind?, by: String? = nil
   ) {
     self.v = 1
     self.at = at
@@ -36,9 +43,11 @@ public struct PhoneNote: Codable, Equatable, Sendable {
     self.start = start
     self.end = end
     self.kind = kind
+    self.by = by
   }
 
-  /// The contract's fields, with `end` and `kind` written as null when there are none.
+  /// The contract's fields, with `end` and `kind` written as null when there are none. `by` is
+  /// left out when there is none, so a note without a finder reads the same as in older builds.
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: CodingKeys.self)
     try container.encode(v, forKey: .v)
@@ -49,6 +58,7 @@ public struct PhoneNote: Codable, Equatable, Sendable {
     try container.encode(start, forKey: .start)
     try container.encode(end, forKey: .end)
     try container.encode(kind, forKey: .kind)
+    try container.encodeIfPresent(by, forKey: .by)
   }
 
   /// The note as one line of JSON, with no line break.

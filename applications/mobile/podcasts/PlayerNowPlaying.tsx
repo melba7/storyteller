@@ -14,6 +14,7 @@ import {
 import { VolumeView } from "@/modules/podcasts/volumeView"
 
 import { AdFindingLine } from "./AdFindingLine"
+import { AskAdNote } from "./AskAdNote"
 import { ChapterTitle } from "./ChapterBar"
 import { MissedAdNote } from "./MissedAdNote"
 import { PlayerMenu } from "./PlayerMenu"
@@ -132,6 +133,7 @@ export function PlayerNowPlaying({
       <AdFindingLine episode={episode} show={show} />
       <SkippedAdNote />
       <MissedAdNote />
+      <AskAdNote />
 
       <PlayerTransport view={view} />
 

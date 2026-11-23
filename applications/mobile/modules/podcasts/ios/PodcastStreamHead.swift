@@ -268,7 +268,7 @@ final class PodcastStreamHead: @unchecked Sendable {
     // What the Mac taught about this show sets the steps (PodcastTeaching reads its files on this
     // background task, the first time it is asked).
     let plan = HeadPlan(
-      habits: PodcastTeaching.shared.files.habits, show: EpisodeShows.shared.show(for: episodeId))
+      habits: PodcastHabits.shared.merged(), show: EpisodeShows.shared.show(for: episodeId))
     var steps = HeadSteps(steps: plan.steps)
     while let target = steps.target {
       try Task.checkCancellation()
@@ -339,10 +339,10 @@ final class PodcastStreamHead: @unchecked Sendable {
       let begun = opening.look(in: words, episodeId: episodeId)
       // The local layers and the taught sounds (PodcastStreamHead+Local.swift).
       let (sponsors, duration) = lock.withLock { (self.sponsors, self.episodeDuration) }
-      let localAds = findLocal(
+      let local = findLocal(
         lines: lines, transcript: transcript, sponsors: sponsors, episodeDuration: duration,
-        audio: data.prefix(cut.bytes))
-      save(AdHeadRules.merge(remembered.ads + localAds + modelAds), covered: fed)
+        audio: data.prefix(cut.bytes), blockers: remembered.ads + modelAds)
+      save(NewAds.headAds(remembered.ads, local, model: modelAds), covered: fed)
       // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
       if !told {
         told = true
@@ -364,7 +364,7 @@ final class PodcastStreamHead: @unchecked Sendable {
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")
-          save(AdHeadRules.merge(remembered.ads + localAds + modelAds), covered: fed)
+          save(NewAds.headAds(remembered.ads, local, model: modelAds), covered: fed)
         } catch {
           // The error's type name and case name for the diary, not its words.
           PodcastTimeline.mark(episodeId, "model: no answer (\(AdDiary.note(for: error)))")

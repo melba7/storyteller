@@ -47,8 +47,10 @@ public enum AdScoreCommand {
   }
 
   /// Runs the command. 0 it worked (also when nothing is labelled yet), 2 a set-up problem.
+  /// `extras` is what the caller adds for the rows that need audio or Apple's sentence embedding.
   public static func run(
-    _ arguments: [String], now: Date = Date(), out: (String) -> Void, err: (String) -> Void
+    _ arguments: [String], now: Date = Date(), extras: ScoreExtras = ScoreExtras(),
+    out: (String) -> Void, err: (String) -> Void
   ) -> Int32 {
     let options: Options
     switch parse(arguments) {
@@ -97,28 +99,51 @@ public enum AdScoreCommand {
     if !library.ads.isEmpty {
       detectors.append(("Plus the library", LocalAds(model: model, layers: .all), library))
     }
+    var rows: [ScorecardRow] = []
     var cards: [Scorecard] = []
     for detector in detectors {
-      cards.append(
-        AdScoreRun.run(episodes: chosen, habits: habits) { episode, transcript in
-          find(episode, transcript, detector.local, detector.library)
-        })
+      let card = AdScoreRun.run(episodes: chosen, habits: habits) { episode, transcript in
+        find(episode, transcript, detector.local, detector.library)
+      }
+      cards.append(card)
+      rows.append(ScorecardRow(name: detector.name, card: card))
     }
-    let layers = zip(detectors, cards).map {
-      LayerResult(
-        name: $0.0.name, caughtShare: share($0.1.total.caught, $0.1.total.ads),
-        cutSeconds: $0.1.total.cutSeconds)
+    guard let last = detectors.last else { return 0 }
+    let base: (TeachingEpisode, Transcript) -> [FoundAd] = { episode, transcript in
+      find(episode, transcript, last.local, last.library)
+    }
+
+    // The rows that stand on the finders: each adds one thing to the row before it.
+    let audio = TeachingAudio.files(in: folder)
+    let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
+    let finalAds = ScoreEpisodeAds()
+    // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
+    // episode of a show, so the labelled episodes that are not scored come first and only teach.
+    plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
+    let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
+    let made = AdScoreRun.runLayers(
+      episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: layers)
+    for (layer, card) in zip(plan.layers, made.dropFirst()) {
+      cards.append(card)
+      rows.append(ScorecardRow(name: layer.name, card: card))
     }
     guard let card = cards.last else { return 0 }
 
     let historyURL = folder.appendingPathComponent(ScorecardHistory.fileName)
     var history = ScorecardHistory.load(from: historyURL)
-    let reportNotes = libraryRead.file.isEmpty ? [] : ["Library: \(libraryRead.file)"]
-    out(
-      AdScoreReport.text(
-        card, title: title, results: layers, notes: reportNotes, previous: history.runs.last))
-    history.append(
-      ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, total: card.total))
+    let reportNotes = (libraryRead.file.isEmpty ? [] : ["Library: \(libraryRead.file)"]) + plan.notes
+    var text = AdScoreReport.text(
+      card, title: title, results: rows.map { LayerResult(name: $0.name, total: $0.total) },
+      notes: reportNotes, previous: history.runs.last)
+    var after = AdScoreNotes.rowLines(rows) + plan.meaningLines()
+    after += questions(
+      model: model, episodes: chosen, finalAds: finalAds, from: plan.tuning?.askThreshold)
+    after += AdScoreNotes.habitLines(episodes: labelled, mac: habits, find: { episode, head in
+      base(episode, head)
+    })
+    text += "\n\n" + after.joined(separator: "\n")
+    out(text)
+    history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
     do {
       try history.save(to: historyURL)
     } catch {
@@ -128,8 +153,28 @@ public enum AdScoreCommand {
     return 0
   }
 
-  private static func share(_ part: Int, _ whole: Int) -> Double {
-    whole == 0 ? 0 : Double(part) / Double(whole)
+  /// A last, silent row that keeps what the row before it found for each whole episode (not for
+  /// the head), so the questions can be asked outside those ads. It adds nothing and its row is
+  /// not saved.
+  private static func remembering(_ kept: ScoreEpisodeAds) -> AdScoreLayer {
+    AdScoreLayer(name: "") { input, soFar in
+      if !input.isHead { kept.put(soFar, for: input.episode.id) }
+      return []
+    }
+  }
+
+  /// The questions line and the starting gate; or a plain sentence when there is no word model
+  /// to ask them.
+  private static func questions(
+    model: AdWordModel?, episodes: [TeachingEpisode], finalAds: ScoreEpisodeAds, from: Double?
+  ) -> [String] {
+    guard let model else {
+      return ["Questions: not counted, there is no word model (ad-model.json) to ask them."]
+    }
+    let asked = AdScoreNotes.questions(
+      model: model, episodes: episodes, finalAds: { finalAds.ads(for: $0.id) ?? [] },
+      from: from ?? AdAsks.askFrom)
+    return AdScoreNotes.questionLines(asked)
   }
 
   /// What the phone would find in this transcript: the local finders and, when there is a library,

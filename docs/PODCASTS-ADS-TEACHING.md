@@ -1,8 +1,9 @@
 # Podcasts: the Mac teaches, the phone skips alone
 
-This is how ad skipping works after the round of 2026-11-22, and the contracts
-between its parts. The reasons are in the plan document "Podcast ad skipping
-rethink" (linked from `docs/PLAN.md`).
+This is how ad skipping works after the rounds of 2026-11-22 and 2026-11-23, and
+the contracts between its parts. The reasons are in the plan document "Podcast
+ad skipping rethink" (linked from `docs/PLAN.md`). The second round ("the phone
+learns by itself") is described under "What the phone learns by itself" below.
 
 ## The rule
 
@@ -74,20 +75,84 @@ What keeps the layers from cutting the show itself:
   (`detectorVersion` empty); when the model can be asked again, the episode is
   checked again and the local ads are added to its answer.
 
+## What the phone learns by itself
+
+Since the round of 2026-11-23 the phone also finds ads from its own listening,
+with no help from the Mac. Every new finder returns ads that are `unsure` at
+most, and a finder alone never makes a skip that Undo cannot take back. The
+Mac's files only make each finder better or stricter.
+
+| Finder (the `source` of its ads)    | What it does                                                                                                                              |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `own-sound` (`OwnAdSounds`)         | Keeps the sound print of every sure ad the phone skipped (`own-ad-sounds.json`) and finds it again                                        |
+| `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                   |
+| `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                |
+| `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                               |
+| joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later |
+
+For each new finder the phone does, in this order: find, keep only the parts
+outside the ads already known (0.6 s away from them), apply the Mac's per-show
+choice (`ShowTuning.apply`, and the finder guard's mode), join the ads that skip
+(`AdJoin.join`), snap to joints, write through `AdsStore`, and then learn from
+what was found. `ShowTuning.apply` must run on each finder's own list before the
+join, because a joined ad loses its `source`.
+
+- **A repeat only asks.** A repeated stretch is not always an ad, so a repeat
+  never skips on its own: the phone's built-in level for repeats is `ask`, and
+  the Mac's rules only make the phone stricter, never looser. (A hand edit of
+  `show-settings.json` would say `skip`, but the next "Teach the phone again"
+  writes the file whole and loses it.)
+- **Questions.** A guess that is not sure enough to skip becomes a question,
+  from whole-transcript passes only, at most three in an episode (answered ones
+  count). The phone shows "Ad? Skip" with two answers while the stretch plays
+  (`answerAdQuestion`, event `onAdAsk`). A yes skips the stretch like any skip,
+  with Undo, and is kept inside the question (`AdsFile.asks`) so that a join
+  cannot lose it; a no goes to `AdsFile.denied`, never to `undone`. Ads that are
+  `unsure` are still skipped with Undo, as before.
+- **The finder guard** (`FinderGuard`). A mark on disk before a new finder runs
+  tells the next launch that the finder crashed. A crash turns that finder off
+  for that episode, and a second crash in the same app build turns it off
+  everywhere until the next build. Two undone skips among the last five answers
+  on a show (answers older than 30 days do not count) make the finder ask
+  instead of skip, and two "not an ad" answers out of five turn it off for that
+  show. The guard can only make a finder stricter than the Mac's file does.
+- **Learning from answers.** Each saved answer goes to the ad finder
+  (`learnAnswered`). A yes is remembered by its words, its sound is learned and
+  the guard hears the finder was right. A no tells the guard it was wrong and a
+  repeat of words or sound is forgotten. Undo takes what was learned for the
+  stretch back out (`forgetUndone`). Own sound prints are learned only from sure
+  ads, after the joint snap, that were not undone or trimmed.
+- **Limits.** About 20 MB of new data on the phone: prints of the last three
+  episodes of 60 shows (12 MB in Caches) and hashes of repeated words (about 7
+  MB). A show that skips nothing (every sort switched off) gets no new finder,
+  joints, prints or questions.
+- **What the phone keeps.** In `Podcasts/` of Application Support:
+  `own-ad-sounds.json` (the phone's own sound prints), `repeat-words.json`
+  (hashes of repeated words), `finder-guard.json` (the guard's marks and
+  answers) and `finder-learned.json` (which episodes already taught the phone,
+  in three lists: `own`, `print` and `habits`, so an episode teaches once). In
+  `Library/Caches/Podcasts/prints/`: the prints of a show's last episodes, which
+  iOS may clear. Losing any of them costs only what the phone had learned.
+- **Show starts.** `show-starts.json` is version 2 and keeps where openings end;
+  the Mac's habit wins when it has one, so a show the Mac never sampled gets the
+  same first look.
+
 ## The files the Mac makes
 
 The teaching folder is `~/Storyteller Lofi/PodcastTeaching` on the Mac. It is
-never committed. `teach_publish.py` copies four files and a list of them into
+never committed. `teach_publish.py` copies six files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
 the phone has linked.
 
-| File               | Made by                | Holds                                         |
-| ------------------ | ---------------------- | --------------------------------------------- |
-| `ad-model.json`    | `teach_train.py`       | weights of the small word model               |
-| `ad-library.json`  | `teach_library.py`     | the words of ads met in marked episodes       |
-| `show-habits.json` | `teach_habits.py`      | per show: how many episodes open with an ad   |
-| `ad-sounds.json`   | `podcast-teach sounds` | the sound prints of marked ads                |
-| `teaching.json`    | `teach_publish.py`     | the four files' sizes and SHA-256, read first |
+| File                 | Made by                 | Holds                                                |
+| -------------------- | ----------------------- | ---------------------------------------------------- |
+| `ad-model.json`      | `teach_train.py`        | weights of the small word model                      |
+| `ad-library.json`    | `teach_library.py`      | the words of ads met in marked episodes              |
+| `show-habits.json`   | `teach_habits.py`       | per show: how many episodes open with an ad          |
+| `ad-sounds.json`     | `podcast-teach sounds`  | the sound prints of marked ads                       |
+| `ad-meaning.json`    | `podcast-teach meaning` | weights of the meaning model, with two probe vectors |
+| `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
+| `teaching.json`      | `teach_publish.py`      | the six files' sizes and SHA-256, read first         |
 
 All are JSON objects with `"version": 1` and stay under 4.5 MB (the phone
 refuses a file over 5 MB).
@@ -125,15 +190,34 @@ addresses are compared as "feed keys": no scheme, no `www.`, lower-case host, no
 fragment, no closing slash (`feedKey` in `applePodcasts.ts`, `FeedKey` in
 PodcastKit).
 
+**The second download.** `Check ads with a second download.command` fetches
+again, at most 40 marked episodes and 3 GB a run, the copy of an episode the
+phone would play. `teach-finish.sh` then runs `teach_snap.py`, which moves the
+borders of Claude's marked ads onto what the two downloads differ in (where an
+inserted ad starts and ends exactly). The result goes to `labels-snapped/`
+beside Claude's `labels/`, which are never overwritten, and the later steps use
+the snapped labels when they exist. The snap step is left out when there is no
+second download.
+
+**The finish steps.** `teach-finish.sh` prints "Step N of 8": the snap (only
+when `copies/` or `labels-snapped/` exists), then habits, the word model, the
+library, the sounds, the meaning model, the score, the per-show settings and the
+copy to the phone's folders. `podcast-teach meaning` exits 2 for a set-up
+problem (for example, no sentence embedding on this Mac), and that does not stop
+the later steps.
+
 ## From the phone back to the Mac
 
 The phone writes two files into `Podcasts/` of its linked folder:
 
 - `phone-notes.jsonl`: one line per event, the newest 2,000 lines.
-  `{"v": 1, "at": <ms>, "what": "skipped" | "undone" | "trimmed" | "missed", "feed", "guid", "title", "address", "start", "end", "kind"}`.
-  "missed" is a tap on Skip ad where the phone knew no ad. `teach_feedback.py`
-  turns episodes with misses or undone skips into `wanted.json`, and the next
-  gathering takes those episodes first.
+  `{"v": 1, "at": <ms>, "what": "skipped" | "undone" | "trimmed" | "missed" | "confirmed" | "denied", "feed", "guid", "title", "address", "start", "end", "kind", "by"}`.
+  "missed" is a tap on Skip ad where the phone knew no ad. "confirmed" is a yes
+  and "denied" a no to a question the phone asked. `by` names the finder that
+  made the ad, only when the phone knew it (older notes have none).
+  `teach_feedback.py` turns episodes with misses, undone skips or answers into
+  `wanted.json` ("confirmed" counts like "missed" and "denied" like "undone"),
+  and the next gathering takes those episodes first.
 - `phone-diary.jsonl`: the skip log and the ad finder's diary, as "Send skip
   log" shares them, written again when they changed.
 
@@ -153,6 +237,7 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 | `installTeachingFile(name, text, sha256)`                           | true when the file was checked and installed       |
 | `setTeachingShows(json)`                                            | nothing; `json` is `{"<feed key>": "<show id>"}`   |
 | `getTeachingState()`                                                | JSON text, see below                               |
+| `answerAdQuestion(episodeId, start, isAd)`                          | true when an open question starts at `start`       |
 
 - A pending note is
   `{"v": 1, "at": <ms>, "what", "episode": "<episode id>", "show": "<show id or empty>", "start", "end": <seconds or null>, "kind"}`.
@@ -176,6 +261,11 @@ Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
   `{"files": {"<name>": {"sha256", "installedAt"}}, "model": {"writtenAt", "episodes", "precision", "recall"} | null, "library": <entries>, "habits": <shows>, "sounds": <sounds>}`.
 - The `onAdSkipped` event also carries `"kind"`. `onAdsChange` is also sent
   after a trim.
+- The `onAdAsk` event (`{episodeId, start, end, kind}`) is sent once for each
+  question when the playhead enters the stretch. The app shows "Ad? Skip" until
+  the stretch ends. `answerAdQuestion` with `isAd` true skips the stretch like
+  any skip (note, Undo); with false it says the stretch is not an ad. Neither
+  needs the Skip ads switch, because the listener asked for it.
 - The load options take `startChosen`: true when the listener chose the place to
   start from, so an ad there is not skipped at once.
 - An Up Next item carries `notes` (the first 4,000 characters) and `showLink`,
@@ -193,6 +283,19 @@ Native module `LofiScore` (`modules/lofi-score`):
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `writeLinkedFolderFile(path, text)` | `{status: "written"}`, `{status: "notLinked" \| "folderGone"}` or `{status: "unwritable", message}` |
 
+## Switching things off, and going back
+
+- To make one finder stricter for every show or for one show, the Mac decides
+  from the scorecard when you double-click "Teach the phone again": a finder
+  that finds more wrong than right seconds is turned off, and one under 85%
+  precision only asks. The phone's guard does the same by itself after a crash
+  or two undone skips.
+- There is no switch for a finder in the app. To go back to how ads were skipped
+  before this round, install build 33.1 again from the build list in TestFlight;
+  the files the new finders wrote have only new fields, which the old build
+  skips over (it may lose the habits of shows it learned about in the new
+  build).
+
 ## Measuring
 
 `podcast-teach score <teaching folder>` runs the phone's local layers over the
@@ -202,6 +305,21 @@ first look knows, and what each layer adds. By default it scores only the shelf
 episodes, which the model never saw in training. Each run is added to
 `scorecard.json`, so the next run says what changed. Double-click
 `Score the ad skipping.command` on the Mac.
+
+The scorecard lists the layers in the order the phone adds them, and each row is
+the row before plus one more layer: the existing layers, then "Plus the meaning
+model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
+words", "Plus joints", "Plus joints (steady files too)" and, always last, "Plus
+per-show settings" (with the built-in settings when there is no file yet). The
+row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
+what is turned on or off. The learning rows (own sounds, repeats) first learn
+from the marked episodes that are not scored, then scan the scored ones, so each
+episode is judged only on what the earlier episodes of its show taught. The
+scorecard also prints how many questions the word model would ask (not the
+repeat finders' or the meaning model's), a note on habits and what was left out.
+The meaning model is published only when its row adds right seconds for host_ask
+and network_promo and at least 85% of the added seconds are right, and the
+scorecard is not older than the model.
 
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
@@ -215,3 +333,9 @@ trimmed, missed, time saved) and what the Mac taught and when.
 - A missed-ad tap jumps 30 seconds. It could end where the small model thinks
   the stretch ends, and teach the phone's own memory at once.
 - `AdCleanup`'s own merge is not kind-aware.
+- A repeat never skips. A rule that promotes a repeat to skip after enough
+  confirmed answers on a show is parked until the answers show it is safe.
+- Episodes that finished before the update never run the new finders again.
+- A habit may be counted twice for an episode that was streamed and then
+  downloaded; the check of play-through limits it.
+- Transcripts over 64 MB skip the deny-by-words step.

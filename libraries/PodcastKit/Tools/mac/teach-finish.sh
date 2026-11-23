@@ -1,14 +1,23 @@
 #!/bin/bash
 # Not double-clicked: the other teaching files call it. It does the steps after the ads are marked,
 # in this order:
+#   0. snap     (teach_snap.py)      only when the folder copies/ (second downloads) or
+#                                    labels-snapped/ exists: moves the borders of Claude's labels
+#                                    onto what the two downloads differ in, into labels-snapped/.
+#                                    When labels-snapped/ exists (and snapping did not fail) steps 1
+#                                    to 6 are given --labels labels-snapped; Claude's own labels are
+#                                    never changed.
 #   1. habits   (teach_habits.py)    what each show usually does at its start
 #   2. train    (teach_train.py)     the small model that spots ads
 #   3. library  (teach_library.py)   the library of known ads
 #   4. sounds   (podcast-teach sounds) builds podcast-teach first (swift build)
-#   5. score    (podcast-teach score)  the scorecard of the ad skipping
-#   6. publish  (teach_publish.py)   copies the results to the folders the phone reads
-# A step that fails is said plainly and the later steps still run, except that the two Swift steps
-# (4 and 5) are left out together when podcast-teach does not build. It ends with one line per
+#   5. meaning  (podcast-teach meaning)  the small model that reads what a line means (needs a Mac;
+#                                    when it cannot run it says so and the run goes on)
+#   6. score    (podcast-teach score)  the scorecard of the ad skipping (it scores the meaning model)
+#   7. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
+#   8. publish  (teach_publish.py)   copies the results to the folders the phone reads
+# A step that fails is said plainly and the later steps still run, except that the three Swift steps
+# (4, 5 and 6) are left out together when podcast-teach does not build. It ends with one line per
 # step (worked, nothing to do, failed) and exits 0 when publish worked, 1 otherwise. It holds the
 # teaching folder's run lock for its whole length (it starts itself again under
 # `teach_store.py hold`), so a second window cannot gather, mark or train while it works. When
@@ -46,8 +55,12 @@ SUMMARY=""
 
 say() { echo "$@" | tee -a "$LOG"; }
 
-# A short fingerprint of a file, or "none" when there is no such file.
-fingerprint() { if [ -f "$1" ]; then cksum < "$1"; else echo none; fi; }
+# A short fingerprint of a file (or of the .json files of a folder), or "none" when there is none.
+fingerprint() {
+  if [ -f "$1" ]; then cksum < "$1"
+  elif [ -d "$1" ]; then cat "$1"/*.json 2> /dev/null | cksum
+  else echo none; fi
+}
 
 # note LABEL RESULT: adds a line to the summary at the end.
 note() { SUMMARY="$SUMMARY  $1: $2
@@ -82,22 +95,45 @@ run_step() {
   return 0
 }
 
-echo "=== $(date '+%Y-%m-%d %H:%M') finish: habits, model, library, sounds, score, publish ===" >> "$LOG"
+echo "=== $(date '+%Y-%m-%d %H:%M') finish: habits, model, library, sounds, meaning, score, settings, publish ===" >> "$LOG"
 
-say "Step 1 of 6: working out what each show usually does at its start"
-run_step "Habits" "$FOLDER/habits.json" $CAFFEINATE python3 -u "$TOOLS/teach_habits.py" --folder "$FOLDER"
+# Step 0: when second downloads were compared (copies/), or labels-snapped/ is there from an earlier
+# run, bring labels-snapped up to date: Claude's label borders are moved onto the second downloads and
+# the labels marked since the last time are copied in (teach_snap.py copies a label with no second
+# download as it is). The folder's run lock is already held, so teach_snap.py takes none of its own.
+# When it fails, the labels-snapped folder may be old, so Claude's own labels are used this time.
+# LABELS is what the steps below that read labels are given (unquoted on purpose: nothing, or two
+# words).
+LABELS=""
+SNAPPED=1
+if [ -d "$FOLDER/copies" ] || [ -d "$FOLDER/labels-snapped" ]; then
+  say "First: bringing the labels in labels-snapped up to date with the second downloads"
+  if ! run_step "Snap" "$FOLDER/labels-snapped" python3 -u "$TOOLS/teach_snap.py" --folder "$FOLDER"; then
+    SNAPPED=""
+    say "Claude's own labels are used this time, not the snapped ones."
+  fi
+  say
+fi
+if [ -n "$SNAPPED" ] && [ -d "$FOLDER/labels-snapped" ]; then
+  LABELS="--labels labels-snapped"
+  say "The steps below read the labels in labels-snapped (Claude's labels with exact borders)."
+  say
+fi
+
+say "Step 1 of 8: working out what each show usually does at its start"
+run_step "Habits" "$FOLDER/habits.json" $CAFFEINATE python3 -u "$TOOLS/teach_habits.py" --folder "$FOLDER" $LABELS
 
 say
-say "Step 2 of 6: training the model that spots ads"
-run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER"
+say "Step 2 of 8: training the model that spots ads"
+run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" $LABELS
 
 say
-say "Step 3 of 6: making the library of known ads"
-run_step "Library" "$FOLDER/ad-library.json" $CAFFEINATE python3 -u "$TOOLS/teach_library.py" --folder "$FOLDER"
+say "Step 3 of 8: making the library of known ads"
+run_step "Library" "$FOLDER/ad-library.json" $CAFFEINATE python3 -u "$TOOLS/teach_library.py" --folder "$FOLDER" $LABELS
 
-# The two Swift steps: build podcast-teach once, then run it twice.
+# The three Swift steps: build podcast-teach once, then run it three times.
 say
-say "Step 4 of 6: building the ad sounds"
+say "Step 4 of 8: building the ad sounds"
 KIT=""
 for CANDIDATE in "${TEACH_KIT:-$HERE/../..}" "$HOME/Storyteller Lofi/testflight-build/libraries/PodcastKit"; do
   if [ -f "$CANDIDATE/Package.swift" ]; then
@@ -117,17 +153,31 @@ else
 fi
 if [ -z "$TEACH_TOOL" ]; then
   note "Sounds" "failed (podcast-teach is not built)"
+  note "Meaning" "failed (left out because podcast-teach is not built)"
   note "Score" "failed (left out because podcast-teach is not built)"
-  say "The sounds and the score are left out."
+  say "The sounds, the meaning model and the score are left out."
 else
-  run_step "Sounds" "$FOLDER/ad-sounds.json" "$TEACH_TOOL" sounds "$FOLDER"
+  run_step "Sounds" "$FOLDER/ad-sounds.json" "$TEACH_TOOL" sounds "$FOLDER" $LABELS
   say
-  say "Step 5 of 6: scoring the ad skipping"
-  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER"
+  # Exit 2 is a set-up problem (no embedder, no shelf, no vector for any line, no usable model); 0
+  # also covers "no shelf yet" and "too few episodes". Neither stops the run.
+  say "Step 5 of 8: training the model that reads what a line means"
+  run_step "Meaning" "$FOLDER/ad-meaning.json" $CAFFEINATE "$TEACH_TOOL" meaning "$FOLDER" $LABELS \
+    || say "No new meaning model this time (see above). One already at the phone's folders stays as it is."
+  say
+  say "Step 6 of 8: scoring the ad skipping"
+  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS
 fi
 
+# It reads scorecard.json (exit 0 also when there is none yet: nothing is written). Exit 2 is a
+# problem, said above; the settings file is optional, so the run goes on.
 say
-say "Step 6 of 6: copying the results to the phone's folders"
+say "Step 7 of 8: choosing what each new finder may do on each show"
+run_step "Settings" "$FOLDER/show-settings.json" python3 -u "$TOOLS/teach_settings.py" --folder "$FOLDER" \
+  || say "No new settings this time (see above). The phone keeps the ones it has, or its built-in defaults."
+
+say
+say "Step 8 of 8: copying the results to the phone's folders"
 run_step "Publish" "-" python3 -u "$TOOLS/teach_publish.py" --folder "$FOLDER"
 PUBLISH="$LAST_CODE"
 

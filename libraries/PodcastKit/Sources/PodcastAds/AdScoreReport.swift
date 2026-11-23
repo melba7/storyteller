@@ -2,17 +2,34 @@
 // only.
 import Foundation
 
-/// The totals of one scorecard run, as kept in `scorecard.json`.
+/// One scorecard run, as kept in `scorecard.json`: `total` is the last row's total, and `rows`
+/// has every row with its own per-show totals (see `ScorecardRow`). A run saved before rows
+/// existed has no `rows`, and reads with none.
 public struct ScorecardRun: Codable, Sendable, Equatable {
   /// When it ran, in milliseconds since 1970.
   public var at: Int64
   public var title: String
   public var total: ScoreTotals
+  public var rows: [ScorecardRow]
 
-  public init(at: Int64, title: String, total: ScoreTotals) {
+  public init(at: Int64, title: String, total: ScoreTotals, rows: [ScorecardRow] = []) {
     self.at = at
     self.title = title
     self.total = total
+    self.rows = rows
+  }
+
+  /// A run of these rows, the last one being the finished finder: its total is the run's.
+  public init(at: Int64, title: String, rows: [ScorecardRow]) {
+    self.init(at: at, title: title, total: rows.last?.total ?? ScoreTotals(), rows: rows)
+  }
+
+  public init(from decoder: Decoder) throws {
+    let box = try decoder.container(keyedBy: CodingKeys.self)
+    at = try box.decode(Int64.self, forKey: .at)
+    title = try box.decode(String.self, forKey: .title)
+    total = try box.decode(ScoreTotals.self, forKey: .total)
+    rows = (try? box.decodeIfPresent([ScorecardRow].self, forKey: .rows)) ?? []
   }
 }
 
@@ -21,6 +38,9 @@ public struct ScorecardHistory: Codable, Sendable, Equatable {
   public static let currentVersion = 1
   public static let fileName = "scorecard.json"
   public static let mostRuns = 50
+  /// Only this many of the newest runs keep their `rows` (each row holds every show's totals,
+  /// which would make the file large); older runs keep their `total`.
+  public static let mostRunsWithRows = 5
 
   public var version: Int
   public var runs: [ScorecardRun]
@@ -39,10 +59,11 @@ public struct ScorecardHistory: Codable, Sendable, Equatable {
     return saved
   }
 
-  /// Adds a run, keeping the newest 50.
+  /// Adds a run, keeping the newest 50, and the rows of the newest 5.
   public mutating func append(_ run: ScorecardRun) {
     runs.append(run)
     if runs.count > Self.mostRuns { runs.removeFirst(runs.count - Self.mostRuns) }
+    for index in runs.indices.dropLast(Self.mostRunsWithRows) { runs[index].rows = [] }
   }
 
   public func save(to url: URL) throws {
@@ -53,17 +74,33 @@ public struct ScorecardHistory: Codable, Sendable, Equatable {
 }
 
 /// How one layer of the finders did on its own: the share of ads caught and the show seconds cut
-/// by mistake.
+/// by mistake, and, when the caller has them, the seconds of caught ads heard before and after the
+/// skips.
 public struct LayerResult: Sendable, Equatable {
   public var name: String
   /// 0 to 1.
   public var caughtShare: Double
   public var cutSeconds: Double
+  public var heardBeforeSeconds: Double?
+  public var heardAfterSeconds: Double?
 
-  public init(name: String, caughtShare: Double, cutSeconds: Double) {
+  public init(
+    name: String, caughtShare: Double, cutSeconds: Double, heardBeforeSeconds: Double? = nil,
+    heardAfterSeconds: Double? = nil
+  ) {
     self.name = name
     self.caughtShare = caughtShare
     self.cutSeconds = cutSeconds
+    self.heardBeforeSeconds = heardBeforeSeconds
+    self.heardAfterSeconds = heardAfterSeconds
+  }
+
+  /// All of it from a row's totals.
+  public init(name: String, total: ScoreTotals) {
+    self.init(
+      name: name, caughtShare: total.ads == 0 ? 0 : Double(total.caught) / Double(total.ads),
+      cutSeconds: total.cutSeconds, heardBeforeSeconds: total.heardBeforeSeconds,
+      heardAfterSeconds: total.heardAfterSeconds)
   }
 }
 
@@ -104,6 +141,8 @@ public enum AdScoreReport {
     out.append("Ad time still heard: \(time(total.heardSeconds)).")
     out.append(
       "Show time cut by mistake: \(time(total.cutSeconds)) (\(share(total.cutSeconds, total.showSeconds)) of the show), in \(count(total.wrongSkips, "wrong skip")).")
+    out.append(
+      "Ads caught, ad time heard before the skip: \(time(total.heardBeforeSeconds)), after the skip: \(time(total.heardAfterSeconds)).")
     out.append("")
     let names = [
       ("sponsor", "Sponsor ads"), ("network_promo", "Network and house promos"),
@@ -143,6 +182,16 @@ public enum AdScoreReport {
       out.append(
         "What each layer adds: " + parts.joined(separator: results == nil ? ", " : "; ") + ".")
     }
+    let around = (results ?? []).compactMap { result -> String? in
+      guard let before = result.heardBeforeSeconds, let after = result.heardAfterSeconds else {
+        return nil
+      }
+      return "\(result.name) \(time(before)) before, \(time(after)) after"
+    }
+    if !around.isEmpty {
+      out.append(
+        "Caught ads heard before and after the skips, by layer: " + around.joined(separator: "; ") + ".")
+    }
     if let before = previous?.total {
       out.append(
         "Since the last scorecard: ads caught \(percent(total.caught, total.ads)) (was \(percent(before.caught, before.ads))), ad time heard \(time(total.heardSeconds)) (was \(time(before.heardSeconds))), show time cut \(time(total.cutSeconds)) (was \(time(before.cutSeconds))).")
@@ -160,7 +209,7 @@ public enum AdScoreReport {
       let total = show.total
       rows.append(
         "  " + name.padding(toLength: 32, withPad: " ", startingAt: 0)
-          + "  caught \(total.caught) of \(total.ads), heard \(time(total.heardSeconds)), cut \(time(total.cutSeconds))")
+          + "  caught \(total.caught) of \(total.ads), heard \(time(total.heardSeconds)), cut \(time(total.cutSeconds)), caught ads heard before the skip \(time(total.heardBeforeSeconds)), after it \(time(total.heardAfterSeconds))")
     }
     if shows.count > mostShows { rows.append("  and \(shows.count - mostShows) more shows.") }
     return rows

@@ -50,17 +50,25 @@ extension PodcastAdFinder {
         // The local ads join the model's, then chapters named like an ad break (with words that
         // sell inside) add to both.
         let joined = LocalAdsFile.addToFinal(local, store: ads, detector: Self.detectorName) ?? found
-        let file = await withChapterAds(id, ads: ads, finished: joined, transcript: transcript)
+        let withChapters = await withChapterAds(
+          id, ads: ads, finished: joined, transcript: transcript)
+        // The old finders' ads are on disk: a playing episode skips them now, before the new
+        // finders (slow) add what they find, each through the guard (PodcastAdFinder+New.swift).
+        refreshIfPlaying(id)
+        let made = addNewFinders(id, ads: ads, transcript: transcript, file: withChapters)
+        let file = made.file
         set(id, AdsRules.finished(file))
+        // An episode that is playing now starts skipping the new ads at once, not after the
+        // learning below.
+        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
         PodcastTimeline.mark(
           id, "full pass ended: \(file.ads.count) ads, \(file.refusedPieces ?? 0) pieces refused")
-        // The sure ads are remembered by their words, so a repeat is found at once. Only sure ads
-        // are taken: the local ones are sure when a strong rule or an exact taught sound says so.
-        learnRemembered(id, ads: ads, finished: file, transcript: transcript)
-        // The words the show opens with are learned from the episode's first minutes.
-        learnOpening(id, ads: ads, finished: file, transcript: transcript)
-        // An episode that is playing now starts skipping the new ads.
-        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+        // The sure ads are remembered by their words, so a repeat is found at once, and by their
+        // sound; the words the show opens with are learned from the episode's first minutes; the
+        // show's habits and what the episode said and sounded like are noted
+        // (PodcastAdFinder+Learn.swift). Only sure ads are taken: the local ones are sure when a
+        // strong rule or an exact taught sound says so.
+        learnAfterFind(id, ads: ads, transcript: transcript, made: made, trusted: true)
       case .stopped:
         PodcastTimeline.mark(id, "full pass stopped to make way")
         pause(id)
@@ -99,9 +107,14 @@ extension PodcastAdFinder {
       set(id, .notPossible(reason: "The ads could not be saved"))
       return
     }
-    let file = await withChapterAds(id, ads: ads, finished: saved, transcript: transcript)
+    let withChapters = await withChapterAds(id, ads: ads, finished: saved, transcript: transcript)
+    refreshIfPlaying(id)  // before the new finders, as in the full pass
+    let made = addNewFinders(id, ads: ads, transcript: transcript, file: withChapters)
+    let file = made.file
     set(id, AdsRules.finished(file))
-    PodcastTimeline.mark(id, "full pass ended without the model: \(file.ads.count) ads")
     Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+    PodcastTimeline.mark(id, "full pass ended without the model: \(file.ads.count) ads")
+    // Only what the show said and sounded like is noted; the rest is learned from the model's pass.
+    learnAfterFind(id, ads: ads, transcript: transcript, made: made, trusted: false)
   }
 }

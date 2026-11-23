@@ -4,6 +4,11 @@ import Foundation
 import PodcastTranscripts
 
 /// The scores of a set of episodes added up.
+///
+/// In the words of the scorecard: the right seconds are `adSeconds - heardSeconds`, the wrong
+/// seconds `cutSeconds` and the missed seconds `heardSeconds`. `heardBeforeSeconds` and
+/// `heardAfterSeconds` are how much of the caught ads plays before the skip and after it
+/// (`AdScore.heardAround`).
 public struct ScoreTotals: Codable, Sendable, Equatable {
   public var episodes = 0
   public var shows = 0
@@ -11,6 +16,8 @@ public struct ScoreTotals: Codable, Sendable, Equatable {
   public var caught = 0
   public var adSeconds = 0.0
   public var heardSeconds = 0.0
+  public var heardBeforeSeconds = 0.0
+  public var heardAfterSeconds = 0.0
   public var cutSeconds = 0.0
   /// Seconds of the episodes that are show: not a counted ad and not neutral.
   public var showSeconds = 0.0
@@ -20,6 +27,25 @@ public struct ScoreTotals: Codable, Sendable, Equatable {
   public var openingKnown = 0
 
   public init() {}
+
+  /// The two "heard" numbers are new: a total saved without them reads with zero for both.
+  public init(from decoder: Decoder) throws {
+    let box = try decoder.container(keyedBy: CodingKeys.self)
+    episodes = try box.decode(Int.self, forKey: .episodes)
+    shows = try box.decode(Int.self, forKey: .shows)
+    ads = try box.decode(Int.self, forKey: .ads)
+    caught = try box.decode(Int.self, forKey: .caught)
+    adSeconds = try box.decode(Double.self, forKey: .adSeconds)
+    heardSeconds = try box.decode(Double.self, forKey: .heardSeconds)
+    heardBeforeSeconds = try box.decodeIfPresent(Double.self, forKey: .heardBeforeSeconds) ?? 0
+    heardAfterSeconds = try box.decodeIfPresent(Double.self, forKey: .heardAfterSeconds) ?? 0
+    cutSeconds = try box.decode(Double.self, forKey: .cutSeconds)
+    showSeconds = try box.decode(Double.self, forKey: .showSeconds)
+    wrongSkips = try box.decode(Int.self, forKey: .wrongSkips)
+    bySort = try box.decode([String: SortScore].self, forKey: .bySort)
+    openingAds = try box.decode(Int.self, forKey: .openingAds)
+    openingKnown = try box.decode(Int.self, forKey: .openingKnown)
+  }
 }
 
 /// One show's totals.
@@ -36,6 +62,25 @@ public struct Scorecard: Codable, Sendable, Equatable {
   public var shows: [ShowScore]
 }
 
+/// One row of the scorecard as `scorecard.json` keeps it: a name, the row's totals and the same
+/// totals for each show (`shows[].total`, which add up to `total`). Every row has its own, so the
+/// Mac can tell which finder is right or wrong on which show.
+public struct ScorecardRow: Codable, Sendable, Equatable {
+  public var name: String
+  public var total: ScoreTotals
+  public var shows: [ShowScore]
+
+  public init(name: String, total: ScoreTotals, shows: [ShowScore]) {
+    self.name = name
+    self.total = total
+    self.shows = shows
+  }
+
+  public init(name: String, card: Scorecard) {
+    self.init(name: name, total: card.total, shows: card.shows)
+  }
+}
+
 public enum AdScoreRun {
   /// How far into the episode the first look goes when the show's habits say nothing.
   static let defaultLook = 15.0
@@ -46,24 +91,49 @@ public enum AdScoreRun {
     episodes: [TeachingEpisode], habits: ShowHabits, settings: AdSkipSettings = AdSkipSettings(),
     detect: (TeachingEpisode, Transcript) -> [FoundAd]
   ) -> Scorecard {
-    var scores: [EpisodeScore] = []
+    runRows(episodes: episodes, habits: habits, settings: settings, rows: 1) { episode, transcript in
+      [detect(episode, transcript)]
+    }[0]
+  }
+
+  /// The same for several rows at once: `detect` returns the ads of each of the `rows` rows
+  /// (fewer lists than rows means no ads for the last ones), and one scorecard comes back for
+  /// each row. The episodes, the shows and the first look are worked out once for all rows.
+  static func runRows(
+    episodes: [TeachingEpisode], habits: ShowHabits, settings: AdSkipSettings, rows: Int,
+    detect: (TeachingEpisode, Transcript) -> [[FoundAd]]
+  ) -> [Scorecard] {
+    let each = Array(0..<max(0, rows))
+    func ads(_ lists: [[FoundAd]], _ row: Int) -> [FoundAd] {
+      lists.indices.contains(row) ? lists[row] : []
+    }
+    var scores = [[EpisodeScore]](repeating: [], count: each.count)
     var seconds: [String: Double] = [:]  // the show seconds of each episode, by id
     for episode in episodes {
-      var score = AdScore.score(
-        episode: episode, found: detect(episode, episode.transcript), settings: settings)
+      let whole = detect(episode, episode.transcript)
+      var made = each.map {
+        AdScore.score(episode: episode, found: ads(whole, $0), settings: settings)
+      }
       let openings = AdScore.openings(episode, settings)
       if !openings.isEmpty {
         let look = firstLook(habits, show: episode.feed)
         let head = head(of: episode.transcript, seconds: look)
-        let spans = AdScore.skipped(detect(episode, head), settings)
-        score.openingKnown = openings.filter { opening in
-          spans.contains { $0.start < opening.end && opening.start < $0.end }
-        }.count
+        let found = detect(episode, head)
+        for row in each {
+          let spans = AdScore.skipped(ads(found, row), settings)
+          made[row].openingKnown = openings.filter { opening in
+            spans.contains { $0.start < opening.end && opening.start < $0.end }
+          }.count
+        }
       }
-      scores.append(score)
+      for row in each { scores[row].append(made[row]) }
       seconds[episode.id] = AdScore.showSeconds(episode, settings)
     }
+    return scores.map { card($0, seconds: seconds) }
+  }
 
+  /// The scorecard of one row: the totals and the totals of each show, worst first.
+  private static func card(_ scores: [EpisodeScore], seconds: [String: Double]) -> Scorecard {
     var byFeed: [String: [(EpisodeScore, Double)]] = [:]
     var feeds: [String] = []
     for score in scores {
@@ -101,6 +171,8 @@ public enum AdScoreRun {
       total.caught += score.caught
       total.adSeconds += score.adSeconds
       total.heardSeconds += score.heardSeconds
+      total.heardBeforeSeconds += score.heardBeforeSeconds
+      total.heardAfterSeconds += score.heardAfterSeconds
       total.cutSeconds += score.cutSeconds
       total.showSeconds += showSeconds
       total.wrongSkips += score.wrongSkips

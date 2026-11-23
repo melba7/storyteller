@@ -3,6 +3,7 @@ of wanted episodes. Temporary folders only, no network.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -210,6 +211,87 @@ class ReportTests(Setup):
 
     def test_bad_arguments_exit_2(self):
         self.assertEqual(feedback.main(["--nonsense"], say=self.said.append), 2)
+
+
+# The line `MacFixtures.confirmedNote` holds in PodcastKit/Tests/PodcastAdsTests/MacFixtures.swift,
+# word for word: a "confirmed" note as the notes file in the linked folder holds it (what
+# `noteLine` in modules/podcasts/phoneNotes.ts writes, with the finder's name in `by`).
+CONFIRMED_LINE = (
+    '{"v":1,"at":1700000000000,"what":"confirmed","feed":"https://show-a.test/feed",'
+    '"guid":"guid-1","title":"One","address":"https://show-a.test/one.mp3","start":125.5,'
+    '"end":180,"kind":"ad","by":"repeat-words"}')
+
+SWIFT_FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir,
+                              "Tests", "PodcastAdsTests", "MacFixtures.swift")
+
+
+class AnsweredQuestionTests(Setup):
+    """The notes "confirmed" (the listener said yes to a question) and "denied" (not an ad), and
+    the optional `by` (which finder made the ad)."""
+
+    def test_the_shared_line_is_still_in_the_swift_fixture(self):
+        # The Swift tests check this line against what the app writes. If either side changes it,
+        # this fails, so the phone and the Mac cannot drift apart without a test saying so.
+        with open(SWIFT_FIXTURES, encoding="utf-8") as handle:
+            text = handle.read()
+        found = re.search(r'static let confirmedNote =\s*#"(.*)"#', text)
+        self.assertIsNotNone(found, "MacFixtures.swift has no `confirmedNote` line any more")
+        self.assertEqual(found.group(1), CONFIRMED_LINE)
+
+    def test_the_line_the_phone_writes_for_a_confirmed_note_is_read(self):
+        one = feedback.read_note(CONFIRMED_LINE)
+        self.assertEqual(one, json.loads(CONFIRMED_LINE))
+        self.assertEqual((one["what"], one["by"]), ("confirmed", "repeat-words"))
+
+    def test_a_denied_note_is_read_with_or_without_by(self):
+        self.assertIsNotNone(feedback.read_note(json.dumps(note("denied"))))
+        self.assertEqual(feedback.read_note(json.dumps(note("denied", by="meaning")))["by"], "meaning")
+
+    def test_a_note_without_by_has_no_by(self):
+        self.assertNotIn("by", feedback.read_note(json.dumps(note("confirmed"))))
+
+    def test_the_old_kinds_are_still_read(self):
+        for what in ("skipped", "undone", "trimmed", "missed"):
+            self.assertIsNotNone(feedback.read_note(json.dumps(note(what))), what)
+
+    def test_a_by_that_is_not_text_makes_the_line_invalid(self):
+        for bad in (5, True, ["own-sound"], {"a": 1}):
+            self.assertIsNone(feedback.read_note(json.dumps(note("confirmed", by=bad))), bad)
+
+    def test_a_null_by_is_the_same_as_none(self):
+        # A writer that puts `"by": null` knows no finder; the note is still a good note.
+        one = feedback.read_note(json.dumps(note("confirmed", by=None)))
+        self.assertIsNotNone(one)
+        self.assertIsNone(one["by"])
+
+    def test_a_confirmed_note_counts_like_missed_and_a_denied_one_like_undone(self):
+        wanted = feedback.wanted_episodes([
+            note("confirmed", 10, guid="a"), note("denied", 20, guid="b"),
+            note("confirmed", 30, guid="a", by="meaning"), note("missed", 40, guid="a"),
+            note("denied", 50, guid="a"), note("undone", 60, guid="b")])
+        self.assertEqual([e["guid"] for e in wanted], ["b", "a"])
+        self.assertEqual({e["guid"]: (e["missed"], e["undone"]) for e in wanted},
+                         {"a": (3, 1), "b": (0, 2)})
+
+    def test_an_episode_with_only_an_answer_note_is_wanted_most_recent_first(self):
+        self.put(self.cloud, [note("confirmed", 10, guid="a"), note("denied", 30, guid="b"),
+                              note("skipped", 99, guid="s")])
+        self.assertEqual(self.run_main(), 0, self.said)
+        self.assertEqual([e["guid"] for e in self.wanted()["episodes"]], ["b", "a"])
+
+    def test_the_phones_own_confirmed_line_makes_its_episode_wanted(self):
+        self.put(self.cloud, None, raw=(CONFIRMED_LINE + "\n").encode("utf-8"))
+        self.assertEqual(self.run_main(), 0, self.said)
+        episode, = self.wanted()["episodes"]
+        self.assertEqual((episode["feed"], episode["guid"], episode["missed"], episode["undone"]),
+                         ("https://show-a.test/feed", "guid-1", 1, 0))
+        self.assertNotIn("not valid", self.text())
+
+    def test_the_table_still_counts_only_its_three_columns(self):
+        self.put(self.cloud, [note("skipped"), note("confirmed", guid="x"), note("denied", guid="y")])
+        self.run_main()
+        row, = [line for line in self.said if "https://a.example/feed" in line]
+        self.assertEqual(row.split()[-3:], ["1", "0", "0"])
 
 
 if __name__ == "__main__":
