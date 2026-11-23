@@ -323,6 +323,24 @@ The meaning model is published only when its row adds right seconds for host_ask
 and network_promo and at least 85% of the added seconds are right, and the
 scorecard is not older than the model.
 
+### The sealed exam
+
+A set of about 60 newer episodes is kept apart as an exam. Their ids are in
+`exam.json` in the teaching folder. The rule: an exam episode is invisible to
+every step that learns. Only gathering, writing down, marking, second downloads
+and the scorer, when it is asked, may use it. The word model, the shelf, the
+library of ads (both files) and the habits leave it out (the Swift steps `sounds` and `meaning` do not read
+`exam.json` yet), and a training episode
+that repeats an exam episode is left out of training too. The exam is gathered
+only from episodes newer than everything gathered before, so it tests the
+phone on episodes it could not have learned from. Fifteen of its episodes are
+marked a second time (`labels-second/`) to show how much two markings of the
+same episode differ, which is the ceiling for any score against Claude's marks.
+`Gather the exam episodes.command` makes it, `Gather more episodes for
+teaching.command` and `Mark the new episodes at night.command` gather and mark
+the other 500 or so episodes only at night, over several nights, within a cost
+cap (see `Tools/mac/README.md`).
+
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
 

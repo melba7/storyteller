@@ -49,10 +49,15 @@ def find_claude(environment, extra_folders=EXTRA_FOLDERS):
     return None
 
 
+def is_signed_out(message):
+    """True when the message says Claude is not signed in (as opposed to a usage limit)."""
+    return any(word in message.lower() for word in SIGNED_OUT)
+
+
 def is_usage_limit(message):
     """True for not-signed-in wording and for usage or rate limit wording, as the Swift code
     decides (401 and 429), but not for other uses of the word "limit"."""
-    return any(word in message.lower() for word in SIGNED_OUT) or USAGE_LIMIT.search(message) is not None
+    return is_signed_out(message) or USAGE_LIMIT.search(message) is not None
 
 
 def printed_result(output):

@@ -8,6 +8,10 @@
 # again. If you do not type yes, nothing else runs.
 # (python3 -u keeps what it prints from being held back while it is also copied to the log.)
 # Optional first argument: the name of another Claude model to use instead of the default one.
+# The night launchers set these to mark only at night: TEACH_BETWEEN (passed as --between, for
+# example 23-7), TEACH_WAIT_HOURS (--wait-hours: how long to wait for the usage allowance) and
+# TEACH_CAP (--cap: the most dollars of the plan's usage this run may use). Without them it works
+# at any hour and waits for nothing, as it always did.
 # Only one run can work in the folder at a time: marking and the steps after it each hold the
 # folder's lock, and when marking finds another run busy the steps after it do not run.
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
@@ -34,9 +38,15 @@ MODEL=()
 # marking does not ask a second time in the night.
 YES=()
 [ -n "$TEACH_YES" ] && YES=(--yes)
+BETWEEN=()
+[ -n "$TEACH_BETWEEN" ] && BETWEEN=(--between "$TEACH_BETWEEN")
+WAIT=()
+[ -n "$TEACH_WAIT_HOURS" ] && WAIT=(--wait-hours "$TEACH_WAIT_HOURS")
+CAP=()
+[ -n "$TEACH_CAP" ] && CAP=(--cap "$TEACH_CAP")
 
 echo "=== $(date '+%Y-%m-%d %H:%M') mark ads ===" >> "$LOG"
-caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" "${MODEL[@]}" "${YES[@]}" 2>&1 | tee -a "$LOG"
+caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" "${MODEL[@]}" "${BETWEEN[@]}" "${WAIT[@]}" "${CAP[@]}" "${YES[@]}" 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 
 # You did not type yes: nothing was marked, so there is nothing to work out.

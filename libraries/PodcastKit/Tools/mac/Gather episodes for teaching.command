@@ -6,6 +6,11 @@
 # finished transcripts are kept. Everything it prints is also added to
 # ~/Storyteller Lofi/logs/podcast-teaching.log. Only one run can work in the folder at a time.
 # (python3 -u keeps what it prints from being held back while it is also copied to the log.)
+# The bigger runs set these before they start it (the numbers are plain, and without them it does
+# what it always did): TEACH_PER_SHOW (how many of each show's newest episodes, passed as
+# --per-show), TEACH_MAX_GB (the size limit on all kept audio, passed as --max-gb), TEACH_EXAM=1
+# (gathers the sealed exam instead, passed as --exam: see teach_exam.py) and TEACH_AFTER (a file
+# that is started in place of this one when steps 1 and 2 worked, instead of waiting for Return).
 HERE="$(cd "$(dirname "$0")" && pwd)"
 FOLDER="$HOME/Storyteller Lofi/PodcastTeaching"
 LOG="$HOME/Storyteller Lofi/logs/podcast-teaching.log"
@@ -21,9 +26,17 @@ mkdir -p "$(dirname "$LOG")" || finish "Could not make the folder for the log." 
 # Everything below is shown here and added to the log; pipefail keeps the Python exit codes.
 set -o pipefail
 
+# What the environment asks for; each stays empty (nothing is passed) when it is not set.
+PER_SHOW=()
+[ -n "$TEACH_PER_SHOW" ] && PER_SHOW=(--per-show "$TEACH_PER_SHOW")
+MAX_GB=()
+[ -n "$TEACH_MAX_GB" ] && MAX_GB=(--max-gb "$TEACH_MAX_GB")
+EXAM=()
+[ "$TEACH_EXAM" = 1 ] && EXAM=(--exam)
+
 echo "Storyteller Lofi: gather episodes for teaching"
 echo
-echo "Step 1 downloads recent episodes of your shows, up to 12 GB, into:"
+echo "Step 1 downloads recent episodes of your shows, up to ${TEACH_MAX_GB:-12} GB, into:"
 echo "  $FOLDER"
 echo "Step 2 writes down what is said in them. It can take hours."
 echo "Keep the Mac plugged in with the lid open. You can stop with Control-C and double-click"
@@ -31,7 +44,7 @@ echo "this file again later to carry on."
 echo
 
 echo "Step 1 of 2: downloading episodes" | tee -a "$LOG"
-caffeinate -i python3 -u "$HERE/teach_collect.py" --folder "$FOLDER" 2>&1 | tee -a "$LOG"
+caffeinate -i python3 -u "$HERE/teach_collect.py" --folder "$FOLDER" "${PER_SHOW[@]}" "${MAX_GB[@]}" "${EXAM[@]}" 2>&1 | tee -a "$LOG"
 CODE="$?"
 # 3 means the size limit on all kept audio stopped the downloads. That is not a failure: what is
 # on disk still gets written down.
@@ -67,5 +80,10 @@ if [ "$CODE" -eq 3 ]; then
   finish "Step 2 stopped early because several episodes in a row failed (see above). Fix that, then double-click again to carry on." 1
 elif [ "$CODE" -ne 0 ]; then
   finish "Step 2 did not work (see above)." 1
+fi
+if [ -n "$TEACH_AFTER" ]; then
+  echo
+  echo "Done: the episodes are in $FOLDER and written down. Carrying on with the next part." | tee -a "$LOG"
+  exec "$TEACH_AFTER"
 fi
 finish "Done: the episodes are in $FOLDER and written down. Double-click again to carry on with new ones."

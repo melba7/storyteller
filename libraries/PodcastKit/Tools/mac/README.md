@@ -48,6 +48,9 @@ the app is not added again.
   be found".
 - `Gather episodes for teaching.command` and
   `Mark ads in the teaching episodes.command`: see "Teaching run".
+- `Gather more episodes for teaching.command`,
+  `Mark the new episodes at night.command` and
+  `Gather the exam episodes.command`: see "More episodes and the exam".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -442,6 +445,73 @@ does not stop the run. When `labels-snapped/` exists the habits, model, library,
 sounds, meaning and score steps read it instead of `labels/`. At the end it
 prints one line per step (worked, nothing to do or failed). It counts as done
 when the copy to the phone worked.
+
+### More episodes and the exam
+
+Three more files do the same work in bigger steps, with the marking only at
+night. Use them in this order.
+
+1. `Gather more episodes for teaching.command`. Downloads about 500 more
+   episodes (the newest 12 of each show you follow, up to 40 GB of audio in all,
+   keeping 15 GB of the disk free) and writes them down. It asks once, at the
+   start: type `yes` to include the marking, or press Return to only gather.
+   With `yes`, Claude then marks the new episodes (see the next file) and the
+   results are worked out. It does the same as `Gather episodes for teaching`
+   with the numbers set in the environment: `TEACH_PER_SHOW` (`--per-show`),
+   `TEACH_MAX_GB` (`--max-gb`), `TEACH_EXAM=1` (`--exam`) and `TEACH_AFTER` (a
+   file that is started in place of waiting for Return when both steps worked).
+2. `Mark the new episodes at night.command`. Started by the file above when you
+   typed `yes`, or double-clicked later. It is `Mark ads in the teaching
+   episodes` with `--between 23-7` (it marks only between 11 at night and 7 in
+   the morning, and waits for the night with the Mac kept awake), `--wait-hours
+   120` (when Claude's usage allowance is used up it waits 30 minutes and tries
+   the same episode again, up to five days in all) and `--cap 95` (at most $95 of
+   the plan's usage in this run). The environment can change them:
+   `TEACH_BETWEEN`, `TEACH_WAIT_HOURS` and `TEACH_CAP`. Waiting for the allowance
+   is not a failure of the episode. Not being signed in still stops at once. When
+   it ends (also stopped early) it runs the steps after marking.
+3. `Gather the exam episodes.command`. See the next section. Run it after the
+   two files above are done, so that the exam is newer than everything the
+   phone learned from.
+
+The sealed exam is a set of about 60 episodes that no learning step ever sees.
+The ids are in `exam.json` in the teaching folder
+(`{"episodes": ["<12 hex id>", ...]}`, `teach_exam.py`). Gathering, writing down,
+marking and second downloads work on them, and the scorer when it is asked to.
+The Python steps that learn leave them out:
+
+- `teach_train.py` never trains on an exam episode, never puts one on the shelf
+  and also leaves out a training episode that repeats an exam episode. It says
+  how many exam episodes it left out.
+- `teach_library.py` leaves their ads out of `ad-library.json` and of
+  `ad-library-score.json`.
+- `teach_habits.py` leaves their labels out.
+- `teach_copies.py` downloads exam episodes second, first of all, then shelf
+  episodes, then the rest, so a limit cuts the rest first.
+
+The Swift steps `podcast-teach sounds`, `meaning` and `score` do not read
+`exam.json` yet. Until they do, they must not be run on a folder with exam labels
+in it for the phone's learning (`Gather the exam episodes` does not run them).
+
+`Gather the exam episodes.command` downloads about 60 brand-new episodes (it
+runs `teach_collect.py --exam --per-show 2 --max-gb 46`; `--exam-most` changes
+the 60). Only episodes that are newer than every episode of the same feed that
+was gathered before are taken, and one with no date is not. Their ids go into
+`exam.json` before `episodes.json` is saved and before any download, so a run
+that stops half way can never leak them into training. `--list --exam` says how
+many a run would take. The wanted list is ignored for an exam run. It then asks
+once for a typed `yes` (or `TEACH_YES=1`). With `yes`, Claude marks the exam only
+at night (`teach_label.py --only-exam`, up to $14), and marks 15 of them a second
+time into `labels-second/` (up to $4), so we can see how much two markings
+differ. It does not run the steps after marking: the exam teaches nothing. It
+ends with a line saying the exam is ready to be scored.
+
+`teach_label.py` has three new options. `--only-exam` marks only the episodes in
+`exam.json`, in its order. `--between 23-7` gives the local clock hours it may
+work in (a window over midnight works); the clock is checked before every
+episode and outside the hours it waits in steps of at most ten minutes.
+`--wait-hours H` waits for the usage allowance as described above. The opening
+message says the hours and the cap when they are set.
 
 ### What the steps write
 

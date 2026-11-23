@@ -10,7 +10,7 @@ stopped. Each episode is one or a few `claude -p` runs, set up the way the app's
 is signed in to and shares its usage allowance. Nothing is sent anywhere else.
 
   teach_label.py [--folder F] [--labels labels] [--model NAME] [--limit N] [--cap DOLLARS]
-                 [--retry-failed] [--yes]
+                 [--retry-failed] [--yes] [--only-exam] [--between START-END] [--wait-hours H]
 
 Without --yes it says what it is about to do and waits for you to type yes. It stops when --limit
 episodes have been tried (one that failed counts, because it was sent and cost something), when the cost so far (every call counts, also the ones that failed) reaches
@@ -18,6 +18,15 @@ episodes have been tried (one that failed counts, because it was sent and cost s
 episodes in a row that had never failed before failed. Failures are remembered in failures.json:
 episodes that never failed come first, an episode that failed three times is left out (--retry-failed
 asks for those again) and the closing lines say how many.
+
+--only-exam marks only the episodes in exam.json (the sealed exam, see teach_exam.py), in its order.
+--labels labels-second with --only-exam --limit 15 is how some of them are marked a second time.
+--between 23-7 gives the local clock hours in which it may work (it may cross midnight). The clock is
+checked before every episode, and outside the hours it waits in steps of at most ten minutes until
+they begin. --wait-hours H: when Claude says the usage limit is reached it does not stop but waits 30
+minutes and tries the same episode again, for at most H hours of waiting in all, then stops as
+below. Waiting for the allowance is not a failure of the episode. Not being signed in stops at once.
+--cap is the cost limit of this one run.
 
 Exit code: 0 everything waiting was marked, there was nothing to do, or --limit was reached;
 2 a set-up problem, or another run is working in the folder; 3 stopped early; 4 you did not type yes.
@@ -29,9 +38,12 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 
+import teach_exam
+import teach_night
 import teach_segments as seg
-from teach_claude import EXTRA_FOLDERS, UsageLimit, ask_claude, find_claude
+from teach_claude import EXTRA_FOLDERS, UsageLimit, ask_claude, find_claude, is_signed_out
 from teach_failures import IN_A_ROW, Failures, given_up_line
 from teach_store import FOLDER, Busy, Problem, require_manifest, run_lock, write_json  # noqa: F401
 
@@ -41,11 +53,16 @@ NOT_CONFIRMED = 4
 
 # MARK: Files
 
-def waiting(folder, labels):
+def waiting(folder, labels, only_exam=False):
     """([(entry, lines)], [ids with no usable lines]): the episodes in episodes.json order that
-    have a transcript and no label yet. Raises Problem when episodes.json is missing or damaged."""
+    have a transcript and no label yet. With `only_exam` only the episodes in exam.json, in its
+    order. Raises Problem when episodes.json or exam.json is missing or damaged."""
     found, empty = [], []
-    for item in require_manifest(folder):
+    items = require_manifest(folder)
+    if only_exam:
+        by_id = {item["id"]: item for item in items}
+        items = [by_id[i] for i in teach_exam.read_exam(folder) if i in by_id]
+    for item in items:
         if os.path.exists(os.path.join(folder, labels, item["id"] + ".json")):
             continue
         try:
@@ -93,19 +110,23 @@ def counts_text(label):
     return ", ".join(parts) or "no stretches found"
 
 
-def candidates(folder, labels, retry_failed):
+def candidates(folder, labels, retry_failed, only_exam=False):
     """(ready, given_up, empty): the waiting episodes in the order to work in (never failed first,
     then fewer failures first), the ones left out after three failures, and ids with no lines."""
-    items, empty = waiting(folder, labels)
+    items, empty = waiting(folder, labels, only_exam)
     ready, given_up = Failures(folder, "label").split(items, retry_failed, lambda item: item[0]["id"])
     return ready, given_up, empty
 
 
-def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False):
+def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, only_exam=False,
+        waiter=None):
     """Marks the waiting episodes. Returns {"done", "failed", "cost", "given_up", "stop",
     "reason"}; `stop` is None, "limit", "cap", "usage" or "failures". `cost` is what every call
-    cost, also the calls of episodes that failed or were stopped."""
-    items, given_up, empty = candidates(folder, labels, retry_failed)
+    cost, also the calls of episodes that failed or were stopped. The `waiter` (teach_night.py)
+    waits for the night hours before every episode, and for the usage allowance to come back: the
+    same episode is then tried again, and that waiting is not a failure of the episode."""
+    waiter = waiter or teach_night.Waiter(say=say)
+    items, given_up, empty = candidates(folder, labels, retry_failed, only_exam)
     for episode_id in empty:
         say("Skipping %s: its transcript has no usable lines." % episode_id)
     failures = Failures(folder, "label")
@@ -133,10 +154,17 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False):
         if stop:
             result["stop"], result["reason"] = stop
             return result
+        waiter.for_window()
         name = "%d of %d: %s, %s" % (number, len(items), item["show"], item["title"])
         attempted += 1  # an episode that fails still cost a call, so it counts towards --limit
         try:
-            made = label_episode(item, lines, model, counted)
+            while True:
+                try:
+                    made = label_episode(item, lines, model, counted)
+                    break
+                except UsageLimit as error:
+                    if is_signed_out(str(error)) or not waiter.for_allowance():
+                        raise
         except UsageLimit as error:
             result["stop"] = "usage"
             result["reason"] = ("Stopped: Claude's usage limit is reached or it is not signed in "
@@ -171,7 +199,7 @@ def positive_number(text):
 
 
 def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=print,
-         extra_folders=EXTRA_FOLDERS):
+         extra_folders=EXTRA_FOLDERS, clock=datetime.now, sleep=time.sleep):
     environment = dict(os.environ if environment is None else environment)
     parser = argparse.ArgumentParser(prog="teach_label.py")
     parser.add_argument("--folder", default=FOLDER)
@@ -181,6 +209,9 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
     parser.add_argument("--cap")
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--yes", action="store_true")
+    parser.add_argument("--only-exam", action="store_true")
+    parser.add_argument("--between")
+    parser.add_argument("--wait-hours")
     options = parser.parse_args(argv)
     folder = os.path.expanduser(options.folder)
     try:
@@ -192,9 +223,18 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
             "above zero.")
         return 2
     try:
+        window = teach_night.parse_window(options.between) if options.between is not None else None
+        hours = positive_number(options.wait_hours) if options.wait_hours is not None else None
+    except ValueError:
+        say("The --between must be two clock hours like 23-7 (not the same hour twice) and the "
+            "--wait-hours a number of hours above zero.")
+        return 2
+    waiter = teach_night.Waiter(window, hours, clock, sleep, say)
+    try:
         require_manifest(folder)
         with run_lock(folder):
-            return marking(folder, options, cap, ask_person, runner, environment, say, extra_folders)
+            return marking(folder, options, cap, ask_person, runner, environment, say, extra_folders,
+                           waiter)
     except Busy as error:
         say(str(error))
         return 2
@@ -203,11 +243,12 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
         return 2
 
 
-def marking(folder, options, cap, ask_person, runner, environment, say, extra_folders):
+def marking(folder, options, cap, ask_person, runner, environment, say, extra_folders, waiter):
     """Everything main does once the folder is locked."""
-    items, given_up, _ = candidates(folder, options.labels, options.retry_failed)
+    items, given_up, _ = candidates(folder, options.labels, options.retry_failed, options.only_exam)
     if not items:
-        say("Nothing to do: every episode with a transcript already has a label.")
+        say("Nothing to do: every %sepisode with a transcript already has a label."
+            % ("exam " if options.only_exam else ""))
         if given_up:
             say(given_up_line(len(given_up)))
         return 0
@@ -222,6 +263,16 @@ def marking(folder, options, cap, ask_person, runner, environment, say, extra_fo
     say("That is roughly {:,} tokens to read (an estimate: characters divided by 4)."
         .format(characters // 4))
     say("This uses the Claude plan this Mac is signed in to and shares its usage allowance.")
+    if options.only_exam:
+        say("Only the episodes of the sealed exam are marked.")
+    if waiter.window:
+        say("It marks only between %s, local time, and waits outside those hours."
+            % teach_night.window_text(waiter.window))
+    if options.wait_hours is not None:
+        say("When the usage allowance is used up it waits and tries again, for up to %g hours in all."
+            % float(options.wait_hours))
+    if cap is not None:
+        say("The cost of this run is capped at $%.2f." % cap)
     if not options.yes:
         try:
             typed = ask_person("Type yes to start: ")
@@ -236,7 +287,7 @@ def marking(folder, options, cap, ask_person, runner, environment, say, extra_fo
                           environment=environment)
 
     result = run(folder, options.labels, options.model, options.limit, cap, ask, say=say,
-                 retry_failed=options.retry_failed)
+                 retry_failed=options.retry_failed, only_exam=options.only_exam, waiter=waiter)
     say("Marked %d episodes (%d failed). Cost as Claude counts it: $%.2f."
         % (result["done"], result["failed"], result["cost"]))
     if result["reason"]:
