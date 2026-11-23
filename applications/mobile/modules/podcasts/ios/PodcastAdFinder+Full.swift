@@ -52,8 +52,9 @@ extension PodcastAdFinder {
         let joined = LocalAdsFile.addToFinal(local, store: ads, detector: Self.detectorName) ?? found
         let withChapters = await withChapterAds(
           id, ads: ads, finished: joined, transcript: transcript)
-        // The old finders' ads are on disk. Now the new finders add what they find, each one
-        // through the guard (PodcastAdFinder+New.swift).
+        // The old finders' ads are on disk: a playing episode skips them now, before the new
+        // finders (slow) add what they find, each through the guard (PodcastAdFinder+New.swift).
+        refreshIfPlaying(id)
         let made = addNewFinders(id, ads: ads, transcript: transcript, file: withChapters)
         let file = made.file
         set(id, AdsRules.finished(file))
@@ -107,6 +108,7 @@ extension PodcastAdFinder {
       return
     }
     let withChapters = await withChapterAds(id, ads: ads, finished: saved, transcript: transcript)
+    refreshIfPlaying(id)  // before the new finders, as in the full pass
     let made = addNewFinders(id, ads: ads, transcript: transcript, file: withChapters)
     let file = made.file
     set(id, AdsRules.finished(file))
