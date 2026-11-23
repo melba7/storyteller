@@ -5,8 +5,10 @@
 // WHAT IT KEEPS. For each show the last three episodes, as the hashes of every run of five words
 // (never the words), in the order they were said. A new episode is compared with them: a stretch
 // of it whose runs are also in an older episode of the same show, at least 15 seconds and 25 words
-// long, is returned as an unsure ad from the finder "repeat-words". The memory only FINDS. The
-// caller decides, from `FinderGuard.mode`, whether to ask the listener or to skip.
+// long, is returned as an unsure ad from the finder "repeat-words". The memory only FINDS. This
+// finder only ASKS, unless the Mac's settings (`ShowTuning`, whose built-in default for
+// "repeat-words" is "ask") say skip for this show. `FinderGuard.mode` can only make that stricter
+// (ask or off): it answers `.skip` when it has no answers yet, so it is not a reason to skip.
 //
 // THE API (the file is Application Support/Podcasts/repeat-words.json; the lock, the folder and
 // the atomic write belong to the phone code that wires this in):
@@ -33,16 +35,24 @@
 //  4. `remember` AFTER `find`, once per episode. An episode that is already stored is left alone,
 //     so asking twice stores it once, and `find` never compares an episode with itself.
 //  5. `deny` when the listener says a stretch is not an ad, or undoes a skip made from this
-//     finder: it needs the same `lines` and the ad's start and end. The same words are then not
-//     offered again for 60 days.
+//     finder: it needs the same `lines` and the ad's start and end. Where a later episode says
+//     the same words again, that part is cut out of what is offered, for 60 days.
 //  6. One instance behind one lock; change it, then write `data` to disk before letting go.
 //
 // WHAT IS FOUND, exactly (all of it in `RepeatedWords+Find.swift`):
-//  - Nothing in the first minute (`firstMinute`): `ShowOpenings` owns it.
+//  - Nothing in the first minute (`firstMinute`), where `ShowOpenings` learns the opening. It
+//    learns only 8 to 40 words in the first five minutes, so a repeat that follows a pre-roll or
+//    a cold open can still be the show's own intro or credits, which is why this only asks.
 //  - A stretch is at least 15 s (`KnownAds.shortest`), at least 25 words (`KnownAds.fewestWords`)
-//    and at most 300 s (`AdRules.maxLength`; a longer repeat is dropped, like the clean-up does).
+//    and at most 300 s (`AdRules.maxLength`). A replay is dropped when it is longer: stretches less
+//    than 10 s apart are one replay, so a long replay that the recogniser heard differently in
+//    places is not offered piece by piece. (A block of different repeated ads that runs back to
+//    back for over 300 s is dropped too; that is accepted.)
 //  - A few changed words are fine: runs may be missing for up to 7 in a row inside a stretch.
 //  - An episode of which `AdRules.shareLimit` is repeated (a re-run, a "best of") gives nothing.
+//    Every stretch counts, long ones too, except the time that `already` names.
+//  - Where a stretch says what a denied stretch said (`deny`), those words are cut out of it, and
+//    what is left is offered if it is still long enough.
 //
 // BYTE ACCOUNTING (the file is JSON with no spaces; each hash is 4 bytes, which JSON writes as
 // base64, 16/3 or about 5.33 characters; slashes are not escaped). The caps are `mostEpisodes` 3 a
@@ -188,7 +198,8 @@ public struct RepeatedWords: Codable, Sendable, Equatable {
   }
 
   /// Remembers a stretch the listener said is not an ad (or whose skip they undid): up to a
-  /// hundred of its hashes, spread over it. The same words are not offered again for 60 days. A
+  /// hundred of its hashes, spread over it. For 60 days, where a later episode says the same
+  /// words again (the whole stretch or a part of it) they are cut out of what `find` offers. A
   /// stretch with fewer than ten runs, or times that are not numbers or not in order, change
   /// nothing. At most five stretches are kept for a show, the newest last.
   public mutating func deny(
