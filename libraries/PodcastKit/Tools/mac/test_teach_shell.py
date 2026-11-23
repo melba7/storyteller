@@ -17,7 +17,8 @@ SHELL_FILES = sorted(glob.glob(os.path.join(HERE, "*.command")) + glob.glob(os.p
 NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.command",
              "Score the ad skipping.command", "Install weekly teaching.command",
              "Stop weekly teaching.command", "Mark ads in the teaching episodes.command",
-             "Mark ads when the gathering is done.command"]
+             "Mark ads when the gathering is done.command",
+             "Check ads with a second download.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
@@ -48,6 +49,8 @@ case "$script" in
   teach_habits.py) echo "$RANDOM$RANDOM" > "$folder/habits.json" ;;
   teach_train.py) echo "$RANDOM$RANDOM" > "$folder/ad-model.json" ;;
   teach_library.py) echo "$RANDOM$RANDOM" > "$folder/ad-library.json" ;;
+  teach_snap.py) mkdir -p "$folder/labels-snapped"; echo "$RANDOM$RANDOM" > "$folder/labels-snapped/a.json" ;;
+  teach_settings.py) echo "$RANDOM$RANDOM" > "$folder/show-settings.json" ;;
   teach_publish.py) echo "ad-model.json in somewhere: written." ;;
 esac
 exit 0
@@ -63,7 +66,10 @@ exit 0
 TEACH = """#!/bin/bash
 echo "podcast-teach $*" >> "$CALLS"
 case " $FAIL " in *" podcast-teach-$1 "*) echo "podcast-teach $1: pretending to fail"; exit 2 ;; esac
-case "$1" in sounds) out=ad-sounds.json ;; score) out=scorecard.json ;; esac
+for pair in $TEACH_CODES; do
+  [ "${pair%%=*}" = "$1" ] && { echo "podcast-teach $1: ending with ${pair#*=}"; exit "${pair#*=}"; }
+done
+case "$1" in sounds) out=ad-sounds.json ;; meaning) out=ad-meaning.json ;; score) out=scorecard.json ;; esac
 case " $NOOP " in *" podcast-teach-$1 "*) exit 0 ;; esac
 echo "$RANDOM$RANDOM" > "$2/$out"
 exit 0
@@ -175,7 +181,8 @@ class Setup(unittest.TestCase):
     def run_script(self, name, **more):
         env = {"HOME": self.home, "PATH": "%s:/usr/bin:/bin" % self.bin, "TEACH_TOOLS": "/stand/in/tools",
                "TEACH_KIT": self.kit, "TMPDIR": os.path.join(self.root, "tmp"), "CALLS": self.calls,
-               "BIN": self.bin, "FAIL": "", "NOOP": "", "BUSY": "", "BUILD_FAILS": "", "CODES": ""}
+               "BIN": self.bin, "FAIL": "", "NOOP": "", "BUSY": "", "BUILD_FAILS": "", "CODES": "",
+               "TEACH_CODES": ""}
         env.update(more)
         return subprocess.run(["bash", os.path.join(HERE, name)], env=env, capture_output=True,
                               text=True, timeout=120, stdin=subprocess.DEVNULL)
@@ -198,7 +205,8 @@ class Setup(unittest.TestCase):
 FINISH_ORDER = ["python3 teach_habits.py", "python3 teach_train.py", "python3 teach_library.py",
                 "swift build -c release --product podcast-teach",
                 "swift build -c release --show-bin-path", "podcast-teach sounds",
-                "podcast-teach score", "python3 teach_publish.py"]
+                "podcast-teach meaning", "podcast-teach score", "python3 teach_settings.py",
+                "python3 teach_publish.py"]
 
 
 class FinishTests(Setup):
@@ -207,22 +215,24 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), FINISH_ORDER)
         for line in ("Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
-                     "Score: worked", "Publish: worked"):
+                     "Meaning: worked", "Score: worked", "Settings: worked", "Publish: worked"):
             self.assertIn("  " + line, done.stdout)
-        for number in range(1, 7):
-            self.assertIn("Step %d of 6" % number, done.stdout)
+        for number in range(1, 9):
+            self.assertIn("Step %d of 8" % number, done.stdout)
 
     def test_the_summary_comes_last_in_the_order_of_the_steps(self):
         done = self.run_script("teach-finish.sh")
         summary = done.stdout[done.stdout.index("Summary:"):]
         labels = re.findall(r"^  (\w+): ", summary, re.M)
-        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Score", "Publish"])
+        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Score",
+                                  "Settings", "Publish"])
 
     def test_the_podcast_teach_tools_get_the_teaching_folder(self):
         self.run_script("teach-finish.sh")
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
         calls = self.called()
         self.assertIn("podcast-teach sounds %s" % folder, calls)
+        self.assertIn("podcast-teach meaning %s" % folder, calls)
         self.assertIn("podcast-teach score %s" % folder, calls)
 
     def test_a_failing_step_is_said_and_the_later_ones_still_run(self):
@@ -236,7 +246,8 @@ class FinishTests(Setup):
 
     def test_every_step_may_fail_without_stopping_the_next(self):
         for failing, label in (("teach_habits.py", "Habits"), ("teach_library.py", "Library"),
-                               ("podcast-teach-sounds", "Sounds"), ("podcast-teach-score", "Score")):
+                               ("podcast-teach-sounds", "Sounds"), ("podcast-teach-meaning", "Meaning"),
+                               ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
             open(self.calls, "w").close()
             done = self.run_script("teach-finish.sh", FAIL=failing)
             self.assertEqual(done.returncode, 0, failing)
@@ -255,9 +266,10 @@ class FinishTests(Setup):
         self.assertEqual(self.short(), ["python3 teach_habits.py", "python3 teach_train.py",
                                         "python3 teach_library.py",
                                         "swift build -c release --product podcast-teach",
-                                        "python3 teach_publish.py"])
+                                        "python3 teach_settings.py", "python3 teach_publish.py"])
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)
+        self.assertIn("  Meaning: failed", done.stdout)
         self.assertIn("  Score: failed", done.stdout)
         self.assertIn("  Publish: worked", done.stdout)
 
@@ -297,7 +309,7 @@ class FinishTests(Setup):
     def test_everything_is_added_to_the_log(self):
         done = self.run_script("teach-finish.sh")
         log = self.log()
-        self.assertIn("Step 1 of 6", log)
+        self.assertIn("Step 1 of 8", log)
         self.assertIn("Summary:", log)
         self.assertIn("Publish: worked", log)
         self.assertEqual(done.returncode, 0)

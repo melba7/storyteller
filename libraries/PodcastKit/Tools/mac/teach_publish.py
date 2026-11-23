@@ -8,7 +8,9 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
   ad-library.json  from <folder>/ad-library.json  (teach_library.py)
   show-habits.json from <folder>/habits.json      (teach_habits.py)
   ad-sounds.json   from <folder>/ad-sounds.json   (podcast-teach sounds)
-  teaching.json    a small list of the four files above that are in the Podcasts folder now,
+  ad-meaning.json  from <folder>/ad-meaning.json  (podcast-teach meaning), see the gate below
+  show-settings.json from <folder>/show-settings.json (teach_settings.py)
+  teaching.json    a small list of the six files above that are in the Podcasts folder now,
                    each with its sha256 and size, so the phone fetches a big file only when its
                    hash changed. It is rewritten only when that list changes.
 
@@ -21,6 +23,13 @@ trained.heldOut.anyAd.precision (in seconds of the spans the phone would cut) is
 --min-precision. Otherwise the tool says which bar was missed and with what numbers, leaves a model
 that is already at the destination alone and still publishes the other files (this is not a
 failure).
+
+ad-meaning.json passes that same check on held-out episodes AND a second one on scorecard.json
+(teach_publish_gates.py): the row "Plus the meaning model" must add right seconds for host_ask or
+network_promo over the row before it, with a precision of at least --min-precision, in a scorecard
+that is not older than the model. With no scorecard or no such row it is not published. The reason is
+said in one line and a copy already at the destination is left alone. show-settings.json has no gate:
+it only has to be a version 1 file with a list of shows, as the phone needs.
 
 Without --to the destinations are the ones apple_podcasts_export.py writes to: the LofiMusic
 folder under ~/Storyteller Lofi and its copy in iCloud Drive. A source that does not exist is
@@ -45,13 +54,17 @@ import time
 
 import teach_store
 from teach_phone_rule import refusals
+from teach_publish_gates import percent, scorecard_reason, settings_shape
 from apple_podcasts_export import default_folders
 
 LIMIT = 4500000
 SUBFOLDER = "Podcasts"
 FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
-         ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"))
+         ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"),
+         ("ad-meaning.json", "ad-meaning.json"), ("show-settings.json", "show-settings.json"))
 MODEL = "ad-model.json"
+MEANING = "ad-meaning.json"
+SETTINGS = "show-settings.json"
 LIST = "teaching.json"
 MIN_PRECISION = 0.85
 ICLOUD_FAILED = 3
@@ -97,21 +110,11 @@ def precision_of(data):
     return number_of(held_out(data, "anyAd", "precision"))
 
 
-def percent(value):
-    return "%g%%" % round(value * 100, 1)
-
-
-def weak_model(data, minimum):
-    """A sentence saying why the model is not good enough to publish, or None when it is. The
-    check must rest on enough held-out episodes, shows and predicted ad seconds, and its precision
-    (in seconds of the spans the phone would cut) must reach `minimum`."""
+def check_reasons(data, minimum):
+    """The reasons the check on held-out episodes in a model's JSON bytes is not good enough, as a
+    list (empty when it is). It must rest on enough held-out episodes, shows and predicted ad
+    seconds, and its precision (in seconds of the spans the phone would cut) must reach `minimum`."""
     reasons = []
-    try:
-        refused = refusals(json.loads(data))
-    except ValueError:
-        refused = ["it is not JSON"]
-    if refused:
-        reasons.append("the phone would refuse the file, because " + "; and ".join(refused))
     episodes = number_of(held_out(data, "episodes")) or 0
     shows = number_of(held_out(data, "shows")) or 0
     seconds = number_of(held_out(data, "predictedAdSeconds")) or 0
@@ -128,7 +131,28 @@ def weak_model(data, minimum):
     elif precision < minimum:
         reasons.append("it found ads with a precision of %s, and %s is needed"
                        % (percent(precision), percent(minimum)))
-    return "; ".join(reasons) or None
+    return reasons
+
+
+def weak_model(data, minimum):
+    """A sentence saying why the model is not good enough to publish, or None when it is: the phone
+    would refuse the file, or its check on held-out episodes is not good enough."""
+    reasons = []
+    try:
+        refused = refusals(json.loads(data))
+    except ValueError:
+        refused = ["it is not JSON"]
+    if refused:
+        reasons.append("the phone would refuse the file, because " + "; and ".join(refused))
+    return "; ".join(reasons + check_reasons(data, minimum)) or None
+
+
+def weak_meaning(data, folder, minimum):
+    """The same for the meaning model: the check on held-out episodes of the word model's gate, and
+    what the scorecard in `folder` says (teach_publish_gates.py). Both reasons are said at once."""
+    reasons = check_reasons(data, minimum)
+    reason = scorecard_reason(folder, data, minimum)
+    return "; ".join(reasons + ([reason] if reason else [])) or None
 
 
 def write_atomically(path, data):
@@ -231,6 +255,8 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
     for source, target in FILES:
         try:
             data = checked(os.path.join(folder, source), limit)
+            if target == SETTINGS:
+                settings_shape(data)
         except FileNotFoundError:
             say("%s: skipped, there is no %s in %s." % (target, source, folder))
             continue
@@ -243,6 +269,12 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
             if reason:
                 say("%s: The small model was not published: %s. A model already in the phone's "
                     "folder is left as it is." % (target, reason))
+                continue
+        if target == MEANING:
+            reason = weak_meaning(data, folder, options.min_precision)
+            if reason:
+                say("%s: The meaning model was not published: %s. A meaning model already in the "
+                    "phone's folder is left as it is." % (target, reason))
                 continue
         for number, destination in enumerate(destinations):
             try:
