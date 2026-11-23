@@ -4,18 +4,22 @@ import Foundation
 
 /// The vectors of an episode's lines, kept in `meaning-cache/` of the teaching folder, so a second
 /// run does not embed every line again. A cache file is named by the episode, a fingerprint of
-/// its lines' text, and the embedding's revision and size, so changed text or another embedding
-/// is never read from an old file. It holds one row of Float32 numbers for each line (length 1),
+/// its lines' text, the embedding's revision and size, and a short hash of the vector the system
+/// gives for the first probe sentence (a system update can change the numbers and keep the
+/// revision), so changed text or another embedding is never read from an old file. It holds one
+/// row of Float32 numbers for each line (length 1),
 /// and a row of zeros for a line with no vector. A file of the wrong length is embedded again.
 /// The cache is only a speed-up: when it cannot be written, nothing is lost.
 struct MeaningCache {
   let folder: URL
   let revision: Int
   let dimension: Int
+  /// `signature(ofProbe:)` of this system's vector for the first probe sentence.
+  let signature: String
 
   /// The vector (length 1) of each line, nil for a line with none.
   func vectors(id: String, texts: [String], embedder: LineEmbedder) -> [[Float]?] {
-    let name = "\(id).\(Self.fingerprint(texts)).r\(revision).d\(dimension).f32"
+    let name = "\(id).\(Self.fingerprint(texts)).r\(revision).d\(dimension).\(signature).f32"
     let file = folder.appendingPathComponent(name)
     if let data = try? Data(contentsOf: file), let numbers = Float32Bytes.decode(data),
       numbers.count == texts.count * dimension
@@ -43,17 +47,23 @@ struct MeaningCache {
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     if (try? Float32Bytes.encode(flat).write(to: file, options: .atomic)) != nil {
       // One file for each episode: an older one for other text or another embedding goes. A
-      // name is "<id>.<fingerprint>.r<revision>.d<dimension>.f32"; an id that itself holds a
-      // dot never matches the one that is a part of it.
+      // name is "<id>.<fingerprint>.r<revision>.d<dimension>.<signature>.f32"; an id that
+      // itself holds a dot never matches the one that is a part of it.
       for other in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
       where other != name && other.hasPrefix(id + ".") {
         let rest = other.dropFirst(id.count + 1).split(separator: ".", omittingEmptySubsequences: false)
-        if rest.count == 4, rest[3] == "f32" {
+        if rest.count == 5, rest[4] == "f32" {
           try? FileManager.default.removeItem(at: folder.appendingPathComponent(other))
         }
       }
     }
     return found
+  }
+
+  /// A short hash of a probe vector (length 1) rounded to three decimals, so the float noise of
+  /// one system does not change it but another system's numbers do.
+  static func signature(ofProbe vector: [Double]) -> String {
+    fingerprint(vector.map { String(Int(($0 * 1000).rounded())) })
   }
 
   /// A 64-bit FNV-1a fingerprint of the lines' text, in hexadecimal.

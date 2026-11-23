@@ -83,11 +83,13 @@ enum Made {
   static let ask2 = "Tell a friend about us, that is how we grow."
   static let talk = "Rivers carry water down to the sea."
   static let talk2 = "The valley floor was covered in fog."
+  /// A line with ad words in it ("go to", a web address, a code) that sits at the ask vector.
+  static let adCopy = "Go to example.com/show and use code SHOW."
 
   static let table: [String: [Double]] = [
     probeOne: [0.5, 0.5, 0.5, 0.5], probeTwo: [0.5, -0.5, 0.5, -0.5],
     ask: [1, 0.1, 0, 0], ask2: [0.9, 0, 0.1, 0],
-    talk: [0, 0.1, 1, 0], talk2: [0.1, 0, 0.9, 0.1],
+    talk: [0, 0.1, 1, 0], talk2: [0.1, 0, 0.9, 0.1], adCopy: [0.95, 0.05, 0, 0],
   ]
 
   static func embedder(revision: Int = 7) -> MadeEmbedder {

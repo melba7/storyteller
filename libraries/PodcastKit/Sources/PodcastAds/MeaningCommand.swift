@@ -64,7 +64,10 @@ public enum MeaningCommand {
   /// Runs the command: trains the meaning model on the folder's marked episodes that are not on
   /// the shelf, checks it on the shelf, and writes `<folder>/ad-meaning.json`. Returns 0 when it
   /// worked (also when there is too little to train on, and then no file is written) and 2 for a
-  /// set-up problem. `embedder` is nil where there is no sentence embedding.
+  /// set-up problem (no embedder, a bad argument or folder, no vector for any line, no usable
+  /// model). The meaning model is optional: whoever runs this as one step of a longer teaching run
+  /// (`teach-finish.sh`) must not let an exit code of 2 stop the steps after it. `embedder` is nil
+  /// where there is no sentence embedding.
   public static func run(
     _ arguments: [String], embedder: LineEmbedder?, now: Date = Date(),
     out: (String) -> Void, err: (String) -> Void
@@ -118,10 +121,23 @@ public enum MeaningCommand {
       return 0
     }
 
+    // The two probe sentences go in the file, so the phone can tell whether its embedding agrees.
+    var probes: [AdMeaningModel.Probe] = []
+    for sentence in AdMeaningModel.probeSentences {
+      guard let raw = embedder.vector(for: sentence), raw.count == embedder.dimension,
+        let unit = MeaningVectors.unit(raw)
+      else {
+        err("The sentence embedding gave no vector for the probe sentence \"\(sentence)\".")
+        return 2
+      }
+      probes.append(
+        AdMeaningModel.Probe(text: sentence, vector: unit.map { ($0 * 1_000_000).rounded() / 1_000_000 }))
+    }
+
     // The vectors of every line of every episode we need, kept in meaning-cache/.
     let cache = MeaningCache(
       folder: folder.appendingPathComponent("meaning-cache"), revision: embedder.revision,
-      dimension: embedder.dimension)
+      dimension: embedder.dimension, signature: MeaningCache.signature(ofProbe: probes.first?.vector ?? []))
     let wanted = learning + shelf
     var vectors: [String: [[Float]?]] = [:]
     var found = 0
@@ -135,19 +151,6 @@ public enum MeaningCommand {
     guard found > 0 else {
       err("The sentence embedding gave no vector for any line, so nothing could be trained.")
       return 2
-    }
-
-    // The two probe sentences go in the file, so the phone can tell whether its embedding agrees.
-    var probes: [AdMeaningModel.Probe] = []
-    for sentence in AdMeaningModel.probeSentences {
-      guard let raw = embedder.vector(for: sentence), raw.count == embedder.dimension,
-        let unit = MeaningVectors.unit(raw)
-      else {
-        err("The sentence embedding gave no vector for the probe sentence \"\(sentence)\".")
-        return 2
-      }
-      probes.append(
-        AdMeaningModel.Probe(text: sentence, vector: unit.map { ($0 * 1_000_000).rounded() / 1_000_000 }))
     }
 
     var examples: [MeaningExample] = []
@@ -194,14 +197,14 @@ public enum MeaningCommand {
     return 0
   }
 
-  /// A shelf episode for the check. The lines end where the next one starts and the last one
-  /// lasts five seconds, as the Mac's own check counts them, so both give the same seconds.
+  /// A shelf episode for the check. The lines end as `MeaningTrainer.lineEnds` says (where the next
+  /// one starts, five seconds for the last), as the Mac's own check counts them, so both give the
+  /// same seconds.
   private static func heldEpisode(_ episode: TeachingEpisode, _ vectors: [[Float]?]) -> MeaningHeldEpisode {
     let source = episode.transcript.lines
+    let ends = MeaningTrainer.lineEnds(of: source)
     let lines = source.enumerated().map { index, line in
-      NumberedLine(
-        number: index + 1, start: line.start,
-        end: index + 1 < source.count ? source[index + 1].start : line.start + 5, text: line.text)
+      NumberedLine(number: index + 1, start: line.start, end: ends[index], text: line.text)
     }
     return MeaningHeldEpisode(
       id: episode.id, feed: episode.feed, lines: lines,

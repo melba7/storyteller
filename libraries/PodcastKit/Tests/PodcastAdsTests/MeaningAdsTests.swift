@@ -34,6 +34,32 @@ final class MeaningAdsTests: XCTestCase {
     XCTAssertEqual(ad.end, 79, accuracy: 3)
   }
 
+  func testASureSpanWithAdWordsInItIsStillOnlyUnsure() throws {
+    // Lines 4 to 8 hold ad words, which is what keeps `AdCleanup` from lowering a sure ad by
+    // itself. Only the finder's own rule can then keep the ad unsure.
+    let copy = (1...12).map { number -> String in
+      switch number {
+      case 4, 6, 8: return Made.adCopy
+      case 5, 7: return Made.ask
+      default: return number % 2 == 0 ? Made.talk : Made.talk2
+      }
+    }
+    let transcript = makeTranscript(copy)
+    // The fixture is not vacuous: the clean-up keeps a sure range over these lines sure...
+    let sure = AdRange(startLine: 4, endLine: 8, advertiser: "", kind: .ownPlug, confidence: .sure)
+    XCTAssertEqual(AdCleanup.run(ranges: [sure], transcript: transcript).first?.confidence, .sure)
+    // ...and the model is sure of the span.
+    let spans = model.spans(
+      lines: AdChunker.number(transcript.lines), duration: nil, embedder: Made.embedder())
+    XCTAssertEqual(spans.count, 1)
+    XCTAssertTrue(spans[0].sure)
+    // Yet the finder gives an unsure ad.
+    let ads = MeaningAds.find(model: model, transcript: transcript, embedder: Made.embedder())
+    XCTAssertEqual(ads.count, 1)
+    XCTAssertEqual(ads.first?.confidence, .unsure)
+    XCTAssertEqual(ads.first?.source, "meaning")
+  }
+
   func testTheRunKeepsTheRowsAndTheState() {
     let transcript = makeTranscript(texts)
     let run = MeaningAds.run(model: model, transcript: transcript, embedder: Made.embedder())

@@ -1,5 +1,6 @@
 // LOFI-FORK: trains the meaning model on the Mac (see FORK.md). Foundation only.
 import Foundation
+import PodcastTranscripts
 
 /// One line of a marked episode: its vector (length 1) and the index of its class in
 /// `AdWordModel.classes`.
@@ -107,20 +108,33 @@ public enum MeaningTrainer {
 
   // MARK: The class of each line
 
+  /// How long the last line of a transcript counts as lasting.
+  static let lastLineSeconds = 5.0
+
+  /// Where each line ends for the training and the check: at the start of the next line, and
+  /// `lastLineSeconds` after the last line's start (as `teach_train.py` and `teach_spans.py` count).
+  static func lineEnds(of lines: [TranscriptLine]) -> [Double] {
+    lines.indices.map { lines.indices.contains($0 + 1) ? lines[$0 + 1].start : lines[$0].start + lastLineSeconds }
+  }
+
   /// For each line of the episode the index of its class in `AdWordModel.classes`: the sort of
   /// the first stretch marked with high or medium confidence that covers it, 0 ("none") when no
   /// stretch does, and nil when only a low-confidence stretch covers it (such a line is left out
   /// of training and of the check). This is the rule of `teach_train.py`'s `line_classes`. The
-  /// label file gives times, not line numbers, and rounds them to a tenth, so a line belongs to
-  /// a stretch when the middle of the line falls inside it.
+  /// stretches come with times as well as line numbers, and the times are rounded to a tenth,
+  /// so a line belongs to a stretch when the middle of the line falls inside it. The line ends
+  /// are the ones the check uses (`lineEnds`), so a stretch that runs to the last line covers it
+  /// even when the episode goes on for a long time after that line starts.
   public static func lineClasses(for episode: TeachingEpisode) -> [Int?] {
-    episode.transcript.lines.map { line in
-      let middle = (line.start + line.end) / 2
+    let lines = episode.transcript.lines
+    let ends = lineEnds(of: lines)
+    return lines.indices.map { index in
+      let middle = (lines[index].start + ends[index]) / 2
       func covers(_ stretch: TeachingTruth) -> Bool { middle >= stretch.start && middle < stretch.end }
       if let strong = episode.truth.first(where: covers),
-        let index = AdMeaningModel.classes.firstIndex(of: strong.sort)
+        let found = AdMeaningModel.classes.firstIndex(of: strong.sort)
       {
-        return index
+        return found
       }
       return episode.maybe.contains(where: covers) ? nil : 0
     }

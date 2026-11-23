@@ -78,6 +78,11 @@ public struct AdMeaningModel: Sendable, Equatable {
   public let revision: Int
   public let dimension: Int
   let thresholds: AdWordModel.Thresholds
+  /// The probability above which a line may open a span: the start threshold of the model's own
+  /// file. A caller that asks the listener about the lines the model was nearly sure of asks
+  /// about those below this (`AdAsks.questions(... below:)`).
+  public var askBelow: Double { thresholds.start }
+
   /// One row of `dimension` numbers for each class, row by row.
   let weights: [Float]
   let biases: [Double]

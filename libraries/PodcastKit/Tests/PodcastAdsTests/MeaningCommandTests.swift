@@ -145,6 +145,45 @@ final class MeaningCommandTests: XCTestCase {
     XCTAssertEqual(again.count, 1)
   }
 
+  func testAChangedTranscriptIsEmbeddedAgainAndItsOldFileGoes() throws {
+    let made = try folder()
+    _ = run(["--min-episodes", "4"], made.folder, embedder: made.embedder)
+    // One line of t3 is said another way.
+    let file = made.folder.appendingPathComponent("transcripts/t3.txt")
+    let old = sentence("t3", 3, ad: false)
+    let new = old.replacingOccurrences(of: "rivers", with: "streams")
+    XCTAssertNotEqual(old, new)
+    try String(contentsOf: file, encoding: .utf8).replacingOccurrences(of: old, with: new)
+      .write(to: file, atomically: true, encoding: .utf8)
+    made.embedder.set(new, to: talkVector)
+    let before = made.embedder.calls.count
+    XCTAssertEqual(run(["--min-episodes", "4"], made.folder, embedder: made.embedder).code, 0)
+    let again = Array(made.embedder.calls.dropFirst(before))
+    XCTAssertEqual(again.count, 20 + 2, "the twenty lines of t3 and the two probes")
+    XCTAssertTrue(again.contains(new))
+    XCTAssertFalse(again.contains(sentence("t4", 3, ad: false)), "the other episodes are kept")
+    let cache = made.folder.appendingPathComponent("meaning-cache")
+    let names = try FileManager.default.contentsOfDirectory(atPath: cache.path).filter { $0.hasPrefix("t3.") }
+    XCTAssertEqual(names.count, 1)
+  }
+
+  func testVectorsFromAnotherSystemOfTheSameRevisionAreNotReused() throws {
+    // A system update can change the numbers and keep the revision; the probe shows it.
+    let made = try folder()
+    _ = run(["--min-episodes", "4"], made.folder, embedder: made.embedder)
+    var moved = made.embedder.known
+    let probe = AdMeaningModel.probeSentences[0]
+    moved[probe] = [0.6, 0.5, 0.5, 0.4]
+    let other = MadeEmbedder(dimension: 4, revision: 7, table: moved)
+    XCTAssertEqual(run(["--min-episodes", "4"], made.folder, embedder: other).code, 0)
+    XCTAssertEqual(other.calls.count, 10 * 20 + 2, "every line is embedded again")
+    // A tiny difference, as float noise would make, keeps the kept vectors.
+    moved[probe] = [0.600_01, 0.5, 0.5, 0.4]
+    let noisy = MadeEmbedder(dimension: 4, revision: 7, table: moved)
+    XCTAssertEqual(run(["--min-episodes", "4"], made.folder, embedder: noisy).code, 0)
+    XCTAssertEqual(noisy.calls.count, 2)
+  }
+
   func testAnEpisodeThatRepeatsAShelfEpisodeIsLeftOutOfTraining() throws {
     let made = try folder(repeatOf: ("t1", "s1"))
     let ran = run(["--min-episodes", "4"], made.folder, embedder: made.embedder)

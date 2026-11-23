@@ -102,20 +102,23 @@ final class AdMeaningModelTests: XCTestCase {
     XCTAssertEqual(embedder.calls, [])
   }
 
-  func testTheProbeCheckRefusesVectorsThatDiffer() {
-    // A little noise under 0.02 is fine; a revision that moved the vectors is not.
+  func testTheProbeCheckStopsAtZeroPointZeroTwo() {
+    // Moving two numbers of a probe by `shift` each moves the unit vector by about shift * 1.41.
     func embedder(shift: Double) -> MadeEmbedder {
       var table = Made.table
       table[Made.probeOne] = [0.5 + shift, 0.5 - shift, 0.5, 0.5]
       return MadeEmbedder(dimension: 4, revision: 7, table: table)
     }
-    XCTAssertEqual(model().state(for: embedder(shift: 0.005)), .ready)
-    guard case .off(let why) = model().state(for: embedder(shift: 0.05)) else {
+    // About 0.014 away is inside the limit, about 0.025 away is outside it, so a limit of 0.01
+    // or of 0.06 would each fail one of these.
+    XCTAssertEqual(model().state(for: embedder(shift: 0.01)), .ready)
+    guard case .off(let why) = model().state(for: embedder(shift: 0.018)) else {
       return XCTFail("should be off")
     }
     XCTAssertTrue(why.lowercased().contains("probe"), why)
+    XCTAssertEqual(AdMeaningModel.probeLimit, 0.02)
     let run = model().probabilities(
-      lines: Made.lines([Made.ask]), duration: nil, embedder: embedder(shift: 0.05))
+      lines: Made.lines([Made.ask]), duration: nil, embedder: embedder(shift: 0.018))
     XCTAssertEqual(run.state, .off(why))
     XCTAssertEqual(run.rows, [])
   }
@@ -230,9 +233,20 @@ final class AdMeaningModelTests: XCTestCase {
 
   func testTheDecoderIgnoresRowsThatDoNotMatchTheLines() {
     let lines = Made.lines([Made.ask, Made.talk])
-    XCTAssertEqual(AdWordModel.decode(rows: [[1, 0, 0, 0, 0]], lines: lines, thresholds: .init()), [])
-    XCTAssertEqual(
-      AdWordModel.decode(rows: [[1, 0], [1, 0]], lines: lines, thresholds: .init()), [])
+    // One row for two lines, and it is an ad row: without the check it would open a span.
+    XCTAssertEqual(AdWordModel.decode(rows: [[0, 1, 0, 0, 0]], lines: lines, thresholds: .init()), [])
+    // Two rows of two numbers: without the check the decoder would read a third number.
+    XCTAssertEqual(AdWordModel.decode(rows: [[0, 1], [0, 1]], lines: lines, thresholds: .init()), [])
+    // The same rows at the right size do open a span.
+    let right = AdWordModel.decode(
+      rows: [[0, 1, 0, 0, 0], [0, 1, 0, 0, 0]], lines: lines, thresholds: .init())
+    XCTAssertEqual(right.count, 1)
+  }
+
+  func testTheMeaningModelOffersItsOwnStartThresholdForQuestions() {
+    XCTAssertEqual(model().askBelow, 0.6)
+    let strict = model(Made.file { $0["thresholds"] = ["start": 0.7, "stay": 0.4, "sure": 0.9] })
+    XCTAssertEqual(strict.askBelow, 0.7)
   }
 
   // MARK: The time guard

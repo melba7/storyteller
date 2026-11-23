@@ -138,6 +138,23 @@ final class MeaningTrainerTests: XCTestCase {
     XCTAssertEqual(found, [0, 2, 2, 0])
   }
 
+  func testAStretchThatRunsToTheLastLineCoversIt() {
+    // The last line starts at 3590 s and the episode is 3620 s long, so the reader ends the line
+    // at 3620 and its middle would be 3605, outside the stretch 3580 to 3595. Lines are judged
+    // by the ends the check uses (the next line's start, five seconds for the last line).
+    let transcript = TeachingFolder.transcript(
+      fromText: "[0:00:00.0] one\n[0:59:40.0] two\n[0:59:50.0] three", duration: 3620)
+    XCTAssertEqual(transcript.lines.map(\.start), [0, 3580, 3590])
+    XCTAssertEqual(transcript.lines.last?.end, 3620)
+    let found = MeaningTrainer.lineClasses(
+      for: TeachingEpisode(
+        id: "e", feed: "f", show: "s", title: "t", transcript: transcript,
+        truth: [TeachingTruth(start: 3580, end: 3595, sort: "host_ask")], maybe: [], onShelf: false,
+        seconds: 3620))
+    XCTAssertEqual(found, [0, 3, 3])
+    XCTAssertEqual(MeaningTrainer.lineEnds(of: transcript.lines), [3580, 3590, 3595])
+  }
+
   // MARK: The check on the shelf
 
   private func held(
