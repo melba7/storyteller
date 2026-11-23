@@ -42,8 +42,19 @@ public enum AdAsks {
     model: AdWordModel, lines: [NumberedLine], duration: Double?, from: Double = askFrom,
     outside ads: [FoundAd], source: String
   ) -> [FoundAd] {
-    questions(
-      lines: lines, rows: smoothed(model.probabilities(lines: lines, duration: duration)),
+    var rows = model.probabilities(lines: lines, duration: duration)
+    if model.version >= 2 {
+      // A version 2 model's decoder does not count credits as an ad, so neither do the
+      // questions: the chance is the three ad classes, and credits never give a question its kind.
+      rows = rows.map { row in
+        var own = row
+        own[0] = 1 - (row[1] + row[2] + row[3])
+        own[4] = 0
+        return own
+      }
+    }
+    return questions(
+      lines: lines, rows: smoothed(rows),
       from: from, below: model.thresholds.start, outside: ads, source: source)
   }
 

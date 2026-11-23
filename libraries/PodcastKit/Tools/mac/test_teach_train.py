@@ -232,8 +232,8 @@ class TrainingTests(unittest.TestCase):
         self.assertEqual(model["trained"]["episodes"], 4)
         self.assertEqual(model["trained"]["lines"], 160)
         self.assertEqual(model["trained"]["shelf"], 1)
-        self.assertNotIn(str(ft.bucket("u:zorblax")), model["weights"])
-        self.assertIn(str(ft.bucket("u:sleepy")), model["weights"])
+        self.assertNotIn(str(ft.bucket("u:zorblax", ft.BUCKETS_V2)), model["weights"])
+        self.assertIn(str(ft.bucket("u:sleepy", ft.BUCKETS_V2)), model["weights"])
 
     def test_it_learns_to_tell_ads_from_chatter_on_unseen_lines(self):
         folder = toy_folder(self, 8)
@@ -241,16 +241,18 @@ class TrainingTests(unittest.TestCase):
         self.assertEqual(code, 0)
         model = folder.read("ad-model.json")
         weights = {int(k): v for k, v in model["weights"].items()}
-        lines = [(0.0, "We walked along the river slow this morning."),
-                 (10.0, "My neighbour has a quiet dog that barks."),
-                 (20.0, "Use promo code Blorp at Blorp dot com slash show."),
-                 (30.0, "This episode is brought to you by Blorp."),
-                 (40.0, "The weather was old and quite calm."),
-                 (50.0, "Anyway the green story goes on for a while.")]
-        for i in (0, 1, 4, 5):
-            self.assertGreater(train.probabilities(weights, lines, i, 400)[0], 0.5, i)
-        for i in (2, 3):
-            self.assertLess(train.probabilities(weights, lines, i, 400)[0], 0.5, i)
+        # The model now reads the words and word pairs of the two lines on each side, so a chat line
+        # next to an ad takes part of its look; the unseen chat lines to check are away from the ads.
+        pad = ["The weather was old and quite calm.", "Anyway the green story goes on for a while."]
+        lines = [(10.0 * i, text) for i, text in enumerate(
+            pad + ["We walked along the river slow this morning.",
+                   "My neighbour has a quiet dog that barks.",
+                   "Use promo code Blorp at Blorp dot com slash show.",
+                   "This episode is brought to you by Blorp."] + pad + pad)]
+        for i in (0, 1, 2, 6, 7, 8, 9):
+            self.assertGreater(train.probabilities(weights, lines, i, 400, ft.BUCKETS_V2, 2)[0], 0.5, i)
+        for i in (4, 5):
+            self.assertLess(train.probabilities(weights, lines, i, 400, ft.BUCKETS_V2, 2)[0], 0.5, i)
         self.assertEqual(len([s for s in said if s.startswith("Pass ")]), 5)
 
     def test_a_line_with_no_known_words_is_plain_talk_even_when_most_lines_are_ads(self):
@@ -263,7 +265,7 @@ class TrainingTests(unittest.TestCase):
         self.assertEqual(code, 0)
         model = folder.read("ad-model.json")
         self.assertEqual(refusals(model), [])
-        self.assertEqual(model["weights"][str(ft.bucket("#bias"))],
+        self.assertEqual(model["weights"][str(ft.bucket("#bias", ft.BUCKETS_V2))],
                          [train.BIAS_NONE, 0.0, 0.0, 0.0, 0.0])
 
     def test_training_never_moves_the_bias(self):

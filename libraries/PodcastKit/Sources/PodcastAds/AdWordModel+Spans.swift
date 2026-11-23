@@ -22,9 +22,12 @@ extension AdWordModel {
   /// and cut what is left into pieces where the top class other than "none" changes from one
   /// line to the next (a bridged line takes the class of the line before it). Each piece has
   /// its own sort, mean score and "sure" (score at `sure` and 15 seconds long).
+  ///
+  /// A version 2 model decodes by `decodeTwo` instead (see `AdWordModel+SpansTwo.swift`).
   public func spans(lines: [NumberedLine], duration: Double?) -> [Span] {
-    Self.decode(
-      rows: probabilities(lines: lines, duration: duration), lines: lines, thresholds: thresholds)
+    let rows = probabilities(lines: lines, duration: duration)
+    if version >= 2 { return Self.decodeTwo(rows: rows, lines: lines, thresholds: thresholds) }
+    return Self.decode(rows: rows, lines: lines, thresholds: thresholds)
   }
 
   /// The three cut-offs of a model file's `thresholds`, or nil when one is not a number from 0 to

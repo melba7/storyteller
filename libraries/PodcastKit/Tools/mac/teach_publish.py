@@ -73,10 +73,10 @@ MIN_SHOWS = 3
 MIN_AD_SECONDS = 600
 
 
-def checked(path, limit=LIMIT):
+def checked(path, limit=LIMIT, versions=(1,)):
     """The bytes of a source that is fit to publish. Raises ValueError (with the reason in plain
-    words) when it is too large, not JSON or not a version 1 object, and OSError when it cannot
-    be read."""
+    words) when it is too large, not JSON or not an object of one of `versions` (the word model may
+    be version 1 or 2, every other file is version 1), and OSError when it cannot be read."""
     size = os.path.getsize(path)
     if size > limit:
         raise ValueError("it is too large (%d bytes, the most is %d)" % (size, limit))
@@ -87,8 +87,9 @@ def checked(path, limit=LIMIT):
     except ValueError:
         raise ValueError("it is not JSON")
     if not isinstance(value, dict) or type(value.get("version")) is not int \
-            or value["version"] != 1:
-        raise ValueError("it is not an object with \"version\": 1")
+            or value["version"] not in versions:
+        raise ValueError("it is not an object with \"version\": %s"
+                         % " or ".join(str(v) for v in versions))
     return data
 
 
@@ -254,7 +255,7 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
 
     for source, target in FILES:
         try:
-            data = checked(os.path.join(folder, source), limit)
+            data = checked(os.path.join(folder, source), limit, (1, 2) if target == MODEL else (1,))
             if target == SETTINGS:
                 settings_shape(data)
         except FileNotFoundError:

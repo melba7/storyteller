@@ -202,6 +202,7 @@ class Setup(unittest.TestCase):
         """The calls, each as its tool and first words, without the folder arguments."""
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
         return [line.replace(" --folder " + folder, "").replace(" " + folder, "")
+                .replace(" --fit-tool " + self.bin + "/podcast-teach", "")
                 for line in self.called() if " teach_store.py hold" not in line]
 
     def log(self):
@@ -209,9 +210,10 @@ class Setup(unittest.TestCase):
             return f.read()
 
 
-FINISH_ORDER = ["python3 teach_habits.py", "python3 teach_train.py", "python3 teach_library.py",
-                "swift build -c release --product podcast-teach",
-                "swift build -c release --show-bin-path", "podcast-teach sounds",
+# The model step comes after the build of podcast-teach, which fits its weights (--fit-tool).
+FINISH_ORDER = ["python3 teach_habits.py", "swift build -c release --product podcast-teach",
+                "swift build -c release --show-bin-path", "python3 teach_train.py",
+                "python3 teach_library.py", "podcast-teach sounds",
                 "podcast-teach meaning", "podcast-teach score", "python3 teach_settings.py",
                 "python3 teach_publish.py"]
 
@@ -270,9 +272,9 @@ class FinishTests(Setup):
     def test_when_the_build_fails_both_swift_steps_are_left_out_and_publish_still_runs(self):
         done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
         self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertEqual(self.short(), ["python3 teach_habits.py", "python3 teach_train.py",
-                                        "python3 teach_library.py",
+        self.assertEqual(self.short(), ["python3 teach_habits.py",
                                         "swift build -c release --product podcast-teach",
+                                        "python3 teach_train.py", "python3 teach_library.py",
                                         "python3 teach_settings.py", "python3 teach_publish.py"])
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)

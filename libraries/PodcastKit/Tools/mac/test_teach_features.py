@@ -84,5 +84,63 @@ class ProbabilityTests(unittest.TestCase):
             self.assertEqual([round(x, 6) for x in got], expected, "line %d" % i)
 
 
+# Version 2 (4194304 buckets): the same numbers are pinned in AdWordModelVersionTwoTests.swift.
+V2 = ft.BUCKETS_V2
+WEIGHTS_V2 = {3357031: [5.0, 0, 0, 0, 0], 2033433: [-2.0, 2.0, 0, 0, 0],
+              2349595: [-1.0, 0, 1.0, 0, 0], 1170965: [-3.0, 3.0, 0, 0, 0],
+              3728355: [-1.0, 1.0, 0, 0, 0]}
+EXPECTED_V2 = [[0.242466, 0.659091, 0.032814, 0.032814, 0.032814],
+               [0.659091, 0.242466, 0.032814, 0.032814, 0.032814],
+               [0.006561, 0.973756, 0.006561, 0.006561, 0.006561],
+               [0.098767, 0.729797, 0.098767, 0.036334, 0.036334],
+               [0.905195, 0.016579, 0.045067, 0.016579, 0.016579],
+               [0.905195, 0.016579, 0.045067, 0.016579, 0.016579],
+               [0.973756, 0.006561, 0.006561, 0.006561, 0.006561],
+               [0.973756, 0.006561, 0.006561, 0.006561, 0.006561],
+               [0.973756, 0.006561, 0.006561, 0.006561, 0.006561]]
+
+
+class VersionTwoTests(unittest.TestCase):
+    def test_reference_buckets(self):
+        expected = {"#bias": 3357031, "u:promo": 1170965, "nb:promo code": 2033433,
+                    "pb:promo code": 2349595, "nb:brought to": 3728355, "pb:welcome to": 358674,
+                    "#t0": 4085766, "#end": 906079}
+        for feature, number in expected.items():
+            self.assertEqual(ft.bucket(feature, V2), number, feature)
+
+    def test_a_version_1_line_has_no_pairs_of_its_neighbours(self):
+        self.assertFalse([f for f in ft.features(LINES, 3, 150) if f[:2] in ("pb", "nb")])
+
+    def test_the_pairs_of_the_neighbouring_lines_never_cross_a_line_border(self):
+        found = ft.features(LINES, 3, 150, 2)
+        pairs = sorted(f for f in found if f[:2] in ("pb", "nb"))
+        self.assertEqual(len(pairs), 30)
+        self.assertIn("pb:promo code", pairs)
+        self.assertIn("pb:example mattress", pairs)
+        self.assertNotIn("pb:mattress go", pairs)
+        self.assertIn("nb:we're back", pairs)
+        self.assertNotIn("nb:today rivers", pairs)
+        self.assertEqual(len(found), 74)
+        # Line 3 is three lines from line 0, so it takes no pair from it.
+        self.assertNotIn("pb:welcome to", found)
+
+    def test_the_pinned_pair_buckets_of_a_line(self):
+        pairs = sorted(ft.bucket(f, V2) for f in ft.features(LINES, 3, 150, 2) if f[:2] in ("pb", "nb"))
+        self.assertEqual(pairs[:4], [269845, 589285, 690944, 1015682])
+        self.assertEqual(pairs[-3:], [3983256, 4093510, 4150614])
+
+    def test_precomputed_buckets_equal_the_features(self):
+        for duration in (150, None):
+            precomputed = ft.episode_buckets(LINES, duration, 2, V2)
+            for i in range(len(LINES)):
+                wanted = sorted({ft.bucket(f, V2) for f in ft.features(LINES, i, duration, 2)})
+                self.assertEqual(list(precomputed[i]), wanted)
+
+    def test_reference_probabilities(self):
+        for i, expected in enumerate(EXPECTED_V2):
+            got = ft.probabilities(WEIGHTS_V2, LINES, i, 150, V2, 2)
+            self.assertEqual([round(x, 6) for x in got], expected, "line %d" % i)
+
+
 if __name__ == "__main__":
     unittest.main()

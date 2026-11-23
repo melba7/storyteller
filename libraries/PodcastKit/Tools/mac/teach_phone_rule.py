@@ -1,5 +1,5 @@
 """Says why the phone would refuse a model file, by the same rules as `init?(data:)` in
-AdWordModel.swift (PodcastAds). Standard library only. Change nothing here without changing it there.
+AdWordModel.swift (PodcastAds). Versions 1 and 2 are taken. Standard library only. Change nothing here without changing it there.
 
 The teaching run must never publish a model the phone silently drops, so teach_publish.py asks
 `refusals` before it copies ad-model.json. JSON can hold odd values (a string where a number
@@ -77,8 +77,8 @@ def refusals(value):
     if not isinstance(value, dict):
         return ["it is not an object"]
     reasons = []
-    if not is_int(value.get("version")) or value["version"] != 1:
-        reasons.append("its version is not 1")
+    if not is_int(value.get("version")) or value["version"] not in (1, 2):
+        reasons.append("its version is not 1 or 2")
     size = value.get("buckets")
     sized = is_int(size) and MIN_BUCKETS <= size <= MAX_BUCKETS
     if not sized:
