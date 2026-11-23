@@ -117,12 +117,28 @@ extension PodcastAdFinder {
         meaningRows = (model, run.rows)
       }
     }
-    let joints = modes.joints ? pass?.joints : nil
-    let questions = wordModelQuestions(id, modes, transcript, collect.allAds)
-    var out = collect.written(joints: joints, steadyToo: modes.steadyToo)
+    // The snap, the word model's questions and the meaning layer's are new work too: each runs
+    // under the mark of the finder it belongs to, so a crash in it is not repeated every launch.
+    let guardian = PodcastFinderGuard.shared
+    var asked: [FoundAd] = []
+    if modes.level(FinderNames.wordModel) != .off, PodcastTeaching.shared.files.model != nil {
+      asked =
+        guardian.hold([FinderNames.wordModel], episode: id) { _ in
+          wordModelQuestions(id, modes, transcript, collect.allAds)
+        } ?? []
+    }
+    let snapped = (modes.joints ? pass?.joints : nil).flatMap { joints in
+      guardian.hold([FinderNames.joints], episode: id) { _ in
+        collect.written(joints: joints, steadyToo: modes.steadyToo)
+      }
+    }
+    var out = snapped ?? collect.written(joints: nil, steadyToo: modes.steadyToo)
     result.moved = out.moved
-    let picked = collect.questions(
-      lines: AdChunker.number(transcript.lines), meaning: meaningRows, first: questions)
+    let lines = AdChunker.number(transcript.lines)
+    let picked =
+      guardian.hold(meaningRows == nil ? [] : [FinderNames.meaning], episode: id) { _ in
+        collect.questions(lines: lines, meaning: meaningRows, first: asked)
+      } ?? collect.questions(lines: lines, meaning: nil, first: asked)
     out.file = AdAsking.adding(picked, to: out.file)
     PodcastTimeline.mark(
       id,
