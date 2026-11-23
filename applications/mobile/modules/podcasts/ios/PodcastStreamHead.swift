@@ -341,7 +341,7 @@ final class PodcastStreamHead: @unchecked Sendable {
       let (sponsors, duration) = lock.withLock { (self.sponsors, self.episodeDuration) }
       let localAds = findLocal(
         lines: lines, transcript: transcript, sponsors: sponsors, episodeDuration: duration,
-        audio: data.prefix(cut.bytes))
+        audio: data.prefix(cut.bytes), blockers: remembered.ads + modelAds)
       save(AdHeadRules.merge(remembered.ads + localAds + modelAds), covered: fed)
       // The first look is done: the player may start (it waits for this, PodcastPlayer+StartHold).
       if !told {

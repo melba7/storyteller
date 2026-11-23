@@ -13,10 +13,11 @@ import PodcastTranscripts
 
 extension PodcastStreamHead {
   /// The ads of the local layers and of the taught sounds in `audio` (the audio of this step).
-  /// `episodeDuration` is the episode's length when it is known.
+  /// `episodeDuration` is the episode's length when it is known. `blockers` are the ads of the
+  /// memory and the model, which the caller joins with these: a new finder keeps away from them.
   func findLocal(
     lines: [TranscriptLine], transcript: Transcript, sponsors: [SponsorName],
-    episodeDuration: Double?, audio: Data
+    episodeDuration: Double?, audio: Data, blockers: [FoundAd]
   ) -> [FoundAd] {
     let started = Date()
     let teaching = PodcastTeaching.shared
@@ -29,15 +30,21 @@ extension PodcastStreamHead {
       HeadNotes.local(
         ads: local.count, sounds: sounds.count,
         milliseconds: Int(Date().timeIntervalSince(started) * 1000)))
-    return withOwnSoundsAndJoints(local + sounds, audio: audio)
+    return withOwnSoundsAndJoints(local + sounds, audio: audio, blockers: blockers)
   }
 
-  /// `found` with what the phone's own sounds add in `audio`, and with every border put on a
-  /// joint of `audio` when the listener's switches, the show's settings and the guard allow it.
-  /// Only the own sounds that may skip are added (the head scan asks no questions), and only the
-  /// parts outside `found`, so they can only add. Both are new finders: a guard mark is on disk
-  /// while they run, and iOS holds the time. `found` itself when nothing may run.
-  private func withOwnSoundsAndJoints(_ found: [FoundAd], audio: Data) -> [FoundAd] {
+  /// `found` with every border put on a joint of `audio`, and with what the phone's own sounds
+  /// add in it, when the listener's switches, the show's settings and the guard allow it. The old
+  /// ads come first: their borders snap, and a snap never goes into one of the `blockers` (the
+  /// ads the memory and the model found, which are joined with these later). Then only the own
+  /// sounds that may skip are added (the head scan asks no questions), and only the parts that
+  /// lie outside every old ad, snapped or not, so a new finder only adds a stretch and never
+  /// lengthens or upgrades an old ad. Both are new finders: a guard mark is on disk while they
+  /// run (all of it, the snap and the sorting too), and iOS holds the time. `found` itself when
+  /// nothing may run.
+  private func withOwnSoundsAndJoints(
+    _ found: [FoundAd], audio: Data, blockers: [FoundAd]
+  ) -> [FoundAd] {
     guard let show = EpisodeShows.shared.show(for: episodeId), !show.isEmpty else { return found }
     let listener = PodcastAdFinder.listenerSwitches(forShow: show)
     guard listener.skipsAnySort else { return found }
@@ -56,36 +63,51 @@ extension PodcastStreamHead {
     if pass.consumers.contains(.own) { finders.append(FinderNames.ownSound) }
     if pass.consumers.contains(.joints) { finders.append(FinderNames.joints) }
     guard !finders.isEmpty else { return found }
-    let result = guardian.hold(finders, episode: episodeId) { held -> SoundPassResult in
+    let made = guardian.hold(finders, episode: episodeId) { held -> (ads: [FoundAd], moved: Int) in
       var allowed = pass
       if !held.finders.contains(FinderNames.ownSound) { allowed.own = AdSoundLibrary() }
       if !held.finders.contains(FinderNames.joints) { allowed.wantsJoints = false }
-      return allowed.run(data: audio)
-    }
-    guard let result else { return found }
-    var ads = found
-    if result.ran.contains(.own) {
-      let heard = NewAds.ads(ofSounds: result.own).filter { listener.allows($0.kind) }.map {
-        ad -> FoundAd in
-        var one = ad
-        one.source = FinderNames.ownSound
-        one.confidence = .unsure
-        return one
+      let result = allowed.run(data: audio)
+      var old = found
+      var moved = 0
+      if result.ran.contains(.joints), let joints = result.joints {
+        let snapped = snap(
+          found, among: blockers, joints: joints, steadyToo: tuning.steadyJoints(show: show))
+        old = snapped.ads
+        moved = snapped.moved
       }
-      ads += tuning.apply(to: NewAds.outside(heard, of: found), show: show).skip
+      var added: [FoundAd] = []
+      if result.ran.contains(.own) {
+        let heard = NewAds.ads(ofSounds: result.own).filter { listener.allows($0.kind) }.map {
+          ad -> FoundAd in
+          var one = ad
+          one.source = FinderNames.ownSound
+          one.confidence = .unsure
+          return one
+        }
+        added = tuning.apply(to: NewAds.outside(heard, of: old + blockers), show: show).skip
+      }
+      return (old + added, moved)
     }
-    var moved = 0
-    if result.ran.contains(.joints), let joints = result.joints {
-      let snapped = NewAds.snap(
-        ads.sorted { $0.start < $1.start }, joints: joints,
-        steadyToo: tuning.steadyJoints(show: show))
-      ads = snapped.ads
-      moved = snapped.moved.count
-    }
-    if ads.count != found.count || moved > 0 {
+    guard let made else { return found }
+    if made.ads.count != found.count || made.moved > 0 {
       PodcastTimeline.mark(
-        episodeId, "head: \(ads.count - found.count) own sounds, \(moved) borders on joints")
+        episodeId,
+        "head: \(made.ads.count - found.count) own sounds, \(made.moved) borders on joints")
     }
-    return ads
+    return made.ads
+  }
+
+  /// The old ads with their borders on the joints. The blockers are neighbours that stay as they
+  /// are: they hold the places the old ads may not move into, and they are not given back.
+  private func snap(
+    _ found: [FoundAd], among blockers: [FoundAd], joints: Joints, steadyToo: Bool
+  ) -> (ads: [FoundAd], moved: Int) {
+    let all = (found.map { (ad: $0, fixed: false) } + blockers.map { (ad: $0, fixed: true) })
+      .sorted { $0.ad.start < $1.ad.start }
+    let snapped = NewAds.snap(
+      all.map(\.ad), joints: joints, steadyToo: steadyToo, leaving: { blockers.contains($0) })
+    let mine = zip(all, snapped.ads).filter { !$0.0.fixed }.map(\.1)
+    return (mine, snapped.moved.count)
   }
 }
