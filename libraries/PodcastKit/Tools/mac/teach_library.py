@@ -10,7 +10,7 @@ teach_label.py wrote and the matching <folder>/transcripts/<id>.txt, and writes
   teach_library.py [--folder F] [--labels labels] [--most 1500]
 
 How it works:
-- A candidate is a segment with confidence "high" or "medium" (not one that
+- A candidate is a segment with confidence "high" (not one that
   teach_snap.py added as a copy) whose words (transcript lines first to last)
   number at least 25 and whose length is from 8 to 300 seconds. A word is a piece of text between
   spaces that has at least one letter or digit.
@@ -45,7 +45,7 @@ from teach_shelf import read_shelf
 DEFAULT_MOST = 1500
 MAX_BYTES = 4500000
 WORD_LIMIT = 600
-CONFIDENCES = ("high", "medium")
+CONFIDENCES = ("high",)
 MIN_WORDS = 25
 MIN_SECONDS = 8
 MAX_SECONDS = 300
@@ -84,7 +84,7 @@ def same_ad(one, other):
 # MARK: Candidates
 
 def usable(item, lines):
-    """True when a segment of a label can be used: high or medium confidence and a place in the
+    """True when a segment of a label can be used: high confidence and a place in the
     transcript."""
     if not isinstance(item, dict) or item.get("confidence") not in CONFIDENCES:
         return False

@@ -457,7 +457,7 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
   how well it did on the shelf.
-- `ad-library.json`: every ad Claude marked with high or medium confidence (at
+- `ad-library.json`: every ad Claude marked with high confidence (at
   least 25 words, 8 to 300 seconds), each different ad once, the ones met in
   most episodes first. An ad met in one episode only is in it too. An entry
   keeps the first 600 words of the ad. The phone gets it.
