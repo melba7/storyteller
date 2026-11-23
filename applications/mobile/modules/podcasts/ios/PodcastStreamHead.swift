@@ -268,7 +268,7 @@ final class PodcastStreamHead: @unchecked Sendable {
     // What the Mac taught about this show sets the steps (PodcastTeaching reads its files on this
     // background task, the first time it is asked).
     let plan = HeadPlan(
-      habits: PodcastTeaching.shared.files.habits, show: EpisodeShows.shared.show(for: episodeId))
+      habits: PodcastHabits.shared.merged(), show: EpisodeShows.shared.show(for: episodeId))
     var steps = HeadSteps(steps: plan.steps)
     while let target = steps.target {
       try Task.checkCancellation()
