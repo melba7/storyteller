@@ -150,7 +150,7 @@ fi
 if [ -n "$TEACH_TOOL" ]; then
   run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" --fit-tool "$TEACH_TOOL" $LABELS
 else
-  say "podcast-teach is not built, so the model was trained the old way (version 1)."
+  say "podcast-teach is not built, so the model is trained the old way (version 1)."
   run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" $LABELS
 fi
 
