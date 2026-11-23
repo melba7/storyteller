@@ -42,7 +42,11 @@ echo
 # After a second download the labels in labels-snapped have exact borders, so the joints are scored
 # against those (the finish steps do the same).
 LABELS=()
-[ -d "$FOLDER/labels-snapped" ] && LABELS=(--labels labels-snapped)
+if [ -d "$FOLDER/labels-snapped" ]; then
+  LABELS=(--labels labels-snapped)
+  echo "Scoring against the labels in labels-snapped. Episodes marked since the last \"Teach the phone again\" are not in it yet: double-click that first to include them."
+  echo
+fi
 "$TOOL" score "$FOLDER" "${LABELS[@]}" 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 case "$CODE" in

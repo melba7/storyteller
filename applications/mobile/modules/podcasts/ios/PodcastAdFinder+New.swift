@@ -271,11 +271,15 @@ struct NewCollect {
     }
     candidates = candidates.filter { modes.listener.allows($0.ad.kind) }
     let word = askable(first)
-    let early = Array(word.prefix(Self.wordSlots))
+    // The places left in the file: one is kept for the finders' questions even when answered ones
+    // already hold some.
+    let left = AdAsks.most - (file.asks?.count ?? 0)
+    let slots = max(0, min(Self.wordSlots, left - 1))
+    let early = Array(word.prefix(slots))
     let rest = AdAsks.pick(
       candidates.filter { item in !early.contains { NewAds.overlap($0, item.ad) } },
       outside: allAds + early)
-    let late = word.dropFirst(Self.wordSlots).filter { ad in
+    let late = word.dropFirst(slots).filter { ad in
       !rest.contains { NewAds.overlap($0, ad) }
     }
     return askable(early + rest + late)
