@@ -174,13 +174,12 @@ final class PodcastAdSkipping {
     StatsStore.shared.undoAdSkip()
     StatsStore.shared.countAd(.undone)
     // An ad the listener did not want skipped is forgotten by the memory too, so it is not found
-    // again by its words in the next episode.
-    PodcastKnownAds.shared.forget(
-      episodeId: episodeId, ads: ([ad] + skip.chained).map { (start: $0.start, end: $0.end) },
-      heard: owner.streamDownload?.head.memory.words ?? [])
-    // The finder that made each ad hears of it too (and the guard of its show).
+    // again by its words in the next episode. The finder that made each ad hears of it (and the
+    // guard of its show). Both wait in the finder's queue behind a yes that is still learned.
+    let heard = owner.streamDownload?.head.memory.words ?? []
     for undone in [ad] + skip.chained {
-      PodcastAdFinder.shared.forgetUndone(episodeId, start: undone.start, end: undone.end)
+      PodcastAdFinder.shared.forgetUndone(
+        episodeId, start: undone.start, end: undone.end, heard: heard)
     }
     PodcastSkipLogger.shared.undone()
     // What the skip put on the tally is what comes off it: only the seconds really jumped. The

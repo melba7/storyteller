@@ -175,12 +175,15 @@ extension PodcastAdFinder {
   }
 
   /// The listener undid the skip of the stretch from `start` to `end`: the phone forgets what it
-  /// learned for it (its own sound prints, what a repeat of words or sound remembered), and the
-  /// guard hears which finder's skip it was. Returns at once.
-  func forgetUndone(_ id: String, start: Double, end: Double) {
+  /// learned for it (the remembered ad by its words, its own sound prints, what a repeat of words
+  /// or sound remembered), and the guard hears which finder's skip it was. `heard` are the words
+  /// of a stream's head scan. It waits in the queue behind a yes that is still being learned, so
+  /// that the Undo comes after it. Returns at once.
+  func forgetUndone(_ id: String, start: Double, end: Double, heard: [TranscriptWord]) {
     guard start.isFinite, end.isFinite, end > start else { return }
     Self.answerQueue.async { [self] in
       guard let show = EpisodeShows.shared.show(for: id), !show.isEmpty else { return }
+      PodcastKnownAds.shared.forget(episodeId: id, ads: [(start, end)], heard: heard)
       let (store, transcripts) = answerStores(id)
       let ad = store?.adOver(start: start, end: end, detector: Self.detectorName)
       if let source = ad?.source, FinderNames.answerable.contains(source) {
