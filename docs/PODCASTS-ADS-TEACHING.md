@@ -123,6 +123,13 @@ join, because a joined ad loses its `source`.
   episodes of 60 shows (12 MB in Caches) and hashes of repeated words (about 7
   MB). A show whose own Skip ads switch is off gets no new finder, joints,
   prints or questions.
+- **What the phone keeps.** In `Podcasts/` of Application Support:
+  `own-ad-sounds.json` (the phone's own sound prints), `repeat-words.json`
+  (hashes of repeated words), `finder-guard.json` (the guard's marks and
+  answers) and `finder-learned.json` (which episodes already taught the phone,
+  in three lists: `own`, `print` and `habits`, so an episode teaches once). In
+  `Library/Caches/Podcasts/prints/`: the prints of a show's last episodes, which
+  iOS may clear. Losing any of them costs only what the phone had learned.
 - **Show starts.** `show-starts.json` is version 2 and keeps where openings end;
   the Mac's habit wins when it has one, so a show the Mac never sampled gets the
   same first look.
