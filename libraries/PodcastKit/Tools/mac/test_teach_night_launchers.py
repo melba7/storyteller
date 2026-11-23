@@ -9,9 +9,13 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
+from teach_exam import add_to_exam
+from teach_store import save_manifest
+from teach_testing import entry, transcript
 from test_teach_shell import PYTHON, SWIFT, TEACH
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -47,7 +51,8 @@ class Setup(unittest.TestCase):
     def run_script(self, name, typed="", **more):
         env = {"HOME": self.home, "PATH": "%s:/usr/bin:/bin" % self.bin, "TMPDIR": os.path.join(self.root, "tmp"),
                "CALLS": self.calls, "BIN": self.bin, "FAIL": "", "NOOP": "", "BUSY": "",
-               "BUILD_FAILS": "", "CODES": "", "TEACH_CODES": ""}
+               "BUILD_FAILS": "", "CODES": "", "TEACH_CODES": "", "REAL_PYTHON": sys.executable,
+               "TOOLS": HERE}
         env.update(more)
         return subprocess.run(["bash", os.path.join(HERE, name)], env=env, input=typed,
                               capture_output=True, text=True, timeout=120)
@@ -62,7 +67,8 @@ class Setup(unittest.TestCase):
 
     def python_calls(self):
         return [c for c in self.called() if c.startswith("python3 teach_")
-                and not c.startswith("python3 teach_store.py")]
+                and not c.startswith(("python3 teach_store.py", "python3 teach_exam.py",
+                                      "python3 teach_failures.py"))]
 
     def labelling(self):
         return [c for c in self.called() if c.startswith("python3 teach_label.py")]
@@ -165,7 +171,7 @@ class MoreTests(Setup):
         self.assertEqual(self.python_calls(), [
             COLLECT + " --per-show 12 --max-gb 40",
             "python3 teach_transcribe.py --folder FOLDER --tool %s/podcast-transcribe" % self.bin,
-            "python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --yes",
+            "python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes --yes",
             "python3 teach_habits.py --folder FOLDER", "python3 teach_train.py --folder FOLDER",
             "python3 teach_library.py --folder FOLDER", "python3 teach_settings.py --folder FOLDER",
             "python3 teach_publish.py --folder FOLDER"])
@@ -179,6 +185,10 @@ class MoreTests(Setup):
         done = self.run_script(MORE, TEACH_YES="1")
         self.assertNotIn("Type yes", done.stdout)
         self.assertEqual(len(self.labelling()), 1)
+
+    def test_a_typed_yes_with_a_space_inside_is_not_a_yes(self):
+        self.run_script(MORE, typed="ye s\n")
+        self.assertEqual(self.labelling(), [])
 
     def test_teach_yes_other_than_1_does_not_count_as_a_yes_here(self):
         self.run_script(MORE, typed="\n", TEACH_YES="0")
@@ -202,18 +212,25 @@ class NightTests(Setup):
         done = self.run_script(NIGHT)
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95"])
+                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes"])
         self.assertIn("python3 teach_publish.py --folder FOLDER", self.called())
 
     def test_the_numbers_can_be_changed_from_the_environment(self):
         self.run_script(NIGHT, TEACH_BETWEEN="22-6", TEACH_WAIT_HOURS="48", TEACH_CAP="10")
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 22-6 --wait-hours 48 --cap 10"])
+                         ["python3 teach_label.py --folder FOLDER --between 22-6 --wait-hours 48 --cap 10 --budget more-episodes"])
 
     def test_with_teach_yes_the_tool_is_not_asked_to_confirm_again(self):
         self.run_script(NIGHT, TEACH_YES="1")
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --yes"])
+                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes --yes"])
+
+    def test_teach_yes_must_be_exactly_1_to_skip_the_question(self):
+        for value in ("yes", "0", "true", "2"):
+            self.run_script(NIGHT, TEACH_YES=value)
+            self.assertNotIn("--yes", self.labelling()[-1], value)
+        self.run_script(MARK, TEACH_YES="yes")
+        self.assertNotIn("--yes", self.labelling()[-1])
 
     def test_without_teach_yes_nothing_is_passed_to_skip_the_question(self):
         self.run_script(NIGHT)
@@ -233,6 +250,29 @@ class NightTests(Setup):
         self.assertEqual(done.returncode, 3)
         self.assertIn("python3 teach_publish.py --folder FOLDER", self.called())
 
+    def test_each_stop_says_why_and_still_works_out_what_was_marked(self):
+        cases = (("3", "usage allowance", "Double-click again to carry on"),
+                 ("5", "spending limit of $95", "nothing more will be marked under it"),
+                 ("6", "episodes failed", "failures.json"))
+        for code, first, second in cases:
+            open(self.calls, "w").close()
+            done = self.run_script(NIGHT, CODES="teach_label.py=" + code)
+            self.assertIn(first, done.stdout, code)
+            self.assertIn(second if code != "3" else "usage allowance", done.stdout, code)
+            self.assertEqual(done.returncode, int(code), code)
+            self.assertIn("python3 teach_publish.py --folder FOLDER", self.called(), code)
+
+    def test_the_failure_stop_says_how_many_failed(self):
+        os.makedirs(self.folder)
+        with open(os.path.join(self.folder, "failures.json"), "w") as f:
+            f.write('{"version": 1, "transcribe": {}, "label": {"000000000001": 3, "000000000002": 1}}')
+        done = self.run_script(NIGHT, CODES="teach_label.py=6")
+        self.assertIn("2 episodes are on the list of failures", done.stdout)
+
+    def test_the_budget_is_passed_and_can_be_named_from_the_environment(self):
+        self.run_script(NIGHT, TEACH_BUDGET="again")
+        self.assertIn("--budget again", self.labelling()[0])
+
     def test_a_marking_that_could_not_start_does_not_run_the_steps_after_it(self):
         done = self.run_script(NIGHT, CODES="teach_label.py=2")
         self.assertEqual(done.returncode, 2)
@@ -244,9 +284,29 @@ class NightTests(Setup):
 
 
 class ExamTests(Setup):
-    FIRST = "python3 teach_label.py --folder FOLDER --only-exam --between 23-7 --wait-hours 120 --cap 14 --yes"
+    def setUp(self):
+        super().setUp()
+        self.prepare(4)
+
+    def prepare(self, ready, first=0, second=0, in_exam=None):
+        """A teaching folder with `ready` exam episodes that have a transcript, `first` of them
+        marked once and `second` of them marked twice (the stand-in marking writes nothing)."""
+        entries = [entry(n) for n in range(1, ready + 1)]
+        os.makedirs(os.path.join(self.folder, "transcripts"), exist_ok=True)
+        save_manifest(self.folder, entries)
+        add_to_exam(self.folder, [e["id"] for e in (entries if in_exam is None else entries[:in_exam])])
+        for item in entries:
+            with open(os.path.join(self.folder, "transcripts", item["id"] + ".txt"), "w") as f:
+                f.write(transcript(5))
+        for labels, count in (("labels", first), ("labels-second", second)):
+            os.makedirs(os.path.join(self.folder, labels), exist_ok=True)
+            for item in entries[:count]:
+                with open(os.path.join(self.folder, labels, item["id"] + ".json"), "w") as f:
+                    f.write("{}")
+
+    FIRST = "python3 teach_label.py --folder FOLDER --only-exam --between 23-7 --wait-hours 120 --cap 14 --budget exam --yes"
     SECOND = ("python3 teach_label.py --folder FOLDER --only-exam --labels labels-second --limit 15 "
-              "--between 23-7 --wait-hours 120 --cap 4 --yes")
+              "--between 23-7 --wait-hours 120 --cap 4 --budget exam-second --yes")
 
     def test_it_explains_in_plain_words(self):
         done = self.run_script(EXAM)
@@ -263,6 +323,7 @@ class ExamTests(Setup):
             self.assertIn("Nothing will be marked", done.stdout)
 
     def test_a_typed_yes_gathers_then_marks_the_exam_then_marks_15_again_and_learns_nothing(self):
+        self.prepare(4, first=4, second=4)  # what the markings would have written
         done = self.run_script(EXAM, typed="yes\n")
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.python_calls(), [
@@ -301,6 +362,59 @@ class ExamTests(Setup):
         self.run_script(EXAM, typed="yes\n")
         awake = [c for c in self.called() if c.startswith("caffeinate -i python3 -u") and "teach_label.py" in c]
         self.assertEqual(len(awake), 2)
+
+    def test_it_says_how_many_exam_episodes_have_audio_and_a_transcript(self):
+        done = self.run_script(EXAM, typed="yes\n")
+        self.assertIn("4 exam episodes have audio and a transcript", done.stdout)
+
+    def test_with_no_exam_episode_ready_it_says_so_marks_nothing_and_is_not_done(self):
+        os.remove(os.path.join(self.folder, "exam.json"))
+        self.prepare(3, in_exam=0)
+        for typed in ("yes\n", "\n"):
+            open(self.calls, "w").close()
+            done = self.run_script(EXAM, typed=typed)
+            self.assertEqual(self.labelling(), [], typed)
+            self.assertNotEqual(done.returncode, 0, typed)
+            self.assertIn("No exam episode has audio and a transcript", done.stdout)
+            self.assertNotIn("Done", done.stdout)
+            self.assertNotIn("ready to be scored", done.stdout)
+
+    def test_when_the_marking_leaves_exam_episodes_unmarked_it_says_what_is_left_not_done(self):
+        self.prepare(4, first=3, second=1)
+        done = self.run_script(EXAM, typed="yes\n")
+        self.assertEqual(done.returncode, 3)
+        self.assertNotIn("Done", done.stdout)
+        for text in ("marked once: 2", "marked twice: 1", "Double-click again to carry on"):
+            self.assertIn(text, done.stdout)
+
+    def test_when_everything_is_marked_it_says_how_many_once_and_twice_and_done(self):
+        self.prepare(20, first=20, second=15)
+        done = self.run_script(EXAM, typed="yes\n")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        for text in ("marked once: 5", "marked twice: 15", "Done"):
+            self.assertIn(text, done.stdout)
+
+    def test_each_stop_is_told_apart(self):
+        cases = (("3", "usage allowance", "Double-click again to carry on"),
+                 ("5", "spending limit of $14", "nothing more will be marked under it"),
+                 ("6", "episodes failed", "failures.json"))
+        for code, first, second in cases:
+            open(self.calls, "w").close()
+            done = self.run_script(EXAM, typed="yes\n", CODES="teach_label.py=" + code)
+            self.assertIn(first, done.stdout, code)
+            self.assertIn(second, done.stdout, code)
+            self.assertEqual(done.returncode, int(code), code)
+            self.assertEqual(len(self.labelling()), 1, code)
+
+    def test_a_yes_other_than_1_in_the_environment_does_not_count(self):
+        for value in ("yes", "0", "true"):
+            open(self.calls, "w").close()
+            self.run_script(EXAM, typed="\n", TEACH_YES=value)
+            self.assertEqual(self.labelling(), [], value)
+
+    def test_a_typed_yes_with_a_space_inside_is_not_a_yes(self):
+        self.run_script(EXAM, typed="ye s\n")
+        self.assertEqual(self.labelling(), [])
 
     def test_everything_is_added_to_the_log(self):
         self.run_script(EXAM, typed="yes\n")

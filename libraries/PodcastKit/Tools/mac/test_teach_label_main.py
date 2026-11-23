@@ -90,15 +90,15 @@ class MainTests(unittest.TestCase):
         code, _, _ = self.main(teaching, "--limit", "1")
         self.assertEqual((code, len(teaching.labels())), (0, 1))
 
-    def test_stopped_early_is_exit_three(self):
+    def test_each_way_of_stopping_early_has_its_own_exit_code(self):
         teaching = Teaching(self, 3)
         limit = FakeRunner(stdout=printed("usage limit reached", is_error=True), returncode=1)
         self.assertEqual(self.main(teaching, runner=limit)[0], 3)
         cap = FakeRunner(stdout=printed(answer((1, 2)), cost=2.0))
-        self.assertEqual(self.main(teaching, "--cap", "1.5", runner=cap)[0], 3)
+        self.assertEqual(self.main(teaching, "--cap", "1.5", runner=cap)[0], 5)
         broken = FakeRunner(stdout="junk", returncode=1)
         teaching = Teaching(self, 4)
-        self.assertEqual(self.main(teaching, runner=broken)[0], 3)
+        self.assertEqual(self.main(teaching, runner=broken)[0], 6)
 
     def test_set_up_problems_are_exit_two(self):
         empty = SimpleNamespace(dir=tempfile.mkdtemp())
@@ -163,7 +163,7 @@ class MainTests(unittest.TestCase):
         teaching = Teaching(self, 4)
         runner = FakeRunner(stdout=printed("broken", cost=2.0, is_error=True), returncode=1)
         code, _, _ = self.main(teaching, "--cap", "3.5", runner=runner)
-        self.assertEqual(code, 3)
+        self.assertEqual(code, 5)
         self.assertTrue(any("Cost as Claude counts it: $4.00" in line for line in self.said), self.said)
 
 

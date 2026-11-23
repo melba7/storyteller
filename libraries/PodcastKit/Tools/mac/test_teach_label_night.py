@@ -145,7 +145,8 @@ class AllowanceTests(unittest.TestCase):
         teaching = Teaching(self, 3)
         fake, ask = FakeTime(1), self.limited(1, cost=3.0)
         result, _ = run(teaching, ask, self.waiter(fake, 5), cap=2.0)
-        self.assertEqual((result["done"], result["stop"]), (1, "cap"))
+        # The cap is checked before every call: the limit answer cost 3.0, so the retry is not made.
+        self.assertEqual((result["done"], result["stop"], len(ask.state["prompts"])), (0, "cap", 1))
 
 
 class SignedOutTests(unittest.TestCase):

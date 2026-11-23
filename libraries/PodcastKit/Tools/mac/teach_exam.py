@@ -8,14 +8,20 @@ the ids, before it saves episodes.json and before any download, so a run that st
 never leak an exam episode into training.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import argparse
 import json
 import os
+import sys
 
+import teach_segments
 import teach_store
 from teach_feed import feed_key
 
 EXAM_FILE = "exam.json"
 MOST = 60  # the usual size of the exam
+FIRST = "labels"  # the folders of the first and the second marking
+SECOND = "labels-second"
+SECOND_MOST = 15  # how many exam episodes are marked a second time, in all
 
 
 def read_exam(folder):
@@ -69,3 +75,84 @@ def pick_new(known, planned, already, most):
                                                                            float("-inf")):
             picked.append(entry)
     return picked
+
+
+# MARK: Counting
+
+def has(folder, labels, identifier):
+    return os.path.exists(os.path.join(folder, labels, identifier + ".json"))
+
+
+def has_transcript(folder, identifier):
+    """True when the episode has a transcript with at least one usable line."""
+    try:
+        with open(os.path.join(folder, "transcripts", identifier + ".txt"), encoding="utf-8",
+                  errors="replace") as f:
+            return bool(teach_segments.read_transcript(f.read()))
+    except OSError:
+        return False
+
+
+def status(folder):
+    """What the exam looks like: {"ready", "first", "second", "wanted_second", "complete"}. `ready`
+    is the exam episodes that are in episodes.json and have a usable transcript, `first` and
+    `second` those of them with a label of the first and of the second marking. The exam is
+    complete when every ready episode has a first label and the second marking holds
+    min(15, ready) of them. Raises teach_store.Problem when exam.json or episodes.json is
+    damaged."""
+    known = {item["id"] for item in teach_store.require_manifest(folder)}
+    ready = [i for i in read_exam(folder) if i in known and has_transcript(folder, i)]
+    first = sum(1 for i in ready if has(folder, FIRST, i))
+    second = sum(1 for i in ready if has(folder, SECOND, i))
+    wanted = min(SECOND_MOST, len(ready))
+    return {"ready": len(ready), "first": first, "second": second, "wanted_second": wanted,
+            "complete": bool(ready) and first == len(ready) and second >= wanted}
+
+
+def plural(count, one, many):
+    return "%d %s" % (count, one if count == 1 else many)
+
+
+def main(argv, say=print):
+    """`ready --folder F` says how many exam episodes have audio and a transcript (exit 1 when
+    none). `finish --folder F` says how many are marked once and twice, and whether the exam is
+    done (exit 1 when it is not). Exit 2 for a damaged file or a bad command."""
+    parser = argparse.ArgumentParser(prog="teach_exam.py")
+    parser.add_argument("command", choices=("ready", "finish"))
+    parser.add_argument("--folder", default=teach_store.FOLDER)
+    try:
+        options = parser.parse_args(argv)
+        found = status(os.path.expanduser(options.folder))
+    except SystemExit:
+        return 2
+    except teach_store.Problem as error:
+        say(str(error))
+        return 2
+    ready = found["ready"]
+    if options.command == "ready":
+        if not ready:
+            say("No exam episode has audio and a transcript yet.")
+            return 1
+        say("%s audio and a transcript." % plural(ready, "exam episode has", "exam episodes have"))
+        return 0
+    twice = found["second"]
+    say("Of the %s that have audio and a transcript: marked once: %d, marked twice: %d."
+        % (plural(ready, "exam episode", "exam episodes"), found["first"] - twice, twice))
+    if found["complete"]:
+        say("Done. The exam episodes are marked (%d of them twice) and kept apart from the learning. "
+            "The exam is ready to be scored." % twice)
+        return 0
+    if not ready:
+        say("There is nothing to mark yet, because no exam episode has audio and a transcript.")
+        return 1
+    missing = ready - found["first"]
+    if missing:
+        say("%s no first marking yet." % (plural(missing, "exam episode has", "exam episodes have")))
+    if found["second"] < found["wanted_second"]:
+        say("The second marking has %d of the %d wanted." % (found["second"], found["wanted_second"]))
+    say("Not done yet. Double-click again to carry on.")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

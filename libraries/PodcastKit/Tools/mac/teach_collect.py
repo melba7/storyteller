@@ -34,7 +34,8 @@ episodes only those whose published time is later than the newest of every episo
 already in episodes.json are kept (one with no published time is not), at most --exam-most (default
 60, the exam episodes already in exam.json counting) in the planner's round-robin order. Their ids go
 into exam.json before episodes.json is saved and before any download, so a run that stops half way
-cannot leak them into training. With --list it says how many exam episodes a run would take.
+cannot leak them into training. The exam's episodes are downloaded first (those of an earlier exam
+gather that are still waiting too), the other waiting ones after them if the size limit allows. With --list it says how many exam episodes a run would take.
 
 --max-gb is the limit for all the audio kept in the folder, not for one run, and audio is never
 deleted, so once the folder is full nothing more is downloaded, the wanted episodes included.
@@ -157,14 +158,15 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
             pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE,
             wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST):
     """Adds the new episodes to episodes.json and downloads every entry that has no file yet, in
-    list order. Stops before a download that would take the audio on disk over `max_bytes`, or
+    list order (with `exam`, the exam's episodes first). Stops before a download that would take the audio on disk over `max_bytes`, or
     when the free disk space, less the file about to come (the feed's size, when known), is under
     `keep_free_bytes`. An episode bigger than `max_file` (by the feed's size or the server's) is
     recorded as "skipped: ..." and never tried again. episodes.json is saved after every episode.
     A failed download is recorded and the run carries on. Answers {"shows_read", "downloaded",
     "failed", "skipped", "waiting", "files", "bytes", "why"}, `why` being "size", "space" or None.
     With `exam`, the wanted list is ignored and only the episodes that teach_exam.pick_new takes are
-    added; their ids go into exam.json before episodes.json is saved and before any download."""
+    added; their ids go into exam.json before episodes.json is saved and before any download, and
+    the downloads start with the exam's episodes."""
     entries = load_manifest(folder)
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     stats = {}
@@ -181,7 +183,11 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
               "waiting": 0, "files": 0, "bytes": 0, "why": None}
     too_big = "%s larger than %d MB" % (SKIPPED, max_file // 1_000_000)
     first = True
-    for position, entry in enumerate(entries):
+    # An exam run downloads the exam's own episodes first, so the size allowance goes to them and
+    # not to episodes that were still waiting from an earlier run.
+    exam_ids = set(teach_exam.read_exam(folder)) if exam else set()
+    order = [e for e in entries if e["id"] in exam_ids] + [e for e in entries if e["id"] not in exam_ids]
+    for position, entry in enumerate(order):
         if entry["file"] or is_skipped(entry):
             continue
         if (entry["size"] or 0) > max_file:
@@ -195,7 +201,7 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
         elif free_space(folder) - (entry["size"] or 0) < keep_free_bytes:
             result["why"] = "space"
         if result["why"]:
-            result["waiting"] = sum(1 for other in entries[position:]
+            result["waiting"] = sum(1 for other in order[position:]
                                     if not other["file"] and not is_skipped(other))
             break
         if not first:

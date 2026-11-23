@@ -30,7 +30,7 @@ echo "show, up to 40 GB of audio in all. It keeps 15 GB of the disk free, and it
 echo "is said in them. That takes hours. Keep the Mac plugged in with the lid open."
 echo
 echo "Then Claude can mark the ads in them, but only between 11 at night and 7 in the morning,"
-echo "over several nights, and it uses at most \$95 of the Claude plan's usage. When it is done,"
+echo "over several nights, and it uses at most \$95 of the Claude plan's usage in all. When it is done,"
 echo "the results are worked out and copied to the phone's folders."
 echo "The marking uses the Claude plan this Mac is signed in to and shares its usage allowance."
 echo "You can stop with Control-C and double-click this file again later to carry on."
@@ -41,7 +41,8 @@ if [ "$TEACH_YES" = 1 ]; then
 else
   read -r -p "Type yes to include the marking, or press Return to only gather: " TYPED
 fi
-TYPED="$(echo "$TYPED" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+# Only the ends are trimmed: "ye s" is not yes.
+TYPED="$(echo "$TYPED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
 
 TEACH_PER_SHOW=12
 TEACH_MAX_GB=40

@@ -83,7 +83,7 @@ elif [ "$CODE" -ne 0 ]; then
 fi
 if [ -n "$TEACH_AFTER" ]; then
   echo
-  echo "Done: the episodes are in $FOLDER and written down. Carrying on with the next part." | tee -a "$LOG"
+  echo "The episodes are in $FOLDER and written down. Carrying on with the next part." | tee -a "$LOG"
   exec "$TEACH_AFTER"
 fi
 finish "Done: the episodes are in $FOLDER and written down. Double-click again to carry on with new ones."

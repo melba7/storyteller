@@ -111,6 +111,40 @@ class ExamCollectTests(unittest.TestCase):
         self.assertEqual({e["id"] for e in tc.load_manifest(self.folder)} & set(
             teach_exam.read_exam(self.folder)), set(teach_exam.read_exam(self.folder)))
 
+    def waiting_from_before(self):
+        """A normal run whose downloads all failed: nine episodes (days 3 to 5) wait for audio."""
+        def failing(address, path, **more):
+            raise OSError("no network")
+
+        tc.collect(self.folder, SHOWS, 3, 10**9, 0, fetch=fetcher(feeds_for(per_show=5)),
+                   download=failing, free_space=lambda path: 10**12, sleep=lambda s: None,
+                   say=self.lines.append)
+
+    def test_an_exam_run_downloads_the_exam_episodes_first_even_when_others_wait(self):
+        self.waiting_from_before()
+        tc.collect(self.folder, SHOWS, 7, 10**9, 0, fetch=fetcher(feeds_for(per_show=7)),
+                   download=self.download, free_space=lambda path: 10**12, sleep=lambda s: None,
+                   say=self.lines.append, exam=True, exam_most=3)
+        self.assertEqual(self.downloaded[:3], ["https://cdn/a7.mp3", "https://cdn/b7.mp3",
+                                               "https://cdn/c7.mp3"])
+        self.assertEqual(len(self.downloaded), 12)  # the ones that waited follow, the size allowing
+
+    def test_the_size_limit_is_used_on_the_exam_episodes_before_the_ones_that_waited(self):
+        self.waiting_from_before()
+        result = tc.collect(self.folder, SHOWS, 7, 300, 0, fetch=fetcher(feeds_for(per_show=7)),
+                            download=self.download, free_space=lambda path: 10**12,
+                            sleep=lambda s: None, say=self.lines.append, exam=True, exam_most=3)
+        self.assertEqual((result["downloaded"], result["why"], result["waiting"]), (3, "size", 9))
+        with_audio = {e["title"] for e in tc.load_manifest(self.folder) if e["file"]}
+        self.assertEqual(with_audio, {"a7", "b7", "c7"})
+
+    def test_a_normal_run_still_downloads_in_list_order(self):
+        self.waiting_from_before()
+        tc.collect(self.folder, SHOWS, 7, 10**9, 0, fetch=fetcher(feeds_for(per_show=7)),
+                   download=self.download, free_space=lambda path: 10**12, sleep=lambda s: None,
+                   say=self.lines.append)
+        self.assertEqual(self.downloaded[:3], ["https://cdn/a5.mp3", "https://cdn/b5.mp3", "https://cdn/c5.mp3"])
+
     def test_the_wanted_list_is_ignored_for_an_exam_run(self):
         self.collect(feeds_for(per_show=5), 1)  # a5, b5 and c5 are gathered
         old = want("https://f/a", "", "https://cdn/a1.mp3")

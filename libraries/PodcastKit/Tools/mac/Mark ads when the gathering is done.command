@@ -50,7 +50,7 @@ echo "It stops by itself when the allowance is used up and keeps what it marked.
 echo "Keep the Mac plugged in with the lid open, and leave this window and the gathering's open."
 echo
 read -r -p "Type yes to agree: " TYPED
-TYPED="$(echo "$TYPED" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+TYPED="$(echo "$TYPED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
 [ "$TYPED" = yes ] || finish "Nothing will run, because you did not type yes." 0
 
 # Keeps the Mac from going to sleep for as long as this window works, the marking included.
