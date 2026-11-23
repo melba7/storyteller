@@ -15,7 +15,10 @@ the phone | The Mac teaches, the phone skips alone (T1 to T9, Mo's ask
 first teaching run, the merge and the phone (TestFlight 33.1) | The phone learns
 by itself (U1 to U11, Mo's ask 2026-11-23): all built, checked by Opus and fixed
 (PR #55, whole check green); waiting on the Fable final check, the merge and the
-TestFlight build
+TestFlight build | Ad skipping to 95%, round A (V1 to V8, Mo's ask 2026-11-23):
+V1 to V7 built, checked by Opus and fixed (PR #56); on the 63 shelf episodes 125
+of 219 ad breaks pass Mo's bar (was 101) with 13 skips where there is no ad (was
+75); waiting on Mo's OK, the one TestFlight build and the run on the Mac (V8)
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1293,39 +1296,52 @@ of it are heard, and the skip cuts at most 5 seconds of show before it and after
 it. Today 101 of 219 breaks on the 63 shelf episodes pass (46%), with 75 skips
 where there is no ad.
 
-- [ ] **V1 The scorecard measures the bar**: `AdBar` and a bar block under the
+- [x] **V1 The scorecard measures the bar**: `AdBar` and a bar block under the
       scorecard for every row, one cause for each failed break, skips with no
       ad, `--dump`, the sealed exam (`exam.json`, `score --exam`) and
       `podcast-teach agree` for two markings of one episode.
   - Done when: the last row on the shelf reads 101 of 219, with starts late 59,
     stops early 16, gap inside 16, missed 14, starts early 9, lands too far 4.
-- [ ] **V2 Mac tools for the new episodes**: `teach_exam.py` and the rule that
+- [x] **V2 Mac tools for the new episodes**: `teach_exam.py` and the rule that
       an exam episode teaches nothing, `teach_collect.py --exam`,
       `teach_label.py --only-exam --between 23-7 --wait-hours`, second downloads
       that take the exam first, and three launchers: "Gather more episodes for
       teaching", "Mark the new episodes at night", "Gather the exam episodes".
-  - Done when: the tools' tests pass and a `--list` run on the Mac says what it
-    would download.
-- [ ] **V3 A word model that does not memorise** (fix 1): model file version 2
+  - Done when: the tools' tests pass. The first run on the Mac is part of V8
+    (the cloud cannot start a launcher on the Mac, see LESSONS).
+- [x] **V3 A word model that does not memorise** (fix 1): model file version 2
       with the word pairs of the neighbouring lines, a trainer with real
       regularisation that drops words seen fewer than 3 times, and a decoder
       whose ad score leaves credits out and whose start widens back.
   - Done when: on the shelf the row "Plus the trained model" passes at least 115
     of 219 with at most 20 skips with no ad (the prototype: 122 of 226 and 10).
-- [ ] **V4 Remembered ads set the edges** (fix 2): the library keeps an ad's
-      whole text, a remembered ad is found from any of its word runs, and a
-      word-model skip that hangs up to 12 seconds over a remembered ad is cut
-      back to it.
+  - Result: 115 of 219 with 15 skips with no ad (was 95 and 75). Without
+    `podcast-teach` the trainer still writes a version 1 file.
+- [x] **V4 Remembered ads are found whole** (fix 2): the library keeps an ad's
+      first 600 words and a remembered ad is found from any of its word runs.
+      The rule that cut a word-model skip back to a remembered ad's edges was
+      built, measured and removed: it fixed 6 breaks and broke 6.
   - Done when: the row "Plus the library" passes more breaks than the row before
     it and adds no skip with no ad.
-- [ ] **V5 Joints pull a late start back** (fix 3): in steady files too, a skip
-      starts at the nearest joint up to 60 seconds before it.
-  - Done when: the joints row on the Mac's scorecard (it needs the audio) passes
-    more breaks than the row before it; the prototype says about 10 more.
-- [ ] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
+  - Result: 121 of 219 against 115 in the row before, both with 15 skips with
+    no ad.
+- [x] **V5 Joints pull a late start back** (fix 3): in steady files too, a skip
+      starts at the nearest joint up to 60 seconds before it, but only when a
+      word finder gave that start (`JointPull`), never inside a stretch the
+      listener judged, and never in the head scan of a stream.
+  - Done when: the joints row on the scorecard (it reads the joints kept in
+    `joints.json`) passes more breaks than the row before it.
+  - Result: 111 of 219 against 102 with the old word model; with the new word
+    model 125 against 121, and 13 skips with no ad against 15. Mo approved 3
+    seconds for a joint in the round before, so the 60 seconds wait for his OK.
+- [x] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
       go down the phone's own path for a playing stream, Apple's model
       included, and are scored by the bar counting only skips known in time.
-- [ ] **V7 Pass rate from real listening** (test part 5): the results page says
+  - Result: `score --stream`. At the assumed standard pace 100 of 219 breaks
+    pass (21 of 58 in the first 3 minutes); an episode that is ready before it
+    is played passes 124 (45 of 58). The phone's real pace is not measured yet,
+    and Apple's row needs its answers gathered on the Mac (V8).
+- [x] **V7 Pass rate from real listening** (test part 5): the results page says
       how many skips Mo neither took back nor trimmed, against skips plus ads he
       marked as missed.
 - [ ] **V8 The run**: gather and mark the 500 and the exam on the Mac, teach
@@ -1334,6 +1350,26 @@ where there is no ad.
 
 ## Later
 
+- Ad skipping to 95%, round A (2026-11-23), found and not fixed: the new word
+  model's skips land more than 5 seconds past the ad in about 27 of 226 breaks
+  (15 before), mostly one line late, and a plain trim of the end by the line's
+  score only trades that for hearing the ad's last line (a model of the end
+  border is the next idea); the first 3 minutes of a stream depend on how fast
+  the phone writes down speech, which is not measured (the timeline's "head
+  audio on disk" to "local:" lines, or "Time the first minute of an episode");
+  the stream replay runs the repeated words at every reach, drops a remembered
+  ad whose end is a guess, knows no sponsor names or opening words, joins
+  Apple's row after the per-show settings (so where Apple's model starts an ad
+  before the words do, the scorecard pulls and the phone does not), and prints
+  no failure causes; a library entry whose first member covers two ads can miss
+  one, and `KnownAds.swift` is over 300 lines; a joint pull that lands on the
+  end of the ad before glues two ads; a trim the listener made on a start the
+  snap had moved may not be found again when the episode is looked at a second
+  time; the scorecard works the word list out three times an episode;
+  `teach_train.py` and `teach_settings.py` are over 300 lines; nothing on the
+  Mac knows the phone's app version before it writes a version 2 model; there
+  are no unit tests for the phone's own `NewAds.snap`, `isFixed` and
+  `trimReach` (macOS CI only compiles them).
 - Podcasts ads (round of 2026-11-23): a rule that promotes a repeat to skip
   after enough confirmed answers on a show (today a repeat never skips); new
   finders for episodes that finished before the update; a habit counted twice
