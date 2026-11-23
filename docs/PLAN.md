@@ -16,9 +16,10 @@ first teaching run, the merge and the phone (TestFlight 33.1) | The phone learns
 by itself (U1 to U11, Mo's ask 2026-11-23): all built, checked by Opus and fixed
 (PR #55, whole check green); waiting on the Fable final check, the merge and the
 TestFlight build | Ad skipping to 95%, round A (V1 to V8, Mo's ask 2026-11-23):
-V1 to V7 built, checked by Opus and fixed (PR #56); on the 63 shelf episodes 125
-of 219 ad breaks pass Mo's bar (was 101) with 13 skips where there is no ad (was
-75); waiting on Mo's OK, the one TestFlight build and the run on the Mac (V8)
+V1 to V7 built, checked by Opus and fixed (PR #56 merged, TestFlight 35.1); on
+the 63 shelf episodes 125 of 219 ad breaks pass Mo's bar (was 101) with 13 skips
+where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
+run and the exam (V8)
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1333,7 +1334,8 @@ where there is no ad.
     `joints.json`) passes more breaks than the row before it.
   - Result: 111 of 219 against 102 with the old word model; with the new word
     model 125 against 121, and 13 skips with no ad against 15. Mo approved 3
-    seconds for a joint in the round before, so the 60 seconds wait for his OK.
+    seconds for a joint in the round before and the 60 seconds on 2026-11-23,
+    knowing that two skips on the test started 12 and 26 seconds too early.
 - [x] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
       go down the phone's own path for a playing stream, Apple's model included,
       and are scored by the bar counting only skips known in time.
@@ -1345,8 +1347,12 @@ where there is no ad.
       how many skips Mo neither took back nor trimmed, against skips plus ads he
       marked as missed.
 - [ ] **V8 The run**: gather and mark the 500 and the exam on the Mac, teach
-      again, score the shelf, then the exam once, and bring Mo the numbers
-      before the merge and the one TestFlight build.
+      again, score the shelf, then the exam once, and bring Mo the numbers.
+  - Mo chose on 2026-11-23 to merge and build first, on the shelf numbers (PR
+    #56, TestFlight 35.1). The round A tools are on the Mac. The run starts with
+    his double-click on "Second downloads then gather more"; "Gather the exam
+    episodes" comes some days later, so the exam's inserted ads are not the same
+    day's.
 
 ## Later
 

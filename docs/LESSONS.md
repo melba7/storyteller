@@ -195,3 +195,7 @@ One line per lesson.
 - The trainer's built-in loop could not match the reference fit on version 2
   features, so a weakened test crept in. Keep the old path writing the old file
   and never loosen a test to fit a new path (2026-11-23).
+- A remote session said the Mac's permission check had refused to start the
+  TestFlight build, but the build had started and uploaded. Read the logs on the
+  Mac before offering another way to start a job: a second start would have run
+  two builds at once (2026-11-23).
