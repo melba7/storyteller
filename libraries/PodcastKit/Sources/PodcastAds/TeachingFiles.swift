@@ -3,30 +3,44 @@ import Foundation
 
 /// The files the Mac's teaching run gives the phone, kept in one folder of the app. They are the
 /// Mac's own files: a show is named in them by its feed address, and `load` turns that into the
-/// app's show id with a table.
+/// app's show id with a table. The ad sounds are another file kept in the same folder
+/// (`AdSoundLibrary`), so the folder holds six files in all.
 public struct TeachingFiles: Sendable {
   public static let maxBytes = 5_000_000
   public var model: AdWordModel?
+  /// The model that reads what a line means. Nil when the Mac has not published one (it only does
+  /// when it beat the word model on the scorecard) or the file is damaged: the layer is then off.
+  public var meaning: AdMeaningModel?
   public var seeds: KnownAds
   public var habits: ShowHabits
+  /// What each new finder may do on each show. The built-in default when there is no file.
+  public var tuning: ShowTuning
   public var local: LocalAds { LocalAds(model: model) }
 
   /// Nothing taught yet.
   public init() {
     model = nil
+    meaning = nil
     seeds = KnownAds()
     habits = ShowHabits()
+    tuning = ShowTuning()
   }
 
-  /// What the folder holds. A missing or unreadable file gives no model, no seeds, no habits.
-  /// `shows` maps a feed key (`FeedKey.key`) to the app's show id. An ad of one show, or the
-  /// habits of a show, whose feed is not in it is left out; an ad of every show is kept.
+  /// What the folder holds. A missing or unreadable file gives no model, no meaning model, no
+  /// seeds, no habits and the built-in settings.
+  /// `shows` maps a feed key (`FeedKey.key`) to the app's show id. An ad of one show, the
+  /// habits of a show, or the settings of a show, whose feed is not in it is left out; an ad of
+  /// every show is kept.
   public static func load(
     folder: URL, now: Date = Date(), shows: [String: String] = [:]
   ) -> TeachingFiles {
     var files = TeachingFiles()
     files.model = read(AdWordModel.fileName, in: folder).flatMap { AdWordModel(data: $0) }
+    files.meaning = read(AdMeaningModel.fileName, in: folder).flatMap { AdMeaningModel(data: $0) }
     let showOf = MacFiles.table(shows)
+    if let data = read(ShowTuning.fileName, in: folder) {
+      files.tuning = ShowTuning(data: data, showOf: showOf)
+    }
     if let data = read(AdLibraryFile.fileName, in: folder) {
       files.seeds = MacFiles.library(data: data, now: now, showOf: showOf)
     }
@@ -55,13 +69,19 @@ public struct TeachingFiles: Sendable {
   }
 
   /// Checks `data` and writes it as `name` in `folder`. False when the name is not one of the
-  /// three files, the data is larger than `maxBytes`, or it is not what the Mac writes under that
-  /// name (a version 1 file with the right list). A refused file leaves the old one in place.
+  /// five files, the data is larger than `maxBytes`, or it is not what the Mac writes under that
+  /// name (a model the phone can run, or a version 1 file with the right list). A refused file
+  /// leaves the old one in place. The settings are only checked for their shape here: the Mac
+  /// always writes a `shows` list, and each entry is read leniently by `ShowTuning` later.
   public static func install(name: String, data: Data, folder: URL) -> Bool {
     guard data.count <= maxBytes else { return false }
     switch name {
     case AdWordModel.fileName:
       guard AdWordModel(data: data) != nil else { return false }
+    case AdMeaningModel.fileName:
+      guard AdMeaningModel(data: data) != nil else { return false }
+    case ShowTuning.fileName:
+      guard isVersion1(data, list: "shows") else { return false }
     case AdLibraryFile.fileName:
       guard isVersion1(data, list: "ads") else { return false }
     case ShowHabits.fileName:
