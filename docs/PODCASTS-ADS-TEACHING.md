@@ -284,15 +284,19 @@ episodes, which the model never saw in training. Each run is added to
 `Score the ad skipping.command` on the Mac.
 
 The scorecard lists the layers in the order the phone adds them, and each row is
-the row before plus one more layer: the existing layers, then "Plus the phone's
-own sounds", "Plus repeated sounds", "Plus repeated words", "Plus the meaning
-model", "Plus joints", "Plus joints (steady files too)" and "Plus per-show
-settings". The row names must equal `ROWS` in `teach_settings.py`, which reads
-them to decide what is turned on or off. It also prints how many questions the
-phone would ask, a note on habits and what was left out. The meaning model is
-published only when its row adds right seconds for host_ask and network_promo
-and at least 85% of the added seconds are right, and the scorecard is not older
-than the model.
+the row before plus one more layer: the existing layers, then "Plus the meaning
+model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
+words", "Plus joints", "Plus joints (steady files too)" and, always last, "Plus
+per-show settings" (with the built-in settings when there is no file yet). The
+row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
+what is turned on or off. The learning rows (own sounds, repeats) first learn
+from the marked episodes that are not scored, then scan the scored ones, so each
+episode is judged only on what the earlier episodes of its show taught. The
+scorecard also prints how many questions the word model would ask (not the
+repeat finders' or the meaning model's), a note on habits and what was left out.
+The meaning model is published only when its row adds right seconds for host_ask
+and network_promo and at least 85% of the added seconds are right, and the
+scorecard is not older than the model.
 
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.

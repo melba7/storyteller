@@ -55,10 +55,10 @@ from teach_store import FOLDER, Problem
 NAME = "show-settings.json"
 # The rows the scorecard writes (the wiring registers exactly these names) and what each one holds.
 ROWS = {
+    "Plus the meaning model": "meaning",
     "Plus the phone's own sounds": "own-sound",
     "Plus repeated sounds": "repeat-sound",
     "Plus repeated words": "repeat-words",
-    "Plus the meaning model": "meaning",
     "Plus joints": "joints",
     "Plus joints (steady files too)": "steady-joints",
 }
