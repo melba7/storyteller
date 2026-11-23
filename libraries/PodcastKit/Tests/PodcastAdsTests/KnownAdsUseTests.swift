@@ -25,6 +25,19 @@ final class KnownAdsUseTests: XCTestCase {
       length: length, seen: seen, lastSeen: now)
   }
 
+  // MARK: Where a found ad came from
+
+  func testAWholeMatchIsMarkedAsExactAndAGuessedOpeningIsNot() {
+    let known = KnownAds(ads: [remembered(seen: 2)])
+    let whole = timed(plain(30) + adWords() + plain(30, from: 500))
+    let exact = KnownAdUse.from(known.find(in: whole, show: "show"), words: whole)
+    XCTAssertEqual(exact.ads.first?.source, KnownAds.source)
+    let cut = timed(plain(30) + Array(adWords().prefix(20)))
+    let guessed = KnownAdUse.from(known.find(in: cut, show: "show"), words: cut)
+    XCTAssertEqual(guessed.provisional.count, 1)
+    XCTAssertNil(guessed.ads.first?.source)
+  }
+
   // MARK: Forgetting
 
   func testForgettingAnAdRemovesTheStoredAdThatTheRangeIs() {

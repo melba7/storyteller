@@ -19,6 +19,7 @@ public enum AdJoin {
   /// other is cut back to what lies outside it (a left-over part shorter than
   /// `AdRules.minLength` is dropped).
   public static func join(_ ads: [FoundAd], touching: Double = 0.5) -> [FoundAd] {
+    let ads = settingEdges(ads)
     let kinds = Set(ads.map(\.kind)).sorted { rank($0) < rank($1) }
     var higher: [FoundAd] = []  // the whole stretches of the kinds ranked above
     var result: [FoundAd] = []
@@ -29,6 +30,37 @@ public enum AdJoin {
     }
     return result.sorted { $0.start < $1.start }
   }
+
+  /// A looser span that overlaps whole matches of remembered ads (`FoundAd.source` is
+  /// `KnownAds.source`) is cut back to them: the match's edges are exact to the word, the span's
+  /// are not. Matches that touch or lie within `blockGap` seconds of each other count as one
+  /// block. Only an overhang of at most `overhang` seconds is cut; a longer one is probably
+  /// another ad and stays. The matches themselves are never changed.
+  static func settingEdges(_ ads: [FoundAd]) -> [FoundAd] {
+    var blocks: [(start: Double, end: Double)] = []
+    for match in ads.filter({ $0.source == KnownAds.source }).sorted(by: { $0.start < $1.start }) {
+      if let last = blocks.last, match.start <= last.end + blockGap {
+        blocks[blocks.count - 1].end = max(last.end, match.end)
+      } else {
+        blocks.append((match.start, match.end))
+      }
+    }
+    guard !blocks.isEmpty else { return ads }
+    return ads.map { ad in
+      guard ad.source != KnownAds.source else { return ad }
+      let inside = blocks.filter { $0.start < ad.end && ad.start < $0.end }
+      guard let first = inside.first, let last = inside.last else { return ad }
+      var set = ad
+      if first.start > ad.start, first.start - ad.start <= overhang { set.start = first.start }
+      if ad.end > last.end, ad.end - last.end <= overhang { set.end = last.end }
+      return set
+    }
+  }
+
+  /// Whole matches of remembered ads that lie this close together are one block, in seconds.
+  static let blockGap = 2.0
+  /// The longest stretch of a span that may be cut back to a match, in seconds.
+  static let overhang = 15.0
 
   /// Ads of one kind joined where they overlap or touch.
   private static func union(_ ads: [FoundAd], touching: Double) -> [FoundAd] {

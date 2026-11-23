@@ -40,9 +40,15 @@ final class AdLibraryTests: XCTestCase {
     XCTAssertEqual(ad.lastSeen, now)
   }
 
-  func testAtMostTheFirstHundredAndFiftyWordsAreKept() throws {
-    let known = try seeds([entry(text: raw(200))])
-    XCTAssertEqual(known.ads.first?.words.count, KnownAds.mostWords)
+  func testAtMostTheFirstSixHundredWordsAreKept() throws {
+    XCTAssertEqual(AdLibrary.mostWords, 600)
+    let known = try seeds([entry(text: raw(700))])
+    XCTAssertEqual(known.ads.first?.words.count, 600)
+    XCTAssertEqual(known.ads.first?.words.last, "spot599")
+  }
+
+  func testTheMemorysOwnLearningStaysAtOneHundredFiftyWords() {
+    XCTAssertEqual(KnownAds.mostWords, 150)
   }
 
   func testWordsThatAreOnlyPunctuationAreLeftOut() throws {

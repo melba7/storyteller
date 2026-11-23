@@ -14,8 +14,8 @@ public struct KnownAd: Codable, Sendable, Equatable {
   public var showId: String
   public var advertiser: String
   public var kind: AdKind
-  /// The ad's first words (at most `KnownAds.mostWords`): lower case, no punctuation, one space
-  /// apart. One string rather than a list keeps the file small.
+  /// The ad's first words (at most `KnownAds.mostWords`, or `AdLibrary.mostWords` for a taught ad):
+  /// lower case, no punctuation, one space apart. One string rather than a list keeps the file small.
   public var text: String
   /// How long the ad lasted, in seconds.
   public var length: Double
@@ -66,6 +66,9 @@ public struct KnownAdHit: Equatable, Sendable {
 public struct KnownAds: Codable, Sendable, Equatable {
   public static let currentVersion = 1
   public static let fileName = "known-ads.json"
+  /// The name in `FoundAd.source` of an ad that was found whole, with edges exact to the word.
+  /// `AdJoin` lets such an ad set the edges of a looser span that overlaps it.
+  public static let source = "known-ad"
 
   /// An ad is learned only when it is sure, was not undone or trimmed, lasts `shortest` to
   /// `longest` seconds and has at least `fewestWords` words. Only its first `mostWords` are kept.
@@ -172,22 +175,39 @@ public struct KnownAds: Codable, Sendable, Equatable {
   /// The remembered ads of `show`, and those of any show (scope "all"), that `words` (a
   /// transcript's words, timed) contain, by start.
   public func find(in words: [TranscriptWord], show: String) -> [KnownAdHit] {
-    let timed = words.compactMap { word in
-      Self.normalise(word.text).map { (text: $0, start: word.start, end: word.end) }
-    }
-    let index = RunIndex(timed.map(\.text))
+    hits(in: Heard(words), show: show)
+  }
+
+  /// The same for words that were prepared once, so the memory and the seeds share the work.
+  func hits(in heard: Heard, show: String) -> [KnownAdHit] {
+    let timed = heard.timed
     var hits: [KnownAdHit] = []
     for ad in ads where ad.showId == show || ad.scope == "all" {
-      let runs = Self.runs(of: ad.words)
-      for chain in Self.chains(of: runs, in: index) {
-        let start = timed[chain.first].start
-        if Self.isWhole(chain, of: runs.count) {
-          hits.append(KnownAdHit(ad: ad, match: .whole(start: start, end: timed[chain.last].end)))
+      let adWords = ad.words
+      var openings: [Chain] = []
+      var wholes: [Chain] = []
+      let total = max(adWords.count - Self.runLength + 1, 0)
+      let runAt = { (at: Int) in adWords[at..<(at + Self.runLength)].joined(separator: " ") }
+      for chain in Self.chains(count: total, run: runAt, in: heard.index) {
+        if Self.isWhole(chain, of: total) {
+          wholes.append(chain)
         } else if timed.count - 1 - chain.last <= Self.gapWords {
-          // The transcript ended before the ad did.
-          hits.append(
-            KnownAdHit(ad: ad, match: .opening(start: start, expectedEnd: start + ad.length)))
+          openings.append(chain)  // The transcript ended before the ad did.
         }
+      }
+      // A stretch found by its opening keeps its edges; the sturdy search adds the ones it missed.
+      let sturdy = Self.sturdy(adWords, in: heard).filter { found in
+        !wholes.contains { Self.sharesWords($0, found) }
+      }
+      openings.removeAll { open in sturdy.contains { Self.sharesWords(open, $0) } }
+      for chain in wholes + sturdy {
+        hits.append(
+          KnownAdHit(
+            ad: ad, match: .whole(start: timed[chain.first].start, end: timed[chain.last].end)))
+      }
+      for chain in openings {
+        let start = timed[chain.first].start
+        hits.append(KnownAdHit(ad: ad, match: .opening(start: start, expectedEnd: start + ad.length)))
       }
     }
     return hits.sorted { $0.match.start < $1.match.start }
@@ -198,9 +218,10 @@ public struct KnownAds: Codable, Sendable, Equatable {
   /// a whole match beats an opening; of the same sort the ad seen more often wins, and on a tie
   /// the memory's own.
   public func find(in words: [TranscriptWord], show: String, seeds: KnownAds) -> [KnownAdHit] {
-    let own = find(in: words, show: show)
+    let heard = Heard(words)
+    let own = hits(in: heard, show: show)
     var kept = own
-    for seed in seeds.find(in: words, show: show) {
+    for seed in seeds.hits(in: heard, show: show) {
       let overlapped = kept.indices.filter { at in
         own.contains(kept[at]) && Self.overlap(kept[at], seed)
       }
@@ -278,7 +299,13 @@ extension KnownAds {
   /// its first runs come close together, then goes on run by run while the next one is found
   /// within `gapWords` words of the last match. A run that is not found is passed over.
   static func chains(of runs: [String], in index: RunIndex) -> [Chain] {
-    let head = runs.prefix(openingRuns).map { index.positions[$0] ?? [] }
+    chains(count: runs.count, run: { runs[$0] }, in: index)
+  }
+
+  /// The same for an ad of `count` runs that are made only when needed (`run` gives the one at an
+  /// index): most ads are not there, and then only their first runs are ever made.
+  static func chains(count: Int, run: (Int) -> String, in index: RunIndex) -> [Chain] {
+    let head = (0..<min(openingRuns, count)).map { index.positions[run($0)] ?? [] }
     var result: [Chain] = []
     var from = 0
     for q in Set(head.flatMap { $0 }).sorted() {
@@ -296,9 +323,9 @@ extension KnownAds {
         last = hit + runLength - 1
       }
       guard found >= openingNeeded, let start = first else { continue }
-      for run in runs.dropFirst(openingRuns) {
+      for at in min(openingRuns, count)..<count {
         guard
-          let hit = (index.positions[run] ?? []).first(where: {
+          let hit = (index.positions[run(at)] ?? []).first(where: {
             $0 >= cursor && $0 <= last + 1 + gapWords
           })
         else { continue }
