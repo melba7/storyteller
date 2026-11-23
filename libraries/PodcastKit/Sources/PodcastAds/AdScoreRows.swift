@@ -24,6 +24,10 @@ public struct ScoreExtras: Sendable {
   }
 }
 
+/// The ads the word rules and the word model give for a whole episode, before any join: what tells
+/// the joint rows (which only look at a whole episode) which ads with no source may be pulled back to a joint (`JointPull`).
+public typealias ScoreWords = @Sendable (AdScoreInput) -> [FoundAd]
+
 /// The rows to add after the detectors, in the round's order, and what to say about the rest.
 struct ScorePlan {
   var layers: [AdScoreLayer] = []
@@ -41,7 +45,8 @@ struct ScorePlan {
   /// cut it), then own sounds, repeated sounds, repeated words, joints, joints in steady files too,
   /// and last the per-show settings. Each row stands on the one before it.
   static func make(
-    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras
+    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras,
+    words: @escaping ScoreWords = { _ in [] }
   ) -> ScorePlan {
     var plan = ScorePlan()
     let finders = plan.finders
@@ -57,11 +62,13 @@ struct ScorePlan {
     let learning = [ScoreRows.ownSounds, ScoreRows.repeatedSounds, ScoreRows.repeatedWords]
     plan.learners = plan.layers.filter { learning.contains($0.name) }
     if let kit {
-      plan.layers.append(SoundScoreLayers.joints(kit.snapJoints, stash: stash, cached: kit.cachedJoints))
+      plan.layers.append(SoundScoreLayers.joints(
+          kit.snapJoints, stash: stash, cached: kit.cachedJoints, words: words))
       plan.layers.append(
-        SoundScoreLayers.steadyJoints(kit.snapJoints, stash: stash, cached: kit.cachedJoints))
+        SoundScoreLayers.steadyJoints(
+          kit.snapJoints, stash: stash, cached: kit.cachedJoints, words: words))
     }
-    plan.addSettings(folder: folder, snap: kit?.snapJoints, cached: kit?.cachedJoints)
+    plan.addSettings(folder: folder, snap: kit?.snapJoints, cached: kit?.cachedJoints, words: words)
     return plan
   }
 
@@ -158,7 +165,7 @@ struct ScorePlan {
   /// built-in settings, which is what the phone does, so the run's total is the phone's.
   private mutating func addSettings(
     folder: URL, snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?,
-    cached: ScoreCachedJoints?
+    cached: ScoreCachedJoints?, words: @escaping ScoreWords
   ) {
     let url = folder.appendingPathComponent(ShowTuning.fileName)
     var chosen = ShowTuning()
@@ -173,7 +180,8 @@ struct ScorePlan {
     }
     tuning = chosen
     layers.append(SettingsScoreLayer.perShowSettings(
-        tuning: chosen, finders: finders, snap: snap, cached: cached ?? ScoreCachedJoints()))
+        tuning: chosen, finders: finders, snap: snap, cached: cached ?? ScoreCachedJoints(),
+        words: words))
   }
 
   /// What the meaning row noticed, as plain sentences.

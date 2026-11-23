@@ -108,15 +108,17 @@ public enum ScoreAds {
   /// The ads with their borders moved by `move`, which gets the stretches in order of their start
   /// and gives them back in that order (each one moved or not). The ads keep everything else. If
   /// `move` gives another number of stretches, or one that is not a stretch, the ad stays as it was.
+  /// `words` is what the word finders gave for the whole episode, which tells which ads with no
+  /// source may be pulled (`JointPull.allows(_:words:)`).
   public static func moved(
-    _ ads: [FoundAd], by move: ([ScoreSpan]) -> [ScoreSpan]
+    _ ads: [FoundAd], words: [FoundAd] = [], by move: ([ScoreSpan]) -> [ScoreSpan]
   ) -> [FoundAd] {
     let ordered = ads.sorted { $0.start < $1.start }
     let given = move(
       ordered.map {
         ScoreSpan(
           start: $0.start, end: $0.end, sort: $0.kind.sortName,
-          mayPull: JointPull.allows(source: $0.source))
+          mayPull: JointPull.allows($0, words: words))
       })
     guard given.count == ordered.count else { return ordered }
     return zip(ordered, given).map { ad, span in

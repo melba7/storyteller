@@ -135,7 +135,13 @@ public enum AdScoreCommand {
 
     // The rows that stand on the finders: each adds one thing to the row before it.
     let audio = TeachingAudio.files(in: folder)
-    let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
+    // The word finders' own ads for the whole episode, with no library and no join: they tell which
+    // ads with no source may be pulled back to a joint.
+    let words: ScoreWords = { input in
+      last.local.ads(transcript: input.transcript, episodeDuration: input.episode.episodeLength)
+    }
+    let plan = ScorePlan.make(
+      folder: folder, episodes: chosen, audio: audio, now: now, extras: extras, words: words)
     let finalAds = ScoreEpisodeAds()
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
     // episode of a show, so the labelled episodes that are not scored come first and only teach.

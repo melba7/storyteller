@@ -134,9 +134,11 @@ public enum SoundScoreLayers {
   /// `snap` is `ScoreSoundKit.snapJoints`.
   public static func joints(
     _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
-    cached: ScoreCachedJoints = ScoreCachedJoints()
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
-    snapping(name: ScoreRows.joints, steadyToo: false, snap: snap, stash: stash, keep: true, cached: cached)
+    snapping(
+      name: ScoreRows.joints, steadyToo: false, snap: snap, stash: stash, keep: true, cached: cached,
+      words: words)
   }
 
   /// "Plus joints (steady files too)": the same, and a file whose frames are all alike is used
@@ -145,15 +147,17 @@ public enum SoundScoreLayers {
   /// (no stash) it moves what it is given.
   public static func steadyJoints(
     _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
-    cached: ScoreCachedJoints = ScoreCachedJoints()
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
-    snapping(name: ScoreRows.steadyJoints, steadyToo: true, snap: snap, stash: stash, keep: false, cached: cached)
+    snapping(
+      name: ScoreRows.steadyJoints, steadyToo: true, snap: snap, stash: stash, keep: false,
+      cached: cached, words: words)
   }
 
   private static func snapping(
     name: String, steadyToo: Bool,
     snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
-    keep: Bool, cached: ScoreCachedJoints
+    keep: Bool, cached: ScoreCachedJoints, words: @escaping ScoreWords
   ) -> AdScoreLayer {
     .rewriting(name: name) { input, soFar in
       // The first look is by words; its borders are not moved, and the stash is the whole
@@ -163,7 +167,9 @@ public enum SoundScoreLayers {
       let id = input.episode.id
       if keep { stash.put(soFar, for: id) }
       let base = keep ? soFar : (stash.ads(for: id) ?? soFar)
-      return ScoreAds.moved(base) { move($0, steadyToo) }
+      return ScoreAds.moved(base, words: words(input)) {
+        move($0, steadyToo)
+      }
     }
   }
 }

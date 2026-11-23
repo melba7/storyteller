@@ -16,9 +16,10 @@ enum NewAds {
   static let apart = 0.6
   /// How far from an ad's start a trim of it may lie before the ad is left alone by the snap: a
   /// trim is found by where its ad started, and the snap moves that start up to 3 seconds, or up to
-  /// the pull distance for an ad the pull may apply to (`JointSnap.trimReach`).
-  static func trimReach(for ad: FoundAd) -> Double {
-    JointSnap.trimReach(pulled: JointPull.allows(source: ad.source))
+  /// the pull distance for an ad the pull may apply to (`JointSnap.trimReach`). `words` is what the
+  /// word rules and the word model gave for the whole transcript (`JointPull.allows(_:words:)`).
+  static func trimReach(for ad: FoundAd, words: [FoundAd] = []) -> Double {
+    JointSnap.trimReach(pulled: JointPull.allows(ad, words: words))
   }
 
   /// An ad's borders before and after the snap moved them.
@@ -105,12 +106,13 @@ enum NewAds {
   /// the end of the ad before it (after that one's own snap), and its end never after the start of
   /// the next as it was found. Between two ads of different finders (`source`) the snap keeps
   /// `apart` seconds, so it never leaves them close enough for `AdJoin` to join them. The pull of
-  /// a late start is only for the ads `JointPull` names, and it keeps out of the stretches in
-  /// `judged` (the listener's "no" answers, open questions and undone skips); the start's floor is
-  /// the latest end of ALL the ads before it.
+  /// a late start is only for the ads `JointPull` allows (given `words`, the ads the word finders
+  /// gave for the whole transcript), and it keeps out of the stretches in `judged` (the listener's
+  /// "no" answers, open questions and undone skips); the start's floor is the latest end of ALL
+  /// the ads before it.
   static func snap(
     _ found: [FoundAd], joints: Joints, steadyToo: Bool,
-    judged: [(start: Double, end: Double)] = [],
+    judged: [(start: Double, end: Double)] = [], words: [FoundAd] = [],
     leaving fixed: (FoundAd) -> Bool = { _ in false }
   ) -> (ads: [FoundAd], moved: [Moved]) {
     var ads = found
@@ -124,7 +126,7 @@ enum NewAds {
       let to = JointSnap.snap(
         start: ad.start, end: ad.end, joints: joints,
         previousEnd: earlierEnd, nextStart: after.map { $0.start - room(ad, $0) }, steadyToo: steadyToo,
-        mayPull: JointPull.allows(source: ad.source), judged: judged)
+        mayPull: JointPull.allows(ad, words: words), judged: judged)
       guard to.start != ad.start || to.end != ad.end else { continue }
       ads[index].start = to.start
       ads[index].end = to.end
@@ -146,8 +148,10 @@ enum NewAds {
   }
 
   /// An ad that the listener confirmed (source "tap"), undid or trimmed keeps its borders.
-  static func isFixed(_ ad: FoundAd, in file: AdsFile) -> Bool {
+  static func isFixed(_ ad: FoundAd, in file: AdsFile, words: [FoundAd] = []) -> Bool {
     ad.source == AdAsking.source || file.isUndone(ad)
-      || (file.trims ?? []).contains { $0.adStart >= ad.start - trimReach(for: ad) && $0.adStart < ad.end }
+      || (file.trims ?? []).contains {
+        $0.adStart >= ad.start - trimReach(for: ad, words: words) && $0.adStart < ad.end
+      }
   }
 }

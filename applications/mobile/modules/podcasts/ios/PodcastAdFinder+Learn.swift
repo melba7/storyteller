@@ -35,7 +35,7 @@ extension PodcastAdFinder {
     rememberRepeats(id, ads: store, transcript: transcript, modes: modes)
     guard trusted else { return }
     let saved = store.load(detector: Self.detectorName) ?? made.file
-    learnOwnSounds(id, saved, modes: modes, moved: made.moved)
+    learnOwnSounds(id, saved, modes: modes, moved: made.moved, words: made.words)
     learnHabits(id, saved, transcript: transcript, modes: modes)
   }
 
@@ -93,7 +93,7 @@ extension PodcastAdFinder {
   /// minute of what came before the ad, as `learnKnown` does too. The episode is noted as learned
   /// from only when the learning ran: with no time held from iOS the next pass tries again.
   private func learnOwnSounds(
-    _ id: String, _ saved: AdsFile, modes: NewModes, moved: [NewAds.Moved]
+    _ id: String, _ saved: AdsFile, modes: NewModes, moved: [NewAds.Moved], words: [FoundAd]
   ) {
     guard modes.level(FinderNames.ownSound) != .off,
       let file = PodcastDownloader.shared.localFile(for: id),
@@ -102,7 +102,10 @@ extension PodcastAdFinder {
     let stretches = saved.ads.filter { ad in
       ad.confidence == .sure && ad.source != AdAsking.source && !saved.isUndone(ad)
         && !(saved.trims ?? []).contains {
-          $0.adStart >= ad.start - NewAds.trimReach(for: ad) && $0.adStart < ad.end
+          // The snap moved the saved ad's start; the pull is judged on the start it was found with.
+          $0.adStart >= ad.start
+            - NewAds.trimReach(for: NewAds.restored(ad, from: moved), words: words)
+            && $0.adStart < ad.end
         }
         && !(saved.asks ?? []).contains { $0.confidence != .guess && NewAds.overlap($0, ad) }
     }.map { ad -> MarkedStretch in
