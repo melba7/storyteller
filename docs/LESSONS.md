@@ -167,3 +167,7 @@ One line per lesson.
   check the scorecard has a "Plus the trained model" row before judging any
   finder. The trainer must also fix the bias at plain talk, or the many
   plain-word weights carry it and the bias ends up saying "ad" (2026-11-23).
+- The Mac's test cannot see what the phone's own learners gain (one unseen
+  episode per show), and the first rule switched them off for every show on 0 s
+  found and 15 s cut. A finder that found nothing and cut almost nothing is not
+  judged (2026-11-23).

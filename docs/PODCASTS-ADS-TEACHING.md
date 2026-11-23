@@ -288,8 +288,10 @@ Native module `LofiScore` (`modules/lofi-score`):
 - To make one finder stricter for every show or for one show, the Mac decides
   from the scorecard when you double-click "Teach the phone again": a finder
   that finds more wrong than right seconds is turned off, and one under 85%
-  precision only asks. The phone's guard does the same by itself after a crash
-  or two undone skips.
+  precision only asks. A finder that found no ad at all and cut under 0.05
+  percent of the show is left as it is: the sound and repeat finders learn from
+  a show's earlier episodes, which one unseen episode of each show cannot show.
+  The phone's guard does the same by itself after a crash or two undone skips.
 - There is no switch for a finder in the app. To go back to how ads were skipped
   before this round, install build 33.1 again from the build list in TestFlight;
   the files the new finders wrote have only new fields, which the old build

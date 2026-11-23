@@ -2,7 +2,8 @@
 
 Standard library only. A run has `rows`, one per finder (each stands on the row before it), and a row
 has `total` and `shows[]` (`feed`, `show`, `total`). Of a total only the numbers this needs are read:
-how many episodes, the right seconds (adSeconds - heardSeconds) and the wrong seconds (cutSeconds).
+how many episodes, the right seconds (adSeconds - heardSeconds), the wrong seconds (cutSeconds) and
+the seconds of show (showSeconds, 0 when the file has none).
 Anything of the wrong shape is skipped, never raised.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -17,7 +18,7 @@ from teach_store import Problem
 SCORECARD = "scorecard.json"
 SCORECARD_LIMIT = 16 * 1024 * 1024
 
-Figures = collections.namedtuple("Figures", "episodes right wrong")
+Figures = collections.namedtuple("Figures", "episodes right wrong show")
 Show = collections.namedtuple("Show", "feed name figures")
 Row = collections.namedtuple("Row", "name total shows")
 
@@ -39,7 +40,8 @@ def figures(total):
     kept = [total.get(key) for key in ("episodes", "adSeconds", "heardSeconds", "cutSeconds")]
     if not all(number(value) for value in kept) or kept[0] < 0:
         return None
-    return Figures(int(kept[0]), kept[1] - kept[2], kept[3])
+    shown = total.get("showSeconds")
+    return Figures(int(kept[0]), kept[1] - kept[2], kept[3], shown if number(shown) and shown > 0 else 0.0)
 
 
 def added(first, second):

@@ -14,11 +14,11 @@ OWN, SOUNDS, WORDS, MEANING = (
 JOINTS, STEADY = "Plus joints", "Plus joints (steady files too)"
 
 
-def total(episodes=3, ad=100.0, heard=0.0, cut=0.0, before=0.0, after=0.0):
+def total(episodes=3, ad=100.0, heard=0.0, cut=0.0, before=0.0, after=0.0, show_seconds=3000.0):
     """A scorecard total in the shape the phone's tool writes it (more keys are there in the file)."""
     return {"episodes": episodes, "ads": 4, "caught": 2, "adSeconds": ad, "heardSeconds": heard,
             "heardBeforeSeconds": before, "heardAfterSeconds": after, "cutSeconds": cut,
-            "showSeconds": 3000.0, "wrongSkips": 1, "bySort": {}}
+            "showSeconds": show_seconds, "wrongSkips": 1, "bySort": {}}
 
 
 def show(feed, name="Show", **figures):
@@ -26,7 +26,7 @@ def show(feed, name="Show", **figures):
 
 
 SUMMED = ("episodes", "ads", "caught", "adSeconds", "heardSeconds", "heardBeforeSeconds",
-          "heardAfterSeconds", "cutSeconds", "wrongSkips")
+          "heardAfterSeconds", "cutSeconds", "showSeconds", "wrongSkips")
 
 
 def row(name, *shows, whole=None):

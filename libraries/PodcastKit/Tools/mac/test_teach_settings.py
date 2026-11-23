@@ -38,6 +38,25 @@ class DefaultTests(unittest.TestCase):
         self.assertEqual(default["finders"]["own-sound"], "ask", "under 85 percent right, not off")
         self.assertEqual(shows, [])
 
+    def test_a_finder_that_found_nothing_and_cut_almost_nothing_is_not_judged(self):
+        # The sound and repeat finders learn from a show's earlier episodes, so a test over one unseen
+        # episode of each show cannot show their gain. Nothing found and 15 s cut of 60000 s of show
+        # (a fortieth of a percent) says nothing, so the finder keeps its level.
+        base = row("Phone", show(FEED_A, heard=40, show_seconds=30000.0), show(FEED_B, heard=40, show_seconds=30000.0))
+        quiet = row(OWN, show(FEED_A, heard=40, cut=10, show_seconds=30000.0),
+                    show(FEED_B, heard=40, cut=5, show_seconds=30000.0))
+        default, shows, lines = choose(rows_of(base, quiet))
+        self.assertEqual(default["finders"]["own-sound"], "skip")
+        self.assertEqual(shows, [])
+        self.assertTrue(any("own-sound" in line and "too little to judge" in line for line in lines), lines)
+
+    def test_a_finder_that_found_nothing_but_cut_more_of_the_show_is_still_off(self):
+        # 40 s of 60000 s is over 0.05 percent: that is judged, and more wrong than right is off.
+        base = row("Phone", show(FEED_A, heard=40, show_seconds=30000.0), show(FEED_B, heard=40, show_seconds=30000.0))
+        loud = row(OWN, show(FEED_A, heard=40, cut=25, show_seconds=30000.0),
+                   show(FEED_B, heard=40, cut=15, show_seconds=30000.0))
+        self.assertEqual(choose(rows_of(base, loud))[0]["finders"]["own-sound"], "off")
+
     def test_the_overall_row_needs_three_marked_episodes_too(self):
         base = row("Phone", show(FEED_A, episodes=2, heard=40))
         bad = row(OWN, show(FEED_A, episodes=2, heard=40, cut=50))
