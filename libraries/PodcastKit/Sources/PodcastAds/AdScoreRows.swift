@@ -1,0 +1,130 @@
+// LOFI-FORK: which new rows the scorecard gets, and the plain notes about the ones it leaves out
+// (see FORK.md and AdScoreLayer.swift). Foundation only.
+import Foundation
+
+/// What the caller of `AdScoreCommand` can add. PodcastAds cannot see the audio code or Apple's
+/// sentence embedding, so the `podcast-teach` tool hands them in; with the defaults the rows that
+/// need them are left out, and the notes say so.
+public struct ScoreExtras: Sendable {
+  /// The sound finders, made once for a run (they learn across episodes in boxes of their own).
+  /// It gets the teaching folder (for the Mac's `ad-sounds.json`) and the time the run starts.
+  /// Nil: this build has no audio code.
+  public var sounds: @Sendable (URL, Date) -> ScoreSoundKit?
+  /// The embedder for a meaning model, or nil when this Mac has none (Linux, or no English
+  /// sentence embedding of the revision the model was trained on).
+  public var embedder: @Sendable (AdMeaningModel) -> LineEmbedder?
+
+  public init(
+    sounds: @escaping @Sendable (URL, Date) -> ScoreSoundKit? = { _, _ in nil },
+    embedder: @escaping @Sendable (AdMeaningModel) -> LineEmbedder? = { _ in nil }
+  ) {
+    self.sounds = sounds
+    self.embedder = embedder
+  }
+}
+
+/// The rows to add after the detectors, in the round's order, and what to say about the rest.
+struct ScorePlan {
+  var layers: [AdScoreLayer] = []
+  /// Plain sentences about rows that are left out, printed under the scorecard's title.
+  var notes: [String] = []
+  var meaning: MeaningScoreNotes?
+  /// The Mac's settings, when `show-settings.json` is there.
+  var tuning: ShowTuning?
+
+  /// The order: own sounds, repeated sounds, repeated words, the meaning model, joints, joints in
+  /// steady files too, and last the per-show settings. Each row stands on the one before it.
+  static func make(
+    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras
+  ) -> ScorePlan {
+    var plan = ScorePlan()
+    let kit = plan.soundKit(folder: folder, episodes: episodes, audio: audio, now: now, extras: extras)
+    let stash = ScoreEpisodeAds()
+    if let kit {
+      plan.layers.append(SoundScoreLayers.ownSounds(kit.ownSounds))
+      plan.layers.append(SoundScoreLayers.repeatedSounds(kit.repeatedSounds))
+    }
+    plan.layers.append(WordScoreLayers.repeatedWords(now: now))
+    plan.addMeaning(folder: folder, extras: extras)
+    if let kit {
+      plan.layers.append(SoundScoreLayers.joints(kit.snapJoints, stash: stash))
+      plan.layers.append(SoundScoreLayers.steadyJoints(kit.snapJoints, stash: stash))
+    }
+    plan.addSettings(folder: folder, stash: stash, snap: kit?.snapJoints)
+    return plan
+  }
+
+  /// The sound finders when there is any audio to read, else nil and a note.
+  private mutating func soundKit(
+    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras
+  ) -> ScoreSoundKit? {
+    let rows = ScoreRows.needingAudio.joined(separator: ", ")
+    guard let kit = extras.sounds(folder, now) else {
+      notes.append("Rows left out: \(rows). This build of the tool has no audio code.")
+      return nil
+    }
+    let without = episodes.filter { audio[$0.id] == nil }.map(\.id)
+    guard without.count < episodes.count else {
+      notes.append(
+        "No episode has an MP3 file in the teaching folder, so the rows that need audio are left out: \(rows).")
+      return nil
+    }
+    if !without.isEmpty {
+      let named = without.prefix(5).joined(separator: ", ")
+      let more = without.count > 5 ? " and \(without.count - 5) more" : ""
+      notes.append(
+        "\(without.count) of \(episodes.count) episodes have no MP3 file (\(named)\(more)), so the rows that need audio leave them out.")
+    }
+    return kit
+  }
+
+  private mutating func addMeaning(folder: URL, extras: ScoreExtras) {
+    let url = folder.appendingPathComponent(AdMeaningModel.fileName)
+    guard FileManager.default.fileExists(atPath: url.path) else {
+      notes.append("The meaning model's row is left out: there is no \(AdMeaningModel.fileName) in the folder.")
+      return
+    }
+    guard let model = AdMeaningModel.load(from: url) else {
+      notes.append(
+        "The meaning model's row is left out: \(AdMeaningModel.fileName) could not be read (or does not fit this phone code).")
+      return
+    }
+    guard let embedder = extras.embedder(model) else {
+      notes.append(
+        "The meaning model's row is left out: it needs a Mac with Apple's English sentence embedding (revision \(model.revision)).")
+      return
+    }
+    let seen = MeaningScoreNotes()
+    meaning = seen
+    layers.append(WordScoreLayers.meaning(model: model, embedder: embedder, notes: seen))
+  }
+
+  private mutating func addSettings(
+    folder: URL, stash: ScoreEpisodeAds, snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?
+  ) {
+    let url = folder.appendingPathComponent(ShowTuning.fileName)
+    guard FileManager.default.fileExists(atPath: url.path) else {
+      notes.append("There is no \(ShowTuning.fileName) in the folder, so there is no per-show settings row.")
+      return
+    }
+    guard let data = try? Data(contentsOf: url) else {
+      notes.append("\(ShowTuning.fileName) could not be read, so there is no per-show settings row.")
+      return
+    }
+    let tuning = ShowTuning(data: data)
+    self.tuning = tuning
+    layers.append(SettingsScoreLayer.perShowSettings(tuning: tuning, stash: stash, snap: snap))
+  }
+
+  /// What the meaning row noticed, as plain sentences.
+  func meaningLines() -> [String] {
+    guard let meaning else { return [] }
+    var lines: [String] = []
+    if meaning.episodes > 0 {
+      let speed = meaning.secondsPerLine.map { String(format: " (about %.0f ms a line)", $0 * 1000) } ?? ""
+      lines.append("The meaning model read \(meaning.episodes) episode\(meaning.episodes == 1 ? "" : "s")\(speed).")
+    }
+    for reason in meaning.offReasons { lines.append("The meaning model was off for an episode: \(reason)") }
+    return lines
+  }
+}
