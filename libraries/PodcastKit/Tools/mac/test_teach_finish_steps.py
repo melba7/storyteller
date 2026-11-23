@@ -41,12 +41,23 @@ class LabelsTests(Steps):
         for call in self.called():
             self.assertNotIn("--labels", call)
 
-    def test_a_labels_snapped_folder_alone_is_used_without_snapping(self):
+    def test_a_labels_snapped_folder_alone_is_snapped_again_and_then_used(self):
+        # Without copies/ (second downloads were removed) the folder is still brought up to date, so
+        # episodes marked since the last snap are in it: snapping copies a label that has no truth
+        # file as it is.
         self.make("labels-snapped")
         self.finish()
-        self.assertEqual(self.short(), [call + (" " + LABELS if call.startswith(READING_LABELS) else "")
-                                        for call in shell.FINISH_ORDER])
-        self.assertEqual(self.calls_of("python3 teach_snap.py"), [])
+        self.assertEqual(self.short(), ["python3 teach_snap.py"] + [
+            call + (" " + LABELS if call.startswith(READING_LABELS) else "")
+            for call in shell.FINISH_ORDER])
+
+    def test_a_failed_snap_of_a_labels_snapped_folder_alone_leaves_it_unused(self):
+        self.make("labels-snapped")
+        done = self.finish(CODES="teach_snap.py=2")
+        self.assertEqual(self.short(), ["python3 teach_snap.py"] + shell.FINISH_ORDER)
+        self.assertIn("  Snap: failed", done.stdout)
+        for call in self.called():
+            self.assertNotIn("--labels", call)
 
     def test_every_tool_that_reads_labels_gets_the_option_and_the_others_do_not(self):
         self.make("labels-snapped")
@@ -59,6 +70,12 @@ class LabelsTests(Steps):
             found = self.calls_of(start)
             self.assertEqual(len(found), 1, start)
             self.assertNotIn("--labels", found[0])
+
+    def test_neither_folder_means_no_snap_and_no_option(self):
+        self.finish()
+        self.assertEqual(self.calls_of("python3 teach_snap.py"), [])
+        for call in self.called():
+            self.assertNotIn("--labels", call)
 
     def test_the_folder_comes_before_the_option_for_the_swift_tools(self):
         self.make("labels-snapped")
@@ -135,6 +152,17 @@ class MeaningTests(Steps):
         self.assertLess(order.index("podcast-teach sounds"), order.index("podcast-teach meaning"))
         self.assertLess(order.index("podcast-teach meaning"), order.index("podcast-teach score"))
         self.assertLess(order.index("python3 teach_train.py"), order.index("podcast-teach meaning"))
+
+    def test_it_is_wrapped_to_keep_the_mac_awake_like_the_python_steps(self):
+        self.program("caffeinate", '#!/bin/bash\necho "caffeinate $*" >> "$CALLS"\nshift\nexec "$@"\n')
+        self.finish()
+        wrapped = [c for c in self.called() if c.startswith("caffeinate -i ")]
+        for step in ("teach_habits.py", "teach_train.py", "teach_library.py"):
+            self.assertEqual(len([c for c in wrapped if step in c]), 1, step)
+        meaning = [c for c in wrapped if " meaning " in c]
+        self.assertEqual(meaning, ["caffeinate -i %s/podcast-teach meaning %s" % (self.bin, self.folder)])
+        # The tool still ran, and with the same arguments as without the wrapper.
+        self.assertIn("podcast-teach meaning %s" % self.folder, self.called())
 
     def test_every_exit_code_of_the_meaning_tool_lets_the_run_go_on(self):
         for code in CODES:

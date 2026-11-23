@@ -8,8 +8,10 @@ import Foundation
 public struct TeachingFiles: Sendable {
   public static let maxBytes = 5_000_000
   public var model: AdWordModel?
-  /// The model that reads what a line means. Nil when the Mac has not published one (it only does
-  /// when it beat the word model on the scorecard) or the file is damaged: the layer is then off.
+  /// The model that reads what a line means. Nil when the Mac has not published one or the file is
+  /// damaged: the layer is then off. The Mac publishes it only when its check on held-out episodes
+  /// is good, and the scorecard row for it adds right seconds for host_ask or network_promo over the
+  /// row before it, at least 85 percent right, in a scorecard that is not older than the model.
   public var meaning: AdMeaningModel?
   public var seeds: KnownAds
   public var habits: ShowHabits

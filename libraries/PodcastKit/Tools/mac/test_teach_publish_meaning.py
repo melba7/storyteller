@@ -1,20 +1,16 @@
-"""Tests for the two newest files of teach_publish.py: the meaning model (published only when the
-held-out check AND the scorecard say it helps) and the per-show settings (published when valid).
-No network. Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+"""Tests for the gate of the meaning model in teach_publish.py: it is published only when the
+held-out check AND the scorecard say it helps. (The settings file and the list of names are in
+test_teach_publish_settings.py.) No network. Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
-import re
 import unittest
 
-import teach_publish as publish
 import teach_settings
 from test_teach_publish import ENOUGH, Setup, read
 
 ROW = "Plus the meaning model"
 BEFORE = "Plus repeated words"
 WRITTEN = 1_700_000_000_000  # when the meaning model was trained (milliseconds)
-TEACHING_TS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..",
-                           "applications", "mobile", "modules", "podcasts", "teaching.ts")
 
 
 def meaning(precision=0.9, written=WRITTEN, **held):
@@ -183,11 +179,76 @@ class MeaningGateTests(Setup):
         self.publish_meaning()
         self.not_published("older than the meaning model", "Score the ad skipping")
 
-    def test_a_model_with_no_time_in_it_is_judged_by_the_scorecard_alone(self):
-        self.source("ad-meaning.json", meaning(written=None))
-        self.scorecard(PASSES)
+    def test_a_model_with_no_time_in_it_cannot_be_matched_to_a_scorecard(self):
+        # The rule changed on purpose: with no time the gate cannot tell whether the scorecard scored
+        # this model, so the model waits (it used to be judged by the scorecard alone).
+        for value in (None, "yesterday", True, float("nan")):
+            self.messages.clear()
+            self.source("ad-meaning.json", meaning(written=value))
+            self.scorecard(PASSES)
+            self.publish_meaning()
+            self.not_published("meaning model has no time", "Score the ad skipping")
+
+    def test_a_scorecard_run_with_no_time_in_it_cannot_be_matched_to_the_model(self):
+        self.source("ad-meaning.json", meaning())
+        for value in (None, "today", False):
+            self.messages.clear()
+            good = json.loads(json.dumps(PASSES))
+            if value is None:
+                del good["runs"][-1]["at"]
+            else:
+                good["runs"][-1]["at"] = value
+            self.scorecard(good)
+            self.publish_meaning()
+            self.not_published("scorecard has no time", "Score the ad skipping")
+
+    def test_a_row_name_that_is_a_list_or_a_table_does_not_stop_publishing(self):
+        self.source("ad-meaning.json", meaning())
+        self.source("show-settings.json", {"version": 1, "shows": []})
+        odd = {"name": ["x"], "total": {}, "shows": []}
+        for strange in (odd, dict(odd, name={"a": 1}), dict(odd, name=7), dict(odd, name=None)):
+            self.messages.clear()
+            # The damaged row is not next to the meaning row: the rows that count are fine.
+            self.scorecard(card(strange, row(BEFORE, 100, 5, sorts(host=(100, 100))),
+                                row(ROW, 150, 8, sorts(host=(100, 60)))))
+            self.publish_meaning()
+            self.assertTrue(os.path.exists(self.published(self.one, "ad-meaning.json")), strange)
+            self.assertTrue(os.path.exists(self.published(self.one, "show-settings.json")))
+            self.assertIn("ad-meaning.json", json.loads(
+                read(self.published(self.one, "teaching.json")))["files"])
+            for folder in (self.one, self.two):
+                os.remove(self.published(folder, "ad-meaning.json"))
+
+    def test_a_damaged_row_just_before_the_meaning_row_is_not_skipped_over(self):
+        # The gain of the damaged row would be counted as the model's if the row before were taken
+        # from the rows that can be read: here "Plus repeated words" has 100 right seconds and the
+        # meaning row 150, but the row in between (which cannot be read) has 140.
+        self.source("ad-meaning.json", meaning())
+        self.source("show-settings.json", {"version": 1, "shows": []})
+        for damaged in ({"name": "Plus joints", "total": "x", "shows": []},
+                        {"name": ["x"], "total": {}, "shows": []}, 7, None,
+                        {"name": "Plus joints", "total": {"episodes": "many"}}):
+            self.messages.clear()
+            self.scorecard(card(row(BEFORE, 100, 5, sorts(host=(100, 100))), damaged,
+                                row(ROW, 150, 8, sorts(host=(100, 60)))))
+            self.publish_meaning()
+            self.not_published("row before \"%s\"" % ROW, "cannot be read")
+            self.assertTrue(os.path.exists(self.published(self.one, "show-settings.json")))
+
+    def test_a_meaning_row_that_cannot_be_read_is_not_published(self):
+        self.source("ad-meaning.json", meaning())
+        self.scorecard(card(row(BEFORE, 100, 5, sorts(host=(100, 100))),
+                            {"name": ROW, "total": "x", "shows": []}))
         self.publish_meaning()
-        self.assertTrue(os.path.exists(self.published(self.one, "ad-meaning.json")))
+        self.not_published("\"%s\" in the scorecard cannot be read" % ROW)
+
+    def test_the_first_row_of_the_name_is_the_one_that_counts(self):
+        self.source("ad-meaning.json", meaning())
+        self.scorecard(card(row(BEFORE, 100, 5, sorts(host=(100, 100))),
+                            row(ROW, 100, 5, sorts(host=(100, 100))),
+                            row(ROW, 150, 8, sorts(host=(100, 60)))))
+        self.publish_meaning()
+        self.not_published("added no right seconds")
 
     def test_a_weak_held_out_check_stops_it_whatever_the_scorecard_says(self):
         self.scorecard(PASSES)
@@ -236,62 +297,6 @@ class MeaningGateTests(Setup):
 
     def test_the_row_name_is_the_one_the_settings_tool_knows(self):
         self.assertEqual(teach_settings.ROWS[ROW], "meaning")
-
-
-class SettingsTests(Setup):
-    GOOD = {"version": 1, "writtenAt": 1700000000, "default": {"joints": True}, "shows": []}
-
-    def test_a_valid_settings_file_is_published_with_no_other_gate(self):
-        self.source("show-settings.json", self.GOOD)
-        self.assertEqual(self.main(self.one, self.two), 0, self.messages)
-        for folder in (self.one, self.two):
-            self.assertEqual(read(self.published(folder, "show-settings.json")),
-                             read(os.path.join(self.teaching, "show-settings.json")))
-            self.assertIn("show-settings.json",
-                          json.loads(read(self.published(folder, "teaching.json")))["files"])
-
-    def test_it_needs_no_scorecard_and_no_held_out_check(self):
-        self.source("show-settings.json", {"version": 1, "shows": []})
-        self.assertEqual(self.main(self.one), 0)
-        self.assertTrue(os.path.exists(self.published(self.one, "show-settings.json")))
-
-    def test_what_the_phone_would_refuse_is_not_published_and_says_why(self):
-        for value in ({"version": 1}, {"version": 1, "shows": {"a": 1}}, {"version": 1, "shows": "x"}):
-            self.messages.clear()
-            self.source("show-settings.json", value)
-            self.assertEqual(self.main(self.one), 2, value)
-            self.assertFalse(os.path.exists(self.published(self.one, "show-settings.json")))
-            self.assertTrue(any("show-settings.json" in m and "list of shows" in m
-                                for m in self.messages), self.messages)
-
-    def test_a_file_that_is_not_version_1_is_refused_like_the_others(self):
-        self.source("show-settings.json", {"version": 2, "shows": []})
-        self.assertEqual(self.main(self.one), 2)
-        self.assertFalse(os.path.exists(self.published(self.one, "show-settings.json")))
-
-    def test_a_refused_file_leaves_the_old_published_one(self):
-        self.source("show-settings.json", self.GOOD)
-        self.main(self.one)
-        before = read(self.published(self.one, "show-settings.json"))
-        self.source("show-settings.json", raw=b"[]")
-        self.assertEqual(self.main(self.one), 2)
-        self.assertEqual(read(self.published(self.one, "show-settings.json")), before)
-
-    def test_a_missing_settings_file_is_skipped_with_one_line(self):
-        self.assertEqual(self.main(self.one), 0)
-        said = [m for m in self.messages if "show-settings.json" in m]
-        self.assertEqual(len(said), 1)
-        self.assertIn("skipped", said[0])
-
-
-class NamesTests(unittest.TestCase):
-    def test_the_files_published_are_the_files_the_phone_fetches(self):
-        with open(TEACHING_TS, encoding="utf-8") as f:
-            text = f.read()
-        block = re.search(r"export const TEACHING_NAMES = \[(.*?)\] as const", text, re.S).group(1)
-        fetched = re.findall(r'"([^"]+)"', block)
-        self.assertEqual(fetched, [target for _, target in publish.FILES])
-        self.assertEqual(len(fetched), 6)
 
 
 if __name__ == "__main__":

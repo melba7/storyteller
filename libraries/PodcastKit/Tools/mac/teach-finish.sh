@@ -1,17 +1,18 @@
 #!/bin/bash
 # Not double-clicked: the other teaching files call it. It does the steps after the ads are marked,
 # in this order:
-#   0. snap     (teach_snap.py)      only when the folder copies/ exists (second downloads): moves
-#                                    the borders of Claude's labels onto what the two downloads
-#                                    differ in, into labels-snapped/. When labels-snapped/ exists
-#                                    (and snapping did not fail) steps 1 to 6 are given
-#                                    --labels labels-snapped; Claude's own labels are never changed.
+#   0. snap     (teach_snap.py)      only when the folder copies/ (second downloads) or
+#                                    labels-snapped/ exists: moves the borders of Claude's labels
+#                                    onto what the two downloads differ in, into labels-snapped/.
+#                                    When labels-snapped/ exists (and snapping did not fail) steps 1
+#                                    to 6 are given --labels labels-snapped; Claude's own labels are
+#                                    never changed.
 #   1. habits   (teach_habits.py)    what each show usually does at its start
 #   2. train    (teach_train.py)     the small model that spots ads
 #   3. library  (teach_library.py)   the library of known ads
 #   4. sounds   (podcast-teach sounds) builds podcast-teach first (swift build)
 #   5. meaning  (podcast-teach meaning)  the small model that reads what a line means (needs a Mac;
-#                                    it is no stop when it cannot run: exit 2 is said and the run goes on)
+#                                    when it cannot run it says so and the run goes on)
 #   6. score    (podcast-teach score)  the scorecard of the ad skipping (it scores the meaning model)
 #   7. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
 #   8. publish  (teach_publish.py)   copies the results to the folders the phone reads
@@ -96,14 +97,17 @@ run_step() {
 
 echo "=== $(date '+%Y-%m-%d %H:%M') finish: habits, model, library, sounds, meaning, score, settings, publish ===" >> "$LOG"
 
-# Step 0: when second downloads were compared (copies/), move Claude's label borders onto them. The
-# folder's run lock is already held, so teach_snap.py takes none of its own. When it fails, the
-# labels-snapped folder may be old, so Claude's own labels are used this time. LABELS is what the
-# steps below that read labels are given (unquoted on purpose: nothing, or two words).
+# Step 0: when second downloads were compared (copies/), or labels-snapped/ is there from an earlier
+# run, bring labels-snapped up to date: Claude's label borders are moved onto the second downloads and
+# the labels marked since the last time are copied in (teach_snap.py copies a label with no second
+# download as it is). The folder's run lock is already held, so teach_snap.py takes none of its own.
+# When it fails, the labels-snapped folder may be old, so Claude's own labels are used this time.
+# LABELS is what the steps below that read labels are given (unquoted on purpose: nothing, or two
+# words).
 LABELS=""
 SNAPPED=1
-if [ -d "$FOLDER/copies" ]; then
-  say "First: moving the borders of Claude's labels onto the second downloads"
+if [ -d "$FOLDER/copies" ] || [ -d "$FOLDER/labels-snapped" ]; then
+  say "First: bringing the labels in labels-snapped up to date with the second downloads"
   if ! run_step "Snap" "$FOLDER/labels-snapped" python3 -u "$TOOLS/teach_snap.py" --folder "$FOLDER"; then
     SNAPPED=""
     say "Claude's own labels are used this time, not the snapped ones."
@@ -158,7 +162,7 @@ else
   # Exit 2 is a set-up problem (no embedder, no shelf, no vector for any line, no usable model); 0
   # also covers "no shelf yet" and "too few episodes". Neither stops the run.
   say "Step 5 of 8: training the model that reads what a line means"
-  run_step "Meaning" "$FOLDER/ad-meaning.json" "$TEACH_TOOL" meaning "$FOLDER" $LABELS \
+  run_step "Meaning" "$FOLDER/ad-meaning.json" $CAFFEINATE "$TEACH_TOOL" meaning "$FOLDER" $LABELS \
     || say "No new meaning model this time (see above). One already at the phone's folders stays as it is."
   say
   say "Step 6 of 8: scoring the ad skipping"

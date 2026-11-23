@@ -13,7 +13,7 @@ wrong seconds are cutSeconds, as in teach_settings_rows.py). The row must
 - add them with a precision of at least the bar (85 percent): the right seconds it added divided
   by the right and the wrong seconds it added;
 - come from a scorecard that is not older than the model (a model trained after the last score
-  has not been scored).
+  has not been scored); a model or a scorecard run with no time in it waits too.
 
 With no scorecard, no such row or no numbers per sort the model is not published: the phone never
 runs a meaning model nobody has measured.
@@ -23,7 +23,7 @@ import json
 import math
 import os
 
-from teach_settings_rows import SCORECARD, read_scorecard, rows_in
+from teach_settings_rows import SCORECARD, read_row, read_scorecard
 from teach_store import Problem
 
 MEANING_ROW = "Plus the meaning model"
@@ -73,38 +73,53 @@ def percent(value):
 
 def scorecard_reason(folder, meaning, minimum):
     """A sentence saying why the scorecard in `folder` does not show that the meaning model (the
-    bytes `meaning`) helps, or None when it does."""
+    bytes `meaning`) helps, or None when it does. The rows are read as they stand in the file: the
+    row before the meaning row is the one just above it there, and when that one (or the meaning
+    row itself) cannot be read the model waits, so a damaged row's gain is never counted as the
+    model's. When the file has a row of that name twice, the first counts, as in teach_settings.py.
+    A model and a scorecard without a time cannot be matched, so they wait too."""
     try:
         root = read_scorecard(os.path.join(folder, SCORECARD))
     except Problem as error:
         return "the scorecard could not be used (%s)" % str(error).replace(" Nothing was written.", "")
     if root is None:
         return "there is no scorecard yet, so nobody has measured it (run \"Score the ad skipping\")"
-    rows = rows_in(root)
-    names = [row.name for row in rows]
-    if MEANING_ROW not in names:
+    runs = root["runs"]
+    newest = runs[-1] if runs else None
+    items = newest.get("rows") if isinstance(newest, dict) else None
+    items = items if isinstance(items, list) else []
+    where = [i for i, item in enumerate(items) if isinstance(item, dict) and item.get("name") == MEANING_ROW]
+    if not where:
         return "the newest run of the scorecard has no row \"%s\" (run \"Score the ad skipping\")" \
             % MEANING_ROW
-    index = names.index(MEANING_ROW)
+    index = where[0]
     if index == 0:
         return "the scorecard has no row before \"%s\" to compare it with" % MEANING_ROW
-    at = root["runs"][-1].get("at")
-    trained = written_at(meaning)
-    if finite(at) and trained is not None and at < trained:
+    row, before = read_row(items[index]), read_row(items[index - 1])
+    if row is None:
+        return "the row \"%s\" in the scorecard cannot be read, so it says nothing about the model" \
+            % MEANING_ROW
+    if before is None:
+        return "the row before \"%s\" in the scorecard cannot be read, so what the model added " \
+            "cannot be told" % MEANING_ROW
+    at, trained = newest.get("at"), written_at(meaning)
+    if not finite(at):
+        return "the scorecard has no time in it, so it cannot be told whether it scored this model " \
+            "(run \"Score the ad skipping\")"
+    if trained is None:
+        return "the meaning model has no time in it, so it cannot be told whether the scorecard " \
+            "scored it (run \"Score the ad skipping\")"
+    if at < trained:
         return "the scorecard is older than the meaning model, so it was not scored (run " \
             "\"Score the ad skipping\")"
-    right = rows[index].total.right - rows[index - 1].total.right
-    wrong = max(0.0, rows[index].total.wrong - rows[index - 1].total.wrong)
+    right = row.total.right - before.total.right
+    wrong = max(0.0, row.total.wrong - before.total.wrong)
     if right <= EPSILON:
         return "it added no right seconds to the row before it in the scorecard"
     if right / (right + wrong) < minimum - 1e-9:
         return "what it added in the scorecard was right with a precision of %s, and %s is needed" \
             % (percent(right / (right + wrong)), percent(minimum))
-    raw = {}
-    for item in root["runs"][-1].get("rows", []):
-        if isinstance(item, dict):
-            raw.setdefault(item.get("name"), item)  # the first row of a name, as the chooser takes it
-    gain = sort_gain(raw.get(names[index]), raw.get(names[index - 1]))
+    gain = sort_gain(items[index], items[index - 1])
     if gain is None:
         return "the scorecard has no numbers per sort, so it cannot say whether the model finds " \
             "%s" % " or ".join(SORTS)
