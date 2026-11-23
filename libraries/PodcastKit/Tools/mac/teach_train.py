@@ -20,6 +20,8 @@ phone and lives in teach_features.py.
   training, and the tool says how many.
 - Training is softmax regression on the hashed features with AdaGrad (rate 0.5), L2 of 1e-6 on the
   weights an example touches, and each example's loss weighted by min(5, none count / class count).
+  The bias bucket is fixed at plain talk (teach_model.BIAS_NONE) and never trained: the many words of
+  plain talk used to carry its weight, which left a bias that said "ad" and a model the phone refuses.
   It is deterministic for a given --seed.
 - After training the shelf is scored and the numbers are printed and saved in the model under
   trained.heldOut: "episodes", "shows", "predictedAdSeconds" (what teach_publish.py needs before it
@@ -42,7 +44,8 @@ from array import array
 
 import teach_segments as seg
 import teach_store
-from teach_model import MAX_BUCKETS, MAX_BYTES, THRESHOLDS, build_model, ranked_buckets, write_text  # noqa: F401
+from teach_model import (BIAS_BUCKET, BIAS_NONE, MAX_BUCKETS, MAX_BYTES, THRESHOLDS,  # noqa: F401
+                         build_model, ranked_buckets, write_text)
 from teach_overlap import same_episode_ids
 from teach_shelf import SHELF_FILE, check_lines, choose_shelf, evaluate, read_shelf
 from teach_features import BUCKETS, CLASSES, episode_buckets, probabilities  # noqa: F401
@@ -142,6 +145,8 @@ def train(examples, epochs, seed, say=print):
     cost = class_weights(counts)
     w = new_weights()
     g2 = new_weights()
+    bias_k = BIAS_BUCKET * 5
+    w[bias_k] = BIAS_NONE
     rng = random.Random(seed)
     order = list(range(len(examples)))
     exp, log, sqrt = math.exp, math.log, math.sqrt
@@ -167,6 +172,8 @@ def train(examples, epochs, seed, say=print):
             slope = [weight * v / norm for v in e]
             slope[cls] -= weight
             for b in active:
+                if b == BIAS_BUCKET:
+                    continue
                 k = b * 5
                 for c in range(5):
                     g = slope[c] + L2 * w[k + c]

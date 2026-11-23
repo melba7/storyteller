@@ -162,3 +162,8 @@ One line per lesson.
   full builder fleet used the window and the marking stopped at once with 0
   episodes marked. Builders must also commit early, because a limit cut-off
   loses what is not committed (2026-11-23).
+- A model file the phone refuses is silent: the scorecard just left the model
+  out and every row looked weak. After a run, read the publish step's lines and
+  check the scorecard has a "Plus the trained model" row before judging any
+  finder. The trainer must also fix the bias at plain talk, or the many
+  plain-word weights carry it and the bias ends up saying "ad" (2026-11-23).

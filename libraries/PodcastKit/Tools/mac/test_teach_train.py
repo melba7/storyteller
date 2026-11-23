@@ -13,6 +13,7 @@ import unittest
 import teach_collect as collect
 import teach_features as ft
 import teach_train as train
+from teach_phone_rule import refusals
 
 ADS = ["This episode is brought to you by {b}.", "Use promo code {b} at {b} dot com slash show.",
        "Go to {b} dot com slash {b} for twenty percent off."]
@@ -252,6 +253,25 @@ class TrainingTests(unittest.TestCase):
             self.assertLess(train.probabilities(weights, lines, i, 400)[0], 0.5, i)
         self.assertEqual(len([s for s in said if s.startswith("Pass ")]), 5)
 
+    def test_a_line_with_no_known_words_is_plain_talk_even_when_most_lines_are_ads(self):
+        # Real runs found the bias leaning to "ad" (0% plain) because the many words of plain
+        # talk carried the plain weight; the phone refuses such a model, so the bias is fixed.
+        folder = Folder(self)
+        for n in range(8):
+            folder.add("feedA", 100 + n, brand="Sleepy", ads=(1, 30))
+        code, _ = run(folder, "--min-episodes", "3")
+        self.assertEqual(code, 0)
+        model = folder.read("ad-model.json")
+        self.assertEqual(refusals(model), [])
+        self.assertEqual(model["weights"][str(ft.bucket("#bias"))],
+                         [train.BIAS_NONE, 0.0, 0.0, 0.0, 0.0])
+
+    def test_training_never_moves_the_bias(self):
+        flat = train.train([(1, [ft.bucket("#bias"), 7, 8]), (0, [ft.bucket("#bias"), 9])], 3, 1,
+                           say=lambda _: None)
+        k = ft.bucket("#bias") * 5
+        self.assertEqual(list(flat[k:k + 5]), [train.BIAS_NONE, 0.0, 0.0, 0.0, 0.0])
+
     def test_the_same_seed_gives_the_same_file(self):
         folder = toy_folder(self)
         run(folder, "--min-episodes", "3", "--seed", "7")
@@ -303,6 +323,13 @@ class ModelFileTests(unittest.TestCase):
         values = {b: [0, b / 10.0, 0, 0, 0] for b in range(1, 11)}
         model, _ = self.build(values, max_buckets=3)
         self.assertEqual(sorted(model["weights"], key=int), ["8", "9", "10"])
+
+    def test_the_bias_bucket_is_kept_even_when_its_weights_are_small(self):
+        bias = ft.bucket("#bias")
+        values = {b: [0, b / 10.0, 0, 0, 0] for b in range(1, 11)}
+        values[bias] = [0.5, 0, 0, 0, 0]
+        model, _ = self.build(values, max_buckets=3)
+        self.assertEqual(sorted(model["weights"], key=int), ["9", "10", str(bias)])
 
     def test_the_size_cap_writes_fewer_buckets(self):
         values = {b: [0, b / 10.0, 0.1, 0.1, 0.1] for b in range(1, 201)}

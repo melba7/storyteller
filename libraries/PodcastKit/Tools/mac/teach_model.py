@@ -7,16 +7,22 @@ import json
 import os
 import tempfile
 
-from teach_features import BUCKETS, CLASSES
+from teach_features import BUCKETS, CLASSES, bucket
 from teach_spans import THRESHOLDS  # the cut-offs the file carries are the ones the check uses
 
 MAX_BUCKETS = 40000
 MAX_BYTES = 4500000
+# The bias bucket (every line has it) holds [BIAS_NONE, 0, 0, 0, 0] and training never moves it: a
+# line with no known words is plain talk, and the phone refuses a model whose bias alone says
+# otherwise. A word that hashes to the same bucket cannot be learned.
+BIAS_BUCKET = bucket("#bias")
+BIAS_NONE = 5.0
 
 
 def ranked_buckets(flat, limit):
     """[(bucket, five rounded weights)] with the biggest weights first, at most `limit`, leaving
-    out buckets whose rounded weights are all zero."""
+    out buckets whose rounded weights are all zero. The bias bucket always comes first, so it is
+    always kept."""
     found = []
     for b in range(BUCKETS):
         k = b * 5
@@ -25,6 +31,7 @@ def ranked_buckets(flat, limit):
             if any(five):
                 found.append((b, five))
     found.sort(key=lambda item: (-max(abs(v) for v in item[1]), item[0]))
+    found.sort(key=lambda item: item[0] != BIAS_BUCKET)
     return found[:limit]
 
 
