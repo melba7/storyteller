@@ -27,7 +27,8 @@ public enum StreamTimeline {
   }
 
   /// The moments of one episode: the head steps, then the whole-file pass's pieces from 0.
-  /// `withModel` adds the model's own time and moments.
+  /// `withModel` adds the model's own time and moments. In a head step the model reads the whole
+  /// head so far; in the pass it reads each new piece.
   public static func events(
     duration: Double, plan: HeadPlan, pace: StreamPace, withModel: Bool
   ) -> [StreamEvent] {
@@ -42,7 +43,7 @@ public enum StreamTimeline {
       free = done
       let original = plan.steps.indices.contains(index) ? plan.steps[index] : reach
       if withModel, plan.modelSteps.contains(original) {
-        free = done + pace.modelSeconds(forAudio: reach - previousReach)
+        free = done + pace.modelSeconds(forAudio: reach)
         out.append(StreamEvent(at: free, reach: reach, headStep: reach, modelAnswers: true))
       }
       previousReach = reach

@@ -335,21 +335,32 @@ step. A real `AdSkipper` decides every jump, and the jumps are scored by the sam
 bar as found ads. The speeds are assumptions, not measurements, and the block
 prints them: a standard pace (1 s to the first byte, 40 s of audio downloaded and
 12 s transcribed per second, 0.5 s per step, a jump costs 1 s, the model 2 s per
-minute of new audio and at least 2 s) and a slow one (4 s of audio downloaded and
-5 s transcribed per second). Without `--stream` nothing changes.
+minute of the head read so far and at least 2 s) and a slow one (4 s of audio
+downloaded and 5 s transcribed per second). The head scan waits for Apple's model
+at the steps that ask it in every row, as on a phone with Apple Intelligence on
+(an assumption, printed with the paces), although the model's answers count only
+in the Apple row. "Ready" in the block means the same player with everything
+known before the listener taps play, so it chains ads the way the player does
+and is not the row's own bar, which stays in the bar block. After the paces the
+block prints the first 3 minutes at two more speech speeds, 6 and 25 times real
+time, because the phone's real speed is not measured yet and the first 3 minutes
+depend on it. Without `--stream` nothing changes.
 
 Apple's on-device model only runs on a Mac or a phone. `podcast-teach apple
 <folder> [--exam] [--limit N]` asks it about the episodes a plain `score` run
 scores and keeps the answers (times, kinds and how sure, never any text) in
 `apple-model.json`, one episode at a time, so a run that is stopped carries on
-where it was. The scorecard then gets one more row after all the others,
+where it was. A damaged or newer `apple-model.json` stops `podcast-teach apple`
+(it never overwrites the file), but the scorecard leaves the Apple row out, prints
+one note that the file could not be read and carries on; `podcast-teach apple` can
+make it again once the file is moved away. The scorecard then gets one more row after all the others,
 "Plus Apple's model (asked on the Mac)": the last row's ads joined with the
 answers, the row before it for an episode with no answer. `teach_settings.py` and
 `teach_publish_gates.py` find rows by name and never take the last one, so the
 new row changes nothing they decide, and the run's saved total stays the
 finders' last row. In the stream replay the model's answers count in a snapshot
 only where the ad ends within the snapshot's reach, at the head's model steps,
-and cost the model's time. Double-click
+and cost the model's time (the wait itself is in the head scan of every row). Double-click
 `Ask Apple's model about the test episodes.command` to ask; it costs nothing, uses
 no Claude allowance and may take a few hours.
 

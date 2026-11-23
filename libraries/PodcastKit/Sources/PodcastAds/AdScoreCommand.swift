@@ -140,11 +140,13 @@ public enum AdScoreCommand {
     let audio = TeachingAudio.files(in: folder)
     let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
     let finalAds = ScoreEpisodeAds()
-    let appleSaved: AppleAnswers?
+    // A damaged or newer file leaves the Apple row out; `podcast-teach apple` never overwrites it.
+    var appleSaved: AppleAnswers?
+    var appleNote: String?
     switch AppleAnswers.load(in: folder) {
-    case .failure(let problem):
-      err(problem.message)
-      return 2
+    case .failure:
+      appleNote =
+        "Apple's model row is left out: \(AppleAnswers.fileName) in \(folder.path) could not be read (it is damaged or of another version). After the file is moved away, `podcast-teach apple` can make it again."
     case .success(let loaded): appleSaved = loaded
     }
     let apple = AppleScoreRow.answers(appleSaved, episodes: chosen)
@@ -182,6 +184,7 @@ public enum AdScoreCommand {
       text += "\n\n" + AppleScoreRow.lines(row, answered: apple.count, of: chosen.count).joined(separator: "\n")
       saved.append(row)
     }
+    if let appleNote { text += "\n\n" + appleNote }
     if options.stream {
       let detect: (TeachingEpisode, Transcript) -> [FoundAd] = { episode, transcript in
         let input = AdScoreInput(episode: episode, transcript: transcript, audio: audio[episode.id])
@@ -192,11 +195,11 @@ public enum AdScoreCommand {
       let streamed = StreamScore.run(
         episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple,
         whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
-      var shown = [(name: String, ready: BarTotals?, stream: StreamNumbers)]()
-      shown.append((rows.last?.name ?? "", rows.last?.bar, streamed.finders))
+      var shown = [(name: String, stream: StreamNumbers)]()
+      shown.append((rows.last?.name ?? "", streamed.finders))
       saved[rows.count - 1].stream = streamed.finders
       if let more = streamed.withModel, let row = saved.last, saved.count == rows.count + 1 {
-        shown.append((row.name, row.bar, more))
+        shown.append((row.name, more))
         saved[rows.count].stream = more
       }
       text += "\n\n" + StreamReport.lines(shown).joined(separator: "\n")

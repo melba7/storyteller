@@ -449,14 +449,22 @@ when the copy to the phone worked.
 that replays every episode as a stream played from the start: the phone's head
 scan and whole-file pass at an assumed standard pace and a slow one (the report
 prints the speeds, which are guesses), the player's own skip rules, and the same
-bar as above. It shows what streaming costs against a ready episode.
+bar as above. "Ready" there means the same player with everything known before
+play, so it shows what streaming costs. The head scan waits for Apple's model in
+every row (a phone with Apple Intelligence on is assumed), and the first 3
+minutes are also shown at speech speeds of 6 and 25 times real time, since the
+phone's real speed is not measured yet.
 
 `Ask Apple's model about the test episodes.command` builds `podcast-teach` and
 runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
 Apple's on-device model about each scored episode that has no answer yet and
 saves each answer at once in `apple-model.json`, so it may be closed and
 double-clicked again to carry on. It costs nothing and uses no Claude allowance,
-but may take a few hours. Needs macOS 26 with Apple Intelligence on. The next
+but may take a few hours. Needs macOS 26 with Apple Intelligence on. When it
+stops with exit 2 the window says to read what the tool printed above (no model, a
+model still downloading, a damaged or foreign `apple-model.json`, or a folder
+problem), and when every episode already had an answer it says so. A damaged
+`apple-model.json` only leaves the row out of the scorecard, with a note. The next
 scorecard then ends with the row "Plus Apple's model (asked on the Mac)" and
 streams it too. The settings and publish steps read rows by name, so the extra
 row changes nothing they decide.

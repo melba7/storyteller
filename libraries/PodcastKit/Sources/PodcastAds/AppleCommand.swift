@@ -89,6 +89,10 @@ public enum AppleCommand {
       )
       return 2
     }
+    if chosen.allSatisfy({ answers.episodes[$0.id] != nil }) {
+      out("Every episode already had an answer from \(model). Nothing was asked.")
+      return 0
+    }
     let failed = await ask(
       chosen, into: &answers, detector: detector, osVersion: osVersion, limit: options.limit,
       save: { try $0.save(in: folder) }, out: out, err: err)

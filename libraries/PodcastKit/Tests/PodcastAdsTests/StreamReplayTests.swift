@@ -39,6 +39,13 @@ final class StreamReplayTests: XCTestCase {
     AdBar.score(episode: episode, found: StreamReplay.asAds(jumps), settings: settings)
   }
 
+  /// The standard pace with no wait for the model, as on a phone without Apple Intelligence.
+  private var noModelWait: StreamPace {
+    var pace = StreamPace.standard
+    pace.waitsForModel = false
+    return pace
+  }
+
   // MARK: Pace and times
 
   func testThePacesHaveTheDocumentedNumbers() {
@@ -94,6 +101,57 @@ final class StreamReplayTests: XCTestCase {
     XCTAssertFalse(plain.contains { $0.modelAnswers })
   }
 
+  func testTheModelsTimeInAHeadStepIsCountedOnTheWholeHeadSoFar() {
+    let plan = HeadPlan(habits: ShowHabits(), show: "f")
+    let events = StreamTimeline.events(duration: 600, plan: plan, pace: .standard, withModel: true)
+    let step = events.first { $0.reach == 180 && $0.headStep != nil && !$0.modelAnswers }!
+    let model = events.first { $0.reach == 180 && $0.headStep != nil && $0.modelAnswers }!
+    XCTAssertEqual(model.at - step.at, 6, accuracy: 1e-9)  // 2 s per minute of the 3 minutes
+  }
+
+  func testTheModelsWaitIsPartOfTheHeadScanEvenWithNoAnswersUnlessThePaceSaysNot() {
+    let plan = HeadPlan(habits: ShowHabits(), show: "f")
+    let waiting = StreamScore.timeline(duration: 600, plan: plan, pace: .standard, model: nil)
+    XCTAssertEqual(waiting.filter { $0.modelAnswers && $0.headStep != nil }.map(\.reach), [30, 60, 120, 180])
+    var without = StreamPace.standard
+    without.waitsForModel = false
+    let plain = StreamScore.timeline(duration: 600, plan: plan, pace: without, model: nil)
+    XCTAssertFalse(plain.contains { $0.modelAnswers })
+    XCTAssertGreaterThan(waiting.last!.at, plain.last!.at)
+    // An answer from the model always means its wait is counted.
+    XCTAssertTrue(StreamScore.timeline(duration: 600, plan: plan, pace: without, model: []).contains { $0.modelAnswers })
+  }
+
+  func testAnInstantPaceKnowsEverythingBeforePlayAndChainsAdsTheWayThePlayerDoes() {
+    let sample = episode(600, truth: [(100, 130), (130.3, 160)])
+    let local: (Double) -> [FoundAd] = { _ in [self.ad(100, 130), self.ad(130.3, 160)] }
+    let found = jumps(sample, pace: .instant, local: local)
+    XCTAssertEqual(found.count, 1)  // less than half a second apart: one jump
+    XCTAssertEqual(found[0].from, 100, accuracy: 0.01)
+    XCTAssertEqual(found[0].to, 160, accuracy: 0.01)
+  }
+
+  func testTheReadyNumbersAreTheSamePlayerWithEverythingKnownAtTheStart() {
+    let sample = episode(600, truth: [(0, 60)])
+    let result = StreamScore.run(
+      episodes: [sample], habits: ShowHabits(), settings: settings, models: nil,
+      whole: { _ in [self.ad(0, 60)] },
+      detect: { _, transcript in transcript.duration >= 60 ? [self.ad(0, 60)] : [] })
+    XCTAssertEqual(result.finders.ready?.breaks, 1)
+    XCTAssertEqual(result.finders.ready?.passed, 1)
+    XCTAssertEqual(result.finders.ready?.earlyPassed, 1)
+  }
+
+  func testTheSpeechSpeedsOfTheSensitivityAreKeptBesideTheStandardNumbers() {
+    let sample = episode(600, truth: [(0, 60)])
+    let result = StreamScore.run(
+      episodes: [sample], habits: ShowHabits(), settings: settings, models: nil,
+      whole: { _ in [self.ad(0, 60)] },
+      detect: { _, transcript in transcript.duration >= 60 ? [self.ad(0, 60)] : [] })
+    XCTAssertEqual(result.finders.speeds?.map(\.speech), [6, 25])
+    XCTAssertEqual(result.finders.speeds?.map(\.bar.breaks), [1, 1])
+  }
+
   func testAShowThatIsNotWaitedForStartsAtTheFirstByte() {
     var habits = ShowHabits()
     habits.shows = [
@@ -114,7 +172,7 @@ final class StreamReplayTests: XCTestCase {
 
   func testASixtySecondAdTheFinderSeesAfter30SecondsIsHeardABitAndThenLeft() {
     let sample = episode(600, truth: [(0, 60)])
-    let found = jumps(sample, local: finder(start: 0, end: 60, seen: 30))
+    let found = jumps(sample, pace: noModelWait, local: finder(start: 0, end: 60, seen: 30))
     XCTAssertEqual(found.count, 2)
     XCTAssertEqual(found[0].from, 1.875, accuracy: 0.01)  // heard from 3 s of the clock to the 30 s step
     XCTAssertEqual(found[0].to, 30, accuracy: 0.01)
@@ -122,6 +180,14 @@ final class StreamReplayTests: XCTestCase {
     let result = bar(sample, found)
     XCTAssertEqual(result.breaks, 1)
     XCTAssertEqual(result.passed, 1)
+  }
+
+  func testTheModelsWaitInTheHeadScanLeavesMoreOfThatAdHeardAndItFails() {
+    let sample = episode(600, truth: [(0, 60)])
+    let found = jumps(sample, local: finder(start: 0, end: 60, seen: 30))
+    XCTAssertEqual(found.count, 2)
+    XCTAssertEqual(found[1].from, 34, accuracy: 0.01)  // the 60 s step waited for the model at 30 s
+    XCTAssertEqual(bar(sample, found).passed, 0)
   }
 
   func testAnAdAt20MinutesIsSkippedWhole() {

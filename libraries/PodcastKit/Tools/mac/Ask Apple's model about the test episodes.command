@@ -13,7 +13,8 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 
 finish() {
   echo
-  read -r -p "$1 Press Return to close this window. " _
+  echo "$1"
+  read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 
@@ -47,10 +48,19 @@ TOOL="$(swift build -c release --show-bin-path)/podcast-teach"
 echo
 CAFFEINATE=""
 command -v caffeinate > /dev/null && CAFFEINATE="caffeinate -i"
-$CAFFEINATE "$TOOL" apple "$FOLDER" 2>&1 | tee -a "$LOG"
+SAID="$(mktemp "${TMPDIR:-/tmp}/apple-said.XXXXXX")" || SAID="/dev/null"
+$CAFFEINATE "$TOOL" apple "$FOLDER" 2>&1 | tee -a "$LOG" "$SAID"
 CODE="${PIPESTATUS[0]}"
+ALREADY=""
+grep -q "already had an answer" "$SAID" 2> /dev/null && ALREADY="yes"
+[ "$SAID" != "/dev/null" ] && rm -f "$SAID"
 case "$CODE" in
-  0) finish "Done. The answers are in $FOLDER/apple-model.json. Double-click \"Score the ad skipping\" to see them." ;;
-  2) finish "Apple's model could not be asked (see above). It needs macOS 26 with Apple Intelligence on." 2 ;;
+  0)
+    if [ -n "$ALREADY" ]; then
+      finish "Every episode already had an answer, so nothing was asked. The answers are in $FOLDER/apple-model.json."
+    else
+      finish "Done. The answers are in $FOLDER/apple-model.json. Double-click \"Score the ad skipping\" to see them."
+    fi ;;
+  2) finish "Apple's model was not asked. The reason is in what the tool printed above. It may be that this Mac needs macOS 26 with Apple Intelligence on, that the model is still downloading, that apple-model.json is damaged or from another model (move it away to start again), or that the teaching folder has a problem." 2 ;;
   *) finish "Some episodes could not be asked (see above). Double-click this again to try those once more." 1 ;;
 esac

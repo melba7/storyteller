@@ -210,6 +210,41 @@ FINISH_ORDER = ["python3 teach_habits.py", "python3 teach_train.py", "python3 te
                 "python3 teach_publish.py"]
 
 
+class AppleLauncherTests(Setup):
+    NAME = "Ask Apple's model about the test episodes.command"
+
+    def tool(self, code, line):
+        self.program("podcast-teach", '#!/bin/bash\necho "podcast-teach $*" >> "$CALLS"\necho "%s"\nexit %d\n'
+                     % (line, code))
+
+    def run_launcher(self):
+        os.makedirs(os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching"))
+        return self.run_script(self.NAME)
+
+    def test_a_run_that_asked_something_says_done(self):
+        self.tool(0, "e1: 2 ads, 3.0 s")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("Done. The answers are in", done.stdout)
+        self.assertNotIn("already had an answer, so", done.stdout)
+
+    def test_a_run_with_nothing_due_says_every_episode_had_an_answer(self):
+        self.tool(0, "Every episode already had an answer from m 1. Nothing was asked.")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("Every episode already had an answer, so nothing was asked", done.stdout)
+        self.assertNotIn("Done. The answers are in", done.stdout)
+
+    def test_exit_2_points_at_what_the_tool_printed_and_names_the_causes(self):
+        self.tool(2, "apple-model.json is damaged")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 2, done.stdout)
+        self.assertIn("apple-model.json is damaged", done.stdout)
+        for words in ("what the tool printed above", "macOS 26", "still downloading", "damaged or from another model",
+                      "teaching folder"):
+            self.assertIn(words, done.stdout)
+
+
 class FinishTests(Setup):
     def test_the_steps_run_in_order_and_everything_worked(self):
         done = self.run_script("teach-finish.sh")
