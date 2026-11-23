@@ -1323,8 +1323,8 @@ where there is no ad.
       built, measured and removed: it fixed 6 breaks and broke 6.
   - Done when: the row "Plus the library" passes more breaks than the row before
     it and adds no skip with no ad.
-  - Result: 121 of 219 against 115 in the row before, both with 15 skips with
-    no ad.
+  - Result: 121 of 219 against 115 in the row before, both with 15 skips with no
+    ad.
 - [x] **V5 Joints pull a late start back** (fix 3): in steady files too, a skip
       starts at the nearest joint up to 60 seconds before it, but only when a
       word finder gave that start (`JointPull`), never inside a stretch the
@@ -1335,8 +1335,8 @@ where there is no ad.
     model 125 against 121, and 13 skips with no ad against 15. Mo approved 3
     seconds for a joint in the round before, so the 60 seconds wait for his OK.
 - [x] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
-      go down the phone's own path for a playing stream, Apple's model
-      included, and are scored by the bar counting only skips known in time.
+      go down the phone's own path for a playing stream, Apple's model included,
+      and are scored by the bar counting only skips known in time.
   - Result: `score --stream`. At the assumed standard pace 100 of 219 breaks
     pass (21 of 58 in the first 3 minutes); an episode that is ready before it
     is played passes 124 (45 of 58). The phone's real pace is not measured yet,
@@ -1368,8 +1368,8 @@ where there is no ad.
   time; the scorecard works the word list out three times an episode;
   `teach_train.py` and `teach_settings.py` are over 300 lines; nothing on the
   Mac knows the phone's app version before it writes a version 2 model; there
-  are no unit tests for the phone's own `NewAds.snap`, `isFixed` and
-  `trimReach` (macOS CI only compiles them).
+  are no unit tests for the phone's own `NewAds.snap`, `isFixed` and `trimReach`
+  (macOS CI only compiles them).
 - Podcasts ads (round of 2026-11-23): a rule that promotes a repeat to skip
   after enough confirmed answers on a show (today a repeat never skips); new
   finders for episodes that finished before the update; a habit counted twice

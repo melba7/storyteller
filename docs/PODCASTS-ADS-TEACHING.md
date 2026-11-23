@@ -82,12 +82,12 @@ with no help from the Mac. Every new finder returns ads that are `unsure` at
 most, and a finder alone never makes a skip that Undo cannot take back. The
 Mac's files only make each finder better or stricter.
 
-| Finder (the `source` of its ads)    | What it does                                                                                                                              |
-| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `own-sound` (`OwnAdSounds`)         | Keeps the sound print of every sure ad the phone skipped (`own-ad-sounds.json`) and finds it again                                        |
-| `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                   |
-| `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                |
-| `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                               |
+| Finder (the `source` of its ads)    | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `own-sound` (`OwnAdSounds`)         | Keeps the sound print of every sure ad the phone skipped (`own-ad-sounds.json`) and finds it again                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                                                                                                                                                                                                                                                                                                                                                                            |
+| `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                                                                                                                                                                                                                                                                                                                                                                                        |
 | joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later. Whenever `steadyJoints` is on (in steady files and in the others), the late start of an ad whose start a word finder gave (`JointPull`: the repeated words, the meaning model, the word model, the word rules) with no joint near it is pulled back to the latest joint up to 60 s before it, never into an earlier ad or a stretch the listener judged |
 
 For each new finder the phone does, in this order: find, keep only the parts
@@ -154,8 +154,8 @@ the phone has linked.
 | `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
 | `teaching.json`      | `teach_publish.py`      | the six files' sizes and SHA-256, read first         |
 
-All are JSON objects with `"version": 1` (the word model may be 2) and stay under 4.5 MB (the phone
-refuses a file over 5 MB).
+All are JSON objects with `"version": 1` (the word model may be 2) and stay
+under 4.5 MB (the phone refuses a file over 5 MB).
 
 - `ad-model.json`:
   `{"version", "buckets": 262144, "classes": ["none", "sponsor", "network_promo", "host_ask", "intro_credits"], "thresholds": {...}, "weights": {"<bucket>": [5 numbers]}, "trained": {"writtenAt", "episodes", "lines", "shelf", "heldOut": {"episodes", "lines", "anyAd": {"precision", "recall"}, "classes": {...}}}}`.
@@ -165,30 +165,30 @@ refuses a file over 5 MB).
   from 3 shows and 600 predicted ad seconds, the spans the phone would cut are
   right for at least 0.85 of their seconds, and the phone would accept the file.
   `teach_spans.py` decodes spans exactly as `AdWordModel+Spans.swift` does;
-  change neither without the other.
-  A model is version 1 (262144 buckets) or version 2 (4194304 buckets). Version 2
-  adds the word pairs of the two lines before and after as features, and decodes
-  with `AdWordModel+SpansTwo.swift` (and `decode_two` in `teach_spans.py`): the ad
-  score leaves credits out, credits get a second pass that never includes a line
-  inside an ad, and an ad's start widens back over lines whose own score is at
-  least `stay`. A widened line whose smoothed score is under `stay` takes the kind
-  of the line before it, as bridged lines do. `teach_train.py` writes version 2
-  only with `--fit-tool` (the built `podcast-teach`, which fits the weights);
-  without it the trainer writes a version 1 file as before.
-  **Warning:** an app older than the build that reads version 2 refuses a version
-  2 file and keeps the model it has, so update the phone's app before using the
-  Mac's version 2 trainer. Without the fit tool the trainer still writes a
-  version 1 file.
+  change neither without the other. A model is version 1 (262144 buckets) or
+  version 2 (4194304 buckets). Version 2 adds the word pairs of the two lines
+  before and after as features, and decodes with `AdWordModel+SpansTwo.swift`
+  (and `decode_two` in `teach_spans.py`): the ad score leaves credits out,
+  credits get a second pass that never includes a line inside an ad, and an ad's
+  start widens back over lines whose own score is at least `stay`. A widened
+  line whose smoothed score is under `stay` takes the kind of the line before
+  it, as bridged lines do. `teach_train.py` writes version 2 only with
+  `--fit-tool` (the built `podcast-teach`, which fits the weights); without it
+  the trainer writes a version 1 file as before. **Warning:** an app older than
+  the build that reads version 2 refuses a version 2 file and keeps the model it
+  has, so update the phone's app before using the Mac's version 2 trainer.
+  Without the fit tool the trainer still writes a version 1 file.
 - `ad-library.json`:
   `{"version", "writtenAt", "ads": [{"feed", "scope": "show" | "all", "sort", "who", "text", "length", "seen"}]}`.
   `teach_library.py` also writes `ad-library-score.json`, the same library built
   without the shelf episodes. It is not published. The scorecard reads it when
   it scores only the shelf, so an episode is never scored against its own ads.
   An entry's `text` holds up to 600 words of the ad, from segments marked "high"
-  (not the stretches the snap added as copies). The phone finds an entry again when three fifths of its three-word
-  runs, and at least eight different ones, lie at one distance in the
-  transcript, so a different opening does not hide it. The match runs to its
-  first and last matched word, moved out by at most five words.
+  (not the stretches the snap added as copies). The phone finds an entry again
+  when three fifths of its three-word runs, and at least eight different ones,
+  lie at one distance in the transcript, so a different opening does not hide
+  it. The match runs to its first and last matched word, moved out by at most
+  five words.
 - `show-habits.json`:
   `{"version", "writtenAt", "shows": [{"feed", "title", "episodes", "opensWithAd", "openingStarts", "openingEnds", "breaks", "adSeconds"}]}`.
 - `ad-sounds.json`:
@@ -219,11 +219,11 @@ second download.
 
 **The finish steps.** `teach-finish.sh` prints "Step N of 8": the snap (only
 when `copies/` or `labels-snapped/` exists), then habits, the word model, the
-library, the sounds, the meaning model, the joints of the audio (`podcast-teach
-joints`, kept in `joints.json` so the score needs no audio for its joint rows),
-the score, the per-show settings and the copy to the phone's folders. `podcast-teach meaning` exits 2 for a set-up
-problem (for example, no sentence embedding on this Mac), and that does not stop
-the later steps.
+library, the sounds, the meaning model, the joints of the audio
+(`podcast-teach joints`, kept in `joints.json` so the score needs no audio for
+its joint rows), the score, the per-show settings and the copy to the phone's
+folders. `podcast-teach meaning` exits 2 for a set-up problem (for example, no
+sentence embedding on this Mac), and that does not stop the later steps.
 
 ## From the phone back to the Mac
 
@@ -330,49 +330,50 @@ episodes, which the model never saw in training. Each run is added to
 The scorecard lists the layers in the order the phone adds them, and each row is
 the row before plus one more layer: the existing layers, then "Plus the meaning
 model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
-words", "Plus joints", "Plus joints (steady files too)" and, last of the finders, "Plus
-per-show settings" (with the built-in settings when there is no file yet). The
-row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
-what is turned on or off. Steady joints (which switch on the pull-back of a late
-start, in steady files and in the others) are on when the steady row passes at
-least 3 more breaks than the row before it and adds at most 1 skip with no ad.
-The pull is for a start that a word finder gave: an ad with the name of the
-repeated words, the meaning model or the word model, or an ad with no name whose
-kind and start equal those of an ad the word rules and the word model gave for
-the whole transcript (`LocalAds`, before any join). The scorecard hands that
-list to the joint rows, and the phone finds it again before it snaps. The
-learning rows (own sounds, repeats) first learn
-from the marked episodes that are not scored, then scan the scored ones, so each
-episode is judged only on what the earlier episodes of its show taught. The
-scorecard also prints how many questions the word model would ask (not the
-repeat finders' or the meaning model's), a note on habits and what was left out.
-The meaning model is published only when its row adds right seconds for host_ask
-and network_promo and at least 85% of the added seconds are right, and the
-scorecard is not older than the model.
+words", "Plus joints", "Plus joints (steady files too)" and, last of the
+finders, "Plus per-show settings" (with the built-in settings when there is no
+file yet). The row names must equal `ROWS` in `teach_settings.py`, which reads
+them to decide what is turned on or off. Steady joints (which switch on the
+pull-back of a late start, in steady files and in the others) are on when the
+steady row passes at least 3 more breaks than the row before it and adds at most
+1 skip with no ad. The pull is for a start that a word finder gave: an ad with
+the name of the repeated words, the meaning model or the word model, or an ad
+with no name whose kind and start equal those of an ad the word rules and the
+word model gave for the whole transcript (`LocalAds`, before any join). The
+scorecard hands that list to the joint rows, and the phone finds it again before
+it snaps. The learning rows (own sounds, repeats) first learn from the marked
+episodes that are not scored, then scan the scored ones, so each episode is
+judged only on what the earlier episodes of its show taught. The scorecard also
+prints how many questions the word model would ask (not the repeat finders' or
+the meaning model's), a note on habits and what was left out. The meaning model
+is published only when its row adds right seconds for host_ask and network_promo
+and at least 85% of the added seconds are right, and the scorecard is not older
+than the model.
 
 ### The sealed exam
 
 A set of about 60 newer episodes is kept apart as an exam. Their ids are in
 `exam.json` in the teaching folder. The rule: an exam episode is invisible to
 every step that learns. Only gathering, writing down, marking, second downloads
-and the scorer, when it is asked, may use it. Every learning step leaves it out: the word
-model, the shelf, the library of ads (both files), the habits and the Swift steps
-`sounds` and `meaning`. A training episode
-that repeats an exam episode is left out of training too. The exam is gathered
-only from episodes newer than everything gathered before, so it tests the
-phone on episodes it could not have learned from. Fifteen of its episodes are
-marked a second time (`labels-second/`) to show how much two markings of the
-same episode differ, which is the ceiling for any score against Claude's marks.
-`Gather the exam episodes.command` makes it, `Gather more episodes for
-teaching.command` and `Mark the new episodes at night.command` gather and mark
-the other 500 or so episodes only at night, over several nights, within a cost
-cap (see `Tools/mac/README.md`).
+and the scorer, when it is asked, may use it. Every learning step leaves it out:
+the word model, the shelf, the library of ads (both files), the habits and the
+Swift steps `sounds` and `meaning`. A training episode that repeats an exam
+episode is left out of training too. The exam is gathered only from episodes
+newer than everything gathered before, so it tests the phone on episodes it
+could not have learned from. Fifteen of its episodes are marked a second time
+(`labels-second/`) to show how much two markings of the same episode differ,
+which is the ceiling for any score against Claude's marks.
+`Gather the exam episodes.command` makes it,
+`Gather more episodes for teaching.command` and
+`Mark the new episodes at night.command` gather and mark the other 500 or so
+episodes only at night, over several nights, within a cost cap (see
+`Tools/mac/README.md`).
 
 Marking happens only in the night window: no call to Claude starts outside it,
 also not a retry after a wait for the usage allowance, and a retry asks only for
 the parts of an episode that are still missing. The cost cap is a budget kept
-across runs in `marking-spend.json`, so double-clicking again carries on with what
-is left and never starts a fresh cap. The exam launcher says how many exam
+across runs in `marking-spend.json`, so double-clicking again carries on with
+what is left and never starts a fresh cap. The exam launcher says how many exam
 episodes have audio and a transcript, and says "Done" only when all of them are
 marked once and 15 of them twice; otherwise it says what is left.
 
@@ -384,39 +385,40 @@ never touches the phone, because on a stream the phone learns the ads while the
 episode already plays, and a whole transcript is its best case. It follows the
 phone's own scans: the head steps of the show, then the whole-file pass's pieces
 from 0, with the finders run on the first seconds of the transcript at each
-step. A real `AdSkipper` decides every jump, and the jumps are scored by the same
-bar as found ads. The speeds are assumptions, not measurements, and the block
-prints them: a standard pace (1 s to the first byte, 40 s of audio downloaded and
-12 s transcribed per second, 0.5 s per step, a jump costs 1 s, the model 2 s per
-minute of the head read so far and at least 2 s) and a slow one (4 s of audio
-downloaded and 5 s transcribed per second). The head scan waits for Apple's model
-at the steps that ask it in every row, as on a phone with Apple Intelligence on
-(an assumption, printed with the paces), although the model's answers count only
-in the Apple row. "Ready" in the block means the same player with the finished
-file known before the listener taps play (an episode that was read to its end
-first), so it chains ads the way the player does and is not the row's own bar,
-which stays in the bar block. After the paces the
-block prints the first 3 minutes at two more speech speeds, 6 and 25 times real
-time, because the phone's real speed is not measured yet and the first 3 minutes
+step. A real `AdSkipper` decides every jump, and the jumps are scored by the
+same bar as found ads. The speeds are assumptions, not measurements, and the
+block prints them: a standard pace (1 s to the first byte, 40 s of audio
+downloaded and 12 s transcribed per second, 0.5 s per step, a jump costs 1 s,
+the model 2 s per minute of the head read so far and at least 2 s) and a slow
+one (4 s of audio downloaded and 5 s transcribed per second). The head scan
+waits for Apple's model at the steps that ask it in every row, as on a phone
+with Apple Intelligence on (an assumption, printed with the paces), although the
+model's answers count only in the Apple row. "Ready" in the block means the same
+player with the finished file known before the listener taps play (an episode
+that was read to its end first), so it chains ads the way the player does and is
+not the row's own bar, which stays in the bar block. After the paces the block
+prints the first 3 minutes at two more speech speeds, 6 and 25 times real time,
+because the phone's real speed is not measured yet and the first 3 minutes
 depend on it. Without `--stream` nothing changes.
 
-Apple's on-device model only runs on a Mac or a phone. `podcast-teach apple
-<folder> [--exam] [--limit N]` asks it about the episodes a plain `score` run
-scores and keeps the answers (times, kinds and how sure, never any text) in
-`apple-model.json`, one episode at a time, so a run that is stopped carries on
-where it was. A damaged or newer `apple-model.json` stops `podcast-teach apple`
-(it never overwrites the file), but the scorecard leaves the Apple row out, prints
-one note that the file could not be read and carries on; `podcast-teach apple` can
-make it again once the file is moved away. The scorecard then gets one more row after all the others,
-"Plus Apple's model (asked on the Mac)": the last row's ads joined with the
-answers, the row before it for an episode with no answer. `teach_settings.py` and
+Apple's on-device model only runs on a Mac or a phone.
+`podcast-teach apple <folder> [--exam] [--limit N]` asks it about the episodes a
+plain `score` run scores and keeps the answers (times, kinds and how sure, never
+any text) in `apple-model.json`, one episode at a time, so a run that is stopped
+carries on where it was. A damaged or newer `apple-model.json` stops
+`podcast-teach apple` (it never overwrites the file), but the scorecard leaves
+the Apple row out, prints one note that the file could not be read and carries
+on; `podcast-teach apple` can make it again once the file is moved away. The
+scorecard then gets one more row after all the others, "Plus Apple's model
+(asked on the Mac)": the last row's ads joined with the answers, the row before
+it for an episode with no answer. `teach_settings.py` and
 `teach_publish_gates.py` find rows by name and never take the last one, so the
 new row changes nothing they decide, and the run's saved total stays the
 finders' last row. In the stream replay the model's answers count in a snapshot
 only where the ad ends within the snapshot's reach, at the head's model steps,
-and cost the model's time (the wait itself is in the head scan of every row). Double-click
-`Ask Apple's model about the test episodes.command` to ask; it costs nothing, uses
-no Claude allowance and may take a few hours.
+and cost the model's time (the wait itself is in the head scan of every row).
+Double-click `Ask Apple's model about the test episodes.command` to ask; it
+costs nothing, uses no Claude allowance and may take a few hours.
 
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
