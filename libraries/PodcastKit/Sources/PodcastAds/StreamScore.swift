@@ -15,7 +15,8 @@ public struct StreamNumbers: Codable, Sendable, Equatable {
 
   public var standard: BarTotals
   public var slow: BarTotals
-  /// The same player with everything known before play (nil in a file saved before it existed).
+  /// The same player with the finished file known before play (nil in a file saved before it
+  /// existed).
   public var ready: BarTotals?
   /// How the standard pace does at other speech speeds (nil in an older file).
   public var speeds: [Speed]?
@@ -100,13 +101,15 @@ public enum StreamScore {
   ) -> [StreamJump] {
     let plan = HeadPlan(habits: habits, show: episode.feed)
     let duration = episode.transcript.duration
-    let events = timeline(duration: duration, plan: plan, pace: pace, model: model)
-    let moments = snapshots(events: events, plan: plan, model: model, local: local)
     if pace.isInstant {
-      let known = StreamSnapshot(at: 0, ads: moments.last?.ads ?? [])
+      // A ready episode holds the finished file: the finders on the whole transcript and the
+      // model's answers. What a head step saw on a cut transcript is not in it.
+      let known = StreamSnapshot(at: 0, ads: AdJoin.join(local(duration) + (model ?? [])))
       return StreamReplay.play(
         snapshots: [known], startsAt: 0, duration: duration, settings: settings, seek: pace.seek)
     }
+    let events = timeline(duration: duration, plan: plan, pace: pace, model: model)
+    let moments = snapshots(events: events, plan: plan, model: model, local: local)
     let starts = StreamTimeline.playStart(
       habits: habits, show: episode.feed, firstLookDone: events.first?.at, pace: pace,
       settings: settings)

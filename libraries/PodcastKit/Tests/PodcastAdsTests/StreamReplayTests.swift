@@ -131,6 +131,18 @@ final class StreamReplayTests: XCTestCase {
     XCTAssertEqual(found[0].to, 160, accuracy: 0.01)
   }
 
+  func testAReadyEpisodeUsesTheFinishedFileNotWhatAHeadStepSawOnACutTranscript() {
+    // On a cut transcript the finder runs the opening ad on to 44.5 s; on the whole transcript it
+    // ends at 34.9 s. A ready episode holds the finished file, so the jump lands at 34.9 s.
+    let sample = episode(600, truth: [(0, 35)])
+    let local: (Double) -> [FoundAd] = { reach in
+      reach >= 600 - 0.01 ? [self.ad(0, 34.9)] : [self.ad(0, 44.5)]
+    }
+    let found = jumps(sample, pace: .instant, local: local)
+    XCTAssertEqual(found.count, 1)
+    XCTAssertEqual(found[0].to, 34.9, accuracy: 0.01)
+  }
+
   func testTheReadyNumbersAreTheSamePlayerWithEverythingKnownAtTheStart() {
     let sample = episode(600, truth: [(0, 60)])
     let result = StreamScore.run(

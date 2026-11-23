@@ -339,9 +339,10 @@ minute of the head read so far and at least 2 s) and a slow one (4 s of audio
 downloaded and 5 s transcribed per second). The head scan waits for Apple's model
 at the steps that ask it in every row, as on a phone with Apple Intelligence on
 (an assumption, printed with the paces), although the model's answers count only
-in the Apple row. "Ready" in the block means the same player with everything
-known before the listener taps play, so it chains ads the way the player does
-and is not the row's own bar, which stays in the bar block. After the paces the
+in the Apple row. "Ready" in the block means the same player with the finished
+file known before the listener taps play (an episode that was read to its end
+first), so it chains ads the way the player does and is not the row's own bar,
+which stays in the bar block. After the paces the
 block prints the first 3 minutes at two more speech speeds, 6 and 25 times real
 time, because the phone's real speed is not measured yet and the first 3 minutes
 depend on it. Without `--stream` nothing changes.

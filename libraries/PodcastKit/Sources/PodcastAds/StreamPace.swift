@@ -23,13 +23,13 @@ public struct StreamPace: Equatable, Sendable {
   /// Whether the head scan waits for Apple's model at the steps that ask it, as on a phone with
   /// Apple Intelligence on. The model's answers are used only in the row that has them.
   public var waitsForModel = true
-  /// Everything is known before the listener taps play: the times do not matter.
+  /// The finished file is known before the listener taps play: the times do not matter.
   public var isInstant = false
 
   /// A phone on a good connection with nothing else to do.
   public static let standard = StreamPace(name: "standard")
 
-  /// The same player with everything known at the start, to compare a stream with.
+  /// The same player with the finished file known at the start, to compare a stream with.
   public static let instant: StreamPace = {
     var pace = StreamPace(name: "instant")
     pace.isInstant = true

@@ -22,7 +22,7 @@ enum StreamReport {
       "  " + StreamPace.standard.summary,
       "  " + StreamPace.slow.summary,
       "  The head scan waits for Apple's model at the steps that ask it, in every row, as on a phone with Apple Intelligence on (an assumption); the model's answers count only in the Apple row.",
-      "  \"ready\" here means the same player with everything known at the start.",
+      "  \"ready\" here means the same player with everything known at the start: the finished file of an episode that was read to its end before it is played.",
     ]
     for row in rows {
       out.append("Row \"\(row.name)\" as a stream (standard pace): " + barLine(row.stream.standard))

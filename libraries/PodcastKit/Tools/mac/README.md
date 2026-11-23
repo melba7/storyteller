@@ -449,8 +449,8 @@ when the copy to the phone worked.
 that replays every episode as a stream played from the start: the phone's head
 scan and whole-file pass at an assumed standard pace and a slow one (the report
 prints the speeds, which are guesses), the player's own skip rules, and the same
-bar as above. "Ready" there means the same player with everything known before
-play, so it shows what streaming costs. The head scan waits for Apple's model in
+bar as above. "Ready" there means the same player with the finished file known
+before play, so it shows what streaming costs. The head scan waits for Apple's model in
 every row (a phone with Apple Intelligence on is assumed), and the first 3
 minutes are also shown at speech speeds of 6 and 25 times real time, since the
 phone's real speed is not measured yet.
