@@ -117,11 +117,12 @@ public struct ShowStarts: Codable, Sendable, Equatable {
   }
 
   /// Records what a head scan found, when it reached far enough to say. The opening ad's end is
-  /// kept only when the scan saw it end: an ad that runs to the edge of what was checked has no
-  /// known end yet.
+  /// kept only when the scan heard `joinSeconds` past it: by the Mac's rule a later ad that starts
+  /// within that long still joins the opening, so an end nearer the edge of what was checked is
+  /// not known yet.
   public mutating func record(show: String, ads: [FoundAd], reached: Double) {
     guard reached >= Self.checkedSeconds else { return }
-    let end = Self.openingEnd(ads).flatMap { $0 < reached ? $0 : nil }
+    let end = Self.openingEnd(ads).flatMap { $0 + Self.joinSeconds <= reached ? $0 : nil }
     record(show: show, hadAdAtStart: Self.hadAdAtStart(ads), openingEnd: end)
   }
 

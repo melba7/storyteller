@@ -1,9 +1,13 @@
 // LOFI-FORK: the phone's own notes of how a show starts, as the Mac's habits (see FORK.md).
 //
 // `ShowStarts` is what the phone saw itself: for each show whether its last five checked episodes
-// opened with an ad and where that opening ended. This puts it in the shape of `ShowHabits`, with
-// the numbers worked out as `teach_habits.py` works them out, so a show the Mac never sampled is
-// waited for and looked at the same way as one it did. Where the Mac has an entry for a show, its
+// opened with an ad and where that opening ended. This puts it in the shape of `ShowHabits`, so a
+// show the Mac never sampled is waited for and looked at the same way as one it did. The counts,
+// the middle value with its rounding to a tenth and the 20 second join of ads are the Mac's
+// (`teach_habits.py`). The window is not: the phone's opening is an ad that starts before 30
+// seconds (`ShowStarts.window`, as its bit has always been), the Mac's is a first block of ads that
+// starts at or before 90 seconds. So an episode whose first ad starts at 30 to 90 seconds counts as
+// opening with an ad on the Mac and not on the phone. Where the Mac has an entry for a show, its
 // entry is the one used. Foundation only.
 import Foundation
 
@@ -48,14 +52,16 @@ extension ShowStarts {
 extension ShowHabits {
   /// These habits (the Mac's) with the phone's own for the shows the Mac has no entry for. The
   /// Mac's entry wins where it has one whose numbers are possible; a show it has nothing usable
-  /// for gets the phone's entry. The Mac's shows come first, in their order, and a show the phone
-  /// lists twice is listed once.
+  /// for gets the phone's entry, but only when that entry says the show opened with an ad. A show
+  /// that never did is left to `ShowStarts.startsClean` (five clean episodes), as before, so Play
+  /// never stops holding the start earlier than it did. The Mac's shows come first, in their
+  /// order, and a show the phone lists twice is listed once.
   public func merged(with own: ShowHabits) -> ShowHabits {
     var merged = ShowHabits()
     merged.shows = shows.filter(\.isSound)
     var known = Set(merged.shows.map(\.id))
-    for show in own.shows where show.isSound && known.insert(show.id).inserted {
-      merged.shows.append(show)
+    for show in own.shows where show.isSound && show.opensWithAd > 0 {
+      if known.insert(show.id).inserted { merged.shows.append(show) }
     }
     return merged
   }

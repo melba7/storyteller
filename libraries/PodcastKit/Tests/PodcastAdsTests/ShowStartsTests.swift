@@ -169,17 +169,26 @@ final class ShowStartsTests: XCTestCase {
     XCTAssertNil(ShowStarts.openingEnd([]))
   }
 
-  func testAnEndIsKeptOnlyWhenTheScanSawTheAdEnd() {
+  func testAnEndIsKeptOnlyWhenTheScanHeardTwentySecondsPastIt() {
+    // Twenty seconds is what joins a later ad to the opening (the Mac's rule): once the scan has
+    // heard that far past the end, no later ad can still join, so the end is the end.
     var starts = ShowStarts()
-    starts.record(show: "show", ads: [adBetween(0, 55)], reached: 60)
-    XCTAssertEqual(starts.shows[0].ends, [55])
-    starts.record(show: "show", ads: [adBetween(0, 60)], reached: 60)
+    starts.record(show: "show", ads: [adBetween(0, 40)], reached: 60)
+    XCTAssertEqual(starts.shows[0].ends, [40], "exactly 20 seconds heard past the end")
+    starts.record(show: "show", ads: [adBetween(0, 40.5)], reached: 60)
     XCTAssertEqual(starts.shows[0].results, [true, true])
-    XCTAssertEqual(starts.shows[0].ends, [55, nil], "an ad to the scan's edge has no known end")
+    XCTAssertEqual(starts.shows[0].ends, [40, nil], "19.5 seconds past it is not enough")
+    starts.record(show: "show", ads: [adBetween(0, 55)], reached: 60)
+    XCTAssertEqual(starts.shows[0].ends, [40, nil, nil])
+    starts.record(show: "show", ads: [adBetween(0, 60)], reached: 60)
+    XCTAssertEqual(starts.shows[0].ends, [40, nil, nil, nil], "an ad to the scan's edge")
     starts.record(show: "show", ads: [adBetween(0, 200)], reached: 180)
-    XCTAssertEqual(starts.shows[0].ends, [55, nil, nil])
+    XCTAssertEqual(starts.shows[0].ends, [40, nil, nil, nil, nil])
+    starts.record(show: "show", ads: [adBetween(0, 160)], reached: 180)
+    XCTAssertEqual(starts.shows[0].ends, [nil, nil, nil, nil, 160], "the boundary again, at 180")
     starts.record(show: "show", ads: [adBetween(0, 20)], reached: 59)
-    XCTAssertEqual(starts.shows[0].results.count, 3, "a scan under 60 seconds records nothing")
+    XCTAssertEqual(starts.shows[0].results.count, ShowStarts.kept)
+    XCTAssertEqual(starts.shows[0].ends?.last, 160, "a scan under 60 seconds records nothing")
   }
 
   func testNoBadEndIsStoredAndSavingStillWorks() throws {
@@ -205,7 +214,7 @@ final class ShowStartsTests: XCTestCase {
     XCTAssertEqual(starts.shows[0].ends, [nil])
   }
 
-  func testAVersionTwoFileReadsBackAndAVersionOneReaderIgnoresItsEnds() throws {
+  func testAVersionTwoFileReadsBackAndTheVersionOneDecoderSkipsItsEnds() throws {
     var starts = ShowStarts()
     starts.record(show: "show", ads: [adBetween(0, 40)], reached: 180)
     starts.record(show: "show", ads: [], reached: 180)
@@ -215,7 +224,9 @@ final class ShowStartsTests: XCTestCase {
     let text = try String(contentsOf: url, encoding: .utf8)
     XCTAssertTrue(text.contains(#""version":2"#), text)
     XCTAssertTrue(text.contains(#""ends":[40,null]"#), text)
-    // What version 1 of the type was: it must read the bits and skip the field it does not know.
+    // What version 1 of the type was. Its decoder skips the key it does not know and reads the
+    // bits. Its `load` refuses a file of version 2 (it asks for exactly 1), so an old app starts
+    // empty on this file, which is harmless: a show is learned again in five episodes.
     struct VersionOne: Decodable {
       struct Show: Decodable {
         var id: String
@@ -226,6 +237,7 @@ final class ShowStartsTests: XCTestCase {
     }
     let old = try JSONDecoder().decode(VersionOne.self, from: Data(text.utf8))
     XCTAssertEqual(old.shows.map(\.results), [[true, false]])
+    XCTAssertNotEqual(old.version, 1, "so the old load starts empty")
   }
 
   func testEndsInAFileAreCheckedWhenItIsRead() throws {

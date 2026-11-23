@@ -59,6 +59,7 @@ final class ShowHabitsOwnTests: XCTestCase {
     XCTAssertTrue(ShowStarts().habits().shows.isEmpty)
     XCTAssertEqual(ShowStarts().habits().version, ShowHabits.currentVersion)
     // A show with a clean start reads as clean by the Mac's rule: four episodes, none opened.
+    // (`merged` still leaves such a show to the phone's own rule of five, see below.)
     XCTAssertTrue(phone(opens: 0, of: 4).habits().startsClean(show: "s"))
   }
 
@@ -160,6 +161,24 @@ final class ShowHabitsOwnTests: XCTestCase {
     XCTAssertEqual(merged.firstLook(show: "mine"), 43)
     XCTAssertTrue(merged.usuallyOpensWithAd(show: "known"))
     XCTAssertFalse(merged.usuallyOpensWithAd(show: "neither"))
+  }
+
+  func testACleanShowOnlyThePhoneKnowsIsLeftToThePhonesOwnRuleOfFive() {
+    let four = ShowHabits().merged(with: phone(opens: 0, of: 4).habits())
+    XCTAssertTrue(four.shows.isEmpty, "only a show that opened with an ad is put in")
+    XCTAssertFalse(StartHold.startsClean(habits: four, show: "s", own: false), "the hold goes on")
+    let five = ShowHabits().merged(with: phone(opens: 0, of: 5).habits())
+    XCTAssertFalse(StartHold.startsClean(habits: five, show: "s", own: false))
+    XCTAssertTrue(StartHold.startsClean(habits: five, show: "s", own: true), "own says five clean")
+    // A show that opened with an ad, even once, is put in; it says nothing until it usually does.
+    let some = ShowHabits().merged(with: phone(opens: 1, of: 5).habits())
+    XCTAssertEqual(some.shows.map(\.opensWithAd), [1])
+    XCTAssertFalse(some.usuallyOpensWithAd(show: "s"))
+    XCTAssertFalse(StartHold.startsClean(habits: some, show: "s", own: false))
+    let three = ShowHabits().merged(with: phone(opens: 3, of: 5).habits())
+    XCTAssertTrue(three.usuallyOpensWithAd(show: "s"))
+    // The Mac's clean entry still counts for a show it knows.
+    XCTAssertTrue(mac(5, 0).merged(with: ShowHabits()).startsClean(show: "s"))
   }
 
   func testWithNothingTaughtThePhonesHabitsAreAllThereIs() {
