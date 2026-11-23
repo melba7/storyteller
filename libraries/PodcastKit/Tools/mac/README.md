@@ -431,18 +431,17 @@ double-clicked: the files above call it. When the folder `copies/` or
 `labels-snapped/` exists it first snaps the labels to the second download (see
 item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
-sounds, trains the small meaning model (`podcast-teach meaning`, only on a
-Mac), scores the ad skipping, chooses the per-show settings
-(`teach_settings.py`), and copies the results to the folders the phone reads.
-Every step prints a heading ("Step N of 8"). A step that fails is said plainly
-and the later steps still run, except that the Swift steps are left out
-together when `podcast-teach` does not build. The meaning step ending with a
-set-up problem (no shelf, no vector for any line, no usable model) or the
-settings step ending without a scorecard does not stop the run. When
-`labels-snapped/` exists the habits, model, library, sounds, meaning and score
-steps read it instead of `labels/`. At the end it prints one line per step
-(worked, nothing to do or failed). It counts as done when the copy to the phone
-worked.
+sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
+scores the ad skipping, chooses the per-show settings (`teach_settings.py`), and
+copies the results to the folders the phone reads. Every step prints a heading
+("Step N of 8"). A step that fails is said plainly and the later steps still
+run, except that the Swift steps are left out together when `podcast-teach` does
+not build. The meaning step ending with a set-up problem (no shelf, no vector
+for any line, no usable model) or the settings step ending without a scorecard
+does not stop the run. When `labels-snapped/` exists the habits, model, library,
+sounds, meaning and score steps read it instead of `labels/`. At the end it
+prints one line per step (worked, nothing to do or failed). It counts as done
+when the copy to the phone worked.
 
 ### What the steps write
 
@@ -468,13 +467,13 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
-- `show-settings.json`: per show and per finder, whether the phone may skip,
-  may only ask, or must leave it off, and whether joints are used, chosen by
+- `show-settings.json`: per show and per finder, whether the phone may skip, may
+  only ask, or must leave it off, and whether joints are used, chosen by
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
   whole at every run, so a hand edit is lost at the next "Teach the phone
   again". It only ever makes the phone stricter than its built-in default.
-- `copies/` and `labels-snapped/`: the second download's findings and the
-  labels snapped to them (see item 5 above).
+- `copies/` and `labels-snapped/`: the second download's findings and the labels
+  snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.
 - `wanted.json`: the episodes to fetch first next time (see below).
 - `failures.json`: which episodes failed in the writing-down step or in the
@@ -490,8 +489,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 `~/Storyteller Lofi/LofiMusic` and of its iCloud Drive copy, the folder the
 phone follows: `ad-model.json`, `ad-library.json`, `show-habits.json` (from
 `habits.json`), `ad-sounds.json`, `ad-meaning.json` and `show-settings.json`.
-Each file is checked first (it must be JSON
-with `"version": 1` and under 4.5 MB) and is only rewritten when it changed.
+Each file is checked first (it must be JSON with `"version": 1` and under 4.5
+MB) and is only rewritten when it changed.
 
 A weak model is not sent. The model is copied only when its precision on the
 test shelf is at least 85% (`--min-precision` changes that). When it is lower,
@@ -499,17 +498,17 @@ or missing, the window says so in one sentence, a model the phone already has is
 left alone and the other files are still sent. This is not counted as a failure.
 
 The meaning model has a stricter gate. It is copied only when it passes the same
-check on the test shelf and the newest scorecard shows its row "Plus the
-meaning model" adding right seconds for host_ask or network_promo over the row
-before it, with at least 85% of the added seconds right, and the scorecard is
-not older than the model. With about four marked episodes a show this will
-often not hold; then the phone never runs the meaning model, which is the safe
-default. `show-settings.json` is copied when it is a valid version 1 file.
+check on the test shelf and the newest scorecard shows its row "Plus the meaning
+model" adding right seconds for host_ask or network_promo over the row before
+it, with at least 85% of the added seconds right, and the scorecard is not older
+than the model. With about four marked episodes a show this will often not hold;
+then the phone never runs the meaning model, which is the safe default.
+`show-settings.json` is copied when it is a valid version 1 file.
 
-`Podcasts/teaching.json` is a short list of the files that are in that
-folder, each with its hash and size. The phone reads this small file first and
-downloads a big file only when its hash changed. It is rewritten only when the
-list changes.
+`Podcasts/teaching.json` is a short list of the files that are in that folder,
+each with its hash and size. The phone reads this small file first and downloads
+a big file only when its hash changed. It is rewritten only when the list
+changes.
 
 ### The phone's notes and the wanted list
 
@@ -521,16 +520,15 @@ questions ("confirmed" for Skip, "denied" for Not an ad; the note's `by` names
 the finder that asked). `teach_feedback.py` reads that file (the iCloud copy
 first, then the Mac's own copy), prints a small table per show and writes
 `wanted.json`: the episodes with at least one "missed", "confirmed", "undone" or
-"denied" note,
-the most recent first, at most 40. Lines that are not valid notes are counted
-and skipped: not JSON, over 64 KB, a time that is not a finite number, or a feed
-or audio address that is not http or https. A notes file over 8 MB is not read
-(it says so). A wanted episode is used only when its feed matches a show you
-follow (the same feed key as the phone's: no scheme, no `www.`, lower-case host,
-no fragment, no closing slash); it is gathered under the followed show's own
-feed address. When the phone has sent no notes yet it says so and writes
-nothing, and when macOS does not let the tool read the notes it says that
-instead.
+"denied" note, the most recent first, at most 40. Lines that are not valid notes
+are counted and skipped: not JSON, over 64 KB, a time that is not a finite
+number, or a feed or audio address that is not http or https. A notes file over
+8 MB is not read (it says so). A wanted episode is used only when its feed
+matches a show you follow (the same feed key as the phone's: no scheme, no
+`www.`, lower-case host, no fragment, no closing slash); it is gathered under
+the followed show's own feed address. When the phone has sent no notes yet it
+says so and writes nothing, and when macOS does not let the tool read the notes
+it says that instead.
 
 The next gather plans the wanted episodes before the newest episodes of each
 show, at most 20 in one run (`--wanted 20`), even when that is more than the
