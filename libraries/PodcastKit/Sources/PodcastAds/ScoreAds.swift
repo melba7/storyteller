@@ -96,7 +96,7 @@ public enum ScoreAds {
   /// skip of a new finder, which is only unsure.
   public static func learnable(_ ads: [FoundAd]) -> [ScoreSpan] {
     ads.filter {
-      $0.confidence == .sure && $0.kind != .ownPlug && ($0.source == nil || $0.source == "tap")
+      $0.confidence == .sure && $0.kind != .ownPlug && ($0.source == nil || $0.source == "tap" || $0.source == KnownAds.source)
         && $0.start.isFinite && $0.end.isFinite && $0.end > $0.start
     }.map { ScoreSpan(start: $0.start, end: $0.end, sort: $0.kind.sortName) }
   }

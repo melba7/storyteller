@@ -76,9 +76,9 @@ class WordTests(unittest.TestCase):
         self.assertEqual(library.normalise("--"), "")
 
     def test_words_of_a_text_drop_empty_words_and_stop_at_the_limit(self):
-        text = "One -- two, THREE " + " ".join(word_list("x", 200))
+        text = "One -- two, THREE " + " ".join(word_list("x", 700))
         words = library.words_of(text)
-        self.assertEqual(len(words), 150)
+        self.assertEqual(len(words), 600)
         self.assertEqual(words[:3], ["One", "two,", "THREE"])
 
     def test_runs_are_the_three_word_runs(self):
@@ -123,10 +123,16 @@ class CandidateTests(Folder):
         self.ad("aaaaaaaaaaaa", word_list("w", 25), start=0, end=8)
         self.assertEqual(len(self.candidates()), 1)
 
-    def test_confidence_must_be_high(self):
+    def test_confidence_must_be_high_or_medium(self):
         self.ad("aaaaaaaaaaaa", word_list("w", 40), confidence="medium")
+        self.assertEqual(len(self.candidates()), 1)
         self.ad("bbbbbbbbbbbb", word_list("w", 40), confidence="low")
-        self.assertEqual(self.candidates(), [])
+        self.assertEqual(len(self.candidates()), 1)
+
+    def test_a_long_ad_keeps_up_to_600_words(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 700), end=300)
+        self.assertEqual(len(self.candidates()[0]["words"]), 600)
+        self.assertEqual(self.candidates()[0]["words"][-1], "w599")
 
     def test_at_least_25_words(self):
         self.ad("aaaaaaaaaaaa", word_list("w", 24))

@@ -171,6 +171,13 @@ refuses a file over 5 MB).
   `teach_library.py` also writes `ad-library-score.json`, the same library built
   without the shelf episodes. It is not published. The scorecard reads it when
   it scores only the shelf, so an episode is never scored against its own ads.
+  An entry's `text` holds up to 600 words of the ad, from segments marked "high"
+  or "medium". The phone finds an entry again when three fifths of its three-word
+  runs, and at least eight different ones, lie at one distance in the
+  transcript, so a different opening does not hide it. The match runs to its
+  first and last matched word, moved out by at most five words. Where a looser
+  span of the word finders overlaps such a match and overhangs it by up to 15
+  seconds, `AdJoin` cuts the overhang back to the match.
 - `show-habits.json`:
   `{"version", "writtenAt", "shows": [{"feed", "title", "episodes", "opensWithAd", "openingStarts", "openingEnds", "breaks", "adSeconds"}]}`.
 - `ad-sounds.json`:

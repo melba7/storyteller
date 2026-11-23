@@ -62,6 +62,10 @@ public enum AdLibrary {
   /// An ad of a sensible length, in seconds.
   static let lengths = 8.0...300.0
 
+  /// How many words of a taught ad are kept. The phone's own memory keeps fewer
+  /// (`KnownAds.mostWords`) because it learns from every ad it hears.
+  public static let mostWords = 600
+
   static func usable(length: Double) -> Bool { length.isFinite && lengths.contains(length) }
 
   /// The taught ads as remembered ads. Nothing when the data is not this format or version.
@@ -76,7 +80,7 @@ public enum AdLibrary {
         entry.scope == "all" || (entry.scope == "show" && !entry.show.isEmpty)
       else { continue }
       let words = entry.text.split(whereSeparator: \.isWhitespace)
-        .compactMap { KnownAds.normalise(String($0)) }.prefix(KnownAds.mostWords)
+        .compactMap { KnownAds.normalise(String($0)) }.prefix(mostWords)
       guard words.count >= KnownAds.fewestWords else { continue }
       let text = words.joined(separator: " ")
       let seen = min(max(entry.seen, 1), 1_000_000)
