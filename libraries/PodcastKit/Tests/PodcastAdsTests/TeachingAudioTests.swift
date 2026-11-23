@@ -39,4 +39,26 @@ final class TeachingAudioTests: XCTestCase {
     try folder.write("episodes.json", "{\"episodes\": [1, \"two\", {\"id\": 3, \"file\": \"a.mp3\"}]}")
     XCTAssertEqual(TeachingAudio.files(in: folder.url), [:])
   }
+
+  func testALinkOutOfTheFolderOrAFileThatIsNotARegularOneIsNotAudio() throws {
+    let elsewhere = FileManager.default.temporaryDirectory.appendingPathComponent("elsewhere-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: elsewhere, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: elsewhere) }
+    try Data("x".utf8).write(to: elsewhere.appendingPathComponent("x.mp3"))
+    try folder.write("audio/real.mp3", "x")
+    let audio = folder.url.appendingPathComponent("audio")
+    let fileManager = FileManager.default
+    // A link to a file elsewhere, a link to a folder elsewhere, a link to a file in the folder,
+    // and a named pipe (reading it would wait for ever).
+    try fileManager.createSymbolicLink(
+      at: audio.appendingPathComponent("out.mp3"), withDestinationURL: elsewhere.appendingPathComponent("x.mp3"))
+    try fileManager.createSymbolicLink(
+      at: folder.url.appendingPathComponent("linked"), withDestinationURL: elsewhere)
+    try fileManager.createSymbolicLink(
+      at: audio.appendingPathComponent("same.mp3"), withDestinationURL: audio.appendingPathComponent("real.mp3"))
+    XCTAssertEqual(mkfifo(audio.appendingPathComponent("pipe.mp3").path, 0o600), 0)
+    try list(["audio/real.mp3", "audio/out.mp3", "linked/x.mp3", "audio/same.mp3", "audio/pipe.mp3"])
+    let found = TeachingAudio.files(in: folder.url)
+    XCTAssertEqual(found.keys.sorted(), ["e0", "e3"])
+  }
 }
