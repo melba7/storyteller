@@ -177,22 +177,28 @@ extension PodcastAdFinder {
   /// The listener undid the skip of the stretch from `start` to `end`: the phone forgets what it
   /// learned for it (the remembered ad by its words, its own sound prints, what a repeat of words
   /// or sound remembered), and the guard hears which finder's skip it was. `heard` are the words
-  /// of a stream's head scan. It waits in the queue behind a yes that is still being learned, so
-  /// that the Undo comes after it. Returns at once.
-  func forgetUndone(_ id: String, start: Double, end: Double, heard: [TranscriptWord]) {
+  /// of a stream's head scan, `source` is the finder that made the ad as the player knows it: an
+  /// episode that is still streamed has no ads file or audio file yet, so the guard is told by
+  /// it, and what the phone's own sounds learned of the stretch is not forgotten then (that could
+  /// be done once the download is filed). It waits in the queue behind a yes that is still being
+  /// learned, so that the Undo comes after it. Returns at once.
+  func forgetUndone(
+    _ id: String, start: Double, end: Double, heard: [TranscriptWord], source: String?
+  ) {
     guard start.isFinite, end.isFinite, end > start else { return }
     Self.answerQueue.async { [self] in
       guard let show = EpisodeShows.shared.show(for: id), !show.isEmpty else { return }
       PodcastKnownAds.shared.forget(episodeId: id, ads: [(start, end)], heard: heard)
       let (store, transcripts) = answerStores(id)
       let ad = store?.adOver(start: start, end: end, detector: Self.detectorName)
-      if let source = ad?.source, FinderNames.answerable.contains(source) {
-        PodcastFinderGuard.shared.undone(finder: source, show: show)
+      let by = ad?.source ?? source
+      if let by, FinderNames.answerable.contains(by) {
+        PodcastFinderGuard.shared.undone(finder: by, show: show)
       }
       forget(
         id, show: show, start: start, end: end, transcript: transcripts.flatMap(loadTranscript),
         words: true, sound: true)
-      PodcastTimeline.mark(id, "undo: forgot what was learned (\(ad?.source ?? "no finder"))")
+      PodcastTimeline.mark(id, "undo: forgot what was learned (\(by ?? "no finder"))")
     }
   }
 

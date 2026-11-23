@@ -179,7 +179,7 @@ final class PodcastAdSkipping {
     let heard = owner.streamDownload?.head.memory.words ?? []
     for undone in [ad] + skip.chained {
       PodcastAdFinder.shared.forgetUndone(
-        episodeId, start: undone.start, end: undone.end, heard: heard)
+        episodeId, start: undone.start, end: undone.end, heard: heard, source: undone.source)
     }
     PodcastSkipLogger.shared.undone()
     // What the skip put on the tally is what comes off it: only the seconds really jumped. The
