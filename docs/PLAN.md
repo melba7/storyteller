@@ -13,7 +13,9 @@ S15, from Mo's 31.1 report): all built and checked, waiting on the iOS build and
 the phone | The Mac teaches, the phone skips alone (T1 to T9, Mo's ask
 2026-11-22): all built, checked by Opus and fixed (PR #54); waiting on Mo's
 first teaching run, the merge and the phone (TestFlight 33.1) | The phone learns
-by itself (U1 to U11, Mo's ask 2026-11-23): planned, building
+by itself (U1 to U11, Mo's ask 2026-11-23): all built, checked by Opus and fixed
+(PR #55, whole check green); waiting on the Fable final check, the merge and the
+TestFlight build
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1232,39 +1234,39 @@ final check. Two ideas are built smaller than listed: a repeat only asks (it
 skips only where the Mac's settings say so), and per-show settings are three
 levels, not thresholds, because a show has about four marked episodes.
 
-- [ ] **U1 Seams and the finder guard**: `FoundAd.source`, `AdsFile.asks`, the
+- [x] **U1 Seams and the finder guard**: `FoundAd.source`, `AdsFile.asks`, the
       note kinds `confirmed` and `denied`, and `FinderGuard`, which switches off
       a new finder that crashed or was undone twice. The scorecard gains
       "seconds of an ad heard before the skip" and per-show totals for every
       row.
-- [ ] **U2 The phone's own sound prints**: `OwnAdSounds` keeps a print of each
+- [x] **U2 The phone's own sound prints**: `OwnAdSounds` keeps a print of each
       sure ad of a downloaded MP3 (`own-ad-sounds.json`, 40 a show, 400 in all,
       60 days). The head scan and the download pass look for them with the Mac's
       sounds.
-- [ ] **U3 Repeats**: `EpisodePrints` and `RepeatScanner` (sound) and
+- [x] **U3 Repeats**: `EpisodePrints` and `RepeatScanner` (sound) and
       `RepeatedWords` (words) find what a show's last three episodes share. A
       repeat asks; it skips only where the Mac's settings say so.
-- [ ] **U4 The one-tap question**: guesses become questions (`AdAsks`,
+- [x] **U4 The one-tap question**: guesses become questions (`AdAsks`,
       `AdAsking`, `AskAdNote.tsx`, `onAdAsk`, `answerAdQuestion`). Yes teaches
       the memory, the prints and the Mac; no stops the asking.
-- [ ] **U5 A second download on the Mac**: `teach_copies.py` and `teach_snap.py`
+- [x] **U5 A second download on the Mac**: `teach_copies.py` and `teach_snap.py`
       write `labels-snapped/` from `CopyTruth`, and the teaching run uses it
       when it is there.
-- [ ] **U6 Borders from joints**: `JointSnap` moves a start or an end onto a
+- [x] **U6 Borders from joints**: `JointSnap` moves a start or an end onto a
       joint of the file within a few seconds.
-- [ ] **U7 The phone's own habits**: `show-starts.json` version 2 keeps where
+- [x] **U7 The phone's own habits**: `show-starts.json` version 2 keeps where
       each opening ad ended and stands in for `show-habits.json` for shows the
       Mac never sampled.
-- [ ] **U8 Per-show settings**: `teach_settings.py` writes `show-settings.json`
+- [x] **U8 Per-show settings**: `teach_settings.py` writes `show-settings.json`
       from the scorecard and the phone's notes; `ShowTuning` applies skip, ask
       or off.
-- [ ] **U9 The meaning model**: `podcast-teach meaning` trains weights over
+- [x] **U9 The meaning model**: `podcast-teach meaning` trains weights over
       Apple's sentence embedding (`ad-meaning.json`); the phone runs it in the
       background when it was published.
-- [ ] **U10 Scorecard rows and the round's test**: one row for each new finder,
+- [x] **U10 Scorecard rows and the round's test**: one row for each new finder,
       the questions line, the habits note, and a three-episode test of the whole
       round.
-- [ ] **U11 Docs**: `PODCASTS-ADS-TEACHING.md`, the Mac README, ARCHITECTURE and
+- [x] **U11 Docs**: `PODCASTS-ADS-TEACHING.md`, the Mac README, ARCHITECTURE and
       LESSONS.
 - [ ] **Waits on Mo**: the limits card (about 20 MB of new data, questions only
       for dropped guesses, joints moving a skip up to 3 s earlier and 4 s later,
