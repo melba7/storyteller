@@ -5,20 +5,23 @@ should fetch first.
 Standard library only. The phone writes Podcasts/phone-notes.jsonl into its linked folder (the
 iCloud copy of LofiMusic). One JSON object per line:
 
-  {"v": 1, "at": <ms>, "what": "skipped"|"undone"|"trimmed"|"missed", "feed": "<feed address>",
-   "guid": "<may be empty>", "title": "...", "address": "<audio address>", "start": <seconds>,
-   "end": <seconds or null>, "kind": "ad"|"promo"|"ownPlug"|"credits"|""}
+  {"v": 1, "at": <ms>, "what": "skipped"|"undone"|"trimmed"|"missed"|"confirmed"|"denied",
+   "feed": "<feed address>", "guid": "<may be empty>", "title": "...", "address": "<audio address>",
+   "start": <seconds>, "end": <seconds or null>, "kind": "ad"|"promo"|"ownPlug"|"credits"|"",
+   "by": "<the finder that made the ad, only when the phone knew it>"}
 
 "missed" means you pressed Skip ad where the phone knew no ad, "undone" means you took a skip back.
+"confirmed" means you said yes to a question the phone asked ("Ad? Skip"), "denied" that it is not
+an ad. `by` is kept when it is there (older notes have none).
 
   teach_feedback.py [--folder F] [--notes FILE]
 
 The notes are looked for in the iCloud copy first, then in the Mac's own copy (or read from
 --notes). The tool prints a small table per show (skipped, undone, missed) and writes
-<folder>/wanted.json: the episodes with at least one "missed" or "undone" note, the most recent
-first, at most 40, one per (feed, guid) or, without a guid, (feed, audio address). teach_collect.py
-gathers those first. Lines that are not valid notes are counted and skipped. Having no notes is not
-an error: nothing is written.
+<folder>/wanted.json: the episodes with at least one "missed" or "undone" note ("confirmed" counts
+like "missed" and "denied" like "undone"), the most recent first, at most 40, one per (feed, guid)
+or, without a guid, (feed, audio address). teach_collect.py gathers those first. Lines that are not
+valid notes are counted and skipped. Having no notes is not an error: nothing is written.
 
 Exit code: 0 it worked (also with no notes), 2 a set-up problem.
 
@@ -37,7 +40,9 @@ from teach_feed import is_web_address
 NOTES = os.path.join("Podcasts", "phone-notes.jsonl")
 WANTED = "wanted.json"
 MOST = 40
-WHAT = ("skipped", "undone", "trimmed", "missed")
+WHAT = ("skipped", "undone", "trimmed", "missed", "confirmed", "denied")
+# The notes that make an episode wanted, and the count each one adds to.
+WANTED_AS = {"missed": "missed", "confirmed": "missed", "undone": "undone", "denied": "undone"}
 LINE_LIMIT = 64 * 1024
 FILE_LIMIT = 8 * 1024 * 1024
 
@@ -57,7 +62,8 @@ def number(value):
 def read_note(line):
     """The note a line holds, or None when the line is not a valid note: not JSON (a line nested so
     deeply that Python gives up counts too), longer than 64 KB, or with a time that is not a
-    finite number, or with a feed or audio address that is not http or https."""
+    finite number, or with a feed or audio address that is not http or https, or with a `by` that
+    is not text. A `by` is kept when there is one."""
     if len(line) > LINE_LIMIT:
         return None
     try:
@@ -73,6 +79,8 @@ def read_note(line):
     for field in ("feed", "guid", "title", "address", "kind"):
         if not isinstance(one.get(field), str):
             return None
+    if "by" in one and not isinstance(one["by"], str):
+        return None
     if not one["feed"] or not (one["guid"] or one["address"]):
         return None
     if not is_web_address(one["feed"]) or (one["address"] and not is_web_address(one["address"])):
@@ -124,15 +132,16 @@ def find_notes(defaults, denied=None):
 # MARK: Counting
 
 def wanted_episodes(notes):
-    """The episodes with a "missed" or "undone" note, most recent first, at most MOST."""
+    """The episodes with a "missed" or "undone" note, most recent first, at most MOST. A "confirmed"
+    note counts like "missed" and a "denied" one like "undone"."""
     found = {}
     for one in sorted(notes, key=lambda n: n["at"]):
-        if one["what"] not in ("missed", "undone"):
+        if one["what"] not in WANTED_AS:
             continue
         key = (one["feed"], one["guid"] or None, "" if one["guid"] else one["address"])
         episode = found.setdefault(key, {"feed": one["feed"], "guid": one["guid"], "title": "",
                                          "address": "", "missed": 0, "undone": 0, "last": 0})
-        episode[one["what"]] += 1
+        episode[WANTED_AS[one["what"]]] += 1
         episode["last"] = max(episode["last"], one["at"])
         for field in ("title", "address"):
             if one[field]:  # notes come oldest first, so the newest one that has it wins
