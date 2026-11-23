@@ -43,6 +43,25 @@ final class ScoreSoundsTests: XCTestCase {
     XCTAssertEqual(found.first?.sort, "sponsor")
   }
 
+  func testAnEpisodeIsSearchedWithWhatEarlierEpisodesTaughtNeverWithItsOwnStretches() throws {
+    let one = try write(episode(10_000..<10_500, 50_000..<50_600, 10_500..<11_000), as: "one.mp3")
+    let two = try write(episode(20_000..<21_000, 50_000..<50_600, 21_000..<21_200), as: "two.mp3")
+    var own = OwnAdSounds()
+    let stretch = MarkedStretch(start: 500 * frame, end: 1100 * frame, sort: "sponsor", who: "")
+    // The first file's own stretch is learned from it but not found in it.
+    XCTAssertEqual(ScoreSounds.scanThenLearn(&own, show: "show", in: one, stretches: [stretch], now: now), [])
+    XCTAssertEqual(own.entries.count, 1)
+    // The second file is searched with what the first taught, and then teaches (the same sound
+    // again is counted as seen again, not added).
+    let second = MarkedStretch(start: 1000 * frame, end: 1600 * frame, sort: "sponsor", who: "")
+    let found = ScoreSounds.scanThenLearn(&own, show: "show", in: two, stretches: [second], now: now)
+    XCTAssertEqual(found.count, 1)
+    XCTAssertEqual(found.first?.start ?? 0, 1000 * frame, accuracy: 0.3)
+    XCTAssertEqual(own.entries.count, 1)
+    // With nothing to learn it only searches.
+    XCTAssertEqual(ScoreSounds.scanThenLearn(&own, show: "show", in: two, stretches: [], now: now).count, 1)
+  }
+
   func testASoundSeenOnceBelongsToItsShowAlone() throws {
     let one = try write(episode(10_000..<10_500, 50_000..<50_600, 10_500..<11_000), as: "one.mp3")
     let two = try write(episode(20_000..<21_000, 50_000..<50_600), as: "two.mp3")

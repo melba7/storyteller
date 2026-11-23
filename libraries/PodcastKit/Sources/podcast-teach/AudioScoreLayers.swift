@@ -64,9 +64,9 @@ final class AudioScoreBox: @unchecked Sendable {
   private func ownSounds(_ url: URL, _ show: String, _ learn: [ScoreSpan]) -> [ScoreSpan] {
     lock.lock()
     defer { lock.unlock() }
-    let found = ScoreSounds.ownSounds(in: url, own: own, show: show)
     let stretches = learn.map { MarkedStretch(start: $0.start, end: $0.end, sort: $0.sort, who: "") }
-    ScoreSounds.learnOwn(&own, show: show, in: url, stretches: stretches, mac: mac, now: now)
+    let found = ScoreSounds.scanThenLearn(
+      &own, show: show, in: url, stretches: stretches, mac: mac, now: now)
     return found.map { ScoreSpan(start: $0.start, end: $0.end, sort: $0.sort) }
   }
 

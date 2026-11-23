@@ -50,6 +50,18 @@ public enum ScoreSounds {
     }
   }
 
+  /// The phone's own sounds of `show` that play in the file, found with what EARLIER episodes
+  /// taught, and only then the stretches of this file learned (`learnOwn`): an episode is never
+  /// searched with its own ads, or the row would find every ad it was told about.
+  public static func scanThenLearn(
+    _ own: inout OwnAdSounds, show: String, in url: URL, stretches: [MarkedStretch],
+    mac: AdSoundLibrary = AdSoundLibrary(), now: Double
+  ) -> [SoundSpan] {
+    let found = ownSounds(in: url, own: own, show: show)
+    learnOwn(&own, show: show, in: url, stretches: stretches, mac: mac, now: now)
+    return found
+  }
+
   /// Learns the stretches of the file that were skipped (`OwnAdSounds.learn`), reading only the
   /// frames inside them. `mac` is the Mac's library: what it holds is not learned again. Returns
   /// how many sounds were added.
