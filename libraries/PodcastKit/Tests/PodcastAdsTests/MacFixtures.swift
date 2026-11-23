@@ -74,7 +74,7 @@ enum MacFixtures {
   /// `teach_feedback.read_note` reads: `noteLine` in `modules/podcasts/phoneNotes.ts` writes it
   /// from the pending note and what the database knows of the episode (feed, guid, title and
   /// audio address, no episode or show id), in this key order, with `kind` "" when there is
-  /// none. `by` is the one key it does not write yet. Swift cannot make this line (JavaScript
+  /// none and `by` last, only when the note names a finder. Swift cannot make this line (JavaScript
   /// writes it), so `PhoneNoteKindsTests` checks it against the pending line instead. The
   /// Mac's Python test reads this text.
   static let confirmedNote =

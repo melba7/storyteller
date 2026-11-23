@@ -350,9 +350,9 @@ public final class PodcastsModule: Module {
 
     // MARK: Teaching
 
-    // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json or
-    // ad-sounds.json) when its SHA-256 is right and it reads as that file. True when it was kept;
-    // the episodes are looked at again then.
+    // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json, ad-sounds.json,
+    // ad-meaning.json or show-settings.json) when its SHA-256 is right and it reads as that file.
+    // True when it was kept; the episodes are looked at again then.
     AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in
       let kept = PodcastTeaching.shared.install(name: name, text: text, sha256: sha256)
       if kept { PodcastAdFinder.shared.teachingChanged() }
