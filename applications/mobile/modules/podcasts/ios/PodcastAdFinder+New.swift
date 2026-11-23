@@ -247,8 +247,14 @@ struct NewCollect {
     out.ads = (file.ads + AdJoin.join(taken)).sorted { $0.start < $1.start }
     var moved: [NewAds.Moved] = []
     if let joints {
+      // The stretches the listener judged or was asked about: the pull keeps out of them.
+      var judged: [(start: Double, end: Double)] = []
+      judged += (file.denied ?? []).map { (start: $0.start, end: $0.end) }
+      judged += (file.asks ?? []).map { (start: $0.start, end: $0.end) }
+      judged += file.undone.map { (start: $0.start, end: $0.end) }
       let snapped = NewAds.snap(
-        out.ads, joints: joints, steadyToo: steadyToo, leaving: { NewAds.isFixed($0, in: out) })
+        out.ads, joints: joints, steadyToo: steadyToo, judged: judged,
+        leaving: { NewAds.isFixed($0, in: out) })
       out.ads = snapped.ads
       moved = snapped.moved
     }

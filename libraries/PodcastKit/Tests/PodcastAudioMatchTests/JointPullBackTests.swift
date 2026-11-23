@@ -14,7 +14,7 @@ final class JointPullBackTests: XCTestCase {
   ) -> (start: Double, end: Double) {
     JointSnap.snap(
       start: start, end: end, joints: joints, previousEnd: previousEnd, nextStart: nextStart,
-      steadyToo: steadyToo, pullBack: pullBack)
+      steadyToo: steadyToo, pullBack: pullBack, mayPull: true)
   }
 
   func testALateStartMovesBackToTheLatestJointWithinAMinute() {

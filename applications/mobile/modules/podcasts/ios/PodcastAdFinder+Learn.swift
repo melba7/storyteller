@@ -35,7 +35,7 @@ extension PodcastAdFinder {
     rememberRepeats(id, ads: store, transcript: transcript, modes: modes)
     guard trusted else { return }
     let saved = store.load(detector: Self.detectorName) ?? made.file
-    learnOwnSounds(id, saved, modes: modes)
+    learnOwnSounds(id, saved, modes: modes, moved: made.moved)
     learnHabits(id, saved, transcript: transcript, modes: modes)
   }
 
@@ -50,15 +50,7 @@ extension PodcastAdFinder {
   ) {
     guard let show = EpisodeShows.shared.show(for: id) else { return }
     var saved = store.load(detector: Self.detectorName) ?? file
-    saved.ads = saved.ads.map { ad in
-      guard let was = moved.first(where: { $0.start == ad.start && $0.end == ad.end }) else {
-        return ad
-      }
-      var original = ad
-      original.start = was.wasStart
-      original.end = was.wasEnd
-      return original
-    }
+    saved.ads = saved.ads.map { NewAds.restored($0, from: moved) }
     let counted =
       saved.ads.filter { $0.source == AdAsking.source }
       + (saved.asks ?? []).filter { $0.confidence != .guess }
@@ -94,12 +86,15 @@ extension PodcastAdFinder {
     if stored == true { PodcastLearned.shared.note(.print, episode: id) }
   }
 
-  /// The prints of the sure ads of the saved file (after the joint snap, so they have exact
-  /// borders), once for each episode. Not the ads of the new finders (they are unsure), not an ad
-  /// the listener undid or trimmed, not one the listener confirmed (it was learned with the
-  /// answer). The episode is noted as learned from only when the learning ran: with no time held
-  /// from iOS the next pass tries again.
-  private func learnOwnSounds(_ id: String, _ saved: AdsFile, modes: NewModes) {
+  /// The prints of the sure ads of the saved file (with the borders they were found with, not the
+  /// ones the joint snap moved them to), once for each episode. Not the ads of the new finders
+  /// (they are unsure), not an ad the listener undid or trimmed, not one the listener confirmed (it
+  /// was learned with the answer). The found borders are used because a pull can add up to a
+  /// minute of what came before the ad, as `learnKnown` does too. The episode is noted as learned
+  /// from only when the learning ran: with no time held from iOS the next pass tries again.
+  private func learnOwnSounds(
+    _ id: String, _ saved: AdsFile, modes: NewModes, moved: [NewAds.Moved]
+  ) {
     guard modes.level(FinderNames.ownSound) != .off,
       let file = PodcastDownloader.shared.localFile(for: id),
       !PodcastLearned.shared.seen(.own, episode: id)
@@ -107,11 +102,13 @@ extension PodcastAdFinder {
     let stretches = saved.ads.filter { ad in
       ad.confidence == .sure && ad.source != AdAsking.source && !saved.isUndone(ad)
         && !(saved.trims ?? []).contains {
-          $0.adStart >= ad.start - NewAds.trimReach && $0.adStart < ad.end
+          $0.adStart >= ad.start - NewAds.trimReach(for: ad) && $0.adStart < ad.end
         }
         && !(saved.asks ?? []).contains { $0.confidence != .guess && NewAds.overlap($0, ad) }
-    }.map {
-      MarkedStretch(start: $0.start, end: $0.end, sort: Self.sort(of: $0.kind), who: $0.advertiser)
+    }.map { ad -> MarkedStretch in
+      let found = NewAds.restored(ad, from: moved)
+      return MarkedStretch(
+        start: found.start, end: found.end, sort: Self.sort(of: ad.kind), who: ad.advertiser)
     }
     guard !stretches.isEmpty else { return }
     let added = PodcastFinderGuard.shared.hold([FinderNames.ownSound], episode: id) { _ -> Int in

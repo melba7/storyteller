@@ -109,6 +109,21 @@ final class ScoreCachedJointsTests: XCTestCase {
     XCTAssertTrue(output.contains("1 of 2"), output)
   }
 
+  func testAnEpisodeWithJointsButNoMP3IsNamedAsLeftOutOfTheAudioRows() throws {
+    try fill()
+    try folder.write(
+      "episodes.json",
+      "{\"version\": 1, \"episodes\": [{\"id\": \"e1\", \"feed\": \"f1\", \"show\": \"One\", \"title\": \"T1\", \"file\": \"audio/e1.mp3\"},"
+        + "{\"id\": \"e2\", \"feed\": \"f2\", \"show\": \"Two\", \"title\": \"T2\"}]}")
+    try folder.write("audio/e1.mp3", "not really audio")
+    let kit = ScoreSoundKit(cachedJoints: cache(["e2"], SoundCalls()))
+    XCTAssertEqual(run(ScoreExtras(sounds: { _, _ in kit })), 0)
+    let output = printed.joined(separator: "\n")
+    XCTAssertTrue(output.contains("1 of 2 episodes have no MP3 file (e2)"), output)
+    XCTAssertTrue(output.contains("joints.json"), output)
+    XCTAssertFalse(output.contains("e1,"), output)
+  }
+
   func testAKitWithNoCachedEpisodeKeepsTheOldNoteAndLeavesTheRowsOut() throws {
     try fill()
     let kit = ScoreSoundKit(cachedJoints: cache([], SoundCalls()))

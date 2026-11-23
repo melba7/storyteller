@@ -88,7 +88,7 @@ Mac's files only make each finder better or stricter.
 | `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                   |
 | `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                |
 | `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                               |
-| joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later. In steady files too (`steadyJoints`) a start with no joint near it is pulled back to the latest joint up to 60 s before it |
+| joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later. Whenever `steadyJoints` is on (in steady files and in the others), the late start of an ad found from the words (`JointPull` names the finders) with no joint near it is pulled back to the latest joint up to 60 s before it, never into an earlier ad or a stretch the listener judged |
 
 For each new finder the phone does, in this order: find, keep only the parts
 outside the ads already known (0.6 s away from them), apply the Mac's per-show
@@ -315,8 +315,8 @@ model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
 words", "Plus joints", "Plus joints (steady files too)" and, always last, "Plus
 per-show settings" (with the built-in settings when there is no file yet). The
 row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
-what is turned on or off. Steady joints (which include the pull-back of a late
-start) are on when the steady row passes at least 3 more breaks than the row
+what is turned on or off. Steady joints (which switch on the pull-back of a late
+start, in steady files and in the others) are on when the steady row passes at least 3 more breaks than the row
 before it and adds at most 1 skip with no ad. The learning rows (own sounds, repeats) first learn
 from the marked episodes that are not scored, then scan the scored ones, so each
 episode is judged only on what the earlier episodes of its show taught. The

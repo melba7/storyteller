@@ -52,11 +52,12 @@ def added(first, second):
 
 
 def read_bar(value):
-    """The Bar of a row's `bar`, or None when there is none or it is not made of numbers."""
+    """The Bar of a row's `bar`, or None when there is none, it is not made of numbers or it has no
+    breaks (a bar of no breaks passes nothing and says nothing)."""
     if not isinstance(value, dict):
         return None
     kept = [value.get(key) for key in ("breaks", "passed", "noAdSkips")]
-    if not all(number(each) and each >= 0 for each in kept):
+    if not all(number(each) and each >= 0 for each in kept) or kept[0] == 0:
         return None
     return Bar(*(int(each) for each in kept))
 

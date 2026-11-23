@@ -9,11 +9,15 @@ public struct SoundSpan: Sendable, Equatable {
   public var start: Double
   public var end: Double
   public var sort: String
+  /// Whether the pull-back of a late start may apply to this stretch (`JointPull` in PodcastAds
+  /// says it for an ad's source). The small window's snap does not need it.
+  public var mayPull: Bool
 
-  public init(start: Double, end: Double, sort: String = "sponsor") {
+  public init(start: Double, end: Double, sort: String = "sponsor", mayPull: Bool = false) {
     self.start = start
     self.end = end
     self.sort = sort
+    self.mayPull = mayPull
   }
 }
 
@@ -114,9 +118,9 @@ public enum ScoreSounds {
   }
 
   /// Moves the start and the end of each stretch onto the joints (`JointSnap.snap`), as the phone
-  /// does for the ads of a file: in order of time, each start no earlier than where the stretch
-  /// before ENDED after its own move, each end no later than where the stretch after STARTED as
-  /// given. The answer is in the order the stretches came in. A stretch that is not a stretch of
+  /// does for the ads of a file: in order of time, each start no earlier than where the stretches
+  /// before ENDED after their own moves (the latest of those ends), each end no later than where
+  /// the stretch after STARTED as given. The answer is in the order the stretches came in. A stretch that is not a stretch of
   /// finite times is given back as it was and has no say about its neighbours.
   public static func snap(
     _ spans: [SoundSpan], joints: Joints, steadyToo: Bool
@@ -131,10 +135,10 @@ public enum ScoreSounds {
       let nextStart = place + 1 < order.count ? spans[order[place + 1]].start : nil
       let moved = JointSnap.snap(
         start: span.start, end: span.end, joints: joints, previousEnd: previousEnd,
-        nextStart: nextStart, steadyToo: steadyToo)
+        nextStart: nextStart, steadyToo: steadyToo, mayPull: span.mayPull)
       result[index].start = moved.start
       result[index].end = moved.end
-      previousEnd = moved.end
+      previousEnd = max(previousEnd ?? moved.end, moved.end)
     }
     return result
   }

@@ -52,6 +52,11 @@ public struct Joints: Equatable, Sendable {
 /// `SeekDrift.resetAfter` frames that reach into it. Two signs at one frame are one joint. The
 /// tests compare it with `SeekDrift.report` on made files, so the two cannot drift apart.
 public struct JointFinder: Sendable {
+  /// The version of the joint rules. `JointsCache` writes it into `joints.json` and ignores a file
+  /// made by another version (or by none), so a change to what counts as a joint, or to
+  /// `SeekDrift`'s constants, must raise it by one.
+  public static let version = 1
+
   /// At most this many joint times are kept. A file that has more is busy anyway.
   public static let keepLimit = 2000
 
@@ -168,16 +173,25 @@ public enum JointSnap {
   /// `overflowed` hold either way.
   ///
   /// A word finder's most common fault is a skip that starts late, because an ad often opens with
-  /// a story the words do not give away. So when no joint lies inside the start's window, the start
-  /// is pulled back to the LATEST joint that lies up to `pullBack` seconds before it. It never goes
+  /// a story the words do not give away. So when `mayPull` is true and no joint lies inside the
+  /// start's window, the start is pulled back to the LATEST joint that lies up to `pullBack`
+  /// seconds before it. The caller says `mayPull`: the pull is only for the late start of an ad
+  /// found from the words, not for the border of a sound, a chapter or a memory. It never goes
   /// before `previousEnd` or 0, so a pull that would reach into the ad before is not made, and a
-  /// start that touches that ad (it is inside a break, not at its beginning) stays. An end is never
-  /// pulled. `pullBack` nil means `JointSnap.pullBack` when `steadyToo` is true (the files of the
-  /// owner are steady, which is what the pull is for) and no pull when it is false; 0 or a number
-  /// that is not finite or is below 0 means no pull.
+  /// start that touches that ad (it is inside a break, not at its beginning) stays. `previousEnd`
+  /// is the latest end of ALL the ads before this one, not only the one just before.
+  ///
+  /// `judged` are the stretches the listener said are not an ad or was asked about. For the pull the
+  /// end of the latest one that lies before the start is a floor like `previousEnd`, and when one
+  /// lies over the start there is no pull at all. They do not change the small window's snap.
+  ///
+  /// An end is never pulled. `pullBack` nil means `JointSnap.pullBack` when `steadyToo` is true (the
+  /// pull is on whenever steady joints are on, in steady and in other files) and no pull when it
+  /// is false; 0 or a number that is not finite or is below 0 means no pull.
   public static func snap(
     start: Double, end: Double, joints: Joints, previousEnd: Double? = nil,
-    nextStart: Double? = nil, steadyToo: Bool = false, pullBack: Double? = nil
+    nextStart: Double? = nil, steadyToo: Bool = false, pullBack: Double? = nil,
+    mayPull: Bool = false, judged: [(start: Double, end: Double)] = []
   ) -> (start: Double, end: Double) {
     let unchanged = (start: start, end: end)
     guard start.isFinite, end.isFinite, start >= 0, end > start,
@@ -193,17 +207,42 @@ public enum JointSnap {
       $0 > start && $0 <= before
     }
     let reach = pullBack ?? (steadyToo ? JointSnap.pullBack : 0)
-    let pulled = first == nil ? pull(start, reach: reach, in: joints, after: after) : nil
+    let pulled =
+      first == nil && mayPull
+      ? pull(start, reach: reach, in: joints, after: pullFloor(start, after: after, judged: judged))
+      : nil
     let moved = (start: first ?? pulled ?? start, end: last ?? end)
     return moved.start < moved.end ? moved : unchanged
   }
 
+  /// Where the pull may not go before: `after`, or the end of the latest judged stretch that lies
+  /// before `start`. Nil (no pull) when a judged stretch lies over `start`.
+  private static func pullFloor(
+    _ start: Double, after: Double, judged: [(start: Double, end: Double)]
+  ) -> Double? {
+    var floor = after
+    for stretch in judged where stretch.start.isFinite && stretch.end.isFinite
+      && stretch.end > stretch.start {
+      if stretch.end <= start + tie {
+        floor = max(floor, stretch.end)
+      } else if stretch.start <= start + tie {
+        return nil
+      }
+    }
+    return floor
+  }
+
+  /// How far from an ad's start a trim of it may lie before the ad is left alone by the snap: a
+  /// trim is found by where its ad started, and the snap moved that start up to `startEarlier`
+  /// seconds, or up to `pullBack` seconds for an ad that may be pulled, plus half a second.
+  public static func trimReach(pulled: Bool) -> Double { (pulled ? pullBack : startEarlier) + 0.5 }
+
   /// The latest joint that lies before `start`, no more than `reach` seconds and no earlier than
   /// `after`. Nil when there is none, when `reach` is no use, or when the start touches `after`.
   private static func pull(
-    _ start: Double, reach: Double, in joints: Joints, after: Double
+    _ start: Double, reach: Double, in joints: Joints, after: Double?
   ) -> Double? {
-    guard reach.isFinite, reach > 0, start - after > tie else { return nil }
+    guard let after, reach.isFinite, reach > 0, start - after > tie else { return nil }
     var latest: Double?
     for joint in joints.times
     where joint.isFinite && joint >= 0 && joint <= joints.seconds && joint < start - tie

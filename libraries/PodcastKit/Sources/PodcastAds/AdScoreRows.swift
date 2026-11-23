@@ -99,12 +99,16 @@ struct ScorePlan {
       return nil
     }
     if !without.isEmpty {
-      let named = without.prefix(5).joined(separator: ", ")
-      let more = without.count > 5 ? " and \(without.count - 5) more" : ""
       notes.append(
-        "\(without.count) of \(episodes.count) episodes have no MP3 file (\(named)\(more)), so the rows that need audio leave them out.")
+        "\(without.count) of \(episodes.count) episodes have no MP3 file (\(Self.named(without))), so the rows that need audio leave them out.")
     }
     return kit
+  }
+
+  /// The ids as one phrase: the first five, then how many more.
+  private static func named(_ ids: [String]) -> String {
+    let more = ids.count > 5 ? " and \(ids.count - 5) more" : ""
+    return ids.prefix(5).joined(separator: ", ") + more
   }
 
   /// The kit when `joints.json` holds the joints of `kept` of the episodes: an episode is out of
@@ -118,10 +122,11 @@ struct ScorePlan {
       notes.append(
         "No episode has an MP3 file in the teaching folder, so the rows that need audio are left out: \(rows). The joints rows use \(cache), which holds \(kept) of \(episodes.count) episodes.")
     } else {
-      let without = episodes.filter { audio[$0.id] == nil && !kit.cachedJoints.has($0.id) }.count
-      if without > 0 {
+      let without = episodes.filter { audio[$0.id] == nil }.map(\.id)
+      if !without.isEmpty {
+        let neither = episodes.filter { audio[$0.id] == nil && !kit.cachedJoints.has($0.id) }.count
         notes.append(
-          "\(without) of \(episodes.count) episodes have neither an MP3 file nor \(cache), so the rows that need audio leave them out.")
+          "\(without.count) of \(episodes.count) episodes have no MP3 file (\(Self.named(without))), so the rows that need audio leave them out; \(neither) of them have no joints in joints.json either, so the joints rows leave those out too.")
       }
     }
     return kit

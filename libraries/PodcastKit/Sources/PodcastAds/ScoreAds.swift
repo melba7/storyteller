@@ -8,11 +8,15 @@ public struct ScoreSpan: Sendable, Equatable {
   public var start: Double
   public var end: Double
   public var sort: String
+  /// Whether the pull-back of a late start may apply (`JointPull.allows`). Only the joint rows
+  /// look at it; a sound finder's stretch leaves it false.
+  public var mayPull: Bool
 
-  public init(start: Double, end: Double, sort: String = "sponsor") {
+  public init(start: Double, end: Double, sort: String = "sponsor", mayPull: Bool = false) {
     self.start = start
     self.end = end
     self.sort = sort
+    self.mayPull = mayPull
   }
 }
 
@@ -108,7 +112,12 @@ public enum ScoreAds {
     _ ads: [FoundAd], by move: ([ScoreSpan]) -> [ScoreSpan]
   ) -> [FoundAd] {
     let ordered = ads.sorted { $0.start < $1.start }
-    let given = move(ordered.map { ScoreSpan(start: $0.start, end: $0.end, sort: $0.kind.sortName) })
+    let given = move(
+      ordered.map {
+        ScoreSpan(
+          start: $0.start, end: $0.end, sort: $0.kind.sortName,
+          mayPull: JointPull.allows(source: $0.source))
+      })
     guard given.count == ordered.count else { return ordered }
     return zip(ordered, given).map { ad, span in
       guard span.start.isFinite, span.end.isFinite, span.end > span.start else { return ad }
