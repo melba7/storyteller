@@ -48,6 +48,9 @@ the app is not added again.
   be found".
 - `Gather episodes for teaching.command` and
   `Mark ads in the teaching episodes.command`: see "Teaching run".
+- `Gather more episodes for teaching.command`,
+  `Mark the new episodes at night.command` and
+  `Gather the exam episodes.command`: see "More episodes and the exam".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -432,16 +435,149 @@ double-clicked: the files above call it. When the folder `copies/` or
 item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
 sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
-scores the ad skipping, chooses the per-show settings (`teach_settings.py`), and
-copies the results to the folders the phone reads. Every step prints a heading
-("Step N of 8"). A step that fails is said plainly and the later steps still
-run, except that the Swift steps are left out together when `podcast-teach` does
-not build. The meaning step ending with a set-up problem (no shelf, no vector
-for any line, no usable model) or the settings step ending without a scorecard
-does not stop the run. When `labels-snapped/` exists the habits, model, library,
+finds the joints of each episode's audio once (`podcast-teach joints`, see
+`joints.json` below), scores the ad skipping, chooses the per-show settings
+(`teach_settings.py`), and copies the results to the folders the phone reads.
+Every step prints a heading ("Step N of 8"; the joints belong to step 6, with
+the score). A step that fails is said plainly and the later steps still run,
+except that the Swift steps are left out together when `podcast-teach` does not
+build. The meaning step ending with a set-up problem (no shelf, no vector for
+any line, no usable model) or the settings step ending without a scorecard does
+not stop the run. When `labels-snapped/` exists the habits, model, library,
 sounds, meaning and score steps read it instead of `labels/`. At the end it
 prints one line per step (worked, nothing to do or failed). It counts as done
 when the copy to the phone worked.
+
+### More episodes and the exam
+
+Three more files do the same work in bigger steps, with the marking only at
+night. Use them in this order.
+
+1. `Gather more episodes for teaching.command`. Downloads about 500 more
+   episodes (the newest 12 of each show you follow, up to 40 GB of audio in all,
+   keeping 15 GB of the disk free) and writes them down. It asks once, at the
+   start: type `yes` to include the marking, or press Return to only gather.
+   With `yes`, Claude then marks the new episodes (see the next file) and the
+   results are worked out. It does the same as `Gather episodes for teaching`
+   with the numbers set in the environment: `TEACH_PER_SHOW` (`--per-show`),
+   `TEACH_MAX_GB` (`--max-gb`), `TEACH_EXAM=1` (`--exam`) and `TEACH_AFTER` (a
+   file that is started in place of waiting for Return when both steps worked).
+2. `Mark the new episodes at night.command`. Started by the file above when you
+   typed `yes`, or double-clicked later. It is
+   `Mark ads in the teaching episodes` with `--between 23-7` (it marks only
+   between 11 at night and 7 in the morning, and waits for the night with the
+   Mac kept awake), `--wait-hours 120` (when Claude's usage allowance is used up
+   it waits 30 minutes and tries the same episode again, up to five days in all)
+   and `--cap 95 --budget more-episodes` (at most $95 of the plan's usage in
+   all, over every run: see "The budget" below). The environment can change
+   them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`.
+   Waiting for the allowance is not a failure of the episode. Not being signed
+   in still stops at once. When it ends (also stopped early) it runs the steps
+   after marking, and it says why it stopped: the spending limit is reached, the
+   usage allowance stayed used up for longer than it waits, or episodes failed
+   (how many, and that the list is `failures.json`). Only `TEACH_YES=1` counts
+   as a yes in the launchers, and a typed answer is trimmed at its ends only, so
+   "ye s" is not yes.
+3. `Gather the exam episodes.command`. See the next section. Run it after the
+   two files above are done, so that the exam is newer than everything the phone
+   learned from.
+
+The sealed exam is a set of about 60 episodes that no learning step ever sees.
+The ids are in `exam.json` in the teaching folder
+(`{"episodes": ["<12 hex id>", ...]}`, `teach_exam.py`). Gathering, writing
+down, marking and second downloads work on them, and the scorer when it is asked
+to. The Python steps that learn leave them out:
+
+- `teach_train.py` never trains on an exam episode, never puts one on the shelf
+  and also leaves out a training episode that repeats an exam episode. It says
+  how many exam episodes it left out.
+- `teach_library.py` leaves their ads out of `ad-library.json` and of
+  `ad-library-score.json`.
+- `teach_habits.py` leaves their labels out.
+- `teach_copies.py` downloads exam episodes second, first of all, then shelf
+  episodes, then the rest, so a limit cuts the rest first.
+
+Every learning step leaves exam episodes out, the Swift steps
+`podcast-teach sounds` and `meaning` included. The scorer reads them only when
+it is asked to.
+
+`Gather the exam episodes.command` downloads about 60 brand-new episodes (it
+runs `teach_collect.py --exam --per-show 2 --max-gb 46`; `--exam-most` changes
+the 60). Only episodes that are newer than every episode of the same feed that
+was gathered before are taken, and one with no date is not. Their ids go into
+`exam.json` before `episodes.json` is saved and before any download, so a run
+that stops half way can never leak them into training. `--list --exam` says how
+many a run would take. The wanted list is ignored for an exam run. It then asks
+once for a typed `yes` (or `TEACH_YES=1`). The exam's own episodes are
+downloaded first, so episodes still waiting from an earlier gather cannot use up
+the size allowance before them. After the gathering it says how many exam
+episodes have audio and a transcript. With none it says so, marks nothing, and
+stops with an error instead of saying "Done". With `yes`, Claude marks the exam
+only at night (`teach_label.py --only-exam`, up to
+$14 in all under the budget `exam`), and
+marks 15 of them a second time into `labels-second/` (up to $4
+in all under the budget `exam-second`), so we can see how much two markings
+differ. The second marking is only made for an episode that already has a first
+label, and its `--limit 15` counts the second labels already held. It does not
+run the steps after marking: the exam teaches nothing. At the end it says how
+many exam episodes are marked once and how many twice (counted by
+`teach_exam.py finish`). It says "Done" and that the exam is ready to be scored
+only when every exam episode that has a transcript has a first label and the
+second marking holds 15 of them (or all of them when there are fewer). Otherwise
+it says what is left and that double-clicking again carries on.
+
+`teach_label.py` has these options. `--only-exam` marks only the episodes in
+`exam.json`, in its order. `--between 23-7` gives the local clock hours it may
+work in (a window over midnight works). The window rule: no call to Claude
+starts outside the hours. The clock is checked before every call (each part of
+an episode and each retry), so a usage-limit wait that ends at 7:15 does not
+mark anything until 23:00. Outside the hours it waits in steps of at most ten
+minutes. `--wait-hours H` waits for the usage allowance as described above. A
+retry after that wait asks only for the parts of the episode that are still
+missing. The opening message says the hours and the cap when they are set.
+
+The budget. `--budget NAME` makes `--cap` the total for all runs under that
+name. What was spent is kept in `marking-spend.json` in the teaching folder,
+`{"version": 1, "budgets": {"<name>": {"dollars": 12.34, "episodes": 65}}}`,
+written after every marked episode (and after a failed one that still cost
+something). A run starts by saying what the budget has spent and what is left,
+never starts a call when the budget is spent, and ends with a line saying where
+it stands. A damaged file is a set-up problem, never a fresh start. Without
+`--budget` the cap is for one run only, and it is checked before every call. The
+launchers use the budgets `more-episodes` ($95), `exam` ($14) and `exam-second`
+($4).
+
+Exit codes of `teach_label.py`: 0 done, nothing to do, or `--limit` reached; 2 a
+set-up problem or another run is working in the folder; 3 stopped early because
+the usage allowance wait ran out or Claude is not signed in; 4 you did not type
+yes; 5 the cap or the budget is reached; 6 stopped early because three episodes
+in a row failed.
+
+### The stream replay and Apple's model
+
+`Score the ad skipping.command` passes `--stream`, so its report ends with a
+block that replays every episode as a stream played from the start: the phone's
+head scan and whole-file pass at an assumed standard pace and a slow one (the
+report prints the speeds, which are guesses), the player's own skip rules, and
+the same bar as above. "Ready" there means the same player with the finished
+file known before play, so it shows what streaming costs. The head scan waits
+for Apple's model in every row (a phone with Apple Intelligence on is assumed),
+and the first 3 minutes are also shown at speech speeds of 6 and 25 times real
+time, since the phone's real speed is not measured yet.
+
+`Ask Apple's model about the test episodes.command` builds `podcast-teach` and
+runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
+Apple's on-device model about each scored episode that has no answer yet and
+saves each answer at once in `apple-model.json`, so it may be closed and
+double-clicked again to carry on. It costs nothing and uses no Claude allowance,
+but may take a few hours. Needs macOS 26 with Apple Intelligence on. When it
+stops with exit 2 the window says to read what the tool printed above (no model,
+a model still downloading, a damaged or foreign `apple-model.json`, or a folder
+problem), and when every episode already had an answer it says so. A damaged
+`apple-model.json` only leaves the row out of the scorecard, with a note. The
+next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
+and streams it too. The settings and publish steps read rows by name, so the
+extra row changes nothing they decide.
 
 ### What the steps write
 
@@ -456,14 +592,31 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `habits.json`: what is usual for each show.
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
-  how well it did on the shelf.
+  how well it did on the shelf. With `--fit-tool` (teach-finish.sh builds
+  `podcast-teach` first and passes it) the model is version 2: word pairs of the
+  two lines before and after as features, fitted by `podcast-teach fit`, and
+  decoded with a second decoder in which the ad score leaves credits out,
+  credits get a second pass, and an ad's start widens back. A widened line whose
+  smoothed score is under `stay` takes the kind of the line before it, as
+  bridged lines do. Without the fit tool the trainer writes a version 1 file.
+  Warning: an app older than the build that reads version 2 refuses a version 2
+  file and keeps the model it has, so update the phone's app before using the
+  Mac's version 2 trainer.
 - `ad-library.json`: every ad Claude marked with high confidence (at least 25
   words, 8 to 300 seconds), each different ad once, the ones met in most
-  episodes first. An ad met in one episode only is in it too. The phone gets it.
+  episodes first. An ad met in one episode only is in it too. An entry keeps the
+  first 600 words of the ad. The phone gets it.
 - `ad-library-score.json`: the same, built without the shelf episodes. It stays
   here, and is for scoring only, so the scorecard's "plus the library" row does
   not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
+- `joints.json`: the joints of each episode's MP3 file (where an inserted ad was
+  spliced in), made by `podcast-teach joints` once for each episode that has an
+  audio file and no entry yet; existing entries are kept. `podcast-teach score`
+  uses it for the joint rows when it has the episode, and reads the audio only
+  when it does not, so a folder with `joints.json` and no audio still gets those
+  rows. A damaged file, or one made by another version of the joint finder (it
+  is written into the file), is ignored with one line and made again.
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
@@ -472,6 +625,14 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
   whole at every run, so a hand edit is lost at the next "Teach the phone
   again". It only ever makes the phone stricter than its built-in default.
+  Steady joints (`steadyJoints`: steady files are used too, and a late start is
+  pulled back to a joint up to 60 s before it, in steady files and in the
+  others) are turned on when the scorecard's "Plus joints (steady files too)"
+  row passes at least 3 more of the owner's breaks than the row before it and
+  adds at most 1 skip with no ad; a scorecard with no bar is judged by seconds
+  as before. The pull is only for a start that a word finder gave: an ad named
+  by the repeated words, the meaning model or the word model, or an ad with no
+  name that starts where an ad of the word rules or the word model starts.
 - `copies/` and `labels-snapped/`: the second download's findings and the labels
   snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.

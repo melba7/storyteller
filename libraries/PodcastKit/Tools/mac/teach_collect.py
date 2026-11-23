@@ -19,7 +19,7 @@ once more (with the address the feed gives now), and new episodes are added at t
 that is bigger than the file limit is marked "skipped: ..." and not tried again.
 
   teach_collect.py [--folder F] [--shows FILE] [--per-show 4] [--wanted 20] [--max-gb 12]
-                   [--keep-free-gb 15] [--list]
+                   [--keep-free-gb 15] [--exam] [--exam-most 60] [--list]
 
 When the folder has a wanted.json (teach_feedback.py writes it from the phone's notes), the episodes
 in it are planned before the newest episodes of each show, whatever --per-show says, at most
@@ -28,6 +28,14 @@ phone's spelling of a feed finds the show, and is planned under the show's own f
 It is looked up in the show's feed by guid (or by audio address when it has no guid). One whose
 feed is not followed, whose address is not http or https, that is no longer in its feed, or that is
 already gathered, is left out and counted. A damaged wanted.json is ignored.
+
+--exam gathers a sealed exam instead (see teach_exam.py): wanted.json is ignored for the run, of the new
+episodes only those whose published time is later than the newest of every episode of the same feed
+already in episodes.json are kept (one with no published time is not), at most --exam-most (default
+60, the exam episodes already in exam.json counting) in the planner's round-robin order. Their ids go
+into exam.json before episodes.json is saved and before any download, so a run that stops half way
+cannot leak them into training. The exam's episodes are downloaded first (those of an earlier exam
+gather that are still waiting too), the other waiting ones after them if the size limit allows. With --list it says how many exam episodes a run would take.
 
 --max-gb is the limit for all the audio kept in the folder, not for one run, and audio is never
 deleted, so once the folder is full nothing more is downloaded, the wanted episodes included.
@@ -45,6 +53,8 @@ import time
 
 import probe_shows as probe
 import teach_fetch as fetching
+import teach_exam
+import teach_store
 import teach_wanted
 from teach_wanted import wanted_entries
 from teach_feed import audio_name, episode_id, feed_episodes
@@ -118,6 +128,16 @@ def plan(shows, known_ids, per_show, fetch=fetching.fetch_feed, pause=probe.PAUS
     return entries
 
 
+def positive(text):
+    try:
+        number = int(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError("%r is not a whole number" % text)
+    if number < 1:
+        raise argparse.ArgumentTypeError("%r is not 1 or more" % text)
+    return number
+
+
 def is_skipped(entry):
     return (entry["error"] or "").startswith(SKIPPED)
 
@@ -136,19 +156,26 @@ def refresh(entries, listed):
 def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.fetch_feed,
             download=fetching.download, free_space=lambda path: shutil.disk_usage(path).free,
             pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE,
-            wanted=(), wanted_most=WANTED):
+            wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST):
     """Adds the new episodes to episodes.json and downloads every entry that has no file yet, in
-    list order. Stops before a download that would take the audio on disk over `max_bytes`, or
+    list order (with `exam`, the exam's episodes first). Stops before a download that would take the audio on disk over `max_bytes`, or
     when the free disk space, less the file about to come (the feed's size, when known), is under
     `keep_free_bytes`. An episode bigger than `max_file` (by the feed's size or the server's) is
     recorded as "skipped: ..." and never tried again. episodes.json is saved after every episode.
     A failed download is recorded and the run carries on. Answers {"shows_read", "downloaded",
-    "failed", "skipped", "waiting", "files", "bytes", "why"}, `why` being "size", "space" or None."""
+    "failed", "skipped", "waiting", "files", "bytes", "why"}, `why` being "size", "space" or None.
+    With `exam`, the wanted list is ignored and only the episodes that teach_exam.pick_new takes are
+    added; their ids go into exam.json before episodes.json is saved and before any download, and
+    the downloads start with the exam's episodes."""
     entries = load_manifest(folder)
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     stats = {}
     new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, pause, sleep, say, stats,
-               wanted, wanted_most)
+               () if exam else wanted, wanted_most)
+    if exam:
+        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most)
+        joined = teach_exam.add_to_exam(folder, [entry["id"] for entry in new])
+        say("%d new episodes were put in the exam (%d in all)." % (len(new), len(joined)))
     refresh(entries, stats["listed"])
     entries.extend(new)
     save_manifest(folder, entries)
@@ -156,7 +183,11 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
               "waiting": 0, "files": 0, "bytes": 0, "why": None}
     too_big = "%s larger than %d MB" % (SKIPPED, max_file // 1_000_000)
     first = True
-    for position, entry in enumerate(entries):
+    # An exam run downloads the exam's own episodes first, so the size allowance goes to them and
+    # not to episodes that were still waiting from an earlier run.
+    exam_ids = set(teach_exam.read_exam(folder)) if exam else set()
+    order = [e for e in entries if e["id"] in exam_ids] + [e for e in entries if e["id"] not in exam_ids]
+    for position, entry in enumerate(order):
         if entry["file"] or is_skipped(entry):
             continue
         if (entry["size"] or 0) > max_file:
@@ -170,7 +201,7 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
         elif free_space(folder) - (entry["size"] or 0) < keep_free_bytes:
             result["why"] = "space"
         if result["why"]:
-            result["waiting"] = sum(1 for other in entries[position:]
+            result["waiting"] = sum(1 for other in order[position:]
                                     if not other["file"] and not is_skipped(other))
             break
         if not first:
@@ -198,15 +229,20 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     return result
 
 
-def list_command(folder, shows, per_show, fetch, sleep, say, wanted_most=WANTED):
+def list_command(folder, shows, per_show, fetch, sleep, say, wanted_most=WANTED, exam=False,
+                 exam_most=teach_exam.MOST):
     """Says what a run would download, without writing anything."""
     entries = load_manifest(folder)
     stats = {}
-    entries = [e for e in entries if not e["file"] and not is_skipped(e)] + plan(
-        shows, {entry["id"] for entry in entries}, per_show, fetch, probe.PAUSE, sleep, say, stats,
-        teach_wanted.load_wanted(folder, say), wanted_most)
+    new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, probe.PAUSE, sleep, say,
+               stats, () if exam else teach_wanted.load_wanted(folder, say), wanted_most)
+    if exam:
+        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most)
+    entries = [e for e in entries if not e["file"] and not is_skipped(e)] + new
     known = sum(entry["size"] or 0 for entry in entries)
     unknown = sum(1 for entry in entries if not entry["size"])
+    if exam:
+        say("A run would take %d exam episodes." % len(new))
     say("Read %d show%s. A run would download %d episodes, %.1f GB in the sizes the feeds give; "
         "%d of them have no size." % (stats["shows_read"], "" if stats["shows_read"] == 1 else "s",
                                      len(entries), known / GB, unknown))
@@ -221,6 +257,8 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
     parser.add_argument("--max-gb", type=float, default=MAX_GB)
     parser.add_argument("--keep-free-gb", type=float, default=KEEP_FREE_GB)
     parser.add_argument("--wanted", type=int, default=WANTED)
+    parser.add_argument("--exam", action="store_true")
+    parser.add_argument("--exam-most", type=positive, default=teach_exam.MOST)
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
@@ -231,14 +269,16 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
         return 2
     try:
         if args.list:
-            return list_command(folder, shows, args.per_show, fetch, sleep, say, args.wanted)
+            return list_command(folder, shows, args.per_show, fetch, sleep, say, args.wanted,
+                                args.exam, args.exam_most)
         with run_lock(folder):
             say("Reading the feeds of %d shows..." % len(shows))
             result = collect(folder, shows, args.per_show, int(args.max_gb * GB),
                              int(args.keep_free_gb * GB), fetch=fetch, download=download,
-                             sleep=sleep, say=say, wanted=teach_wanted.load_wanted(folder, say),
-                             wanted_most=args.wanted)
-    except Busy as error:
+                             sleep=sleep, say=say,
+                             wanted=() if args.exam else teach_wanted.load_wanted(folder, say),
+                             wanted_most=args.wanted, exam=args.exam, exam_most=args.exam_most)
+    except (Busy, teach_store.Problem) as error:
         say(str(error))
         return 2
     except ManifestError as error:

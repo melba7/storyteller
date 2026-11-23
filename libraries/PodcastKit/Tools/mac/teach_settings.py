@@ -19,7 +19,10 @@ it. Right seconds are adSeconds - heardSeconds, wrong seconds are cutSeconds. Th
 - A finder whose row is under 85 percent right (right / (right + wrong) seconds) only asks: on every
   show when that holds over all shows and its default is "skip", and on a show when it holds there.
 - A finder with more wrong than right seconds is off everywhere when that holds over all shows, and
-  asks on a show when it holds there.
+  asks on a show when it holds there. A finder that found no ad at all and cut under
+  0.05 percent of the show is not judged, over all shows and on a show (the sound and repeat finders
+  learn from a show's earlier episodes, which one unseen episode of each show cannot show): it keeps
+  its level.
 - Two undone skips of a finder on a show among its last five answers in the notes (the last 30 days)
   make it ask there; two "not an ad" answers among the last five turn it off there. Same rule as the
   phone's own finder guard.
@@ -28,7 +31,10 @@ it. Right seconds are adSeconds - heardSeconds, wrong seconds are cutSeconds. Th
   seconds (most podcast files are steady, and on those the plain row finds nothing); when neither does
   they are off everywhere. On a show where the plain row adds more wrong than right seconds they are
   off for that show.
-- Steady files get joints too ("steadyJoints") when the steady row pays by that test and, if the plain
+- Steady files get joints too ("steadyJoints") by the owner's bar when the steady row and the row
+  before it both carry a "bar" (breaks passed, skips with no ad): on when the steady row passes at
+  least 3 more breaks than the row before it and adds at most 1 skip with no ad, else off. Without a
+  bar on both rows, by the seconds: when the steady row pays by that test and, if the plain
   row pays as well, has more right seconds than it and at most one in a hundred more wrong ones. A
   show where the steady row adds more wrong than right seconds over "Plus joints" gets
   "steadyJoints": false.
@@ -51,6 +57,7 @@ import time
 
 import teach_store
 from apple_podcasts_export import default_folders
+from teach_settings_bar import bar_decision
 from teach_settings_notes import answers, read_notes
 from teach_settings_rows import SCORECARD, read_scorecard, rows_in
 from teach_store import FOLDER, Problem
@@ -71,6 +78,10 @@ DEFAULT = {"finders": {"own-sound": "skip", "repeat-sound": "ask", "repeat-words
 STRICTNESS = {"skip": 0, "ask": 1, "off": 2}
 MIN_EPISODES = 3
 PRECISION_PERCENT = 85
+# A finder that found no ad at all and cut under one part in this many of the show has shown nothing
+# either way: the sound and repeat finders learn from a show's earlier episodes, so a test over one
+# unseen episode of each show cannot show their gain.
+UNJUDGED_PARTS = 2000
 # Wrong seconds may rise by one in a hundred (as 101 percent of the row before) and joints still pay.
 WRONG_ALLOWED_PERCENT = 101
 EPSILON = 1e-6
@@ -86,6 +97,11 @@ def gained(after, before):
 def worse(right, wrong):
     """More wrong than right seconds (a hair more, so sums that differ by rounding do not count)."""
     return wrong - right > EPSILON
+
+
+def unjudged(right, wrong, show):
+    """Nothing found and almost nothing cut (under 0.05 percent of the show): too little to judge by."""
+    return abs(right) <= EPSILON and wrong * UNJUDGED_PARTS < show
 
 
 def imprecise(right, wrong):
@@ -121,6 +137,11 @@ def added_on(pairs, key, what):
     return show_gain(*pairs[what], key) if what in pairs else None
 
 
+def show_seconds(pairs, key, what):
+    """The seconds of the show `key` in the row of `what` (call it only when `added_on` found it)."""
+    return pairs[what][0].shows[key].figures.show
+
+
 def joints_pay(row, before):
     """Whether a joints row gains: more right seconds, and at most one in a hundred more wrong ones."""
     right, _ = gained(row.total, before.total)
@@ -150,13 +171,16 @@ def over_joints(named, pairs, default, lines):
     """Judges the joints over all shows. Most podcast files are steady, and there the plain "Plus joints"
     row finds nothing, so joints stay on when EITHER that row OR the "(steady files too)" row pays against
     the row before "Plus joints"; they go off only when neither does. Steady files are used too when the
-    steady row pays and, if the plain row pays as well, finds more than it for at most the allowed wrong."""
+    steady row pays and, if the plain row pays as well, finds more than it for at most the allowed wrong.
+    When the rows carry the owner's bar, the bar says whether the steady row pays, in place of the seconds,
+    everywhere below, so a steady row that fails the bar cannot keep plain joints on."""
     joints, steady = named.get("joints"), named.get("steady-joints")
     if "joints" not in pairs or joints.total.episodes < MIN_EPISODES:
         return
     before = pairs["joints"][1]
+    by_bar = bar_decision(pairs["steady-joints"], lines) if steady and "steady-joints" in pairs else None
     plain_pays = joints_pay(joints, before)
-    steady_pays = bool(steady) and joints_pay(steady, before)
+    steady_pays = by_bar if by_bar is not None else bool(steady) and joints_pay(steady, before)
     if not plain_pays and not steady_pays:
         right, wrong = gained(joints.total, before.total)
         text = "Joints are off for every show: over %d marked episodes they found %s more of the ads and " \
@@ -166,6 +190,8 @@ def over_joints(named, pairs, default, lines):
             text += " (%s and %s with steady files too)" % (signed(right), signed(wrong))
         default["joints"] = False
         lines.append(text + ", which is not a clear gain.")
+    elif by_bar is not None:
+        default["steadyJoints"] = by_bar
     elif steady_pays:
         compared = joints if plain_pays else before
         right, wrong = gained(steady.total, compared.total)
@@ -180,7 +206,11 @@ def overall(what, row, before, default, lines):
     """Changes the default block for the finder `what`, judged over all shows."""
     right, wrong = gained(row.total, before.total)
     episodes = row.total.episodes
-    if worse(right, wrong):
+    if unjudged(right, wrong, row.total.show):
+        if wrong > EPSILON:
+            lines.append("%s stays as it is: over %d marked episodes it found no ad and cut only %s of show, "
+                         "too little to judge." % (what, episodes, secs(wrong)))
+    elif worse(right, wrong):
         default["finders"][what] = "off"
         lines.append("%s is off for every show: over %d marked episodes it %s."
                      % (what, episodes, cost(right, wrong)))
@@ -195,7 +225,8 @@ def level_of(pairs, heard, key, finder):
     """What the scorecard and the notes together let `finder` do on the show `key`: (level, why)."""
     level, why = "skip", ""
     seconds = added_on(pairs, key, finder)
-    if seconds and (worse(*seconds) or imprecise(*seconds)):
+    if seconds and not unjudged(*seconds, show_seconds(pairs, key, finder)) \
+            and (worse(*seconds) or imprecise(*seconds)):
         level, why = "ask", "it " + cost(*seconds)
     if (key, finder) in heard and STRICTNESS[heard[key, finder][0]] > STRICTNESS[level]:
         level, why = heard[key, finder]

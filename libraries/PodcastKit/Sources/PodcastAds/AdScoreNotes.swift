@@ -48,9 +48,12 @@ enum AdScoreNotes {
   /// What `teach_settings.py` asks of a finder before it judges it, and its two rules, over what
   /// the row added to the row before it: more wrong than right seconds turns the finder off for
   /// every show, and under 85 percent of the added seconds being ad turns a finder that skips by
-  /// default into one that only asks.
+  /// default into one that only asks. A finder that found no ad at all and cut under one part in
+  /// `unjudgedParts` of the show is not judged (the sound and repeat finders learn from a show's
+  /// earlier episodes, which one unseen episode of each show cannot show).
   private static let judgedOverEpisodes = 3
   private static let precisionPercent = 85.0
+  private static let unjudgedParts = 2000.0
 
   /// What a finder row added to the row before it, and what the Mac will do about it the next time
   /// it chooses the settings (the same rule, read from the same numbers).
@@ -63,6 +66,9 @@ enum AdScoreNotes {
     let verdict: String
     if row.total.episodes < judgedOverEpisodes {
       verdict = "The Mac judges a finder only over \(judgedOverEpisodes) or more marked episodes, so it stays as it is."
+    } else if abs(right) <= epsilon, wrong > epsilon, wrong * unjudgedParts < row.total.showSeconds {
+      verdict =
+        "It found no ad and cut under 0.05 percent of the show, too little to judge, so it stays as it is."
     } else if wrong - right > epsilon {
       verdict = "The next Teach the phone again turns it off for every show."
     } else if right + wrong > epsilon, right * 100 < precisionPercent * (right + wrong),

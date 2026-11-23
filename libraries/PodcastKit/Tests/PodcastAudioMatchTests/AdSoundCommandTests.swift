@@ -110,6 +110,32 @@ final class AdSoundCommandTests: XCTestCase {
     XCTAssertTrue(result.said.contains("Kept 1 different sound."), result.said)
   }
 
+  func testAnExamEpisodeIsNeverLearnedFrom() throws {
+    try addEpisode("aaaaaaaaaaaa", filler: 10_000, ad: 0..<500)
+    try addEpisode("bbbbbbbbbbbb", filler: 20_000, ad: 0..<500)
+    // The exam episode has an ad of its own that no other episode has.
+    try addEpisode("cccccccccccc", filler: 30_000, ad: 700..<1200)
+    try writeManifest()
+    try Data("{\"episodes\": [\"cccccccccccc\"]}".utf8).write(
+      to: folder.appendingPathComponent("exam.json"))
+    XCTAssertEqual(go().code, 0)
+    let file = folder.appendingPathComponent(AdSoundLibrary.fileName)
+    let withLabel = try Data(contentsOf: file)
+    // Take the exam episode's label away: what is saved must be the same, byte for byte.
+    try FileManager.default.removeItem(at: folder.appendingPathComponent("labels/cccccccccccc.json"))
+    XCTAssertEqual(go().code, 0)
+    XCTAssertEqual(try Data(contentsOf: file), withLabel)
+    XCTAssertEqual(AdSoundLibrary.load(from: file).sounds.count, 1)
+  }
+
+  func testADamagedExamFileIsASetUpProblem() throws {
+    try addEpisode("aaaaaaaaaaaa", filler: 10_000, ad: 0..<500)
+    try writeManifest()
+    try Data("{broken".utf8).write(to: folder.appendingPathComponent("exam.json"))
+    XCTAssertEqual(go().code, 2)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: folder.appendingPathComponent(AdSoundLibrary.fileName).path))
+  }
+
   func testSetUpProblemsExitWithTwo() throws {
     XCTAssertEqual(go([]).code, 2)
     XCTAssertEqual(go([folder.path + "-missing"]).code, 2)

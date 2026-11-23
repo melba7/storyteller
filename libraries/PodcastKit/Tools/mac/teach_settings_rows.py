@@ -2,7 +2,10 @@
 
 Standard library only. A run has `rows`, one per finder (each stands on the row before it), and a row
 has `total` and `shows[]` (`feed`, `show`, `total`). Of a total only the numbers this needs are read:
-how many episodes, the right seconds (adSeconds - heardSeconds) and the wrong seconds (cutSeconds).
+how many episodes, the right seconds (adSeconds - heardSeconds), the wrong seconds (cutSeconds) and
+the seconds of show (showSeconds, 0 when the file has none). A row may also carry the owner's `bar`
+(AdBar.swift): of it only `breaks`, `passed` and `noAdSkips` are read, and a bar that lacks one of them
+or holds a number that is not a number counts as none.
 Anything of the wrong shape is skipped, never raised.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -17,9 +20,10 @@ from teach_store import Problem
 SCORECARD = "scorecard.json"
 SCORECARD_LIMIT = 16 * 1024 * 1024
 
-Figures = collections.namedtuple("Figures", "episodes right wrong")
+Figures = collections.namedtuple("Figures", "episodes right wrong show")
 Show = collections.namedtuple("Show", "feed name figures")
-Row = collections.namedtuple("Row", "name total shows")
+Bar = collections.namedtuple("Bar", "breaks passed skips")
+Row = collections.namedtuple("Row", "name total shows bar", defaults=(None,))
 
 
 def number(value):
@@ -39,11 +43,23 @@ def figures(total):
     kept = [total.get(key) for key in ("episodes", "adSeconds", "heardSeconds", "cutSeconds")]
     if not all(number(value) for value in kept) or kept[0] < 0:
         return None
-    return Figures(int(kept[0]), kept[1] - kept[2], kept[3])
+    shown = total.get("showSeconds")
+    return Figures(int(kept[0]), kept[1] - kept[2], kept[3], shown if number(shown) and shown > 0 else 0.0)
 
 
 def added(first, second):
     return Figures(*(a + b for a, b in zip(first, second)))
+
+
+def read_bar(value):
+    """The Bar of a row's `bar`, or None when there is none, it is not made of numbers or it has no
+    breaks (a bar of no breaks passes nothing and says nothing)."""
+    if not isinstance(value, dict):
+        return None
+    kept = [value.get(key) for key in ("breaks", "passed", "noAdSkips")]
+    if not all(number(each) and each >= 0 for each in kept) or kept[0] == 0:
+        return None
+    return Bar(*(int(each) for each in kept))
 
 
 def read_row(item):
@@ -66,7 +82,7 @@ def read_row(item):
             one = dict(one, feed=shows[key].feed, show=shows[key].name)
         name = one["show"] if isinstance(one.get("show"), str) else ""
         shows[key] = Show(one["feed"], name, counted)
-    return Row(item["name"], whole, shows)
+    return Row(item["name"], whole, shows, read_bar(item.get("bar")))
 
 
 def rows_in(root):

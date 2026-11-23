@@ -10,10 +10,16 @@ public enum AdScoreCommand {
     public var all = false
     public var noModel = false
     public var noLibrary = false
+    /// Score only the sealed exam episodes (`exam.json`).
+    public var exam = false
+    /// Where to write what the last row found for each scored episode; empty for nowhere.
+    public var dump = ""
+    /// Also replay every episode as a stream played from the start (StreamScore.swift).
+    public var stream = false
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -24,6 +30,14 @@ public enum AdScoreCommand {
       case "--all": options.all = true
       case "--no-model": options.noModel = true
       case "--no-library": options.noLibrary = true
+      case "--exam": options.exam = true
+      case "--stream": options.stream = true
+      case "--dump":
+        index += 1
+        guard index < arguments.count, !arguments[index].isEmpty else {
+          return .failure(TeachingFolderError(message: "--dump needs a file name."))
+        }
+        options.dump = arguments[index]
       case "--labels":
         index += 1
         guard index < arguments.count, !arguments[index].isEmpty else {
@@ -61,29 +75,43 @@ public enum AdScoreCommand {
     }
     let folder = URL(fileURLWithPath: options.folder)
     var notes: [String] = []
-    let labelled: [TeachingEpisode]
+    let everyone: [TeachingEpisode]
     do {
-      labelled = try TeachingFolder.episodes(in: folder, labels: options.labels, notes: &notes)
+      everyone = try TeachingFolder.episodes(in: folder, labels: options.labels, notes: &notes)
     } catch {
       err("\(error.localizedDescription)")
       return 2
     }
     for note in notes { err(note) }
+    // The exam is invisible unless asked for: out of the scores and out of what teaches the
+    // finders. With --exam it is all that is scored and every other episode only teaches.
+    let exam = everyone.filter(\.onExam)
+    let labelled = options.exam ? everyone : everyone.filter { !$0.onExam }
+    if options.exam && exam.isEmpty {
+      err("--exam was asked for, but no labelled episode is named in exam.json in \(folder.path).")
+      return 2
+    }
     guard !labelled.isEmpty else {
-      out("No episode in \(folder.path) has both a transcript and a label yet.")
+      if !exam.isEmpty {
+        out(
+          "The only marked episodes in \(folder.path) are on the exam (exam.json); --exam scores them.")
+      } else {
+        out("No episode in \(folder.path) has both a transcript and a label yet.")
+      }
       return 0
     }
 
     let shelf = labelled.filter(\.onShelf)
-    let chosen = options.all || shelf.isEmpty ? labelled : shelf
+    let chosen = options.exam ? exam : options.all || shelf.isEmpty ? labelled : shelf
     let which =
-      options.all ? "all \(chosen.count) labelled episodes"
+      options.exam ? "the \(chosen.count) sealed exam episodes, every other labelled episode only teaches"
+      : options.all ? "all \(chosen.count) labelled episodes"
       : shelf.isEmpty ? "all \(chosen.count) labelled episodes (there is no shelf yet)"
       : "the \(chosen.count) shelf episodes the model never saw"
     let title = "Scorecard for \(folder.lastPathComponent): \(which)"
 
     let model = options.noModel ? nil : AdWordModel.load(from: folder.appendingPathComponent("ad-model.json"))
-    let scoringShelf = !options.all && !shelf.isEmpty
+    let scoringShelf = options.exam || (!options.all && !shelf.isEmpty)
     let libraryRead =
       options.noLibrary
       ? (known: KnownAds(), file: "")
@@ -115,21 +143,39 @@ public enum AdScoreCommand {
 
     // The rows that stand on the finders: each adds one thing to the row before it.
     let audio = TeachingAudio.files(in: folder)
-    let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
+    // The word finders' own ads for the whole episode, with no library and no join: they tell which
+    // ads with no source may be pulled back to a joint.
+    let words: ScoreWords = { input in
+      last.local.ads(transcript: input.transcript, episodeDuration: input.episode.episodeLength)
+    }
+    let plan = ScorePlan.make(
+      folder: folder, episodes: chosen, audio: audio, now: now, extras: extras, words: words)
     let finalAds = ScoreEpisodeAds()
+    // A damaged or newer file leaves the Apple row out; `podcast-teach apple` never overwrites it.
+    var appleSaved: AppleAnswers?
+    var appleNote: String?
+    switch AppleAnswers.load(in: folder) {
+    case .failure:
+      appleNote =
+        "Apple's model row is left out: \(AppleAnswers.fileName) in \(folder.path) could not be read (it is damaged or of another version). After the file is moved away, `podcast-teach apple` can make it again."
+    case .success(let loaded): appleSaved = loaded
+    }
+    let apple = AppleScoreRow.answers(appleSaved, episodes: chosen)
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
     // episode of a show, so the labelled episodes that are not scored come first and only teach.
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
     let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
+    let allLayers = layers + (apple.map { [AppleScoreRow.layer($0)] } ?? [])
     let made = AdScoreRun.runLayers(
-      episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: layers)
+      episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
       cards.append(card)
       rows.append(ScorecardRow(name: layer.name, card: card))
     }
     guard let card = cards.last else { return 0 }
 
-    let historyURL = folder.appendingPathComponent(ScorecardHistory.fileName)
+    let historyURL = folder.appendingPathComponent(
+      options.exam ? ScorecardHistory.examFileName : ScorecardHistory.fileName)
     var history = ScorecardHistory.load(from: historyURL)
     let reportNotes = (libraryRead.file.isEmpty ? [] : ["Library: \(libraryRead.file)"]) + plan.notes
     var text = AdScoreReport.text(
@@ -142,13 +188,53 @@ public enum AdScoreCommand {
       base(episode, head)
     })
     text += "\n\n" + after.joined(separator: "\n")
+    let bar = AdBarReport.lines(rows)
+    if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
+    var saved = rows
+    if let apple, let card = made.last {
+      let row = ScorecardRow(name: AppleScoreRow.name, card: card)
+      text += "\n\n" + AppleScoreRow.lines(row, answered: apple.count, of: chosen.count).joined(separator: "\n")
+      saved.append(row)
+    }
+    if let appleNote { text += "\n\n" + appleNote }
+    if options.stream {
+      let detect: (TeachingEpisode, Transcript) -> [FoundAd] = { episode, transcript in
+        let input = AdScoreInput(episode: episode, transcript: transcript, audio: audio[episode.id])
+        var soFar = base(episode, transcript)
+        for layer in layers { soFar = layer.apply(input, soFar: soFar) }
+        return soFar
+      }
+      let streamed = StreamScore.run(
+        episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple,
+        whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
+      var shown = [(name: String, stream: StreamNumbers)]()
+      shown.append((rows.last?.name ?? "", streamed.finders))
+      saved[rows.count - 1].stream = streamed.finders
+      if let more = streamed.withModel, let row = saved.last, saved.count == rows.count + 1 {
+        shown.append((row.name, more))
+        saved[rows.count].stream = more
+      }
+      text += "\n\n" + StreamReport.lines(shown).joined(separator: "\n")
+    }
     out(text)
-    history.append(ScorecardRun(at: Int64(now.timeIntervalSince1970 * 1000), title: title, rows: rows))
+    history.append(
+      ScorecardRun(
+        at: Int64(now.timeIntervalSince1970 * 1000), title: title, total: card.total, rows: saved))
     do {
       try history.save(to: historyURL)
     } catch {
       err("The scorecard could not be saved to \(historyURL.path): \(error.localizedDescription)")
       return 2
+    }
+    if !options.dump.isEmpty {
+      do {
+        try AdScoreDump.write(
+          chosen, found: { finalAds.ads(for: $0.id) ?? [] },
+          to: URL(fileURLWithPath: options.dump))
+      } catch {
+        err("The dump could not be written to \(options.dump): \(error.localizedDescription)")
+        return 2
+      }
     }
     return 0
   }

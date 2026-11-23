@@ -9,10 +9,12 @@ then the failed ones with the fewest failures, and an episode that failed three 
 until the run is started with --retry-failed. An entry goes when the episode later succeeds.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import argparse
 import json
 import os
+import sys
 
-from teach_store import write_json
+from teach_store import FOLDER, write_json
 
 FILE = "failures.json"
 VERSION = 1
@@ -69,3 +71,22 @@ class Failures:
             return ordered, []
         ready = [item for item in ordered if self.count(key(item)) < GIVE_UP_AFTER]
         return ready, ordered[len(ready):]
+
+
+def main(argv, say=print):
+    """`count --folder F [--step label]` says how many episodes are on the list of failures of the
+    step (the launchers print it)."""
+    parser = argparse.ArgumentParser(prog="teach_failures.py")
+    parser.add_argument("command", choices=("count",))
+    parser.add_argument("--folder", default=FOLDER)
+    parser.add_argument("--step", choices=("transcribe", "label"), default="label")
+    try:
+        options = parser.parse_args(argv)
+    except SystemExit:
+        return 2
+    say(len(Failures(os.path.expanduser(options.folder), options.step).data[options.step]))
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

@@ -8,10 +8,11 @@ import XCTest
 final class AdScoreNotesTests: XCTestCase {
   private func row(
     _ name: String, ad: Double = 300, heard: Double, cut: Double, before: Double = 0, after: Double = 0,
-    episodes: Int = 3
+    episodes: Int = 3, show: Double = 0
   ) -> ScorecardRow {
     var total = ScoreTotals()
     total.episodes = episodes
+    total.showSeconds = show
     total.adSeconds = ad
     total.heardSeconds = heard
     total.cutSeconds = cut
@@ -79,12 +80,26 @@ final class AdScoreNotesTests: XCTestCase {
   /// A row before it with 100 right seconds (300 of ad, 200 heard) and 10 wrong, and a finder row
   /// that adds `right` right seconds and `wrong` wrong seconds to it.
   private func finder(
-    _ name: String, right: Double, wrong: Double, episodes: Int = 3
+    _ name: String, right: Double, wrong: Double, episodes: Int = 3, show: Double = 0
   ) -> [ScorecardRow] {
     [
-      row("Plus promo rules", heard: 200, cut: 10),
-      row(name, heard: 200 - right, cut: 10 + wrong, episodes: episodes),
+      row("Plus promo rules", heard: 200, cut: 10, show: show),
+      row(name, heard: 200 - right, cut: 10 + wrong, episodes: episodes, show: show),
     ]
+  }
+
+  func testAFinderThatFoundNothingAndCutAlmostNothingIsNotJudgedByTheMac() {
+    // 15 s of 190000 s of show is under 0.05 percent (the Mac's rule: wrong * 2000 < show).
+    let lines = AdScoreNotes.rowLines(finder(ScoreRows.ownSounds, right: 0, wrong: 15, show: 190_000))
+    XCTAssertEqual(
+      lines,
+      ["Plus the phone's own sounds: found 0 s more right seconds and 15 s more wrong seconds. It found no ad and cut under 0.05 percent of the show, too little to judge, so it stays as it is."])
+    // Cutting more of the show than that is judged as before.
+    let more = AdScoreNotes.rowLines(finder(ScoreRows.ownSounds, right: 0, wrong: 100, show: 190_000))
+    XCTAssertTrue(more[0].hasSuffix("turns it off for every show."), more[0])
+    // Finding anything at all is judged as before.
+    let found = AdScoreNotes.rowLines(finder(ScoreRows.ownSounds, right: 1, wrong: 15, show: 190_000))
+    XCTAssertTrue(found[0].hasSuffix("turns it off for every show."), found[0])
   }
 
   func testAFinderThatCutsMoreShowThanItFindsOfAdIsTurnedOffByTheMac() {

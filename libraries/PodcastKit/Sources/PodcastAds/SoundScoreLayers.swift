@@ -15,6 +15,38 @@
 // one that applies the settings). An episode with no audio adds nothing.
 import Foundation
 
+/// The joints of the episodes that were found before and kept in the teaching folder
+/// (`joints.json`, made by `podcast-teach joints`), so the joint rows need no audio.
+public struct ScoreCachedJoints: Sendable {
+  /// Whether the cache holds the joints of the episode with this id.
+  public var has: @Sendable (String) -> Bool
+  /// `(episode id, stretches, steadyToo)`: the stretches with their borders moved onto the cached
+  /// joints of the episode, in the same order.
+  public var snap: @Sendable (String, [ScoreSpan], Bool) -> [ScoreSpan]
+
+  public init(
+    has: @escaping @Sendable (String) -> Bool = { _ in false },
+    snap: @escaping @Sendable (String, [ScoreSpan], Bool) -> [ScoreSpan] = { _, spans, _ in spans }
+  ) {
+    self.has = has
+    self.snap = snap
+  }
+
+  /// What moves the stretches of this episode: the cache when it holds the episode (it is the same
+  /// joints, without reading the file again), else the audio, else nothing.
+  func mover(
+    for input: AdScoreInput, audio snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan]
+  ) -> (@Sendable ([ScoreSpan], Bool) -> [ScoreSpan])? {
+    let id = input.episode.id
+    if has(id) {
+      let cached = self.snap
+      return { cached(id, $0, $1) }
+    }
+    guard let audio = input.audio else { return nil }
+    return { snap(audio, $0, $1) }
+  }
+}
+
 /// The sound finders of the scorecard, as functions. The caller that has the audio code makes
 /// them; each learns across episodes in a box of its own (the scorecard goes through the
 /// episodes in order, one at a time).
@@ -30,15 +62,20 @@ public struct ScoreSoundKit: Sendable {
   /// `(audio, stretches, steadyToo)`: the stretches with their borders moved onto the joints of
   /// the audio, in the same order.
   public var snapJoints: @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan]
+  /// The joints kept in the folder, for the episodes that have no audio there (or that need not be
+  /// read again). Holds no episode by default.
+  public var cachedJoints: ScoreCachedJoints
 
   public init(
     ownSounds: @escaping @Sendable (URL, String, String, [ScoreSpan]) -> [ScoreSpan] = { _, _, _, _ in [] },
     repeatedSounds: @escaping @Sendable (URL, String, String) -> [ScoreSpan] = { _, _, _ in [] },
-    snapJoints: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan] = { _, spans, _ in spans }
+    snapJoints: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan] = { _, spans, _ in spans },
+    cachedJoints: ScoreCachedJoints = ScoreCachedJoints()
   ) {
     self.ownSounds = ownSounds
     self.repeatedSounds = repeatedSounds
     self.snapJoints = snapJoints
+    self.cachedJoints = cachedJoints
   }
 }
 
@@ -96,9 +133,12 @@ public enum SoundScoreLayers {
   /// `stash` for the steady row and the settings row, which start from the ads as they were.
   /// `snap` is `ScoreSoundKit.snapJoints`.
   public static func joints(
-    _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds
+    _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
-    snapping(name: ScoreRows.joints, steadyToo: false, snap: snap, stash: stash, keep: true)
+    snapping(
+      name: ScoreRows.joints, steadyToo: false, snap: snap, stash: stash, keep: true, cached: cached,
+      words: words)
   }
 
   /// "Plus joints (steady files too)": the same, and a file whose frames are all alike is used
@@ -106,24 +146,30 @@ public enum SoundScoreLayers {
   /// before the joints row (in `stash`), so the two rows can be told apart. With no joints row
   /// (no stash) it moves what it is given.
   public static func steadyJoints(
-    _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds
+    _ snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
-    snapping(name: ScoreRows.steadyJoints, steadyToo: true, snap: snap, stash: stash, keep: false)
+    snapping(
+      name: ScoreRows.steadyJoints, steadyToo: true, snap: snap, stash: stash, keep: false,
+      cached: cached, words: words)
   }
 
   private static func snapping(
     name: String, steadyToo: Bool,
     snap: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan], stash: ScoreEpisodeAds,
-    keep: Bool
+    keep: Bool, cached: ScoreCachedJoints, words: @escaping ScoreWords
   ) -> AdScoreLayer {
     .rewriting(name: name) { input, soFar in
       // The first look is by words; its borders are not moved, and the stash is the whole
       // episode's.
-      guard !input.isHead, let audio = input.audio, !soFar.isEmpty else { return soFar }
+      guard !input.isHead, !soFar.isEmpty, let move = cached.mover(for: input, audio: snap)
+      else { return soFar }
       let id = input.episode.id
       if keep { stash.put(soFar, for: id) }
       let base = keep ? soFar : (stash.ads(for: id) ?? soFar)
-      return ScoreAds.moved(base) { snap(audio, $0, steadyToo) }
+      return ScoreAds.moved(base, words: words(input)) {
+        move($0, steadyToo)
+      }
     }
   }
 }

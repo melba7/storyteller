@@ -154,5 +154,96 @@ class ScoreTests(unittest.TestCase):
                          (40.0, 30.0, 30.0))
 
 
+def row(s=0.0, n=0.0, h=0.0, c=0.0):
+    """A row with the given class probabilities and the rest as plain talk."""
+    return [round(1 - s - n - h - c, 4), s, n, h, c]
+
+
+# Twenty lines, six seconds apart and five long. The same rows and the same answers are pinned in
+# AdWordModelVersionTwoTests.swift, so the Mac and the phone agree on the version 2 decoder.
+TWO_ROWS = [row(c=.9), row(c=.9), row(), row(s=.45), row(s=.95), row(s=.95), row(s=.95),
+            row(h=.95), row(h=.95), row(), row(c=.9), row(c=.9), row(s=.5, c=.45), row(s=.95),
+            row(s=.95), row(s=.95), row(), row(), row(s=.95), row()]
+TWO_STARTS = [i * 6.0 for i in range(20)]
+TWO_ENDS = [t + 5.0 for t in TWO_STARTS]
+
+
+class VersionTwoTests(unittest.TestCase):
+    def found(self, rows=TWO_ROWS, starts=TWO_STARTS, ends=TWO_ENDS, thresholds=spans.THRESHOLDS):
+        return spans.decode(rows, starts, ends, thresholds, 2)
+
+    def test_the_pinned_spans(self):
+        found = self.found()
+        self.assertEqual([f[:3] for f in found],
+                         [(0, 1, "intro_credits"), (3, 6, "sponsor"), (7, 8, "host_ask"),
+                          (10, 11, "intro_credits"), (12, 15, "sponsor")])
+        for got, want in zip(found, [0.7875, 0.796875, 0.83125, 0.73125, 0.746875]):
+            self.assertAlmostEqual(got[3], want, places=9)
+
+    def test_version_1_takes_the_same_rows_differently(self):
+        old = spans.decode(TWO_ROWS, TWO_STARTS, TWO_ENDS)
+        self.assertIn("intro_credits", [f[2] for f in old])
+        self.assertNotEqual([f[:3] for f in old], [f[:3] for f in self.found()])
+
+    def test_credits_do_not_count_towards_an_ad(self):
+        rows = [row(c=.95)] * 6
+        self.assertEqual([f[2] for f in self.found(rows, TWO_STARTS[:6], TWO_ENDS[:6])],
+                         ["intro_credits"])
+        self.assertEqual([f for f in self.found(rows, TWO_STARTS[:6], TWO_ENDS[:6]) if f[2] != "intro_credits"], [])
+
+    def test_the_start_is_widened_over_lines_at_stay(self):
+        found = self.found()
+        self.assertEqual(found[1][0], 3)  # line 3 has only 0.45 of its own
+        self.assertEqual(found[4][0], 12)  # line 12 is half credits, half sponsor
+
+    def test_widening_stops_at_a_line_whose_score_is_zero(self):
+        rows = [row(s=.95)] * 3 + [row()] * 2 + [row(s=.45)] + [row(s=.95)] * 3
+        found = self.found(rows, TWO_STARTS[:9], TWO_ENDS[:9])
+        self.assertEqual([f[:2] for f in found], [(0, 2), (5, 8)])
+        rows = [row(s=.95)] * 3 + [row(s=.45)] * 3 + [row(s=.95)] * 3
+        self.assertEqual([f[:2] for f in self.found(rows, TWO_STARTS[:9], TWO_ENDS[:9])], [(0, 8)])
+
+    # The same rows and answers are pinned in AdWordModelVersionTwoTests.swift. In the first, line 2
+    # has an own score of 0.45 (at `stay`) but a smoothed one of only 0.35, so only the own score
+    # widens the span over it. In the second the lines are 3 seconds apart: lines 3 and 4 alone are
+    # 5 seconds long and not sure enough, and the span is kept only because widening over line 2
+    # makes it 8 seconds long.
+    def test_the_widening_uses_the_own_score_and_not_the_smoothed_one(self):
+        rows = [row(), row(s=.45), row(s=.5), row(s=1.0), row(s=1.0), row(), row(), row()]
+        found = self.found(rows, TWO_STARTS[:8], TWO_ENDS[:8])
+        self.assertEqual([f[:2] for f in found], [(1, 4)])
+
+    def test_the_kept_rule_is_judged_on_the_widened_span(self):
+        rows = [row(), row(s=.45), row(s=.8), row(s=.8), row(), row(), row()]
+        starts = [i * 3.0 for i in range(7)]
+        found = self.found(rows, starts, [t + 2.0 for t in starts])
+        self.assertEqual([f[:2] for f in found], [(1, 3)])
+
+    def test_a_credits_span_is_cut_where_an_ad_span_lies(self):
+        found = self.found()
+        self.assertEqual(found[3][:2], (10, 11))  # line 12 belongs to the ad
+        self.assertEqual(found[4][:2], (12, 15))
+
+    def test_a_short_part_of_a_cut_credits_span_is_dropped(self):
+        rows = [row(c=.9), row(s=.95), row(s=.95), row(s=.95)]
+        found = self.found(rows, TWO_STARTS[:4], TWO_ENDS[:4])
+        self.assertEqual([f[2] for f in found], ["sponsor"])
+
+    def test_a_span_is_cut_where_the_class_changes(self):
+        found = self.found()
+        self.assertEqual([f[2] for f in found[1:3]], ["sponsor", "host_ask"])
+        self.assertAlmostEqual(found[1][3], 0.796875, places=9)
+
+    def test_empty_input(self):
+        self.assertEqual(self.found([], [], []), [])
+
+    def test_the_scores_in_seconds_follow_the_version(self):
+        classes = [4, 4, 0, 1, 1, 1, 1, 3, 3, 0, 4, 4, 1, 1, 1, 1, 0, 0, 0, 0]
+        cut, right, real = spans.span_scores(TWO_ROWS, classes, TWO_STARTS, TWO_ENDS, version=2)
+        self.assertEqual((cut, right, real), (50.0, 50.0, 50.0))
+        cut1, _, _ = spans.span_scores(TWO_ROWS, classes, TWO_STARTS, TWO_ENDS)
+        self.assertNotEqual(cut1, cut)
+
+
 if __name__ == "__main__":
     unittest.main()

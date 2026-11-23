@@ -21,6 +21,8 @@ How the numbers are worked out:
   and end of the openings in seconds, null when there are none), breaks (the median number of ad
   blocks in an episode) and adSeconds (the median total length of the ads in an episode).
 
+The labels of episodes in the sealed exam (exam.json, see teach_exam.py) are left out.
+
 Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem (no episodes.json,
 or a damaged one).
 
@@ -31,6 +33,7 @@ import os
 import sys
 import time
 
+from teach_exam import read_exam
 from teach_store import FOLDER, Problem, require_manifest, write_json
 
 AD_SORTS = ("sponsor", "network_promo")
@@ -103,13 +106,14 @@ def valid(one):
                for s in one["segments"])
 
 
-def read_labels(folder, say):
-    """The valid labels in a folder; each damaged file is skipped with one line."""
+def read_labels(folder, say, sealed=()):
+    """The valid labels in a folder; each damaged file is skipped with one line. The label of an
+    episode in `sealed` (the exam) is not read."""
     labels = []
     if not os.path.isdir(folder):
         return labels
     for name in sorted(os.listdir(folder)):
-        if not name.endswith(".json"):
+        if not name.endswith(".json") or name[:-len(".json")] in sealed:
             continue
         try:
             with open(os.path.join(folder, name), encoding="utf-8") as f:
@@ -143,6 +147,7 @@ def main(argv, say=print):
     folder = os.path.expanduser(options.folder)
     try:
         episodes = require_manifest(folder)
+        sealed = set(read_exam(folder))
     except Problem as error:
         say(str(error))
         return 2
@@ -150,7 +155,7 @@ def main(argv, say=print):
     for item in episodes:
         if item["feed"] and item["show"]:
             titles.setdefault(item["feed"], item["show"])
-    labels = read_labels(os.path.join(folder, options.labels), say)
+    labels = read_labels(os.path.join(folder, options.labels), say, sealed)
     if not labels:
         say("No labels yet. Run \"Mark ads in the teaching episodes\" first.")
         return 0

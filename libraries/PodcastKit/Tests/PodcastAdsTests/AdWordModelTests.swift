@@ -241,7 +241,7 @@ final class AdWordModelTests: XCTestCase {
     func bad(_ data: Data, _ why: String) { XCTAssertNil(AdWordModel(data: data), why) }
     bad(Data("not json".utf8), "not JSON")
     bad(Data("[1,2]".utf8), "not an object")
-    bad(file(weights: ok, extra: ["version": 2]), "version 2")
+    bad(file(weights: ok, extra: ["version": 3]), "version 3")
     bad(file(weights: ok, extra: ["version": "1"]), "version as text")
     bad(file(weights: ok, extra: ["buckets": 1023]), "too few buckets")
     bad(file(weights: ok, extra: ["buckets": 4_194_305]), "too many buckets")

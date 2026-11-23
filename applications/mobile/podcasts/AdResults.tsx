@@ -87,6 +87,11 @@ export function AdResults() {
                   </View>
                 ))}
               </View>
+              {results.totals[0]?.key === "passed" ? (
+                <Text className="text-muted-foreground px-4 pt-2 text-sm">
+                  {results.passNote}
+                </Text>
+              ) : null}
               <Text
                 className="text-muted-foreground px-4 pt-6 pb-2 text-sm font-semibold"
                 accessibilityRole="header"

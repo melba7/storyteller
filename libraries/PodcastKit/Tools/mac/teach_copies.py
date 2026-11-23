@@ -18,7 +18,9 @@ than the one that made the first copy.
 
 --max is the most episodes to download in one run (one that fails counts: it was asked for) and
 --max-gb the most traffic, counted from the size of each first copy, and the download itself is cut
-off at what is left of it. An episode that was compared is not downloaded again; delete its file in
+off at what is left of it. Exam episodes (exam.json, see teach_exam.py) come first, then shelf episodes (shelf.json), then
+the rest, each group in its usual order, so a limit cuts the rest first. An episode that was
+compared is not downloaded again; delete its file in
 copies/ to compare it again. Two downloads often get the same ads: then no stretch differs and
 nothing is learned for that episode, which is said plainly. The audio files are never touched, and
 the tool is given a link to the audio inside copies/ so that it writes nothing beside the audio.
@@ -43,10 +45,12 @@ import sys
 import time
 
 import probe_shows as probe
+import teach_exam
 import teach_fetch as fetching
+import teach_shelf
 from teach_failures import GIVE_UP_AFTER, IN_A_ROW, given_up_line
 from teach_second import Failures, compare, plural, tell
-from teach_store import FOLDER, MANIFEST, Busy, ManifestError, load_manifest, run_lock
+from teach_store import FOLDER, MANIFEST, Busy, ManifestError, Problem, load_manifest, run_lock
 from teach_truth import COPIES, LABELS, save_bytes, truth_path
 
 MAX_EPISODES = 40
@@ -94,6 +98,10 @@ def waiting(folder, entries, failures, retry_failed):
         else:
             todo.append(entry)
     todo.sort(key=lambda entry: failures.count(entry["id"]))
+    sealed, shelved = set(teach_exam.read_exam(folder)), set(teach_shelf.read_shelf(folder))
+    # Exam episodes first, then shelf episodes, then the rest; sort is stable, so each group
+    # keeps the order above.
+    todo.sort(key=lambda entry: 0 if entry["id"] in sealed else 1 if entry["id"] in shelved else 2)
     if not retry_failed:
         ready = [entry for entry in todo if failures.count(entry["id"]) < GIVE_UP_AFTER]
         left["given_up"], todo = len(todo) - len(ready), ready
@@ -222,7 +230,7 @@ def main(argv=None, download=fetching.download, runner=subprocess.run, sleep=tim
     except Busy as error:
         say(str(error))
         return 2
-    except ManifestError as error:
+    except (ManifestError, Problem) as error:
         say(str(error))
         return 2
     except OSError as error:

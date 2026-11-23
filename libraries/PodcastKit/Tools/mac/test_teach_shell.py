@@ -18,7 +18,11 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Score the ad skipping.command", "Install weekly teaching.command",
              "Stop weekly teaching.command", "Mark ads in the teaching episodes.command",
              "Mark ads when the gathering is done.command",
-             "Check ads with a second download.command"]
+             "Check ads with a second download.command",
+             "Gather more episodes for teaching.command",
+             "Mark the new episodes at night.command",
+             "Gather the exam episodes.command",
+             "Ask Apple's model about the test episodes.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
@@ -26,6 +30,10 @@ PYTHON = """#!/bin/bash
 script="$(basename "$1")"
 shift
 echo "python3 $script $*" >> "$CALLS"
+# The counting helpers are run for real when the test gives the real python3 (REAL_PYTHON).
+case "$script" in teach_exam.py|teach_failures.py)
+  [ -n "$REAL_PYTHON" ] && exec "$REAL_PYTHON" "$TOOLS/$script" "$@" ;;
+esac
 case " $FAIL " in *" $script "*) echo "$script: pretending to fail"; exit 1 ;; esac
 for pair in $CODES; do
   [ "${pair%%=*}" = "$script" ] && { echo "$script: ending with ${pair#*=}"; exit "${pair#*=}"; }
@@ -69,7 +77,7 @@ case " $FAIL " in *" podcast-teach-$1 "*) echo "podcast-teach $1: pretending to 
 for pair in $TEACH_CODES; do
   [ "${pair%%=*}" = "$1" ] && { echo "podcast-teach $1: ending with ${pair#*=}"; exit "${pair#*=}"; }
 done
-case "$1" in sounds) out=ad-sounds.json ;; meaning) out=ad-meaning.json ;; score) out=scorecard.json ;; esac
+case "$1" in sounds) out=ad-sounds.json ;; meaning) out=ad-meaning.json ;; joints) out=joints.json ;; score) out=scorecard.json ;; esac
 case " $NOOP " in *" podcast-teach-$1 "*) exit 0 ;; esac
 echo "$RANDOM$RANDOM" > "$2/$out"
 exit 0
@@ -195,6 +203,7 @@ class Setup(unittest.TestCase):
         """The calls, each as its tool and first words, without the folder arguments."""
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
         return [line.replace(" --folder " + folder, "").replace(" " + folder, "")
+                .replace(" --fit-tool " + self.bin + "/podcast-teach", "")
                 for line in self.called() if " teach_store.py hold" not in line]
 
     def log(self):
@@ -202,11 +211,48 @@ class Setup(unittest.TestCase):
             return f.read()
 
 
-FINISH_ORDER = ["python3 teach_habits.py", "python3 teach_train.py", "python3 teach_library.py",
-                "swift build -c release --product podcast-teach",
-                "swift build -c release --show-bin-path", "podcast-teach sounds",
-                "podcast-teach meaning", "podcast-teach score", "python3 teach_settings.py",
+# The model step comes after the build of podcast-teach, which fits its weights (--fit-tool).
+FINISH_ORDER = ["python3 teach_habits.py", "swift build -c release --product podcast-teach",
+                "swift build -c release --show-bin-path", "python3 teach_train.py",
+                "python3 teach_library.py", "podcast-teach sounds",
+                "podcast-teach meaning", "podcast-teach joints", "podcast-teach score",
+                "python3 teach_settings.py",
                 "python3 teach_publish.py"]
+
+
+class AppleLauncherTests(Setup):
+    NAME = "Ask Apple's model about the test episodes.command"
+
+    def tool(self, code, line):
+        self.program("podcast-teach", '#!/bin/bash\necho "podcast-teach $*" >> "$CALLS"\necho "%s"\nexit %d\n'
+                     % (line, code))
+
+    def run_launcher(self):
+        os.makedirs(os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching"))
+        return self.run_script(self.NAME)
+
+    def test_a_run_that_asked_something_says_done(self):
+        self.tool(0, "e1: 2 ads, 3.0 s")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("Done. The answers are in", done.stdout)
+        self.assertNotIn("already had an answer, so", done.stdout)
+
+    def test_a_run_with_nothing_due_says_every_episode_had_an_answer(self):
+        self.tool(0, "Every episode already had an answer from m 1. Nothing was asked.")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("Every episode already had an answer, so nothing was asked", done.stdout)
+        self.assertNotIn("Done. The answers are in", done.stdout)
+
+    def test_exit_2_points_at_what_the_tool_printed_and_names_the_causes(self):
+        self.tool(2, "apple-model.json is damaged")
+        done = self.run_launcher()
+        self.assertEqual(done.returncode, 2, done.stdout)
+        self.assertIn("apple-model.json is damaged", done.stdout)
+        for words in ("what the tool printed above", "macOS 26", "still downloading", "damaged or from another model",
+                      "teaching folder"):
+            self.assertIn(words, done.stdout)
 
 
 class FinishTests(Setup):
@@ -215,7 +261,7 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), FINISH_ORDER)
         for line in ("Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
-                     "Meaning: worked", "Score: worked", "Settings: worked", "Publish: worked"):
+                     "Meaning: worked", "Joints: worked", "Score: worked", "Settings: worked", "Publish: worked"):
             self.assertIn("  " + line, done.stdout)
         for number in range(1, 9):
             self.assertIn("Step %d of 8" % number, done.stdout)
@@ -224,8 +270,8 @@ class FinishTests(Setup):
         done = self.run_script("teach-finish.sh")
         summary = done.stdout[done.stdout.index("Summary:"):]
         labels = re.findall(r"^  (\w+): ", summary, re.M)
-        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Score",
-                                  "Settings", "Publish"])
+        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+                                  "Score", "Settings", "Publish"])
 
     def test_the_podcast_teach_tools_get_the_teaching_folder(self):
         self.run_script("teach-finish.sh")
@@ -233,6 +279,7 @@ class FinishTests(Setup):
         calls = self.called()
         self.assertIn("podcast-teach sounds %s" % folder, calls)
         self.assertIn("podcast-teach meaning %s" % folder, calls)
+        self.assertIn("podcast-teach joints %s" % folder, calls)
         self.assertIn("podcast-teach score %s" % folder, calls)
 
     def test_a_failing_step_is_said_and_the_later_ones_still_run(self):
@@ -247,7 +294,7 @@ class FinishTests(Setup):
     def test_every_step_may_fail_without_stopping_the_next(self):
         for failing, label in (("teach_habits.py", "Habits"), ("teach_library.py", "Library"),
                                ("podcast-teach-sounds", "Sounds"), ("podcast-teach-meaning", "Meaning"),
-                               ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
+                               ("podcast-teach-joints", "Joints"), ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
             open(self.calls, "w").close()
             done = self.run_script("teach-finish.sh", FAIL=failing)
             self.assertEqual(done.returncode, 0, failing)
@@ -263,13 +310,14 @@ class FinishTests(Setup):
     def test_when_the_build_fails_both_swift_steps_are_left_out_and_publish_still_runs(self):
         done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
         self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertEqual(self.short(), ["python3 teach_habits.py", "python3 teach_train.py",
-                                        "python3 teach_library.py",
+        self.assertEqual(self.short(), ["python3 teach_habits.py",
                                         "swift build -c release --product podcast-teach",
+                                        "python3 teach_train.py", "python3 teach_library.py",
                                         "python3 teach_settings.py", "python3 teach_publish.py"])
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)
         self.assertIn("  Meaning: failed", done.stdout)
+        self.assertIn("  Joints: failed", done.stdout)
         self.assertIn("  Score: failed", done.stdout)
         self.assertIn("  Publish: worked", done.stdout)
 

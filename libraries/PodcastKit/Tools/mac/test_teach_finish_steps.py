@@ -146,6 +146,21 @@ class LabelsTests(Steps):
 
 
 class MeaningTests(Steps):
+    def test_the_joints_are_found_before_the_score_and_a_failure_there_does_not_stop_it(self):
+        done = self.finish()
+        order = [c.split(" %s" % self.folder)[0] for c in self.called() if c.startswith("podcast-teach")]
+        self.assertLess(order.index("podcast-teach joints"), order.index("podcast-teach score"))
+        self.assertIn("  Joints: worked", done.stdout)
+        for code in CODES:
+            open(self.calls, "w").close()
+            done = self.finish(TEACH_CODES="joints=%d" % code)
+            self.assertEqual(len(self.calls_of("podcast-teach score")), 1, code)
+            self.assertIn("  Score: worked", done.stdout, code)
+            if code:
+                self.assertIn("  Joints: failed", done.stdout, code)
+                self.assertIn("No joints were saved this time", done.stdout, code)
+        self.assertNotIn("--labels", self.calls_of("podcast-teach joints")[0])
+
     def test_it_runs_after_the_sounds_and_before_the_score(self):
         self.finish()
         order = self.short()
@@ -249,8 +264,8 @@ class WholeRunTests(Steps):
         summary = done.stdout[done.stdout.index("Summary:"):]
         import re
         self.assertEqual(re.findall(r"^  (\w+): ", summary, re.M),
-                         ["Snap", "Habits", "Model", "Library", "Sounds", "Meaning", "Score",
-                          "Settings", "Publish"])
+                         ["Snap", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+                          "Score", "Settings", "Publish"])
 
     def test_the_weekly_run_goes_through_the_same_steps(self):
         self.make("copies")

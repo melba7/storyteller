@@ -8,6 +8,11 @@ other than "none" with the highest probability, the first winning a tie; a weak 
 the class of the line before it), and a kept span is cut into pieces where that class changes.
 Each piece has its own sort and its own score. Change nothing here without changing it there.
 
+Version 2 model files decode with decode_two (AdWordModel+SpansTwo.swift): the ad score of a line is
+p[sponsor] + p[network_promo] + p[host_ask] (credits do not count), a span's start is widened
+backwards over lines whose own score is at least `stay`, and credits get a second pass on
+p[intro_credits] that never includes a line inside an ad span.
+
 The check on the held-out shelf uses it, so its precision is about what the phone would cut:
 a cut second is right only when the line's true sort is one the phone skips under its default
 switches (sponsor ads, hosts' plugs and promos on, credits off). A span of a sort the phone does not
@@ -31,10 +36,12 @@ def top_class(row):
     return best
 
 
-def decode(rows, starts, ends, thresholds=THRESHOLDS):
+def decode(rows, starts, ends, thresholds=THRESHOLDS, version=1):
     """The pieces as (first index, last index, sort, score) for the per-line probability rows (five
     numbers each, "none" first) and the start and end second of every line. A span that changes its
-    top class is cut into one piece for each run of one class."""
+    top class is cut into one piece for each run of one class. Version 2 uses decode_two."""
+    if version >= 2:
+        return decode_two(rows, starts, ends, thresholds)
     n = len(rows)
     p = [1 - row[0] for row in rows]
     s = []
@@ -77,12 +84,92 @@ def decode(rows, starts, ends, thresholds=THRESHOLDS):
     return found
 
 
-def span_scores(rows, classes, starts, ends, thresholds=THRESHOLDS):
+def top_among(row, among):
+    """The class in `among` with the highest probability (the first wins a tie)."""
+    best = among[0]
+    for c in among[1:]:
+        if row[c] > row[best]:
+            best = c
+    return best
+
+
+def one_pass(p, rows, starts, ends, thresholds, among, widen, blocked):
+    """One pass of the version 2 decoder as (first, last, class index, score). p is each line's own
+    score, `among` the classes a line may take, `blocked` the lines no span may include (or None)."""
+    n = len(p)
+    s = []
+    for i in range(n):
+        before = p[i - 1] if i > 0 else p[i]
+        after = p[i + 1] if i + 1 < n else p[i]
+        s.append(before / 4 + p[i] / 2 + after / 4)
+    found = []
+    i = 0
+    while i < n:
+        if s[i] < thresholds["start"]:
+            i += 1
+            continue
+        j = i
+        while True:
+            if j + 1 < n and s[j + 1] >= thresholds["stay"]:
+                j += 1
+            elif j + 2 < n and s[j + 2] >= thresholds["stay"]:
+                j += 2
+            else:
+                break
+        a = i
+        if widen:
+            # The check on the previous kept span cannot bind today: a span ends only where the next
+            # two smoothed scores are under `stay`, and a smoothed score is a mix of its neighbours,
+            # so the widening stops before it can reach an earlier span's last line. It is a safety.
+            while a > 0 and p[a - 1] >= thresholds["stay"] and a - 1 > (found[-1][1] if found else -1):
+                a -= 1
+        sorts = []
+        for k in range(a, j + 1):
+            if k > a and s[k] < thresholds["stay"]:
+                sorts.append(sorts[-1])
+            else:
+                sorts.append(top_among(rows[k], among))
+        first = a
+        while first <= j:
+            if blocked and blocked[first]:
+                first += 1
+                continue
+            last = first
+            while last < j and not (blocked and blocked[last + 1]):
+                last += 1
+            whole = sum(s[first:last + 1]) / (last - first + 1)
+            if ends[last] - starts[first] >= MIN_SECONDS or whole >= CERTAIN_SCORE:
+                start = first
+                while start <= last:
+                    stop = start
+                    while stop < last and sorts[stop + 1 - a] == sorts[start - a]:
+                        stop += 1
+                    found.append((start, stop, sorts[start - a],
+                                  sum(s[start:stop + 1]) / (stop - start + 1)))
+                    start = stop + 1
+            first = last + 1
+        i = j + 1
+    return found
+
+
+def decode_two(rows, starts, ends, thresholds=THRESHOLDS):
+    """The version 2 decoder, as (first index, last index, sort, score) in order of the first line."""
+    ads = one_pass([row[1] + row[2] + row[3] for row in rows], rows, starts, ends, thresholds,
+                   (1, 2, 3), True, None)
+    inside = [False] * len(rows)
+    for first, last, _, _ in ads:
+        for k in range(first, last + 1):
+            inside[k] = True
+    credits = one_pass([row[4] for row in rows], rows, starts, ends, thresholds, (4,), False, inside)
+    return [(first, last, CLASSES[c], score) for first, last, c, score in sorted(ads + credits)]
+
+
+def span_scores(rows, classes, starts, ends, thresholds=THRESHOLDS, version=1):
     """The seconds the phone would cut, the seconds of those that are really ads, and the seconds
     of real ads, as (cut, right, real). classes holds the true class index of every line, or None
     where the labels are unsure."""
     cut = right = 0.0
-    for first, last, sort, _ in decode(rows, starts, ends, thresholds):
+    for first, last, sort, _ in decode(rows, starts, ends, thresholds, version):
         if sort not in SKIPPED_SORTS:
             continue
         for k in range(first, last + 1):

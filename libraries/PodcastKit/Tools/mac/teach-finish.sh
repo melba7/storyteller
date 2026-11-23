@@ -8,16 +8,21 @@
 #                                    to 6 are given --labels labels-snapped; Claude's own labels are
 #                                    never changed.
 #   1. habits   (teach_habits.py)    what each show usually does at its start
-#   2. train    (teach_train.py)     the small model that spots ads
+#   2. train    (teach_train.py)     the small model that spots ads; builds podcast-teach first, which
+#                                    fits the model's weights (--fit-tool) and is used by steps 4 to 6
 #   3. library  (teach_library.py)   the library of known ads
-#   4. sounds   (podcast-teach sounds) builds podcast-teach first (swift build)
+#   4. sounds   (podcast-teach sounds) uses the podcast-teach built in step 2
 #   5. meaning  (podcast-teach meaning)  the small model that reads what a line means (needs a Mac;
 #                                    when it cannot run it says so and the run goes on)
-#   6. score    (podcast-teach score)  the scorecard of the ad skipping (it scores the meaning model)
+#   6. score    (podcast-teach score)  the scorecard of the ad skipping (it scores the meaning model).
+#                                    Before it, "joints" (podcast-teach joints) finds the joints of each
+#                                    episode's MP3 file once and keeps them in joints.json, so the
+#                                    scorer's joint rows do not read the audio again
 #   7. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
 #   8. publish  (teach_publish.py)   copies the results to the folders the phone reads
-# A step that fails is said plainly and the later steps still run, except that the three Swift steps
-# (4, 5 and 6) are left out together when podcast-teach does not build. It ends with one line per
+# A step that fails is said plainly and the later steps still run, except that the Swift steps
+# (4, 5 and 6, and the joints before 6) are left out together when podcast-teach does not build (the
+# model is then trained the old way, as version 1). It ends with one line per
 # step (worked, nothing to do, failed) and exits 0 when publish worked, 1 otherwise. It holds the
 # teaching folder's run lock for its whole length (it starts itself again under
 # `teach_store.py hold`), so a second window cannot gather, mark or train while it works. When
@@ -125,15 +130,9 @@ run_step "Habits" "$FOLDER/habits.json" $CAFFEINATE python3 -u "$TOOLS/teach_hab
 
 say
 say "Step 2 of 8: training the model that spots ads"
-run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" $LABELS
-
-say
-say "Step 3 of 8: making the library of known ads"
-run_step "Library" "$FOLDER/ad-library.json" $CAFFEINATE python3 -u "$TOOLS/teach_library.py" --folder "$FOLDER" $LABELS
-
-# The three Swift steps: build podcast-teach once, then run it three times.
-say
-say "Step 4 of 8: building the ad sounds"
+# The fit of the model's weights is done by podcast-teach (Python is too slow for it), so it is built
+# first. The sounds, meaning and score steps below use the same build. When it cannot be built, the
+# model is trained the old way (a version 1 file) and the Swift steps are left out.
 KIT=""
 for CANDIDATE in "${TEACH_KIT:-$HERE/../..}" "$HOME/Storyteller Lofi/testflight-build/libraries/PodcastKit"; do
   if [ -f "$CANDIDATE/Package.swift" ]; then
@@ -151,11 +150,27 @@ elif ! (cd "$KIT" && swift build -c release --product podcast-teach 2>&1 | tee -
 else
   TEACH_TOOL="$(cd "$KIT" && swift build -c release --show-bin-path)/podcast-teach"
 fi
+if [ -n "$TEACH_TOOL" ]; then
+  run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" --fit-tool "$TEACH_TOOL" $LABELS
+else
+  say "podcast-teach is not built, so the model is trained the old way (version 1)."
+  run_step "Model" "$FOLDER/ad-model.json" $CAFFEINATE python3 -u "$TOOLS/teach_train.py" --folder "$FOLDER" $LABELS
+fi
+
+say
+say "Step 3 of 8: making the library of known ads"
+run_step "Library" "$FOLDER/ad-library.json" $CAFFEINATE python3 -u "$TOOLS/teach_library.py" --folder "$FOLDER" $LABELS
+
+# The Swift steps (the sounds, the meaning model, the joints and the score) use the podcast-teach
+# built for step 2.
+say
+say "Step 4 of 8: building the ad sounds"
 if [ -z "$TEACH_TOOL" ]; then
   note "Sounds" "failed (podcast-teach is not built)"
   note "Meaning" "failed (left out because podcast-teach is not built)"
+  note "Joints" "failed (left out because podcast-teach is not built)"
   note "Score" "failed (left out because podcast-teach is not built)"
-  say "The sounds, the meaning model and the score are left out."
+  say "The sounds, the meaning model, the joints and the score are left out."
 else
   run_step "Sounds" "$FOLDER/ad-sounds.json" "$TEACH_TOOL" sounds "$FOLDER" $LABELS
   say
@@ -165,7 +180,10 @@ else
   run_step "Meaning" "$FOLDER/ad-meaning.json" $CAFFEINATE "$TEACH_TOOL" meaning "$FOLDER" $LABELS \
     || say "No new meaning model this time (see above). One already at the phone's folders stays as it is."
   say
-  say "Step 6 of 8: scoring the ad skipping"
+  say "Step 6 of 8: finding the joints of the audio, then scoring the ad skipping"
+  # The joints are kept in joints.json; a failure here only means the scorer reads the audio itself.
+  run_step "Joints" "$FOLDER/joints.json" $CAFFEINATE "$TEACH_TOOL" joints "$FOLDER" \
+    || say "No joints were saved this time (see above). The score reads the audio itself."
   run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS
 fi
 

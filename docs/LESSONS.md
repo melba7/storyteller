@@ -162,3 +162,36 @@ One line per lesson.
   full builder fleet used the window and the marking stopped at once with 0
   episodes marked. Builders must also commit early, because a limit cut-off
   loses what is not committed (2026-11-23).
+- A model file the phone refuses is silent: the scorecard just left the model
+  out and every row looked weak. After a run, read the publish step's lines and
+  check the scorecard has a "Plus the trained model" row before judging any
+  finder. The trainer must also fix the bias at plain talk, or the many
+  plain-word weights carry it and the bias ends up saying "ad" (2026-11-23).
+- The Mac's test cannot see what the phone's own learners gain (one unseen
+  episode per show), and the first rule switched them off for every show on 0 s
+  found and 15 s cut. A finder that found nothing and cut almost nothing is not
+  judged (2026-11-23).
+- Measure each part of a round alone on its own branch before joining them. The
+  rule that cut skips back to a remembered ad's edges looked good in the
+  prototype and netted nothing when measured (6 fixed, 6 broken), and was worse
+  with the phone's shorter memory (2026-11-23).
+- A rule that moves a skip's border on the phone must be limited to what the
+  scorecard measures. The first joint pull moved every ad on the phone (Apple's
+  model, chapters, memory) while the scorecard only had the word finders' ads.
+  And a limit by the finder's name switched the pull off altogether, because the
+  older finders' ads carry no name: check what the data really holds before
+  writing a rule on it (2026-11-23).
+- Four Opus checks at extra effort beside the builders used up Mo's 5-hour
+  allowance and stopped everything for 40 minutes. Run one or two agents at a
+  time (2026-11-23).
+- The cloud cannot start a launcher on Mo's Mac: Remote Control's own permission
+  check refuses to start or stop processes, and a locked screen cannot be
+  driven. Leave one double-clickable launcher that does every step in a row, and
+  give a detached launcher `< /dev/null` so it does not wait at a "Press Return"
+  prompt (2026-11-23).
+- Builders must run the format check on every doc they touch
+  (`yarn oxfmt --check` on `libraries/PodcastKit`); a merge of two branches that
+  both edited the Mac tools README needs it again (2026-11-23).
+- The trainer's built-in loop could not match the reference fit on version 2
+  features, so a weakened test crept in. Keep the old path writing the old file
+  and never loosen a test to fit a new path (2026-11-23).

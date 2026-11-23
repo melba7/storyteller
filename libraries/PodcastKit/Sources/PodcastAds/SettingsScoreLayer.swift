@@ -14,10 +14,12 @@ public enum SettingsScoreLayer {
   /// the lists are joined: only the skips are in the join. The snap comes last, only where the
   /// settings say joints are on for the show, with steady files too only where they say so. With
   /// no base kept for the episode (the rows before did not run) it starts from the ads it is given.
-  /// `snap` is `ScoreSoundKit.snapJoints`. The first look is by words and only drops.
+  /// `snap` is `ScoreSoundKit.snapJoints` and `cached` is `ScoreSoundKit.cachedJoints`. The first look
+  /// is by words and only drops.
   public static func perShowSettings(
     tuning: ShowTuning, finders: ScoreFinderAds,
-    snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?
+    snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?,
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
     .rewriting(name: ScoreRows.settings) { input, soFar in
       let show = input.episode.feed
@@ -34,11 +36,13 @@ public enum SettingsScoreLayer {
       } else {
         kept = tuning.apply(to: soFar, show: show).skip
       }
-      guard let snap, let audio = input.audio, tuning.joints(show: show), !kept.isEmpty else {
-        return kept
-      }
+      guard let snap, tuning.joints(show: show), !kept.isEmpty,
+        let move = cached.mover(for: input, audio: snap)
+      else { return kept }
       let steadyToo = tuning.steadyJoints(show: show)
-      return ScoreAds.moved(kept) { snap(audio, $0, steadyToo) }
+      return ScoreAds.moved(kept, words: words(input)) {
+        move($0, steadyToo)
+      }
     }
   }
 }

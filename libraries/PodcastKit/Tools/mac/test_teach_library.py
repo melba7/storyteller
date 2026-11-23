@@ -25,9 +25,13 @@ def entry(episode, feed="f1", show="Show"):
             "bytes": 0, "sha256": None, "host": None, "error": None}
 
 
-def segment(first, last, start=0.0, end=60.0, sort="sponsor", who="Acme", confidence="high"):
-    return {"first": first, "last": last, "start": start, "end": end, "sort": sort, "who": who,
-            "delivery": "host", "confidence": confidence, "why": ""}
+def segment(first, last, start=0.0, end=60.0, sort="sponsor", who="Acme", confidence="high",
+            origin=None):
+    one = {"first": first, "last": last, "start": start, "end": end, "sort": sort, "who": who,
+           "delivery": "host", "confidence": confidence, "why": ""}
+    if origin:
+        one["origin"] = origin
+    return one
 
 
 class Folder(unittest.TestCase):
@@ -76,9 +80,9 @@ class WordTests(unittest.TestCase):
         self.assertEqual(library.normalise("--"), "")
 
     def test_words_of_a_text_drop_empty_words_and_stop_at_the_limit(self):
-        text = "One -- two, THREE " + " ".join(word_list("x", 200))
+        text = "One -- two, THREE " + " ".join(word_list("x", 700))
         words = library.words_of(text)
-        self.assertEqual(len(words), 150)
+        self.assertEqual(len(words), 600)
         self.assertEqual(words[:3], ["One", "two,", "THREE"])
 
     def test_runs_are_the_three_word_runs(self):
@@ -127,6 +131,17 @@ class CandidateTests(Folder):
         self.ad("aaaaaaaaaaaa", word_list("w", 40), confidence="medium")
         self.ad("bbbbbbbbbbbb", word_list("w", 40), confidence="low")
         self.assertEqual(self.candidates(), [])
+
+    def test_a_stretch_the_snap_copied_is_left_out(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 40), origin="copy")
+        self.assertEqual(self.candidates(), [])
+        self.ad("bbbbbbbbbbbb", word_list("v", 40))
+        self.assertEqual(len(self.candidates()), 1)
+
+    def test_a_long_ad_keeps_up_to_600_words(self):
+        self.ad("aaaaaaaaaaaa", word_list("w", 700), end=300)
+        self.assertEqual(len(self.candidates()[0]["words"]), 600)
+        self.assertEqual(self.candidates()[0]["words"][-1], "w599")
 
     def test_at_least_25_words(self):
         self.ad("aaaaaaaaaaaa", word_list("w", 24))

@@ -90,7 +90,7 @@ public enum MeaningCommand {
     }
     let folder = URL(fileURLWithPath: options.folder)
     var notes: [String] = []
-    let labelled: [TeachingEpisode]
+    var labelled: [TeachingEpisode]
     do {
       labelled = try TeachingFolder.episodes(in: folder, labels: options.labels, notes: &notes)
     } catch {
@@ -98,6 +98,8 @@ public enum MeaningCommand {
       return 2
     }
     for note in notes { err(note) }
+    // The sealed exam (exam.json) never teaches anything.
+    labelled = labelled.filter { !$0.onExam }
     guard !labelled.isEmpty else {
       out("No episode in \(folder.path) has both a transcript and a label yet.")
       return 0

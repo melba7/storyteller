@@ -6,6 +6,7 @@ import {
   agoText,
   macSection,
   parseTally,
+  passRate,
   resultsFor,
 } from "./adResults"
 import { parseTeachingState } from "./teaching"
@@ -52,6 +53,31 @@ describe("parseTally", () => {
   })
 })
 
+describe("passRate", () => {
+  const rate = (
+    skipped: number,
+    undone: number,
+    trimmed: number,
+    missed: number,
+  ) => passRate({ skipped, undone, trimmed, missed })
+
+  it("counts a skip that stood, over every skip and every missed ad", () => {
+    expect(rate(45, 2, 1, 3)).toEqual({ passed: 42, total: 48, percent: 88 })
+    expect(rate(41, 0, 0, 4)).toEqual({ passed: 41, total: 45, percent: 91 })
+  })
+
+  it("has no rate when nothing was skipped or missed", () => {
+    expect(rate(0, 0, 0, 0)).toBeNull()
+    expect(rate(0, 3, 1, 0)).toBeNull()
+  })
+
+  it("never goes below 0 or above 100 when the counts make no sense", () => {
+    expect(rate(2, 5, 4, 0)).toEqual({ passed: 0, total: 2, percent: 0 })
+    expect(rate(0, 0, 0, 3)).toEqual({ passed: 0, total: 3, percent: 0 })
+    expect(rate(10, 0, 0, 0)).toEqual({ passed: 10, total: 10, percent: 100 })
+  })
+})
+
 describe("resultsFor", () => {
   it("adds up the totals at the top", () => {
     const results = resultsFor(
@@ -65,11 +91,32 @@ describe("resultsFor", () => {
     )
     expect(results.empty).toBe(false)
     expect(results.totals).toEqual([
+      {
+        key: "passed",
+        label: "Passed by your ears",
+        value: "49 of 54 (91%)",
+      },
       { key: "skipped", label: "Ads skipped", value: "51" },
       { key: "saved", label: "Time saved", value: "1 h 25 min" },
       { key: "undone", label: "Skips you took back", value: "2" },
       { key: "missed", label: "Ads you marked as missed", value: "3" },
     ])
+  })
+
+  it("leaves the pass line out when there is nothing to rate", () => {
+    const results = resultsFor(parseTally(tally({ a: { undone: 2 } })), SHOWS)
+    expect(results.totals.map((total) => total.key)).toEqual([
+      "skipped",
+      "saved",
+      "undone",
+      "missed",
+    ])
+  })
+
+  it("explains what the pass line counts", () => {
+    expect(resultsFor({}, SHOWS).passNote).toBe(
+      "A skip you took back or trimmed, or an ad you marked as missed, counts as not passed. It only knows what you told it.",
+    )
   })
 
   it("writes one row for each show, the most missed and undone first", () => {

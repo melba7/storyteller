@@ -58,7 +58,8 @@ public struct KnownAdUse: Equatable, Sendable {
     for hit in hits {
       switch hit.match {
       case .whole(let start, let end):
-        use.ads.append(found(hit.ad, start: start, end: landing(of: end, in: words), .sure))
+        use.ads.append(
+          found(hit.ad, start: start, end: landing(of: end, in: words), .sure, source: KnownAds.source))
       case .opening(let start, let expectedEnd):
         use.jumpTo = max(use.jumpTo ?? 0, expectedEnd + jumpMargin)
         let heard = words.last?.end ?? start
@@ -83,12 +84,12 @@ public struct KnownAdUse: Equatable, Sendable {
   }
 
   private static func found(
-    _ ad: KnownAd, start: Double, end: Double, _ confidence: AdConfidence
+    _ ad: KnownAd, start: Double, end: Double, _ confidence: AdConfidence, source: String? = nil
   ) -> FoundAd {
     FoundAd(
       start: start <= topOfEpisode ? 0 : start, end: end, kind: ad.kind,
       advertiser: ad.advertiser, confidence: confidence,
-      firstWords: ad.words.prefix(listedWords).joined(separator: " "))
+      firstWords: ad.words.prefix(listedWords).joined(separator: " "), source: source)
   }
 
   /// The end of a match, a quarter second before the next word when that is earlier: Apple's

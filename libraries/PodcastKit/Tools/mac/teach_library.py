@@ -10,12 +10,13 @@ teach_label.py wrote and the matching <folder>/transcripts/<id>.txt, and writes
   teach_library.py [--folder F] [--labels labels] [--most 1500]
 
 How it works:
-- A candidate is a segment with confidence "high" whose words (transcript lines first to last)
+- A candidate is a segment with confidence "high" (not one that
+  teach_snap.py added as a copy) whose words (transcript lines first to last)
   number at least 25 and whose length is from 8 to 300 seconds. A word is a piece of text between
   spaces that has at least one letter or digit.
 - Two candidates are the same ad when at least 60% of the 3-word runs of the one with fewer runs
-  are also in the other. The runs are made from the first 150 words, lower-cased with everything
-  but letters and digits removed.
+  are also in the other. The runs are made from the first 600 words (the whole text of nearly every
+  ad), lower-cased with everything but letters and digits removed.
 - Candidates are grouped in the order of episodes.json, then segment order. A candidate joins the
   first group whose first member it is the same as, otherwise it starts a group. Each group is one
   entry of the library: the more episodes it was met in, the earlier it comes.
@@ -24,6 +25,7 @@ How it works:
 - ad-library.json is built from all marked episodes. ad-library-score.json has the same shape but is
   built only from the episodes that are not on the shelf (shelf.json), so the scorecard's "plus the
   library" row does not know the shelf ads' own words. It is not published.
+- Episodes of the sealed exam (exam.json, see teach_exam.py) are left out of both files.
 - The file stays under 4.5 MB (the phone refuses files over 5 MB): entries are dropped from the end.
 
 Exit code: 0 it worked (also when there are no labels yet), 2 a set-up problem.
@@ -39,11 +41,13 @@ import time
 
 import teach_store
 import teach_segments as seg
+from teach_exam import read_exam
 from teach_shelf import read_shelf
 
 DEFAULT_MOST = 1500
 MAX_BYTES = 4500000
-WORD_LIMIT = 150
+WORD_LIMIT = 600
+CONFIDENCES = ("high",)
 MIN_WORDS = 25
 MIN_SECONDS = 8
 MAX_SECONDS = 300
@@ -60,7 +64,7 @@ def normalise(word):
 
 
 def words_of(text):
-    """The first 150 words of the text as transcribed (case and punctuation kept). Pieces of
+    """The first 600 words of the text as transcribed (case and punctuation kept). Pieces of
     text with no letter or digit are not words."""
     found = [word for word in text.split() if normalise(word)]
     return found[:WORD_LIMIT]
@@ -82,9 +86,12 @@ def same_ad(one, other):
 # MARK: Candidates
 
 def usable(item, lines):
-    """True when a segment of a label can be used: high confidence and a place in the transcript."""
-    if not isinstance(item, dict) or item.get("confidence") != "high":
+    """True when a segment of a label can be used: high confidence and a place in the
+    transcript."""
+    if not isinstance(item, dict) or item.get("confidence") not in CONFIDENCES:
         return False
+    if item.get("origin") == "copy":
+        return False  # a stretch added by the snap because it sounds like an ad, not one marked
     first, last = item.get("first"), item.get("last")
     if not seg.whole(first) or not seg.whole(last) or not 1 <= first <= last <= len(lines):
         return False
@@ -110,7 +117,7 @@ def episode_candidates(entry, folder, labels, say):
     if not isinstance(one, dict) or not isinstance(one.get("segments"), list):
         say("Skipping %s/%s.json: it is not a valid label." % (labels, name))
         return [], False
-    segments = [s for s in one["segments"] if isinstance(s, dict) and s.get("confidence") == "high"]
+    segments = [s for s in one["segments"] if isinstance(s, dict) and s.get("confidence") in CONFIDENCES]
     if not segments:
         return [], True
     try:
@@ -136,9 +143,12 @@ def episode_candidates(entry, folder, labels, say):
 
 def read_candidates(folder, labels, say):
     """([candidate], how many labels were read) in the order of episodes.json, then segment
-    order."""
+    order. The episodes of the sealed exam (exam.json) are left out."""
     found, read = [], 0
+    sealed = set(read_exam(folder))
     for entry in teach_store.load_manifest(folder):
+        if entry["id"] in sealed:
+            continue
         more, ok = episode_candidates(entry, folder, labels, say)
         found += more
         read += 1 if ok else 0
