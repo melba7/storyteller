@@ -28,14 +28,16 @@ final class PodcastAdNotes: @unchecked Sendable {
   static var tallyURL: URL { folder.appendingPathComponent("ad-tally.json") }
 
   /// Writes the note and counts it for the show. `seconds` is what a skip took out of the
-  /// listening (for "skipped" and "undone"; the other two ignore it).
+  /// listening (for "skipped" and "undone"; the other kinds ignore it). `by` is the name of the
+  /// finder that made the ad the note is about, nil when it is not known.
   func record(
     _ what: PhoneNote.What, episode: String, show: String?, start: Double, end: Double?,
-    kind: AdKind?, seconds: Double = 0
+    kind: AdKind?, seconds: Double = 0, by: String? = nil
   ) {
     let time = Date().timeIntervalSince1970 * 1000
     let note = PhoneNote(
-      at: time, what: what, episode: episode, show: show, start: start, end: end, kind: kind)
+      at: time, what: what, episode: episode, show: show, start: start, end: end, kind: kind,
+      by: by)
     queue.async {
       self.append(note.line)
       var counted = self.loadedTally()

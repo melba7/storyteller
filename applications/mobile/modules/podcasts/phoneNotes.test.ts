@@ -1,4 +1,8 @@
 // LOFI-FORK: the podcasts section's notes for the Mac (see FORK.md).
+import { readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+
 import { describe, expect, it } from "vitest"
 
 import {
@@ -53,6 +57,27 @@ describe("parsePendingNotes", () => {
     expect(parsePendingNotes(`\n${pending()}\n\n`).count).toBe(1)
   })
 
+  it("keeps the answers to a question, with the finder's name when there is one", () => {
+    const text = [
+      pending({ what: "confirmed", by: "repeat-words" }),
+      pending({ what: "denied", by: "meaning" }),
+      pending({ what: "confirmed" }),
+    ].join("\n")
+    const read = parsePendingNotes(text)
+    expect(read.count).toBe(3)
+    expect(read.notes.map((note) => [note.what, note.by])).toEqual([
+      ["confirmed", "repeat-words"],
+      ["denied", "meaning"],
+      ["confirmed", ""],
+    ])
+  })
+
+  it("reads a note with no finder, a null finder or one that is not text as having none", () => {
+    for (const by of [undefined, null, 5, ["own-sound"], {}]) {
+      expect(parsePendingNotes(pending({ by })).notes[0]?.by).toBe("")
+    }
+  })
+
   it("keeps a missing or unknown kind empty, and a missing show for none", () => {
     const [note] = parsePendingNotes(
       pending({ kind: "weird", show: undefined }),
@@ -79,6 +104,20 @@ describe("noteLine", () => {
     expect(line).toBe(
       '{"v":1,"at":1700000000000,"what":"skipped","feed":"https://example.com/feed","guid":"g-1","title":"Episode one","address":"https://example.com/1.mp3","start":120.5,"end":185,"kind":"ad"}',
     )
+  })
+
+  it("writes no by when the note has none", () => {
+    const line = JSON.parse(noteLine(note!, null)) as Record<string, unknown>
+    expect("by" in line).toBe(false)
+  })
+
+  it("writes by last, after kind, when the note has one", () => {
+    const [named] = parsePendingNotes(
+      pending({ what: "denied", by: "meaning" }),
+    ).notes
+    const line = noteLine(named!, null)
+    expect(line.endsWith('"kind":"ad","by":"meaning"}')).toBe(true)
+    expect(Object.keys(JSON.parse(line) as object).at(-1)).toBe("by")
   })
 
   it("writes empty text for an episode that is gone and null for no end", () => {
@@ -164,5 +203,39 @@ describe("oldNotesText", () => {
     expect(oldNotesText({ status: "unreadable", message: "no" })).toBeNull()
     expect(oldNotesText({ status: "notLinked" })).toBeNull()
     expect(oldNotesText({ status: "folderGone" })).toBeNull()
+  })
+})
+
+// The two lines the Swift tests and the Mac's Python test share
+// (libraries/PodcastKit/Tests/PodcastAdsTests/MacFixtures.swift): what the phone keeps, and what
+// `noteLine` must make of it for the folder. Read from the Swift file, so one side cannot change
+// without this test saying so.
+const FIXTURES = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../libraries/PodcastKit/Tests/PodcastAdsTests/MacFixtures.swift",
+)
+
+function fixtureLine(name: string): string {
+  const found = new RegExp(`static let ${name} =\\s*#"(.*)"#`).exec(
+    readFileSync(FIXTURES, "utf8"),
+  )
+  if (found?.[1] === undefined) throw new Error(`MacFixtures has no ${name}`)
+  return found[1]
+}
+
+describe("the line the Mac reads", () => {
+  it("is the shared folder line for the shared pending line, byte for byte", () => {
+    const { notes, count } = parsePendingNotes(
+      fixtureLine("confirmedPendingNote"),
+    )
+    expect(count).toBe(1)
+    expect(notes).toHaveLength(1)
+    const line = noteLine(notes[0]!, {
+      feed: "https://show-a.test/feed",
+      guid: "guid-1",
+      title: "One",
+      address: "https://show-a.test/one.mp3",
+    })
+    expect(line).toBe(fixtureLine("confirmedNote"))
   })
 })
