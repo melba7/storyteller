@@ -12,13 +12,15 @@ import PodcastAudioMatch
 import PodcastTranscripts
 
 extension PodcastStreamHead {
-  /// The ads of the local layers and of the taught sounds in `audio` (the audio of this step).
-  /// `episodeDuration` is the episode's length when it is known. `blockers` are the ads of the
-  /// memory and the model, which the caller joins with these: a new finder keeps away from them.
+  /// The ads of the local layers and of the taught sounds in `audio` (the audio of this step),
+  /// and apart from them the ads the phone's own sounds add (`own`, which the caller cuts again
+  /// before it joins them, see `NewAds.headAds`). `episodeDuration` is the episode's length when
+  /// it is known. `blockers` are the ads of the memory and the model, which the caller joins with
+  /// these: a new finder keeps away from them.
   func findLocal(
     lines: [TranscriptLine], transcript: Transcript, sponsors: [SponsorName],
     episodeDuration: Double?, audio: Data, blockers: [FoundAd]
-  ) -> [FoundAd] {
+  ) -> (old: [FoundAd], own: [FoundAd]) {
     let started = Date()
     let teaching = PodcastTeaching.shared
     let ranges = teaching.files.local.ranges(
@@ -41,13 +43,16 @@ extension PodcastStreamHead {
   /// lie outside every old ad, snapped or not, so a new finder only adds a stretch and never
   /// lengthens or upgrades an old ad. Both are new finders: a guard mark is on disk while they
   /// run (all of it, the snap and the sorting too), and iOS holds the time. `found` itself when
-  /// nothing may run.
+  /// nothing may run. The own sounds' ads come back apart from the old ones.
   private func withOwnSoundsAndJoints(
     _ found: [FoundAd], audio: Data, blockers: [FoundAd]
-  ) -> [FoundAd] {
-    guard let show = EpisodeShows.shared.show(for: episodeId), !show.isEmpty else { return found }
+  ) -> (old: [FoundAd], own: [FoundAd]) {
+    let unchanged = (old: found, own: [FoundAd]())
+    guard let show = EpisodeShows.shared.show(for: episodeId), !show.isEmpty else {
+      return unchanged
+    }
     let listener = PodcastAdFinder.listenerSwitches(forShow: show)
-    guard listener.skipsAnySort else { return found }
+    guard listener.skipsAnySort else { return unchanged }
     let tuning = PodcastTeaching.shared.files.tuning
     let guardian = PodcastFinderGuard.shared
     let own = ShowTuning.stricter(
@@ -62,8 +67,9 @@ extension PodcastStreamHead {
     var finders: [String] = []
     if pass.consumers.contains(.own) { finders.append(FinderNames.ownSound) }
     if pass.consumers.contains(.joints) { finders.append(FinderNames.joints) }
-    guard !finders.isEmpty else { return found }
-    let made = guardian.hold(finders, episode: episodeId) { held -> (ads: [FoundAd], moved: Int) in
+    guard !finders.isEmpty else { return unchanged }
+    let made = guardian.hold(finders, episode: episodeId) {
+      held -> (old: [FoundAd], own: [FoundAd], moved: Int) in
       var allowed = pass
       if !held.finders.contains(FinderNames.ownSound) { allowed.own = AdSoundLibrary() }
       if !held.finders.contains(FinderNames.joints) { allowed.wantsJoints = false }
@@ -87,15 +93,14 @@ extension PodcastStreamHead {
         }
         added = tuning.apply(to: NewAds.outside(heard, of: old + blockers), show: show).skip
       }
-      return (old + added, moved)
+      return (old, added, moved)
     }
-    guard let made else { return found }
-    if made.ads.count != found.count || made.moved > 0 {
+    guard let made else { return unchanged }
+    if !made.own.isEmpty || made.moved > 0 {
       PodcastTimeline.mark(
-        episodeId,
-        "head: \(made.ads.count - found.count) own sounds, \(made.moved) borders on joints")
+        episodeId, "head: \(made.own.count) own sounds, \(made.moved) borders on joints")
     }
-    return made.ads
+    return (made.old, made.own)
   }
 
   /// The old ads with their borders on the joints. The blockers are neighbours that stay as they

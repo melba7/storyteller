@@ -86,6 +86,17 @@ enum NewAds {
     return result
   }
 
+  /// What the head scan saves after a step: the ads of the memory, the old local layers, the
+  /// model and the own sounds, joined. The own sounds were cut against the model's ads of the step
+  /// before; the model's new answer may lie over them, so they are cut again here, or `AdJoin`
+  /// would make one longer ad of an own ad over a model ad, with the finder's name lost.
+  static func headAds(
+    _ remembered: [FoundAd], _ local: (old: [FoundAd], own: [FoundAd]), model: [FoundAd]
+  ) -> [FoundAd] {
+    let own = outside(local.own, of: remembered + local.old + model)
+    return AdHeadRules.merge(remembered + local.old + own + model)
+  }
+
   /// The ads (in order of start) with each border put on a joint of the file, when `JointSnap`
   /// finds one near. An ad that `fixed` names is left as it is. An ad's start never goes before
   /// the end of the ad before it (after that one's own snap), and its end never after the start of
