@@ -7,6 +7,8 @@
 import Foundation
 import PodcastAds
 import PodcastAdsOnDevice
+import PodcastAudioMatch
+import PodcastDownloads
 import PodcastTranscripts
 
 extension PodcastAdFinder {
@@ -76,13 +78,98 @@ extension PodcastAdFinder {
   // MARK: The sounds of a downloaded file
 
   /// The ads the taught sounds find in the episode's file, read once in this launch for each
-  /// download (by its SHA-256). Reads the file, so never from the main thread.
+  /// download (by its SHA-256). Reads the file, so never from the main thread. The same read
+  /// also feeds the new sound finders when they may run (PodcastSoundPass), which keep what they
+  /// found for the new finders' step (`addNewFinders`) and add nothing to this list.
   func soundLook(_ id: String, sha256: String) -> [FoundAd] {
     if let known = lock.withLock({ soundLooks[sha256] }) { return known }
     guard let file = PodcastDownloader.shared.localFile(for: id) else { return [] }
-    let found = PodcastTeaching.shared.soundAds(inFile: file)
+    let found = taughtSoundAds(id, sha256: sha256, file: file)
     lock.withLock { soundLooks[sha256] = found }
     return found
+  }
+
+  /// The taught sounds' ads: from the one pass when a new sound finder may run, else as before.
+  private func taughtSoundAds(_ id: String, sha256: String, file: URL) -> [FoundAd] {
+    guard let modes = newModes(id) else { return PodcastTeaching.shared.soundAds(inFile: file) }
+    let pass = newSoundPass(id, modes: modes)
+    guard !pass.consumers.subtracting([.mac]).isEmpty,
+      let result = runSoundPass(id, sha256: sha256, file: file, pass: pass)
+    else { return PodcastTeaching.shared.soundAds(inFile: file) }
+    return NewAds.ads(ofSounds: result.mac)
+  }
+
+  /// What the sound pass is asked to do for this episode now.
+  func newSoundPass(_ id: String, modes: NewModes) -> SoundPass {
+    var pass = SoundPass()
+    pass.mac = PodcastTeaching.shared.sounds
+    pass.episode = id
+    if modes.level(FinderNames.ownSound) != .off {
+      pass.own = PodcastOwnSounds.shared.library(for: modes.show)
+    }
+    if modes.level(FinderNames.repeatSound) != .off {
+      pass.older = PodcastRepeats.shared.olderPrints(show: modes.show, excluding: id)
+      pass.wantsRepeats = true
+      pass.printOf = (id, episodeDate(id))
+    }
+    pass.wantsJoints = modes.joints
+    return pass
+  }
+
+  /// Reads the file once for every consumer in `pass`, with a guard mark on disk for each new
+  /// finder that takes part and iOS holding time. The result is kept for this launch. Nil when
+  /// the file cannot be read or no time was held.
+  func runSoundPass(_ id: String, sha256: String, file: URL, pass: SoundPass) -> SoundPassResult? {
+    var finders: [String] = []
+    let wanted = pass.consumers
+    if wanted.contains(.own) { finders.append(FinderNames.ownSound) }
+    if wanted.contains(.repeats) || wanted.contains(.print) {
+      finders.append(FinderNames.repeatSound)
+    }
+    if wanted.contains(.joints) { finders.append(FinderNames.joints) }
+    let result = PodcastFinderGuard.shared.hold(finders, episode: id) { held -> SoundPassResult? in
+      // A finder whose mark could not be written must not run.
+      var allowed = pass
+      if !held.finders.contains(FinderNames.ownSound) { allowed.own = AdSoundLibrary() }
+      if !held.finders.contains(FinderNames.repeatSound) {
+        allowed.older = []
+        allowed.printOf = nil
+      }
+      if !held.finders.contains(FinderNames.joints) { allowed.wantsJoints = false }
+      return allowed.run(file: file, stop: held.stop)
+    }.flatMap { $0 }
+    if let result {
+      PodcastSoundPasses.shared.store(result, sha: sha256, stamp: soundStamp)
+    }
+    return result
+  }
+
+  /// What the new finders need of the file's one pass: the kept result, or a new pass when the
+  /// first one did not run what is wanted now (the show was not known then).
+  func soundResult(
+    _ id: String, sha256: String, file: URL, modes: NewModes
+  ) -> SoundPassResult? {
+    let pass = newSoundPass(id, modes: modes)
+    let needs = pass.consumers.subtracting([.mac])
+    guard !needs.isEmpty else { return nil }
+    if let known = PodcastSoundPasses.shared.result(sha: sha256, stamp: soundStamp, needs: needs) {
+      return known
+    }
+    return runSoundPass(id, sha256: sha256, file: file, pass: pass)
+  }
+
+  var soundStamp: PodcastSoundPasses.Stamp {
+    PodcastSoundPasses.Stamp(
+      taught: PodcastTeaching.shared.soundsInstalls, own: PodcastOwnSounds.shared.revision)
+  }
+
+  /// When the episode was downloaded (what a print is dated by), else now.
+  private func episodeDate(_ id: String) -> Double {
+    if case .downloaded(_, _, _, let date)? = PodcastDownloader.shared.store?.entry(for: id)?.state
+    {
+      return date.timeIntervalSince1970
+    }
+    return Date().timeIntervalSince1970
   }
 
   /// A download that has no transcript yet: its sounds are looked for in the background, once in
