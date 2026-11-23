@@ -615,7 +615,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   audio file and no entry yet; existing entries are kept. `podcast-teach score`
   uses it for the joint rows when it has the episode, and reads the audio only
   when it does not, so a folder with `joints.json` and no audio still gets those
-  rows. A damaged file is ignored with one line and made again.
+  rows. A damaged file, or one made by another version of the joint finder (it
+  is written into the file), is ignored with one line and made again.
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
@@ -624,11 +625,14 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
   whole at every run, so a hand edit is lost at the next "Teach the phone
   again". It only ever makes the phone stricter than its built-in default.
-  Joints in steady files (`steadyJoints`, which also pulls a late start back to
-  a joint up to 60 s before it) are turned on when the scorecard's "Plus joints
-  (steady files too)" row passes at least 3 more of the owner's breaks than the
-  row before it and adds at most 1 skip with no ad; a scorecard with no bar is
-  judged by seconds as before.
+  Steady joints (`steadyJoints`: steady files are used too, and a late start is
+  pulled back to a joint up to 60 s before it, in steady files and in the
+  others) are turned on when the scorecard's "Plus joints (steady files too)"
+  row passes at least 3 more of the owner's breaks than the row before it and
+  adds at most 1 skip with no ad; a scorecard with no bar is judged by seconds
+  as before. The pull is only for a start that a word finder gave: an ad named
+  by the repeated words, the meaning model or the word model, or an ad with no
+  name that starts where an ad of the word rules or the word model starts.
 - `copies/` and `labels-snapped/`: the second download's findings and the labels
   snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.

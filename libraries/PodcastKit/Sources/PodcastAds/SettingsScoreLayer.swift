@@ -19,7 +19,7 @@ public enum SettingsScoreLayer {
   public static func perShowSettings(
     tuning: ShowTuning, finders: ScoreFinderAds,
     snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?,
-    cached: ScoreCachedJoints = ScoreCachedJoints()
+    cached: ScoreCachedJoints = ScoreCachedJoints(), words: @escaping ScoreWords = { _ in [] }
   ) -> AdScoreLayer {
     .rewriting(name: ScoreRows.settings) { input, soFar in
       let show = input.episode.feed
@@ -40,7 +40,9 @@ public enum SettingsScoreLayer {
         let move = cached.mover(for: input, audio: snap)
       else { return kept }
       let steadyToo = tuning.steadyJoints(show: show)
-      return ScoreAds.moved(kept) { move($0, steadyToo) }
+      return ScoreAds.moved(kept, words: words(input)) {
+        move($0, steadyToo)
+      }
     }
   }
 }

@@ -33,6 +33,7 @@ final class JointsCacheTests: XCTestCase {
     let json = try XCTUnwrap(
       try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any])
     XCTAssertEqual(json["version"] as? Int, 1)
+    XCTAssertEqual(json["finder"] as? Int, JointFinder.version)
     let entry = try XCTUnwrap((json["episodes"] as? [String: [String: Any]])?["a"])
     XCTAssertEqual(entry["seconds"] as? Double, 1234.5)
     XCTAssertEqual(entry["steady"] as? Bool, true)
@@ -59,9 +60,27 @@ final class JointsCacheTests: XCTestCase {
     }
   }
 
+  func testAFileMadeByAnotherFinderVersionOrNoneIsIgnoredWithOneLineAndMadeAgain() throws {
+    let entries = "\"episodes\": {\"a\": {\"seconds\": 100, \"steady\": true, \"overflowed\": false, \"times\": [1]}}"
+    let other = JointFinder.version + 1
+    for head in ["{\"version\": 1, \"finder\": \(other), ", "{\"version\": 1, "] {
+      try Data((head + entries + "}").utf8).write(to: file)
+      let back = JointsCache.load(from: file)
+      XCTAssertTrue(back.cache.episodes.isEmpty, head)
+      XCTAssertNotNil(back.problem, head)
+      XCTAssertFalse(back.problem?.contains("\n") ?? true, head)
+      XCTAssertTrue(back.problem?.contains("finder") ?? false, head)
+    }
+    // The fill says so once and makes the joints again with the current finder.
+    let spliced = try mp3("spliced.mp3", spliced: true)
+    let run = lines { say in JointsCache.fill(folder: folder, audio: ["spliced": spliced], say: say) }
+    XCTAssertEqual(run.code, 0)
+    XCTAssertEqual(Set(JointsCache.load(from: file).cache.episodes.keys), ["spliced"])
+  }
+
   func testAnEntryThatCannotBeUsedIsLeftOutAndTheRestStays() throws {
     let text = """
-      {"version": 1, "episodes": {
+      {"version": 1, "finder": \(JointFinder.version), "episodes": {
         "good": {"seconds": 100, "steady": true, "overflowed": false, "times": [1, 2]},
         "no-times": {"seconds": 100, "steady": true, "overflowed": false},
         "bad-time": {"seconds": 100, "steady": true, "overflowed": false, "times": [-1]},

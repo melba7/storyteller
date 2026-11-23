@@ -24,6 +24,11 @@ public struct ScoreExtras: Sendable {
   }
 }
 
+/// The ads the word rules and the word model give for a whole episode, before any join. They tell
+/// the joint rows (which only look at a whole episode) which ads with no source may be pulled back
+/// to a joint (`JointPull`).
+public typealias ScoreWords = @Sendable (AdScoreInput) -> [FoundAd]
+
 /// The rows to add after the detectors, in the round's order, and what to say about the rest.
 struct ScorePlan {
   var layers: [AdScoreLayer] = []
@@ -41,7 +46,8 @@ struct ScorePlan {
   /// cut it), then own sounds, repeated sounds, repeated words, joints, joints in steady files too,
   /// and last the per-show settings. Each row stands on the one before it.
   static func make(
-    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras
+    folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras,
+    words: @escaping ScoreWords = { _ in [] }
   ) -> ScorePlan {
     var plan = ScorePlan()
     let finders = plan.finders
@@ -57,11 +63,13 @@ struct ScorePlan {
     let learning = [ScoreRows.ownSounds, ScoreRows.repeatedSounds, ScoreRows.repeatedWords]
     plan.learners = plan.layers.filter { learning.contains($0.name) }
     if let kit {
-      plan.layers.append(SoundScoreLayers.joints(kit.snapJoints, stash: stash, cached: kit.cachedJoints))
+      plan.layers.append(SoundScoreLayers.joints(
+          kit.snapJoints, stash: stash, cached: kit.cachedJoints, words: words))
       plan.layers.append(
-        SoundScoreLayers.steadyJoints(kit.snapJoints, stash: stash, cached: kit.cachedJoints))
+        SoundScoreLayers.steadyJoints(
+          kit.snapJoints, stash: stash, cached: kit.cachedJoints, words: words))
     }
-    plan.addSettings(folder: folder, snap: kit?.snapJoints, cached: kit?.cachedJoints)
+    plan.addSettings(folder: folder, snap: kit?.snapJoints, cached: kit?.cachedJoints, words: words)
     return plan
   }
 
@@ -99,12 +107,16 @@ struct ScorePlan {
       return nil
     }
     if !without.isEmpty {
-      let named = without.prefix(5).joined(separator: ", ")
-      let more = without.count > 5 ? " and \(without.count - 5) more" : ""
       notes.append(
-        "\(without.count) of \(episodes.count) episodes have no MP3 file (\(named)\(more)), so the rows that need audio leave them out.")
+        "\(without.count) of \(episodes.count) episodes have no MP3 file (\(Self.named(without))), so the rows that need audio leave them out.")
     }
     return kit
+  }
+
+  /// The ids as one phrase: the first five, then how many more.
+  private static func named(_ ids: [String]) -> String {
+    let more = ids.count > 5 ? " and \(ids.count - 5) more" : ""
+    return ids.prefix(5).joined(separator: ", ") + more
   }
 
   /// The kit when `joints.json` holds the joints of `kept` of the episodes: an episode is out of
@@ -118,10 +130,11 @@ struct ScorePlan {
       notes.append(
         "No episode has an MP3 file in the teaching folder, so the rows that need audio are left out: \(rows). The joints rows use \(cache), which holds \(kept) of \(episodes.count) episodes.")
     } else {
-      let without = episodes.filter { audio[$0.id] == nil && !kit.cachedJoints.has($0.id) }.count
-      if without > 0 {
+      let without = episodes.filter { audio[$0.id] == nil }.map(\.id)
+      if !without.isEmpty {
+        let neither = episodes.filter { audio[$0.id] == nil && !kit.cachedJoints.has($0.id) }.count
         notes.append(
-          "\(without) of \(episodes.count) episodes have neither an MP3 file nor \(cache), so the rows that need audio leave them out.")
+          "\(without.count) of \(episodes.count) episodes have no MP3 file (\(Self.named(without))), so the rows that need audio leave them out; \(neither) of them have no joints in joints.json either, so the joints rows leave those out too.")
       }
     }
     return kit
@@ -153,7 +166,7 @@ struct ScorePlan {
   /// built-in settings, which is what the phone does, so the run's total is the phone's.
   private mutating func addSettings(
     folder: URL, snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?,
-    cached: ScoreCachedJoints?
+    cached: ScoreCachedJoints?, words: @escaping ScoreWords
   ) {
     let url = folder.appendingPathComponent(ShowTuning.fileName)
     var chosen = ShowTuning()
@@ -168,7 +181,8 @@ struct ScorePlan {
     }
     tuning = chosen
     layers.append(SettingsScoreLayer.perShowSettings(
-        tuning: chosen, finders: finders, snap: snap, cached: cached ?? ScoreCachedJoints()))
+        tuning: chosen, finders: finders, snap: snap, cached: cached ?? ScoreCachedJoints(),
+        words: words))
   }
 
   /// What the meaning row noticed, as plain sentences.

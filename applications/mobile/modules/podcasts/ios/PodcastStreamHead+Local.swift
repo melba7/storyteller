@@ -107,7 +107,8 @@ extension PodcastStreamHead {
   }
 
   /// The old ads with their borders on the joints. The blockers are neighbours that stay as they
-  /// are: they hold the places the old ads may not move into, and they are not given back.
+  /// are: they hold the places the old ads may not move into, and they are not given back. It
+  /// passes no `words`, so the head scan never pulls a late start back (`JointPull`).
   private func snap(
     _ found: [FoundAd], among blockers: [FoundAd], joints: Joints, steadyToo: Bool
   ) -> (ads: [FoundAd], moved: Int) {

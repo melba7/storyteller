@@ -110,8 +110,10 @@ final class AudioScoreBox: @unchecked Sendable {
 
   private func snapped(_ spans: [ScoreSpan], _ joints: Joints, _ steady: Bool) -> [ScoreSpan] {
     let moved = ScoreSounds.snap(
-      spans.map { SoundSpan(start: $0.start, end: $0.end, sort: $0.sort) }, joints: joints,
-      steadyToo: steady)
-    return moved.map { ScoreSpan(start: $0.start, end: $0.end, sort: $0.sort) }
+      spans.map { SoundSpan(start: $0.start, end: $0.end, sort: $0.sort, mayPull: $0.mayPull) },
+      joints: joints, steadyToo: steady)
+    return moved.map {
+      ScoreSpan(start: $0.start, end: $0.end, sort: $0.sort, mayPull: $0.mayPull)
+    }
   }
 }

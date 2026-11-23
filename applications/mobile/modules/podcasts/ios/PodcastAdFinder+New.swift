@@ -39,6 +39,9 @@ struct NewResult {
   var file: AdsFile
   var moved: [NewAds.Moved] = []
   var modes: NewModes?
+  /// What the word rules and the word model gave for the whole transcript, before any join. It is
+  /// empty unless steady joints are on (the pull-back is only on then); see `JointPull`.
+  var words: [FoundAd] = []
 }
 
 extension PodcastAdFinder {
@@ -127,6 +130,12 @@ extension PodcastAdFinder {
           wordModelQuestions(id, modes, transcript, collect.allAds)
         } ?? []
     }
+    // The pull-back of a late start is for the starts the word finders gave, and the ads of the
+    // file are joined already, so the words are found again here (as `localAds` does for the file).
+    if modes.joints && modes.steadyToo {
+      collect.words = PodcastTeaching.shared.files.local.ads(
+        transcript: transcript, episodeDuration: transcript.duration)
+    }
     let snapped = (modes.joints ? pass?.joints : nil).flatMap { joints in
       guardian.hold([FinderNames.joints], episode: id) { _ in
         collect.written(joints: joints, steadyToo: modes.steadyToo)
@@ -134,6 +143,7 @@ extension PodcastAdFinder {
     }
     var out = snapped ?? collect.written(joints: nil, steadyToo: modes.steadyToo)
     result.moved = out.moved
+    result.words = collect.words
     let lines = AdChunker.number(transcript.lines)
     let picked =
       guardian.hold(meaningRows == nil ? [] : [FinderNames.meaning], episode: id) { _ in
@@ -187,6 +197,9 @@ struct NewCollect {
   /// The stretches the finders would only ask about, with the chance each is an ad.
   private var asks: [AdAsks.Candidate] = []
   private var counts: [(finder: String, count: Int)] = []
+  /// The ads the word finders gave for the whole transcript, which tell the snap which starts it
+  /// may pull back to a joint (`JointPull.allows(_:words:)`).
+  var words: [FoundAd] = []
 
   /// The chance given to a stretch a finder found that only asks. A repeat or a print has no
   /// model behind it; the questions of a model's own band rank by their own chance.
@@ -247,8 +260,14 @@ struct NewCollect {
     out.ads = (file.ads + AdJoin.join(taken)).sorted { $0.start < $1.start }
     var moved: [NewAds.Moved] = []
     if let joints {
+      // The stretches the listener judged or was asked about: the pull keeps out of them.
+      var judged: [(start: Double, end: Double)] = []
+      judged += (file.denied ?? []).map { (start: $0.start, end: $0.end) }
+      judged += (file.asks ?? []).map { (start: $0.start, end: $0.end) }
+      judged += file.undone.map { (start: $0.start, end: $0.end) }
       let snapped = NewAds.snap(
-        out.ads, joints: joints, steadyToo: steadyToo, leaving: { NewAds.isFixed($0, in: out) })
+        out.ads, joints: joints, steadyToo: steadyToo, judged: judged, words: words,
+        leaving: { NewAds.isFixed($0, in: out, words: words) })
       out.ads = snapped.ads
       moved = snapped.moved
     }

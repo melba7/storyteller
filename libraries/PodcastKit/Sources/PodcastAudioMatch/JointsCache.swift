@@ -23,18 +23,22 @@ public struct JointsCache: Equatable, Sendable {
 
   private struct Root: Codable {
     var version: Int
+    var finder: Int
     var episodes: [String: Entry]
   }
 
   /// The cache in the file at `url`. A file that is not there is an empty cache and no problem. A
-  /// file that cannot be used (not JSON, another version) is an empty cache and one plain line
+  /// file that cannot be used (not JSON, another version, or made by another version of the joint
+  /// finder, `JointFinder.version`, or by none) is an empty cache and one plain line
   /// saying so. An entry that cannot be used is left out; the next `fill` makes it again.
   public static func load(from url: URL) -> (cache: JointsCache, problem: String?) {
     guard FileManager.default.fileExists(atPath: url.path) else { return (JointsCache(), nil) }
-    let ignored = "\(fileName) is damaged or not a version 1 file, so it is ignored."
+    let ignored =
+      "\(fileName) is damaged, not a version 1 file or made by another joint finder (now version \(JointFinder.version)), so it is ignored and made again."
     guard let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int,
       size <= readLimit, let data = try? Data(contentsOf: url),
-      let root = try? JSONDecoder().decode(LenientRoot.self, from: data), root.version == 1
+      let root = try? JSONDecoder().decode(LenientRoot.self, from: data), root.version == 1,
+      root.finder == JointFinder.version
     else { return (JointsCache(), ignored) }
     var found: [String: Joints] = [:]
     for (id, entry) in root.episodes {
@@ -51,13 +55,15 @@ public struct JointsCache: Equatable, Sendable {
   /// Entries that do not decode are nil, so one bad entry does not cost the others.
   private struct LenientRoot: Decodable {
     var version: Int
+    var finder: Int?
     var episodes: [String: Entry?]
 
-    private enum Keys: String, CodingKey { case version, episodes }
+    private enum Keys: String, CodingKey { case version, finder, episodes }
 
     init(from decoder: Decoder) throws {
       let box = try decoder.container(keyedBy: Keys.self)
       version = try box.decode(Int.self, forKey: .version)
+      finder = try? box.decode(Int.self, forKey: .finder)
       let list = try box.nestedContainer(keyedBy: AnyKey.self, forKey: .episodes)
       var made: [String: Entry?] = [:]
       for key in list.allKeys { made[key.stringValue] = try? list.decode(Entry.self, forKey: key) }
@@ -75,7 +81,7 @@ public struct JointsCache: Equatable, Sendable {
   /// Writes the file in one piece (a reader never sees half of it).
   public func write(to url: URL) throws {
     let root = Root(
-      version: 1,
+      version: 1, finder: JointFinder.version,
       episodes: episodes.mapValues {
         Entry(seconds: $0.seconds, steady: $0.steady, overflowed: $0.overflowed, times: $0.times)
       })

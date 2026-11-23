@@ -143,7 +143,13 @@ public enum AdScoreCommand {
 
     // The rows that stand on the finders: each adds one thing to the row before it.
     let audio = TeachingAudio.files(in: folder)
-    let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
+    // The word finders' own ads for the whole episode, with no library and no join: they tell which
+    // ads with no source may be pulled back to a joint.
+    let words: ScoreWords = { input in
+      last.local.ads(transcript: input.transcript, episodeDuration: input.episode.episodeLength)
+    }
+    let plan = ScorePlan.make(
+      folder: folder, episodes: chosen, audio: audio, now: now, extras: extras, words: words)
     let finalAds = ScoreEpisodeAds()
     // A damaged or newer file leaves the Apple row out; `podcast-teach apple` never overwrites it.
     var appleSaved: AppleAnswers?

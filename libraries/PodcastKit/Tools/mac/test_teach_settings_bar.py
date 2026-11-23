@@ -11,15 +11,15 @@ def barred(item, passed, skips, breaks=219):
     return dict(item, bar={"breaks": breaks, "passed": passed, "noAdSkips": skips, "causes": {}})
 
 
-def rows(joints=(100, 75), steady=(103, 76), heard=(490, 480), cut=(100, 100)):
+def rows(joints=(100, 75), steady=(103, 76), heard=(490, 480), cut=(100, 100), breaks=219):
     """The row before, a joints row and a steady row, each with a bar `(passed, noAdSkips)`. The
     seconds are what the older rule reads: `heard` and `cut` of the joints row and the steady row."""
     def whole(heard, cut):
         return total(3, ad=1000, heard=heard, cut=cut)
     return rows_of(
-        barred(row(MEANING, whole=whole(500, 100)), 100, 75),
-        barred(row(JOINTS, whole=whole(heard[0], cut[0])), *joints),
-        barred(row(STEADY, whole=whole(heard[1], cut[1])), *steady))
+        barred(row(MEANING, whole=whole(500, 100)), 100, 75, breaks),
+        barred(row(JOINTS, whole=whole(heard[0], cut[0])), *joints, breaks=breaks),
+        barred(row(STEADY, whole=whole(heard[1], cut[1])), *steady, breaks=breaks))
 
 
 class BarTests(unittest.TestCase):
@@ -45,6 +45,26 @@ class BarTests(unittest.TestCase):
         self.assertTrue(default["steadyJoints"])
         # Steady joints need joints: they are on too.
         self.assertTrue(default["joints"])
+
+    def test_a_steady_row_that_pays_by_seconds_but_fails_the_bar_leaves_joints_off_too(self):
+        # The plain row finds 0 s and cuts 50 s more; the steady row finds 100 s more and cuts 0 s
+        # more. The seconds would keep joints on for the steady row, but the bar (+1 break) says no.
+        default, _, lines = choose(rows((100, 75), (101, 75), heard=(500, 400), cut=(150, 100)))
+        self.assertFalse(default["joints"])
+        self.assertFalse(default["steadyJoints"])
+        self.assertTrue(any("Joints are off" in line for line in lines), lines)
+
+    def test_a_steady_row_that_passes_the_bar_keeps_joints_on_when_the_plain_row_does_not_pay(self):
+        default, _, _ = choose(rows((100, 75), (103, 75), heard=(500, 400), cut=(150, 100)))
+        self.assertTrue(default["joints"])
+        self.assertTrue(default["steadyJoints"])
+
+    def test_a_bar_of_no_breaks_is_not_a_bar_and_the_seconds_decide(self):
+        # By the numbers the bar would say no (+1 break); with 0 breaks it is not a bar.
+        default, _, _ = choose(rows((100, 75), (101, 75), heard=(490, 480), breaks=0))
+        self.assertTrue(default["steadyJoints"])
+        default, _, _ = choose(rows((100, 75), (103, 76), heard=(500, 500), breaks=0))
+        self.assertFalse(default["steadyJoints"])
 
     def test_the_joints_row_is_the_row_it_is_compared_with(self):
         # The plain joints row already gained 5 breaks; the steady row adds only 2 over it.

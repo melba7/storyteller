@@ -171,15 +171,17 @@ def over_joints(named, pairs, default, lines):
     """Judges the joints over all shows. Most podcast files are steady, and there the plain "Plus joints"
     row finds nothing, so joints stay on when EITHER that row OR the "(steady files too)" row pays against
     the row before "Plus joints"; they go off only when neither does. Steady files are used too when the
-    steady row pays and, if the plain row pays as well, finds more than it for at most the allowed wrong."""
+    steady row pays and, if the plain row pays as well, finds more than it for at most the allowed wrong.
+    When the rows carry the owner's bar, the bar says whether the steady row pays, in place of the seconds,
+    everywhere below, so a steady row that fails the bar cannot keep plain joints on."""
     joints, steady = named.get("joints"), named.get("steady-joints")
     if "joints" not in pairs or joints.total.episodes < MIN_EPISODES:
         return
     before = pairs["joints"][1]
     by_bar = bar_decision(pairs["steady-joints"], lines) if steady and "steady-joints" in pairs else None
     plain_pays = joints_pay(joints, before)
-    steady_pays = bool(steady) and joints_pay(steady, before)
-    if not plain_pays and not steady_pays and not by_bar:
+    steady_pays = by_bar if by_bar is not None else bool(steady) and joints_pay(steady, before)
+    if not plain_pays and not steady_pays:
         right, wrong = gained(joints.total, before.total)
         text = "Joints are off for every show: over %d marked episodes they found %s more of the ads and " \
             "cut %s more of show by mistake" % (joints.total.episodes, signed(right), signed(wrong))
