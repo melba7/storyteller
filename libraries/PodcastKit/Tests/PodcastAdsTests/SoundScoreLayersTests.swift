@@ -179,4 +179,31 @@ final class SoundScoreLayersTests: XCTestCase {
     XCTAssertEqual(spans(row), [[99, 132]])
     XCTAssertEqual(calls.steady, [true])
   }
+
+  // MARK: What the settings row starts from
+
+  func testAFinderRowKeepsItsOwnAdsCutAgainstTheOlderFindersOnlyAndHandsOnTheCutRow() {
+    let finders = ScoreFinderAds()
+    let layer = SoundScoreLayers.ownSounds(
+      { _, _, _, _ in [ScoreSpan(start: 100, end: 200)] }, finders: finders)
+    let episode = scoreEpisode(id: "e1", feed: "fa")
+    let base = [foundAd(90, 110)]
+    _ = finders.baseRow.apply(input(episode, audio: audio), soFar: base)
+    // An earlier new finder holds 130 to 145 in the row before.
+    let before = base + [foundAd(130, 145, .unsure)]
+    let row = layer.apply(input(episode, audio: audio), soFar: before)
+    // Its own list loses only what the older finders have; the row loses what the row before has.
+    XCTAssertEqual(spans(finders.ads(finder: "own-sound", for: "e1")), [[111, 200]])
+    XCTAssertEqual(spans(row), [[90, 110], [111, 129], [130, 145], [146, 200]])
+  }
+
+  func testTheFirstLookKeepsNothingForTheSettingsRow() {
+    let finders = ScoreFinderAds()
+    let layer = SoundScoreLayers.repeatedSounds({ _, _, _ in [ScoreSpan(start: 100, end: 200)] }, finders: finders)
+    let episode = scoreEpisode(id: "e1", feed: "fa")
+    _ = layer.apply(input(episode, audio: audio, head: 50), soFar: [])
+    XCTAssertEqual(finders.ads(finder: "repeat-sound", for: "e1"), [])
+    _ = layer.apply(input(episode, audio: audio), soFar: [])
+    XCTAssertEqual(spans(finders.ads(finder: "repeat-sound", for: "e1")), [[100, 200]])
+  }
 }

@@ -44,10 +44,32 @@ final class SettingsScoreLayerTests: XCTestCase {
   }
 
   private func layer(
-    _ tuning: ShowTuning, stash: ScoreEpisodeAds = ScoreEpisodeAds(),
+    _ tuning: ShowTuning, finders: ScoreFinderAds = ScoreFinderAds(),
     snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])? = nil
   ) -> AdScoreLayer {
-    SettingsScoreLayer.perShowSettings(tuning: tuning, stash: stash, snap: snap)
+    SettingsScoreLayer.perShowSettings(tuning: tuning, finders: finders, snap: snap)
+  }
+
+  /// What the finder rows kept for episode "e1": the older finders' ads as the base, and each
+  /// finder's own list cut back to the base only.
+  private func kept(base: [FoundAd], lists: [String: [FoundAd]]) -> ScoreFinderAds {
+    let finders = ScoreFinderAds()
+    _ = finders.baseRow.apply(input(feed: "fz", audio: nil), soFar: base)
+    for (name, ads) in lists {
+      _ = finders.add(ads, finder: name, to: base, for: "e1", base: base, keep: true)
+    }
+    return finders
+  }
+
+  /// The soFar above as what the finder rows kept.
+  private var keptSoFar: ScoreFinderAds {
+    kept(
+      base: [ad(10, 40, source: nil, .sure), ad(180, 200, source: nil, kind: .ownPlug, .sure)],
+      lists: [
+        "own-sound": [ad(60, 90, source: "own-sound")],
+        "repeat-sound": [ad(100, 130, source: "repeat-sound")],
+        "meaning": [ad(140, 170, source: "meaning")],
+      ])
   }
 
   func testTheRowRewritesTheListWithWhatTheSettingsLetSkip() {
@@ -70,7 +92,7 @@ final class SettingsScoreLayerTests: XCTestCase {
 
   func testWithNoFileEveryFinderIsAtItsBuiltInLevel() {
     // Built in: own sounds and the meaning model skip, the two repeat finders only ask.
-    let row = layer(ShowTuning()).apply(input(feed: "fz", audio: nil), soFar: soFar)
+    let row = layer(ShowTuning(), finders: keptSoFar).apply(input(feed: "fz", audio: nil), soFar: soFar)
     XCTAssertEqual(spans(row), [[10, 40], [60, 90], [140, 170], [180, 200]])
   }
 
@@ -93,13 +115,11 @@ final class SettingsScoreLayerTests: XCTestCase {
     }
   }
 
-  func testWhereJointsAreOnTheSettingsStartFromTheAdsBeforeTheJointsRowAndSnapThem() {
+  func testWhereJointsAreOnTheSettingsStartFromTheKeptListsNotFromWhatTheJointsRowHandedOnAndSnapThem() {
     let calls = SoundCalls()
-    let stash = ScoreEpisodeAds()
-    stash.put(soFar, for: "e1")
     // What the joints row handed on is not what the settings start from.
     let moved = soFar.map { ad($0.start - 5, $0.end + 5, source: $0.source) }
-    let row = layer(tuning, stash: stash, snap: widen(calls)).apply(
+    let row = layer(tuning, finders: keptSoFar, snap: widen(calls)).apply(
       input(feed: "fa", audio: audio), soFar: moved)
     XCTAssertEqual(spans(row), [[9, 42], [59, 92], [139, 172], [179, 202]])
     // Joints are on by default and steady files are not used by default.
@@ -108,13 +128,48 @@ final class SettingsScoreLayerTests: XCTestCase {
 
   func testWhereJointsAreOffTheAdsAreNotMovedAndTheJointsRowIsUndone() {
     let calls = SoundCalls()
-    let stash = ScoreEpisodeAds()
-    stash.put(soFar, for: "e1")
     let moved = soFar.map { ad($0.start - 5, $0.end + 5, source: $0.source) }
-    let row = layer(tuning, stash: stash, snap: widen(calls)).apply(
+    let row = layer(tuning, finders: keptSoFar, snap: widen(calls)).apply(
       input(feed: "fc", audio: audio), soFar: moved)
     XCTAssertEqual(spans(row), [[10, 40], [140, 170], [180, 200]])
     XCTAssertEqual(calls.all, [])
+  }
+
+  // MARK: Two finders on one stretch
+
+  func testAFinderThatOnlyAsksDoesNotTakeAnythingFromOneThatSkips() {
+    // Built in: the meaning model skips and repeated words only ask. Both found the stretch from
+    // 150 s, and the meaning model's ad is whole in its own list.
+    let finders = kept(
+      base: [],
+      lists: [
+        "meaning": [ad(100, 200, source: "meaning")], "repeat-words": [ad(150, 250, source: "repeat-words")],
+      ])
+    let row = layer(ShowTuning(), finders: finders).apply(input(feed: "fz", audio: nil), soFar: [])
+    XCTAssertEqual(spans(row), [[100, 200]])
+  }
+
+  func testTwoFindersThatSkipAreCutAgainstEachOtherInTheOrderOfTheirRows() {
+    let finders = kept(
+      base: [ad(10, 40, source: nil, .sure)],
+      lists: [
+        "meaning": [ad(100, 200, source: "meaning")], "own-sound": [ad(150, 250, source: "own-sound")],
+        "repeat-words": [ad(5, 30, source: "repeat-words")],
+      ])
+    // Repeated words only ask. Own sounds lose the part the meaning model has, and a second of
+    // distance is kept between the two.
+    let row = layer(ShowTuning(), finders: finders).apply(input(feed: "fz", audio: nil), soFar: [])
+    XCTAssertEqual(spans(row), [[10, 40], [100, 200], [201, 250]])
+  }
+
+  func testWhenTheSettingsTurnTheFindersOffTheOlderFindersAdsAreWhatIsLeft() {
+    let off = ShowTuning(
+      text: "{\"version\": 1, \"default\": {\"finders\": {\"meaning\": \"off\", \"own-sound\": \"off\"}}}")
+    let finders = kept(
+      base: [ad(10, 40, source: nil, .sure)],
+      lists: ["meaning": [ad(100, 200, source: "meaning")], "own-sound": [ad(300, 340, source: "own-sound")]])
+    let row = layer(off, finders: finders).apply(input(feed: "fz", audio: nil), soFar: [])
+    XCTAssertEqual(spans(row), [[10, 40]])
   }
 
   func testSteadyFilesAreUsedOnlyWhereTheSettingsSay() {

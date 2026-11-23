@@ -75,7 +75,9 @@ final class AdScoreCommandRowsTests: XCTestCase {
     try fill(audio: false)
     XCTAssertEqual(run(), 0)
     let rows = savedRows()
-    XCTAssertEqual(rows.map(\.name), ["Word rules", "Plus promo rules", "Plus repeated words"])
+    XCTAssertEqual(
+      rows.map(\.name),
+      ["Word rules", "Plus promo rules", "Plus repeated words", "Plus per-show settings"])
     for row in rows {
       XCTAssertEqual(Set(row.shows.map(\.feed)), ["f1", "f2"], row.name)
       XCTAssertEqual(row.total.episodes, 2, row.name)
@@ -135,6 +137,7 @@ final class AdScoreCommandRowsTests: XCTestCase {
       [
         "Word rules", "Plus promo rules", "Plus the phone's own sounds", "Plus repeated sounds",
         "Plus repeated words", "Plus joints", "Plus joints (steady files too)",
+        "Plus per-show settings",
       ])
     // Only the first episode has audio: the finders were asked about it alone.
     XCTAssertEqual(calls.all.filter { $0.hasPrefix("own") }, ["own e1.mp3 f1 e1"])
@@ -154,7 +157,9 @@ final class AdScoreCommandRowsTests: XCTestCase {
     try fill(audio: false)
     let calls = SoundCalls()
     XCTAssertEqual(run(extras(calls)), 0)
-    XCTAssertEqual(savedRows().map(\.name), ["Word rules", "Plus promo rules", "Plus repeated words"])
+    XCTAssertEqual(
+      savedRows().map(\.name),
+      ["Word rules", "Plus promo rules", "Plus repeated words", "Plus per-show settings"])
     XCTAssertEqual(calls.all, [])
     XCTAssertTrue(output.contains("No episode has an MP3 file in the teaching folder"), output)
   }
@@ -206,11 +211,15 @@ final class AdScoreCommandRowsTests: XCTestCase {
     XCTAssertEqual(run(), 0)
     XCTAssertFalse(savedRows().contains { $0.name == ScoreRows.meaning })
     XCTAssertTrue(output.contains("needs a Mac"), output)
-    // With an embedder the row is there, straight after the repeated words.
+    // With an embedder the row is there, first among the new rows: it skips by default, so the
+    // finders that only ask must never cut it.
     XCTAssertEqual(run(ScoreExtras(embedder: { _ in Made.embedder() })), 0)
-    let names = savedRows().map(\.name)
-    XCTAssertEqual(names.last, "Plus the meaning model")
-    XCTAssertEqual(names.dropLast().last, "Plus repeated words")
+    XCTAssertEqual(
+      savedRows().map(\.name),
+      [
+        "Word rules", "Plus promo rules", "Plus the meaning model", "Plus repeated words",
+        "Plus per-show settings",
+      ])
     XCTAssertTrue(output.contains("The meaning model read 2 episodes"), output)
   }
 
@@ -241,11 +250,15 @@ final class AdScoreCommandRowsTests: XCTestCase {
     XCTAssertEqual(history.runs.last?.total, rows.last?.total)
   }
 
-  func testWithNoSettingsFileThereIsNoSettingsRow() throws {
+  func testWithNoSettingsFileTheSettingsRowUsesTheBuiltInSettings() throws {
     try fill(audio: false)
     XCTAssertEqual(run(), 0)
-    XCTAssertFalse(savedRows().contains { $0.name == ScoreRows.settings })
+    XCTAssertEqual(savedRows().last?.name, ScoreRows.settings)
     XCTAssertTrue(output.contains("no show-settings.json"), output)
+    XCTAssertTrue(output.contains("built-in settings"), output)
+    // The run's total is the settings row's, as the phone would do with no file.
+    let history = ScorecardHistory.load(from: folder.url.appendingPathComponent("scorecard.json"))
+    XCTAssertEqual(history.runs.last?.total, savedRows().last?.total)
   }
 
   func testSettingsThatSkipEverythingHoldTheCheck() throws {

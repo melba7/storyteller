@@ -127,7 +127,7 @@ enum AdScoreNotes {
     guard asked.hours > 0 else { return ["Questions: there is no transcript time to count over."] }
     let seconds = asked.hours * 3600
     guard asked.count > 0 else {
-      return ["Questions: none in \(time(seconds)) of transcript, so nothing would be asked."]
+      return ["Questions: none in \(time(seconds)) of transcript, so the word model would ask nothing."]
     }
     let perHour = Double(asked.count) / asked.hours
     let share = Double(asked.wereAds) / Double(asked.count)
@@ -137,7 +137,8 @@ enum AdScoreNotes {
     return [
       "Questions: \(asked.count) question\(asked.count == 1 ? "" : "s") over \(time(seconds)) of transcript "
         + "(\(String(format: "%.1f", perHour)) an hour), \(asked.wereAds) of \(asked.count) were ads "
-        + "(\(Int((share * 100).rounded()))%).",
+        + "(\(Int((share * 100).rounded()))%). Only the word model's questions are counted, not the "
+        + "repeat finders' or the meaning model's.",
       "Starting gate for the question note: at most 2 an hour and at least half of them ads. "
         + (failed.isEmpty ? "Met." : "Not met: \(failed.joined(separator: " and ")).")
     ]

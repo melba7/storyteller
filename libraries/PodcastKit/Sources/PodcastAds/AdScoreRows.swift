@@ -1,6 +1,7 @@
 // LOFI-FORK: which new rows the scorecard gets, and the plain notes about the ones it leaves out
 // (see FORK.md and AdScoreLayer.swift). Foundation only.
 import Foundation
+import PodcastTranscripts
 
 /// What the caller of `AdScoreCommand` can add. PodcastAds cannot see the audio code or Apple's
 /// sentence embedding, so the `podcast-teach` tool hands them in; with the defaults the rows that
@@ -29,29 +30,51 @@ struct ScorePlan {
   /// Plain sentences about rows that are left out, printed under the scorecard's title.
   var notes: [String] = []
   var meaning: MeaningScoreNotes?
-  /// The Mac's settings, when `show-settings.json` is there.
+  /// The Mac's settings (or the built-in ones), for the question note.
   var tuning: ShowTuning?
+  /// What the finder rows keep for the settings row, and the silent row that starts it.
+  let finders = ScoreFinderAds()
+  /// The rows that learn from the episodes before them: own sounds, repeated sounds, repeated words.
+  var learners: [AdScoreLayer] = []
 
-  /// The order: own sounds, repeated sounds, repeated words, the meaning model, joints, joints in
-  /// steady files too, and last the per-show settings. Each row stands on the one before it.
+  /// The order: the meaning model first (it skips by default, so a finder that only asks must not
+  /// cut it), then own sounds, repeated sounds, repeated words, joints, joints in steady files too,
+  /// and last the per-show settings. Each row stands on the one before it.
   static func make(
     folder: URL, episodes: [TeachingEpisode], audio: [String: URL], now: Date, extras: ScoreExtras
   ) -> ScorePlan {
     var plan = ScorePlan()
+    let finders = plan.finders
     let kit = plan.soundKit(folder: folder, episodes: episodes, audio: audio, now: now, extras: extras)
     let stash = ScoreEpisodeAds()
-    if let kit {
-      plan.layers.append(SoundScoreLayers.ownSounds(kit.ownSounds))
-      plan.layers.append(SoundScoreLayers.repeatedSounds(kit.repeatedSounds))
-    }
-    plan.layers.append(WordScoreLayers.repeatedWords(now: now))
     plan.addMeaning(folder: folder, extras: extras)
+    if let kit {
+      plan.layers.append(SoundScoreLayers.ownSounds(kit.ownSounds, finders: finders))
+      plan.layers.append(SoundScoreLayers.repeatedSounds(kit.repeatedSounds, finders: finders))
+    }
+    plan.layers.append(WordScoreLayers.repeatedWords(now: now, finders: finders))
+    let learning = [ScoreRows.ownSounds, ScoreRows.repeatedSounds, ScoreRows.repeatedWords]
+    plan.learners = plan.layers.filter { learning.contains($0.name) }
     if let kit {
       plan.layers.append(SoundScoreLayers.joints(kit.snapJoints, stash: stash))
       plan.layers.append(SoundScoreLayers.steadyJoints(kit.snapJoints, stash: stash))
     }
-    plan.addSettings(folder: folder, stash: stash, snap: kit?.snapJoints)
+    plan.addSettings(folder: folder, snap: kit?.snapJoints)
     return plan
+  }
+
+  /// The rows that learn, run over episodes that are not scored (the older episodes of the shelf's
+  /// shows), in order, so the scored ones have something before them. Their rows are not kept.
+  func teach(
+    _ episodes: [TeachingEpisode], audio: [String: URL],
+    base: (TeachingEpisode, Transcript) -> [FoundAd]
+  ) {
+    for episode in episodes {
+      let input = AdScoreInput(
+        episode: episode, transcript: episode.transcript, audio: audio[episode.id])
+      var soFar = base(episode, episode.transcript)
+      for layer in [finders.baseRow] + learners { soFar = layer.apply(input, soFar: soFar) }
+    }
   }
 
   /// The sound finders when there is any audio to read, else nil and a note.
@@ -96,24 +119,28 @@ struct ScorePlan {
     }
     let seen = MeaningScoreNotes()
     meaning = seen
-    layers.append(WordScoreLayers.meaning(model: model, embedder: embedder, notes: seen))
+    layers.append(
+      WordScoreLayers.meaning(model: model, embedder: embedder, notes: seen, finders: finders))
   }
 
+  /// The settings row is always there: with no file (or one that cannot be read) it holds the
+  /// built-in settings, which is what the phone does, so the run's total is the phone's.
   private mutating func addSettings(
-    folder: URL, stash: ScoreEpisodeAds, snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?
+    folder: URL, snap: (@Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan])?
   ) {
     let url = folder.appendingPathComponent(ShowTuning.fileName)
-    guard FileManager.default.fileExists(atPath: url.path) else {
-      notes.append("There is no \(ShowTuning.fileName) in the folder, so there is no per-show settings row.")
-      return
+    var chosen = ShowTuning()
+    if !FileManager.default.fileExists(atPath: url.path) {
+      notes.append(
+        "There is no \(ShowTuning.fileName) in the folder, so the per-show settings row uses the built-in settings.")
+    } else if let data = try? Data(contentsOf: url) {
+      chosen = ShowTuning(data: data)
+    } else {
+      notes.append(
+        "\(ShowTuning.fileName) could not be read, so the per-show settings row uses the built-in settings.")
     }
-    guard let data = try? Data(contentsOf: url) else {
-      notes.append("\(ShowTuning.fileName) could not be read, so there is no per-show settings row.")
-      return
-    }
-    let tuning = ShowTuning(data: data)
-    self.tuning = tuning
-    layers.append(SettingsScoreLayer.perShowSettings(tuning: tuning, stash: stash, snap: snap))
+    tuning = chosen
+    layers.append(SettingsScoreLayer.perShowSettings(tuning: chosen, finders: finders, snap: snap))
   }
 
   /// What the meaning row noticed, as plain sentences.

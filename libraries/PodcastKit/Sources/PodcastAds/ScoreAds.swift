@@ -30,6 +30,12 @@ public enum ScoreRows {
 
   /// The rows that need the episode's audio.
   public static let needingAudio = [ownSounds, repeatedSounds, joints, steadyJoints]
+
+  /// The finders of the new rows, in the order of their rows: the meaning model first, because it
+  /// skips by default and so must not be cut by a finder that only asks.
+  public static let finderOrder = [
+    ShowTuning.meaning, ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords,
+  ]
 }
 
 public enum ScoreAds {
@@ -134,5 +140,64 @@ public final class ScoreEpisodeAds: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     return kept[episode]
+  }
+}
+
+/// What each finder row found for each episode on its own, for the settings row. A row of the
+/// scorecard stands on the row before it, so a finder's ads are cut back to what the finders
+/// before it left. That is fine for showing how right each finder is, but the settings can turn
+/// a finder into one that only asks, and then the part another finder lost to its cut is gone. So
+/// every finder row also keeps its ads cut back to the OLDER finders only (the base), and the
+/// settings row builds its list from the base and these lists, as the phone does: the settings
+/// first, on each finder's own list, then the cut against what is kept, then the join.
+public final class ScoreFinderAds: @unchecked Sendable {
+  private let lock = NSLock()
+  private var bases: [String: [FoundAd]] = [:]
+  private var finds: [String: [String: [FoundAd]]] = [:]
+
+  public init() {}
+
+  /// A silent first row: it adds nothing, and keeps the ads of the older finders for each whole
+  /// episode (not the first look). Its row of the scorecard is not saved.
+  public var baseRow: AdScoreLayer {
+    AdScoreLayer(name: "") { [self] input, soFar in
+      if !input.isHead {
+        lock.lock()
+        defer { lock.unlock() }
+        bases[input.episode.id] = soFar
+      }
+      return []
+    }
+  }
+
+  /// The ads of the older finders for the whole episode, once the base row has seen it.
+  public func base(for episode: String) -> [FoundAd]? {
+    lock.lock()
+    defer { lock.unlock() }
+    return bases[episode]
+  }
+
+  /// What `finder` found for the episode on its own (empty when it did not run).
+  public func ads(finder: String, for episode: String) -> [FoundAd] {
+    lock.lock()
+    defer { lock.unlock() }
+    return finds[episode]?[finder] ?? []
+  }
+
+  /// What a finder row adds to the rows before it (`soFar`): `found` cut back to what `soFar`
+  /// holds. With `keep` it also remembers `found` cut back to the base alone, which is what the
+  /// settings row starts from. `base` is where that cut is made: the first look has no base of
+  /// its own, so it passes `soFar` and keeps nothing.
+  func add(
+    _ found: [FoundAd], finder: String, to soFar: [FoundAd], for episode: String, base: [FoundAd]?,
+    keep: Bool
+  ) -> [FoundAd] {
+    let own = ScoreAds.outside(found, of: base ?? soFar)
+    if keep {
+      lock.lock()
+      finds[episode, default: [:]][finder] = own
+      lock.unlock()
+    }
+    return ScoreAds.outside(own, of: soFar)
   }
 }

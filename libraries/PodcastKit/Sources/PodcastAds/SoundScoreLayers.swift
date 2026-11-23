@@ -47,18 +47,21 @@ public enum SoundScoreLayers {
 
   /// "Plus the phone's own sounds". `scan` is `ScoreSoundKit.ownSounds`.
   public static func ownSounds(
-    _ scan: @escaping @Sendable (URL, String, String, [ScoreSpan]) -> [ScoreSpan]
+    _ scan: @escaping @Sendable (URL, String, String, [ScoreSpan]) -> [ScoreSpan],
+    finders: ScoreFinderAds? = nil
   ) -> AdScoreLayer {
-    finder(name: ScoreRows.ownSounds, source: ShowTuning.ownSound) { input, audio, soFar in
+    finder(name: ScoreRows.ownSounds, source: ShowTuning.ownSound, finders: finders) {
+      input, audio, soFar in
       scan(audio, input.episode.feed, input.episode.id, ScoreAds.learnable(soFar))
     }
   }
 
   /// "Plus repeated sounds". `scan` is `ScoreSoundKit.repeatedSounds`.
   public static func repeatedSounds(
-    _ scan: @escaping @Sendable (URL, String, String) -> [ScoreSpan]
+    _ scan: @escaping @Sendable (URL, String, String) -> [ScoreSpan], finders: ScoreFinderAds? = nil
   ) -> AdScoreLayer {
-    finder(name: ScoreRows.repeatedSounds, source: ShowTuning.repeatSound) { input, audio, _ in
+    finder(name: ScoreRows.repeatedSounds, source: ShowTuning.repeatSound, finders: finders) {
+      input, audio, _ in
       scan(audio, input.episode.feed, input.episode.id)
     }
   }
@@ -67,7 +70,7 @@ public enum SoundScoreLayers {
   /// for an episode: the look at its first seconds (a call with only the head of the transcript)
   /// answers from what the whole call found, and only the ads that end by then.
   private static func finder(
-    name: String, source: String,
+    name: String, source: String, finders: ScoreFinderAds?,
     look: @escaping @Sendable (AdScoreInput, URL, [FoundAd]) -> [ScoreSpan]
   ) -> AdScoreLayer {
     let found = ScoreEpisodeAds()
@@ -77,8 +80,10 @@ public enum SoundScoreLayers {
       if input.isHead {
         return (found.ads(for: id) ?? []).filter { $0.end <= input.transcript.duration }
       }
-      let added = ScoreAds.outside(
-        ScoreAds.ads(look(input, audio, soFar), source: source), of: soFar)
+      let own = ScoreAds.ads(look(input, audio, soFar), source: source)
+      let added =
+        finders?.add(own, finder: source, to: soFar, for: id, base: finders?.base(for: id), keep: true)
+        ?? ScoreAds.outside(own, of: soFar)
       found.put(added, for: id)
       return added
     }

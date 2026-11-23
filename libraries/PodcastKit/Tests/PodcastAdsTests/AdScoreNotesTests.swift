@@ -128,6 +128,10 @@ final class AdScoreNotesTests: XCTestCase {
     XCTAssertTrue(lines[0].contains("2 questions over 2 min 00 s"), lines[0])
     XCTAssertTrue(lines[0].contains("60.0 an hour"), lines[0])
     XCTAssertTrue(lines[0].contains("1 of 2 were ads (50%)"), lines[0])
+    // The line says plainly what it does not count.
+    XCTAssertTrue(
+      lines[0].hasSuffix("Only the word model's questions are counted, not the repeat finders' or the meaning model's."),
+      lines[0])
     XCTAssertTrue(lines[1].contains("at most 2 an hour and at least half of them ads"), lines[1])
     XCTAssertTrue(lines[1].hasSuffix("Not met: too many questions an hour."), lines[1])
   }

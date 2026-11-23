@@ -117,10 +117,13 @@ public enum AdScoreCommand {
     let audio = TeachingAudio.files(in: folder)
     let plan = ScorePlan.make(folder: folder, episodes: chosen, audio: audio, now: now, extras: extras)
     let finalAds = ScoreEpisodeAds()
-    let layers = plan.layers + [remembering(finalAds)]
+    // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
+    // episode of a show, so the labelled episodes that are not scored come first and only teach.
+    plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
+    let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
     let made = AdScoreRun.runLayers(
       episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: layers)
-    for (layer, card) in zip(plan.layers, made) {
+    for (layer, card) in zip(plan.layers, made.dropFirst()) {
       cards.append(card)
       rows.append(ScorecardRow(name: layer.name, card: card))
     }
@@ -135,7 +138,7 @@ public enum AdScoreCommand {
     var after = AdScoreNotes.rowLines(rows) + plan.meaningLines()
     after += questions(
       model: model, episodes: chosen, finalAds: finalAds, from: plan.tuning?.askThreshold)
-    after += AdScoreNotes.habitLines(episodes: chosen, mac: habits, find: { episode, head in
+    after += AdScoreNotes.habitLines(episodes: labelled, mac: habits, find: { episode, head in
       base(episode, head)
     })
     text += "\n\n" + after.joined(separator: "\n")
@@ -172,10 +175,6 @@ public enum AdScoreCommand {
       model: model, episodes: episodes, finalAds: { finalAds.ads(for: $0.id) ?? [] },
       from: from ?? AdAsks.askFrom)
     return AdScoreNotes.questionLines(asked)
-  }
-
-  private static func share(_ part: Int, _ whole: Int) -> Double {
-    whole == 0 ? 0 : Double(part) / Double(whole)
   }
 
   /// What the phone would find in this transcript: the local finders and, when there is a library,

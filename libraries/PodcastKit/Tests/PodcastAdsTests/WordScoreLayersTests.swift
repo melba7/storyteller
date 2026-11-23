@@ -147,4 +147,36 @@ final class WordScoreLayersTests: XCTestCase {
     XCTAssertTrue(notes.offReasons.first?.contains("revision") ?? false)
     XCTAssertEqual(notes.episodes, 0)
   }
+
+  // MARK: What the settings row starts from
+
+  func testTheRepeatedWordsRowKeepsItsOwnListAndTheMeaningRowKeepsItsToo() throws {
+    let finders = ScoreFinderAds()
+    let layer = WordScoreLayers.repeatedWords(now: now, finders: finders)
+    let one = episode("e1", words: Speech.episode(tag: "one", total: 1400, plugs: [(400, Speech.plug(80))]))
+    let two = episode("e2", words: Speech.episode(tag: "two", total: 1400, plugs: [(903, Speech.plug(80))]))
+    _ = layer.apply(input(one), soFar: [])
+    _ = finders.baseRow.apply(input(two), soFar: [])
+    // An earlier new finder already has 475 s to 495 s in the row before it, not in the base.
+    let before = [foundAd(Speech.time(ofWord: 950), Speech.time(ofWord: 990), .unsure)]
+    let row = layer.apply(input(two), soFar: before)
+    let own = finders.ads(finder: "repeat-words", for: "e2")
+    XCTAssertFalse(own.isEmpty)
+    // The whole plug is in its own list (the base has nothing), the row loses what the row before has.
+    let ownLength = own.reduce(0) { $0 + $1.end - $1.start }
+    let rowLength = row.filter { $0.source == "repeat-words" }.reduce(0) { $0 + $1.end - $1.start }
+    XCTAssertGreaterThan(ownLength, rowLength + 15)
+    // The first look keeps nothing and does not touch the list.
+    _ = layer.apply(input(two, head: 600), soFar: [])
+    XCTAssertEqual(finders.ads(finder: "repeat-words", for: "e2"), own)
+
+    let meaningFinders = ScoreFinderAds()
+    let meaning = WordScoreLayers.meaning(
+      model: model, embedder: Made.embedder(), notes: MeaningScoreNotes(), finders: meaningFinders)
+    _ = meaningFinders.baseRow.apply(input(meaningEpisode), soFar: [foundAd(0, 20)])
+    _ = meaning.apply(input(meaningEpisode), soFar: [foundAd(0, 20), foundAd(40, 60, .unsure)])
+    let kept = meaningFinders.ads(finder: "meaning", for: "m1")
+    XCTAssertEqual(try XCTUnwrap(kept.first).start, 30, accuracy: 1.5)
+    XCTAssertTrue(kept.allSatisfy { $0.source == "meaning" })
+  }
 }

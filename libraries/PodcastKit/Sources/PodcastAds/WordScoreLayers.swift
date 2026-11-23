@@ -56,12 +56,12 @@ public enum WordScoreLayers {
   /// scorecard goes through the episodes in order, and an episode is compared with the ones
   /// before it (up to three, as on the phone) and then remembered. `now` is the time the run
   /// starts. A transcript with no lines gives nothing and is remembered as nothing.
-  public static func repeatedWords(now: Date) -> AdScoreLayer {
+  public static func repeatedWords(now: Date, finders: ScoreFinderAds? = nil) -> AdScoreLayer {
     let memory = RepeatedWordsMemory()
     return AdScoreLayer(name: ScoreRows.repeatedWords) { input, soFar in
       // The look at the first seconds asks the memory and keeps it as it is: the whole
       // transcript was remembered before it.
-      return memory.find(input, soFar: soFar, now: now, remember: !input.isHead)
+      return memory.find(input, soFar: soFar, now: now, finders: finders)
     }
   }
 
@@ -71,13 +71,17 @@ public enum WordScoreLayers {
   /// the numbers the model was trained on, or a line takes too long) adds nothing, and the reason
   /// goes to `notes`.
   public static func meaning(
-    model: AdMeaningModel, embedder: LineEmbedder, notes: MeaningScoreNotes
+    model: AdMeaningModel, embedder: LineEmbedder, notes: MeaningScoreNotes,
+    finders: ScoreFinderAds? = nil
   ) -> AdScoreLayer {
     AdScoreLayer(name: ScoreRows.meaning) { input, soFar in
       guard !input.isHead else { return [] }
       let run = MeaningAds.run(model: model, transcript: input.transcript, embedder: embedder)
       notes.record(run)
-      return ScoreAds.outside(run.ads, of: soFar)
+      let id = input.episode.id
+      return finders?.add(
+        run.ads, finder: ShowTuning.meaning, to: soFar, for: id, base: finders?.base(for: id),
+        keep: true) ?? ScoreAds.outside(run.ads, of: soFar)
     }
   }
 }
@@ -87,20 +91,24 @@ private final class RepeatedWordsMemory: @unchecked Sendable {
   private let lock = NSLock()
   private var memory = RepeatedWords()
 
-  func find(_ input: AdScoreInput, soFar: [FoundAd], now: Date, remember: Bool) -> [FoundAd] {
+  func find(_ input: AdScoreInput, soFar: [FoundAd], now: Date, finders: ScoreFinderAds?) -> [FoundAd] {
     lock.lock()
     defer { lock.unlock() }
     let episode = input.episode
     let lines = input.transcript.lines
     guard !lines.isEmpty else { return [] }
-    // `already` is every ad known for the episode: nothing found overlaps one, and every piece
-    // stays a second away from it.
+    // `already` is every ad of the older finders: nothing found overlaps one, and every piece
+    // stays a second away from it. The first look has its own, so it uses the ads it was given.
+    let whole = !input.isHead
+    let base = whole ? finders?.base(for: episode.id) : nil
     let found = memory.find(
       show: episode.feed, episode: episode.id, lines: lines, duration: episode.episodeLength,
-      now: now, already: soFar)
-    if remember {
+      now: now, already: base ?? soFar)
+    if whole {
       memory.remember(show: episode.feed, episode: episode.id, lines: lines, now: now)
     }
-    return ScoreAds.outside(found, of: soFar)
+    return finders?.add(
+      found, finder: ShowTuning.repeatWords, to: soFar, for: episode.id, base: base, keep: whole)
+      ?? ScoreAds.outside(found, of: soFar)
   }
 }
