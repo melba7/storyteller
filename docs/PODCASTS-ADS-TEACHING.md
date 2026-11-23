@@ -97,9 +97,11 @@ choice (`ShowTuning.apply`, and the finder guard's mode), join the ads that skip
 what was found. `ShowTuning.apply` must run on each finder's own list before the
 join, because a joined ad loses its `source`.
 
-- **A repeat only asks.** A repeated stretch is not always an ad, so repeats
-  skip only where `show-settings.json` has been edited by hand to say `skip`.
-  The Mac's own rules only make the phone stricter.
+- **A repeat only asks.** A repeated stretch is not always an ad, so a repeat
+  never skips on its own: the phone's built-in level for repeats is `ask`, and
+  the Mac's rules only make the phone stricter, never looser. (A hand edit of
+  `show-settings.json` would say `skip`, but the next "Teach the phone again"
+  writes the file whole and loses it.)
 - **Questions.** A guess that is not sure enough to skip becomes a question,
   from whole-transcript passes only, at most three in an episode (answered ones
   count). The phone shows "Ad? Skip" with two answers while the stretch plays
@@ -281,6 +283,18 @@ Native module `LofiScore` (`modules/lofi-score`):
 | ----------------------------------- | --------------------------------------------------------------------------------------------------- |
 | `writeLinkedFolderFile(path, text)` | `{status: "written"}`, `{status: "notLinked" \| "folderGone"}` or `{status: "unwritable", message}` |
 
+## Switching things off, and going back
+
+- To make one finder stricter for every show or for one show, the Mac decides
+  from the scorecard when you double-click "Teach the phone again": a finder
+  that finds more wrong than right seconds is turned off, and one under 85%
+  precision only asks. The phone's guard does the same by itself after a crash
+  or two undone skips.
+- There is no switch for a finder in the app. To go back to how ads were skipped
+  before this round, install build 33.1 again from the build list in TestFlight;
+  the files the new finders wrote are only read by the new build, and the old
+  build ignores them.
+
 ## Measuring
 
 `podcast-teach score <teaching folder>` runs the phone's local layers over the
@@ -318,9 +332,8 @@ trimmed, missed, time saved) and what the Mac taught and when.
 - A missed-ad tap jumps 30 seconds. It could end where the small model thinks
   the stretch ends, and teach the phone's own memory at once.
 - `AdCleanup`'s own merge is not kind-aware.
-- A repeat never skips unless `show-settings.json` is edited by hand. A rule
-  that promotes a repeat to skip after enough confirmed answers on a show is
-  parked until the answers show it is safe.
+- A repeat never skips. A rule that promotes a repeat to skip after enough
+  confirmed answers on a show is parked until the answers show it is safe.
 - Episodes that finished before the update never run the new finders again.
 - A habit may be counted twice for an episode that was streamed and then
   downloaded; the check of play-through limits it.
