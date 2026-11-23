@@ -27,7 +27,12 @@ public struct EpisodeScore: Codable, Sendable, Equatable {
   public var ads: Int
   public var caught: Int
   public var adSeconds: Double
+  /// The seconds of those marked stretches that no skip covers (the missed ones included).
   public var heardSeconds: Double
+  /// Of the marked stretches a skip reaches, the seconds that play before the skip starts and
+  /// after it ends. Defined at `AdScore.heardAround`.
+  public var heardBeforeSeconds: Double
+  public var heardAfterSeconds: Double
   public var cutSeconds: Double
   public var wrongSkips: Int
   /// All four sorts, whatever the settings.
@@ -124,6 +129,7 @@ public enum AdScore {
     let whole = caughtCount(truth, by: skippedSpans, limit: duration)
     let adSeconds = truthSpans.length
     let heard = adSeconds - truthSpans.overlap(skippedSpans)
+    let around = heardAround(truth, by: skippedSpans, limit: duration)
     let cut = skippedSpans.length - skippedSpans.overlap(marked)
     let wrong = skippedAds.filter { ad in
       let own = Spans([(start: ad.start, end: ad.end)], limit: duration)
@@ -144,8 +150,43 @@ public enum AdScore {
 
     return EpisodeScore(
       id: episode.id, feed: episode.feed, show: episode.show, duration: duration, ads: truth.count,
-      caught: whole, adSeconds: adSeconds, heardSeconds: heard, cutSeconds: cut, wrongSkips: wrong,
-      bySort: bySort, openingAds: openings(episode, settings).count, openingKnown: 0)
+      caught: whole, adSeconds: adSeconds, heardSeconds: heard, heardBeforeSeconds: around.before,
+      heardAfterSeconds: around.after, cutSeconds: cut, wrongSkips: wrong, bySort: bySort,
+      openingAds: openings(episode, settings).count, openingKnown: 0)
+  }
+
+  /// The seconds of a marked ad that play before the skip and after it, which is how late a skip
+  /// starts and how early it ends. For each counted marked stretch (the ones the settings skip,
+  /// cut to the episode) that the skips overlap by more than zero seconds:
+  ///
+  ///     early = max(0, skipStart - stretchStart)
+  ///     late  = max(0, stretchEnd - skipEnd)
+  ///
+  /// Skips are the player's (`skipped`), overlapping ones joined. When several separate skips
+  /// reach one stretch, `skipStart` is the start of the first and `skipEnd` the end of the last;
+  /// what plays between two skips inside a stretch is in neither number (it is in
+  /// `heardSeconds`). One skip over two stretches is counted for each stretch on its own. A
+  /// stretch no skip reaches is a missed one: it is in `heardSeconds` and not counted here, so
+  /// these numbers say how late or early the skips are, not how many ads were missed. Stretches
+  /// are counted one by one, so two marked stretches that overlap each other count twice.
+  static func heardAround(
+    _ truth: [TeachingTruth], by skips: Spans, limit: Double
+  ) -> (before: Double, after: Double) {
+    var before = 0.0
+    var after = 0.0
+    for stretch in truth {
+      guard let own = Spans([(start: stretch.start, end: stretch.end)], limit: limit).items.first
+      else { continue }
+      // `skips.items` are sorted and apart, so the first and the last one reaching the stretch
+      // hold its earliest start and its latest end.
+      let reaching = skips.items.filter {
+        min($0.end, own.end) - max($0.start, own.start) > 0
+      }
+      guard let first = reaching.first, let last = reaching.last else { continue }
+      before += max(0, first.start - own.start)
+      after += max(0, own.end - last.end)
+    }
+    return (before, after)
   }
 
   /// How many of the stretches have at least `caughtShare` of their length inside `spans`.
