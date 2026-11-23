@@ -29,8 +29,8 @@ public struct EpisodeScore: Codable, Sendable, Equatable {
   public var adSeconds: Double
   /// The seconds of those marked stretches that no skip covers (the missed ones included).
   public var heardSeconds: Double
-  /// Of the marked stretches a skip reaches, the seconds that play before the skip starts and
-  /// after it ends. Defined at `AdScore.heardAround`.
+  /// Of the caught ads, the seconds that play before the skip starts and after it ends. Defined
+  /// at `AdScore.heardAround`.
   public var heardBeforeSeconds: Double
   public var heardAfterSeconds: Double
   public var cutSeconds: Double
@@ -129,7 +129,7 @@ public enum AdScore {
     let whole = caughtCount(truth, by: skippedSpans, limit: duration)
     let adSeconds = truthSpans.length
     let heard = adSeconds - truthSpans.overlap(skippedSpans)
-    let around = heardAround(truth, by: skippedSpans, limit: duration)
+    let around = heardAround(truthSpans, by: skippedSpans)
     let cut = skippedSpans.length - skippedSpans.overlap(marked)
     let wrong = skippedAds.filter { ad in
       let own = Spans([(start: ad.start, end: ad.end)], limit: duration)
@@ -155,36 +155,36 @@ public enum AdScore {
       openingAds: openings(episode, settings).count, openingKnown: 0)
   }
 
-  /// The seconds of a marked ad that play before the skip and after it, which is how late a skip
-  /// starts and how early it ends. For each counted marked stretch (the ones the settings skip,
-  /// cut to the episode) that the skips overlap by more than zero seconds:
+  /// The seconds of a caught ad that play before the skip and after it, which is how late a skip
+  /// starts and how early it ends. The ads are the counted marked stretches (the ones the
+  /// settings skip, cut to the episode), with the ones that overlap or touch joined into one, as
+  /// `heardSeconds` has them, so these two numbers never add up to more than `heardSeconds`. An
+  /// ad counts only when it is caught: at least `caughtShare` of it is skipped (the rule of
+  /// `caught`). For each such ad:
   ///
-  ///     early = max(0, skipStart - stretchStart)
-  ///     late  = max(0, stretchEnd - skipEnd)
+  ///     early = max(0, skipStart - adStart)
+  ///     late  = max(0, adEnd - skipEnd)
   ///
-  /// Skips are the player's (`skipped`), overlapping ones joined. When several separate skips
-  /// reach one stretch, `skipStart` is the start of the first and `skipEnd` the end of the last;
-  /// what plays between two skips inside a stretch is in neither number (it is in
-  /// `heardSeconds`). One skip over two stretches is counted for each stretch on its own. A
-  /// stretch no skip reaches is a missed one: it is in `heardSeconds` and not counted here, so
-  /// these numbers say how late or early the skips are, not how many ads were missed. Stretches
-  /// are counted one by one, so two marked stretches that overlap each other count twice.
-  static func heardAround(
-    _ truth: [TeachingTruth], by skips: Spans, limit: Double
-  ) -> (before: Double, after: Double) {
+  /// Skips are the player's (`skipped`), overlapping ones joined. A skip reaches an ad when it
+  /// overlaps it by more than zero seconds (one that only touches an edge does not). When several
+  /// separate skips reach one ad, `skipStart` is the start of the first and `skipEnd` the end of
+  /// the last; what plays between two skips inside an ad is in neither number (it is in
+  /// `heardSeconds`). One skip over two ads is counted for each ad on its own. An ad that is not
+  /// caught, a missed one or one that a skip only clips, is in `heardSeconds` and not counted
+  /// here, so these numbers say how late or early the skips are on the ads they catch, not how
+  /// many ads were missed.
+  static func heardAround(_ ads: Spans, by skips: Spans) -> (before: Double, after: Double) {
     var before = 0.0
     var after = 0.0
-    for stretch in truth {
-      guard let own = Spans([(start: stretch.start, end: stretch.end)], limit: limit).items.first
-      else { continue }
-      // `skips.items` are sorted and apart, so the first and the last one reaching the stretch
-      // hold its earliest start and its latest end.
-      let reaching = skips.items.filter {
-        min($0.end, own.end) - max($0.start, own.start) > 0
-      }
+    for ad in ads.items {
+      let length = ad.end - ad.start
+      guard Spans.overlap([ad], skips.items) >= caughtShare * length - 1e-9 else { continue }
+      // `skips.items` are sorted and apart, so the first and the last one reaching the ad hold
+      // its earliest start and its latest end.
+      let reaching = skips.items.filter { min($0.end, ad.end) - max($0.start, ad.start) > 0 }
       guard let first = reaching.first, let last = reaching.last else { continue }
-      before += max(0, first.start - own.start)
-      after += max(0, own.end - last.end)
+      before += max(0, first.start - ad.start)
+      after += max(0, ad.end - last.end)
     }
     return (before, after)
   }

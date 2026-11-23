@@ -157,9 +157,9 @@ final class AdScoreRowsTests: XCTestCase {
     XCTAssertEqual(lines[3], "Ad time still heard: 8 s.")
     XCTAssertTrue(lines[4].hasPrefix("Show time cut by mistake:"))
     XCTAssertEqual(
-      lines[5], "Ads a skip reached, ad time heard before the skip: 4 s, after the skip: 4 s.")
+      lines[5], "Ads caught, ad time heard before the skip: 4 s, after the skip: 4 s.")
     XCTAssertTrue(
-      lines.contains { $0.hasPrefix("  Show One") && $0.hasSuffix("heard 8 s, cut 0 s, before the skip 4 s, after it 4 s") },
+      lines.contains { $0.hasPrefix("  Show One") && $0.hasSuffix("heard 8 s, cut 0 s, caught ads heard before the skip 4 s, after it 4 s") },
       text)
   }
 
@@ -178,7 +178,7 @@ final class AdScoreRowsTests: XCTestCase {
       previous: nil)
     XCTAssertTrue(
       with.contains(
-        "Ad heard before and after the skips, by layer: Word rules 4 s before, 4 s after; Plus X 0 s before, 5 s after."),
+        "Caught ads heard before and after the skips, by layer: Word rules 4 s before, 4 s after; Plus X 0 s before, 5 s after."),
       with)
     XCTAssertTrue(with.contains("What each layer adds: Word rules 100% caught, 0 s cut by mistake; Plus X 100% caught (+0 points), 0 s cut by mistake."), with)
   }

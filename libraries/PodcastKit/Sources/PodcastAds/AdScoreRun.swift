@@ -7,7 +7,7 @@ import PodcastTranscripts
 ///
 /// In the words of the scorecard: the right seconds are `adSeconds - heardSeconds`, the wrong
 /// seconds `cutSeconds` and the missed seconds `heardSeconds`. `heardBeforeSeconds` and
-/// `heardAfterSeconds` are how much of the ads a skip reached plays before the skip and after it
+/// `heardAfterSeconds` are how much of the caught ads plays before the skip and after it
 /// (`AdScore.heardAround`).
 public struct ScoreTotals: Codable, Sendable, Equatable {
   public var episodes = 0

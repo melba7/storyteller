@@ -3,7 +3,8 @@ import XCTest
 @testable import PodcastAds
 @testable import PodcastTranscripts
 
-/// The two numbers "seconds of an ad heard before the skip" and "after the skip". The episode of
+/// The two numbers "seconds of a caught ad heard before the skip" and "after the skip". A marked
+/// stretch counts only when it is caught (half of it or more is skipped). The episode of
 /// `scoreEpisode` is 100 seconds long.
 final class AdScoreHeardTests: XCTestCase {
   private func score(
@@ -34,7 +35,28 @@ final class AdScoreHeardTests: XCTestCase {
 
   func testASkipThatEndsEarlyLeavesTheEndOfTheAdHeard() {
     assertHeard(score([(20, 40, "sponsor")], [foundAd(20, 33)]), before: 0, after: 7)
-    assertHeard(score([(20, 40, "sponsor")], [foundAd(27, 33)]), before: 7, after: 7)
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(24, 36)]), before: 4, after: 4)
+    // Exactly half skipped is caught.
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(25, 35)]), before: 5, after: 5)
+  }
+
+  func testAStretchThatIsNotCaughtCountsNothingHere() {
+    // 6 of 20 seconds skipped: not caught, so nothing is counted, and the seconds stay heard.
+    let thin = score([(20, 40, "sponsor")], [foundAd(27, 33)])
+    assertHeard(thin, before: 0, after: 0)
+    XCTAssertEqual(thin.caught, 0)
+    XCTAssertEqual(thin.heardSeconds, 14, accuracy: 1e-9)
+    // A skip that only clips the end of a long ad.
+    let clip = score([(20, 80, "sponsor")], [foundAd(75, 95)])
+    assertHeard(clip, before: 0, after: 0)
+    XCTAssertEqual(clip.caught, 0)
+    XCTAssertEqual(clip.heardSeconds, 55, accuracy: 1e-9)
+    // A wrong skip that runs over the start of the next stretch of show.
+    let over = score([(20, 40, "sponsor")], [foundAd(39.5, 70)])
+    assertHeard(over, before: 0, after: 0)
+    XCTAssertEqual(over.caught, 0)
+    // Just under half is not caught, half is.
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(30, 39.9)]), before: 0, after: 0)
   }
 
   func testAMissedAdIsNotCountedHereOnlyAsMissed() {
@@ -48,6 +70,11 @@ final class AdScoreHeardTests: XCTestCase {
 
   func testASkipThatOnlyTouchesTheEdgeOfAnAdDoesNotReachIt() {
     assertHeard(score([(20, 40, "sponsor")], [foundAd(10, 20), foundAd(40, 50)]), before: 0, after: 0)
+    // Beside a skip that does reach the ad, a skip that ends where the ad starts (or starts where
+    // it ends) is not the first (or the last) skip: the ad still starts to play at 20 and the
+    // first skip over it starts at 25.
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(10, 20), foundAd(25, 40)]), before: 5, after: 0)
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(20, 35), foundAd(40, 50)]), before: 0, after: 5)
   }
 
   func testOneSkipOverTwoMarkedStretchesIsCountedForEach() {
@@ -55,20 +82,44 @@ final class AdScoreHeardTests: XCTestCase {
     assertHeard(score(truth, [foundAd(25, 55)]), before: 5, after: 5, "starts inside the first, ends inside the second")
     assertHeard(score(truth, [foundAd(15, 65)]), before: 0, after: 0, "covers both")
     assertHeard(score(truth, [foundAd(22, 65)]), before: 2, after: 0)
-    assertHeard(score(truth, [foundAd(15, 52)]), before: 0, after: 8)
+    assertHeard(score(truth, [foundAd(15, 56)]), before: 0, after: 4)
+    // A skip that clips the second stretch only (2 of 10 seconds) catches the first alone.
+    assertHeard(score(truth, [foundAd(15, 52)]), before: 0, after: 0)
   }
 
   func testSeveralSkipsOnOneAdCountFromTheFirstStartToTheLastEnd() {
-    let split = score([(20, 40, "sponsor")], [foundAd(22, 26), foundAd(34, 38)])
+    let split = score([(20, 40, "sponsor")], [foundAd(22, 28), foundAd(32, 38)])
     // The gap between the two skips is heard, but it is neither before nor after.
     assertHeard(split, before: 2, after: 2)
-    XCTAssertEqual(split.heardSeconds, 12, accuracy: 1e-9)
+    XCTAssertEqual(split.heardSeconds, 8, accuracy: 1e-9)
+    // The same two skips with less in them do not catch the ad.
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(22, 26), foundAd(34, 38)]), before: 0, after: 0)
     assertHeard(score([(20, 40, "sponsor")], [foundAd(27, 30), foundAd(29, 40)]), before: 7, after: 0)
     assertHeard(score([(20, 40, "sponsor")], [foundAd(27, 40), foundAd(27, 40)]), before: 7, after: 0)
   }
 
   func testASkipInsideAnAdHearsBothEnds() {
-    assertHeard(score([(20, 40, "sponsor")], [foundAd(28, 30)]), before: 8, after: 10)
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(24, 36)]), before: 4, after: 4)
+    assertHeard(score([(20, 40, "sponsor")], [foundAd(28, 30)]), before: 0, after: 0, "not caught")
+  }
+
+  func testMarkedStretchesThatOverlapOrTouchCountOnce() {
+    // The same stretch marked twice (as two sorts): 7 seconds are heard, 7 before the skip.
+    let twice = score([(20, 40, "sponsor"), (20, 40, "host_ask")], [foundAd(27, 40)])
+    XCTAssertEqual(twice.heardSeconds, 7, accuracy: 1e-9)
+    assertHeard(twice, before: 7, after: 0)
+    // Stretches that overlap are one ad of 30 seconds, 12 of them heard: 7 before and 5 after.
+    let overlapping = score([(20, 40, "sponsor"), (30, 50, "sponsor")], [foundAd(27, 45)])
+    XCTAssertEqual(overlapping.heardSeconds, 12, accuracy: 1e-9)
+    assertHeard(overlapping, before: 7, after: 5)
+    // Stretches that touch are one ad as well.
+    assertHeard(score([(20, 30, "sponsor"), (30, 40, "sponsor")], [foundAd(27, 40)]), before: 7, after: 0)
+    // Whatever the marks, the numbers never add up to more than the seconds heard.
+    for found in [foundAd(27, 33), foundAd(27, 45), foundAd(22, 24), foundAd(20, 50)] {
+      let one = score([(20, 40, "sponsor"), (20, 40, "host_ask"), (30, 50, "sponsor")], [found])
+      XCTAssertLessThanOrEqual(
+        one.heardBeforeSeconds + one.heardAfterSeconds, one.heardSeconds + 1e-9, "\(found)")
+    }
   }
 
   func testOnlySkipsThePlayerMakesCount() {

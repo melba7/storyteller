@@ -74,7 +74,8 @@ public struct ScorecardHistory: Codable, Sendable, Equatable {
 }
 
 /// How one layer of the finders did on its own: the share of ads caught and the show seconds cut
-/// by mistake, and, when the caller has them, the ad seconds heard before and after the skips.
+/// by mistake, and, when the caller has them, the seconds of caught ads heard before and after the
+/// skips.
 public struct LayerResult: Sendable, Equatable {
   public var name: String
   /// 0 to 1.
@@ -141,7 +142,7 @@ public enum AdScoreReport {
     out.append(
       "Show time cut by mistake: \(time(total.cutSeconds)) (\(share(total.cutSeconds, total.showSeconds)) of the show), in \(count(total.wrongSkips, "wrong skip")).")
     out.append(
-      "Ads a skip reached, ad time heard before the skip: \(time(total.heardBeforeSeconds)), after the skip: \(time(total.heardAfterSeconds)).")
+      "Ads caught, ad time heard before the skip: \(time(total.heardBeforeSeconds)), after the skip: \(time(total.heardAfterSeconds)).")
     out.append("")
     let names = [
       ("sponsor", "Sponsor ads"), ("network_promo", "Network and house promos"),
@@ -189,7 +190,7 @@ public enum AdScoreReport {
     }
     if !around.isEmpty {
       out.append(
-        "Ad heard before and after the skips, by layer: " + around.joined(separator: "; ") + ".")
+        "Caught ads heard before and after the skips, by layer: " + around.joined(separator: "; ") + ".")
     }
     if let before = previous?.total {
       out.append(
@@ -208,7 +209,7 @@ public enum AdScoreReport {
       let total = show.total
       rows.append(
         "  " + name.padding(toLength: 32, withPad: " ", startingAt: 0)
-          + "  caught \(total.caught) of \(total.ads), heard \(time(total.heardSeconds)), cut \(time(total.cutSeconds)), before the skip \(time(total.heardBeforeSeconds)), after it \(time(total.heardAfterSeconds))")
+          + "  caught \(total.caught) of \(total.ads), heard \(time(total.heardSeconds)), cut \(time(total.cutSeconds)), caught ads heard before the skip \(time(total.heardBeforeSeconds)), after it \(time(total.heardAfterSeconds))")
     }
     if shows.count > mostShows { rows.append("  and \(shows.count - mostShows) more shows.") }
     return rows

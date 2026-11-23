@@ -15,8 +15,10 @@
 //      and unsure ads of a kind the settings skip count as skips, and a `.guess` is not a skip.
 //
 // What `find` receives:
-//   - `input.episode` is the `TeachingEpisode`: `id`; `feed` (the show's key, the feed address,
-//     which is the show id the phone uses); `show` (the show's name); `title`; `seconds`;
+//   - `input.episode` is the `TeachingEpisode`: `id`; `feed` (the show's feed address; the
+//     scorecard uses it as the show's id through `MacFiles.feedAsShow`, while the phone maps
+//     feed addresses to its own show ids with `MacFiles.table`, so it is not the id the phone
+//     keeps for the show); `show` (the show's name); `title`; `seconds`;
 //     `episodeLength` (the length of the whole episode in seconds, even when the transcript is
 //     only its head); `truth` and `maybe` (the labels: the stretches Claude marked, as
 //     `TeachingTruth` start, end and sort; `maybe` holds the doubtful ones); `onShelf`.
@@ -27,14 +29,17 @@
 //     and it does so only for an episode that opens with a marked ad, so a layer is called once,
 //     or twice with the head, for an episode.
 //   - `input.audio` is the file URL of the episode's audio when the caller has one, else nil. A
-//     layer that needs audio and gets nil returns no ads.
+//     layer that needs audio and gets nil adds nothing: an adding layer returns no ads, and a
+//     rewriting layer returns `soFar` unchanged (see below).
 //   - `soFar` is the `[FoundAd]` of the rows before it.
 //
 // What `find` must return:
 //   - Only the MORE ads: ads the layer adds. Every `FoundAd` is in seconds of the audio, with
 //     `start < end`, a kind and a confidence. An ad that is not finite or has `end <= start` is
 //     left out by the scorecard.
-//   - It never traps and never throws: on bad input, return no ads.
+//   - It never traps and never throws. On bad input or when it cannot work, it changes nothing:
+//     an adding layer returns no ads, and a rewriting layer returns `soFar` as it was (an empty
+//     list from a rewriting layer would wipe the row).
 //   - It does not read the labels of the episode it is looking at to find ads, because then the
 //     row would score itself. The labels are in the input for a layer that was built to learn
 //     from a show's other episodes, and for tests.
@@ -43,7 +48,19 @@
 //
 // A layer that changes or drops the ads found before it (moving borders, applying settings)
 // cannot do that by adding. It is made with `AdScoreLayer.rewriting`: its function returns the
-// WHOLE list of the row, which replaces `soFar` and is not joined.
+// WHOLE list of the row, which replaces `soFar` and is not joined. Only two rows are rewriting
+// layers: the joints row (it moves borders) and the per-show settings row (it drops or moves
+// ads to the questions). A finder row never is, because a new finder never edits what an earlier
+// finder found (rule 2 of the round plan); a finder row adds.
+//
+// `find` is `@Sendable`, so a layer that learns across episodes (prints of the episodes it has
+// seen, say) keeps that state in its own box: a final class marked `@unchecked Sendable` that
+// guards the state with a lock. The scorecard calls one layer at a time, but the compiler
+// cannot know it.
+//
+// Where a layer lives: `PodcastAudioMatch` does not depend on `PodcastAds`, so a layer that
+// needs types of both (the sounds of `PodcastAudioMatch` and `AdScoreLayer` of `PodcastAds`)
+// lives in the `podcast-teach` target, which depends on both.
 //
 // `AdScoreRun.runLayers` makes the rows. Each row stands on the one before it, the first on the
 // `base` finder (the last of the rows that are not layers).
