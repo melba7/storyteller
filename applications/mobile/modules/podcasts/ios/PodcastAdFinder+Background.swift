@@ -77,6 +77,9 @@ extension PodcastAdFinder {
     lock.withLock { inBackgroundTask = true }
     task.expirationHandler = { [weak self] in
       self?.lock.withLock { self?.inBackgroundTask = false }
+      // A new finder may be running in this task: its stop flag is raised and its marks on disk
+      // are ended before iOS takes the time back, so a kill is not counted as a crash.
+      PodcastFinderGuard.shared.expireAll()
     }
     Task { [self] in
       // Too little battery: give the turn back and ask again later.

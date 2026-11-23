@@ -67,7 +67,7 @@ final class PodcastFinderGuard: @unchecked Sendable {
   }
 
   /// How long `hold` waits for iOS to grant the time before it gives up and does not run.
-  static let grantSeconds = 5.0
+  var grantSeconds = 5.0
 
   private struct Mark: Hashable {
     var finder: String
@@ -77,9 +77,12 @@ final class PodcastFinderGuard: @unchecked Sendable {
   private let url: URL
   private let lock = NSLock()
   private var state: FinderGuard
-  /// The marks written and not ended, and the flags of the holds that wrote them.
-  private var live: Set<Mark> = []
+  /// The marks written and not ended, each with the holds that wrote it (two holds of one finder
+  /// on one episode share the mark, and it is cleared when the last of them ends), and the flags
+  /// of the holds that are running.
+  private var live: [Mark: Set<Int>] = [:]
   private var holds: [ObjectIdentifier: StopFlag] = [:]
+  private var holders = 0
 
   init(url: URL, appBuild: String, now: Date = Date()) {
     self.url = url
@@ -129,66 +132,83 @@ final class PodcastFinderGuard: @unchecked Sendable {
 
   // MARK: Running a finder
 
-  /// Writes the marks of `finders` for this episode and, while iOS holds time for the app, runs
-  /// `work` on this thread. The marks are ended and saved when `work` returns. Nil, and `work`
-  /// does not run, when no mark could be written or iOS did not grant the time. `work` gets the
-  /// finders that have a mark (it must run no others) and the flag that says the time is up.
+  /// Waits for iOS to hold time for the app and, once it does, writes the marks of `finders` for
+  /// this episode and runs `work` on this thread. The marks are ended and saved when `work`
+  /// returns, before the time is given back. Nil, and `work` does not run, when iOS did not grant
+  /// the time or no mark could be written. `work` gets the finders that have a mark (it must run
+  /// no others) and the flag that says the time is up. No mark is on disk while the app waits: a
+  /// suspension or a kill in that gap is no crash of a finder.
   func hold<T>(
-    _ finders: [String], episode: String, reason: String = "Finding ads",
-    _ work: (Held) -> T
+    _ finders: [String], episode: String, reason: String? = nil, _ work: (Held) -> T
   ) -> T? {
-    let marked = finders.filter { begin($0, episode: episode) }
-    guard !marked.isEmpty else { return nil }
-    let held = Held(finders: Set(marked), stop: StopFlag())
-    lock.withLock { holds[ObjectIdentifier(held.stop)] = held.stop }
-    defer {
-      lock.withLock { holds[ObjectIdentifier(held.stop)] = nil }
-      for finder in marked { end(finder, episode: episode) }
+    guard !finders.isEmpty else { return nil }
+    let stop = StopFlag()
+    let key = ObjectIdentifier(stop)
+    let holder = lock.withLock { () -> Int in
+      holds[key] = stop
+      holders += 1
+      return holders
     }
+    defer { lock.withLock { holds[key] = nil } }
     let started = DispatchSemaphore(value: 0)
     let finished = DispatchSemaphore(value: 0)
     let granted = Granted()
-    ProcessInfo.processInfo.performExpiringActivity(withReason: reason) { [self] expired in
+    let named = reason ?? "Finding ads: " + finders.joined(separator: ", ")
+    ProcessInfo.processInfo.performExpiringActivity(withReason: named) { [self] expired in
       if expired {
         // The time is up: ask the finder to stop, and clear every mark before it is given back.
-        raiseStops()
-        endAll()
+        expireAll()
         return
       }
       guard granted.take() else { return }
       started.signal()
       finished.wait()
     }
-    guard started.wait(timeout: .now() + Self.grantSeconds) == .success else {
+    guard started.wait(timeout: .now() + grantSeconds) == .success else {
       // The block may have begun just now: it is waiting, so let it go.
       if granted.cancel() { finished.signal() }
       return nil
     }
+    // The time is held. The marks come now, and go before the time is given back (the defers
+    // run in the opposite order of their writing).
     defer { finished.signal() }
-    return work(held)
+    let marked = finders.filter { begin($0, episode: episode, holder: holder) }
+    defer { for finder in marked { end(finder, episode: episode, holder: holder) } }
+    guard !marked.isEmpty else { return nil }
+    return work(Held(finders: Set(marked), stop: stop))
   }
 
   /// Writes a mark and saves it. False, with no mark left in memory, when the save throws.
-  func begin(_ finder: String, episode: String, now: Date = Date()) -> Bool {
+  func begin(_ finder: String, episode: String, holder: Int = 0, now: Date = Date()) -> Bool {
     lock.withLock {
-      state.begin(finder: finder, episode: episode)
-      do {
-        try state.save(to: url, now: now)
-      } catch {
-        state.end(finder: finder, episode: episode)
-        return false
+      let mark = Mark(finder: finder, episode: episode)
+      if live[mark] == nil {
+        state.begin(finder: finder, episode: episode)
+        do {
+          try state.save(to: url, now: now)
+        } catch {
+          state.end(finder: finder, episode: episode)
+          return false
+        }
       }
-      live.insert(Mark(finder: finder, episode: episode))
+      live[mark, default: []].insert(holder)
       return true
     }
   }
 
-  /// Clears a mark and saves it. Nothing is written when there was no such mark.
-  func end(_ finder: String, episode: String, now: Date = Date()) {
+  /// Takes one hold's share of a mark. The mark is cleared and saved when no hold keeps it;
+  /// nothing is written for a hold whose mark was cleared already (`expireAll`).
+  func end(_ finder: String, episode: String, holder: Int = 0, now: Date = Date()) {
     lock.withLock {
-      guard live.remove(Mark(finder: finder, episode: episode)) != nil else { return }
-      state.end(finder: finder, episode: episode)
-      save(now)
+      let mark = Mark(finder: finder, episode: episode)
+      guard var keeping = live[mark], keeping.remove(holder) != nil else { return }
+      if keeping.isEmpty {
+        live[mark] = nil
+        state.end(finder: finder, episode: episode)
+        save(now)
+      } else {
+        live[mark] = keeping
+      }
     }
   }
 
@@ -196,14 +216,27 @@ final class PodcastFinderGuard: @unchecked Sendable {
   func endAll(now: Date = Date()) {
     lock.withLock {
       guard !live.isEmpty else { return }
-      for mark in live { state.end(finder: mark.finder, episode: mark.episode) }
-      live = []
+      for mark in live.keys { state.end(finder: mark.finder, episode: mark.episode) }
+      live = [:]
       save(now)
     }
   }
 
+  /// The activity's time is up: every stop flag is raised and every live mark is ended and saved,
+  /// before the time goes back. Called by the activity of `hold` and by a background task's
+  /// expiration handler (an app that is killed with a mark on disk looks like a crash).
+  func expireAll() {
+    raiseStops()
+    endAll()
+  }
+
   /// The number of marks that are live now, for the harness.
   var liveMarks: Int { lock.withLock { live.count } }
+
+  /// The same for one episode.
+  func liveMarks(episode: String) -> Int {
+    lock.withLock { live.keys.filter { $0.episode == episode }.count }
+  }
 
   private func raiseStops() {
     let flags = lock.withLock { Array(holds.values) }
