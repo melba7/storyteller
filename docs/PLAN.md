@@ -1281,7 +1281,16 @@ levels, not thresholds, because a show has about four marked episodes.
   after enough confirmed answers on a show (today a repeat never skips); new
   finders for episodes that finished before the update; a habit counted twice
   for an episode that was streamed and then downloaded; deny-by-words for
-  transcripts over 64 MB; questions on the lock screen.
+  transcripts over 64 MB; questions on the lock screen; counts of own sounds,
+  the guard and the Mac's new files on the "Ad skipping results" page (today the
+  question note and the skip log are the only proof on the phone); an Undo in a
+  streamed episode only counts for the guard and does not yet forget the own
+  sound print until the download is filed; own sounds and habits are learned
+  only after Apple's model pass, so nothing is learned while it cannot be asked;
+  a swipe-away or memory kill with a mark on disk counts as a crash for the
+  guard; the scorecard's finder and joints lines describe the default decision,
+  not a show's own; Skip ad inside an open question jumps to the question's end
+  (up to 300 s, with Undo); a switch for each finder in the app.
 - Podcasts ads: the sound scan of a stream's bytes as they arrive after the
   first three minutes (a mid-roll in a streamed episode is found only when
   transcription reaches it); questions from the head scan and on the lock
