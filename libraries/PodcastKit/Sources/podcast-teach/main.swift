@@ -1,6 +1,7 @@
 // LOFI-FORK: the Mac's teaching run, the parts that use the phone's own code (see FORK.md).
 //
 //   swift run -c release podcast-teach score <teaching folder> [options]
+//   swift run -c release podcast-teach agree <teaching folder> [options]
 //   swift run -c release podcast-teach sounds <teaching folder> [options]
 //   swift run -c release podcast-teach meaning <teaching folder> [options]
 //
@@ -14,13 +15,14 @@ import Foundation
 let arguments = Array(CommandLine.arguments.dropFirst())
 switch arguments.first {
 case "score": exit(ScoreCommand.run(Array(arguments.dropFirst())))
+case "agree": exit(AgreeCommand.run(Array(arguments.dropFirst())))
 case "sounds": exit(SoundsCommand.run(Array(arguments.dropFirst())))
 case "meaning": exit(MeaningTool.run(Array(arguments.dropFirst())))
 default:
   FileHandle.standardError.write(
     Data(
       """
-      Usage: podcast-teach score <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder>
+      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder>
 
       """.utf8))
   exit(2)

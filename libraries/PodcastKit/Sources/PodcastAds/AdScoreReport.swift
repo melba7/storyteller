@@ -37,6 +37,9 @@ public struct ScorecardRun: Codable, Sendable, Equatable {
 public struct ScorecardHistory: Codable, Sendable, Equatable {
   public static let currentVersion = 1
   public static let fileName = "scorecard.json"
+  /// The runs that score the sealed exam (`--exam`), kept apart so the plain scorecard stays the
+  /// newest plain run.
+  public static let examFileName = "scorecard-exam.json"
   public static let mostRuns = 50
   /// Only this many of the newest runs keep their `rows` (each row holds every show's totals,
   /// which would make the file large); older runs keep their `total`.
