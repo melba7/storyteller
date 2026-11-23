@@ -23,12 +23,13 @@ public struct ShowPrints: Sendable, Equatable {
 
   /// This show with `print` added, and only the newest `maxEpisodes` kept. A print of an episode
   /// that is there already replaces it; one that is older than all that are kept is not kept; one
-  /// with no id, no anchors or too many (`EpisodePrint.storable`) is left out.
+  /// with no id, no anchors or too many (`EpisodePrint.storable`) is left out. A print whose date
+  /// is the same as one already there goes before it, so among equal dates the one added last
+  /// is first, and the one added first is the first to go.
   public func adding(_ print: EpisodePrint) -> ShowPrints {
     guard print.storable else { return self }
-    let all = (prints.filter { $0.episode != print.episode } + [print]).enumerated()
-      .sorted { ($0.element.date, $0.offset) > ($1.element.date, $1.offset) }  // later wins a tie
-      .map(\.element)
+    var all = prints.filter { $0.episode != print.episode }
+    all.insert(print, at: all.firstIndex { $0.date <= print.date } ?? all.count)
     var shown = ShowPrints()
     shown.prints = Array(all.prefix(Self.maxEpisodes))
     return shown
@@ -84,7 +85,8 @@ public struct ShowPrints: Sendable, Equatable {
       read.append(print)
     }
     guard reader.atEnd else { return }
-    self = ShowPrints(prints: read)
+    // The file lists the newest first and a later print wins a tie, so add them oldest first.
+    self = ShowPrints(prints: read.reversed())
   }
 
   private static func readPrint(from reader: inout ByteReader) -> EpisodePrint? {

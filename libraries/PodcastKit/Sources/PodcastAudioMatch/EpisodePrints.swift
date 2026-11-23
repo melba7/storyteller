@@ -53,7 +53,8 @@ public struct EpisodePrint: Sendable, Equatable {
   public init(episode: String, date: Double, frames: Int, seconds: Double, anchors: [UInt32]) {
     self.episode = episode
     self.date = date.isFinite ? date : 0
-    self.frames = max(frames, 0)
+    // At most what a print covers, so that no sum of it can overflow.
+    self.frames = min(max(frames, 0), Self.maxFrames)
     self.seconds = seconds.isFinite ? max(seconds, 0) : 0
     self.anchors = anchors
   }
@@ -61,7 +62,8 @@ public struct EpisodePrint: Sendable, Equatable {
   /// Whether a store may keep this print: it has an id and some anchors, and fits the limits.
   var storable: Bool {
     !episode.isEmpty && episode.utf8.count <= Self.maxIdBytes && !anchors.isEmpty
-      && anchors.count <= Self.maxAnchors && anchors.count == (frames + Self.step - 1) / Self.step
+      && anchors.count <= Self.maxAnchors && frames > 0 && frames <= Self.maxFrames
+      && anchors.count == (frames - 1) / Self.step + 1  // a sum that cannot overflow
   }
 }
 

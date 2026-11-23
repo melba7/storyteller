@@ -1,8 +1,11 @@
 // LOFI-FORK: finds the stretches of a new episode that an older episode already had (see FORK.md).
 import Foundation
 
-/// A stretch of the new file that follows an older print. Seconds in the new file, accurate to one
-/// anchor step (0.21 s); it lies inside the real repeat, so a little of each edge may be missing.
+/// A stretch of the new file that follows an older print, in seconds in the new file. Each edge is
+/// accurate to one anchor step, which is eight frames: 0.21 s at 44.1 or 22.05 kHz, 0.29 s at 32 or
+/// 16 kHz and 0.58 s at 8 kHz. A stretch found in one piece lies inside the real repeat, so a little
+/// of each edge may be missing; one that was merged from pieces up to `mergeGap` apart also holds
+/// the gap between them.
 public struct RepeatStretch: Sendable, Equatable {
   public var start: Double
   public var end: Double
@@ -25,8 +28,14 @@ public struct RepeatStretch: Sendable, Equatable {
 /// its anchors matched and it lasts `minSeconds`. State held while scanning: the runs that are
 /// still going, which are few, and the stretches found so far.
 public struct RepeatScanner: Sendable {
-  /// The shortest stretch that is a repeat.
+  /// The shortest stretch that is a repeat. The phone asks about a stretch only when it is at least
+  /// 10 s (the questions' own minimum), so a hit of 8 to 10 s never becomes a question; it is still
+  /// given, because it may be the start of a longer repeat that was cut by the first minute.
   public static let minSeconds = 8.0
+  /// The longest stretch that is given. A shared stretch of over five minutes is not a plug (the
+  /// ads' own longest, `AdRules.maxLength`, is 300 s; this module does not import PodcastAds, so
+  /// the number is kept here). It is dropped whole, not cut.
+  public static let longest = 300.0
   /// A stretch that starts in the first minute is left to the show's opening (the theme).
   public static let openingSeconds = 60.0
   /// Anchors that may be missing in a row inside a run.
@@ -39,6 +48,10 @@ public struct RepeatScanner: Sendable {
   /// An older print that matches more than this share of the new file is the same recording again
   /// (a second download), not something that repeats in the show: it gives nothing.
   public static let maxShare = 0.5
+  /// A frame number that is in more places than this for each older print starts nothing: it is
+  /// silence, which says little. Three prints that hold an ad once each, and one of them twice,
+  /// have four places for it, which is fine.
+  static let placesPerPrint = 3
   /// The most older prints looked at together (a show keeps three).
   static let maxPrints = 16
   private static let sweepEvery = 64
@@ -70,6 +83,7 @@ public struct RepeatScanner: Sendable {
   /// Every anchor of every older print, sorted: the anchor in the top 32 bits, the print in the
   /// next 8 and the anchor's place in the print in the lowest 24.
   private let index: [UInt64]
+  private let maxPlaces: Int  // the most places of one number that start a hit
   private var runs: [Key: Run] = [:]
   private var found: [Found] = []
   private var count = 0  // frames fed so far
@@ -87,6 +101,7 @@ public struct RepeatScanner: Sendable {
     }
     entries.sort()
     index = entries
+    maxPlaces = Self.placesPerPrint * max(usable.count, 1)
   }
 
   /// Feed the frames of the new file in order, in as many calls as you like. A frame whose times
@@ -102,9 +117,9 @@ public struct RepeatScanner: Sendable {
       let anchor = UInt64(UInt32(truncatingIfNeeded: frame.hash))
       let first = firstPlace(from: anchor << 32)
       var stop = first
-      while stop < index.count, index[stop] >> 32 == anchor, stop - first < 4 { stop += 1 }
+      while stop < index.count, index[stop] >> 32 == anchor, stop - first <= maxPlaces { stop += 1 }
       // A number in many places says little (a silent stretch), so it starts nothing.
-      guard stop > first, stop - first <= 3 else { continue }
+      guard stop > first, stop - first <= maxPlaces else { continue }
       for entry in index[first..<stop] {
         hit(
           print: Int(entry >> 24 & 0xFF), anchor: Int(entry & 0xFF_FFFF), frame: number,
@@ -123,11 +138,11 @@ public struct RepeatScanner: Sendable {
     found = []
     count = 0
     seconds = 0
-    var perPrint: [Int: Double] = [:]
-    for item in all { perPrint[item.print, default: 0] += item.end - item.start }
-    let kept = all.filter {
-      $0.start >= Self.openingSeconds && perPrint[$0.print, default: 0] <= Self.maxShare * total
-    }.sorted { ($0.start, $0.end) < ($1.start, $1.end) }
+    var perPrint: [Int: [Found]] = [:]
+    for item in all { perPrint[item.print, default: []].append(item) }
+    let same = Set(perPrint.filter { Self.covered($0.value) > Self.maxShare * total }.keys)
+    let kept = all.filter { $0.start >= Self.openingSeconds && !same.contains($0.print) }
+      .sorted { ($0.start, $0.end) < ($1.start, $1.end) }
     var stretches: [RepeatStretch] = []
     for item in kept {
       if let last = stretches.last, item.start <= last.end + Self.mergeGap {
@@ -136,7 +151,18 @@ public struct RepeatScanner: Sendable {
         stretches.append(RepeatStretch(start: item.start, end: item.end))
       }
     }
-    return stretches
+    return stretches.filter { $0.end - $0.start <= Self.longest }
+  }
+
+  /// The seconds of the new file that the stretches of one print cover (where they overlap, once).
+  private static func covered(_ items: [Found]) -> Double {
+    var total = 0.0
+    var reached = -Double.infinity
+    for item in items.sorted(by: { $0.start < $1.start }) {
+      total += max(item.end - max(item.start, reached), 0)
+      reached = max(reached, item.end)
+    }
+    return total
   }
 
   // MARK: runs

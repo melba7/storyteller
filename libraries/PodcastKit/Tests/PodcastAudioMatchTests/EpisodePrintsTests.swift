@@ -101,6 +101,29 @@ final class EpisodePrintsTests: XCTestCase {
     XCTAssertEqual(show.adding(print(long, date: 3)), show)
   }
 
+  func testAFrameCountNearTheLargestIntDoesNotTrap() {
+    for frames in [Int.max, Int.max - 3, Int.max - 7] {
+      let huge = EpisodePrint(episode: "e", date: 1, frames: frames, seconds: 1, anchors: [1, 2, 3])
+      XCTAssertEqual(huge.frames, EpisodePrint.maxFrames)
+      XCTAssertFalse(huge.storable)
+      let show = ShowPrints().adding(print("e1", date: 1))
+      XCTAssertEqual(show.adding(huge), show)
+    }
+    XCTAssertEqual(EpisodePrint(episode: "e", date: 1, frames: Int.min, seconds: 1, anchors: []).frames, 0)
+  }
+
+  func testPrintsWithTheSameDateReadBackInTheOrderTheyWereWritten() {
+    let two = ShowPrints().adding(print("e1", date: 5)).adding(print("e2", date: 5))
+    XCTAssertEqual(two.prints.map(\.episode), ["e2", "e1"])
+    XCTAssertEqual(ShowPrints(data: two.data()), two)
+    let three = two.adding(print("e3", date: 5))
+    XCTAssertEqual(ShowPrints(data: three.data()), three)
+    // So a tie evicts the same print whether or not the file was written and read in between.
+    let fourth = print("e4", date: 5)
+    XCTAssertEqual(ShowPrints(data: three.data()).adding(fourth), three.adding(fourth))
+    XCTAssertEqual(three.adding(fourth).prints.map(\.episode), ["e4", "e3", "e2"])
+  }
+
   func testTheOlderPrintsToScanAgainstLeaveOutTheEpisodeBeingScanned() {
     let show = ShowPrints().adding(print("e1", date: 1)).adding(print("e2", date: 2))
     XCTAssertEqual(show.prints(excluding: "e2").map(\.episode), ["e1"])

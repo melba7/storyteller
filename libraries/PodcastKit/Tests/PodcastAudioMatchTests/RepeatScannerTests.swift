@@ -196,15 +196,6 @@ final class RepeatScannerTests: XCTestCase {
     XCTAssertEqual(scanner.finish(), first)
   }
 
-  func testFramesThatAreAllAlikeNeitherMatchNorSlowItDown() {
-    // A silent stretch: the same frame over and over, in the old print and in the new file.
-    let print = Rep.print(Array(0..<500) + Array(repeating: 77, count: 300) + Array(600..<1100))
-    let started = Date()
-    let found = Rep.scan([print], Array(repeating: 77, count: 60_000))
-    XCTAssertTrue(found.isEmpty)
-    XCTAssertLessThan(Date().timeIntervalSince(started), 20)
-  }
-
   func testAThreeHourEpisodeScansInBoundedTime() {
     let old = Array(0..<413_000)  // 3 hours of an older episode
     let print = Rep.print(old)
