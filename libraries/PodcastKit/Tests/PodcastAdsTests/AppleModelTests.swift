@@ -100,11 +100,30 @@ final class AppleModelTests: XCTestCase {
     XCTAssertEqual(code3, 2)
     XCTAssertTrue(warned.joined().contains("damaged"))
     XCTAssertEqual(try String(contentsOf: cacheURL), "not json")
-    XCTAssertEqual(score(), 2)
     try AppleAnswers(model: "other 1").save(in: folder.url)
     let code4 = await apple(detector: model)
     XCTAssertEqual(code4, 2)
     XCTAssertTrue(warned.joined().contains("other 1"))
+  }
+
+  func testADamagedCacheLeavesTheAppleRowOutAndTheScorecardStillRuns() throws {
+    try fill()
+    try Data("not json".utf8).write(to: cacheURL)
+    XCTAssertEqual(score(["--stream"]), 0, warned.joined())
+    XCTAssertEqual(printed.filter { $0.contains("could not be read") }.count, 1, output)
+    XCTAssertTrue(output.contains("podcast-teach apple"), output)
+    XCTAssertFalse(output.contains("Plus Apple's model"))
+    XCTAssertTrue(output.contains("Stream replay:"), output)
+    XCTAssertEqual(lastRun()?.rows.count, 4)
+    XCTAssertEqual(try String(contentsOf: cacheURL), "not json")
+  }
+
+  func testWhenEveryEpisodeAlreadyHasAnAnswerTheCommandSaysSo() async throws {
+    try fill()
+    _ = await apple(detector: model)
+    let code = await apple(detector: model)
+    XCTAssertEqual(code, 0)
+    XCTAssertTrue(output.contains("Every episode already had an answer"), output)
   }
 
   func testAModelThatCannotBeUsedStopsTheRunAndKeepsWhatWasAsked() async throws {
@@ -164,7 +183,11 @@ final class AppleModelTests: XCTestCase {
     XCTAssertTrue(output.contains("Stream replay: every episode is played from the start"), output)
     XCTAssertTrue(output.contains("standard: 1 s to the first byte"), output)
     XCTAssertTrue(output.contains("At the slow pace:"), output)
-    XCTAssertTrue(output.contains("On a ready episode"), output)
+    XCTAssertTrue(output.contains("Ready (everything known at the start"), output)
+    XCTAssertTrue(output.contains("\"ready\" here means the same player with everything known"), output)
+    XCTAssertTrue(output.contains("waits for Apple's model"), output)
+    XCTAssertTrue(output.contains("Speech at 6 times real time"), output)
+    XCTAssertTrue(output.contains("not measured yet"), output)
     let rows = lastRun()?.rows ?? []
     XCTAssertEqual(rows.count, 5)
     XCTAssertNil(rows[0].stream)

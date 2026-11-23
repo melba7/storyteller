@@ -14,15 +14,34 @@ public struct StreamPace: Equatable, Sendable {
   public var speech = 12.0
   /// Seconds each step costs besides the transcribing.
   public var stepOverhead = 0.5
-  /// Seconds Apple's model needs for a minute of new audio, used only where its answers are part
-  /// of the row, and the least it ever needs.
+  /// Seconds Apple's model needs for a minute of the head read so far (the phone asks it about
+  /// the whole head each time), and the least it ever needs.
   public var modelPerMinute = 2.0
   public var modelFloor = 2.0
   /// Seconds of silence a jump costs.
   public var seek = 1.0
+  /// Whether the head scan waits for Apple's model at the steps that ask it, as on a phone with
+  /// Apple Intelligence on. The model's answers are used only in the row that has them.
+  public var waitsForModel = true
+  /// The finished file is known before the listener taps play: the times do not matter.
+  public var isInstant = false
 
   /// A phone on a good connection with nothing else to do.
   public static let standard = StreamPace(name: "standard")
+
+  /// The same player with the finished file known at the start, to compare a stream with.
+  public static let instant: StreamPace = {
+    var pace = StreamPace(name: "instant")
+    pace.isInstant = true
+    return pace
+  }()
+
+  /// This pace with another speech speed (seconds of audio transcribed per second).
+  public func withSpeech(_ speech: Double) -> StreamPace {
+    var pace = self
+    pace.speech = speech
+    return pace
+  }
 
   /// A weak connection and a busy phone: the audio arrives and is read much more slowly.
   public static let slow: StreamPace = {
@@ -34,7 +53,7 @@ public struct StreamPace: Equatable, Sendable {
 
   public init(name: String) { self.name = name }
 
-  /// The seconds the model needs for `audio` seconds of new audio.
+  /// The seconds the model needs for `audio` seconds of audio.
   public func modelSeconds(forAudio audio: Double) -> Double {
     max(modelFloor, modelPerMinute * max(0, audio) / 60)
   }
@@ -43,6 +62,6 @@ public struct StreamPace: Equatable, Sendable {
   public var summary: String {
     func number(_ value: Double) -> String { String(format: "%g", value) }
     return
-      "\(name): \(number(connect)) s to the first byte, \(number(download)) s of audio downloaded and \(number(speech)) s transcribed per second, \(number(stepOverhead)) s extra per step, the model \(number(modelPerMinute)) s per minute of new audio (at least \(number(modelFloor)) s), a jump costs \(number(seek)) s"
+      "\(name): \(number(connect)) s to the first byte, \(number(download)) s of audio downloaded and \(number(speech)) s transcribed per second, \(number(stepOverhead)) s extra per step, the model \(number(modelPerMinute)) s per minute of the head read so far (at least \(number(modelFloor)) s), \(waitsForModel ? "the head scan waits for it" : "the head scan does not wait for it"), a jump costs \(number(seek)) s"
   }
 }

@@ -13,22 +13,33 @@ enum StreamReport {
       bar.passed - bar.earlyPassed, bar.breaks - bar.earlyBreaks, bar.noAdSkips, bar.noAdPerHour)
   }
 
-  /// The block for the rows that were streamed: `ready` is each row's own bar.
-  static func lines(_ rows: [(name: String, ready: BarTotals?, stream: StreamNumbers)]) -> [String] {
+  /// The block for the rows that were streamed.
+  static func lines(_ rows: [(name: String, stream: StreamNumbers)]) -> [String] {
     guard !rows.isEmpty else { return [] }
+    let minutes = Int(AdBar.earlySeconds / 60)
     var out = [
       "Stream replay: every episode is played from the start as a stream, by a listener who taps play and never touches the phone, with the player's own skip rules. The speeds below are assumptions, not measurements.",
       "  " + StreamPace.standard.summary,
       "  " + StreamPace.slow.summary,
+      "  The head scan waits for Apple's model at the steps that ask it, in every row, as on a phone with Apple Intelligence on (an assumption); the model's answers count only in the Apple row.",
+      "  \"ready\" here means the same player with everything known at the start: the finished file of an episode that was read to its end before it is played.",
     ]
     for row in rows {
       out.append("Row \"\(row.name)\" as a stream (standard pace): " + barLine(row.stream.standard))
-      if let ready = row.ready {
-        out.append(
-          "  On a ready episode (the row's own bar) \(ready.passed) of \(row.stream.standard.breaks) of these breaks pass.")
+      if let ready = row.stream.ready {
+        out.append("  Ready (everything known at the start, the same player): " + barLine(ready))
       }
       out.append("  At the slow pace: " + barLine(row.stream.slow))
+      for speed in row.stream.speeds ?? [] {
+        out.append(
+          String(
+            format: "  Speech at %g times real time (other values standard): first %d minutes %d of %d (%d of %d in all)",
+            speed.speech, minutes, speed.bar.earlyPassed, speed.bar.earlyBreaks, speed.bar.passed,
+            speed.bar.breaks))
+      }
     }
+    out.append(
+      "These speech speeds are assumptions: the phone's real speed is not measured yet, and the first \(minutes) minutes depend on it.")
     return out
   }
 }
