@@ -255,8 +255,14 @@ class AnsweredQuestionTests(Setup):
             self.assertIsNotNone(feedback.read_note(json.dumps(note(what))), what)
 
     def test_a_by_that_is_not_text_makes_the_line_invalid(self):
-        for bad in (5, True, None, ["own-sound"], {"a": 1}):
+        for bad in (5, True, ["own-sound"], {"a": 1}):
             self.assertIsNone(feedback.read_note(json.dumps(note("confirmed", by=bad))), bad)
+
+    def test_a_null_by_is_the_same_as_none(self):
+        # A writer that puts `"by": null` knows no finder; the note is still a good note.
+        one = feedback.read_note(json.dumps(note("confirmed", by=None)))
+        self.assertIsNotNone(one)
+        self.assertIsNone(one["by"])
 
     def test_a_confirmed_note_counts_like_missed_and_a_denied_one_like_undone(self):
         wanted = feedback.wanted_episodes([

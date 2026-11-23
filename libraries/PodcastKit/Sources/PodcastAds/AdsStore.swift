@@ -83,15 +83,22 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// The skips the listener found too far. Nil when there are none (and in a file saved before
   /// trims existed).
   public var trims: [AdTrim]?
-  /// What the phone would ask the listener about: stretches it is not sure enough to skip. Nil
-  /// when there are none (and in a file saved before questions existed).
+  /// What the phone would ask the listener about: stretches it is not sure enough to skip. Kept
+  /// after they are answered (an answered one is hidden by an ad over it or by `denied`), so the
+  /// cap of three questions an episode counts them (`AdAsking`). Nil when there are none (and in
+  /// a file saved before questions existed).
   public var asks: [FoundAd]?
+  /// The questions the listener answered "not an ad" to. Kept apart from `undone` on purpose: an
+  /// undone skip stops any ad over it (`isUndone`), but a "no" about a question must never stop
+  /// a real ad that is found next to it later. Ads are never compared with this list. Nil when
+  /// there are none (and in a file saved before it existed).
+  public var denied: [UndoneAd]?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
     coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil,
-    asks: [FoundAd]? = nil
+    asks: [FoundAd]? = nil, denied: [UndoneAd]? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -105,6 +112,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.refusedPieces = refusedPieces
     self.trims = trims
     self.asks = asks
+    self.denied = denied
   }
 
   /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.
@@ -150,9 +158,9 @@ public struct AdsStore: Sendable {
       to: url(detector: file.detector), options: .atomic)
   }
 
-  /// `file` with the trims and undone skips already saved for this detector (in its final or
-  /// partial file). A detector that writes a file does not know them, and the listener's choices
-  /// must outlive it.
+  /// `file` with the trims, undone skips, questions, "no" answers and confirmed ads already saved
+  /// for this detector (in its final or partial file). A detector that writes a file does not
+  /// know them, and the listener's choices must outlive it (`AdAsking.carrying`).
   func carryingTrims(_ file: AdsFile) -> AdsFile {
     var carried = file
     for earlier in [load(detector: file.detector), loadPartial(detector: file.detector)] {
@@ -160,6 +168,7 @@ public struct AdsStore: Sendable {
       for undone in earlier?.undone ?? [] where !carried.undone.contains(undone) {
         carried.undone.append(undone)
       }
+      if let earlier { carried = AdAsking.carrying(earlier, into: carried) }
     }
     return carried
   }

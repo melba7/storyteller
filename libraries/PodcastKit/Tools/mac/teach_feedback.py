@@ -63,7 +63,7 @@ def read_note(line):
     """The note a line holds, or None when the line is not a valid note: not JSON (a line nested so
     deeply that Python gives up counts too), longer than 64 KB, or with a time that is not a
     finite number, or with a feed or audio address that is not http or https, or with a `by` that
-    is not text. A `by` is kept when there is one."""
+    is there (not null) and is not text. A `by` is kept when there is one."""
     if len(line) > LINE_LIMIT:
         return None
     try:
@@ -79,7 +79,7 @@ def read_note(line):
     for field in ("feed", "guid", "title", "address", "kind"):
         if not isinstance(one.get(field), str):
             return None
-    if "by" in one and not isinstance(one["by"], str):
+    if one.get("by") is not None and not isinstance(one["by"], str):
         return None
     if not one["feed"] or not (one["guid"] or one["address"]):
         return None

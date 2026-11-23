@@ -40,14 +40,14 @@ final class KnownAdsTapTests: XCTestCase {
       sha256: "aa", detector: "fake", detectorVersion: "1", osVersion: "26.0", duration: 120, ads: ads)
   }
 
-  func testOneConfirmedStretchIsRemembered() {
+  func testOneConfirmedStretchIsRemembered() throws {
     var known = KnownAds()
     // The question as it was asked: a guess. The listener's "yes" makes it sure.
     let changed = known.learnTapped(
       ad(60, 90, .guess), transcript: transcript, show: "show", now: now)
     XCTAssertTrue(changed)
     XCTAssertEqual(known.ads.count, 1)
-    let learned = known.ads[0]
+    let learned = try XCTUnwrap(known.ads.first)
     XCTAssertEqual(learned.words, words("plug"))
     XCTAssertEqual(learned.showId, "show")
     XCTAssertEqual(learned.advertiser, "Acme")

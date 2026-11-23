@@ -30,24 +30,51 @@ public enum AdAsks {
   // MARK: From a model's rows
 
   /// The questions for the lines of a transcript, from the word model. The rows are the model's
-  /// (`AdWordModel.probabilities`) and the ceiling is its own start threshold, so a stretch the
-  /// model calls an ad is not asked about.
+  /// (`AdWordModel.probabilities`), smoothed as its decoder smooths them (`smoothed`), and the
+  /// ceiling is its own start threshold. The decoder opens an ad where the SMOOTHED chance
+  /// reaches that threshold, so a stretch it drops (its smoothed chance stays under the
+  /// threshold) is asked about even when some of its lines have a raw chance over it.
+  ///
+  /// The rows do not know the ads: the decoder's spans only become ads after the clean-up cuts
+  /// and joins them, and other finders add theirs. So `ads` must hold every ad already in the
+  /// episode's file after the clean-up, or a stretch that an ad covers can be asked about.
   public static func questions(
     model: AdWordModel, lines: [NumberedLine], duration: Double?, from: Double = askFrom,
     outside ads: [FoundAd], source: String
   ) -> [FoundAd] {
     questions(
-      lines: lines, rows: model.probabilities(lines: lines, duration: duration), from: from,
-      below: model.thresholds.start, outside: ads, source: source)
+      lines: lines, rows: smoothed(model.probabilities(lines: lines, duration: duration)),
+      from: from, below: model.thresholds.start, outside: ads, source: source)
+  }
+
+  /// The rows with the chance of an ad on each line replaced by the decoder's smoothed value
+  /// (`AdWordModel+Spans`): a quarter of the line before, half of the line and a quarter of the
+  /// line after, where a missing neighbour (the first and last line, or a row that is not
+  /// numbers) counts as the line itself. Only the first number of each row, the probability of
+  /// "none", is changed (to one minus the smoothed chance); the classes keep their numbers, so
+  /// the kind of a question is as before. A row that is not numbers is left as it is. A model
+  /// whose decoder smooths the same way (the meaning model) passes its rows through this.
+  public static func smoothed(_ rows: [[Double]]) -> [[Double]] {
+    let chances = rows.map { chance(of: $0) }
+    return rows.indices.map { at in
+      guard let own = chances[at] else { return rows[at] }
+      let before = at > 0 ? chances[at - 1] ?? own : own
+      let after = at + 1 < rows.count ? chances[at + 1] ?? own : own
+      var row = rows[at]
+      row[0] = 1 - (before / 4 + own / 2 + after / 4)
+      return row
+    }
   }
 
   /// The questions for the lines, from any model's probability rows: one row for each line, in
   /// the order of `AdWordModel.classes` (the first is "none", so the chance of an ad is one
-  /// minus it). The runs of lines whose chance is at least `from` and under `below`, that lie
-  /// outside every ad in `ads`, last at least `AdRules.minLength` seconds and at most
-  /// `AdRules.maxLength`, are the candidates; at most `most` of them are kept, the most likely
-  /// first. A row that is not a list of numbers reads as no chance (the line is not asked
-  /// about), and lines with no row are left out, so bad input asks nothing and traps nothing.
+  /// minus it). The chance is each line's own, as the row gives it: these rows are NOT smoothed
+  /// (a model whose decoder smooths passes `smoothed(rows)`). The runs of lines whose chance is
+  /// at least `from` and under `below`, that lie outside every ad in `ads`, last at least
+  /// `AdRules.minLength` seconds and at most `AdRules.maxLength`, are the candidates; at most
+  /// `most` of them are kept, the most likely first. A row that is not a list of numbers reads
+  /// as no chance (the line is not asked about), and lines with no row are left out, so bad
+  /// input asks nothing and traps nothing.
   public static func questions(
     lines: [NumberedLine], rows: [[Double]], from: Double = askFrom, below: Double,
     outside ads: [FoundAd], source: String

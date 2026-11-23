@@ -12,14 +12,16 @@ final class AdAsksModelTests: XCTestCase {
 
   // MARK: The word model's own rows
 
-  /// A word model where "hi" lines are surely an ad, "mid" lines have a chance of about 0.55
-  /// and any other line about 0.03 (the same weights as the word model's own tests).
+  /// A word model where "hi" lines are surely an ad, "mid" lines have a chance of about 0.555,
+  /// "hot" lines about 0.642 and any other line about 0.03 (the first three as in the word
+  /// model's own tests).
   private var model: AdWordModel {
     func key(_ feature: String) -> String { String(AdWordModel.bucket(feature, buckets: 262144)) }
     let weights: [String: Any] = [
       key("#bias"): [5.0, 0.0, 0.0, 0.0, 0.0],
       key("u:hi"): [-7.0, 7.0, 0.0, 0.0, 0.0],
       key("u:mid"): [-2.5, 2.5, 0.0, 0.0, 0.0],
+      key("u:hot"): [-2.7, 2.7, 0.0, 0.0, 0.0],
     ]
     let json: [String: Any] = [
       "version": 1, "buckets": 262144, "classes": AdWordModel.classes, "weights": weights,
@@ -33,8 +35,11 @@ final class AdAsksModelTests: XCTestCase {
     }
   }
 
-  func testTheWordModelsRowsGiveTheSameQuestionsAsTheirNumbers() {
-    let words = ["plain", "plain", "mid", "mid", "mid", "mid", "plain", "hi", "hi", "hi", "hi", "plain"]
+  func testTheWordModelsRowsGiveTheSameQuestionsAsTheirSmoothedNumbers() {
+    let words = [
+      "plain", "plain", "mid", "mid", "mid", "mid", "plain", "plain", "plain", "hi", "hi", "hi", "hi",
+      "plain",
+    ]
     let lines = modelLines(words)
     let asked = AdAsks.questions(
       model: model, lines: lines, duration: 100, outside: [], source: "word-model")
@@ -46,8 +51,68 @@ final class AdAsksModelTests: XCTestCase {
     XCTAssertEqual(
       asked,
       AdAsks.questions(
-        lines: lines, rows: model.probabilities(lines: lines, duration: 100),
+        lines: lines, rows: AdAsks.smoothed(model.probabilities(lines: lines, duration: 100)),
         below: model.thresholds.start, outside: [], source: "word-model"))
+  }
+
+  // MARK: The decoder's smoothed value
+
+  /// Five borderline lines over 29 seconds whose raw chances alternate 0.555 and 0.642: the
+  /// decoder smooths them to under its start threshold, so it makes no span and today the
+  /// stretch is dropped.
+  private let borderline = ["plain", "plain", "mid", "hot", "mid", "hot", "mid", "plain", "plain"]
+
+  func testTheModelsBandIsTheDecodersSmoothedValueNotTheRawChance() {
+    let lines = modelLines(borderline)
+    XCTAssertEqual(model.spans(lines: lines, duration: nil), [], "the decoder makes no span")
+    let rows = model.probabilities(lines: lines, duration: nil)
+    let raw = rows.map { 1 - $0[0] }
+    XCTAssertEqual(raw[2], 0.555, accuracy: 0.001)
+    XCTAssertEqual(raw[3], 0.642, accuracy: 0.001)
+    let asked = AdAsks.questions(
+      model: model, lines: lines, duration: nil, outside: [], source: "word-model")
+    XCTAssertEqual(asked.map(\.start), [12])
+    XCTAssertEqual(asked.map(\.end), [41], "all five lines are one question of 29 s")
+  }
+
+  func testTheRowsApiStaysRawForOtherModels() {
+    // The same rows, banded as they are: a 0.642 line is over the start threshold and the 0.555
+    // lines are 5 s each, so nothing is asked. A model that smooths in its own decoder passes
+    // `smoothed` rows itself.
+    let lines = modelLines(borderline)
+    let rows = model.probabilities(lines: lines, duration: nil)
+    XCTAssertEqual(
+      AdAsks.questions(
+        lines: lines, rows: rows, below: model.thresholds.start, outside: [], source: "x"), [])
+    XCTAssertEqual(
+      AdAsks.questions(
+        lines: lines, rows: AdAsks.smoothed(rows), below: model.thresholds.start, outside: [],
+        source: "x"
+      ).map(\.end), [41])
+  }
+
+  func testSmoothedFollowsTheDecoderWithTheEndsHeldAtTheirOwnValue() {
+    func row(_ chance: Double) -> [Double] { [1 - chance, chance, 0, 0, 0] }
+    let smooth = AdAsks.smoothed([row(0.2), row(0.8), row(0.4)])
+    // before/4 + own/2 + after/4 with the missing neighbour replaced by the line itself.
+    XCTAssertEqual(1 - smooth[0][0], 0.2 / 4 + 0.2 / 2 + 0.8 / 4, accuracy: 1e-12)
+    XCTAssertEqual(1 - smooth[1][0], 0.2 / 4 + 0.8 / 2 + 0.4 / 4, accuracy: 1e-12)
+    XCTAssertEqual(1 - smooth[2][0], 0.8 / 4 + 0.4 / 2 + 0.4 / 4, accuracy: 1e-12)
+    XCTAssertEqual(Array(smooth[1].dropFirst()), [0.8, 0, 0, 0], "the classes are left as they were")
+    XCTAssertEqual(AdAsks.smoothed([]), [])
+    XCTAssertEqual(1 - AdAsks.smoothed([row(0.45)])[0][0], 0.45, accuracy: 1e-12)
+  }
+
+  func testSmoothedLeavesARowThatIsNotNumbersAloneAndLeansOnNothingInIt() {
+    func row(_ chance: Double) -> [Double] { [1 - chance, chance, 0, 0, 0] }
+    let broken: [Double] = [.nan, 0.5, 0, 0, 0]
+    let smooth = AdAsks.smoothed([row(0.4), broken, row(0.4), [0.5], []])
+    XCTAssertEqual(smooth[1].map { $0.isNaN }, broken.map { $0.isNaN })
+    XCTAssertEqual(smooth[3], [0.5])
+    XCTAssertEqual(smooth[4], [])
+    // The line next to the broken one uses its own value in place of it.
+    XCTAssertEqual(1 - smooth[0][0], 0.4, accuracy: 1e-12)
+    XCTAssertEqual(1 - smooth[2][0], 0.4 / 4 + 0.4 / 2 + 0.4 / 4, accuracy: 1e-12)
   }
 
   func testAHigherAskThresholdLeavesTheMidRunUnasked() {

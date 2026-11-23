@@ -25,11 +25,12 @@ final class AdAskingTests: XCTestCase {
   }
 
   private func file(
-    ads: [FoundAd] = [], asks: [FoundAd]? = nil, undone: [UndoneAd] = [], coveredUntil: Double? = nil
+    ads: [FoundAd] = [], asks: [FoundAd]? = nil, undone: [UndoneAd] = [], denied: [UndoneAd]? = nil,
+    coveredUntil: Double? = nil
   ) -> AdsFile {
     AdsFile(
       sha256: "abc", detector: "local", detectorVersion: "1", osVersion: "26", duration: 3600,
-      ads: ads, undone: undone, coveredUntil: coveredUntil, asks: asks)
+      ads: ads, undone: undone, coveredUntil: coveredUntil, asks: asks, denied: denied)
   }
 
   private func tempFolder() throws -> URL {
@@ -44,6 +45,7 @@ final class AdAskingTests: XCTestCase {
   func testAnOldFileWithNoAsksReadsAndHasNoQuestion() throws {
     let old = try JSONDecoder().decode(AdsFile.self, from: Data(oldFile.utf8))
     XCTAssertNil(old.asks)
+    XCTAssertNil(old.denied)
     XCTAssertEqual(AdAsking.open(in: old), [])
     XCTAssertNil(AdAsking.live(in: old, at: 40))
     XCTAssertNil(AdAsking.answer(old, askStart: 100, isAd: true))
@@ -51,8 +53,9 @@ final class AdAskingTests: XCTestCase {
     let with = AdAsking.adding([ask(100, 130)], to: old)
     XCTAssertEqual(with.asks, [ask(100, 130)])
     XCTAssertEqual(with.ads, old.ads)
-    let again = try JSONDecoder().decode(AdsFile.self, from: AdsStore.encoder.encode(with))
-    XCTAssertEqual(again, with)
+    let written = try AdsStore.encoder.encode(with)
+    XCTAssertFalse(String(decoding: written, as: UTF8.self).contains("denied"), "none, so no key")
+    XCTAssertEqual(try JSONDecoder().decode(AdsFile.self, from: written), with)
   }
 
   // MARK: Which question is live
@@ -84,6 +87,12 @@ final class AdAskingTests: XCTestCase {
     XCTAssertNil(AdAsking.live(in: f, at: 105))
   }
 
+  func testAQuestionTheListenerSaidNoToIsNotLive() {
+    let f = file(asks: [ask(100, 130)], denied: [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(AdAsking.open(in: f), [])
+    XCTAssertNil(AdAsking.live(in: f, at: 105))
+  }
+
   func testAQuestionWithBadTimesIsNeverLive() {
     let f = file(asks: [ask(.nan, 130), ask(200, .infinity), ask(300, 290), ask(400, 400)])
     XCTAssertEqual(AdAsking.open(in: f), [])
@@ -102,36 +111,47 @@ final class AdAskingTests: XCTestCase {
     XCTAssertEqual(tapped.end, 130)
     XCTAssertEqual(tapped.kind, .promo, "the question's kind stays")
     XCTAssertEqual(tapped.firstWords, "words at 100.0")
-    XCTAssertEqual(after.asks, [ask(300, 330)], "the other question waits")
+    XCTAssertEqual(after.asks, before.asks, "the list keeps every question, answered or not")
+    XCTAssertEqual(AdAsking.open(in: after).map(\.start), [300], "the other question waits")
     XCTAssertEqual(after.undone, [])
+    XCTAssertNil(after.denied)
     XCTAssertEqual(after.ads[0], before.ads[0])
     XCTAssertEqual(after.ads[2], before.ads[1])
   }
 
-  func testTheLastAnswerLeavesNoAsksList() throws {
+  func testAnAnsweredQuestionStaysInTheListButIsNotOpen() throws {
+    // It stays so that the cap of three questions an episode counts it.
     let after = try XCTUnwrap(AdAsking.answer(file(asks: [ask(100, 130)]), askStart: 100, isAd: true))
-    XCTAssertNil(after.asks, "an empty list is written as no list, like a file from before")
+    XCTAssertEqual(after.asks, [ask(100, 130)])
+    XCTAssertEqual(AdAsking.open(in: after), [])
   }
 
   // MARK: No
 
-  func testNoMovesTheAskToUndone() throws {
+  func testNoMovesTheAskToDeniedAndNeverToUndone() throws {
     let before = file(ads: [ad(30, 60)], asks: [ask(100, 130), ask(300, 330)])
     let after = try XCTUnwrap(AdAsking.answer(before, askStart: 300, isAd: false))
-    XCTAssertEqual(after.undone, [UndoneAd(start: 300, end: 330)])
+    XCTAssertEqual(after.denied, [UndoneAd(start: 300, end: 330)])
+    XCTAssertEqual(after.undone, [], "a skip the listener took back is another thing")
     XCTAssertEqual(after.ads, before.ads, "no ad is added")
-    XCTAssertEqual(after.asks, [ask(100, 130)])
+    XCTAssertEqual(after.asks, before.asks)
+    XCTAssertEqual(AdAsking.open(in: after).map(\.start), [100])
+    let again = try XCTUnwrap(AdAsking.answer(after, askStart: 100, isAd: false))
+    XCTAssertEqual(again.denied, [UndoneAd(start: 300, end: 330), UndoneAd(start: 100, end: 130)])
   }
 
-  func testNoIsKeptByTheFinalFileThatReplacesALocalOne() throws {
-    // `LocalAdsFile.carryChoices` carries what a local-only final file holds in `undone`.
+  func testNoIsKeptByTheModelsRunThatReplacesALocalFinalFile() throws {
+    // The local final file stays on disk until the model's own final file replaces it, and
+    // every write of the model's partial files carries what it holds: the question and the no.
     let store = AdsStore(folder: try tempFolder(), sha256: "abc")
     var local = file(asks: [ask(100, 130)])
     local.detectorVersion = LocalAdsFile.localVersion
     try store.save(local)
     XCTAssertNotNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: false))
-    LocalAdsFile.carryChoices(store: store, detector: "local")
-    XCTAssertEqual(store.loadPartial(detector: "local")?.undone, [UndoneAd(start: 100, end: 130)])
+    try store.savePartial(file(coveredUntil: 100))
+    XCTAssertEqual(store.loadPartial(detector: "local")?.denied, [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(store.loadPartial(detector: "local")?.asks, [ask(100, 130)])
+    XCTAssertEqual(store.loadPartial(detector: "local")?.undone, [])
   }
 
   // MARK: An answered ask is never live again
@@ -170,9 +190,9 @@ final class AdAskingTests: XCTestCase {
   func testTheStartMayDifferByLessThanHalfASecond() throws {
     let f = file(asks: [ask(100, 130), ask(131, 160)])
     let after = try XCTUnwrap(AdAsking.answer(f, askStart: 100.3, isAd: false))
-    XCTAssertEqual(after.undone, [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(after.denied, [UndoneAd(start: 100, end: 130)])
     let next = try XCTUnwrap(AdAsking.answer(f, askStart: 130.8, isAd: false))
-    XCTAssertEqual(next.undone, [UndoneAd(start: 131, end: 160)], "the question that starts there")
+    XCTAssertEqual(next.denied, [UndoneAd(start: 131, end: 160)], "the question that starts there")
     XCTAssertNil(AdAsking.answer(f, askStart: 100.6, isAd: false))
   }
 
@@ -209,17 +229,19 @@ final class AdAskingTests: XCTestCase {
     XCTAssertEqual(AdAsks.most, 3)
   }
 
-  func testRoomIsWhatTheOpenQuestionsLeave() {
+  func testRoomIsWhatTheStoredQuestionsLeave() {
     let f = AdAsking.adding([ask(400, 430), ask(500, 530)], to: file(asks: [ask(300, 330), ask(100, 130)]))
     XCTAssertEqual(f.asks?.map(\.start), [100, 300, 400], "stored by start")
-    XCTAssertEqual(AdAsking.adding([ask(900, 930)], to: f), f, "three are open already")
+    XCTAssertEqual(AdAsking.adding([ask(900, 930)], to: f), f, "three are stored already")
   }
 
-  func testAnAnsweredQuestionMakesRoomForANewOne() throws {
+  func testAnAnsweredQuestionKeepsItsPlaceInTheCapOfThree() throws {
     let full = AdAsking.adding(
       [ask(100, 130), ask(200, 230), ask(300, 330)], to: file())
-    let answered = try XCTUnwrap(AdAsking.answer(full, askStart: 100, isAd: false))
-    XCTAssertEqual(AdAsking.adding([ask(400, 430)], to: answered).asks?.map(\.start), [200, 300, 400])
+    for isAd in [true, false] {
+      let answered = try XCTUnwrap(AdAsking.answer(full, askStart: 100, isAd: isAd))
+      XCTAssertEqual(AdAsking.adding([ask(400, 430)], to: answered), answered, "isAd \(isAd)")
+    }
   }
 
   func testAddingKeepsEverythingElseInTheFile() {
@@ -245,7 +267,8 @@ final class AdAskingTests: XCTestCase {
     let saved = try XCTUnwrap(store.load(detector: "local"))
     XCTAssertEqual(saved.ads.map(\.start), [30, 100])
     XCTAssertEqual(saved.ads[1].source, "tap")
-    XCTAssertNil(saved.asks)
+    XCTAssertEqual(saved.asks, [ask(100, 130)], "kept, and no longer open")
+    XCTAssertEqual(AdAsking.open(in: saved), [])
     XCTAssertNil(store.loadPartial(detector: "local"), "no partial file was made")
   }
 
@@ -255,7 +278,8 @@ final class AdAskingTests: XCTestCase {
     XCTAssertNotNil(AdAsking.answer(store: store, detector: "local", askStart: 100, isAd: false))
     XCTAssertNil(store.load(detector: "local"), "no final file was made")
     let partial = try XCTUnwrap(store.loadPartial(detector: "local"))
-    XCTAssertEqual(partial.undone, [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(partial.denied, [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(partial.undone, [])
     XCTAssertEqual(partial.coveredUntil, 600)
   }
 
