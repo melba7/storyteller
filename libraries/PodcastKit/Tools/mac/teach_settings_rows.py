@@ -3,7 +3,9 @@
 Standard library only. A run has `rows`, one per finder (each stands on the row before it), and a row
 has `total` and `shows[]` (`feed`, `show`, `total`). Of a total only the numbers this needs are read:
 how many episodes, the right seconds (adSeconds - heardSeconds), the wrong seconds (cutSeconds) and
-the seconds of show (showSeconds, 0 when the file has none).
+the seconds of show (showSeconds, 0 when the file has none). A row may also carry the owner's `bar`
+(AdBar.swift): of it only `breaks`, `passed` and `noAdSkips` are read, and a bar that lacks one of them
+or holds a number that is not a number counts as none.
 Anything of the wrong shape is skipped, never raised.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -20,7 +22,8 @@ SCORECARD_LIMIT = 16 * 1024 * 1024
 
 Figures = collections.namedtuple("Figures", "episodes right wrong show")
 Show = collections.namedtuple("Show", "feed name figures")
-Row = collections.namedtuple("Row", "name total shows")
+Bar = collections.namedtuple("Bar", "breaks passed skips")
+Row = collections.namedtuple("Row", "name total shows bar", defaults=(None,))
 
 
 def number(value):
@@ -48,6 +51,16 @@ def added(first, second):
     return Figures(*(a + b for a, b in zip(first, second)))
 
 
+def read_bar(value):
+    """The Bar of a row's `bar`, or None when there is none or it is not made of numbers."""
+    if not isinstance(value, dict):
+        return None
+    kept = [value.get(key) for key in ("breaks", "passed", "noAdSkips")]
+    if not all(number(each) and each >= 0 for each in kept):
+        return None
+    return Bar(*(int(each) for each in kept))
+
+
 def read_row(item):
     """The Row an item of `rows` holds, or None when it is not one. A show that cannot be used is left
     out; a feed that comes twice (or spelt two ways) is added up."""
@@ -68,7 +81,7 @@ def read_row(item):
             one = dict(one, feed=shows[key].feed, show=shows[key].name)
         name = one["show"] if isinstance(one.get("show"), str) else ""
         shows[key] = Show(one["feed"], name, counted)
-    return Row(item["name"], whole, shows)
+    return Row(item["name"], whole, shows, read_bar(item.get("bar")))
 
 
 def rows_in(root):

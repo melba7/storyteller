@@ -88,7 +88,7 @@ Mac's files only make each finder better or stricter.
 | `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                   |
 | `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                |
 | `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                               |
-| joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later |
+| joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later. In steady files too (`steadyJoints`) a start with no joint near it is pulled back to the latest joint up to 60 s before it |
 
 For each new finder the phone does, in this order: find, keep only the parts
 outside the ads already known (0.6 s away from them), apply the Mac's per-show
@@ -201,8 +201,9 @@ second download.
 
 **The finish steps.** `teach-finish.sh` prints "Step N of 8": the snap (only
 when `copies/` or `labels-snapped/` exists), then habits, the word model, the
-library, the sounds, the meaning model, the score, the per-show settings and the
-copy to the phone's folders. `podcast-teach meaning` exits 2 for a set-up
+library, the sounds, the meaning model, the joints of the audio (`podcast-teach
+joints`, kept in `joints.json` so the score needs no audio for its joint rows),
+the score, the per-show settings and the copy to the phone's folders. `podcast-teach meaning` exits 2 for a set-up
 problem (for example, no sentence embedding on this Mac), and that does not stop
 the later steps.
 
@@ -314,7 +315,9 @@ model", "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated
 words", "Plus joints", "Plus joints (steady files too)" and, always last, "Plus
 per-show settings" (with the built-in settings when there is no file yet). The
 row names must equal `ROWS` in `teach_settings.py`, which reads them to decide
-what is turned on or off. The learning rows (own sounds, repeats) first learn
+what is turned on or off. Steady joints (which include the pull-back of a late
+start) are on when the steady row passes at least 3 more breaks than the row
+before it and adds at most 1 skip with no ad. The learning rows (own sounds, repeats) first learn
 from the marked episodes that are not scored, then scan the scored ones, so each
 episode is judged only on what the earlier episodes of its show taught. The
 scorecard also prints how many questions the word model would ask (not the

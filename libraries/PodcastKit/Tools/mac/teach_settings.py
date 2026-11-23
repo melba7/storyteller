@@ -31,7 +31,10 @@ it. Right seconds are adSeconds - heardSeconds, wrong seconds are cutSeconds. Th
   seconds (most podcast files are steady, and on those the plain row finds nothing); when neither does
   they are off everywhere. On a show where the plain row adds more wrong than right seconds they are
   off for that show.
-- Steady files get joints too ("steadyJoints") when the steady row pays by that test and, if the plain
+- Steady files get joints too ("steadyJoints") by the owner's bar when the steady row and the row
+  before it both carry a "bar" (breaks passed, skips with no ad): on when the steady row passes at
+  least 3 more breaks than the row before it and adds at most 1 skip with no ad, else off. Without a
+  bar on both rows, by the seconds: when the steady row pays by that test and, if the plain
   row pays as well, has more right seconds than it and at most one in a hundred more wrong ones. A
   show where the steady row adds more wrong than right seconds over "Plus joints" gets
   "steadyJoints": false.
@@ -54,6 +57,7 @@ import time
 
 import teach_store
 from apple_podcasts_export import default_folders
+from teach_settings_bar import bar_decision
 from teach_settings_notes import answers, read_notes
 from teach_settings_rows import SCORECARD, read_scorecard, rows_in
 from teach_store import FOLDER, Problem
@@ -172,9 +176,10 @@ def over_joints(named, pairs, default, lines):
     if "joints" not in pairs or joints.total.episodes < MIN_EPISODES:
         return
     before = pairs["joints"][1]
+    by_bar = bar_decision(pairs["steady-joints"], lines) if steady and "steady-joints" in pairs else None
     plain_pays = joints_pay(joints, before)
     steady_pays = bool(steady) and joints_pay(steady, before)
-    if not plain_pays and not steady_pays:
+    if not plain_pays and not steady_pays and not by_bar:
         right, wrong = gained(joints.total, before.total)
         text = "Joints are off for every show: over %d marked episodes they found %s more of the ads and " \
             "cut %s more of show by mistake" % (joints.total.episodes, signed(right), signed(wrong))
@@ -183,6 +188,8 @@ def over_joints(named, pairs, default, lines):
             text += " (%s and %s with steady files too)" % (signed(right), signed(wrong))
         default["joints"] = False
         lines.append(text + ", which is not a clear gain.")
+    elif by_bar is not None:
+        default["steadyJoints"] = by_bar
     elif steady_pays:
         compared = joints if plain_pays else before
         right, wrong = gained(steady.total, compared.total)

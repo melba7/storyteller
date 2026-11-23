@@ -69,7 +69,7 @@ case " $FAIL " in *" podcast-teach-$1 "*) echo "podcast-teach $1: pretending to 
 for pair in $TEACH_CODES; do
   [ "${pair%%=*}" = "$1" ] && { echo "podcast-teach $1: ending with ${pair#*=}"; exit "${pair#*=}"; }
 done
-case "$1" in sounds) out=ad-sounds.json ;; meaning) out=ad-meaning.json ;; score) out=scorecard.json ;; esac
+case "$1" in sounds) out=ad-sounds.json ;; meaning) out=ad-meaning.json ;; joints) out=joints.json ;; score) out=scorecard.json ;; esac
 case " $NOOP " in *" podcast-teach-$1 "*) exit 0 ;; esac
 echo "$RANDOM$RANDOM" > "$2/$out"
 exit 0
@@ -205,7 +205,8 @@ class Setup(unittest.TestCase):
 FINISH_ORDER = ["python3 teach_habits.py", "python3 teach_train.py", "python3 teach_library.py",
                 "swift build -c release --product podcast-teach",
                 "swift build -c release --show-bin-path", "podcast-teach sounds",
-                "podcast-teach meaning", "podcast-teach score", "python3 teach_settings.py",
+                "podcast-teach meaning", "podcast-teach joints", "podcast-teach score",
+                "python3 teach_settings.py",
                 "python3 teach_publish.py"]
 
 
@@ -215,7 +216,7 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), FINISH_ORDER)
         for line in ("Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
-                     "Meaning: worked", "Score: worked", "Settings: worked", "Publish: worked"):
+                     "Meaning: worked", "Joints: worked", "Score: worked", "Settings: worked", "Publish: worked"):
             self.assertIn("  " + line, done.stdout)
         for number in range(1, 9):
             self.assertIn("Step %d of 8" % number, done.stdout)
@@ -224,8 +225,8 @@ class FinishTests(Setup):
         done = self.run_script("teach-finish.sh")
         summary = done.stdout[done.stdout.index("Summary:"):]
         labels = re.findall(r"^  (\w+): ", summary, re.M)
-        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Score",
-                                  "Settings", "Publish"])
+        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+                                  "Score", "Settings", "Publish"])
 
     def test_the_podcast_teach_tools_get_the_teaching_folder(self):
         self.run_script("teach-finish.sh")
@@ -233,6 +234,7 @@ class FinishTests(Setup):
         calls = self.called()
         self.assertIn("podcast-teach sounds %s" % folder, calls)
         self.assertIn("podcast-teach meaning %s" % folder, calls)
+        self.assertIn("podcast-teach joints %s" % folder, calls)
         self.assertIn("podcast-teach score %s" % folder, calls)
 
     def test_a_failing_step_is_said_and_the_later_ones_still_run(self):
@@ -247,7 +249,7 @@ class FinishTests(Setup):
     def test_every_step_may_fail_without_stopping_the_next(self):
         for failing, label in (("teach_habits.py", "Habits"), ("teach_library.py", "Library"),
                                ("podcast-teach-sounds", "Sounds"), ("podcast-teach-meaning", "Meaning"),
-                               ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
+                               ("podcast-teach-joints", "Joints"), ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
             open(self.calls, "w").close()
             done = self.run_script("teach-finish.sh", FAIL=failing)
             self.assertEqual(done.returncode, 0, failing)
@@ -270,6 +272,7 @@ class FinishTests(Setup):
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)
         self.assertIn("  Meaning: failed", done.stdout)
+        self.assertIn("  Joints: failed", done.stdout)
         self.assertIn("  Score: failed", done.stdout)
         self.assertIn("  Publish: worked", done.stdout)
 

@@ -46,17 +46,28 @@ final class AudioScoreBox: @unchecked Sendable {
   /// The joints of the file looked at last. The rows of one episode come one after the other, so
   /// one file at a time is enough, and a long run does not keep every file's joints.
   private var lastJoints: (path: String, joints: Joints?)?
+  /// The joints the Mac found before (`podcast-teach joints`), by episode id.
+  private let kept: [String: Joints]
 
   init(folder: URL, now: Date) {
     self.now = now.timeIntervalSince1970
     mac = AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName))
+    let loaded = JointsCache.load(from: folder.appendingPathComponent(JointsCache.fileName))
+    if let problem = loaded.problem { FileHandle.standardError.write(Data((problem + "\n").utf8)) }
+    kept = loaded.cache.episodes
   }
 
   var kit: ScoreSoundKit {
     ScoreSoundKit(
       ownSounds: { [self] url, show, _, learn in ownSounds(url, show, learn) },
       repeatedSounds: { [self] url, show, episode in repeatedSounds(url, show, episode) },
-      snapJoints: { [self] url, spans, steady in snapJoints(url, spans, steady) })
+      snapJoints: { [self] url, spans, steady in snapJoints(url, spans, steady) },
+      cachedJoints: ScoreCachedJoints(
+        has: { [self] in kept[$0] != nil },
+        snap: { [self] id, spans, steady in
+          guard let joints = kept[id] else { return spans }
+          return snapped(spans, joints, steady)
+        }))
   }
 
   /// The sounds the show's earlier episodes taught that play in this file, and then what this
@@ -94,6 +105,10 @@ final class AudioScoreBox: @unchecked Sendable {
       lastJoints = (url.path, joints)
     }
     guard let joints else { return spans }
+    return snapped(spans, joints, steady)
+  }
+
+  private func snapped(_ spans: [ScoreSpan], _ joints: Joints, _ steady: Bool) -> [ScoreSpan] {
     let moved = ScoreSounds.snap(
       spans.map { SoundSpan(start: $0.start, end: $0.end, sort: $0.sort) }, joints: joints,
       steadyToo: steady)
