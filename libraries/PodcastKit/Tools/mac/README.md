@@ -462,29 +462,30 @@ night. Use them in this order.
    `TEACH_MAX_GB` (`--max-gb`), `TEACH_EXAM=1` (`--exam`) and `TEACH_AFTER` (a
    file that is started in place of waiting for Return when both steps worked).
 2. `Mark the new episodes at night.command`. Started by the file above when you
-   typed `yes`, or double-clicked later. It is `Mark ads in the teaching
-   episodes` with `--between 23-7` (it marks only between 11 at night and 7 in
-   the morning, and waits for the night with the Mac kept awake), `--wait-hours
-   120` (when Claude's usage allowance is used up it waits 30 minutes and tries
-   the same episode again, up to five days in all) and `--cap 95 --budget
-   more-episodes` (at most $95 of the plan's usage in all, over every run: see
-   "The budget" below). The environment can change them: `TEACH_BETWEEN`,
-   `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`. Waiting for the allowance
-   is not a failure of the episode. Not being signed in still stops at once. When
-   it ends (also stopped early) it runs the steps after marking, and it says why
-   it stopped: the spending limit is reached, the usage allowance stayed used up
-   for longer than it waits, or episodes failed (how many, and that the list is
-   `failures.json`). Only `TEACH_YES=1` counts as a yes in the launchers, and a
-   typed answer is trimmed at its ends only, so "ye s" is not yes.
+   typed `yes`, or double-clicked later. It is
+   `Mark ads in the teaching episodes` with `--between 23-7` (it marks only
+   between 11 at night and 7 in the morning, and waits for the night with the
+   Mac kept awake), `--wait-hours 120` (when Claude's usage allowance is used up
+   it waits 30 minutes and tries the same episode again, up to five days in all)
+   and `--cap 95 --budget more-episodes` (at most $95 of the plan's usage in
+   all, over every run: see "The budget" below). The environment can change
+   them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`.
+   Waiting for the allowance is not a failure of the episode. Not being signed
+   in still stops at once. When it ends (also stopped early) it runs the steps
+   after marking, and it says why it stopped: the spending limit is reached, the
+   usage allowance stayed used up for longer than it waits, or episodes failed
+   (how many, and that the list is `failures.json`). Only `TEACH_YES=1` counts
+   as a yes in the launchers, and a typed answer is trimmed at its ends only, so
+   "ye s" is not yes.
 3. `Gather the exam episodes.command`. See the next section. Run it after the
-   two files above are done, so that the exam is newer than everything the
-   phone learned from.
+   two files above are done, so that the exam is newer than everything the phone
+   learned from.
 
 The sealed exam is a set of about 60 episodes that no learning step ever sees.
 The ids are in `exam.json` in the teaching folder
-(`{"episodes": ["<12 hex id>", ...]}`, `teach_exam.py`). Gathering, writing down,
-marking and second downloads work on them, and the scorer when it is asked to.
-The Python steps that learn leave them out:
+(`{"episodes": ["<12 hex id>", ...]}`, `teach_exam.py`). Gathering, writing
+down, marking and second downloads work on them, and the scorer when it is asked
+to. The Python steps that learn leave them out:
 
 - `teach_train.py` never trains on an exam episode, never puts one on the shelf
   and also leaves out a training episode that repeats an exam episode. It says
@@ -495,8 +496,9 @@ The Python steps that learn leave them out:
 - `teach_copies.py` downloads exam episodes second, first of all, then shelf
   episodes, then the rest, so a limit cuts the rest first.
 
-Every learning step leaves exam episodes out, the Swift steps `podcast-teach
-sounds` and `meaning` included. The scorer reads them only when it is asked to.
+Every learning step leaves exam episodes out, the Swift steps
+`podcast-teach sounds` and `meaning` included. The scorer reads them only when
+it is asked to.
 
 `Gather the exam episodes.command` downloads about 60 brand-new episodes (it
 runs `teach_collect.py --exam --per-show 2 --max-gb 46`; `--exam-most` changes
@@ -505,49 +507,50 @@ was gathered before are taken, and one with no date is not. Their ids go into
 `exam.json` before `episodes.json` is saved and before any download, so a run
 that stops half way can never leak them into training. `--list --exam` says how
 many a run would take. The wanted list is ignored for an exam run. It then asks
-once for a typed `yes` (or `TEACH_YES=1`). The exam's own episodes are downloaded
-first, so episodes still waiting from an earlier gather cannot use up the size
-allowance before them. After the gathering it says how many exam episodes have
-audio and a transcript. With none it says so, marks nothing, and stops with an
-error instead of saying "Done". With `yes`, Claude marks the exam only at night
-(`teach_label.py --only-exam`, up to $14 in all under the budget `exam`), and
-marks 15 of them a second time into `labels-second/` (up to $4 in all under the
-budget `exam-second`), so we can see how much two markings differ. The second
-marking is only made for an episode that already has a first label, and its
-`--limit 15` counts the second labels already held. It does not run the steps
-after marking: the exam teaches nothing. At the end it says how many exam
-episodes are marked once and how many twice (counted by `teach_exam.py finish`).
-It says "Done" and that the exam is ready to be scored only when every exam
-episode that has a transcript has a first label and the second marking holds 15
-of them (or all of them when there are fewer). Otherwise it says what is left
-and that double-clicking again carries on.
+once for a typed `yes` (or `TEACH_YES=1`). The exam's own episodes are
+downloaded first, so episodes still waiting from an earlier gather cannot use up
+the size allowance before them. After the gathering it says how many exam
+episodes have audio and a transcript. With none it says so, marks nothing, and
+stops with an error instead of saying "Done". With `yes`, Claude marks the exam
+only at night (`teach_label.py --only-exam`, up to
+$14 in all under the budget `exam`), and
+marks 15 of them a second time into `labels-second/` (up to $4
+in all under the budget `exam-second`), so we can see how much two markings
+differ. The second marking is only made for an episode that already has a first
+label, and its `--limit 15` counts the second labels already held. It does not
+run the steps after marking: the exam teaches nothing. At the end it says how
+many exam episodes are marked once and how many twice (counted by
+`teach_exam.py finish`). It says "Done" and that the exam is ready to be scored
+only when every exam episode that has a transcript has a first label and the
+second marking holds 15 of them (or all of them when there are fewer). Otherwise
+it says what is left and that double-clicking again carries on.
 
 `teach_label.py` has these options. `--only-exam` marks only the episodes in
 `exam.json`, in its order. `--between 23-7` gives the local clock hours it may
-work in (a window over midnight works). The window rule: no call to Claude starts
-outside the hours. The clock is checked before every call (each part of an
-episode and each retry), so a usage-limit wait that ends at 7:15 does not mark
-anything until 23:00. Outside the hours it waits in steps of at most ten minutes.
-`--wait-hours H` waits for the usage allowance as described above. A retry after
-that wait asks only for the parts of the episode that are still missing. The
-opening message says the hours and the cap when they are set.
+work in (a window over midnight works). The window rule: no call to Claude
+starts outside the hours. The clock is checked before every call (each part of
+an episode and each retry), so a usage-limit wait that ends at 7:15 does not
+mark anything until 23:00. Outside the hours it waits in steps of at most ten
+minutes. `--wait-hours H` waits for the usage allowance as described above. A
+retry after that wait asks only for the parts of the episode that are still
+missing. The opening message says the hours and the cap when they are set.
 
-The budget. `--budget NAME` makes `--cap` the total for all runs under that name.
-What was spent is kept in `marking-spend.json` in the teaching folder,
+The budget. `--budget NAME` makes `--cap` the total for all runs under that
+name. What was spent is kept in `marking-spend.json` in the teaching folder,
 `{"version": 1, "budgets": {"<name>": {"dollars": 12.34, "episodes": 65}}}`,
 written after every marked episode (and after a failed one that still cost
 something). A run starts by saying what the budget has spent and what is left,
-never starts a call when the budget is spent, and ends with a line saying where it
-stands. A damaged file is a set-up problem, never a fresh start. Without
-`--budget` the cap is for one run only, and it is checked before every call.
-The launchers use the budgets `more-episodes` ($95), `exam` ($14) and
-`exam-second` ($4).
+never starts a call when the budget is spent, and ends with a line saying where
+it stands. A damaged file is a set-up problem, never a fresh start. Without
+`--budget` the cap is for one run only, and it is checked before every call. The
+launchers use the budgets `more-episodes` ($95), `exam` ($14) and `exam-second`
+($4).
 
 Exit codes of `teach_label.py`: 0 done, nothing to do, or `--limit` reached; 2 a
 set-up problem or another run is working in the folder; 3 stopped early because
 the usage allowance wait ran out or Claude is not signed in; 4 you did not type
-yes; 5 the cap or the budget is reached; 6 stopped early because three episodes in
-a row failed.
+yes; 5 the cap or the budget is reached; 6 stopped early because three episodes
+in a row failed.
 
 ### The stream replay and Apple's model
 
