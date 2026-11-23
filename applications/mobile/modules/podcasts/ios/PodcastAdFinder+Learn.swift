@@ -39,10 +39,11 @@ extension PodcastAdFinder {
     learnHabits(id, saved, transcript: transcript, modes: modes)
   }
 
-  /// The sure ads of the saved file are remembered by their words, as `learnRemembered` does it,
-  /// with two changes. An ad whose borders a joint moved is learned as it was found, because the
-  /// words between the joint and the found border are the show's. An ad over a stretch the
-  /// listener said yes to is left out: `learnTapped` counted that stretch once already.
+  /// The sure ads of the saved file are remembered by their words, for the show, as before the
+  /// new finders, with two changes. An ad whose borders a joint moved is learned as it was found,
+  /// because the words between the joint and the found border are the show's. An ad over a
+  /// stretch the listener said yes to is left out: `learnTapped` counted that stretch once
+  /// already.
   func learnKnown(
     _ id: String, ads store: AdsStore, finished file: AdsFile, transcript: Transcript,
     moved: [NewAds.Moved]
@@ -66,36 +67,42 @@ extension PodcastAdFinder {
   }
 
   /// Remembers what the episode said (hashes of five-word runs) and what it sounded like (its
-  /// print), so the show's next episode is compared with it. After the finders ran, once.
+  /// print), so the show's next episode is compared with it. After the finders ran. The words are
+  /// remembered on every pass; the print once for each episode, because a second one would replace
+  /// the print that a "no" to a repeat had scrambled.
   private func rememberRepeats(
     _ id: String, ads store: AdsStore, transcript: Transcript, modes: NewModes
   ) {
     let words = modes.level(FinderNames.repeatWords) != .off
     let sound = modes.level(FinderNames.repeatSound) != .off
-    let print =
+    let made =
       sound
       ? PodcastSoundPasses.shared.result(sha: store.sha256, stamp: soundStamp, needs: [.print])?
         .print : nil
+    let print = PodcastLearned.shared.seen(.print, episode: id) ? nil : made
     guard words || print != nil else { return }
     let finders =
       (words ? [FinderNames.repeatWords] : []) + (print != nil ? [FinderNames.repeatSound] : [])
-    _ = PodcastFinderGuard.shared.hold(finders, episode: id) { held in
+    let stored = PodcastFinderGuard.shared.hold(finders, episode: id) { held -> Bool in
       if words, held.finders.contains(FinderNames.repeatWords) {
         PodcastRepeats.shared.rememberWords(show: modes.show, episode: id, lines: transcript.lines)
       }
-      if let print, held.finders.contains(FinderNames.repeatSound) {
-        PodcastRepeats.shared.storePrint(print, show: modes.show)
-      }
+      guard let print, held.finders.contains(FinderNames.repeatSound) else { return false }
+      PodcastRepeats.shared.storePrint(print, show: modes.show)
+      return true
     }
+    if stored == true { PodcastLearned.shared.note(.print, episode: id) }
   }
 
   /// The prints of the sure ads of the saved file (after the joint snap, so they have exact
   /// borders), once for each episode. Not the ads of the new finders (they are unsure), not an ad
   /// the listener undid or trimmed, not one the listener confirmed (it was learned with the
-  /// answer).
+  /// answer). The episode is noted as learned from only when the learning ran: with no time held
+  /// from iOS the next pass tries again.
   private func learnOwnSounds(_ id: String, _ saved: AdsFile, modes: NewModes) {
     guard modes.level(FinderNames.ownSound) != .off,
-      let file = PodcastDownloader.shared.localFile(for: id)
+      let file = PodcastDownloader.shared.localFile(for: id),
+      !PodcastLearned.shared.seen(.own, episode: id)
     else { return }
     let stretches = saved.ads.filter { ad in
       ad.confidence == .sure && ad.source != AdAsking.source && !saved.isUndone(ad)
@@ -106,12 +113,13 @@ extension PodcastAdFinder {
     }.map {
       MarkedStretch(start: $0.start, end: $0.end, sort: Self.sort(of: $0.kind), who: $0.advertiser)
     }
-    guard !stretches.isEmpty, PodcastLearned.shared.firstTime(.own, episode: id) else { return }
+    guard !stretches.isEmpty else { return }
     let added = PodcastFinderGuard.shared.hold([FinderNames.ownSound], episode: id) { _ -> Int in
       let frames = OwnAdSoundsFile.frames(in: file, stretches: stretches.map { ($0.start, $0.end) })
       return PodcastOwnSounds.shared.learn(
         show: modes.show, frames: frames, stretches: stretches, mac: PodcastTeaching.shared.sounds)
     }
+    if added != nil { PodcastLearned.shared.note(.own, episode: id) }
     PodcastTimeline.mark(id, "own sounds: \(added ?? 0) learned from \(stretches.count) ads")
   }
 
@@ -185,8 +193,18 @@ extension PodcastAdFinder {
     }
   }
 
+  /// Whether a finder may work on this episode: neither the guard nor the Mac's settings switch
+  /// it off.
+  private func works(_ finder: String, show: String, episode: String) -> Bool {
+    let guarded = PodcastFinderGuard.shared.mode(finder: finder, show: show, episode: episode)
+    let settings = PodcastTeaching.shared.files.tuning.level(forFinder: finder, show: show)
+    return ShowTuning.stricter(guarded, settings) != .off
+  }
+
   /// Drops what was learned for a stretch: the prints of the phone's own sounds found in it, what
-  /// the repeats of words and of sound remember of it.
+  /// the repeats of words and of sound remember of it. The file is read only when a finder that
+  /// keeps something of sound works (it may be off by the Mac's settings or by the guard), and
+  /// only the finders that are used are held.
   private func forget(
     _ id: String, show: String, start: Double, end: Double, transcript: Transcript?, words: Bool,
     sound: Bool
@@ -194,20 +212,25 @@ extension PodcastAdFinder {
     if words, let transcript {
       PodcastRepeats.shared.denyWords(show: show, lines: transcript.lines, start: start, end: end)
     }
-    guard let file = PodcastDownloader.shared.localFile(for: id),
-      PodcastFinderGuard.shared.mode(finder: FinderNames.ownSound, show: show, episode: id) != .off
-    else { return }
-    _ = PodcastFinderGuard.shared.hold([FinderNames.ownSound], episode: id) { _ in
+    let own = works(FinderNames.ownSound, show: show, episode: id)
+    let repeats = sound && works(FinderNames.repeatSound, show: show, episode: id)
+    guard own || repeats, let file = PodcastDownloader.shared.localFile(for: id) else { return }
+    let used = (own ? [FinderNames.ownSound] : []) + (repeats ? [FinderNames.repeatSound] : [])
+    _ = PodcastFinderGuard.shared.hold(used, episode: id) { held in
       let frames = OwnAdSoundsFile.frames(in: file, stretches: [(start, end)])
-      PodcastOwnSounds.shared.forget(frames: frames, start: start, end: end)
-      if sound { PodcastRepeats.shared.forgetSound(show: show, frames: frames) }
+      if held.finders.contains(FinderNames.ownSound) {
+        PodcastOwnSounds.shared.forget(frames: frames, start: start, end: end)
+      }
+      if held.finders.contains(FinderNames.repeatSound) {
+        PodcastRepeats.shared.forgetSound(show: show, frames: frames)
+      }
     }
   }
 
   /// The sound of a stretch the listener confirmed is learned as a sure ad's is.
   private func learnSound(_ id: String, show: String, ad: FoundAd) {
-    guard let file = PodcastDownloader.shared.localFile(for: id),
-      PodcastFinderGuard.shared.mode(finder: FinderNames.ownSound, show: show, episode: id) != .off
+    guard works(FinderNames.ownSound, show: show, episode: id),
+      let file = PodcastDownloader.shared.localFile(for: id)
     else { return }
     let stretch = MarkedStretch(
       start: ad.start, end: ad.end, sort: Self.sort(of: ad.kind), who: ad.advertiser)

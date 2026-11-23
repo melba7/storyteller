@@ -190,12 +190,13 @@ final class PodcastRepeats: @unchecked Sendable {
 }
 
 /// Which episodes were learned from already, for what must be learned once for each episode: the
-/// phone's own sound prints (a second learning would count the same ad as seen again) and the
-/// show's habits. `Podcasts/finder-learned.json`, the newest 400 episodes of each kind.
+/// phone's own sound prints (a second learning would count the same ad as seen again), the show's
+/// habits and the print of what the episode sounded like (a second one would replace a print that
+/// a "no" scrambled). `Podcasts/finder-learned.json`, the newest 400 episodes of each kind.
 final class PodcastLearned: @unchecked Sendable {
   static let shared = PodcastLearned(url: defaultURL)
 
-  enum Kind: String, CaseIterable { case own, habits }
+  enum Kind: String, CaseIterable { case own, habits, print }
 
   static var defaultURL: URL {
     FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -211,13 +212,18 @@ final class PodcastLearned: @unchecked Sendable {
 
   init(url: URL) { self.url = url }
 
-  /// True the first time it is asked for this episode and kind, and noted on disk before it
-  /// returns; false after that.
-  func firstTime(_ kind: Kind, episode: String) -> Bool {
+  /// Whether the episode was learned from for this kind.
+  func seen(_ kind: Kind, episode: String) -> Bool {
+    lock.withLock { current()[kind.rawValue]?.contains(episode) == true }
+  }
+
+  /// Notes the episode as learned from, on disk before it returns. Call it once the learning ran,
+  /// not before: an episode that was not learned from because no time was held must be tried again.
+  func note(_ kind: Kind, episode: String) {
     lock.withLock {
       var all = current()
       var list = all[kind.rawValue] ?? []
-      guard !list.contains(episode) else { return false }
+      guard !list.contains(episode) else { return }
       list.append(episode)
       all[kind.rawValue] = Array(list.suffix(Self.most))
       lists = all
@@ -228,8 +234,15 @@ final class PodcastLearned: @unchecked Sendable {
       } catch {
         NSLog("Podcasts: the learned episodes could not be saved: \(error)")
       }
-      return true
     }
+  }
+
+  /// True the first time it is asked for this episode and kind, and noted on disk before it
+  /// returns; false after that.
+  func firstTime(_ kind: Kind, episode: String) -> Bool {
+    guard !seen(kind, episode: episode) else { return false }
+    note(kind, episode: episode)
+    return true
   }
 
   /// The caller holds the lock.
