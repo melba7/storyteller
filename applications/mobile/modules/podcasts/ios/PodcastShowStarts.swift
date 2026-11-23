@@ -1,10 +1,11 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
-// Whether each show's episodes start with an ad (PodcastAds' ShowStarts), kept in
-// `Podcasts/show-starts.json`: a few hundred bytes per show, read by `warm()` from a background
-// task when a stream's head is made (or when a scan records what it found), never on the main
-// actor, which only asks `startsClean`. A missing or broken file starts empty, which means no show
-// is known to start clean.
+// Whether each show's episodes start with an ad, and where that opening ad ended (PodcastAds'
+// ShowStarts), kept in `Podcasts/show-starts.json`: a few hundred bytes per show, read by `warm()`
+// from a background task when a stream's head is made (or when a scan records what it found),
+// never on the main actor, which only asks `startsClean`. A missing or broken file starts empty,
+// which means no show is known to start clean. `habits()` gives the same notes in the shape of the
+// Mac's show habits, for PodcastHabits to put beside them.
 import Foundation
 import PodcastAds
 
@@ -36,7 +37,15 @@ final class PodcastShowStarts: @unchecked Sendable {
     lock.withLock { _ = current() }
   }
 
-  /// Notes what a stream's head scan found. A scan that did not reach far enough says nothing.
+  /// What the phone saw itself, in the shape of the Mac's show habits. It reads the file when it
+  /// was not read, so only a background task asks (PodcastHabits.warm), never the main actor.
+  func habits() -> ShowHabits {
+    lock.withLock { current().habits() }
+  }
+
+  /// Notes what a stream's head scan found: whether the show opened with an ad and, when the scan
+  /// saw it end, where that opening ad ended (`ShowStarts.record` takes both from `ads`). A scan
+  /// that did not reach far enough says nothing.
   func record(show: String, ads: [FoundAd], reached: Double) {
     lock.withLock {
       var known = current()
