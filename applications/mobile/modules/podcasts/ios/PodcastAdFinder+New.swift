@@ -191,6 +191,9 @@ struct NewCollect {
   /// The chance given to a stretch a finder found that only asks. A repeat or a print has no
   /// model behind it; the questions of a model's own band rank by their own chance.
   static let askChance = 0.5
+  /// How many of an episode's questions (`AdAsks.most`) the word model may take before the other
+  /// finders' questions; the last place is theirs unless they have none.
+  static let wordSlots = AdAsks.most - 1
 
   init(file: AdsFile, modes: NewModes) {
     self.file = file
@@ -252,9 +255,11 @@ struct NewCollect {
     return (out, moved)
   }
 
-  /// The questions to add: the word model's first, then the best of the finders' asks and the
-  /// meaning model's middle band, outside every ad and no more than the cap allows. The settings'
-  /// sorts decide which kinds are asked about at all.
+  /// The questions to add, in the order they take the places of the cap (`AdAsking.adding`): the
+  /// word model's best `wordSlots`, then the best of the finders' asks and the meaning model's
+  /// middle band, outside every ad, then what is left of the word model's. So the word model
+  /// cannot fill all three places when a repeat or the meaning model has a question, and has
+  /// them when they have none. The settings' sorts decide which kinds are asked about at all.
   func questions(
     lines: [NumberedLine], meaning: (model: AdMeaningModel, rows: [[Double]])?, first: [FoundAd]
   ) -> [FoundAd] {
@@ -266,10 +271,14 @@ struct NewCollect {
     }
     candidates = candidates.filter { modes.listener.allows($0.ad.kind) }
     let word = askable(first)
+    let early = Array(word.prefix(Self.wordSlots))
     let rest = AdAsks.pick(
-      candidates.filter { item in !word.contains { NewAds.overlap($0, item.ad) } },
-      outside: allAds + word)
-    return askable(word + rest)
+      candidates.filter { item in !early.contains { NewAds.overlap($0, item.ad) } },
+      outside: allAds + early)
+    let late = word.dropFirst(Self.wordSlots).filter { ad in
+      !rest.contains { NewAds.overlap($0, ad) }
+    }
+    return askable(early + rest + late)
   }
 
   /// Questions of the sorts the listener skips and the settings do not switch off.
