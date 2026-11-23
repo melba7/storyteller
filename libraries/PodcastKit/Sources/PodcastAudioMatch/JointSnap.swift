@@ -26,19 +26,24 @@ public struct Joints: Equatable, Sendable {
     self.overflowed = overflowed
   }
 
-  /// Whether `JointSnap` may use the file at all. It does not for a steady file, nor for one with
-  /// more than `JointSnap.maxPerHour` joints an hour (then a joint says little: the file is joined
-  /// everywhere). Audio shorter than `JointSnap.shortestWindow` counts as that long, so one or
-  /// two joints in the first minutes of a stream do not make a file look busy.
-  public var usable: Bool {
-    guard !steady, !overflowed, seconds.isFinite, seconds > 0, !times.isEmpty else { return false }
+  /// Whether `JointSnap` uses the file by default: `usable(steadyToo: false)`.
+  public var usable: Bool { usable(steadyToo: false) }
+
+  /// Whether `JointSnap` may use the file at all. It does not for a file with more than
+  /// `JointSnap.maxPerHour` joints an hour (then a joint says little: the file is joined
+  /// everywhere), nor for one that overflowed or has no joint. Audio shorter than
+  /// `JointSnap.shortestWindow` counts as that long, so one or two joints in the first minutes of
+  /// a stream do not make a file look busy. A steady file is used only when `steadyToo` is true.
+  public func usable(steadyToo: Bool) -> Bool {
+    guard steadyToo || !steady, !overflowed, seconds.isFinite, seconds > 0, !times.isEmpty
+    else { return false }
     return Double(times.count) * 3600 <= JointSnap.maxPerHour * max(seconds, JointSnap.shortestWindow)
   }
 }
 
 /// Finds the joints of an MP3 file in one pass: frames go in as they come, in order, in as many
 /// calls as you like, and `joints` can be read at any point. What it holds does not grow with the
-/// file: a few counters, one entry for each bitrate (a frame has one of 28) and at most
+/// file: a few counters, one entry for each bitrate (a frame has one of 18) and at most
 /// `keepLimit` joint times.
 ///
 /// A joint is what `SeekDrift.report` lists, with the same rules and the same constants: a change
@@ -93,7 +98,8 @@ public struct JointFinder: Sendable {
       runStart = frame.start
       runLength = 1
     }
-    // The run counts the moment it holds long enough, which is where `SeekDrift` puts the seam.
+    // A run counts once it has held for `seamFrames` frames; as in `SeekDrift`, its joint is its
+    // first frame.
     if runLength == SeekDrift.seamFrames {
       if let held, held != header { add(runStart) }
       held = header
@@ -154,14 +160,17 @@ public enum JointSnap {
   /// A border never moves outside 0 to the length of the file, a start never goes before
   /// `previousEnd` (where the ad before this one ends) and an end never goes after `nextStart`
   /// (where the ad after it starts). Touching a neighbour is allowed. A snap that would leave the
-  /// start at or after the end moves neither. A file that is not usable (see `Joints.usable`) and
-  /// any number that is not finite or is below 0 give the stretch back as it came.
+  /// start at or after the end moves neither. A file that is not usable (see
+  /// `Joints.usable(steadyToo:)`) and any number that is not finite or is below 0 give the stretch
+  /// back as it came. A steady file is not used unless `steadyToo` is true; the busy rule and
+  /// `overflowed` hold either way.
   public static func snap(
     start: Double, end: Double, joints: Joints, previousEnd: Double? = nil,
-    nextStart: Double? = nil
+    nextStart: Double? = nil, steadyToo: Bool = false
   ) -> (start: Double, end: Double) {
     let unchanged = (start: start, end: end)
-    guard start.isFinite, end.isFinite, start >= 0, end > start, joints.usable,
+    guard start.isFinite, end.isFinite, start >= 0, end > start,
+      joints.usable(steadyToo: steadyToo),
       isLimit(previousEnd), isLimit(nextStart)
     else { return unchanged }
     let after = previousEnd ?? 0

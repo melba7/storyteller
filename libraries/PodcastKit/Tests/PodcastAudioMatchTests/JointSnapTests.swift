@@ -62,6 +62,61 @@ final class JointSnapTests: XCTestCase {
     assertSnap(start, start + 30, found, gives: (start, start + 30))
   }
 
+  func testASteadyFileMovesABorderOnlyWhenTheCallerAsksForIt() {
+    let found = joints(JointFrames.frames([Run(count: 4000), Run(count: 100, tag: true)]))
+    guard found.times.count == 1 else { return XCTFail("\(found.times.count) joints, not 1") }
+    XCTAssertTrue(found.steady)
+    let joint = found.times[0]
+    let start = joint + 1
+    let end = start + 30
+    // The default is what it was: a steady file is not used.
+    XCTAssertFalse(found.usable)
+    XCTAssertFalse(found.usable(steadyToo: false))
+    let kept = JointSnap.snap(start: start, end: end, joints: found)
+    XCTAssertEqual(kept.start, start)
+    XCTAssertEqual(kept.end, end)
+    let sameAgain = JointSnap.snap(start: start, end: end, joints: found, steadyToo: false)
+    XCTAssertEqual(sameAgain.start, start)
+    XCTAssertEqual(sameAgain.end, end)
+    // Asked for, the joint in the window moves the start.
+    XCTAssertTrue(found.usable(steadyToo: true))
+    let moved = JointSnap.snap(start: start, end: end, joints: found, steadyToo: true)
+    XCTAssertEqual(moved.start, joint, accuracy: 1e-9)
+    XCTAssertEqual(moved.end, end, accuracy: 1e-9)
+  }
+
+  func testABusyOrOverflowedOrEmptyFileIsNotUsedEvenForASteadyAsk() {
+    // 39 Info tags in a file of one bitrate: steady, and far over 60 joints an hour.
+    let busy = joints(JointFrames.frames((0..<40).map { _ in Run(count: 50, tag: true) }))
+    XCTAssertTrue(busy.steady)
+    XCTAssertEqual(busy.times.count, 39)
+    let files = [
+      busy,
+      Joints(times: [99.5], seconds: 1000, steady: true, overflowed: true),
+      Joints(times: [], seconds: 1000, steady: true),
+      Joints(times: [99.5], seconds: .nan, steady: true),
+      Joints(times: Array(repeating: 99.5, count: 11), seconds: 600, steady: true),
+    ]
+    for found in files {
+      XCTAssertFalse(found.usable(steadyToo: true))
+      let start = found.times.first.map { $0 + 0.5 } ?? 100
+      let result = JointSnap.snap(start: start, end: start + 50, joints: found, steadyToo: true)
+      XCTAssertEqual(result.start, start)
+      XCTAssertEqual(result.end, start + 50)
+    }
+  }
+
+  func testAFileThatIsNotSteadyIsUsedWhateverTheCallerAsksForSteadyFiles() {
+    let found = file([99.5])
+    XCTAssertTrue(found.usable)
+    XCTAssertTrue(found.usable(steadyToo: false))
+    XCTAssertTrue(found.usable(steadyToo: true))
+    assertSnap(100, 150, found, gives: (99.5, 150))
+    let asked = JointSnap.snap(start: 100, end: 150, joints: found, steadyToo: true)
+    XCTAssertEqual(asked.start, 99.5)
+    XCTAssertEqual(asked.end, 150)
+  }
+
   // MARK: Windows
 
   func testTheWindowsAreExactAtTheirEdges() {
