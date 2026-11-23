@@ -7,7 +7,7 @@ enum ScoreCommand {
   /// Runs the command and returns its exit code.
   static func run(_ arguments: [String]) -> Int32 {
     AdScoreCommand.run(
-      arguments,
+      arguments, extras: AudioScoreLayers.extras(),
       out: { print($0) },
       err: { FileHandle.standardError.write(Data(($0 + "\n").utf8)) })
   }
