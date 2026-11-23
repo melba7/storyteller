@@ -133,7 +133,10 @@ final class AdScoreNotesTests: XCTestCase {
       lines[0].hasSuffix("Only the word model's questions are counted, not the repeat finders' or the meaning model's."),
       lines[0])
     XCTAssertTrue(lines[1].contains("at most 2 an hour and at least half of them ads"), lines[1])
-    XCTAssertTrue(lines[1].hasSuffix("Not met: too many questions an hour."), lines[1])
+    XCTAssertTrue(
+      lines[1].hasSuffix(
+        "Not met: too many questions an hour. The phone still asks, at most 3 an episode, and every ad it was unsure of is still skipped with Undo, so nothing is lost; tell Claude and the cutoff will be raised (the Mac does not change it by itself yet)."),
+      lines[1])
   }
 
   func testQuestionsOutsideTheAdsOfTheLastRowOnly() {
@@ -150,7 +153,11 @@ final class AdScoreNotesTests: XCTestCase {
       from: AdAsks.askFrom)
     XCTAssertEqual(counted.count, 1)
     let lines = AdScoreNotes.questionLines(counted)
-    XCTAssertTrue(lines[1].hasSuffix("Met."), lines[1])
+    XCTAssertTrue(
+      lines[1].hasSuffix(
+        "Met. The phone asks with the cutoff in show-settings.json (0.35 unless the Mac chose another)."),
+      lines[1])
+    XCTAssertFalse(lines.joined().contains("\u{2014}"))
   }
 
   func testNoQuestionsAndNoTimeSayPlainWords() {

@@ -122,6 +122,15 @@ enum AdScoreNotes {
     return result
   }
 
+  /// What happens after the gate, in plain words. Nothing on the Mac raises the cutoff by itself,
+  /// so a failed gate says what the phone does meanwhile and who can change it.
+  private static let met =
+    "Met. The phone asks with the cutoff in \(ShowTuning.fileName) (\(ShowTuning.defaultAsk) unless the Mac chose another)."
+  private static let notMet =
+    "The phone still asks, at most \(AdAsks.most) an episode, and every ad it was unsure of is still "
+    + "skipped with Undo, so nothing is lost; tell Claude and the cutoff will be raised (the Mac does "
+    + "not change it by itself yet)."
+
   /// "Questions per hour" and "share of questions that were ads", and the starting gate.
   static func questionLines(_ asked: Questions) -> [String] {
     guard asked.hours > 0 else { return ["Questions: there is no transcript time to count over."] }
@@ -140,7 +149,7 @@ enum AdScoreNotes {
         + "(\(Int((share * 100).rounded()))%). Only the word model's questions are counted, not the "
         + "repeat finders' or the meaning model's.",
       "Starting gate for the question note: at most 2 an hour and at least half of them ads. "
-        + (failed.isEmpty ? "Met." : "Not met: \(failed.joined(separator: " and ")).")
+        + (failed.isEmpty ? met : "Not met: \(failed.joined(separator: " and ")). \(notMet)")
     ]
   }
 
