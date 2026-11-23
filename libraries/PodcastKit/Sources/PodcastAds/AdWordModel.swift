@@ -23,6 +23,9 @@ public struct AdWordModel: Sendable, Equatable {
     var sure = 0.85
   }
 
+  /// The file's version. Version 2 adds the word pairs of the neighbouring lines to the features
+  /// and decodes spans with `decodeTwo` (credits apart from ads, widened starts).
+  let version: Int
   let buckets: Int
   let thresholds: Thresholds
   /// Five weights per bucket. A bucket that is missing counts as all zeros.
@@ -40,7 +43,7 @@ public struct AdWordModel: Sendable, Equatable {
   /// Reads a model file. Returns nil when the file cannot be trusted.
   public init?(data: Data) {
     guard let file = try? JSONDecoder().decode(FileContents.self, from: data),
-      file.version == 1, (1024...4_194_304).contains(file.buckets),
+      (1...2).contains(file.version), (1024...4_194_304).contains(file.buckets),
       file.classes == Self.classes, !file.weights.isEmpty  // no weights would call every line an ad
     else { return nil }
 
@@ -70,6 +73,7 @@ public struct AdWordModel: Sendable, Equatable {
     // plain talk (a missing bias row, say) would call every ordinary line an ad.
     let bias = table[Self.bucket("#bias", buckets: file.buckets)] ?? [Double](repeating: 0, count: Self.classes.count)
     guard Self.plainProbability(bias) >= 0.5 else { return nil }
+    self.version = file.version
     self.buckets = file.buckets
     self.thresholds = cutoffs
     self.weights = table
@@ -135,6 +139,12 @@ public struct AdWordModel: Sendable, Equatable {
 
   // MARK: Scoring
 
+  /// The pairs of neighbouring words of one line as features. A pair never crosses a line border.
+  private static func insertPairs(of words: [String], prefix: String, into features: inout Set<String>) {
+    guard words.count > 1 else { return }
+    for k in 1..<words.count { features.insert(prefix + words[k - 1] + " " + words[k]) }
+  }
+
   /// The features of line `i` as buckets, each once and in ascending order.
   private func activeBuckets(_ i: Int, words: [[String]], lines: [NumberedLine], duration: Double?) -> [Int] {
     var features: Set<String> = ["#bias"]
@@ -143,10 +153,14 @@ public struct AdWordModel: Sendable, Equatable {
     if own.count > 1 {
       for k in 1..<own.count { features.insert("b:" + own[k - 1] + " " + own[k]) }
     }
-    for j in max(0, i - 2)..<i { for word in words[j] { features.insert("p:" + word) } }
+    for j in max(0, i - 2)..<i {
+      for word in words[j] { features.insert("p:" + word) }
+      if version >= 2 { Self.insertPairs(of: words[j], prefix: "pb:", into: &features) }
+    }
     if i + 1 < lines.count {
       for j in (i + 1)...min(lines.count - 1, i + 2) {
         for word in words[j] { features.insert("n:" + word) }
+        if version >= 2 { Self.insertPairs(of: words[j], prefix: "nb:", into: &features) }
       }
     }
     let start = lines[i].start

@@ -8,6 +8,9 @@ Standard library only. Used by teach_train.py.
 - features of line i: "#bias"; "u:" + word; "b:" + word pair; "p:" + each word of the two lines
   before; "n:" + each word of the two lines after; "#t0" (starts before 120 s) or "#t1" (before
   300 s); "#end" (fewer than 120 s before the end, when the length is known).
+- Version 2 files (BUCKETS_V2 buckets) add "pb:" + a + " " + b for every pair of neighbouring words
+  a, b of each of the two lines before, and "nb:" + a + " " + b for each of the two lines after.
+  A pair never crosses a line border.
 - A feature's bucket is the FNV-1a 32-bit hash of its UTF-8 bytes modulo 262144. A line's scores
   are the sums of the weights of its distinct buckets, and the probabilities are their softmax.
 
@@ -17,6 +20,7 @@ from array import array
 
 CLASSES = ["none", "sponsor", "network_promo", "host_ask", "intro_credits"]
 BUCKETS = 262144
+BUCKETS_V2 = 4194304
 
 
 def tokens(text):
@@ -60,7 +64,7 @@ def bucket(feature, buckets=BUCKETS):
     return fnv1a32(feature.encode("utf-8")) % buckets
 
 
-def features(lines, i, duration):
+def features(lines, i, duration, version=1):
     """The set of feature strings of line i. lines is [(start_seconds, text)]."""
     found = {"#bias"}
     words = tokens(lines[i][1])
@@ -70,12 +74,20 @@ def features(lines, i, duration):
         found.add("b:" + a + " " + b)
     for j in (i - 2, i - 1):
         if j >= 0:
-            for w in tokens(lines[j][1]):
+            words_before = tokens(lines[j][1])
+            for w in words_before:
                 found.add("p:" + w)
+            if version >= 2:
+                for a, b in zip(words_before, words_before[1:]):
+                    found.add("pb:" + a + " " + b)
     for j in (i + 1, i + 2):
         if j < len(lines):
-            for w in tokens(lines[j][1]):
+            words_after = tokens(lines[j][1])
+            for w in words_after:
                 found.add("n:" + w)
+            if version >= 2:
+                for a, b in zip(words_after, words_after[1:]):
+                    found.add("nb:" + a + " " + b)
     t = lines[i][0]
     if t < 120:
         found.add("#t0")
@@ -86,17 +98,22 @@ def features(lines, i, duration):
     return found
 
 
-def episode_buckets(lines, duration):
+def episode_buckets(lines, duration, version=1, size=BUCKETS):
     """For every line the sorted distinct buckets of its features, as array('i'). Same result as
     hashing features(), but each line's words are hashed once and reused by its neighbours."""
     own, before, after = [], [], []
     for _, text in lines:
         words = tokens(text)
-        own.append({bucket("u:" + w) for w in words}
-                   | {bucket("b:" + a + " " + b) for a, b in zip(words, words[1:])})
-        before.append({bucket("p:" + w) for w in words})
-        after.append({bucket("n:" + w) for w in words})
-    bias, t0, t1, end = bucket("#bias"), bucket("#t0"), bucket("#t1"), bucket("#end")
+        own.append({bucket("u:" + w, size) for w in words}
+                   | {bucket("b:" + a + " " + b, size) for a, b in zip(words, words[1:])})
+        near_before = {bucket("p:" + w, size) for w in words}
+        near_after = {bucket("n:" + w, size) for w in words}
+        if version >= 2:
+            near_before |= {bucket("pb:" + a + " " + b, size) for a, b in zip(words, words[1:])}
+            near_after |= {bucket("nb:" + a + " " + b, size) for a, b in zip(words, words[1:])}
+        before.append(near_before)
+        after.append(near_after)
+    bias, t0, t1, end = (bucket(name, size) for name in ("#bias", "#t0", "#t1", "#end"))
     result = []
     for i, (t, _) in enumerate(lines):
         found = {bias} | own[i]
@@ -130,6 +147,7 @@ def softmax_of(line_buckets, weights):
     return [v / total for v in e]
 
 
-def probabilities(weights, lines, i, duration, buckets=BUCKETS):
+def probabilities(weights, lines, i, duration, buckets=BUCKETS, version=1):
     """The five class probabilities of line i. lines is [(start_seconds, text)]."""
-    return softmax_of(sorted({bucket(f, buckets) for f in features(lines, i, duration)}), weights)
+    found = features(lines, i, duration, version)
+    return softmax_of(sorted({bucket(f, buckets) for f in found}), weights)
