@@ -435,9 +435,10 @@ double-clicked: the files above call it. When the folder `copies/` or
 item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
 sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
-scores the ad skipping, chooses the per-show settings (`teach_settings.py`), and
+finds the joints of each episode's audio once (`podcast-teach joints`, see
+`joints.json` below), scores the ad skipping, chooses the per-show settings (`teach_settings.py`), and
 copies the results to the folders the phone reads. Every step prints a heading
-("Step N of 8"). A step that fails is said plainly and the later steps still
+("Step N of 8"; the joints belong to step 6, with the score). A step that fails is said plainly and the later steps still
 run, except that the Swift steps are left out together when `podcast-teach` does
 not build. The meaning step ending with a set-up problem (no shelf, no vector
 for any line, no usable model) or the settings step ending without a scorecard
@@ -570,6 +571,12 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   here, and is for scoring only, so the scorecard's "plus the library" row does
   not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
+- `joints.json`: the joints of each episode's MP3 file (where an inserted ad was
+  spliced in), made by `podcast-teach joints` once for each episode that has an
+  audio file and no entry yet; existing entries are kept. `podcast-teach score`
+  uses it for the joint rows when it has the episode, and reads the audio only
+  when it does not, so a folder with `joints.json` and no audio still gets those
+  rows. A damaged file is ignored with one line and made again.
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
@@ -578,6 +585,11 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
   whole at every run, so a hand edit is lost at the next "Teach the phone
   again". It only ever makes the phone stricter than its built-in default.
+  Joints in steady files (`steadyJoints`, which also pulls a late start back to a
+  joint up to 60 s before it) are turned on when the scorecard's "Plus joints
+  (steady files too)" row passes at least 3 more of the owner's breaks than the
+  row before it and adds at most 1 skip with no ad; a scorecard with no bar is
+  judged by seconds as before.
 - `copies/` and `labels-snapped/`: the second download's findings and the labels
   snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.

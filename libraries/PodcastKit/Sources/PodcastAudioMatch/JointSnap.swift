@@ -143,6 +143,8 @@ public enum JointSnap {
   /// The same for an end.
   public static let endEarlier = 2.0
   public static let endLater = 4.0
+  /// How far back a late start may be pulled to a joint, in seconds, when no joint is near it.
+  public static let pullBack = 60.0
   /// A file with more joints than this an hour is not used.
   public static let maxPerHour = 60.0
   /// Audio shorter than this counts as this long when joints an hour are worked out.
@@ -164,9 +166,18 @@ public enum JointSnap {
   /// `Joints.usable(steadyToo:)`) and any number that is not finite or is below 0 give the stretch
   /// back as it came. A steady file is not used unless `steadyToo` is true; the busy rule and
   /// `overflowed` hold either way.
+  ///
+  /// A word finder's most common fault is a skip that starts late, because an ad often opens with
+  /// a story the words do not give away. So when no joint lies inside the start's window, the start
+  /// is pulled back to the LATEST joint that lies up to `pullBack` seconds before it. It never goes
+  /// before `previousEnd` or 0, so a pull that would reach into the ad before is not made, and a
+  /// start that touches that ad (it is inside a break, not at its beginning) stays. An end is never
+  /// pulled. `pullBack` nil means `JointSnap.pullBack` when `steadyToo` is true (the files of the
+  /// owner are steady, which is what the pull is for) and no pull when it is false; 0 or a number
+  /// that is not finite or is below 0 means no pull.
   public static func snap(
     start: Double, end: Double, joints: Joints, previousEnd: Double? = nil,
-    nextStart: Double? = nil, steadyToo: Bool = false
+    nextStart: Double? = nil, steadyToo: Bool = false, pullBack: Double? = nil
   ) -> (start: Double, end: Double) {
     let unchanged = (start: start, end: end)
     guard start.isFinite, end.isFinite, start >= 0, end > start,
@@ -181,8 +192,25 @@ public enum JointSnap {
     let last = nearest(to: end, earlier: endEarlier, later: endLater, in: joints) {
       $0 > start && $0 <= before
     }
-    let moved = (start: first ?? start, end: last ?? end)
+    let reach = pullBack ?? (steadyToo ? JointSnap.pullBack : 0)
+    let pulled = first == nil ? pull(start, reach: reach, in: joints, after: after) : nil
+    let moved = (start: first ?? pulled ?? start, end: last ?? end)
     return moved.start < moved.end ? moved : unchanged
+  }
+
+  /// The latest joint that lies before `start`, no more than `reach` seconds and no earlier than
+  /// `after`. Nil when there is none, when `reach` is no use, or when the start touches `after`.
+  private static func pull(
+    _ start: Double, reach: Double, in joints: Joints, after: Double
+  ) -> Double? {
+    guard reach.isFinite, reach > 0, start - after > tie else { return nil }
+    var latest: Double?
+    for joint in joints.times
+    where joint.isFinite && joint >= 0 && joint <= joints.seconds && joint < start - tie
+      && joint >= start - reach - slack && joint >= after {
+      if latest.map({ joint > $0 }) ?? true { latest = joint }
+    }
+    return latest
   }
 
   private static func isLimit(_ limit: Double?) -> Bool {
