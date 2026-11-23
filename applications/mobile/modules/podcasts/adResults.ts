@@ -67,8 +67,28 @@ export function parseTally(text: string | null): Record<string, ShowTally> {
   return tally
 }
 
+/** How often ad skipping passed: skips that stood, out of every skip and every missed ad. */
+export type PassRate = { passed: number; total: number; percent: number }
+
+/** The listening pass rate for a tally, or null when nothing was skipped or missed. */
+export function passRate(
+  t: Pick<ShowTally, "skipped" | "undone" | "trimmed" | "missed">,
+): PassRate | null {
+  const total = t.skipped + t.missed
+  if (total <= 0) return null
+  const passed = Math.max(0, t.skipped - t.undone - t.trimmed)
+  return {
+    passed,
+    total,
+    percent: Math.min(100, Math.round((passed / total) * 100)),
+  }
+}
+
+export const PASS_NOTE =
+  "A skip you took back or trimmed, or an ad you marked as missed, counts as not passed. It only knows what you told it."
+
 export type ResultTotal = {
-  key: "skipped" | "saved" | "undone" | "missed"
+  key: "passed" | "skipped" | "saved" | "undone" | "missed"
   label: string
   value: string
 }
@@ -77,6 +97,8 @@ export type ResultRow = { key: string; title: string; text: string }
 
 export type AdResults = {
   totals: ResultTotal[]
+  /** The sentence that says what the pass line counts. */
+  passNote: string
   rows: ResultRow[]
   /** The phone has skipped nothing yet, and nothing was marked as missed. */
   empty: boolean
@@ -104,8 +126,23 @@ export function resultsFor(
     )
   const sum = (pick: (t: ShowTally) => number) =>
     Object.values(tally).reduce((total, t) => total + pick(t), 0)
+  const pass = passRate({
+    skipped: sum((t) => t.skipped),
+    undone: sum((t) => t.undone),
+    trimmed: sum((t) => t.trimmed),
+    missed: sum((t) => t.missed),
+  })
   return {
     totals: [
+      ...(pass === null
+        ? []
+        : [
+            {
+              key: "passed" as const,
+              label: "Passed by your ears",
+              value: `${pass.passed} of ${pass.total} (${pass.percent}%)`,
+            },
+          ]),
       {
         key: "skipped",
         label: "Ads skipped",
@@ -127,6 +164,7 @@ export function resultsFor(
         value: String(sum((t) => t.missed)),
       },
     ],
+    passNote: PASS_NOTE,
     rows: listed.map(({ id, t, title }) => ({
       key: id,
       title,
