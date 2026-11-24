@@ -150,6 +150,42 @@ final class AheadScoreRowTests: XCTestCase {
     XCTAssertTrue(output.contains("\(rowName): 2 of 2 scored episodes have marks"), output)
   }
 
+  func testTheRowSkipsAHighOrMediumMarkAndOnlyAsksAboutALowOneAsThePhoneDoes() throws {
+    // The bar counts a skip over a low-marked stretch as neither right nor wrong (`maybe`), so the
+    // row's own layer is looked at: its list holds the ads the row skips, and no question.
+    let lines = (1...30).map { line in
+      (11...13).contains(line)
+        ? (0..<20).map { "ad\(line)x\($0)" }.joined(separator: " ")
+        : (0..<6).map { "talk\(line)x\($0)" }.joined(separator: " ")
+    }
+    let episode = TeachingEpisode(
+      id: "e1", feed: "feed1", show: "Show One", title: "Title", transcript: makeTranscript(lines),
+      truth: [], maybe: [], onShelf: true)
+    let adWords = (11...13).flatMap { line in (0..<20).map { "ad\(line)x\($0)" } }
+    let now = Date()
+    for (confidence, skipped) in [
+      (AheadMark.Confidence.high, 1), (.medium, 1), (.low, 0),
+    ] {
+      let mark = AheadMark(
+        kind: .ad, confidence: confidence, start: 100, end: 130,
+        startWords: adWords.prefix(40).joined(separator: " "),
+        endWords: adWords.suffix(40).joined(separator: " "))
+      let file = AheadFile(
+        writtenAt: now.timeIntervalSince1970,
+        episodes: [
+          AheadEntry(
+            feed: "feed1", guid: "e1", title: "Title", marked: now.timeIntervalSince1970,
+            ads: [mark])
+        ])
+      let layer = AheadScoreRow.layer(
+        file, tuning: ShowTuning(), now: now, standingOn: ScoreEpisodeAds(),
+        kept: ScoreEpisodeAds())
+      let made = layer.apply(
+        AdScoreInput(episode: episode, transcript: episode.transcript), soFar: [])
+      XCTAssertEqual(made.count, skipped, "\(confidence)")
+    }
+  }
+
   // MARK: The stream replay and the rule
 
   func testTheStreamReplayHasALineForTheRow() throws {

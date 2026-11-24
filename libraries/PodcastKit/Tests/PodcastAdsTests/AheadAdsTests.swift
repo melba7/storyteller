@@ -94,14 +94,76 @@ final class AheadAdsTests: XCTestCase {
 
   // MARK: Claude's confidence
 
-  func testHighAndMediumMarksGiveSureAdsAndLowOnesUnsureAds() {
-    for (given, expected) in [
-      (AheadMark.Confidence.high, AdConfidence.sure), (.medium, .sure), (.low, .unsure),
-    ] {
+  func testHighAndMediumMarksGiveSureAds() {
+    for given in [AheadMark.Confidence.high, .medium] {
       let found = AheadAds.find(
         entry([mark(adWords(), start: 50, end: 80, confidence: given)]), words: episode())
-      XCTAssertEqual(found.ads.first?.confidence, expected, "\(given)")
+      XCTAssertEqual(found.ads.first?.confidence, .sure, "\(given)")
+      XCTAssertEqual(found.ads.count, 1, "\(given)")
+      XCTAssertTrue(found.asks.isEmpty, "\(given)")
     }
+  }
+
+  func testALowMarkFoundOnBothEdgesIsAQuestionAndNeverASkip() throws {
+    // Claude marks a doubtful stretch as low: the phone may ask about it, but must not skip it.
+    let found = AheadAds.find(
+      entry([mark(adWords(), start: 50, end: 80, confidence: .low)]), words: episode())
+    XCTAssertTrue(found.ads.isEmpty, "a low mark never skips")
+    let ask = try XCTUnwrap(found.asks.first)
+    XCTAssertEqual(found.asks.count, 1)
+    XCTAssertEqual(ask.confidence, .unsure)
+    XCTAssertEqual(ask.source, "ahead")
+    XCTAssertEqual(ask.kind, .ad)
+    XCTAssertEqual(ask.start, 50, accuracy: 0.3)
+    XCTAssertEqual(ask.end, 80, accuracy: 0.3)
+  }
+
+  func testALowMarkFoundOnOneEdgeStillOnlyAsks() throws {
+    let heard = Array(adWords().prefix(40)) + adWords("cut", 20)
+    let found = AheadAds.find(
+      entry([mark(adWords(), start: 50, end: 80, confidence: .low)]), words: episode(ad: heard))
+    XCTAssertTrue(found.ads.isEmpty)
+    XCTAssertEqual(try XCTUnwrap(found.asks.first).start, 50, accuracy: 0.3)
+  }
+
+  func testALowMarkKeepsTheKindOfTheMarkAsAQuestion() {
+    for kind in [AdKind.promo, .ownPlug] {
+      let found = AheadAds.find(
+        entry([mark(adWords(), start: 50, end: 80, kind: kind, confidence: .low)]),
+        words: episode())
+      XCTAssertEqual(found.asks.first?.kind, kind)
+      XCTAssertTrue(found.ads.isEmpty)
+    }
+  }
+
+  func testALowMarkOfAnAdASureMarkFoundAddsNoQuestionOverIt() {
+    let found = AheadAds.find(
+      entry([
+        mark(adWords(), start: 50, end: 80),
+        mark(adWords(), start: 50, end: 80, confidence: .low),
+      ]), words: episode())
+    XCTAssertEqual(found.ads.count, 1)
+    XCTAssertTrue(found.asks.isEmpty, "the question would lie over the skip")
+  }
+
+  func testASureAdAndALowOneInTheSameEpisodeAreASkipAndAQuestion() throws {
+    let other = adWords("other", 60)
+    let words = timed(talk(100) + adWords() + talk(100, from: 100) + other + talk(100, from: 200))
+    let found = AheadAds.find(
+      entry([
+        mark(adWords(), start: 50, end: 80),
+        mark(other, start: 130, end: 160, confidence: .low),
+      ]), words: words)
+    XCTAssertEqual(found.ads.count, 1)
+    XCTAssertEqual(try XCTUnwrap(found.ads.first).start, 50, accuracy: 0.3)
+    XCTAssertEqual(found.asks.count, 1)
+    XCTAssertEqual(try XCTUnwrap(found.asks.first).start, 130, accuracy: 0.3)
+  }
+
+  func testTheHeadOfAStreamNeverGetsASkipFromALowMark() {
+    // The head scan takes only `ads`: with the whole ad heard, a low mark still gives none.
+    let marks = entry([mark(adWords(), start: 50, end: 80, confidence: .low)])
+    XCTAssertTrue(AheadAds.find(marks, words: episode().filter { $0.end <= 90 }).ads.isEmpty)
   }
 
   // MARK: Only one edge
