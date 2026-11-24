@@ -68,6 +68,10 @@ What keeps the layers from cutting the show itself:
   opens with an ad gets no wait.
 - **A downloaded file with no transcript yet**: the sounds are looked for at
   once.
+- **The Mac's marks** (`ahead`): in the head scan, with the words heard so far,
+  and in the whole-transcript pass of `PodcastAdFinder`, both after the other
+  new finders, under the finder guard. The scan of a stream only skips; the
+  whole pass skips the ads found by both edges and asks about the others.
 - **A transcript that is growing or whole** (`PodcastAdFinder`): the local
   layers run first and their ads go into the episode's ads file
   (`LocalAdsFile`), then Apple's model is asked. When Apple's model cannot be
@@ -87,6 +91,7 @@ Mac's files only make each finder better or stricter.
 | `own-sound` (`OwnAdSounds`)         | Keeps the sound print of every sure ad the phone skipped (`own-ad-sounds.json`) and finds it again                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `repeat-sound`                      | A stretch that sounds the same in the last three episodes of a show (`RepeatScanner`, prints in Caches)                                                                                                                                                                                                                                                                                                                                                                                            |
 | `repeat-words`                      | A run of words said in the last three episodes of a show (`RepeatedWords`)                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `ahead` (`AheadAds`)                | The ads the Mac marked the night before in the next episodes (`ahead-ads.json`), found again by their first and last words, not by their times                                                                                                                                                                                                                                                                                                                                                     |
 | `meaning` (`MeaningAds`)            | Apple's sentence embedding plus the Mac's weights (`ad-meaning.json`), for host-read plugs with no ad words                                                                                                                                                                                                                                                                                                                                                                                        |
 | joints (`JointFinder`, `JointSnap`) | Moves the start or end of an ad to the nearest quiet joint: a start up to 3 s earlier or 1 s later, an end up to 2 s earlier or 4 s later. Whenever `steadyJoints` is on (in steady files and in the others), the late start of an ad whose start a word finder gave (`JointPull`: the repeated words, the meaning model, the word model, the word rules) with no joint near it is pulled back to the latest joint up to 60 s before it, never into an earlier ad or a stretch the listener judged |
 
@@ -109,6 +114,23 @@ join, because a joined ad loses its `source`.
   waits for it. Only a show where the Mac's bar passes gets `skip` (see
   `teach_settings.py`); there its answers skip as before. The listener's undo
   and "no" count for the finder guard as for any other finder.
+- **The Mac's marks of the night before** (`AheadAds`,
+  `PodcastAdFinder+Ahead.swift`). The Mac marks the next episodes ahead of time
+  (`ahead-ads.json`, below), and the phone's copy of an episode can carry other
+  inserted ads than the Mac's copy, so a mark is used by its words and never by
+  its times. The finder looks for the first words and the last words of each
+  marked ad in the phone's transcript, with the matching that finds a remembered
+  ad again (three fifths of the three-word runs). The ad starts where its first
+  words start and ends where its last words end, landed like every ad
+  (`AdLanding`). It is accepted only when both edges are found and the length
+  between them is half to one and a half times the length the Mac marked. With
+  one edge only, or two that do not fit, the finder offers a stretch of the
+  marked length from the edge it found as a question, never as a skip. "high" is
+  sure, "medium" is sure when both edges are found, and "low" is unsure. Its
+  level in the settings is `skip` unless the file says otherwise, and the finder
+  guard knows it by the same name (`ahead`). An entry is ignored 14 days after
+  `marked`; a damaged file is no file. On a stream's head it finds an ad once
+  its last words have arrived.
 - **Questions.** A guess that is not sure enough to skip becomes a question,
   from whole-transcript passes only, at most three in an episode (answered ones
   count). The phone shows "Ad? Skip" with two answers while the stretch plays
@@ -147,7 +169,7 @@ join, because a joined ad loses its `source`.
 ## The files the Mac makes
 
 The teaching folder is `~/Storyteller Lofi/PodcastTeaching` on the Mac. It is
-never committed. `teach_publish.py` copies six files and a list of them into
+never committed. `teach_publish.py` copies seven files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
 the phone has linked.
 
@@ -159,7 +181,8 @@ the phone has linked.
 | `ad-sounds.json`     | `podcast-teach sounds`  | the sound prints of marked ads                       |
 | `ad-meaning.json`    | `podcast-teach meaning` | weights of the meaning model, with two probe vectors |
 | `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
-| `teaching.json`      | `teach_publish.py`      | the six files' sizes and SHA-256, read first         |
+| `ahead-ads.json`     | the Mac's read-ahead    | the ads marked in the next episodes, by their words  |
+| `teaching.json`      | `teach_publish.py`      | the seven files' sizes and SHA-256, read first       |
 
 All are JSON objects with `"version": 1` (the word model may be 2) and stay
 under 4.5 MB (the phone refuses a file over 5 MB).
@@ -201,6 +224,16 @@ under 4.5 MB (the phone refuses a file over 5 MB).
 - `ad-sounds.json`:
   `{"version", "step": 8, "sounds": [{"sort", "who", "frames", "seconds", "seen", "anchors": "<base64>"}]}`.
   An anchor is the low 32 bits of the hash of every 8th MP3 frame.
+- `ahead-ads.json`:
+  `{"version": 1, "writtenAt", "episodes": [{"feed", "guid", "title", "marked", "ads": [{"kind": "ad" | "promo" | "ownPlug", "confidence": "high" | "medium" | "low", "start", "end", "startWords", "endWords"}]}]}`.
+  `marked` is when Claude marked the episode (seconds since 1970); an entry more
+  than 14 days old is ignored. `start` and `end` are the times on the Mac's copy
+  and only give the length the ad had. `startWords` and `endWords` are the first
+  and the last (up to 40) words of the ad. An episode is the entry with its
+  `guid`, or, when either has no guid, the entry with the same feed key and the
+  same title (lower case, letters and digits). The phone refuses a file that is
+  not version 1 with a list of `episodes`; `teach_publish.py` does the same, and
+  an entry or an ad of the wrong shape is left out when the file is read.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
 
@@ -214,6 +247,14 @@ show by its own id. The app tells the native side which feed is which show
 addresses are compared as "feed keys": no scheme, no `www.`, lower-case host, no
 fragment, no closing slash (`feedKey` in `applePodcasts.ts`, `FeedKey` in
 PodcastKit).
+
+**Episodes are named by their guid in the marks.** The phone's native side knows
+an episode only by its own id. The app sends it a table of the newest unplayed
+episodes of each show (`setAheadEpisodes`, `aheadEpisodesText` in
+`teaching.ts`): `{"<episode id>": {"feed", "guid", "title"}}`, at most 12 for
+each show and 400 in all, and only when the Mac has published marks. The phone
+keeps it as `ahead-episodes.json` beside the teaching files and looks an
+episode's marks up with it (`AheadEpisodes`, `TeachingFiles.aheadEntry`).
 
 **The second download.** `Check ads with a second download.command` fetches
 again, at most 40 marked episodes and 3 GB a run, the copy of an episode the
@@ -258,19 +299,20 @@ The phone writes two files into `Podcasts/` of its linked folder:
 
 Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
 
-| Function                                                            | Returns                                            |
-| ------------------------------------------------------------------- | -------------------------------------------------- |
-| `getAdSkipSettings()`                                               | `{skipAds, skipOwnPlugs, skipPromos, skipCredits}` |
-| `setAdSkipSettings(skipAds, skipOwnPlugs, skipPromos, skipCredits)` | nothing                                            |
-| `skipAdNow()`                                                       | `{to, known}` or null when nothing is loaded       |
-| `readPendingAdNotes()`                                              | the pending notes as JSON lines, "" when none      |
-| `removePendingAdNotes(count, upToAt)`                               | nothing; see below                                 |
-| `getAdTally()`                                                      | JSON text, see below                               |
-| `readSkipLogText()`                                                 | the skip log and diary text, or null               |
-| `installTeachingFile(name, text, sha256)`                           | true when the file was checked and installed       |
-| `setTeachingShows(json)`                                            | nothing; `json` is `{"<feed key>": "<show id>"}`   |
-| `getTeachingState()`                                                | JSON text, see below                               |
-| `answerAdQuestion(episodeId, start, isAd)`                          | true when an open question starts at `start`       |
+| Function                                                            | Returns                                                    |
+| ------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `getAdSkipSettings()`                                               | `{skipAds, skipOwnPlugs, skipPromos, skipCredits}`         |
+| `setAdSkipSettings(skipAds, skipOwnPlugs, skipPromos, skipCredits)` | nothing                                                    |
+| `skipAdNow()`                                                       | `{to, known}` or null when nothing is loaded               |
+| `readPendingAdNotes()`                                              | the pending notes as JSON lines, "" when none              |
+| `removePendingAdNotes(count, upToAt)`                               | nothing; see below                                         |
+| `getAdTally()`                                                      | JSON text, see below                                       |
+| `readSkipLogText()`                                                 | the skip log and diary text, or null                       |
+| `installTeachingFile(name, text, sha256)`                           | true when the file was checked and installed               |
+| `setTeachingShows(json)`                                            | nothing; `json` is `{"<feed key>": "<show id>"}`           |
+| `setAheadEpisodes(json)`                                            | nothing; `json` is `{"<episode id>": {feed, guid, title}}` |
+| `getTeachingState()`                                                | JSON text, see below                                       |
+| `answerAdQuestion(episodeId, start, isAd)`                          | true when an open question starts at `start`               |
 
 - A pending note is
   `{"v": 1, "at": <ms>, "what", "episode": "<episode id>", "show": "<show id or empty>", "start", "end": <seconds or null>, "kind"}`.
@@ -467,6 +509,29 @@ more skips with no ad. Only then is it shrunk to Core ML for the app.
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
 
+### The Mac's marks, a row
+
+`podcast-teach score <folder> --ahead` adds one row after all the others,
+Apple's and the passage row included: "Plus the Mac's marks from the night
+before" (`AheadScoreRow`). It stands on the last finder row like the passage
+row, and the verdict compares it with that row. The marks are made from Claude's
+own labels in `labels/` (credits are not marked, low confidence stays) and the
+words of each transcript (the first and last 40 words of each ad), written and
+read back as the phone reads the Mac's file, and the row runs the phone's finder
+(`AheadAds`) on each transcript. An episode that has a second download
+(`copies/<id>.truth.txt`) keeps only the marks that are in both downloads: a
+marked ad that overlaps a stretch where the downloads differ by half of its
+length or more is left out, because the phone's copy may not carry it. An
+episode with no second download keeps all its marks, and the report says which
+of the two it did. The report prints the bar, why breaks fail in the row and the
+verdict. The go rule: at least 20 more breaks pass than the last finder row,
+with at most 1 more skip with no ad.
+
+On the shelf the marks are made from the same labels the row is scored against,
+so the row proves only that the matching works: the words of a marked ad are
+found again and give its edges. The real number comes from the exam, where an
+episode is marked once the night before and scored against another marking.
+
 ### The sound at the edges
 
 `podcast-teach edges <folder>` measures, before anything is built into the
@@ -515,6 +580,9 @@ not been tuned on the shelf.
 - A repeat never skips. A rule that promotes a repeat to skip after enough
   confirmed answers on a show is parked until the answers show it is safe.
 - Episodes that finished before the update never run the new finders again.
+- An episode that is already finished when its marks come is not looked at again
+  for them; it is looked at when it is transcribed, or when a new
+  `ahead-ads.json` is installed.
 - A habit may be counted twice for an episode that was streamed and then
   downloaded; the check of play-through limits it.
 - Transcripts over 64 MB skip the deny-by-words step.

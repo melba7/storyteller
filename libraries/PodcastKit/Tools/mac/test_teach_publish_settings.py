@@ -66,7 +66,7 @@ class NamesTests(unittest.TestCase):
         block = re.search(r"export const TEACHING_NAMES = \[(.*?)\] as const", text, re.S).group(1)
         fetched = re.findall(r'"([^"]+)"', block)
         self.assertEqual(fetched, [target for _, target in publish.FILES])
-        self.assertEqual(len(fetched), 6)
+        self.assertEqual(len(fetched), 7)
 
 
 if __name__ == "__main__":

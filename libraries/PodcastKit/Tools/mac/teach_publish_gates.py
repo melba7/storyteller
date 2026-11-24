@@ -133,3 +133,10 @@ def settings_shape(data):
     show-settings.json: it must have a list of shows, which the Mac always writes."""
     if not isinstance(json.loads(data).get("shows"), list):
         raise ValueError("it has no list of shows")
+
+
+def ahead_shape(data):
+    """Raises ValueError (with the reason in plain words) when the phone would refuse these bytes of
+    ahead-ads.json: it must have a list of episodes, which the Mac always writes."""
+    if not isinstance(json.loads(data).get("episodes"), list):
+        raise ValueError("it has no list of episodes")

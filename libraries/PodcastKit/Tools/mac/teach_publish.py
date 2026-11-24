@@ -10,7 +10,8 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
   ad-sounds.json   from <folder>/ad-sounds.json   (podcast-teach sounds)
   ad-meaning.json  from <folder>/ad-meaning.json  (podcast-teach meaning), see the gate below
   show-settings.json from <folder>/show-settings.json (teach_settings.py)
-  teaching.json    a small list of the six files above that are in the Podcasts folder now,
+  ahead-ads.json   from <folder>/ahead-ads.json   (the Mac's marks of the next episodes, the night before)
+  teaching.json    a small list of the seven files above that are in the Podcasts folder now,
                    each with its sha256 and size, so the phone fetches a big file only when its
                    hash changed. It is rewritten only when that list changes.
 
@@ -55,17 +56,19 @@ import time
 
 import teach_store
 from teach_phone_rule import refusals
-from teach_publish_gates import percent, scorecard_reason, settings_shape
+from teach_publish_gates import ahead_shape, percent, scorecard_reason, settings_shape
 from apple_podcasts_export import default_folders
 
 LIMIT = 4500000
 SUBFOLDER = "Podcasts"
 FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.json"),
          ("habits.json", "show-habits.json"), ("ad-sounds.json", "ad-sounds.json"),
-         ("ad-meaning.json", "ad-meaning.json"), ("show-settings.json", "show-settings.json"))
+         ("ad-meaning.json", "ad-meaning.json"), ("show-settings.json", "show-settings.json"),
+         ("ahead-ads.json", "ahead-ads.json"))
 MODEL = "ad-model.json"
 MEANING = "ad-meaning.json"
 SETTINGS = "show-settings.json"
+AHEAD = "ahead-ads.json"
 LIST = "teaching.json"
 MIN_PRECISION = 0.85
 ICLOUD_FAILED = 3
@@ -259,6 +262,8 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
             data = checked(os.path.join(folder, source), limit, (1, 2) if target == MODEL else (1,))
             if target == SETTINGS:
                 settings_shape(data)
+            if target == AHEAD:
+                ahead_shape(data)
         except FileNotFoundError:
             say("%s: skipped, there is no %s in %s." % (target, source, folder))
             continue

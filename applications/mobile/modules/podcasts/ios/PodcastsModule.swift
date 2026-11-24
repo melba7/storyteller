@@ -356,7 +356,8 @@ public final class PodcastsModule: Module {
     // MARK: Teaching
 
     // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json, ad-sounds.json,
-    // ad-meaning.json or show-settings.json) when its SHA-256 is right and it reads as that file.
+    // ad-meaning.json, show-settings.json or ahead-ads.json) when its SHA-256 is right and it reads
+    // as that file.
     // True when it was kept; the episodes are looked at again then.
     AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in
       let kept = PodcastTeaching.shared.install(name: name, text: text, sha256: sha256)
@@ -367,6 +368,13 @@ public final class PodcastsModule: Module {
     // the app does.
     AsyncFunction("setTeachingShows") { (json: String) in
       if PodcastTeaching.shared.setShows(json: json) { PodcastAdFinder.shared.teachingChanged() }
+    }
+    // What the app knows of its episodes, `{"<episode id>": {"feed", "guid", "title"}}`, so the
+    // Mac's marks of the night before (named by guid, or by feed and title) find their episode. It
+    // only saves the table: an episode is looked at when it is transcribed, or when a new
+    // ahead-ads.json is installed.
+    AsyncFunction("setAheadEpisodes") { (json: String) in
+      _ = PodcastTeaching.shared.setAheadEpisodes(json: json)
     }
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }

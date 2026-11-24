@@ -13,10 +13,10 @@ import PodcastTranscripts
 
 extension PodcastStreamHead {
   /// The ads of the local layers and of the taught sounds in `audio` (the audio of this step),
-  /// and apart from them the ads the phone's own sounds add (`own`, which the caller cuts again
-  /// before it joins them, see `NewAds.headAds`). `episodeDuration` is the episode's length when
-  /// it is known. `blockers` are the ads of the memory and the model, which the caller joins with
-  /// these: a new finder keeps away from them.
+  /// and apart from them the ads the phone's own sounds and the Mac's marks add (`own`, which the
+  /// caller cuts again before it joins them, see `NewAds.headAds`). `episodeDuration` is the
+  /// episode's length when it is known. `blockers` are the ads of the memory and the model, which
+  /// the caller joins with these: a new finder keeps away from them.
   func findLocal(
     lines: [TranscriptLine], transcript: Transcript, sponsors: [SponsorName],
     episodeDuration: Double?, audio: Data, blockers: [FoundAd]
@@ -32,7 +32,10 @@ extension PodcastStreamHead {
       HeadNotes.local(
         ads: local.count, sounds: sounds.count,
         milliseconds: Int(Date().timeIntervalSince(started) * 1000)))
-    return withOwnSoundsAndJoints(local + sounds, audio: audio, blockers: blockers)
+    var made = withOwnSoundsAndJoints(local + sounds, audio: audio, blockers: blockers)
+    // The Mac's marks of the night before (PodcastAdFinder+Ahead.swift) add to the new finders' ads.
+    made.own += findAhead(words: transcript.words, blockers: blockers + made.old + made.own)
+    return made
   }
 
   /// `found` with every border put on a joint of `audio`, and with what the phone's own sounds

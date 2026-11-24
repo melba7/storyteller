@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's teaching files from the Mac (see FORK.md).
 //
-// The Mac writes six teaching files and a list of them, `Podcasts/teaching.json`, into the
+// The Mac writes seven teaching files and a list of them, `Podcasts/teaching.json`, into the
 // linked folder (docs/PODCASTS-ADS-TEACHING.md). These are the rules for which files the phone
 // fetches and for the table of feeds it sends to the native side. Nothing here touches the
 // folder or the native modules (teachingSync.ts does).
@@ -11,8 +11,8 @@ export const TEACHING_LIST_FILE = "Podcasts/teaching.json"
 
 /**
  * The files the Mac may teach with, in the order they are fetched. The Mac's teach_publish.py
- * writes the same six (its test compares the two lists) and the phone's `TeachingFiles.install`
- * and `AdSoundLibrary.install` take the same six.
+ * writes the same seven (its test compares the two lists) and the phone's `TeachingFiles.install`
+ * and `AdSoundLibrary.install` take the same seven.
  */
 export const TEACHING_NAMES = [
   "ad-model.json",
@@ -21,6 +21,7 @@ export const TEACHING_NAMES = [
   "ad-sounds.json",
   "ad-meaning.json",
   "show-settings.json",
+  "ahead-ads.json",
 ] as const
 
 export type TeachingName = (typeof TEACHING_NAMES)[number]
@@ -129,6 +130,63 @@ export function showTableText(
 /** Whether a run may start: the first one, or ten minutes since the last (or the clock moved back). */
 export function dueForTeaching(last: number | null, now: number): boolean {
   return last === null || now < last || now - last >= TEACHING_EVERY_MS
+}
+
+/** The table of episodes is looked at again at most this often (milliseconds). */
+export const AHEAD_EVERY_MS = 60 * 1000
+
+/** Whether the table of episodes may be looked at again: the first time, or a minute since. */
+export function dueForAhead(last: number | null, now: number): boolean {
+  return last === null || now < last || now - last >= AHEAD_EVERY_MS
+}
+
+/** What the table of episodes needs of one episode of the library (see `StoredEpisode`). */
+export type AheadEpisode = {
+  id: string
+  guid: string
+  title: string
+  played: boolean
+  archived: boolean
+}
+
+/** The newest episodes of each show that the Mac's marks may be for (it marks 8 a night). */
+export const AHEAD_PER_SHOW = 12
+
+/** The most episodes in the table; the phone keeps at most 500 (`AheadEpisodes.most`). */
+export const AHEAD_MOST = 400
+
+/**
+ * The table that tells the native side which episode is which of the Mac's marks, as JSON text
+ * (`{"<episode id>": {"feed", "guid", "title"}}`, keys in order, so a table that did not change
+ * reads the same): the newest unplayed, unarchived episodes of each show with a feed. The marks
+ * name an episode by its guid, or by its feed and title when it has no guid, and the native side
+ * knows an episode only by its id. `episodes` are by show id, newest first.
+ */
+export function aheadEpisodesText(
+  shows: readonly { id: string; feedUrl: string }[],
+  episodes: Readonly<Record<string, readonly AheadEpisode[]>>,
+): string {
+  const table: Record<string, { feed: string; guid: string; title: string }> =
+    {}
+  for (const show of feedShows(shows)) {
+    const next = (episodes[show.id] ?? [])
+      .filter((episode) => !episode.played && !episode.archived)
+      .slice(0, AHEAD_PER_SHOW)
+    for (const episode of next) {
+      if (Object.keys(table).length >= AHEAD_MOST) break
+      table[episode.id] = {
+        feed: show.feedUrl,
+        guid: episode.guid,
+        title: episode.title,
+      }
+    }
+  }
+  const sorted: typeof table = {}
+  for (const id of Object.keys(table).sort()) {
+    const facts = table[id]
+    if (facts) sorted[id] = facts
+  }
+  return JSON.stringify(sorted)
 }
 
 /** What the phone says about the small model it has. */

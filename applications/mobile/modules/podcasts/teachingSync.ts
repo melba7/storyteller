@@ -10,10 +10,13 @@ import { LofiScore } from "@/modules/lofi-score"
 
 import { type AppleExport, parseAppleExport } from "./applePodcasts"
 import { onLibraryChanged } from "./changes"
-import { listShows } from "./db"
+import { listEpisodes, listShows } from "./db"
 import { Podcasts } from "./index"
+import { type StoredEpisode } from "./library"
 import {
   TEACHING_LIST_FILE,
+  aheadEpisodesText,
+  dueForAhead,
   filesToFetch,
   parseTeachingList,
   parseTeachingState,
@@ -22,6 +25,11 @@ import {
 
 const APPLE_FILE = "Podcasts/apple-podcasts.json"
 let sentShows: string | null = null
+let sentEpisodes: string | null = null
+let lastEpisodesLook: number | null = null
+// Whether the Mac has published marks of the night before (`ahead-ads.json`): only then is the
+// table of episodes worth sending.
+let aheadWanted = false
 let watching = false
 // The files the phone refused in this launch, by name, with the checksum that was refused.
 const refused: Record<string, string> = {}
@@ -46,7 +54,26 @@ export async function sendTeachingShows(): Promise<void> {
   sentShows = text
 }
 
-/** Sends the table again whenever the followed shows change. Starts once. */
+/**
+ * Tells the native side which episode is which (feed, guid and title by episode id), so the Mac's
+ * marks of the night before find theirs. Only once the Mac has published marks, and at most once
+ * a minute unless `force` says the marks have just come.
+ */
+export async function sendAheadEpisodes(force = false): Promise<void> {
+  if (!Podcasts || !aheadWanted) return
+  const now = Date.now()
+  if (!force && !dueForAhead(lastEpisodesLook, now)) return
+  lastEpisodesLook = now
+  const shows = await listShows()
+  const episodes: Record<string, StoredEpisode[]> = {}
+  for (const show of shows) episodes[show.id] = await listEpisodes(show.id)
+  const text = aheadEpisodesText(shows, episodes)
+  if (text === sentEpisodes) return
+  await Podcasts.setAheadEpisodes(text)
+  sentEpisodes = text
+}
+
+/** Sends the tables again whenever the library changes. Starts once. */
 export function watchTeachingShows(): void {
   if (watching) return
   watching = true
@@ -56,6 +83,9 @@ export function watchTeachingShows(): void {
         "Couldn't tell the phone which feeds are which shows",
         cause,
       ),
+    )
+    sendAheadEpisodes().catch((cause) =>
+      console.warn("Couldn't tell the phone which episodes are which", cause),
     )
   })
 }
@@ -67,8 +97,10 @@ export async function syncTeaching(): Promise<void> {
   if (read.status !== "found") return
   const list = parseTeachingList(read.text)
   if (list === null) return
-  // The table goes first, so a file that names shows is converted the moment it is installed.
+  // The tables go first, so a file that names shows or episodes is read the moment it is installed.
   await sendTeachingShows()
+  aheadWanted = list["ahead-ads.json"] !== undefined
+  await sendAheadEpisodes(true)
   const state = parseTeachingState(await Podcasts.getTeachingState())
   for (const name of filesToFetch(list, state.installed, refused)) {
     const listed = list[name]

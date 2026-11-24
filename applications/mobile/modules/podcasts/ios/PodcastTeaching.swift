@@ -1,9 +1,10 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // What the Mac taught the phone, kept in `Podcasts/teaching/`: the small model, the library of
-// ads, the shows' habits, the table of feeds and the sounds. It is read the first time something
-// asks and again after each install, only from a background task: the head scan, the ad finder
-// and the module's own async functions. A missing or broken file is simply nothing taught.
+// ads, the shows' habits, the table of feeds, the Mac's marks of the night before (and the table
+// of episodes that tells which episode is which mark) and the sounds. It is read the first time
+// something asks and again after each install, only from a background task: the head scan, the
+// ad finder and the module's own async functions. A missing or broken file is simply nothing taught.
 // The rules (the shapes of the files, the table, the state) are PodcastAds and PodcastAudioMatch.
 import Foundation
 import PodcastAds
@@ -23,6 +24,8 @@ final class PodcastTeaching: @unchecked Sendable {
   private struct Taught {
     var files: TeachingFiles
     var sounds: AdSoundLibrary
+    /// What the app told of its episodes (guid, feed, title), to find an episode's Mac marks.
+    var episodes: [String: AheadEpisodes.Facts]
   }
 
   private let lock = NSLock()
@@ -47,7 +50,8 @@ final class PodcastTeaching: @unchecked Sendable {
       let folder = Self.folder
       let loaded = Taught(
         files: TeachingFiles.load(folder: folder, now: Date(), shows: TeachingShows.load(from: folder)),
-        sounds: AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName)))
+        sounds: AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName)),
+        episodes: AheadEpisodes.load(from: folder))
       taught = loaded
       return loaded
     }
@@ -94,6 +98,31 @@ final class PodcastTeaching: @unchecked Sendable {
         return true
       } catch {
         NSLog("Podcasts: the table of shows could not be saved: \(error)")
+        return false
+      }
+    }
+  }
+
+  /// The Mac's marks of the night before for an episode of the app (`ahead-ads.json`, found by the
+  /// episode's guid, or its feed and title, from the table the app sent), or nil.
+  func aheadEntry(episode: String, now: Date = Date()) -> AheadEntry? {
+    let taught = read()
+    return taught.files.aheadEntry(episode: episode, table: taught.episodes, now: now)
+  }
+
+  /// Saves what the app knows of its episodes (`{"<episode id>": {"feed", "guid", "title"}}`). A
+  /// text that is not such an object, or a table that is the one saved already, changes nothing.
+  /// True when the table changed.
+  func setAheadEpisodes(json: String) -> Bool {
+    guard let table = AheadEpisodes.parse(json) else { return false }
+    return lock.withLock {
+      guard table != AheadEpisodes.load(from: Self.folder) else { return false }
+      do {
+        try AheadEpisodes.save(table, to: Self.folder)
+        taught = nil
+        return true
+      } catch {
+        NSLog("Podcasts: the table of episodes could not be saved: \(error)")
         return false
       }
     }
