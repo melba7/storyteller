@@ -26,7 +26,8 @@ shift
 echo "python3 $script $*" >> "$CALLS"
 if [ -n "$REAL_STORE" ]; then
   [ "$script" = teach_store.py ] && exec "$REAL_PYTHON" "$REAL_STORE" "$@"
-  "$REAL_PYTHON" "$REAL_STORE" busy "$PROBE" > /dev/null
+  # The probe plays a stranger: without the marker that `hold` gives the tools it started.
+  env -u TEACH_LOCK_HELD "$REAL_PYTHON" "$REAL_STORE" busy "$PROBE" > /dev/null
   echo "lock-during $script $?" >> "$CALLS"
 fi
 key="$script"

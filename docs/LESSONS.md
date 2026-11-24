@@ -215,3 +215,10 @@ One line per lesson.
 - Docker run logs in the scratchpad lag: read the exit line, not the tail. A
   `for ... in infiniteSequence where cond` loop never ends: run swift test with
   a timeout (2026-11-24).
+- A lock held around a job whose tools take the same lock themselves refuses
+  them all, because flock belongs to each opened copy of the file: the nightly
+  read-ahead would have done nothing every night and logged "skipped". Its shell
+  test used stubs and missed it. `hold` now tells the tools it started by the
+  environment (`TEACH_LOCK_HELD`), and a test runs the real tool under it. Test
+  the real tool, not a stub, wherever a lock or a file handle crosses a process
+  (2026-11-24).

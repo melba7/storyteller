@@ -2,9 +2,12 @@
 (never one that is marked, in the teaching set, in the exam or on the shelf), the weekly budget, the
 episodes that get audio, and a night with nothing to do. No network, no Claude, no iCloud: the
 folders are made up. Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
+import contextlib
+import io
 import json
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 from unittest import mock
@@ -238,6 +241,20 @@ class PickTests(Setup):
         with store.run_lock(self.folder):
             self.assertEqual(self.run_command(), 3)
         self.assertEqual(self.picked_guids(), [])
+
+
+    def test_the_real_tool_started_under_hold_is_not_refused_by_its_own_parent(self):
+        # The nightly job runs every step under `teach_store.py hold`, and this tool takes the lock
+        # itself: it must not answer "Busy" (which also ends the night as "nothing to do").
+        self.write_queue([queued(1), queued(2)])
+        said = io.StringIO()
+        tool = os.path.join(os.path.dirname(os.path.abspath(__file__)), "teach_ahead.py")
+        with contextlib.redirect_stdout(said):
+            code = store.hold(self.folder, [sys.executable, tool, "pick", "--folder", self.folder,
+                                            "--budget", "ahead-2026-W48", "--queue", os.path.join(
+                                                self.icloud, "Podcasts", "phone-queue.json")])
+        self.assertEqual(code, 0, said.getvalue())
+        self.assertEqual(self.picked_guids(), ["guid-1", "guid-2"])
 
 
 class BudgetTests(Setup):
