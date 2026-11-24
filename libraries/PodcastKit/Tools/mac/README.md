@@ -861,12 +861,61 @@ to copy into iCloud Drive, give `/bin/bash` Full Disk Access once, as in "Set it
 up once" above. The job runs the files in the folder you installed it from, so
 install it again if you move that folder.
 
+### The nightly read-ahead
+
+`Install nightly read-ahead.command` sets up a job that runs `teach-ahead.sh`
+every night at 2:00, so the phone knows where the ads are in the episodes you
+are about to play before you press play. It first says what it will do, names
+the weekly cap and asks you to type `yes`, and installs nothing otherwise.
+
+Each night the job does this:
+
+1. The phone writes `Podcasts/phone-queue.json` into its linked folder: your Up
+   Next episodes in order, then the newest unplayed episode of each show you
+   played in the last 14 days, 12 at most, never a show with ad skipping off.
+   The job reads the iCloud copy first, then the Mac's own copy.
+2. It picks up to 8 episodes that are not marked yet (not in the teaching set,
+   and not an episode picked on an earlier night), in the phone's order.
+3. It downloads them and writes down what is said, with the same tools as the
+   weekly job (`teach_collect.py`, `teach_transcribe.py`, both with
+   `--only-ahead` so they leave the other episodes alone).
+4. It has Claude mark the ads (`teach_label.py --only-ahead`). This is the only
+   step that uses your Claude plan. Each week has its own budget,
+   `ahead-<year>-W<week>`, with a hard stop at
+   $10: an episode is expected to
+   cost about $0.19, and the marking stops
+   before a call that would pass the cap, says so in the log and starts again
+   the next week. An episode that fails to mark is skipped.
+5. It writes `ahead-ads.json` (the ads of the last 14 days' episodes, told in
+   words, with start and end times) and copies it to the phone's folders with
+   `teach_publish.py`, the way the weekly job does.
+
+The marked episodes join the teaching set with their labels, so the weekly run
+learns from them, but they are never put on the shelf or in the exam
+(`ahead.json` lists them). A night with no list from the phone, nothing new in
+it, no budget left or no network ends quietly with one line in the log and exit
+status 0. If another teaching run is working in the folder, the job says so and
+ends. Change the limits with `TEACH_AHEAD_CAP` (dollars a week),
+`TEACH_AHEAD_ESTIMATE` (dollars an episode), `TEACH_AHEAD_MOST` (episodes a
+night) and `TEACH_MAX_GB`.
+
+The Mac has to be on or asleep at 2:00, not shut down. Give `/bin/bash` Full
+Disk Access once, as in "Set it up once" above, so the job can read and write
+the phone's iCloud folder. Double-click the installer again to replace the job
+(it never makes two), and `Stop nightly read-ahead.command` to turn it off;
+marks already made stay. The job runs the files in the folder you installed it
+from, so install it again if you move that folder.
+
 ### The logs
 
 - `~/Storyteller Lofi/logs/podcast-teaching.log`: what every window and the
   weekly job printed, with a dated heading for each run.
 - `~/Storyteller Lofi/logs/podcast-teaching-weekly.log`: what launchd saw from
   the weekly job.
+- `~/Storyteller Lofi/logs/podcast-read-ahead.log`: what the nightly read-ahead
+  printed, with a dated heading for each night.
+- `~/Storyteller Lofi/logs/podcast-read-ahead-job.log`: what launchd saw from
+  the nightly job.
 
 ### Tests
 

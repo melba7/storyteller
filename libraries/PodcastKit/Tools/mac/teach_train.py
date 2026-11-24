@@ -22,6 +22,8 @@ phone and lives in teach_features.py.
 - The sealed exam (exam.json, see teach_exam.py) is invisible here: an exam episode is never trained
   on and never put on the shelf, an episode that repeats one is left out of training like one that
   repeats a shelf episode, and the tool says how many exam episodes it left out.
+- The episodes of the nightly read-ahead (ahead.json, see teach_ahead_set.py) are learned from like
+  any marked episode, but are never put on the shelf.
 - With --fit-tool (the built `podcast-teach`) the file is version 2: the features of version 1 plus
   the word pairs of the neighbouring lines, in 4194304 buckets, checked with the version 2 decoder
   (see teach_features.py and teach_spans.py). The weights are fitted by `podcast-teach fit` (L-BFGS,
@@ -60,6 +62,7 @@ from array import array
 import teach_segments as seg
 import teach_store
 import teach_fit
+from teach_ahead_set import ahead_ids
 from teach_exam import read_exam
 from teach_model import (BIAS_BUCKET, BIAS_NONE, MAX_BUCKETS, MAX_BUCKETS_V2, MAX_BYTES,  # noqa: F401
                          THRESHOLDS, build_model, ranked_buckets, write_text)
@@ -288,7 +291,8 @@ def main(argv, say=print, now=None):
             found = load_episode(folder, options.labels, entry, say, version, size)
             if found:
                 episodes[entry["id"]] = found
-        shelf = choose_shelf(entries, set(episodes), old_shelf)
+        # The nightly read-ahead's episodes (ahead.json) are learned from, but never put on the shelf.
+        shelf = choose_shelf(entries, set(episodes) - ahead_ids(folder), old_shelf)
         on_shelf = set(shelf)
         shelved = [e for i, e in episodes.items() if i in on_shelf]
         learning = [e for i, e in episodes.items() if i not in on_shelf]
