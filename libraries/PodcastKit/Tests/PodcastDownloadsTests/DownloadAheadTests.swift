@@ -219,4 +219,57 @@ final class DownloadAheadTests: XCTestCase {
     let result = plan(four.map { item($0) }, playing: "z", entries: kept)
     XCTAssertEqual(result, DownloadAhead.Plan(start: ["b"], adopt: [], drop: []))
   }
+
+  // MARK: When Wi-Fi comes back
+
+  func testAnEpisodeQueuedAwayFromWiFiStartsOnceWiFiReturns() {
+    var watch = DownloadAhead.NetworkWatch()
+    let queued = four.map { item($0) }
+    // Queued on the way home: the look at Up Next finds nothing it may start.
+    XCTAssertFalse(watch.reported(onWiFi: false, lowData: false))
+    XCTAssertEqual(plan(queued, onWiFi: false).start, [])
+    // Home again: the report says to look, and the look starts the next two.
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+    XCTAssertEqual(plan(queued, onWiFi: true).start, ["a", "b"])
+  }
+
+  func testTheLookHappensOnceWhenWiFiReturnsNotOnEveryReport() {
+    var watch = DownloadAhead.NetworkWatch()
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+    // The same network reported again (the phone does this when anything about it changes).
+    XCTAssertFalse(watch.reported(onWiFi: true, lowData: false))
+    XCTAssertFalse(watch.reported(onWiFi: true, lowData: false))
+    // Gone and back: once more.
+    XCTAssertFalse(watch.reported(onWiFi: false, lowData: false))
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+  }
+
+  func testNothingIsLookedAtWhileTheNetworkStaysOneThatFetchesNothing() {
+    var watch = DownloadAhead.NetworkWatch()
+    // Mobile data, then none at all.
+    XCTAssertFalse(watch.reported(onWiFi: false, lowData: false))
+    XCTAssertFalse(watch.reported(onWiFi: false, lowData: true))
+    XCTAssertFalse(watch.reported(onWiFi: false, lowData: false))
+  }
+
+  func testLowDataModeBeingTurnedOffCountsAsTheNetworkComingBack() {
+    var watch = DownloadAhead.NetworkWatch()
+    // On Wi-Fi in Low Data Mode, where nothing starts, so there is nothing to look at.
+    XCTAssertFalse(watch.reported(onWiFi: true, lowData: true))
+    XCTAssertEqual(plan(four.map { item($0) }, lowData: true).start, [])
+    // Turned off: now there is.
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+    // Turned on again and off again: once more.
+    XCTAssertFalse(watch.reported(onWiFi: true, lowData: true))
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+  }
+
+  func testTheFirstReportOnWiFiAfterTheAppOpensIsALook() {
+    // The network is not known until the first report, so an app that opens at home has only
+    // looked at Up Next with no Wi-Fi so far.
+    var watch = DownloadAhead.NetworkWatch()
+    XCTAssertTrue(watch.reported(onWiFi: true, lowData: false))
+    var away = DownloadAhead.NetworkWatch()
+    XCTAssertFalse(away.reported(onWiFi: false, lowData: false))
+  }
 }
