@@ -1437,7 +1437,7 @@ written here and the idea goes under Later.
     its answers become questions by default (W3b below). The head scan's wait
     for the model costs 3 breaks as a stream (112 against 109 without the wait).
     The 19 unmarked stretches are not read yet.
-- [ ] **W3b Apple's model asks and does not skip** (phone and Mac settings,
+- [x] **W3b Apple's model asks and does not skip** (phone and Mac settings,
       small): a finder `apple-model` in `ShowTuning` with the built-in default
       `ask`, applied to Apple's list before the join as for the other finders,
       the head scan not waiting for the model unless it may skip, the
@@ -1493,12 +1493,12 @@ written here and the idea goes under Later.
 
 **2. The Mac reads ahead** (about $0.19 an episode of Mo's Claude plan)
 
-- [ ] **W6 The phone tells the Mac what is next** (phone, small):
+- [x] **W6 The phone tells the Mac what is next** (phone, small):
       `Podcasts/phone-queue.json` in the linked folder: Up Next in order, then
       the newest unplayed episode of each show played in the last 14 days, 12 at
       most, each with feed, guid, title and audio address.
   - Files: `modules/podcasts/phoneQueue.ts` with tests, `phoneNotesSync.ts`.
-- [ ] **W7 The nightly job** (Mac): `teach-ahead.sh`, made like
+- [x] **W7 The nightly job** (Mac): `teach-ahead.sh`, made like
       `teach-weekly.sh`: a launchd job at 2:00 at night reads the queue,
       downloads at most 8 episodes it has not marked, writes them down, has
       Claude mark them (budget `ahead-<year>-W<week>`, a hard stop at the weekly
@@ -1509,7 +1509,7 @@ written here and the idea goes under Later.
     yes. I ask before I leave it for him.
   - Files: `Tools/mac/teach-ahead.sh`, `teach_ahead.py`, two launchers (install,
     stop), `teach_publish.py`, the Mac README.
-- [ ] **W8 The phone uses the marks, tested on the bar**: `AheadAds`, a finder
+- [x] **W8 The phone uses the marks, tested on the bar**: `AheadAds`, a finder
       named "ahead", looks for an episode's start and end words in its
       transcript (the whole file and the head of a stream) and gives the ad with
       Claude's edges. Words, not times, because the phone's copy can carry other
@@ -1558,9 +1558,17 @@ round. The largest thing left is exact edges for inserted spots: the second
 download moved 159 of the shelf's 326 paid spots, so a second copy on the phone
 (idea 5, not on Mo's card) is the next candidate.
 
+Mo's answers (2026-11-24): the nightly cap is
+$10 a week (about 50 episodes), 8
+a night, a hard stop. He chose "Two big runs, then $10
+a week": two big teaching runs of up to
+$95 each a few days apart, then the nightly marking as
+maintenance. The exam (W9, up to $18,
+his typed yes) moves to about 2026-12-03, after the second run plus three days.
+
 Questions only Mo can answer:
 
-1. The nightly cap. Recommended: $10 a week (about 50 episodes), 8 a night.
+1. (answered) The nightly cap.
 2. May I leave "Install nightly read-ahead.command" for his double-click when W7
    is checked? Recommended: yes.
 3. Do end-of-show "subscribe, rate us" count as ads? Open since round A.
@@ -1568,6 +1576,24 @@ Questions only Mo can answer:
 4. One tap on "Send skip log" in 35.1, only if W1 finds no diary on the Mac.
 
 ## Later
+
+- Ad skipping to 95%, round B (2026-11-24), found and not fixed: at the `off`
+  level a show still gets a whole-episode run of Apple's model (battery); skip
+  the model at `off` but save the final file with the model version. A per-show
+  `skip` for the Apple finder can never happen, because `teach_settings.py`
+  needs 3 scored episodes of a show and the shelf holds one per show (score the
+  training set per show, or document it). Four files grew over 300 lines:
+  `PodcastStreamHead` 480, `PodcastAdFinder+New` 322, `AdScoreCommand` 318,
+  `teach_settings.py` 348. The old phone parser ignores `apple-model`, so a Mac
+  setting for it only reaches phones that have this round's build. Half of the
+  late starts are 18 to 97 s late, out of the edge snap's reach: a trained edge
+  score is the one more try. The weekly run also marks and downloads ahead
+  episodes that are left unmarked, and ahead audio is never deleted, so the
+  nightly fills the 12 GB audio limit the big runs share within weeks: delete
+  ahead audio after its marks are written. `AheadFile.entry` matches on the guid
+  alone (feeds with numeric guids can collide, though the words must still
+  match). Up Next episodes the weekly run already marked are never sent to the
+  phone.
 
 - Ad skipping to 95%, round A (2026-11-23), found and not fixed: the new word
   model's skips land more than 5 seconds past the ad in about 27 of 226 breaks
