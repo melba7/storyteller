@@ -199,8 +199,19 @@ One line per lesson.
   TestFlight build, but the build had started and uploaded. Read the logs on the
   Mac before offering another way to start a job: a second start would have run
   two builds at once (2026-11-23).
-- Apple's on-device model made the phone worse when the scorecard finally scored it (2026-11-24): never leave a finder on skip without its own scorecard row, and say which finders a number leaves out. I told Mo 64% before the Apple row was scored.
-- Python tests need 15 GB free disk (teach_collect's keep-free default): they failed at 14 GB after Docker volumes piled up. Prune unused volumes before a full check (2026-11-24).
-- Two builders that add a file with the same name to two branches make an add/add conflict at the merge: tell each builder its own test file names, and read the merged tests by hand (2026-11-24).
-- A tool a builder changed in one branch (teach_publish.py's list of files) changes tests in another: after a merge, run the whole Python suite, not just the new files (2026-11-24).
-- Docker run logs in the scratchpad lag: read the exit line, not the tail. A `for ... in infiniteSequence where cond` loop never ends: run swift test with a timeout (2026-11-24).
+- Apple's on-device model made the phone worse when the scorecard finally scored
+  it (2026-11-24): never leave a finder on skip without its own scorecard row,
+  and say which finders a number leaves out. I told Mo 64% before the Apple row
+  was scored.
+- Python tests need 15 GB free disk (teach_collect's keep-free default): they
+  failed at 14 GB after Docker volumes piled up. Prune unused volumes before a
+  full check (2026-11-24).
+- Two builders that add a file with the same name to two branches make an
+  add/add conflict at the merge: tell each builder its own test file names, and
+  read the merged tests by hand (2026-11-24).
+- A tool a builder changed in one branch (teach_publish.py's list of files)
+  changes tests in another: after a merge, run the whole Python suite, not just
+  the new files (2026-11-24).
+- Docker run logs in the scratchpad lag: read the exit line, not the tail. A
+  `for ... in infiniteSequence where cond` loop never ends: run swift test with
+  a timeout (2026-11-24).
