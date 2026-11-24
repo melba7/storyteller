@@ -14,6 +14,9 @@ failed three times is left out (--retry-failed asks for those again) and the clo
 many. Only one run works in the folder at a time.
 
   teach_transcribe.py --tool PATH [--folder F] [--locale en-US] [--limit N] [--retry-failed]
+                      [--only-ahead]
+
+--only-ahead writes down only the episodes in ahead.json (the nightly read-ahead, teach_ahead.py).
 
 Exit codes: 0 everything pending was done (or nothing was), 2 something is not set up (no
 episodes.json, a damaged one, the tool is missing or not a program, or another run is working in
@@ -26,8 +29,10 @@ import subprocess
 import sys
 import time
 
+from teach_ahead_set import ahead_ids
 from teach_failures import IN_A_ROW, Failures, given_up_line
-from teach_store import FOLDER, MANIFEST, Busy, ManifestError, load_manifest, run_lock
+from teach_store import (FOLDER, MANIFEST, Busy, ManifestError, Problem, load_manifest,
+                         run_lock)
 
 LOCALE = "en-US"
 TIMEOUT = 3 * 60 * 60
@@ -79,12 +84,13 @@ def how_long(seconds):
 
 
 def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic, say=print,
-        retry_failed=False):
+        retry_failed=False, only=None):
     """Transcribes the pending episodes, never-failed ones first, at most `limit` of them (None for
     all). Answers {"done", "failed", "left", "given_up", "stopped"}: `left` is how many of this
     run's episodes are still pending, `given_up` how many were left out after three failures and
-    `stopped` is True when three failures in a row ended the run."""
-    episodes = load_manifest(folder)
+    `stopped` is True when three failures in a row ended the run. With `only` (a set of ids) only
+    those episodes are looked at."""
+    episodes = [e for e in load_manifest(folder) if only is None or e["id"] in only]
     failures = Failures(folder, "transcribe")
     todo, given_up = failures.split(pending(folder, episodes), retry_failed, lambda entry: entry["id"])
     if limit is not None:
@@ -133,6 +139,7 @@ def main(argv=None, runner=subprocess.run, clock=time.monotonic, say=print):
     parser.add_argument("--locale", default=LOCALE)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--retry-failed", action="store_true")
+    parser.add_argument("--only-ahead", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     tool = os.path.expanduser(args.tool)
@@ -145,8 +152,9 @@ def main(argv=None, runner=subprocess.run, clock=time.monotonic, say=print):
     try:
         with run_lock(folder):
             result = run(folder, tool, args.locale, args.limit, runner=runner, clock=clock, say=say,
-                         retry_failed=args.retry_failed)
-    except Busy as error:
+                         retry_failed=args.retry_failed,
+                         only=ahead_ids(folder) if args.only_ahead else None)
+    except (Busy, Problem) as error:
         say(str(error))
         return 2
     except ManifestError as error:

@@ -171,7 +171,8 @@ join, because a joined ad loses its `source`.
 The teaching folder is `~/Storyteller Lofi/PodcastTeaching` on the Mac. It is
 never committed. `teach_publish.py` copies seven files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
-the phone has linked.
+the phone has linked. It also copies `ahead-ads.json` (see "The nightly
+read-ahead" below) when the nightly job has made one.
 
 | File                 | Made by                 | Holds                                                |
 | -------------------- | ----------------------- | ---------------------------------------------------- |
@@ -240,6 +241,33 @@ under 4.5 MB (the phone refuses a file over 5 MB).
 An episode's length is the same number everywhere (the trainer, the scorecard
 and the phone's end-of-episode feature): `seconds` from `episodes.json` when it
 is above zero, otherwise the start of the last line.
+
+**The nightly read-ahead.** The phone and the Mac talk through two more files in
+`Podcasts/`. Both are JSON objects with `"version": 1`.
+
+- `phone-queue.json`, written by the phone (`phoneQueue.ts`, at app start and
+  when the app returns to the foreground, only when the list changed):
+  `{"version", "writtenAt", "episodes": [{"feed", "guid", "title", "show", "audio", "reason": "upNext" | "newest", "rank"}]}`.
+  It lists the Up Next episodes in order, then the newest unplayed episode of
+  each show played in the last 14 days, 12 at most, with no show that has ad
+  skipping off, no local file and no duplicate. `rank` is 0 for the first.
+- `ahead-ads.json`, written by the Mac (`teach_ahead_ads.py`) and published with
+  the other files:
+  `{"version", "writtenAt", "episodes": [{"feed", "guid", "title", "marked", "ads": [{"kind": "ad" | "promo" | "ownPlug", "confidence", "start", "end", "startWords", "endWords"}]}]}`.
+  `feed` and `guid` are the phone's own spelling from its list, `start` and
+  `end` are seconds, and `startWords` and `endWords` are the first and last 40
+  words of the ad so the phone can find the spot in its own transcript. It holds
+  the episodes marked in the last 14 days (`marked` is when) and stays under the
+  4.5 MB limit. Credits are left out. The phone does not read this file yet.
+
+`teach-ahead.sh` (the 2:00 job) picks up to 8 unmarked episodes from the list,
+downloads and writes them down with the weekly tools, has Claude mark them under
+the budget `ahead-<ISO year>-W<ISO week>` with a hard stop at
+$10 a week (each
+episode is expected to cost about $0.19), and publishes
+`ahead-ads.json`. `ahead.json` in the teaching folder lists those episodes: they
+join `episodes.json` with their labels, so the weekly run learns from them, but
+`teach_train.py` never puts them on the shelf and the exam never takes them.
 
 **Shows are named by their feed address in the Mac's files.** The phone names a
 show by its own id. The app tells the native side which feed is which show

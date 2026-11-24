@@ -12,13 +12,16 @@ from teach_failures import Failures
 from teach_store import require_manifest
 
 
-def waiting(folder, labels, only_exam=False):
+def waiting(folder, labels, only_exam=False, only=None):
     """([(entry, lines)], [ids with no usable lines]): the episodes in episodes.json order that
     have a transcript and no label yet. With `only_exam` only the episodes in exam.json, in its
     order, and for the second marking (`labels` is labels-second) only those that already have a
-    first label. Raises Problem when episodes.json or exam.json is missing or damaged."""
+    first label. With `only` (a set of ids) only those episodes. Raises Problem when episodes.json
+    or exam.json is missing or damaged."""
     found, empty = [], []
     items = require_manifest(folder)
+    if only is not None:
+        items = [item for item in items if item["id"] in only]
     if only_exam:
         by_id = {item["id"]: item for item in items}
         items = [by_id[i] for i in teach_exam.read_exam(folder) if i in by_id]
@@ -55,16 +58,18 @@ def counts_text(label):
     return ", ".join(parts) or "no stretches found"
 
 
-def candidates(folder, labels, retry_failed, only_exam=False):
+def candidates(folder, labels, retry_failed, only_exam=False, only=None):
     """(ready, given_up, empty): the waiting episodes in the order to work in (never failed first,
     then fewer failures first), the ones left out after three failures, and ids with no lines."""
-    items, empty = waiting(folder, labels, only_exam)
+    items, empty = waiting(folder, labels, only_exam, only)
     ready, given_up = Failures(folder, "label").split(items, retry_failed, lambda item: item[0]["id"])
     return ready, given_up, empty
 
 
-def cap_text(budget, spent, cap):
+def cap_text(budget, spent, cap, reserve=0):
     if budget:
-        return ("Stopped: the budget \"%s\" has spent $%.2f of $%.2f. Nothing more is marked under it."
-                % (budget.name, spent, cap))
+        more = (", and the next episode would cost about $%.2f more, which would pass the cap" % reserve
+                if reserve and spent < cap else "")
+        return ("Stopped: the budget \"%s\" has spent $%.2f of $%.2f%s. Nothing more is marked under it."
+                % (budget.name, spent, cap, more))
     return "Stopped: the cost so far, $%.2f, reached the cap of $%.2f." % (spent, cap)

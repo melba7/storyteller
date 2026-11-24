@@ -40,6 +40,10 @@ gather that are still waiting too), the other waiting ones after them if the siz
 --max-gb is the limit for all the audio kept in the folder, not for one run, and audio is never
 deleted, so once the folder is full nothing more is downloaded, the wanted episodes included.
 
+--only-ahead is for the nightly read-ahead (teach_ahead.py): it reads no feed and downloads only the
+episodes in ahead.json that have no file yet, with the same size and disk limits. Nothing else in
+episodes.json is touched.
+
 --list only reads the feeds and says what a run would download. Exit codes: 0 it ran, 2 the shows
 file cannot be read, the folder cannot be written, episodes.json is damaged or another run is
 working in the folder, 3 it ran but the size limit stopped downloads that were waiting.
@@ -56,6 +60,7 @@ import teach_fetch as fetching
 import teach_exam
 import teach_store
 import teach_wanted
+from teach_ahead_set import ahead_ids
 from teach_wanted import wanted_entries
 from teach_feed import audio_name, episode_id, feed_episodes
 from teach_store import (FIELDS, FOLDER, MANIFEST, Busy, ManifestError, check_entry,  # noqa: F401
@@ -156,7 +161,7 @@ def refresh(entries, listed):
 def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.fetch_feed,
             download=fetching.download, free_space=lambda path: shutil.disk_usage(path).free,
             pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE,
-            wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST):
+            wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST, only=None):
     """Adds the new episodes to episodes.json and downloads every entry that has no file yet, in
     list order (with `exam`, the exam's episodes first). Stops before a download that would take the audio on disk over `max_bytes`, or
     when the free disk space, less the file about to come (the feed's size, when known), is under
@@ -166,7 +171,8 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     "failed", "skipped", "waiting", "files", "bytes", "why"}, `why` being "size", "space" or None.
     With `exam`, the wanted list is ignored and only the episodes that teach_exam.pick_new takes are
     added; their ids go into exam.json before episodes.json is saved and before any download, and
-    the downloads start with the exam's episodes."""
+    the downloads start with the exam's episodes. With `only` (a set of ids) only those episodes are
+    downloaded, and `shows` is normally empty so no feed is read."""
     entries = load_manifest(folder)
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     stats = {}
@@ -187,6 +193,8 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     # not to episodes that were still waiting from an earlier run.
     exam_ids = set(teach_exam.read_exam(folder)) if exam else set()
     order = [e for e in entries if e["id"] in exam_ids] + [e for e in entries if e["id"] not in exam_ids]
+    if only is not None:
+        order = [e for e in order if e["id"] in only]
     for position, entry in enumerate(order):
         if entry["file"] or is_skipped(entry):
             continue
@@ -259,11 +267,12 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
     parser.add_argument("--wanted", type=int, default=WANTED)
     parser.add_argument("--exam", action="store_true")
     parser.add_argument("--exam-most", type=positive, default=teach_exam.MOST)
+    parser.add_argument("--only-ahead", action="store_true")
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     try:
-        shows = probe.load_shows(args.shows)
+        shows = [] if args.only_ahead else probe.load_shows(args.shows)
     except (OSError, ValueError, AttributeError, TypeError) as error:
         say("Could not read your followed shows from %s: %s" % (args.shows, error))
         return 2
@@ -272,12 +281,15 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
             return list_command(folder, shows, args.per_show, fetch, sleep, say, args.wanted,
                                 args.exam, args.exam_most)
         with run_lock(folder):
-            say("Reading the feeds of %d shows..." % len(shows))
+            say("Downloading tonight's episodes..." if args.only_ahead
+                else "Reading the feeds of %d shows..." % len(shows))
             result = collect(folder, shows, args.per_show, int(args.max_gb * GB),
                              int(args.keep_free_gb * GB), fetch=fetch, download=download,
                              sleep=sleep, say=say,
-                             wanted=() if args.exam else teach_wanted.load_wanted(folder, say),
-                             wanted_most=args.wanted, exam=args.exam, exam_most=args.exam_most)
+                             wanted=() if args.exam or args.only_ahead
+                             else teach_wanted.load_wanted(folder, say),
+                             wanted_most=args.wanted, exam=args.exam, exam_most=args.exam_most,
+                             only=ahead_ids(folder) if args.only_ahead else None)
     except (Busy, teach_store.Problem) as error:
         say(str(error))
         return 2
