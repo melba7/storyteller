@@ -161,24 +161,37 @@ export const AHEAD_MOST = 400
  * reads the same): the newest unplayed, unarchived episodes of each show with a feed. The marks
  * name an episode by its guid, or by its feed and title when it has no guid, and the native side
  * knows an episode only by its id. `episodes` are by show id, newest first.
+ *
+ * `queue` is the episodes of the phone's list for the Mac (`Podcasts/phone-queue.json`, by feed
+ * and guid). The Mac marks only those, and an Up Next episode may be older than the newest few of
+ * its show, so they are always in the table, played or not, and they go in first so a full table
+ * never drops one.
  */
 export function aheadEpisodesText(
   shows: readonly { id: string; feedUrl: string }[],
   episodes: Readonly<Record<string, readonly AheadEpisode[]>>,
+  queue: readonly { feed: string; guid: string }[] = [],
 ): string {
   const table: Record<string, { feed: string; guid: string; title: string }> =
     {}
-  for (const show of feedShows(shows)) {
+  const own = feedShows(shows)
+  const add = (feed: string, episode: AheadEpisode) => {
+    table[episode.id] = { feed, guid: episode.guid, title: episode.title }
+  }
+  const listed = new Set(queue.map((one) => `${one.feed}\n${one.guid}`))
+  for (const show of own) {
+    for (const episode of episodes[show.id] ?? []) {
+      if (listed.has(`${show.feedUrl}\n${episode.guid}`))
+        add(show.feedUrl, episode)
+    }
+  }
+  for (const show of own) {
     const next = (episodes[show.id] ?? [])
       .filter((episode) => !episode.played && !episode.archived)
       .slice(0, AHEAD_PER_SHOW)
     for (const episode of next) {
       if (Object.keys(table).length >= AHEAD_MOST) break
-      table[episode.id] = {
-        feed: show.feedUrl,
-        guid: episode.guid,
-        title: episode.title,
-      }
+      add(show.feedUrl, episode)
     }
   }
   const sorted: typeof table = {}
