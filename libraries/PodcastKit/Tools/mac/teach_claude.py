@@ -6,6 +6,7 @@ Standard library only. teach_label.py uses it.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
+import math
 import os
 import re
 import subprocess
@@ -36,8 +37,12 @@ class SignedOut(UsageLimit):
 
 
 class ClaudeError(RuntimeError):
-    """A failed run; `cost` is what the run cost anyway, in dollars (0 when unknown)."""
+    """A failed run; `cost` is what the run cost anyway, in dollars (0 when unknown).
+    `cost_unknown` is True when the run could not tell what it cost (it timed out, or ended without
+    printing its cost) although it may have used some of the plan's allowance; a caller that wants a
+    safe count may then use the cost it expects of one call instead (teach_label.py --reserve)."""
     cost = 0.0
+    cost_unknown = False
 
 
 def find_claude(environment, extra_folders=EXTRA_FOLDERS):
@@ -78,18 +83,29 @@ def printed_result(output):
     return None
 
 
-def failure(error_class, message, cost=0.0):
+def failure(error_class, message, cost=0.0, unknown=False):
     error = error_class(message)
     error.cost = cost
+    error.cost_unknown = unknown
     return error
+
+
+def reported_cost(value):
+    """The cost claude printed as a number of dollars, or None when it printed none (or something
+    that is not a sane number)."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if math.isfinite(value) and value >= 0 else None
 
 
 def ask_claude(system, prompt, model, claude, runner=subprocess.run, timeout=RUN_SECONDS,
                environment=None, folder=WORKING_FOLDER):
     """One `claude -p` run, started in `folder`. Returns {"text", "cost"}. Raises UsageLimit when
     the usage limit is reached or Claude is not signed in, and ClaudeError (a RuntimeError) for
-    any other failure; both carry `cost`, what the run cost even though it failed. The prompt goes
-    to claude's standard input, never into an argument or an error message."""
+    any other failure; both carry `cost`, what the run cost even though it failed. A run that could
+    not tell its cost (a timeout, no result, a result with no cost) says so: `cost_unknown` on the
+    error, and `"cost_unknown": True` in the answer (which then has `cost` 0). The prompt goes to
+    claude's standard input, never into an argument or an error message."""
     arguments = [claude, "-p", "--output-format", "json", "--no-session-persistence",
                  "--tools", "", "--strict-mcp-config", "--disable-slash-commands",
                  "--model", model, "--system-prompt", system]
@@ -101,7 +117,7 @@ def ask_claude(system, prompt, model, claude, runner=subprocess.run, timeout=RUN
         done = runner(arguments, input=prompt, capture_output=True, encoding="utf-8",
                       env=child_environment, cwd=folder, timeout=timeout)
     except subprocess.TimeoutExpired:
-        raise failure(ClaudeError, "claude took longer than %d seconds" % timeout)
+        raise failure(ClaudeError, "claude took longer than %d seconds" % timeout, unknown=True)
     except OSError as error:
         raise failure(ClaudeError, "claude could not be run: %s" % error)
     result = printed_result(done.stdout or "")
@@ -110,16 +126,19 @@ def ask_claude(system, prompt, model, claude, runner=subprocess.run, timeout=RUN
         detail = (done.stderr or done.stdout or "")[-300:].strip()
         message = "claude exited %s without a result: %s" % (done.returncode, detail)
         kind = SignedOut if is_signed_out(raw) else UsageLimit if is_usage_limit(raw) else ClaudeError
-        raise failure(kind, message)
+        # A limit or a sign-in error used nothing; any other run that died may have.
+        raise failure(kind, message, unknown=kind is ClaudeError)
     text = result.get("result")
-    cost = result.get("total_cost_usd")
-    cost = float(cost) if isinstance(cost, (int, float)) and not isinstance(cost, bool) else 0.0
+    printed = reported_cost(result.get("total_cost_usd"))
+    cost = 0.0 if printed is None else printed
     if result.get("is_error") is True or done.returncode != 0:
         message = text if isinstance(text, str) else result.get("subtype") or \
             "claude -p failed (exit %s)" % done.returncode
         kind = SignedOut if is_signed_out(message) else UsageLimit if is_usage_limit(message) \
             else ClaudeError
-        raise failure(kind, message, cost)
+        raise failure(kind, message, cost, unknown=printed is None and kind is ClaudeError)
     if not isinstance(text, str):
-        raise failure(ClaudeError, "claude printed no answer text", cost)
+        raise failure(ClaudeError, "claude printed no answer text", cost, unknown=printed is None)
+    if printed is None:
+        return {"text": text, "cost": 0.0, "cost_unknown": True}
     return {"text": text, "cost": cost}
