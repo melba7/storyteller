@@ -16,9 +16,13 @@
 # never become shelf or exam episodes (ahead.json).
 # A night with no queue, nothing new in it, no budget left or no audio to work on says so in one line
 # and ends quietly (exit 0). A step that fails is said plainly and the next ones still run when they
-# can; it exits 0 when every step worked. One run at a time is enforced by the tools' lock on the
-# teaching folder. What it prints goes to ~/Storyteller Lofi/logs/podcast-read-ahead.log (and what
-# launchd saw to podcast-read-ahead-job.log).
+# can; it exits 0 when every step worked. It holds the teaching folder's run lock for the whole
+# night (it starts itself again under `teach_store.py hold`, as teach-finish.sh does), so no other
+# run can start between two steps; when another run holds the lock it says so and ends quietly
+# (exit 0). On Sunday it does nothing at all, so it never meets the weekly teaching run, which
+# starts at 3:00 on Sunday morning (teach-weekly.sh). What it prints goes to
+# ~/Storyteller Lofi/logs/podcast-read-ahead.log (and what launchd saw to
+# podcast-read-ahead-job.log).
 #
 # launchd starts jobs with no terminal and a short PATH, so the usual places are added to it. The
 # Mac's bash is 3.2: plain variables only. TEACH_AHEAD_CAP (dollars a week, 10), TEACH_AHEAD_ESTIMATE
@@ -59,17 +63,24 @@ step() {
   return "${PIPESTATUS[0]}"
 }
 
-say "=== $(date '+%Y-%m-%d %H:%M') nightly read-ahead ==="
-
-# Another run in the folder: say so and end quietly.
-python3 -u "$TOOLS/teach_store.py" busy "$FOLDER" > /dev/null 2>&1
-LOCKED="$?"
-if [ "$LOCKED" -eq 3 ]; then
-  say "Another teaching run is already working in the teaching folder, so tonight's read-ahead is skipped."
-  exit 0
-elif [ "$LOCKED" -ne 0 ]; then
-  say "The teaching folder $FOLDER cannot be used, so tonight's read-ahead did not start."
-  exit 1
+# The first start only: say so in the log, skip Sunday, and run the whole night again under the lock.
+if [ -z "$TEACH_HOLDING" ]; then
+  say "=== $(date '+%Y-%m-%d %H:%M') nightly read-ahead ==="
+  # `date +%u` is 1 for Monday and 7 for Sunday.
+  if [ "$(date +%u)" -eq 7 ]; then
+    say "It is Sunday, and the weekly teaching run starts at 3:00 this morning, so tonight's read-ahead is skipped."
+    exit 0
+  fi
+  TEACH_HOLDING=1
+  export TEACH_HOLDING
+  # Not exec: the exit code 3 (another run holds the lock) is turned into a quiet end below.
+  python3 -u "$TOOLS/teach_store.py" hold "$FOLDER" /bin/bash "$0" "$@"
+  HELD="$?"
+  if [ "$HELD" -eq 3 ]; then
+    say "Another teaching run is already working in the teaching folder, so tonight's read-ahead is skipped."
+    exit 0
+  fi
+  exit "$HELD"
 fi
 
 # Exit 3 of teach_ahead.py is "nothing to do tonight", said in one line by the tool itself.
