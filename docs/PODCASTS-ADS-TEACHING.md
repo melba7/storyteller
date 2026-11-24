@@ -420,6 +420,31 @@ and cost the model's time (the wait itself is in the head scan of every row).
 Double-click `Ask Apple's model about the test episodes.command` to ask; it
 costs nothing, uses no Claude allowance and may take a few hours.
 
+### The passage model, a trial
+
+`Tools/mac/teach_passage.py` (the launcher `Teach the passage model.command`)
+tries a small language model, milestone W5 of the plan, and nothing of it is in
+the app. In the Mac's `python-mood` environment it embeds every transcript line
+with `sentence-transformers/all-MiniLM-L6-v2`, takes windows of five lines (two
+before, the line, two after, zeros beyond an episode's edge) and trains a
+softmax regression (numpy, L2, the word model trainer's class weights) on the
+marked episodes that are not on the shelf, not in the exam and not a repeat of
+either. It writes `passage-model.json` for the shelf episodes only:
+`{"version": 1, "model", "decoder": 2, "classes", "thresholds", "trained", "episodes": {"<id>": {"lines": N, "rows": [[5 probabilities], ...]}}}`,
+with no words. `podcast-teach score` reads it (`PassageAnswers`) and adds the
+row "Plus the passage model" (`PassageScoreRow`) after the finders and Apple's
+row. The rows go through the word model's version 2 decoder
+(`AdWordModel.decodeTwo`, repeated by `decode_two` in `teach_spans.py`; change
+neither without the other) with the file's cut-offs, and become `unsure` ads of
+the source `passage-model`. The row stands on the last finder row, not on
+Apple's row (`AnswerScoreRow.layer(standingOn:)`, which both rows share with
+`AppleScoreRow`), so it can be compared with the finders. An episode with no
+answer, or with another number of lines than its answer, stays as the last
+finder row. A file that is damaged, of another version or made for another
+decoder leaves the row out with a note. The go rule: the row must pass at least
+10 more breaks than the last finder row on both label sets and add at most 2
+more skips with no ad. Only then is it shrunk to Core ML for the app.
+
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
 

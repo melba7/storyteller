@@ -51,6 +51,7 @@ the app is not added again.
 - `Gather more episodes for teaching.command`,
   `Mark the new episodes at night.command` and
   `Gather the exam episodes.command`: see "More episodes and the exam".
+- `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -579,6 +580,60 @@ next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
 and streams it too. The settings and publish steps read rows by name, so the
 extra row changes nothing they decide.
 
+### The passage model (a trial)
+
+`Teach the passage model.command` tries a small language model on the ad finding
+(milestone W5 of `docs/PLAN.md`). It is a trial: it is measured on the shelf
+first, nothing of it reaches the phone, and shrinking it to Core ML for the app
+happens only if the trial passes its go rule (below). It costs nothing and uses
+no Claude allowance.
+
+- **What it does.** `teach_passage.py` reads every transcript line of the marked
+  episodes that are not on the shelf (and not in the sealed exam, and not a
+  repeat of a shelf or exam episode) with the MiniLM sentence model
+  (`sentence-transformers/all-MiniLM-L6-v2`, the one the mood work uses). It
+  learns, from a window of five lines (two before, the line, two after), how
+  likely the middle line is each of the word model's classes. The classifier is
+  a softmax regression in numpy with L2, the word model trainer's class weights,
+  and a tenth of the episodes keeping the best pass and the best L2 strength. It
+  then answers for the shelf episodes only.
+- **What it needs.** The Mac's `python-mood` environment in `~/Storyteller Lofi`
+  (torch, transformers and numpy; `libraries/LofiScoreKit/Tools/mac/finetune.sh`
+  makes it) and Hugging Face's files in `~/Storyteller Lofi/.cache/huggingface`
+  (the first run downloads the model, about 90 MB, if the mood work did not
+  already). It needs the shelf: double-click `Teach the phone again.command`
+  first if `shelf.json` is missing.
+- **What it writes.** `passage-cache/`: the vectors of each episode's lines, so
+  a stopped run carries on where it was and a second run takes minutes (about
+  1.5 KB a line, a few hundred megabytes in all; it is only a speed-up and may
+  be deleted). `passage-model.json`:
+  `{"version": 1, "model", "decoder": 2, "classes", "thresholds", "trained", "episodes": {"<id>": {"lines": N, "rows": [[five probabilities], ...]}}}`,
+  five numbers for every line of every shelf episode and no words. `trained`
+  says what it learned from and how it did on the shelf lines (line accuracy,
+  precision and recall of "any ad", and the seconds the phone would cut). The
+  window prints the same, with the time left for each episode it embeds.
+- **How long.** The first run embeds about 700 episodes (a few hundred thousand
+  lines), which may take from under an hour to a few hours, depending on whether
+  torch finds the Mac's graphics chip. The cloud could not time it, so read the
+  "about N to go" of the first episodes. Run it at night.
+- **How to try it.** Double-click `Teach the passage model.command`, then
+  `Score the ad skipping.command`. The scorecard gets one more row after the
+  finders and Apple's row, "Plus the passage model", which adds the answers
+  (decoded as the word model's version 2 spans, all `unsure`) to the **last
+  finder row**, not to Apple's row, so the two can be compared with the finders.
+  An episode with no answer, or whose transcript no longer has the number of
+  lines of its answer, stays as the last finder row (the note says how many).
+  With no `passage-model.json` the row is not printed; a damaged one is left out
+  with one note. To score on both label sets run `podcast-teach score <folder>`
+  and `podcast-teach score <folder> --labels labels-snapped`.
+- **The go rule.** The plan goes on with the passage model only when its row
+  passes at least 10 more breaks than the last finder row on both label sets and
+  adds at most 2 more skips with no ad. The per-line numbers in the window are
+  only a first look; the row counts whole ad breaks.
+
+In Terminal (the launcher does the same): with the venv's python,
+`python teach_passage.py [--folder F] [--labels labels-snapped] [--epochs 8] [--seed 1] [--min-episodes 20]`.
+
 ### What the steps write
 
 Everything is in `~/Storyteller Lofi/PodcastTeaching`:
@@ -620,6 +675,10 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
+- `passage-model.json` and `passage-cache/`: the passage model trial's answers
+  for the shelf and the vectors it kept, made by
+  `Teach the passage model.command` (see "The passage model (a trial)"). They
+  are never copied to the phone.
 - `show-settings.json`: per show and per finder, whether the phone may skip, may
   only ask, or must leave it off, and whether joints are used, chosen by
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
