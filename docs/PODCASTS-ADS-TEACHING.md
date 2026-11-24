@@ -247,13 +247,15 @@ under 4.5 MB (the phone refuses a file over 5 MB).
   `marked` is when Claude marked the episode (seconds since 1970); an entry more
   than 14 days old is ignored. `start` and `end` are the times on the Mac's copy
   and only give the length the ad had. `startWords` and `endWords` are the first
-  and the last (up to 40) words of the ad. An episode is the entry with its
-  `guid`, or, when either has no guid, the entry with the same feed key and the
-  same title (lower case, letters and digits). The phone refuses a file that is
-  not version 1 with a list of `episodes`, and an entry or an ad of the wrong
-  shape is left out when the file is read. `teach_publish.py` copies it from
-  `ahead-ads.json` in the teaching folder to `Podcasts/ahead-ads.json` and lists
-  it in `teaching.json`, as the nightly read-ahead (`teach_ahead.py`) writes it.
+  and the last (up to 40) words of the ad. A mark with confidence `low` only
+  ever gives a question on the phone (at most three an episode), never a skip,
+  and none in a stream's head scan. An episode is the entry with its `guid`, or,
+  when either has no guid, the entry with the same feed key and the same title
+  (lower case, letters and digits). The phone refuses a file that is not version
+  1 with a list of `episodes`, and an entry or an ad of the wrong shape is left
+  out when the file is read. `teach_publish.py` copies it from `ahead-ads.json`
+  in the teaching folder to `Podcasts/ahead-ads.json` and lists it in
+  `teaching.json`, as the nightly read-ahead (`teach_ahead.py`) writes it.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
 
@@ -266,10 +268,15 @@ is above zero, otherwise the start of the last line.
 
 - `phone-queue.json`, written by the phone (`phoneQueue.ts`, at app start and
   when the app returns to the foreground, only when the list changed):
-  `{"version", "writtenAt", "episodes": [{"feed", "guid", "title", "show", "audio", "reason": "upNext" | "newest", "rank"}]}`.
+  `{"version", "writtenAt", "episodes": [{"feed", "guid", "title", "show", "audio", "published", "reason": "upNext" | "newest", "rank"}]}`.
   It lists the Up Next episodes in order, then the newest unplayed episode of
   each show played in the last 14 days, 12 at most, with no show that has ad
   skipping off, no local file and no duplicate. `rank` is 0 for the first.
+  `published` is when the episode came out, in seconds since 1970 (null when the
+  feed gave no date; a file from an older phone has none), and the Mac keeps it
+  for the exam's "newer than everything gathered" rule. The phone also puts
+  these episodes in its lookup table of episodes for the marks, whatever their
+  age.
 - `ahead-ads.json`, written by the Mac (`teach_ahead_ads.py`) and published with
   the other files:
   `{"version", "writtenAt", "episodes": [{"feed", "guid", "title", "marked", "ads": [{"kind": "ad" | "promo" | "ownPlug", "confidence", "start", "end", "startWords", "endWords"}]}]}`.

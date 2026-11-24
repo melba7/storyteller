@@ -873,7 +873,11 @@ Each night the job does this:
 1. The phone writes `Podcasts/phone-queue.json` into its linked folder: your Up
    Next episodes in order, then the newest unplayed episode of each show you
    played in the last 14 days, 12 at most, never a show with ad skipping off.
-   The job reads the iCloud copy first, then the Mac's own copy.
+   Each episode carries when it came out (`published`, in seconds since 1970),
+   which the job keeps so the exam only takes episodes newer than the ones the
+   model was taught on; an episode read ahead from an older list with no time
+   keeps its feed out of the exam. The job reads the iCloud copy first, then the
+   Mac's own copy.
 2. It picks up to 8 episodes that are not marked yet (not in the teaching set,
    and not an episode picked on an earlier night), in the phone's order.
 3. It downloads them and writes down what is said, with the same tools as the
@@ -885,7 +889,9 @@ Each night the job does this:
    $10: an episode is expected to
    cost about $0.19, and the marking stops
    before a call that would pass the cap, says so in the log and starts again
-   the next week. An episode that fails to mark is skipped.
+   the next week. An episode that fails to mark is skipped. A call that timed
+   out or printed no cost counts as one episode's expected cost (about $0.19)
+   against the cap, and every call is written in the week's budget at once.
 5. It writes `ahead-ads.json` (the ads of the last 14 days' episodes, told in
    words, with start and end times) and copies it to the phone's folders with
    `teach_publish.py`, the way the weekly job does.
@@ -894,8 +900,11 @@ The marked episodes join the teaching set with their labels, so the weekly run
 learns from them, but they are never put on the shelf or in the exam
 (`ahead.json` lists them). A night with no list from the phone, nothing new in
 it, no budget left or no network ends quietly with one line in the log and exit
-status 0. If another teaching run is working in the folder, the job says so and
-ends. Change the limits with `TEACH_AHEAD_CAP` (dollars a week),
+status 0. The job holds the teaching folder's lock for the whole night, so no
+other run starts between two of its steps; if another run is working in the
+folder, the job says so and ends. On Sunday morning it does nothing at all, so
+it never meets the weekly teaching run at 3:00 (the night of Saturday to Sunday
+is skipped). Change the limits with `TEACH_AHEAD_CAP` (dollars a week),
 `TEACH_AHEAD_ESTIMATE` (dollars an episode), `TEACH_AHEAD_MOST` (episodes a
 night) and `TEACH_MAX_GB`.
 
