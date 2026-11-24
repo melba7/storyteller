@@ -55,8 +55,10 @@ public enum AppleAds {
   @available(iOS 26.0, macOS 26.0, *)
   public struct AppleAdDetector: PrewarmableAdDetector {
     public let name = "apple-on-device"
-    /// Bumped when the instructions or what this file does with answers changes.
-    public let version = "2"
+    /// Bumped when the instructions or what this file does with answers changes. 3: the model's
+    /// answers are questions by default (ShowTuning's "apple-model"), so an episode that was
+    /// found before, with the model's answers skipping, is looked at again.
+    public let version = "3"
     /// The window is 4,096 tokens for the instructions, the lines and the answer together;
     /// about 2,500 are kept for the lines (about ten minutes of speech).
     public let tokenBudget = 2500

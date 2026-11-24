@@ -240,7 +240,11 @@ final class PodcastStreamHead: @unchecked Sendable {
     // starts loading now, while the speech model does.
     let placing = PodcastAdFinder.modelPlacing(forEpisode: id)
     let detector = placing.level == .skip ? Self.warmDetector() : nil
-    lock.withLock { detectorVersion = detector?.version ?? "1" }
+    // The version of the detector the whole pass uses, also when the model is not asked here, so
+    // the list does not show the head's ads as waiting for a later pass.
+    lock.withLock {
+      detectorVersion = detector?.version ?? PodcastAdFinder.shared.detector?.version ?? "1"
+    }
     PodcastTimeline.mark(
       id,
       detector == nil
