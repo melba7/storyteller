@@ -89,14 +89,22 @@ let package = Package(
                 "PodcastDownloads", "PodcastAudioMatch",
             ],
             swiftSettings: [.swiftLanguageMode(.v5)]),
-        // `swift run podcast-teach score|sounds|meaning <teaching folder>`: the Mac teaching
-        // run's scorecard, its library of ad sounds and its meaning model, made with the phone's
-        // own code. It builds and runs on Linux too; only `meaning` needs a Mac (it uses Apple's
-        // sentence embedding through PodcastAdsOnDevice, which is empty on Linux).
+        // `swift run podcast-teach score|sounds|meaning|edges <teaching folder>`: the Mac teaching
+        // run's scorecard, its library of ad sounds, its meaning model and the sound at the edges of
+        // ad spots, made with the phone's own code. It builds and runs on Linux too; only `meaning`
+        // and `edges` need a Mac (they use Apple's sentence embedding through PodcastAdsOnDevice and
+        // Apple's decoder through PodcastEdgeAudio, which are empty on Linux).
         .executableTarget(
             name: "podcast-teach",
             dependencies: [
-                "PodcastAds", "PodcastAdsOnDevice", "PodcastAudioMatch", "PodcastTranscripts",
+                "PodcastAds", "PodcastAdsOnDevice", "PodcastAudioMatch", "PodcastEdgeAudio",
+                "PodcastTranscripts",
             ]),
+        // The decoder `podcast-teach edges` reads an MP3 file with: Apple's AVAssetReader, so
+        // empty on Linux (it hands back no reader there). Swift 5 mode for the same reason as
+        // PodcastSpeech: it cannot be compiled here.
+        .target(
+            name: "PodcastEdgeAudio", dependencies: ["PodcastAudioMatch"],
+            swiftSettings: [.swiftLanguageMode(.v5)]),
     ]
 )

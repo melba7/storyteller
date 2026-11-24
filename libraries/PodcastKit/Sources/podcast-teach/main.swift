@@ -7,6 +7,7 @@
 //   swift run -c release podcast-teach fit <examples file> <output file> [options]
 //   swift run -c release podcast-teach joints <teaching folder>
 //   swift run -c release podcast-teach apple <teaching folder> [options]
+//   swift run -c release podcast-teach edges <teaching folder>
 //
 // "score" replays the phone's ad finders on the marked episodes of the teaching folder and
 // prints a scorecard (Score.swift). "sounds" makes the library of ad sounds from the marked
@@ -16,7 +17,8 @@
 // model's weights for the Python trainer (Fit.swift); it needs only Foundation. "joints" finds the
 // joints of each episode's MP3 file once and saves them in joints.json (Joints.swift), so "score"
 // needs no audio for its joint rows. "apple" asks Apple's on-device model about the episodes and
-// keeps its answers for the scorecard (Apple.swift).
+// keeps its answers for the scorecard (Apple.swift). "edges" measures whether the sound changes at
+// the exact edges of ad spots and keeps the change peaks in edges.json (Edges.swift); it needs a Mac.
 import Foundation
 
 let arguments = Array(CommandLine.arguments.dropFirst())
@@ -28,11 +30,12 @@ case "meaning": exit(MeaningTool.run(Array(arguments.dropFirst())))
 case "fit": exit(FitTool.run(Array(arguments.dropFirst())))
 case "joints": exit(JointsCommand.run(Array(arguments.dropFirst())))
 case "apple": exit(await AppleTool.run(Array(arguments.dropFirst())))
+case "edges": exit(await EdgesTool.run(Array(arguments.dropFirst())))
 default:
   FileHandle.standardError.write(
     Data(
       """
-      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder> | podcast-teach apple <teaching folder>
+      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder> | podcast-teach apple <teaching folder> | podcast-teach edges <teaching folder>
 
       """.utf8))
   exit(2)

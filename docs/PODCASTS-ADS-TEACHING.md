@@ -435,6 +435,42 @@ costs nothing, uses no Claude allowance and may take a few hours.
 The app's "Ad skipping results" page shows the tally per show (skipped, undone,
 trimmed, missed, time saved) and what the Mac taught and when.
 
+### The sound at the edges
+
+`podcast-teach edges <folder>` measures, before anything is built into the
+phone, whether the sound itself says where an ad spot starts and ends. It needs
+a Mac (Apple's decoder, `MacEdgeReader`, reads each shelf episode's MP3 file
+once as mono 16 kHz) and costs nothing. For every half second it works out the
+loudness in decibels, the level of 24 bands (log-spaced from 100 Hz to 7.5 kHz)
+and whether it is a pause (22 dB or more under the episode's 90th percentile of
+loudness). The change score at a point compares the 3 seconds before with the 3
+seconds after: how much louder or quieter the half seconds with sound in them
+are, how differently they are coloured (the bands with their loudness taken
+out), and the difference of their share of pauses (6 dB for a whole window),
+added as squares. A peak is a point that is the strongest within 1.5 seconds and
+scores at least 3; an episode keeps its strongest 300 peaks for each hour.
+
+- `edges.json`:
+  `{"version": 1, "finder": 1, "episodes": {"<id>": {"seconds", "peaks": [[time, strength], ...]}}}`.
+  The peaks of every shelf episode (the exam is never read), so a scorecard row
+  can snap found edges onto them without the audio. An episode in it is not read
+  again; a file that is damaged or made by another `finder` is ignored and made
+  again.
+- `edges-report.json`:
+  `{"version", "finder", "writtenAt", "rule", "reaches": [1, 2, 5], "episodes", "leftOut", "edges": {"points", "within": [...], "share": [...]}, "random": {...}, "verdict": "go" | "no go" | "no verdict"}`.
+  `within` counts the points whose strongest peak within 10 seconds is no
+  further than each reach.
+
+The exact edges are the borders in `labels-snapped/` that the second download
+moved (a border that Claude's own `labels/` does not have) and both borders of a
+stretch only the second download found (`"origin": "copy"`), for marked ads of
+high or medium confidence. The random points are as many as the exact edges, in
+the same episodes, drawn with a fixed seed. An edge or point within 3 seconds of
+the start or end of an episode is left out. The go rule is: the strongest change
+within 10 seconds lies within 1 second of at least 70% of exact edges, and of at
+most 10% of random points. The weights of the score are first guesses and have
+not been tuned on the shelf.
+
 ## Later
 
 - Words inside a teaching transcript line have no times of their own, so the
