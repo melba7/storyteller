@@ -43,6 +43,15 @@ public struct StreamPace: Equatable, Sendable {
     return pace
   }
 
+  /// The standard pace with the speech speed the phone measured (`teach_pace.py` reads it from
+  /// the phone's diary), for `podcast-teach score --stream --speech N`.
+  public static func measured(speech: Double) -> StreamPace {
+    var pace = standard
+    pace.name = "measured"
+    pace.speech = speech
+    return pace
+  }
+
   /// A weak connection and a busy phone: the audio arrives and is read much more slowly.
   public static let slow: StreamPace = {
     var pace = StreamPace(name: "slow")

@@ -17,15 +17,21 @@ enum StreamReport {
   static func lines(_ rows: [(name: String, stream: StreamNumbers)]) -> [String] {
     guard !rows.isEmpty else { return [] }
     let minutes = Int(AdBar.earlySeconds / 60)
+    // With --speech the standard pace has the speech speed the phone measured.
+    let measured = rows.first?.stream.speech
+    let pace = measured.map { StreamPace.measured(speech: $0) } ?? .standard
     var out = [
-      "Stream replay: every episode is played from the start as a stream, by a listener who taps play and never touches the phone, with the player's own skip rules. The speeds below are assumptions, not measurements.",
-      "  " + StreamPace.standard.summary,
+      "Stream replay: every episode is played from the start as a stream, by a listener who taps play and never touches the phone, with the player's own skip rules. "
+        + (measured == nil
+          ? "The speeds below are assumptions, not measurements."
+          : "The speeds below are assumptions, apart from the speech speed of the measured pace."),
+      "  " + pace.summary,
       "  " + StreamPace.slow.summary,
       "  The head scan waits for Apple's model at the steps that ask it, in every row, as on a phone with Apple Intelligence on (an assumption); the model's answers count only in the Apple row.",
       "  \"ready\" here means the same player with everything known at the start: the finished file of an episode that was read to its end before it is played.",
     ]
     for row in rows {
-      out.append("Row \"\(row.name)\" as a stream (standard pace): " + barLine(row.stream.standard))
+      out.append("Row \"\(row.name)\" as a stream (\(pace.name) pace): " + barLine(row.stream.standard))
       if let ready = row.stream.ready {
         out.append("  Ready (everything known at the start, the same player): " + barLine(ready))
       }
@@ -38,8 +44,13 @@ enum StreamReport {
             speed.bar.breaks))
       }
     }
-    out.append(
-      "These speech speeds are assumptions: the phone's real speed is not measured yet, and the first \(minutes) minutes depend on it.")
+    if let measured {
+      out.append(
+        "The speech speed of the measured pace, \(String(format: "%g", measured)) s of audio per second, was measured on the phone (teach_pace.py reads its diary). The other speeds and the slow pace are assumptions, and the first \(minutes) minutes depend on them.")
+    } else {
+      out.append(
+        "These speech speeds are assumptions: the phone's real speed is not measured yet, and the first \(minutes) minutes depend on it.")
+    }
     return out
   }
 }

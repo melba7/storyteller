@@ -188,6 +188,7 @@ final class PodcastPlayer {
   /// Starts the audio (the rest of Play, once any wait for a stream's first look is over).
   func startPlaying() {
     wantsToPlay = true
+    notePlayStart()
     try? AVAudioSession.sharedInstance().setActive(true)
     // A finished episode starts over. It must be finished by the clock and by the listener's place:
     // a resume past the feed's length is a seek on its way (the clock is behind it), and a scrub

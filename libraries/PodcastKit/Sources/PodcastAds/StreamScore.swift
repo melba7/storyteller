@@ -20,15 +20,19 @@ public struct StreamNumbers: Codable, Sendable, Equatable {
   public var ready: BarTotals?
   /// How the standard pace does at other speech speeds (nil in an older file).
   public var speeds: [Speed]?
+  /// The speech speed that the `standard` numbers were replayed at when `--speech` gave one (the
+  /// pace the phone measured). Nil when they are at the assumed standard pace.
+  public var speech: Double?
 
   public init(
     standard: BarTotals = BarTotals(), slow: BarTotals = BarTotals(), ready: BarTotals? = nil,
-    speeds: [Speed]? = nil
+    speeds: [Speed]? = nil, speech: Double? = nil
   ) {
     self.standard = standard
     self.slow = slow
     self.ready = ready
     self.speeds = speeds
+    self.speech = speech
   }
 }
 
@@ -131,11 +135,14 @@ public enum StreamScore {
   /// The stream numbers of the finders' row, and of the row that adds the model's answers when
   /// `models` (the answers by episode id) has any. Each reach's finders run once for an episode.
   /// `whole` is the row's ads for the whole transcript; `detect` runs its finders on a cut one.
+  /// `speech` is the speech speed the phone measured: the `standard` numbers are then replayed at
+  /// it (`StreamPace.measured`) and not at the assumed one.
   public static func run(
     episodes: [TeachingEpisode], habits: ShowHabits, settings: AdSkipSettings,
-    models: [String: [FoundAd]]?, whole: (TeachingEpisode) -> [FoundAd],
+    models: [String: [FoundAd]]?, speech: Double? = nil, whole: (TeachingEpisode) -> [FoundAd],
     detect: (TeachingEpisode, Transcript) -> [FoundAd]
   ) -> (finders: StreamNumbers, withModel: StreamNumbers?) {
+    let standard = speech.map { StreamPace.measured(speech: $0) } ?? .standard
     var finders = StreamNumbers()
     var withModel = models == nil ? nil : StreamNumbers()
     for episode in episodes {
@@ -157,7 +164,7 @@ public enum StreamScore {
       }
       func both(_ model: [FoundAd]?) -> StreamNumbers {
         StreamNumbers(
-          standard: at(.standard, model), slow: at(.slow, model), ready: at(.instant, model),
+          standard: at(standard, model), slow: at(.slow, model), ready: at(.instant, model),
           speeds: sensitivitySpeeds.map {
             .init(speech: $0, bar: at(StreamPace.standard.withSpeech($0), model))
           })
@@ -167,6 +174,8 @@ public enum StreamScore {
       guard withModel != nil else { continue }
       withModel?.add(models?[episode.id].map { both($0) } ?? plain)
     }
+    finders.speech = speech
+    withModel?.speech = speech
     return (finders, withModel)
   }
 }

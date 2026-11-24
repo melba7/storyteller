@@ -111,12 +111,12 @@ def read_notes(path):
     return notes, bad
 
 
-def find_notes(defaults, denied=None):
-    """The path of the notes: the iCloud copy first (the last folder), then the Mac's own. A copy
-    that macOS does not let this read (permissions) is added to the list `denied`, when given, and
-    the next one is tried."""
+def find_notes(defaults, denied=None, name=NOTES):
+    """The path of the notes (or of another file the phone writes into Podcasts/, named by `name`):
+    the iCloud copy first (the last folder), then the Mac's own. A copy that macOS does not let
+    this read (permissions) is added to the list `denied`, when given, and the next one is tried."""
     for folder in reversed(defaults()):
-        path = os.path.join(folder, NOTES)
+        path = os.path.join(folder, name)
         try:
             os.stat(path)
         except PermissionError:

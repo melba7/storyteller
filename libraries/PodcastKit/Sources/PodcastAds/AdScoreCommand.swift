@@ -16,10 +16,13 @@ public enum AdScoreCommand {
     public var dump = ""
     /// Also replay every episode as a stream played from the start (StreamScore.swift).
     public var stream = false
+    /// The seconds of audio the phone transcribes in one second, as measured (teach_pace.py):
+    /// the stream replay uses it for its standard pace. Nil for the assumed one.
+    public var speech: Double?
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -32,6 +35,16 @@ public enum AdScoreCommand {
       case "--no-library": options.noLibrary = true
       case "--exam": options.exam = true
       case "--stream": options.stream = true
+      case "--speech":
+        index += 1
+        guard index < arguments.count, let speech = Double(arguments[index]), speech.isFinite,
+          speech > 0
+        else {
+          return .failure(
+            TeachingFolderError(
+              message: "--speech needs a number above 0: the seconds of audio transcribed in one second."))
+        }
+        options.speech = speech
       case "--dump":
         index += 1
         guard index < arguments.count, !arguments[index].isEmpty else {
@@ -56,6 +69,9 @@ public enum AdScoreCommand {
     }
     guard !options.folder.isEmpty else {
       return .failure(TeachingFolderError(message: "Name the teaching folder."))
+    }
+    guard options.speech == nil || options.stream else {
+      return .failure(TeachingFolderError(message: "--speech goes with --stream: it sets the speed of the replay."))
     }
     return .success(options)
   }
@@ -206,7 +222,7 @@ public enum AdScoreCommand {
       }
       let streamed = StreamScore.run(
         episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple,
-        whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
+        speech: options.speech, whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
       var shown = [(name: String, stream: StreamNumbers)]()
       shown.append((rows.last?.name ?? "", streamed.finders))
       saved[rows.count - 1].stream = streamed.finders

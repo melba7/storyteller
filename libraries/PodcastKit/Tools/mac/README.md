@@ -699,6 +699,28 @@ gathered, is left out, and the window says so for a missing one. A damaged
 `wanted.json` is ignored with one line. `Teach the phone again.command` and the
 weekly job both run `teach_feedback.py` for you.
 
+### How fast the phone really is
+
+The phone also writes `Podcasts/phone-diary.jsonl` into the same folder (the
+skip log and the ad finder's diary, as "Send skip log" shares them). It holds
+one line for every play that starts (`play: ready`,
+`play: partly, transcript to N s` or `play: stream`) and one for every finished
+transcription (`N s of audio in M s, front` or `, background`). Those lines hold
+no word of an episode. `teach_pace.py` reads it (the iCloud copy first, then the
+Mac's own copy; or `--diary FILE`) and prints the share of plays that were ready
+and the speech pace, in seconds of audio per second of work, for all
+transcriptions and for those in front and in the background. It writes nothing.
+It ends with the line to replay the shelf at that pace, using the front pace
+when there is one, because a stream is played with the app open:
+
+```
+python3 libraries/PodcastKit/Tools/mac/teach_pace.py
+podcast-teach score <teaching folder> --stream --speech 12
+```
+
+Both numbers need a few days of listening on the phone. With no diary yet, or no
+play or transcription in it, the tool says so.
+
 ### The weekly job
 
 `Install weekly teaching.command` sets up a job that runs `teach-weekly.sh`
