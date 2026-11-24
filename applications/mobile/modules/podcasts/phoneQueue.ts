@@ -29,6 +29,8 @@ export type QueueCandidate = {
   title: string
   show: string
   audio: string
+  /** When it came out, in seconds since 1970, or null when the feed gave no date. */
+  published: number | null
   skipAds: boolean | null
   skipPlugs: boolean | null
 }
@@ -40,14 +42,16 @@ export type QueueEntry = {
   title: string
   show: string
   audio: string
+  /** When it came out, in seconds like the Mac's files, or null (the exam's newer-than rule needs it). */
+  published: number | null
   reason: "upNext" | "newest"
   rank: number
 }
 
 // MARK: Reading the database
 
-const COLUMNS = `e.id, e.guid, e.title, e.audio_url, s.feed_url, s.title AS show_title,
-  s.skip_ads, s.skip_plugs`
+const COLUMNS = `e.id, e.guid, e.title, e.audio_url, e.published_at, s.feed_url,
+  s.title AS show_title, s.skip_ads, s.skip_plugs`
 
 /** The SQL for the Up Next episodes: `count` ids as parameters. The order is Up Next's, not this. */
 export function queueUpNextSql(count: number): string {
@@ -78,6 +82,13 @@ function text(value: unknown): string {
   return typeof value === "string" ? value : ""
 }
 
+/** The database holds milliseconds; the file holds whole seconds, as the Mac's files do. */
+function secondsOrNull(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.floor(value / 1000)
+    : null
+}
+
 function flagOrNull(value: unknown): boolean | null {
   return value === null || value === undefined
     ? null
@@ -92,6 +103,7 @@ export function queueCandidate(row: Record<string, unknown>): QueueCandidate {
     title: text(row["title"]),
     show: text(row["show_title"]),
     audio: text(row["audio_url"]),
+    published: secondsOrNull(row["published_at"]),
     skipAds: flagOrNull(row["skip_ads"]),
     skipPlugs: flagOrNull(row["skip_plugs"]),
   }
@@ -138,6 +150,7 @@ export function chooseQueue(
         title: episode.title,
         show: episode.show,
         audio: episode.audio,
+        published: episode.published,
         reason,
         rank: entries.length,
       })

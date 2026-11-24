@@ -133,6 +133,20 @@ class PickTests(Setup):
         self.assertEqual(flagged, {"id": one["id"], "feed": "https://phone.example/feed1.xml",
                                    "guid": "guid-1", "title": "Episode 1", "picked": NOW})
 
+    def test_the_phones_published_time_is_kept_in_the_teaching_set(self):
+        # The phone writes it in seconds since 1970, the way the Mac's feed reading does.
+        self.write_queue([queued(1, published=1_700_000_000), queued(2, published=1_700_086_400.0)])
+        self.run_command()
+        self.assertEqual([e["published"] for e in self.manifest()], [1_700_000_000, 1_700_086_400])
+        self.assertTrue(all(isinstance(e["published"], int) for e in self.manifest()))
+
+    def test_a_queue_with_no_published_time_or_a_wrong_one_keeps_none(self):
+        # An older phone writes no time. Anything that is not a number is no time either.
+        self.write_queue([queued(1), queued(2, published=None), queued(3, published="yesterday"),
+                          queued(4, published=True), queued(5, published=float("nan"))])
+        self.run_command()
+        self.assertEqual([e["published"] for e in self.manifest()], [None] * 5)
+
     def test_the_flag_is_written_before_the_teaching_set(self):
         self.write_queue([queued(1)])
         with mock.patch.object(night.teach_store, "save_manifest", side_effect=OSError("disk")):

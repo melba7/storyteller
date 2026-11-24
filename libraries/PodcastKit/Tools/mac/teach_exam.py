@@ -55,24 +55,31 @@ def number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def pick_new(known, planned, already, most):
+def pick_new(known, planned, already, most, ahead=()):
     """The planned entries that may join the exam, in the planner's order. An entry must have a
     published time that is later than the newest published time of every `known` entry of the same
     feed (so it is newer than everything gathered before); one with no published time is not taken.
     At most `most` episodes are in the exam in all, those in `already` (the ids now in exam.json)
-    counting towards that."""
-    newest = {}
+    counting towards that. `ahead` is the ids of the episodes of the nightly read-ahead (ahead.json).
+    They are trained on and their ads are in the library of known ads like any other, so they count
+    like any other entry with a published time. One of them with no published time (the phone's list
+    was written by an older version, which gave none) cannot be placed, so, to be safe, the exam
+    takes no episode from its feed until that one is gone from the teaching set."""
+    newest, blocked = {}, set()
     for entry in known:
+        key = feed_key(entry["feed"])
         if number(entry["published"]):
-            key = feed_key(entry["feed"])
             newest[key] = max(newest.get(key, entry["published"]), entry["published"])
+        elif entry["id"] in ahead:
+            blocked.add(key)
     room = max(most - len(already), 0)
     picked = []
     for entry in planned:
         if len(picked) >= room:
             break
-        if number(entry["published"]) and entry["published"] > newest.get(feed_key(entry["feed"]),
-                                                                           float("-inf")):
+        key = feed_key(entry["feed"])
+        if key not in blocked and number(entry["published"]) \
+                and entry["published"] > newest.get(key, float("-inf")):
             picked.append(entry)
     return picked
 
