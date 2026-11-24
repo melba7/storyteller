@@ -71,7 +71,21 @@ What keeps the layers from cutting the show itself:
 - **The Mac's marks** (`ahead`): in the head scan, with the words heard so far,
   and in the whole-transcript pass of `PodcastAdFinder`, both after the other
   new finders, under the finder guard. The scan of a stream only skips; the
-  whole pass skips the ads found by both edges and asks about the others.
+  whole pass skips the ads found by both edges and asks about the others. The
+  Mac marks an episode at night, and the phone has usually checked it the
+  evening before, so there is a third place: **an episode whose final ads file
+  is made already** gets the finder run once over its stored transcript
+  (`PodcastAdFinder+Ahead.swift`, `AheadPass.merge`), with no model and no sound
+  read. It runs when `ahead-ads.json` is installed, when the app sends a new
+  table of episodes, and at each scan of the downloads, in the finder's own
+  background task and in a background turn. What it finds goes into the file as
+  every new finder's ads do: the parts outside the ads that are there, never
+  over a stretch the listener undid or said no to (those stay as they are),
+  sorted by the show's settings before any join, at most unsure. The episode's
+  `ahead-passes.json` records the `marked` time of the marks used, so the pass
+  is not repeated at the next start and is made again when newer marks come. An
+  episode that waits for its own pass, or is in one, is left to it: that pass
+  runs the finder and records the same time.
 - **A transcript that is growing or whole** (`PodcastAdFinder`): the local
   layers run first and their ads go into the episode's ads file
   (`LocalAdsFile`), then Apple's model is asked. When Apple's model cannot be
@@ -161,7 +175,10 @@ join, because a joined ad loses its `source`.
   answers) and `finder-learned.json` (which episodes already taught the phone,
   in three lists: `own`, `print` and `habits`, so an episode teaches once). In
   `Library/Caches/Podcasts/prints/`: the prints of a show's last episodes, which
-  iOS may clear. Losing any of them costs only what the phone had learned.
+  iOS may clear. Losing any of them costs only what the phone had learned. In
+  `Podcasts/teaching/`, beside the Mac's files: `ahead-episodes.json` (the table
+  the app sent) and `ahead-passes.json` (which marks each episode was looked at
+  with).
 - **Show starts.** `show-starts.json` is version 2 and keeps where openings end;
   the Mac's habit wins when it has one, so a show the Mac never sampled gets the
   same first look.
@@ -232,8 +249,10 @@ under 4.5 MB (the phone refuses a file over 5 MB).
   and the last (up to 40) words of the ad. An episode is the entry with its
   `guid`, or, when either has no guid, the entry with the same feed key and the
   same title (lower case, letters and digits). The phone refuses a file that is
-  not version 1 with a list of `episodes`; `teach_publish.py` does the same, and
-  an entry or an ad of the wrong shape is left out when the file is read.
+  not version 1 with a list of `episodes`, and an entry or an ad of the wrong
+  shape is left out when the file is read. `teach_publish.py` copies it from
+  `ahead-ads.json` in the teaching folder to `Podcasts/ahead-ads.json` and lists
+  it in `teaching.json`, as the nightly read-ahead (`teach_ahead.py`) writes it.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
 
@@ -580,9 +599,8 @@ not been tuned on the shelf.
 - A repeat never skips. A rule that promotes a repeat to skip after enough
   confirmed answers on a show is parked until the answers show it is safe.
 - Episodes that finished before the update never run the new finders again.
-- An episode that is already finished when its marks come is not looked at again
-  for them; it is looked at when it is transcribed, or when a new
-  `ahead-ads.json` is installed.
+- The pass over an episode whose ads are final does not learn from what it found
+  (the memory of ads, the sound prints): only a full pass does.
 - A habit may be counted twice for an episode that was streamed and then
   downloaded; the check of play-through limits it.
 - Transcripts over 64 MB skip the deny-by-words step.

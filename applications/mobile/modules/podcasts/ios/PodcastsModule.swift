@@ -370,11 +370,10 @@ public final class PodcastsModule: Module {
       if PodcastTeaching.shared.setShows(json: json) { PodcastAdFinder.shared.teachingChanged() }
     }
     // What the app knows of its episodes, `{"<episode id>": {"feed", "guid", "title"}}`, so the
-    // Mac's marks of the night before (named by guid, or by feed and title) find their episode. It
-    // only saves the table: an episode is looked at when it is transcribed, or when a new
-    // ahead-ads.json is installed.
+    // Mac's marks of the night before (named by guid, or by feed and title) find their episode. A
+    // new table makes the finder look at the episodes whose ads are final once more.
     AsyncFunction("setAheadEpisodes") { (json: String) in
-      _ = PodcastTeaching.shared.setAheadEpisodes(json: json)
+      if PodcastTeaching.shared.setAheadEpisodes(json: json) { PodcastAdFinder.shared.lookAhead() }
     }
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }

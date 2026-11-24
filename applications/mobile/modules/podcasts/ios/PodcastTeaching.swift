@@ -30,6 +30,7 @@ final class PodcastTeaching: @unchecked Sendable {
 
   private let lock = NSLock()
   private var taught: Taught?
+  private var passes: AheadPasses?
   private var soundsInstallCount = 0
 
   private init() {}
@@ -126,6 +127,36 @@ final class PodcastTeaching: @unchecked Sendable {
         return false
       }
     }
+  }
+
+  // MARK: What the ahead finder has looked at
+
+  /// Whether the ahead finder has not looked at this episode yet with marks made at `marked`.
+  func aheadPassNeeded(episode: String, marked: Double) -> Bool {
+    lock.withLock { passesLoaded().needs(episode: episode, marked: marked) }
+  }
+
+  /// Notes that the ahead finder looked at this episode with marks made at `marked`, so the pass is
+  /// not made again at the next start, and is made when newer marks come.
+  func recordAheadPass(episode: String, marked: Double) {
+    lock.withLock {
+      var current = passesLoaded()
+      current.record(episode: episode, marked: marked)
+      passes = current
+      do {
+        try current.save(to: Self.folder)
+      } catch {
+        NSLog("Podcasts: the record of the Mac's marks could not be saved: \(error)")
+      }
+    }
+  }
+
+  /// The record, read when it has not been. Called with the lock held.
+  private func passesLoaded() -> AheadPasses {
+    if let passes { return passes }
+    let loaded = AheadPasses.load(from: Self.folder)
+    passes = loaded
+    return loaded
   }
 
   /// `getTeachingState()`: the installed files, the model's numbers and how much was taught.

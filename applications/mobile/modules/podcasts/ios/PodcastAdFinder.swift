@@ -51,6 +51,10 @@ final class PodcastAdFinder: @unchecked Sendable {
   /// Episodes whose local-only final file is made again, because new teaching came.
   var localRerun: Set<String> = []
   var worker: Task<Void, Never>?
+  /// The look at the episodes whose ads are final, for the Mac's marks of the night before
+  /// (PodcastAdFinder+Ahead.swift), and whether it was asked again while it ran.
+  var aheadWorker: Task<Void, Never>?
+  var aheadAgain = false
   /// The app is on the screen, a podcast is playing, or iOS gave a background turn.
   var appActive = false
   var playing = false
@@ -167,7 +171,14 @@ final class PodcastAdFinder: @unchecked Sendable {
     }
     for id in lock.withLock({ Set(statuses.keys).subtracting(present) }) { removed(id) }
     if AdsRules.looksAgainLater(unavailable) { scanAgainLater() }
+    lookAhead()
     kick()
+  }
+
+  /// Whether the episode's full pass is at work now.
+  func isFinding(_ id: String) -> Bool {
+    if case .finding(_)? = lock.withLock({ statuses[id] }) { return true }
+    return false
   }
 
   /// While the model downloads, looks again in five minutes.
