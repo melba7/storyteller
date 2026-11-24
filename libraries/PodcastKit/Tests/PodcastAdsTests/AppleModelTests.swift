@@ -166,10 +166,14 @@ final class AppleModelTests: XCTestCase {
     XCTAssertEqual(code7, 0)
     XCTAssertEqual(score(), 0)
     let run = lastRun()
-    XCTAssertEqual(run?.rows.count, 5)
-    XCTAssertEqual(run?.rows.last?.name, "Plus Apple's model (asked on the Mac)")
-    XCTAssertEqual(run?.rows.dropLast().map(\.name), before?.rows.map(\.name))
-    XCTAssertEqual(run?.rows.dropLast().map(\.total), before?.rows.map(\.total))
+    // Apple's row (as the phone places the answers) and then what it would be if every show let
+    // the model skip (AppleScoreRow).
+    XCTAssertEqual(run?.rows.count, 6)
+    XCTAssertEqual(
+      run?.rows.suffix(2).map(\.name),
+      ["Plus Apple's model (asked on the Mac)", "Plus Apple's model, if every show let it skip"])
+    XCTAssertEqual(run?.rows.prefix(4).map(\.name), before?.rows.map(\.name))
+    XCTAssertEqual(run?.rows.prefix(4).map(\.total), before?.rows.map(\.total))
     XCTAssertEqual(run?.total, before?.total)
     XCTAssertTrue(output.contains("1 of 2 scored episodes have an answer"), output)
     XCTAssertTrue(output.contains("Why breaks fail in the last row"), output)
@@ -189,10 +193,11 @@ final class AppleModelTests: XCTestCase {
     XCTAssertTrue(output.contains("Speech at 6 times real time"), output)
     XCTAssertTrue(output.contains("not measured yet"), output)
     let rows = lastRun()?.rows ?? []
-    XCTAssertEqual(rows.count, 5)
+    XCTAssertEqual(rows.count, 6)
     XCTAssertNil(rows[0].stream)
     XCTAssertNotNil(rows[3].stream)
     XCTAssertNotNil(rows[4].stream)
+    XCTAssertNil(rows[5].stream)
     XCTAssertEqual(rows[3].stream?.standard.breaks, rows[3].bar?.breaks)
   }
 }

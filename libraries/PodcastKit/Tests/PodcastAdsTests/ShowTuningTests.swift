@@ -29,6 +29,7 @@ final class ShowTuningTests: XCTestCase {
       XCTAssertEqual(plain.level(forFinder: "repeat-sound", show: show), .ask)
       XCTAssertEqual(plain.level(forFinder: "repeat-words", show: show), .ask)
       XCTAssertEqual(plain.level(forFinder: "meaning", show: show), .skip)
+      XCTAssertEqual(plain.level(forFinder: "apple-model", show: show), .ask)
       XCTAssertTrue(plain.joints(show: show))
       XCTAssertFalse(plain.steadyJoints(show: show))
       for sort in ShowTuning.sortNames { XCTAssertEqual(plain.level(forSort: sort, show: show), .skip) }
@@ -163,9 +164,40 @@ final class ShowTuningTests: XCTestCase {
     XCTAssertEqual(ShowTuning.repeatSound, "repeat-sound")
     XCTAssertEqual(ShowTuning.repeatWords, "repeat-words")
     XCTAssertEqual(ShowTuning.meaning, "meaning")
+    XCTAssertEqual(ShowTuning.appleModel, "apple-model")
     XCTAssertEqual(
       ShowTuning.finderNames,
-      [ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords, ShowTuning.meaning])
+      [
+        ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords, ShowTuning.meaning,
+        ShowTuning.appleModel,
+      ])
+  }
+
+  // MARK: Apple's model
+
+  func testAppleModelsAdsAskByDefaultAndSkipOnlyWhereTheFileSaysSkip() {
+    let answers = [ad(0, "apple-model", confidence: .sure), ad(40, "apple-model")]
+    let byDefault = ShowTuning().apply(to: answers, show: "a")
+    XCTAssertEqual(byDefault.skip, [])
+    XCTAssertEqual(byDefault.ask, answers)
+    // A show that is set to skip skips; every other show goes on asking.
+    let set = tuning(show: #", "finders": {"apple-model": "skip"}"#)
+    XCTAssertEqual(set.apply(to: answers, show: "a").skip, answers)
+    XCTAssertEqual(set.apply(to: answers, show: "b").ask, answers)
+    // The default block can say skip for every show, and a show can take it back.
+    let everywhere = tuning(
+      default: #"{"finders": {"apple-model": "skip"}}"#, show: #", "finders": {"apple-model": "off"}"#)
+    XCTAssertEqual(everywhere.apply(to: answers, show: "b").skip, answers)
+    let dropped = everywhere.apply(to: answers, show: "a")
+    XCTAssertEqual(dropped.skip + dropped.ask, [])
+  }
+
+  func testAppleModelsSortsStillCountWhenItSkips() {
+    let set = tuning(show: #", "finders": {"apple-model": "skip"}, "sorts": {"intro_credits": "ask"}"#)
+    let answers = [ad(0, "apple-model", kind: .ad), ad(40, "apple-model", kind: .credits)]
+    let sorted = set.apply(to: answers, show: "a")
+    XCTAssertEqual(sorted.skip.map(\.start), [0])
+    XCTAssertEqual(sorted.ask.map(\.start), [40])
   }
 
   func testItRunsOnEachFindersOwnListBeforeTheJoinBecauseAJoinedAdLosesItsSource() {

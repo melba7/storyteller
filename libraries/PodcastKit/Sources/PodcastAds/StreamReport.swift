@@ -13,8 +13,12 @@ enum StreamReport {
       bar.passed - bar.earlyPassed, bar.breaks - bar.earlyBreaks, bar.noAdSkips, bar.noAdPerHour)
   }
 
-  /// The block for the rows that were streamed.
-  static func lines(_ rows: [(name: String, stream: StreamNumbers)]) -> [String] {
+  /// The block for the rows that were streamed. `waiting` is how many of the `of` replayed episodes
+  /// waited for Apple's model in the head scan (those of shows whose Apple level is skip); with
+  /// none, the line says the replay did not ask it.
+  static func lines(
+    _ rows: [(name: String, stream: StreamNumbers)], waiting: (episodes: Int, of: Int) = (0, 0)
+  ) -> [String] {
     guard !rows.isEmpty else { return [] }
     let minutes = Int(AdBar.earlySeconds / 60)
     // With --speech the standard pace has the speech speed the phone measured.
@@ -27,7 +31,7 @@ enum StreamReport {
           : "The speeds below are assumptions, apart from the speech speed of the measured pace."),
       "  " + pace.summary,
       "  " + StreamPace.slow.summary,
-      "  The head scan waits for Apple's model at the steps that ask it, in every row, as on a phone with Apple Intelligence on (an assumption); the model's answers count only in the Apple row.",
+      "  The head scan waits for Apple's model only on a show whose Apple level is skip in show-settings.json (ask when the file says nothing), as the phone does, and then at the steps that ask it, in every row (an assumption: a phone with Apple Intelligence on). Here it waits in \(waiting.episodes) of \(waiting.of) episodes; in the others it neither asks nor waits for the model. The model's answers count only in the Apple row, and only the ones that skip.",
       "  \"ready\" here means the same player with everything known at the start: the finished file of an episode that was read to its end before it is played.",
     ]
     for row in rows {

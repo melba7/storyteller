@@ -563,9 +563,12 @@ head scan and whole-file pass at an assumed standard pace and a slow one (the
 report prints the speeds, which are guesses), the player's own skip rules, and
 the same bar as above. "Ready" there means the same player with the finished
 file known before play, so it shows what streaming costs. The head scan waits
-for Apple's model in every row (a phone with Apple Intelligence on is assumed),
-and the first 3 minutes are also shown at speech speeds of 6 and 25 times real
-time, since the phone's real speed is not measured yet.
+for Apple's model only on a show whose `apple-model` level in
+`show-settings.json` is `skip` (it asks by default, and the phone then neither
+asks nor waits for the model on the head, so the replay does not either; a phone
+with Apple Intelligence on is assumed). The block says in how many episodes it
+waited. The first 3 minutes are also shown at speech speeds of 6 and 25 times
+real time, since the phone's real speed is not measured yet.
 
 `Ask Apple's model about the test episodes.command` builds `podcast-teach` and
 runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
@@ -577,9 +580,15 @@ stops with exit 2 the window says to read what the tool printed above (no model,
 a model still downloading, a damaged or foreign `apple-model.json`, or a folder
 problem), and when every episode already had an answer it says so. A damaged
 `apple-model.json` only leaves the row out of the scorecard, with a note. The
-next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
-and streams it too. The settings and publish steps read rows by name, so the
-extra row changes nothing they decide.
+next scorecard then ends with two rows. "Plus Apple's model (asked on the Mac)"
+is what the phone does: Apple's answers go through the per-show settings first
+(the `apple-model` finder: `skip` joins the skips, `ask` becomes questions,
+`off` is dropped), so with the built-in default, which asks, this row is the row
+before it, and it streams too. The report says how many answers asked and how
+many skipped. "Plus Apple's model, if every show let it skip" lets every answer
+skip, which is not what the phone does: it is the evidence for the settings step
+(see `show-settings.json` below), so it does not move with the settings. The
+publish step reads rows by name and ignores both.
 
 ### The sound at the edges
 
@@ -731,6 +740,14 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   as before. The pull is only for a start that a word finder gave: an ad named
   by the repeated words, the meaning model or the word model, or an ad with no
   name that starts where an ad of the word rules or the word model starts.
+- Apple's on-device model (`apple-model` in `show-settings.json`) is the one
+  finder that is not only made stricter. It asks by default, because on the
+  owner's labels its skips did more harm than good. A show gets `skip` for it
+  only when the "Plus Apple's model, if every show let it skip" row passes at
+  least 3 more of that show's breaks than the last finder row and adds at most 1
+  skip with no ad there (the show's own bar, in `scorecard.json`); otherwise it
+  keeps asking. Two undone or two "not an ad" answers on a show still make it
+  ask or turn it off there.
 - `copies/` and `labels-snapped/`: the second download's findings and the labels
   snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.

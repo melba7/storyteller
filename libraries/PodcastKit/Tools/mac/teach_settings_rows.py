@@ -3,9 +3,9 @@
 Standard library only. A run has `rows`, one per finder (each stands on the row before it), and a row
 has `total` and `shows[]` (`feed`, `show`, `total`). Of a total only the numbers this needs are read:
 how many episodes, the right seconds (adSeconds - heardSeconds), the wrong seconds (cutSeconds) and
-the seconds of show (showSeconds, 0 when the file has none). A row may also carry the owner's `bar`
-(AdBar.swift): of it only `breaks`, `passed` and `noAdSkips` are read, and a bar that lacks one of them
-or holds a number that is not a number counts as none.
+the seconds of show (showSeconds, 0 when the file has none). A row, and each of its shows, may also
+carry the owner's `bar` (AdBar.swift): of it only `breaks`, `passed` and `noAdSkips` are read, and a bar
+that lacks one of them or holds a number that is not a number counts as none.
 Anything of the wrong shape is skipped, never raised.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -21,8 +21,8 @@ SCORECARD = "scorecard.json"
 SCORECARD_LIMIT = 16 * 1024 * 1024
 
 Figures = collections.namedtuple("Figures", "episodes right wrong show")
-Show = collections.namedtuple("Show", "feed name figures")
 Bar = collections.namedtuple("Bar", "breaks passed skips")
+Show = collections.namedtuple("Show", "feed name figures bar", defaults=(None,))
 Row = collections.namedtuple("Row", "name total shows bar", defaults=(None,))
 
 
@@ -51,6 +51,13 @@ def added(first, second):
     return Figures(*(a + b for a, b in zip(first, second)))
 
 
+def added_bar(first, second):
+    """Two bars of one show added up; None when one of them is missing."""
+    if first is None or second is None:
+        return None
+    return Bar(*(a + b for a, b in zip(first, second)))
+
+
 def read_bar(value):
     """The Bar of a row's `bar`, or None when there is none, it is not made of numbers or it has no
     breaks (a bar of no breaks passes nothing and says nothing)."""
@@ -77,11 +84,13 @@ def read_row(item):
         key, counted = feed_key(one["feed"]), figures(one.get("total"))
         if not key or counted is None:
             continue
+        shown = read_bar(one.get("bar"))
         if key in shows:
             counted = added(shows[key].figures, counted)
+            shown = added_bar(shows[key].bar, shown)
             one = dict(one, feed=shows[key].feed, show=shows[key].name)
         name = one["show"] if isinstance(one.get("show"), str) else ""
-        shows[key] = Show(one["feed"], name, counted)
+        shows[key] = Show(one["feed"], name, counted, shown)
     return Row(item["name"], whole, shows, read_bar(item.get("bar")))
 
 

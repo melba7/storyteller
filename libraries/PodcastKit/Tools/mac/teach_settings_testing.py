@@ -12,6 +12,14 @@ OWN, SOUNDS, WORDS, MEANING = (
     "Plus the phone's own sounds", "Plus repeated sounds", "Plus repeated words",
     "Plus the meaning model")
 JOINTS, STEADY = "Plus joints", "Plus joints (steady files too)"
+# The scorecard's two Apple rows: the phone's (the answers as the settings place them) and the
+# what-if row (every answer skipping), which is the evidence for the shows where the model may skip.
+APPLE, APPLE_ALL = "Plus Apple's model (asked on the Mac)", "Plus Apple's model, if every show let it skip"
+
+
+def bar(passed, skips, breaks=20):
+    """A bar in the shape the phone's tool writes it, of a row or of a show."""
+    return {"breaks": breaks, "passed": passed, "noAdSkips": skips, "causes": {}}
 
 
 def total(episodes=3, ad=100.0, heard=0.0, cut=0.0, before=0.0, after=0.0, show_seconds=3000.0):
@@ -21,8 +29,12 @@ def total(episodes=3, ad=100.0, heard=0.0, cut=0.0, before=0.0, after=0.0, show_
             "showSeconds": show_seconds, "wrongSkips": 1, "bySort": {}}
 
 
-def show(feed, name="Show", **figures):
-    return {"feed": feed, "show": name, "total": total(**figures)}
+def show(feed, name="Show", bar=None, **figures):
+    """A show of a row, with its own bar when one is given."""
+    made = {"feed": feed, "show": name, "total": total(**figures)}
+    if bar is not None:
+        made["bar"] = bar
+    return made
 
 
 SUMMED = ("episodes", "ads", "caught", "adSeconds", "heardSeconds", "heardBeforeSeconds",

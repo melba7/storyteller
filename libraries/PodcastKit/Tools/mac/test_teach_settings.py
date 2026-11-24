@@ -14,7 +14,8 @@ class DefaultTests(unittest.TestCase):
         default, shows, _ = choose([])
         self.assertEqual(default, {
             "finders": {"own-sound": "skip", "repeat-sound": "ask", "repeat-words": "ask",
-                        "meaning": "skip"}, "joints": True, "steadyJoints": False, "ask": 0.35})
+                        "meaning": "skip", "apple-model": "ask"},
+            "joints": True, "steadyJoints": False, "ask": 0.35})
         self.assertEqual(shows, [])
 
     def test_a_finder_that_has_no_row_keeps_its_default(self):
@@ -124,7 +125,8 @@ class ScorecardRuleTests(unittest.TestCase):
             row(MEANING, show(FEED_A, heard=30, cut=40), show(FEED_B, ad=1000, heard=5, cut=3)))  # A: 37 wrong
         default, shows, _ = choose(rows)
         self.assertEqual(default["finders"], {"own-sound": "skip", "repeat-sound": "ask",
-                                              "repeat-words": "ask", "meaning": "skip"})
+                                              "repeat-words": "ask", "meaning": "skip",
+                                              "apple-model": "ask"})
         # repeat-sound is bad on A but already asks by default, so only the meaning model is written.
         self.assertEqual(shows, [{"feed": FEED_A, "finders": {"meaning": "ask"}}])
 

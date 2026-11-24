@@ -74,7 +74,9 @@ final class RoundThreeEpisodesOffTests: XCTestCase {
     // The Mac's file lets the repeat of words skip too; the built-in default only asks.
     let tuning = RoundShow.tuning(show: #", "finders": {"repeat-words": "skip"}"#)
     let made = try run(tuning)
-    XCTAssertEqual(Set(made.phone.ran), Set(ShowTuning.finderNames))
+    // Apple's model has a name in the settings but is no new finder: the phone's stand-in runs the
+    // four new ones (Apple's own placing is tested in AppleModelAdsTests).
+    XCTAssertEqual(Set(made.phone.ran), Set(ShowTuning.finderNames).subtracting([ShowTuning.appleModel]))
     for (episode, file) in zip(episodes, made.files) {
       // Rule 2 of the round: a new finder only adds. Every older ad is in the file as it was.
       for ad in before(episode) { XCTAssertTrue(file.ads.contains(ad), "\(episode.id): \(ad)") }

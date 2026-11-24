@@ -30,10 +30,13 @@ extension PodcastAdFinder {
     // A local-only result is about to be replaced: what the listener undid in it is kept.
     LocalAdsFile.carryChoices(store: ads, detector: Self.detectorName)
     if addLocalToPartial(local, ads: ads, duration: transcript.duration) { refreshIfPlaying(id) }
+    // The model's answers skip only where the show's level for it is skip; the rest become
+    // questions below (`placing.asked`), or are dropped (PodcastAdFinder+Apple.swift).
+    let placing = Self.modelPlacing(forEpisode: id)
     do {
       let outcome = try await AdsRunner.run(
         transcript: transcript, detector: model, store: ads,
-        osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+        osVersion: ProcessInfo.processInfo.operatingSystemVersionString, placing: placing,
         progress: { [weak self] done, total in
           guard let self else { return }
           if done == 0 { PodcastTimeline.mark(id, "full pass started: \(total) pieces") }
@@ -55,7 +58,8 @@ extension PodcastAdFinder {
         // The old finders' ads are on disk: a playing episode skips them now, before the new
         // finders (slow) add what they find, each through the guard (PodcastAdFinder+New.swift).
         refreshIfPlaying(id)
-        let made = addNewFinders(id, ads: ads, transcript: transcript, file: withChapters)
+        let made = addNewFinders(
+          id, ads: ads, transcript: transcript, file: withChapters, modelAsks: placing.asked)
         let file = made.file
         set(id, AdsRules.finished(file))
         // An episode that is playing now starts skipping the new ads at once, not after the

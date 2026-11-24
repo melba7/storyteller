@@ -38,9 +38,15 @@ it. Right seconds are adSeconds - heardSeconds, wrong seconds are cutSeconds. Th
   row pays as well, has more right seconds than it and at most one in a hundred more wrong ones. A
   show where the steady row adds more wrong than right seconds over "Plus joints" gets
   "steadyJoints": false.
-This tool never raises a finder to "skip": a listener's "yes" does not change this file or a level,
-it only teaches the phone's own memory. Only the settings are written, to the teaching folder; the
-phone's notes are only read. A scorecard without rows (an older file) gives the plain default.
+- Apple's on-device model is one more finder, "apple-model", which ASKS by default (teach_settings_apple.py).
+  It is not judged by seconds. A show gets "skip" for it only when the scorecard's row "Plus Apple's
+  model, if every show let it skip" passes at least 3 more breaks on that show than the last finder row
+  and adds at most 1 skip with no ad (the show's own bar); otherwise it keeps asking. The notes make it
+  stricter on a show like any finder.
+This tool never raises a finder to "skip" by itself, except Apple's model on a show where its bar
+passes as above: a listener's "yes" does not change this file or a level, it only teaches the phone's
+own memory. Only the settings are written, to the teaching folder; the phone's notes are only read. A
+scorecard without rows (an older file) gives the plain default.
 
   teach_settings.py [--folder F] [--notes FILE]
 
@@ -55,6 +61,7 @@ import os
 import sys
 import time
 
+import teach_settings_apple as apple
 import teach_store
 from apple_podcasts_export import default_folders
 from teach_settings_bar import bar_decision
@@ -71,10 +78,13 @@ ROWS = {
     "Plus repeated words": "repeat-words",
     "Plus joints": "joints",
     "Plus joints (steady files too)": "steady-joints",
+    apple.WHAT_IF_ROW: apple.NAME,
 }
-FINDERS = tuple(what for what in ROWS.values() if not what.endswith("joints"))
+# The finders the seconds judge. Apple's model has its own rule (teach_settings_apple.py).
+FINDERS = tuple(what for what in ROWS.values() if not what.endswith("joints") and what != apple.NAME)
 DEFAULT = {"finders": {"own-sound": "skip", "repeat-sound": "ask", "repeat-words": "ask",
-                       "meaning": "skip"}, "joints": True, "steadyJoints": False, "ask": 0.35}
+                       "meaning": "skip", apple.NAME: "ask"},
+           "joints": True, "steadyJoints": False, "ask": 0.35}
 STRICTNESS = {"skip": 0, "ask": 1, "off": 2}
 MIN_EPISODES = 3
 PRECISION_PERCENT = 85
@@ -159,12 +169,13 @@ def choose(rows, notes, now):
         if what and what not in named:
             named[what] = row
             if index > 0:
-                pairs[what] = (row, rows[index - 1])
+                pairs[what] = (row, apple.standing_on(rows, index))
     for what, (row, before) in pairs.items():
-        if what not in ("joints", "steady-joints") and row.total.episodes >= MIN_EPISODES:
+        if what in FINDERS and row.total.episodes >= MIN_EPISODES:
             overall(what, row, before, default, lines)
     over_joints(named, pairs, default, lines)
-    return default, entries(rows, pairs, named, answers(notes, now, FINDERS), default, lines), lines
+    heard = answers(notes, now, FINDERS + (apple.NAME,))
+    return default, entries(rows, pairs, named, heard, default, lines), lines
 
 
 def over_joints(named, pairs, default, lines):
@@ -233,6 +244,18 @@ def level_of(pairs, heard, key, finder):
     return level, why
 
 
+def apple_level(pairs, heard, key):
+    """What the scorecard and the notes let Apple's model do on the show `key`: (level, why). It asks
+    unless the bar says its answers pay there; the notes can only make it stricter."""
+    level, why = "ask", ""
+    found = apple.change(pairs.get(apple.NAME), key)
+    if apple.pays(found):
+        level, why = "skip", "its answers " + apple.why(found)
+    if (key, apple.NAME) in heard and STRICTNESS[heard[key, apple.NAME][0]] > STRICTNESS[level]:
+        level, why = heard[key, apple.NAME]
+    return level, why
+
+
 def entries(rows, pairs, named, heard, default, lines):
     """The shows' entries. A show gets one only for what is stricter than the default block, and
     `lines` gets one line for each."""
@@ -251,6 +274,11 @@ def entries(rows, pairs, named, heard, default, lines):
             if STRICTNESS[level] > STRICTNESS[default["finders"][finder]]:
                 finders[finder] = level
                 parts.append("%s %s (%s)" % (finder, "now only asks" if level == "ask" else "is off", why))
+        level, why = apple_level(pairs, heard, key)
+        if level != default["finders"][apple.NAME]:
+            finders[apple.NAME] = level
+            parts.append("%s %s (%s)" % (apple.NAME, {"skip": "may skip", "ask": "now only asks",
+                                                      "off": "is off"}[level], why))
         entry = {"feed": first[key].feed}
         if finders:
             entry["finders"] = finders
