@@ -63,6 +63,14 @@ extension PodcastPlayer {
     return AVPlayerItem(asset: loader.makeAsset())
   }
 
+  /// Play started (`startPlaying`): the play diary notes how the episode stands, a stream or a
+  /// download with its ads finished or not (PlayDiary), once for each episode that is played.
+  func notePlayStart() {
+    guard let id = current?.id else { return }
+    PodcastTimeline.playStarted(
+      id, isStream: streamDownload != nil || playsPlainAddress, duration: currentDuration)
+  }
+
   /// Playing from the download does not work (the server refused it or sends no length, or the
   /// listener removed it): the same place plays from the episode's plain address instead.
   func fallBackToStream(from loader: PodcastStreamDownload, reason: StreamFallback) {

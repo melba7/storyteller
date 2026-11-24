@@ -7,7 +7,9 @@
 // the listener taps "Send skip log" in Profile, for the share sheet. The words come from the
 // episode's transcript, so the file is never committed. The ad finder's diary (`AdDiary` in
 // PodcastAds, `ad-diary.jsonl` beside the log) is written here too, on the same queue, and its
-// lines join the copy that is sent. It holds no words of the episode.
+// lines join the copy that is sent. It holds no words of the episode. So does the play diary
+// (`PlayDiary`, `play-diary.jsonl`): a line for every play that starts and for every finished
+// transcription, with a limit of its own so the ad diary's 500 lines never push it out.
 
 import Foundation
 import PodcastAds
@@ -150,10 +152,58 @@ enum SkipLogFile {
     }
   }
 
-  /// The skip lines and then the diary lines, as the copy for sharing holds them. Call it on
-  /// the queue.
+  /// The play diary, beside the ad diary.
+  static var playsURL: URL {
+    SkipLogFile.url.deletingLastPathComponent().appendingPathComponent(PlayDiary.fileName)
+  }
+
+  /// A play started: one line in the play diary on how the episode stood (`PlayDiary.start`). The
+  /// files are read on the log's queue, so Play never waits for them.
+  static func appendPlayStart(_ episodeId: String, isStream: Bool, duration: Double?) {
+    let time = Date().timeIntervalSince1970
+    queue.async {
+      var finished = false
+      var reached = 0.0
+      if !isStream, let downloads = PodcastDownloader.shared.store,
+        let (ads, transcripts) = PodcastAdFinder.shared.stores(for: episodeId, in: downloads)
+      {
+        finished = ads.load(detector: PodcastAdFinder.detectorName) != nil
+        reached =
+          transcripts.hasTranscript ? (duration ?? 0) : (transcripts.loadPartial()?.reached ?? 0)
+      }
+      let start = PlayDiary.start(
+        isStream: isStream, hasFinishedAds: finished, transcriptReached: reached)
+      SkipLogFile.writePlayLine(PlayDiary.line(at: time, episodeId: episodeId, start: start))
+    }
+  }
+
+  /// A transcription finished: one line in the play diary with the audio it did and the seconds it
+  /// took (`PlayDiary.line`).
+  static func appendSpeed(_ episodeId: String, audio: Double, work: Double, inBackground: Bool) {
+    let line = PlayDiary.line(
+      at: Date().timeIntervalSince1970, episodeId: episodeId, audio: audio, work: work,
+      inBackground: inBackground)
+    queue.async { SkipLogFile.writePlayLine(line) }
+  }
+
+  /// Adds a line to the play diary and keeps the newest `PlayDiary.maxLines`. Call it on the queue.
+  private static func writePlayLine(_ line: String) {
+    guard !line.isEmpty else { return }
+    let file = playsURL
+    let text = PlayDiary.appending(line, to: read(file))
+    do {
+      try FileManager.default.createDirectory(
+        at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try Data(text.utf8).write(to: file, options: .atomic)
+    } catch {
+      NSLog("Podcasts: the play diary could not be saved: \(error)")
+    }
+  }
+
+  /// The skip lines, then the diary lines and then the play diary's lines, as the copy for sharing
+  /// holds them. Call it on the queue.
   private static func sharedText() -> String {
-    AdDiary.shared(skipLog: read(url), diary: read(diaryURL))
+    AdDiary.shared(skipLog: read(url), diary: read(diaryURL), plays: read(playsURL))
   }
 
   /// The text of the copy for sharing, read on the log's queue, or nil when nothing is logged.

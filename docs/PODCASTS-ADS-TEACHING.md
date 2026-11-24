@@ -238,7 +238,14 @@ The phone writes two files into `Podcasts/` of its linked folder:
   `wanted.json` ("confirmed" counts like "missed" and "denied" like "undone"),
   and the next gathering takes those episodes first.
 - `phone-diary.jsonl`: the skip log and the ad finder's diary, as "Send skip
-  log" shares them, written again when they changed.
+  log" shares them, written again when they changed. It ends with the play diary
+  (`play-diary.jsonl` on the phone, `PlayDiary.swift`), which has its own 2,000
+  lines so the ad diary's 500 never push it out: one line (`"kind": "diary"`)
+  for every play that starts, with `what` set to `play: ready` (the ads were
+  found for the whole episode), `play: partly, transcript to N s` (downloaded,
+  ads not finished) or `play: stream`, and one for every finished transcription
+  (the whole episode or its head), `N s of audio in M s, front` or
+  `, background`. `teach_pace.py` reads them.
 
 ## The bridge between Swift and TypeScript
 
@@ -398,8 +405,13 @@ player with the finished file known before the listener taps play (an episode
 that was read to its end first), so it chains ads the way the player does and is
 not the row's own bar, which stays in the bar block. After the paces the block
 prints the first 3 minutes at two more speech speeds, 6 and 25 times real time,
-because the phone's real speed is not measured yet and the first 3 minutes
-depend on it. Without `--stream` nothing changes.
+because the first 3 minutes depend on the phone's real speed. That speed is
+measured now: `teach_pace.py` reads the phone's diary and prints the speech pace
+in seconds of audio per second of work, and `--stream --speech N` replays the
+standard pace with that speech speed instead of 12. The pace is then called
+"measured", the block says so, and the numbers saved in `scorecard.json` carry
+the `speech` they were replayed at. `--speech` without `--stream` is refused.
+Without `--stream` nothing changes.
 
 Apple's on-device model only runs on a Mac or a phone.
 `podcast-teach apple <folder> [--exam] [--limit N]` asks it about the episodes a

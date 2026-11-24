@@ -228,6 +228,8 @@ final class PodcastTranscriber: @unchecked Sendable {
     let phone = Locale.preferredLanguages.first ?? "en-US"
     let locale = LocalePick.identifier(feedLanguage: languages?.language(for: id), phone: phone)
     set(id, .transcribing(percent: 0))
+    let began = Date()
+    let from = files.loadPartial()?.reached ?? 0
     do {
       let outcome = try await TranscriptRunner.run(
         audio: files.folder.appendingPathComponent(file), sha256: files.sha256, locale: locale,
@@ -239,12 +241,14 @@ final class PodcastTranscriber: @unchecked Sendable {
         },
         shouldContinue: { [weak self] in self?.mayContinue(step) ?? false })
       switch outcome {
-      case .finished:
+      case .finished(let transcript):
         set(id, .done)
+        noteSpeed(id, audio: transcript.duration - from, since: began)
         PodcastAdFinder.shared.scan()
       case .paused(let reached):
         if step.stage == .head, reached >= PrepRules.headSeconds - 0.01 {
           lock.withLock { _ = headDone.insert(id) }
+          noteSpeed(id, audio: reached - from, since: began)
           PodcastAdFinder.shared.transcriptHeadReady(id)
         }
         pause(id)
@@ -263,6 +267,14 @@ final class PodcastTranscriber: @unchecked Sendable {
       if downloads.entry(for: id) == nil { return removed(id) }
       set(id, .failed(reason: "Transcribing stopped: \(error.localizedDescription)"))
     }
+  }
+
+  /// A transcription that finished (the whole episode, or its head) goes into the play diary: the
+  /// audio it did and the seconds it took, in front or in a background turn (PlayDiary).
+  private func noteSpeed(_ id: String, audio: Double, since began: Date) {
+    SkipLogFile.appendSpeed(
+      id, audio: audio, work: Date().timeIntervalSince(began),
+      inBackground: lock.withLock { inBackgroundTask })
   }
 
   /// Back to the front of the queue, with its partial file saved; its download may be gone.

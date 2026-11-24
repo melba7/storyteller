@@ -95,13 +95,15 @@ public enum AdDiary {
     return found.kind == "diary"
   }
 
-  /// The text of the copy that is sent: the skip log's lines, then the diary's. The skip log
-  /// holds no diary line, and if it did, they would not be doubled.
-  public static func shared(skipLog: String, diary: String) -> String {
+  /// The text of the copy that is sent: the skip log's lines, then the diary's, then the play
+  /// diary's (`PlayDiary`, which has its own file and its own limit). The skip log holds no
+  /// diary line, and if it did, they would not be doubled.
+  public static func shared(skipLog: String, diary: String, plays: String = "") -> String {
     let skips = skipLog.split(separator: "\n", omittingEmptySubsequences: true)
       .filter { !isDiaryLine(String($0)) }
     let notes = diary.split(separator: "\n", omittingEmptySubsequences: true)
-    let all = skips + notes
+    let measures = plays.split(separator: "\n", omittingEmptySubsequences: true)
+    let all = skips + notes + measures
     return all.isEmpty ? "" : all.joined(separator: "\n") + "\n"
   }
 
