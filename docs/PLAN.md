@@ -1379,7 +1379,7 @@ written here and the idea goes under Later.
 
 **1. Free steps**
 
-- [ ] **W1 Measure real plays** (phone, small): one diary line for every play
+- [x] **W1 Measure real plays** (phone, small): one diary line for every play
       that starts ("play: ready", "play: partly, transcript to N s" or "play:
       stream") and one for every finished transcription ("N s of audio in M s",
       front or background), kept apart from the 500-line trim. They reach the
@@ -1394,7 +1394,14 @@ written here and the idea goes under Later.
     `Tools/mac/teach_pace.py`.
   - Done when: the tests pass and, after three days on the phone, the Mac prints
     both numbers. It cannot change a skip, so it has no bar number.
-- [ ] **W2 Read ahead when Wi-Fi comes back** (phone, small): the look that
+  - Result: built (`PlayDiary`, `play-diary.jsonl`, `teach_pace.py`,
+    `score --stream --speech N`). The way back from the phone has no break (the
+    notes sync runs at app start and when the app comes to the front). Only
+    plays that start in the first minute count, and not the listener's own
+    files. The numbers wait for a build on the phone. The speech pace is the
+    largest lever on a stream: at 6, 12 and 25 times real time the shelf passes
+    99, 112 and 136 of 219 as a stream.
+- [x] **W2 Read ahead when Wi-Fi comes back** (phone, small): the look that
       fetches the next two of Up Next runs only when Up Next changes or an
       episode starts or ends, so episodes queued away from Wi-Fi are not fetched
       when the phone comes home. It also runs when Wi-Fi returns, when the app
@@ -1405,7 +1412,11 @@ written here and the idea goes under Later.
   - Done when: a test shows a queued episode starts after Wi-Fi returns. Worth
     up to 28 breaks (13 points) on plays that would have been streams, nothing
     on the finished number.
-- [ ] **W3 Apple's row and the unmarked stretches** (cloud, free): when
+  - Result: built. Nothing looked at Up Next on a Wi-Fi return, on the app
+    coming to the front or in the background refresh before (`automaticRun.ts`
+    did not call it at all); `DownloadAhead.NetworkWatch` and a native
+    `lookAhead` do now. The rule and the limit of two are as they were.
+- [x] **W3 Apple's row and the unmarked stretches** (cloud, free): when
       `apple-model.json` is done on the Mac I score the shelf with both label
       sets and `--stream`. Apple's model is already on in the app, so its row is
       what today's phone really does. It stays as it is when the row passes at
@@ -1414,7 +1425,28 @@ written here and the idea goes under Later.
       answers into questions through the per-show settings. I also read the 19
       unmarked stretches: if they are ads, the exact labels become the headline.
   - Done when: both tables and the decision are written here.
-- [ ] **W4 Sound at the edges, measured first** (built in the cloud, run on the
+  - Result (Apple's answers for all 63 shelf episodes, scored 2026-11-24): the
+    model makes the phone worse. On Claude's labels (219 breaks) the row before
+    passes 140 with 20 skips with no ad, with Apple's answers 118 with 183 (3.5
+    an hour). On the snapped labels (242 breaks) 131 and 19 against 109 and 181.
+    As a stream at the assumed pace 109 and 19 against 95 and 188; ready 137
+    against 115. Keeping only its sure answers gives 122 and 70, only sure ads
+    of the kind `ad` 126 and 53, sure ads and promos 122 and 68, so no part of
+    it helps. Of its 144 unsure answers of the kind `ad` 124 are wrong (under
+    20% of the stretch is a marked ad), and 121 of 129 unsure credits. Decision:
+    its answers become questions by default (W3b below). The head scan's wait
+    for the model costs 3 breaks as a stream (112 against 109 without the wait).
+    The 19 unmarked stretches are not read yet.
+- [ ] **W3b Apple's model asks and does not skip** (phone and Mac settings,
+      small): a finder `apple-model` in `ShowTuning` with the built-in default
+      `ask`, applied to Apple's list before the join as for the other finders,
+      the head scan not waiting for the model unless it may skip, the
+      scorecard's Apple row applying the same settings, and `teach_settings.py`
+      choosing it per show by the same rule as the other finders.
+  - Done when: under the built-in default the Apple row equals the row before it
+    (140 of 219 on Claude's labels, 20 skips with no ad), and a show whose
+    setting is `skip` still gets the old behaviour.
+- [x] **W4 Sound at the edges, measured first** (built in the cloud, run on the
       Mac's audio by an RC session or one double-click, free, about an hour):
       `podcast-teach edges` works out, for every half second of each shelf MP3,
       the loudness, a 24-band spectrum and whether it is a pause. A change score
@@ -1427,7 +1459,16 @@ written here and the idea goes under Later.
     more breaks on the exact labels with no more skips with no ad. It can win at
     most the 41 failing spot breaks.
   - Files: `PodcastAudioMatch/EdgeSound.swift`, `podcast-teach`, one launcher.
-- [ ] **W5 A small language model, tried first** (Mac, free, some hours at
+  - Result (2026-11-24, 43 shelf episodes, 232 exact edges, the same number of
+    random points): the strongest change is within 1 second of 84 exact edges
+    (36%), within 2 seconds of 117 (50%), within 5 seconds of 167 (72%); for
+    random points 14%, 18% and 40% (chance is about 10%, 20% and 50% inside 10
+    seconds). Verdict: no go. The sound does point at the edges, but not near
+    enough to the 70% in 1 second, so nothing of it goes into the app. The
+    change score's weights were a first guess; a trained one is the one more
+    try, but half of the late starts are 18 to 97 seconds late, out of any
+    snap's reach.
+- [x] **W5 A small language model, tried first** (Mac, free, some hours at
       night): `teach_passage.py` runs in the Mac's `python-mood` environment
       (MiniLM-L6, about 23 MB once shrunk). It reads five lines at a time and
       says what the middle line is. It learns from the 651 marked episodes off
@@ -1442,6 +1483,13 @@ written here and the idea goes under Later.
     gate (68% right), so this has even odds.
   - Files: `Tools/mac/teach_passage.py`, a launcher, `AppleScoreRow.swift` made
     general; on a go `PodcastAdsOnDevice` and `modules/podcasts/ios`.
+  - Result (2026-11-24, trained on 651 episodes, answering for the shelf): line
+    accuracy 90%, any ad line by line precision 56% and recall 81%. The row
+    "Plus the passage model" passes 103 of 219 (47%) against 140 on Claude's
+    labels, with 370 skips with no ad (7.0 an hour) against 20, and 93 of 242
+    against 131 on the snapped labels. Verdict: no go. A small model that reads
+    five lines is wrong about as often as Apple's much larger one: host-read ads
+    are not told from the show by their words alone.
 
 **2. The Mac reads ahead** (about $0.19 an episode of Mo's Claude plan)
 
