@@ -165,11 +165,12 @@ final class ShowTuningTests: XCTestCase {
     XCTAssertEqual(ShowTuning.repeatWords, "repeat-words")
     XCTAssertEqual(ShowTuning.meaning, "meaning")
     XCTAssertEqual(ShowTuning.appleModel, "apple-model")
+    XCTAssertEqual(ShowTuning.ahead, "ahead")
     XCTAssertEqual(
       ShowTuning.finderNames,
       [
         ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords, ShowTuning.meaning,
-        ShowTuning.appleModel,
+        ShowTuning.appleModel, ShowTuning.ahead,
       ])
   }
 

@@ -19,10 +19,12 @@ public enum AdScoreCommand {
     /// The seconds of audio the phone transcribes in one second, as measured (teach_pace.py):
     /// the stream replay uses it for its standard pace. Nil for the assumed one.
     public var speech: Double?
+    /// Also add the row "Plus the Mac's marks from the night before" (AheadScoreRow.swift).
+    public var ahead = false
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]] [--ahead]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -35,6 +37,7 @@ public enum AdScoreCommand {
       case "--no-library": options.noLibrary = true
       case "--exam": options.exam = true
       case "--stream": options.stream = true
+      case "--ahead": options.ahead = true
       case "--speech":
         index += 1
         guard index < arguments.count, let speech = Double(arguments[index]), speech.isFinite,
@@ -185,6 +188,11 @@ public enum AdScoreCommand {
     // last finder row. A file that cannot be read leaves the row out.
     let passage = PassageScoreRow.read(in: folder, episodes: chosen)
     let passageAds = passage.reading.map(\.ads).flatMap { $0.isEmpty ? nil : $0 }
+    // The Mac's marks of the night before (--ahead), made of Claude's own labels and found again by
+    // the phone's finder, make a row of their own after the others that stands on the last finder row.
+    let ahead = options.ahead
+      ? AheadScoreRow.Run(
+        folder: folder, episodes: chosen, tuning: tuning, now: now, standingOn: finalAds) : nil
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
     // episode of a show, so the labelled episodes that are not scored come first and only teach.
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
@@ -197,6 +205,7 @@ public enum AdScoreCommand {
       + (passageAds.map {
         [AnswerScoreRow.layer(name: PassageScoreRow.name, $0, standingOn: finalAds)]
       } ?? [])
+      + (ahead.map { [$0.layer] } ?? [])
     let made = AdScoreRun.runLayers(
       episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
@@ -222,7 +231,8 @@ public enum AdScoreCommand {
     let bar = AdBarReport.lines(rows)
     if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
     var saved = rows
-    let extra = Array(made.dropFirst(layers.count))  // Apple's two rows, then the passage row, as far as they exist
+    // Apple's two rows, then the passage row, as far as they exist (the Mac's marks row is the last one).
+    let extra = Array(made.dropFirst(layers.count).dropLast(ahead == nil ? 0 : 1))
     if let apple, let placed, extra.count >= 2 {
       let both = AppleScoreRow.report(extra, answered: apple.count, of: chosen.count, placed: placed)
       text += "\n\n" + both.text
@@ -237,22 +247,36 @@ public enum AdScoreCommand {
       text += "\n\n" + PassageScoreRow.staleNote(stale)
     }
     if let note = passage.note { text += "\n\n" + note }
+    if let ahead, let card = made.last {
+      let shown = ahead.report(card, last: rows.last, scored: chosen.count)
+      text += "\n\n" + shown.text
+      saved.append(shown.row)
+    }
     if options.stream {
-      let detect: (TeachingEpisode, Transcript) -> [FoundAd] = { episode, transcript in
-        let input = AdScoreInput(episode: episode, transcript: transcript, audio: audio[episode.id])
-        var soFar = base(episode, transcript)
-        for layer in layers { soFar = layer.apply(input, soFar: soFar) }
-        return soFar
+      func detecting(_ more: [AdScoreLayer]) -> (TeachingEpisode, Transcript) -> [FoundAd] {
+        { episode, transcript in
+          let input = AdScoreInput(episode: episode, transcript: transcript, audio: audio[episode.id])
+          var soFar = base(episode, transcript)
+          for layer in layers + more { soFar = layer.apply(input, soFar: soFar) }
+          return soFar
+        }
       }
       let streamed = StreamScore.run(
         episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple, tuning: tuning,
-        speech: options.speech, whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
+        speech: options.speech, whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detecting([]))
       var shown = [(name: String, stream: StreamNumbers)]()
       shown.append((rows.last?.name ?? "", streamed.finders))
       saved[rows.count - 1].stream = streamed.finders
       if let more = streamed.withModel, saved.count > rows.count {
         shown.append((saved[rows.count].name, more))
         saved[rows.count].stream = more
+      }
+      if let ahead {
+        let more = ahead.streamed(
+          episodes: chosen, habits: habits, tuning: tuning, speech: options.speech,
+          detect: detecting([ahead.layer]))
+        shown.append((AheadScoreRow.name, more))
+        saved[saved.count - 1].stream = more
       }
       let waiting = (episodes: streamed.waiting, of: chosen.count)
       text += "\n\n" + StreamReport.lines(shown, waiting: waiting).joined(separator: "\n")

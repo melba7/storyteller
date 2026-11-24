@@ -452,6 +452,11 @@ type PodcastsNativeModule = {
   ): Promise<boolean>
   /** Tells the native side which show each feed key is: `{"<feed key>": "<show id>"}`. */
   setTeachingShows(json: string): Promise<void>
+  /**
+   * Tells the native side which episode is which, so the Mac's marks of the night before find
+   * theirs: `{"<episode id>": {"feed": "<feed address>", "guid": "...", "title": "..."}}`.
+   */
+  setAheadEpisodes(json: string): Promise<void>
   /** What is installed from the Mac, as JSON text (see teaching.ts). */
   getTeachingState(): Promise<string>
   /**

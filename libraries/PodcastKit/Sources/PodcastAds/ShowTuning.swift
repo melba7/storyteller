@@ -13,9 +13,10 @@ import Foundation
 //    "shows": [{"feed": "<feed address>", "finders": {"repeat-words": "skip"},
 //               "sorts": {"host_ask": "ask"}, "joints": false}]}
 //
-// Finder names are "own-sound", "repeat-sound", "repeat-words", "meaning" and "apple-model" (Apple's
+// Finder names are "own-sound", "repeat-sound", "repeat-words", "meaning", "apple-model" (Apple's
 // on-device model, which asks by default: its answers are questions, never skips, unless the file
-// says "skip" for a show or for every show); sort names are the word model's classes ("sponsor",
+// says "skip" for a show or for every show) and "ahead" (the Mac's marks of the night before, which
+// skips by default; the Mac's teach_settings.py does not choose it yet); sort names are the word model's classes ("sponsor",
 // "network_promo", "host_ask", "intro_credits"); the levels are "skip", "ask" and "off". Any other
 // name or level is ignored, so a build that does not know "apple-model" reads the same file and the
 // file stays version 1. A show is named by its feed address and turned into the app's show id when
@@ -57,7 +58,10 @@ public struct ShowTuning: Sendable, Equatable {
   public static let repeatWords = "repeat-words"
   public static let meaning = "meaning"
   public static let appleModel = "apple-model"
-  public static let finderNames = [ownSound, repeatSound, repeatWords, meaning, appleModel]
+  /// The Mac's marks of the night before, found again by their words (`AheadAds`). It skips unless
+  /// the file says otherwise: the marks are Claude's own, and nothing is found without them.
+  public static let ahead = "ahead"
+  public static let finderNames = [ownSound, repeatSound, repeatWords, meaning, appleModel, ahead]
   /// The word model's classes, which the file can set for each kind of ad.
   public static let sortNames = ["sponsor", "network_promo", "host_ask", "intro_credits"]
   public static let defaultAsk = 0.35
@@ -85,6 +89,7 @@ public struct ShowTuning: Sendable, Equatable {
   static let builtIn = Choices(
     finders: [
       ownSound: .skip, repeatSound: .ask, repeatWords: .ask, meaning: .skip, appleModel: .ask,
+      ahead: .skip,
     ],
     sorts: [:], joints: true, steadyJoints: false)
 
