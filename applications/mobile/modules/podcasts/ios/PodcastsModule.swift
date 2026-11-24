@@ -303,6 +303,11 @@ public final class PodcastsModule: Module {
     AsyncFunction("listDownloads") { () -> [[String: Any]] in
       (PodcastDownloader.shared.store?.entries() ?? []).map(DownloadJSON.object)
     }
+    // Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never
+    // off Wi-Fi). The app asks when it comes to the front and in the background refresh.
+    AsyncFunction("lookAhead") { () async in
+      await MainActor.run { PodcastDownloadAhead.shared.look() }
+    }
     // Bytes taken by finished downloads.
     AsyncFunction("storageUsed") { () -> Double in
       Double(PodcastDownloader.shared.store?.storageUsed() ?? 0)

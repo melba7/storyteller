@@ -30,7 +30,8 @@ final class PodcastDownloadAhead {
 
   private init() {}
 
-  /// Up Next changed, or an episode started or ended (the player changes Up Next then too).
+  /// Up Next changed, an episode started or ended (the player changes Up Next then too), or Wi-Fi
+  /// came back (PodcastNetwork), where an episode queued away from home waits to be fetched.
   func changed() {
     pending?.cancel()
     pending = Task { [weak self] in
@@ -50,8 +51,10 @@ final class PodcastDownloadAhead {
     }
   }
 
-  /// Asks the rule what to do now and does it.
-  private func look() {
+  /// Asks the rule what to do now and does it. JavaScript asks for this when the app comes to the
+  /// front and in the background refresh (automaticRun.ts), at once because the refresh may end,
+  /// and the app be suspended, before the few seconds of `changed()` are up.
+  func look() {
     let player = PodcastPlayer.shared
     let downloader = PodcastDownloader.shared
     guard let store = downloader.store else { return }

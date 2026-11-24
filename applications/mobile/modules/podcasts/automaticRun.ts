@@ -3,7 +3,8 @@ import { archivesByItself, episodesToArchive } from "./archive"
 // LOFI-FORK: the podcasts section's automatic downloads and clean-up (see FORK.md).
 //
 // What the app does by itself when it comes to the front and in the background task: follow
-// what the Mac wrote from Apple Podcasts (appleSync.ts), read every feed, download each show's
+// what the Mac wrote from Apple Podcasts (appleSync.ts), have the phone look at Up Next and
+// fetch the next two episodes ahead (on Wi-Fi), read every feed, download each show's
 // newest new episode (always on Wi-Fi), download the first episodes of the playlists that
 // ask for it, put new episodes in Up Next where a show says so,
 // delete played downloads after a day and archive what each show's rules say. The rules are
@@ -29,7 +30,12 @@ import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
 import { listPlaylists, smartEpisodes } from "./dbPlaylists"
 import { archiveEpisodes, syncShowSettings } from "./dbSettings"
-import { deleteDownload, listDownloads, startDownload } from "./downloadsNative"
+import {
+  deleteDownload,
+  listDownloads,
+  lookAhead,
+  startDownload,
+} from "./downloadsNative"
 import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 import { filterDownloaded, playlistDownloads } from "./playlistRules"
@@ -109,6 +115,18 @@ async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
       console.warn("Couldn't start a playlist download", cause)
     }
   }
+}
+
+/**
+ * Has the phone look at Up Next and fetch the next episodes ahead, which it does only on Wi-Fi.
+ * An episode queued away from home is fetched this way once the app opens or the background
+ * refresh runs at home (the phone itself looks when Wi-Fi returns while the app is running). A
+ * failure is logged, not thrown.
+ */
+async function lookAheadInUpNext() {
+  await lookAhead().catch((cause: unknown) =>
+    console.warn("Couldn't look ahead in Up Next", cause),
+  )
 }
 
 /** Puts new episodes in Up Next for the shows that ask for it, through the native queue. */
@@ -213,6 +231,9 @@ export function runAutomatic(): Promise<void> {
     try {
       const now = Date.now()
       const settings = await loadSettings()
+      // First, before the feeds: the background task's time may run out in them, and a download
+      // that has started carries on after it.
+      await lookAheadInUpNext()
       // The headphones' bookmarks, which the background task may be the first to see.
       await importPendingBookmarks().catch((cause) =>
         console.warn("Couldn't import the headphone bookmarks", cause),
@@ -256,6 +277,7 @@ export function runAutomatic(): Promise<void> {
  */
 export async function runIfDue(): Promise<void> {
   if (!refreshDue(await loadLastRun(), Date.now())) {
+    await lookAheadInUpNext()
     await syncApplePodcastsBriefly()
     runTeachingSync()
     // In full at startup, so the player has every show's settings even on a quiet open.

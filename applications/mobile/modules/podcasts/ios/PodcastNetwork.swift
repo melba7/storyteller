@@ -1,6 +1,7 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 import Foundation
 import Network
+import PodcastDownloads
 
 /// Whether the phone is on Wi-Fi right now (or any network that is not expensive, such as
 /// Ethernet), by the same test the downloader uses to keep a download off mobile data.
@@ -9,12 +10,19 @@ final class PodcastNetwork: @unchecked Sendable {
 
   private let lock = NSLock()
   private var path: NWPath?
+  /// Notices Wi-Fi coming back, so what waited for it is looked at again (PodcastDownloadAhead).
+  private var watch = DownloadAhead.NetworkWatch()
   private let monitor = NWPathMonitor()
 
   private init() {
     monitor.pathUpdateHandler = { [weak self] path in
       guard let self else { return }
-      self.lock.withLock { self.path = path }
+      let returned = self.lock.withLock { () -> Bool in
+        self.path = path
+        return self.watch.reported(
+          onWiFi: path.status == .satisfied && !path.isExpensive, lowData: path.isConstrained)
+      }
+      if returned { Task { @MainActor in PodcastDownloadAhead.shared.changed() } }
     }
     monitor.start(queue: DispatchQueue(label: "PodcastNetwork"))
   }

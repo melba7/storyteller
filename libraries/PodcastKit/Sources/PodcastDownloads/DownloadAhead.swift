@@ -87,6 +87,24 @@ public enum DownloadAhead {
     return plan
   }
 
+  /// Notices when the network turns into one where episodes may be fetched ahead: on Wi-Fi and
+  /// not in Low Data Mode, the two things `plan` asks of it. An episode queued away from home
+  /// waits for that, and nothing else would tell the player that it came. The network counts as
+  /// closed until the first report, as it does for `plan`, so an app that opens at home looks.
+  public struct NetworkWatch: Sendable, Equatable {
+    private var open = false
+
+    public init() {}
+
+    /// Feed this every report of the network. True when this one opens it, so Up Next is to be
+    /// looked at again; false when it is the same network once more or one that fetches nothing.
+    public mutating func reported(onWiFi: Bool, lowData: Bool) -> Bool {
+      let now = onWiFi && !lowData
+      defer { open = now }
+      return now && !open
+    }
+  }
+
   /// Whether an ahead download failed because the phone had no room. The player remembers it
   /// for the rest of the run and passes it to `plan` as `phoneFull`.
   public static func phoneIsFull(in entries: [DownloadEntry]) -> Bool {

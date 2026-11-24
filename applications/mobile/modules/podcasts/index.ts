@@ -403,6 +403,11 @@ type PodcastsNativeModule = {
   /** Removes a download: the audio, its side files and its entry. */
   deleteDownload(episodeId: string): Promise<void>
   listDownloads(): Promise<DownloadInfo[]>
+  /**
+   * Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never off
+   * Wi-Fi). Called when the app comes to the front and in the background refresh.
+   */
+  lookAhead(): Promise<void>
   /** Where each downloaded episode's transcript is. */
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
