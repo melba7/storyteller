@@ -13,6 +13,7 @@ import { onLibraryChanged } from "./changes"
 import { listEpisodes, listShows } from "./db"
 import { Podcasts } from "./index"
 import { type StoredEpisode } from "./library"
+import { currentQueue } from "./phoneNotesSync"
 import {
   TEACHING_LIST_FILE,
   aheadEpisodesText,
@@ -67,7 +68,14 @@ export async function sendAheadEpisodes(force = false): Promise<void> {
   const shows = await listShows()
   const episodes: Record<string, StoredEpisode[]> = {}
   for (const show of shows) episodes[show.id] = await listEpisodes(show.id)
-  const text = aheadEpisodesText(shows, episodes)
+  // The episodes of the phone's list for the Mac are the ones it marks, so they must be found
+  // even when they are older than the newest few of their show. Without the list (a failed read)
+  // the table is still worth sending.
+  const queue = await currentQueue().catch((cause) => {
+    console.warn("Couldn't read the phone's list of next episodes", cause)
+    return []
+  })
+  const text = aheadEpisodesText(shows, episodes, queue)
   if (text === sentEpisodes) return
   await Podcasts.setAheadEpisodes(text)
   sentEpisodes = text

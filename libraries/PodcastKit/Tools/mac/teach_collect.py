@@ -179,7 +179,8 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, pause, sleep, say, stats,
                () if exam else wanted, wanted_most)
     if exam:
-        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most)
+        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most,
+                                  ahead_ids(folder))
         joined = teach_exam.add_to_exam(folder, [entry["id"] for entry in new])
         say("%d new episodes were put in the exam (%d in all)." % (len(new), len(joined)))
     refresh(entries, stats["listed"])
@@ -245,7 +246,8 @@ def list_command(folder, shows, per_show, fetch, sleep, say, wanted_most=WANTED,
     new = plan(shows, {entry["id"] for entry in entries}, per_show, fetch, probe.PAUSE, sleep, say,
                stats, () if exam else teach_wanted.load_wanted(folder, say), wanted_most)
     if exam:
-        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most)
+        new = teach_exam.pick_new(entries, new, teach_exam.read_exam(folder), exam_most,
+                                  ahead_ids(folder))
     entries = [e for e in entries if not e["file"] and not is_skipped(e)] + new
     known = sum(entry["size"] or 0 for entry in entries)
     unknown = sum(1 for entry in entries if not entry["size"])

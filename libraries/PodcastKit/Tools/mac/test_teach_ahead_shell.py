@@ -9,17 +9,26 @@ import plistlib
 import re
 import shutil
 import subprocess
+import sys
 import unittest
 
+from teach_store import run_lock
 from test_teach_shell import HERE, Setup
 
 # The stand-in tells scripts apart by name, and teach_ahead.py by its first word too (pick, ready,
-# write): FAIL and CODES name them as "teach_ahead.py:pick".
+# write): FAIL and CODES name them as "teach_ahead.py:pick". With REAL_STORE and PROBE set, teach_store.py
+# is the real one (so the lock is real) and every other tool asks the real lock, while it runs, whether
+# the folder PROBE is busy, and writes "lock-during <tool> <exit code>" (3 is busy) to the calls.
 PYTHON = """#!/bin/bash
 [ "$1" = "-u" ] && shift
 script="$(basename "$1")"
 shift
 echo "python3 $script $*" >> "$CALLS"
+if [ -n "$REAL_STORE" ]; then
+  [ "$script" = teach_store.py ] && exec "$REAL_PYTHON" "$REAL_STORE" "$@"
+  "$REAL_PYTHON" "$REAL_STORE" busy "$PROBE" > /dev/null
+  echo "lock-during $script $?" >> "$CALLS"
+fi
 key="$script"
 [ "$script" = teach_ahead.py ] && key="$script:$1"
 case " $FAIL " in *" $key "*) echo "$key: pretending to fail"; exit 1 ;; esac
@@ -28,19 +37,37 @@ for pair in $CODES; do
 done
 if [ "$script" = teach_store.py ]; then
   [ -n "$BUSY" ] && exit 3
+  if [ "$1" = hold ]; then
+    shift 2
+    exec "$@"
+  fi
   exit 0
 fi
 exit 0
+"""
+
+# A stand-in for date that says it is a Wednesday (FAKE_WEEKDAY changes the day), so the tests do not
+# depend on the day they run on; everything else it passes on to the real one.
+DATE = """#!/bin/bash
+[ "$1" = "+%u" ] && { echo "${FAKE_WEEKDAY:-3}"; exit 0; }
+exec /bin/date "$@"
 """
 
 class NightTests(Setup):
     def setUp(self):
         super().setUp()
         self.program("python3", PYTHON)
+        self.program("date", DATE)
         self.name = "teach-ahead.sh"
 
     def night(self, **more):
         return self.run_script(self.name, **more)
+
+    def real_lock(self):
+        """The environment that makes teach_store.py real and the folder the one to probe."""
+        folder = os.path.join(self.root, "teaching")
+        return {"REAL_PYTHON": sys.executable, "REAL_STORE": os.path.join(HERE, "teach_store.py"),
+                "PROBE": folder, "TEACH_FOLDER": folder}, folder
 
     def first_words(self):
         """Each call as its tool and, for teach_ahead.py, its command, without the options."""
@@ -131,6 +158,53 @@ class NightTests(Setup):
         done = self.night(BUSY="1")
         self.assertEqual((done.returncode, len(self.called())), (0, 1))
         self.assertIn("Another teaching run is already working", done.stdout)
+
+    def test_the_whole_night_runs_under_the_folders_lock(self):
+        env, folder = self.real_lock()
+        done = self.night(**env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        # The first call is the hold, the only one, and it starts this same file again.
+        holds = [c for c in self.called() if " teach_store.py " in (c + " ")]
+        self.assertEqual(len(holds), 1, holds)
+        self.assertTrue(holds[0].startswith("python3 teach_store.py hold %s " % folder), holds[0])
+        self.assertTrue(holds[0].endswith("teach-ahead.sh"), holds[0])
+        self.assertEqual(self.called()[0], holds[0])
+        # While every step ran, a second run would have found the folder busy (exit code 3): the lock
+        # is held between the steps too, not only during one of them.
+        during = [c for c in self.called() if c.startswith("lock-during")]
+        self.assertEqual([c.split()[1] for c in during],
+                         ["teach_ahead.py", "teach_collect.py", "teach_ahead.py", "teach_transcribe.py",
+                          "teach_label.py", "teach_ahead.py", "teach_publish.py"])
+        self.assertEqual({c.split()[2] for c in during}, {"3"}, during)
+        # And it is let go at the end.
+        free = subprocess.run([sys.executable, os.path.join(HERE, "teach_store.py"), "busy", folder])
+        self.assertEqual(free.returncode, 0)
+
+    def test_another_run_holding_the_real_lock_ends_it_quietly_before_any_step(self):
+        env, folder = self.real_lock()
+        with run_lock(folder):
+            done = self.night(**env)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("Another teaching run is already working", done.stdout)
+        self.assertIn("tonight's read-ahead is skipped", done.stdout)
+        self.assertNotIn("not every step worked", done.stdout)
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_store.py"])
+        self.assertIn("tonight's read-ahead is skipped", self.log())
+
+    def test_a_sunday_morning_does_nothing_so_it_never_meets_the_weekly_run_at_3(self):
+        done = self.night(FAKE_WEEKDAY="7")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.called(), [])  # not even the lock is taken
+        self.assertIn("Sunday", done.stdout)
+        self.assertIn("3:00", done.stdout)
+        self.assertIn("Sunday", self.log())
+
+    def test_every_other_day_of_the_week_runs(self):
+        for day in ("1", "2", "3", "4", "5", "6"):
+            open(self.calls, "w").close()
+            done = self.night(FAKE_WEEKDAY=day, CODES="teach_ahead.py:pick=3")
+            self.assertEqual(done.returncode, 0, day)
+            self.assertEqual(self.first_words(), ["python3 teach_store.py", "python3 teach_ahead.py pick"], day)
 
     def test_the_weekly_cap_reached_is_not_a_failure(self):
         done = self.night(CODES="teach_label.py=5")

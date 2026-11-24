@@ -23,7 +23,10 @@ asks for those again) and the closing lines say how many.
 --only-ahead marks only the episodes in ahead.json (the nightly read-ahead, teach_ahead.py).
 --reserve DOLLARS is what the next call is expected to cost: the cap is checked as if that much were
 already spent, so the run stops before a call that would pass the cap and says so (default 0, the
-cap is then only checked against what has been spent).
+cap is then only checked against what has been spent). A call whose cost is not known (it timed out,
+died without a result or printed no cost, though it may have used the plan's allowance) is counted
+as that much too, so it cannot pass the cap unseen; with no --reserve it counts nothing, as before.
+Every call that cost something is written in the --budget file at once, not after the episode.
 --only-exam marks only the episodes in exam.json (the sealed exam, see teach_exam.py), in its order.
 --labels labels-second with --only-exam --limit 15 is how some of them are marked a second time:
 only an exam episode that already has a first label is marked again, and the limit is the number of
@@ -111,8 +114,12 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
     call. The `waiter` (teach_night.py) waits for the night hours before every call, and for the
     usage allowance to come back: the same episode is then tried again, with the parts already
     answered kept, and that waiting is not a failure of the episode. A `budget` is written down
-    after every episode that was marked or that cost something. With `only` (a set of ids) only
-    those episodes are marked. The cap is checked with `reserve` added to what has been spent."""
+    after every call that cost something (so a run that is stopped half way through an episode has
+    not lost it), and the episode is counted when it is marked. With `only` (a set of ids) only
+    those episodes are marked. The cap is checked with `reserve` added to what has been spent, and
+    a call whose cost is not known (it timed out, or Claude printed no cost: `cost_unknown`) is
+    counted as `reserve`, the cost of one call, because it may have used the plan's allowance. With
+    no `reserve` such a call counts what it printed, which is nothing."""
     waiter = waiter or teach_night.Waiter(say=say)
     items, given_up, empty = candidates(folder, labels, retry_failed, only_exam, only)
     for episode_id in empty:
@@ -121,7 +128,14 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
     result = {"done": 0, "failed": 0, "cost": 0.0, "given_up": len(given_up), "stop": None,
               "reason": ""}
     before = budget.dollars if budget else 0.0
-    episode = {"cost": 0.0}
+
+    def charge(paid, unknown):
+        """Counts what one call cost, and writes it in the budget at once."""
+        if unknown:
+            paid = max(paid, reserve)
+        result["cost"] += paid
+        if budget and paid > 0:
+            budget.add(paid, 0)
 
     def counted(prompt):
         if cap is not None and before + result["cost"] + reserve >= cap:
@@ -130,19 +144,15 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
         try:
             reply = ask(prompt)
         except Exception as error:  # a failed call still cost what it cost
-            paid = getattr(error, "cost", 0.0)
-            result["cost"] += paid
-            episode["cost"] += paid
+            charge(getattr(error, "cost", 0.0), getattr(error, "cost_unknown", False))
             raise
-        result["cost"] += reply["cost"]
-        episode["cost"] += reply["cost"]
+        charge(reply["cost"], reply.get("cost_unknown", False))
         return reply
 
     def settle(marked):
-        """Writes down what the episode cost, when a budget is kept and it cost something."""
-        if budget and (marked or episode["cost"] > 0):
-            budget.add(episode["cost"], 1 if marked else 0)
-        episode["cost"] = 0.0
+        """Counts the episode in the budget when it was marked (what its calls cost is in already)."""
+        if budget and marked:
+            budget.add(0.0, 1)
 
     def stopped(kind, reason):
         result["stop"], result["reason"] = kind, reason

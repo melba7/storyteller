@@ -1,6 +1,7 @@
 import XCTest
 
 @testable import PodcastAds
+@testable import PodcastTranscripts
 
 /// The ahead finder's one look at an episode whose final ads file is made already: what it adds to
 /// the file and what it leaves alone.
@@ -176,6 +177,57 @@ final class AheadPassTests: XCTestCase {
       ]), into: saved)
     XCTAssertEqual(made.file.asks?.count, AdAsks.most)
     XCTAssertEqual(made.file.asks?.map(\.start), [100, 300, 600])
+  }
+
+  // MARK: Low marks from the finder to the file
+
+  /// An episode of 100 words of talk (50 s), then ads of 60 words (30 s) each with 100 words of talk
+  /// between, and the marks of those ads; every ad's words are its own, so no two share a run.
+  private func lowMarkedEpisode(ads count: Int, confidence: AheadMark.Confidence)
+    -> (AheadEntry, [TranscriptWord])
+  {
+    var texts: [String] = []
+    var marks: [AheadMark] = []
+    for ad in 0..<count {
+      texts += (0..<100).map { "talk\(ad)x\($0)" }
+      let words = (0..<60).map { "ad\(ad)x\($0)" }
+      let start = Double(texts.count) * 0.5
+      texts += words
+      marks.append(
+        AheadMark(
+          kind: .ad, confidence: confidence, start: start, end: start + 30,
+          startWords: words.prefix(40).joined(separator: " "),
+          endWords: words.suffix(40).joined(separator: " ")))
+    }
+    texts += (0..<100).map { "talk\(count)x\($0)" }
+    let words = texts.enumerated().map {
+      TranscriptWord(
+        text: $0.element, start: Double($0.offset) * 0.5, end: Double($0.offset + 1) * 0.5)
+    }
+    return (AheadEntry(feed: "f", guid: "g", title: "t", marked: 0, ads: marks), words)
+  }
+
+  func testALowMarkEndsInTheFileAsAQuestionAndNeverAsASkip() {
+    let (marks, words) = lowMarkedEpisode(ads: 1, confidence: .low)
+    let made = merge(AheadAds.find(marks, words: words), into: file())
+    XCTAssertEqual(made.skips, 0)
+    XCTAssertEqual(made.file.ads, [])
+    XCTAssertEqual(made.questions, 1)
+    XCTAssertEqual(made.file.asks?.count, 1)
+  }
+
+  func testAMediumMarkStillEndsInTheFileAsASkip() {
+    let (marks, words) = lowMarkedEpisode(ads: 1, confidence: .medium)
+    let made = merge(AheadAds.find(marks, words: words), into: file())
+    XCTAssertEqual(made.skips, 1)
+    XCTAssertEqual(made.questions, 0)
+  }
+
+  func testManyLowMarksStillGiveAtMostThreeQuestions() {
+    let (marks, words) = lowMarkedEpisode(ads: 5, confidence: .low)
+    let made = merge(AheadAds.find(marks, words: words), into: file())
+    XCTAssertEqual(made.skips, 0)
+    XCTAssertEqual(made.file.asks?.count, AdAsks.most)
   }
 
   // MARK: The stretches the finder keeps out of

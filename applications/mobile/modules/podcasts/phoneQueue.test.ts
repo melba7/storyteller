@@ -33,6 +33,7 @@ function candidate(
     title: `Episode ${id}`,
     show: "A show",
     audio: `https://example.com/${id}.mp3`,
+    published: 1_700_000_000,
     skipAds: null,
     skipPlugs: null,
     ...more,
@@ -67,6 +68,7 @@ describe("chooseQueue", () => {
       title: "Episode a",
       show: "A show",
       audio: "https://example.com/a.mp3",
+      published: 1_700_000_000,
       reason: "upNext",
       rank: 0,
     })
@@ -76,8 +78,28 @@ describe("chooseQueue", () => {
       "title",
       "show",
       "audio",
+      "published",
       "reason",
       "rank",
+    ])
+  })
+
+  it("carries when each episode came out, or null when the feed gave no date", () => {
+    const entries = chooseQueue(
+      [
+        candidate("a", { published: 1_700_086_400 }),
+        candidate("b", { published: null }),
+      ],
+      [],
+      MAIN,
+    )
+    expect(entries.map((entry) => entry.published)).toEqual([
+      1_700_086_400,
+      null,
+    ])
+    expect(JSON.parse(queueText(entries, 1))["episodes"]).toEqual([
+      expect.objectContaining({ guid: "guid-a", published: 1_700_086_400 }),
+      expect.objectContaining({ guid: "guid-b", published: null }),
     ])
   })
 
@@ -321,7 +343,7 @@ describe("the queue's SQL", () => {
       guid: "g2",
       title: "Second",
       audio_url: "https://cdn.example.com/second.mp3",
-      published_at: 200,
+      published_at: 1_700_000_123_456,
     })
     const [row] = db.prepare(QUEUE_NEWEST_SQL).all(newestSince(NOW)) as Record<
       string,
@@ -334,9 +356,23 @@ describe("the queue's SQL", () => {
       title: "Second",
       show: "Show one",
       audio: "https://cdn.example.com/second.mp3",
+      // The database holds milliseconds; the file, like the Mac's files, seconds.
+      published: 1_700_000_123,
       skipAds: false,
       skipPlugs: null,
     })
+  })
+
+  it("gives no published time for an episode the database has no date for", () => {
+    const db = setup()
+    addEpisode(db, { id: "a1", show_id: "s1", guid: "g1", published_at: null })
+    const [row] = db.prepare(queueUpNextSql(1)).all("a1") as Record<
+      string,
+      unknown
+    >[]
+    expect(queueCandidate(row ?? {}).published).toBeNull()
+    expect(queueCandidate({}).published).toBeNull()
+    expect(queueCandidate({ published_at: "soon" }).published).toBeNull()
   })
 
   it("finds the queued episodes by their ids", () => {

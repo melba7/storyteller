@@ -31,6 +31,7 @@ import {
 import {
   QUEUE_FILE,
   QUEUE_NEWEST_SQL,
+  type QueueEntry,
   chooseQueue,
   newestSince,
   queueCandidate,
@@ -119,9 +120,8 @@ async function writeDiary(): Promise<void> {
     await AsyncStorage.setItem(DIARY_STAMP_KEY, stamp)
 }
 
-/** Writes the episodes the listener is likely to play next, when they are not what the file holds. */
-async function writeQueue(): Promise<void> {
-  if (!Podcasts || !LofiScore) return
+/** The episodes the listener is likely to play next, as the file for the Mac holds them. */
+export async function currentQueue(): Promise<QueueEntry[]> {
   const ids = (await listUpNext()).map((item) => item.id).slice(0, CHUNK)
   const queued =
     ids.length === 0 ? [] : await rows(queueUpNextSql(ids.length), ids)
@@ -132,7 +132,13 @@ async function writeQueue(): Promise<void> {
   const newest = (await rows(QUEUE_NEWEST_SQL, [newestSince(Date.now())])).map(
     queueCandidate,
   )
-  const entries = chooseQueue(upNext, newest, await getAdSkipSettings())
+  return chooseQueue(upNext, newest, await getAdSkipSettings())
+}
+
+/** Writes the episodes the listener is likely to play next, when they are not what the file holds. */
+async function writeQueue(): Promise<void> {
+  if (!Podcasts || !LofiScore) return
+  const entries = await currentQueue()
   const text = queueToWrite(
     await LofiScore.readLinkedFolderFileStatus(QUEUE_FILE),
     entries,

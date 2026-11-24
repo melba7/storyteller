@@ -7,8 +7,12 @@ Standard library only. The phone writes Podcasts/phone-queue.json into its linke
 copy of LofiMusic), the episodes it expects to play next, 12 at most:
 
   {"version": 1, "writtenAt": <seconds>, "episodes": [{"feed": "<feed address>", "guid": "<guid>",
-   "title": "...", "show": "<show title>", "audio": "<audio address>", "reason": "upNext" | "newest",
-   "rank": <0 for the first>}]}
+   "title": "...", "show": "<show title>", "audio": "<audio address>", "published": <seconds or null>,
+   "reason": "upNext" | "newest", "rank": <0 for the first>}]}
+
+"published" is when the episode came out, in seconds since 1970 like the published time of episodes.json
+(an older phone writes none). It is kept there so the exam can tell which episodes are newer than the
+ones the model was taught on (teach_exam.pick_new).
 
   teach_ahead.py pick  --budget NAME [--folder F] [--queue FILE] [--shows FILE] [--cap 10]
                        [--most 8] [--estimate 0.19]
@@ -63,6 +67,13 @@ NOTHING = 3
 
 def number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+
+
+def published_time(one):
+    """The phone's published time of a list entry as whole seconds, or None when it gave none or
+    something that is not a time."""
+    value = one.get("published")
+    return int(value) if number(value) else None
 
 
 def usable(one):
@@ -133,7 +144,8 @@ def choose(items, entries, kept, own, limit, now):
             ids.add(identifier)
             keys |= marks
             new.append(new_entry(item["show"], feed, {
-                "guid": item["guid"], "title": item["title"], "published": None, "seconds": None,
+                "guid": item["guid"], "title": item["title"], "published": published_time(item),
+                "seconds": None,
                 "address": item["audio"], "size": None}))
             picked.append({"id": identifier, "feed": item["feed"], "guid": item["guid"],
                            "title": item["title"], "picked": now})

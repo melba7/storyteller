@@ -1526,6 +1526,22 @@ written here and the idea goes under Later.
   - Files: `PodcastAds/AheadAds.swift`, `KnownAdsUse.swift`,
     `AdScoreCommand.swift`, `teachingSync.ts`, `ios/PodcastAdFinder+Local.swift`
     and `ios/PodcastStreamHead+Local.swift`.
+- Review fixes to W6 to W8 (branch `round-b/fixes`, nothing ticked):
+  1. Lock (W7): `teach-ahead.sh` runs under `teach_store.py hold` for the whole
+     night, ends quietly with exit 0 when another run holds the lock, and does
+     nothing on Sunday, so it never meets the weekly run at 3:00.
+  2. Up Next always in the table (W6, W8): `aheadEpisodesText` always adds the
+     episodes of `phone-queue.json` to the phone's lookup table, older ones
+     included, besides the newest 12 of each show.
+  3. Low marks only ask (W8): a mark Claude gave "low" gives a question (at most
+     3 an episode), never a skip, and is not in a stream's head scan; high and
+     medium work as before.
+  4. The exam's "newer than" rule (W6, W7): the phone puts each episode's
+     published time in `phone-queue.json`, `teach_ahead.py` keeps it, and a
+     read-ahead episode with no time blocks exam picks from its feed.
+  5. The weekly cap (W7): a call that timed out or printed no cost counts as one
+     expected call (19 cents), and every call is written in the budget file at
+     once, not after the episode.
 
 **3. The exam**
 

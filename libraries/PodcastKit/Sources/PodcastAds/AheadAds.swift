@@ -12,8 +12,10 @@ import PodcastTranscripts
 // only when both edges are found and the length between them is half to one and a half times the
 // length the Mac marked. Where only one edge is found, or the two do not fit, the finder offers an
 // unsure stretch of the marked length from the edge it found, as a question (`asks`): a half match
-// never skips. It runs on a whole transcript and on the words so far of a stream's head; in the
-// head an ad is there once its end words have arrived.
+// never skips. A mark Claude was not sure of ("low", the doubtful stretches) never skips either,
+// whatever is found of it: it is a question, and so it is not in the head scan of a stream, which
+// takes only the skips. It runs on a whole transcript and on the words so far of a stream's head; in
+// the head an ad is there once its end words have arrived.
 //
 // THE PHONE'S WIRING. The settings (`ShowTuning.apply`) and the guard run on this finder's own
 // ads BEFORE any join, as for every new finder. `ads` are skips; `asks` only ever ask, whatever
@@ -22,10 +24,11 @@ import PodcastTranscripts
 
 /// What one look for an episode's marks found.
 public struct AheadFound: Sendable, Equatable {
-  /// Both edges were found and the length fits: skips, with Claude's confidence ("high" and "medium"
-  /// are sure, "low" is unsure).
+  /// Both edges were found, the length fits and Claude was sure of the mark ("high" or "medium"):
+  /// skips.
   public var ads: [FoundAd]
-  /// Only one edge was found, or the two do not fit: unsure stretches that may be asked about.
+  /// Only one edge was found, or the two do not fit, or Claude marked the stretch as "low": unsure
+  /// stretches that may be asked about, never skipped.
   public var asks: [FoundAd]
 
   public init(ads: [FoundAd] = [], asks: [FoundAd] = []) {
@@ -62,7 +65,11 @@ public enum AheadAds {
       for (from, to) in pairs {
         let begin = heard.timed[starts[from].first].start
         let finish = heard.timed[ends[to].last].end
-        whole.append(ad(mark, from: begin, to: finish, words: words))
+        if mark.confidence == .low {
+          half.append(ask(mark, from: begin, to: finish, words: words))
+        } else {
+          whole.append(ad(mark, from: begin, to: finish, words: words))
+        }
       }
       let startsUsed = Set(pairs.map(\.0)), endsUsed = Set(pairs.map(\.1))
       for (at, place) in starts.enumerated() where !startsUsed.contains(at) {
@@ -134,8 +141,7 @@ public enum AheadAds {
     let edges = AdLanding.edges(start: from, end: to, words: words)
     return FoundAd(
       start: edges.start, end: edges.end, kind: mark.kind, advertiser: "",
-      confidence: mark.confidence == .low ? .unsure : .sure, firstWords: firstWords(mark),
-      source: source)
+      confidence: .sure, firstWords: firstWords(mark), source: source)
   }
 
   private static func ask(

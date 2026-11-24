@@ -6,9 +6,10 @@ under that name in <folder>/marking-spend.json:
   {"version": 1, "budgets": {"<name>": {"dollars": 12.34, "episodes": 65}}}
 
 With a budget, --cap is the total for all the runs together, so a double-click that finds the
-budget spent marks nothing. The file is written atomically after every marked episode (and after an
-episode that failed but still cost something). A damaged file is a set-up problem and is never
-replaced by a fresh start, because that would hand out the money a second time.
+budget spent marks nothing. The file is written atomically after every call that cost something (also
+one of an episode that then failed or was stopped half way) and when an episode is marked. A damaged
+file is a set-up problem and is never replaced by a fresh start, because that would hand out the money
+a second time.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
@@ -67,7 +68,7 @@ class Budget:
         return max(self.cap - self.dollars, 0)
 
     def add(self, dollars, episodes):
-        """Adds what an episode cost (and 1 episode when it was marked) and saves the file."""
+        """Adds what a call cost (and 1 episode when it was marked) and saves the file."""
         self.dollars += dollars
         self.episodes += episodes
         self.budgets[self.name] = {"dollars": round(self.dollars, 6), "episodes": self.episodes}
