@@ -253,12 +253,21 @@ final class PassageModelTests: XCTestCase {
     try writeApple()
     XCTAssertEqual(score(), 0, warned.joined())
     let both = lastRun()?.rows ?? []
-    XCTAssertEqual(both.map(\.name).suffix(2), ["Plus Apple's model (asked on the Mac)", "Plus the passage model"])
-    XCTAssertEqual(both.count, 6)
-    // Apple's row is what it was with no passage file, and the passage row has no Apple ads in it.
+    // Apple has two rows now (as the phone places its answers, and if every show let it skip), and
+    // the passage row stands on neither: on the last finder row.
+    XCTAssertEqual(
+      both.map(\.name).suffix(3),
+      [
+        "Plus Apple's model (asked on the Mac)", "Plus Apple's model, if every show let it skip",
+        "Plus the passage model",
+      ])
+    XCTAssertEqual(both.count, 7)
+    // The passage row is what it was with no Apple file, and has no Apple ads in it.
     XCTAssertEqual(both.last?.total, passageAlone?.total)
     XCTAssertEqual(both.last?.bar, passageAlone?.bar)
-    XCTAssertEqual(both[4].total.caught, 1)
+    // Apple asks by default, so its row is the row before it; the other row has its answer.
+    XCTAssertEqual(both[4].total, both[3].total)
+    XCTAssertEqual(both[5].total.caught, 1)
     XCTAssertTrue(output.contains("Plus Apple's model (asked on the Mac): 1 of 2 scored episodes"), output)
     XCTAssertTrue(output.contains("Plus the passage model: 2 of 2 scored episodes"), output)
   }
@@ -269,11 +278,12 @@ final class PassageModelTests: XCTestCase {
     try writePassage(["e1": middleAd])
     XCTAssertEqual(score(["--stream"]), 0, warned.joined())
     let rows = lastRun()?.rows ?? []
-    XCTAssertEqual(rows.count, 6)
+    XCTAssertEqual(rows.count, 7)
     XCTAssertNotNil(rows[3].stream)
     XCTAssertNotNil(rows[4].stream)
     XCTAssertEqual(rows[4].name, "Plus Apple's model (asked on the Mac)")
     XCTAssertNil(rows[5].stream)
+    XCTAssertNil(rows[6].stream)
     XCTAssertTrue(output.contains("Stream replay:"), output)
   }
 }

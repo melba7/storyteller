@@ -177,6 +177,10 @@ public enum AdScoreCommand {
     case .success(let loaded): appleSaved = loaded
     }
     let apple = AppleScoreRow.answers(appleSaved, episodes: chosen)
+    // The phone sorts Apple's answers by the per-show settings before it joins them: the ones that
+    // skip make the Apple row (none under the built-in default, which asks).
+    let tuning = plan.tuning ?? ShowTuning()
+    let placed = apple.map { AppleScoreRow.place($0, episodes: chosen, tuning: tuning) }
     // The passage model's answers (a trial) make a row of their own, after Apple's, that stands on the
     // last finder row. A file that cannot be read leaves the row out.
     let passage = PassageScoreRow.read(in: folder, episodes: chosen)
@@ -186,7 +190,10 @@ public enum AdScoreCommand {
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
     let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
     let allLayers =
-      layers + (apple.map { [AppleScoreRow.layer($0)] } ?? [])
+      layers
+      + (apple.flatMap { all in
+        placed.map { AppleScoreRow.layers(all, placed: $0, standingOn: finalAds) }
+      } ?? [])
       + (passageAds.map {
         [AnswerScoreRow.layer(name: PassageScoreRow.name, $0, standingOn: finalAds)]
       } ?? [])
@@ -215,11 +222,11 @@ public enum AdScoreCommand {
     let bar = AdBarReport.lines(rows)
     if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
     var saved = rows
-    let extra = made.dropFirst(layers.count)  // Apple's row, then the passage row, as far as they exist
-    if let apple, let card = extra.first {
-      let row = ScorecardRow(name: AppleScoreRow.name, card: card)
-      text += "\n\n" + AppleScoreRow.lines(row, answered: apple.count, of: chosen.count).joined(separator: "\n")
-      saved.append(row)
+    let extra = Array(made.dropFirst(layers.count))  // Apple's two rows, then the passage row, as far as they exist
+    if let apple, let placed, extra.count >= 2 {
+      let both = AppleScoreRow.report(extra, answered: apple.count, of: chosen.count, placed: placed)
+      text += "\n\n" + both.text
+      saved += both.rows
     }
     if let appleNote { text += "\n\n" + appleNote }
     if let reading = passage.reading, passageAds != nil, let card = extra.last {
@@ -238,7 +245,7 @@ public enum AdScoreCommand {
         return soFar
       }
       let streamed = StreamScore.run(
-        episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple,
+        episodes: chosen, habits: habits, settings: AdSkipSettings(), models: apple, tuning: tuning,
         speech: options.speech, whole: { finalAds.ads(for: $0.id) ?? [] }, detect: detect)
       var shown = [(name: String, stream: StreamNumbers)]()
       shown.append((rows.last?.name ?? "", streamed.finders))
@@ -247,7 +254,8 @@ public enum AdScoreCommand {
         shown.append((saved[rows.count].name, more))
         saved[rows.count].stream = more
       }
-      text += "\n\n" + StreamReport.lines(shown).joined(separator: "\n")
+      let waiting = (episodes: streamed.waiting, of: chosen.count)
+      text += "\n\n" + StreamReport.lines(shown, waiting: waiting).joined(separator: "\n")
     }
     out(text)
     history.append(

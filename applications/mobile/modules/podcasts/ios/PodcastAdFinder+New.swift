@@ -81,9 +81,12 @@ extension PodcastAdFinder {
   }
 
   /// Runs the new finders on the final ads file `file` of a whole transcript and saves what they
-  /// add. The result holds the file as saved (`file` itself when nothing changed).
+  /// add. The result holds the file as saved (`file` itself when nothing changed). `modelAsks` are
+  /// the answers of Apple's model that only ask on this show (`ModelPlacing.asked`): they take part
+  /// in the ranking of the questions like the other finders' stretches.
   func addNewFinders(
-    _ id: String, ads store: AdsStore, transcript: Transcript, file: AdsFile
+    _ id: String, ads store: AdsStore, transcript: Transcript, file: AdsFile,
+    modelAsks: [FoundAd] = []
   ) -> NewResult {
     var result = NewResult(file: file)
     guard let modes = newModes(id), let fresh = store.load(detector: Self.detectorName),
@@ -91,6 +94,7 @@ extension PodcastAdFinder {
     else { return result }
     result.modes = modes
     var collect = NewCollect(file: fresh, modes: modes)
+    if !modelAsks.isEmpty { collect.add(ShowTuning.appleModel, modelAsks) }
     let pass = soundResult(id, sha256: store.sha256, file: local, modes: modes)
     if modes.level(FinderNames.ownSound) != .off, let pass {
       collect.add(FinderNames.ownSound, NewAds.ads(ofSounds: pass.own))

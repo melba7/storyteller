@@ -15,21 +15,30 @@ public enum AdsRunner {
   /// piece that does not fit the model is split in two and asked again. `progress` is called
   /// with how many pieces are done and how many there are. The progress and partial files are
   /// removed once the final file is saved.
+  ///
+  /// With a `placing` (the phone's) only the model's ads that may skip on this show go into the
+  /// files, named after the model, and the ones that only ask are left in `placing.asked` for the
+  /// questions. With none, every ad is kept as it is.
   public static func run(
     transcript: Transcript, detector: AdDetector, store: AdsStore, osVersion: String,
-    overlap: Double = AdChunker.overlap, progress: @Sendable (Int, Int) -> Void = { _, _ in },
+    overlap: Double = AdChunker.overlap, placing: ModelPlacing? = nil,
+    progress: @Sendable (Int, Int) -> Void = { _, _ in },
     shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> AdsOutcome {
     let pieces = AdChunker.pieces(
       of: AdChunker.number(transcript.lines), tokenBudget: detector.tokenBudget, overlap: overlap)
     progress(0, pieces.count)
+    @Sendable func kept(_ ranges: [AdRange]) -> [FoundAd] {
+      let ads = AdCleanup.run(ranges: ranges, transcript: transcript)
+      return placing?.keep(ads) ?? ads
+    }
     // Each piece that is asked is saved as a partial file at once, so the player can skip the
     // ads found so far while the rest is still being asked.
     let checkpoint: @Sendable ([AdRange], Double) -> Void = { ranges, covered in
       var partial = AdsFile(
         sha256: store.sha256, detector: detector.name, detectorVersion: detector.version,
         osVersion: osVersion, duration: transcript.duration,
-        ads: AdCleanup.run(ranges: ranges, transcript: transcript), coveredUntil: covered)
+        ads: kept(ranges), coveredUntil: covered)
       partial.undone = store.loadPartial(detector: detector.name)?.undone ?? []
       try? store.savePartial(partial)
     }
@@ -40,8 +49,7 @@ public enum AdsRunner {
     else { return .stopped }
     var file = AdsFile(
       sha256: store.sha256, detector: detector.name, detectorVersion: detector.version,
-      osVersion: osVersion, duration: transcript.duration,
-      ads: AdCleanup.run(ranges: result.ranges, transcript: transcript),
+      osVersion: osVersion, duration: transcript.duration, ads: kept(result.ranges),
       refusedPieces: result.refused > 0 ? result.refused : nil)
     // Skips the listener took back while only the partial file existed stay undone.
     file.undone = store.undoneSoFar(detector: detector.name)
@@ -62,10 +70,14 @@ public enum AdsRunner {
   /// With `limit`, only the first `limit` seconds of the transcript are looked at (the head of an
   /// episode that is not playing). The answer is kept like any growing piece's, so the later
   /// passes carry on from it.
+  ///
+  /// With a `placing`, only the model's ads that may skip are kept, as in `run`; a partial pass
+  /// makes no questions.
   public static func runPartial(
     partial full: PartialTranscript, detector: AdDetector, store: AdsStore, osVersion: String,
     margin: Double = AdChunker.partialMargin, overlap: Double = AdChunker.overlap,
-    limit: Double? = nil, shouldContinue: @Sendable () -> Bool = { true }
+    limit: Double? = nil, placing: ModelPlacing? = nil,
+    shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> AdsOutcome {
     var partial = full
     if let limit, partial.reached > limit {
@@ -89,11 +101,11 @@ public enum AdsRunner {
     let covered = max(pieces.last?.end ?? 0, result.growingEnd ?? 0)
     let transcript = Transcript(
       identity: partial.identity, duration: partial.duration, lines: lines, words: partial.words)
+    let found = AdCleanup.run(ranges: result.ranges, transcript: transcript)
     var file = AdsFile(
       sha256: store.sha256, detector: detector.name, detectorVersion: detector.version,
-      osVersion: osVersion, duration: partial.duration,
-      ads: AdCleanup.run(ranges: result.ranges, transcript: transcript), coveredUntil: covered,
-      refusedPieces: result.refused > 0 ? result.refused : nil)
+      osVersion: osVersion, duration: partial.duration, ads: placing?.keep(found) ?? found,
+      coveredUntil: covered, refusedPieces: result.refused > 0 ? result.refused : nil)
     let existing = store.loadPartial(detector: detector.name)
     file.undone = existing?.undone ?? []
     // Ads saved by someone else (the stream's first minute) stay unless they lie wholly inside

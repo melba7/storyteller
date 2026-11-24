@@ -6,13 +6,15 @@ import XCTest
 /// wrote (through `write_json`, keys in order) for a made scorecard with three shows and notes: the
 /// "repeat-words" row was bad over all shows, the joints were bad on show C, "own-sound" was bad on
 /// show A, the notes had the meaning model undone twice on show B, and steady files found more over
-/// all shows but not on show B.
+/// all shows but not on show B. Apple's what-if row passed the bar on show C only, so Apple's model
+/// may skip there and asks everywhere else.
 final class ShowTuningMacTests: XCTestCase {
   static let macText = """
     {
      "default": {
       "ask": 0.35,
       "finders": {
+       "apple-model": "ask",
        "meaning": "skip",
        "own-sound": "skip",
        "repeat-sound": "ask",
@@ -24,6 +26,9 @@ final class ShowTuningMacTests: XCTestCase {
      "shows": [
       {
        "feed": "https://c.test/f",
+       "finders": {
+        "apple-model": "skip"
+       },
        "joints": false
       },
       {
@@ -77,6 +82,11 @@ final class ShowTuningMacTests: XCTestCase {
     XCTAssertTrue(set.joints(show: "a-id"))
     XCTAssertTrue(set.joints(show: "d-id"))
     XCTAssertEqual(set.level(forFinder: "own-sound", show: "c-id"), .skip)
+    // Apple's model asks everywhere but on the show where the Mac's bar let it skip.
+    for show in ["a-id", "b-id", "d-id", "never-heard-of"] {
+      XCTAssertEqual(set.level(forFinder: "apple-model", show: show), .ask, show)
+    }
+    XCTAssertEqual(set.level(forFinder: "apple-model", show: "c-id"), .skip)
   }
 
   func testTheKeysTheMacWritesAreTheOnesThePhoneLooksFor() throws {

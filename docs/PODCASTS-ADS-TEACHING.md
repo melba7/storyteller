@@ -102,6 +102,13 @@ join, because a joined ad loses its `source`.
   the Mac's rules only make the phone stricter, never looser. (A hand edit of
   `show-settings.json` would say `skip`, but the next "Teach the phone again"
   writes the file whole and loses it.)
+- **Apple's model asks too.** On the owner's labels the on-device model made the
+  phone worse, so it is a fifth name in the settings (`apple-model`) with a
+  built-in level of `ask`: its answers become questions (at most three in an
+  episode, with the other finders'), and the stream's head scan neither asks nor
+  waits for it. Only a show where the Mac's bar passes gets `skip` (see
+  `teach_settings.py`); there its answers skip as before. The listener's undo
+  and "no" count for the finder guard as for any other finder.
 - **Questions.** A guess that is not sure enough to skip becomes a question,
   from whole-transcript passes only, at most three in an episode (answered ones
   count). The phone shows "Ad? Skip" with two answers while the stretch plays

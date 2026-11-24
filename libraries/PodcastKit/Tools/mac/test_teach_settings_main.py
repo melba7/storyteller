@@ -14,7 +14,7 @@ from unittest import mock
 import teach_settings as settings
 from teach_settings_rows import SCORECARD_LIMIT
 from teach_settings_testing import (
-    FEED_A, FEED_B, JOINTS, NOW, OWN, STEADY, WORDS, card, note, row, show, total)
+    APPLE, APPLE_ALL, FEED_A, FEED_B, JOINTS, NOW, OWN, STEADY, WORDS, bar, card, note, row, show, total)
 
 NAME = "show-settings.json"
 SWIFT_TEST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "Tests",
@@ -79,7 +79,8 @@ class WritingTests(Setup):
         self.assertEqual(sorted(found["default"]), ["ask", "finders", "joints", "steadyJoints"])
         self.assertEqual(found["default"], {
             "finders": {"own-sound": "skip", "repeat-sound": "ask", "repeat-words": "ask",
-                        "meaning": "skip"}, "joints": True, "steadyJoints": False, "ask": 0.35})
+                        "meaning": "skip", "apple-model": "ask"},
+            "joints": True, "steadyJoints": False, "ask": 0.35})
         self.assertEqual(found["shows"], [{"feed": FEED_A, "finders": {"own-sound": "ask"}}])
 
     def test_the_text_is_the_same_every_time_with_its_keys_in_order(self):
@@ -147,12 +148,19 @@ class SharedTextTests(Setup):
         def three(a_figures, b_figures, c_figures):
             return [show(a, "Show A", **a_figures), show(b, "Show B", ad=300, **b_figures),
                     show(c, "Show C", **c_figures)]
+        # Apple's rows stand on the steady row. Each show's bar: on A and B the what-if row gains too
+        # little (1 break; 3 breaks but 2 more skips with no ad), on C it passes 4 more and adds 1.
+        last = ({"heard": 27, "cut": 50, "bar": bar(10, 4)}, {"heard": 12, "cut": 20, "bar": bar(10, 4)},
+                {"heard": 18, "cut": 20, "bar": bar(10, 4)})
         self.scorecard(card(
             row("Phone's own finders", *three({"heard": 40}, {"heard": 250}, {"heard": 40})),
             row(OWN, *three({"heard": 40, "cut": 30}, {"heard": 20}, {"heard": 20})),
             row(WORDS, *three({"heard": 40, "cut": 50}, {"heard": 20, "cut": 20}, {"heard": 20, "cut": 20})),
             row(JOINTS, *three({"heard": 30, "cut": 50}, {"heard": 10, "cut": 20}, {"heard": 21, "cut": 20})),
-            row(STEADY, *three({"heard": 27, "cut": 50}, {"heard": 12, "cut": 20}, {"heard": 18, "cut": 20}))))
+            row(STEADY, *three(*last)),
+            row(APPLE, *three(*last)),
+            row(APPLE_ALL, *three(dict(last[0], bar=bar(11, 4)), dict(last[1], bar=bar(13, 6)),
+                                  dict(last[2], bar=bar(14, 5))))))
         notes = self.put_notes(self.root, [note("undone", "meaning", feed="http://show-b.test/rss")] * 2)
         self.assertEqual(self.run_main("--notes", notes), 0)
         self.assertEqual(self.text(), self.swift_text())
