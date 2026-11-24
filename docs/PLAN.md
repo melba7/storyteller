@@ -1523,13 +1523,23 @@ written here and the idea goes under Later.
     proves the matching. The real number is the exam's 15 episodes marked twice,
     with the second marking as the night's marks (W9). Only episodes that were
     in the queue the night before are helped.
+  - Result (2026-11-24, shelf, `score --ahead`): on Claude's labels 140 to 166
+    of 219 breaks pass (75.8%) with no more skips with no ad (20); on the
+    snapped labels 131 to 149 of 242 (the go rule's 20 more is missed by 2); as
+    a stream at the standard pace 112 to 137 of 219 (ready: 163). Marks of low
+    confidence only ask; they never skip. As said above, the shelf's marks are
+    also its truth, so this is the matching's ceiling, not a measured gain: the
+    exam says what the phone gets from a second marking.
   - Files: `PodcastAds/AheadAds.swift`, `KnownAdsUse.swift`,
     `AdScoreCommand.swift`, `teachingSync.ts`, `ios/PodcastAdFinder+Local.swift`
     and `ios/PodcastStreamHead+Local.swift`.
 - Review fixes to W6 to W8 (branch `round-b/fixes`, nothing ticked):
   1. Lock (W7): `teach-ahead.sh` runs under `teach_store.py hold` for the whole
      night, ends quietly with exit 0 when another run holds the lock, and does
-     nothing on Sunday, so it never meets the weekly run at 3:00.
+     nothing on Sunday, so it never meets the weekly run at 3:00. `hold` tells
+     the tools it starts that the lock is theirs (`TEACH_LOCK_HELD`); a first
+     version without that refused every tool and the night did nothing, found by
+     the second review.
   2. Up Next always in the table (W6, W8): `aheadEpisodesText` always adds the
      episodes of `phone-queue.json` to the phone's lookup table, older ones
      included, besides the newest 12 of each show.
