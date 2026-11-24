@@ -7,7 +7,8 @@
 // (PodcastTranscripts) and finding the ads in them (PodcastAds). Pure Swift and Foundation, so
 // it builds and tests on Linux too. The exceptions are PodcastSpeech and podcast-transcribe,
 // which use Apple's Speech framework, and PodcastAdsOnDevice and podcast-ads, which use
-// Apple's Foundation Models framework; all four are empty on Linux.
+// Apple's Foundation Models framework, and PodcastEdgeAudio, which reads audio with AVFoundation
+// for podcast-teach edges; all five are empty on Linux.
 
 import PackageDescription
 
