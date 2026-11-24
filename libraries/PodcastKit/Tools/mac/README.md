@@ -51,6 +51,7 @@ the app is not added again.
 - `Gather more episodes for teaching.command`,
   `Mark the new episodes at night.command` and
   `Gather the exam episodes.command`: see "More episodes and the exam".
+- `Measure the sound at the edges.command`: see "The sound at the edges".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -579,6 +580,42 @@ next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
 and streams it too. The settings and publish steps read rows by name, so the
 extra row changes nothing they decide.
 
+### The sound at the edges
+
+`Measure the sound at the edges.command` builds `podcast-teach` and runs
+`podcast-teach edges` on the teaching folder under `caffeinate -i`. It answers
+one question before anything is built into the phone: does the sound itself say
+where an ad spot starts and ends? For every shelf episode that has an MP3 file
+it reads the sound once (Apple's decoder, so only on a Mac, at 16 kHz, mono) and
+works out, for every half second, the loudness, a 24-band spectrum and whether
+it is a pause. A change score compares the 3 seconds before a point with the 3
+seconds after it, and its peaks are the places where the sound changes most.
+Then it counts how often the strongest change within 10 seconds of an edge lies
+within 1, 2 and 5 seconds of it, for the exactly placed edges and for as many
+random points (a fixed seed).
+
+- The exact edges are the borders in `labels-snapped/` that the second download
+  moved (they differ from Claude's own `labels/`), and both borders of a stretch
+  that only the second download found (`"origin": "copy"`). Claude's own borders
+  are not exact, so an episode with no second download has none. The folder
+  needs `shelf.json` and `labels-snapped/`; the exam is never read.
+- The go rule is the plan's: the strongest change within 10 seconds lies within
+  1 second of at least 70% of exact edges, and of at most 10% of random points.
+  The report says "Go." or "No go." and the numbers behind it. An edge within 3
+  seconds of the start or end of an episode is left out, because its windows do
+  not fit.
+- `edges.json` keeps each shelf episode's strongest peaks (time in seconds and
+  strength, about the decibels the sound moves, at most 300 for an hour) so that
+  a later scorecard row can snap found edges onto them without the audio.
+  `edges-report.json` keeps the numbers. Each episode is saved as soon as it is
+  read, so the window may be closed and the file double-clicked again to carry
+  on; an episode that is in `edges.json` is not read again. A damaged file, or
+  one made by another version of the score (it is written into the file), is
+  ignored with one line and made again.
+- It costs nothing and uses no Claude allowance. The shelf is about 50 hours of
+  sound, so it may take an hour. It needs a Mac, and stops with exit 2 and a
+  plain sentence when there is no shelf, no `labels-snapped/`, or no decoder.
+
 ### What the steps write
 
 Everything is in `~/Storyteller Lofi/PodcastTeaching`:
@@ -617,6 +654,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   when it does not, so a folder with `joints.json` and no audio still gets those
   rows. A damaged file, or one made by another version of the joint finder (it
   is written into the file), is ignored with one line and made again.
+- `edges.json` and `edges-report.json`: the sound at the edges of ad spots, made
+  by `podcast-teach edges` (see "The sound at the edges").
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
