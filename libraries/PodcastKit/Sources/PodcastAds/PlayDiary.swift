@@ -65,6 +65,7 @@ public enum PlayDiary {
   }
 
   private static func whole(_ seconds: Double) -> Int {
-    seconds.isFinite ? Int(max(0, seconds).rounded()) : 0
+    // Capped, because a feed can claim any duration and Int(...) stops the app above 9.2e18.
+    seconds.isFinite ? Int(min(max(0, seconds), 1e9).rounded()) : 0
   }
 }

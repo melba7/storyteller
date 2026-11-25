@@ -310,7 +310,9 @@ def marking(folder, options, cap, ask_person, runner, environment, say, extra_fo
     say("This uses the Claude plan this Mac is signed in to and shares its usage allowance.")
     if options.only_exam:
         say("Only the episodes of the sealed exam are marked.")
-    if waiter.window:
+    if waiter.window == (0, 24):
+        say("It marks at any hour.")
+    elif waiter.window:
         say("It marks only between %s, local time, and waits outside those hours."
             % teach_night.window_text(waiter.window))
     if options.wait_hours is not None:

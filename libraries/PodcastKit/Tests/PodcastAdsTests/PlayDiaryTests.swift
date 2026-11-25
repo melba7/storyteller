@@ -30,6 +30,14 @@ final class PlayDiaryTests: XCTestCase {
       PlayDiary.start(isStream: true, hasFinishedAds: true, transcriptReached: 3600), .stream)
   }
 
+  /// A feed can say any duration. A number too big for an Int must not stop the app.
+  func testAnAbsurdlyLongTimeIsWrittenAndDoesNotCrash() throws {
+    let play = PlayDiary.line(at: 1, episodeId: "e", start: .partly(transcriptTo: 1e30))
+    XCTAssertEqual(try what(play), "play: partly, transcript to 1000000000 s")
+    let done = PlayDiary.line(at: 1, episodeId: "e", audio: 1e300, work: 5, inBackground: false)
+    XCTAssertEqual(try what(done), "1000000000 s of audio in 5.0 s, front")
+  }
+
   func testAPlayLineSaysWhatThePhoneKnewWhenTheEpisodeStarted() throws {
     let ready = PlayDiary.line(at: 1_700_000_000.5, episodeId: "ab12cd34-ef56", start: .ready)
     XCTAssertEqual(try what(ready), "play: ready")

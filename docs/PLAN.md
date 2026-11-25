@@ -1530,9 +1530,9 @@ written here and the idea goes under Later.
     confidence only ask; they never skip. As said above, the shelf's marks are
     also its truth, so this is the matching's ceiling, not a measured gain: the
     exam says what the phone gets from a second marking.
-  - Files: `PodcastAds/AheadAds.swift`, `KnownAdsUse.swift`,
-    `AdScoreCommand.swift`, `teachingSync.ts`, `ios/PodcastAdFinder+Local.swift`
-    and `ios/PodcastStreamHead+Local.swift`.
+  - Files: `PodcastAds/AheadAds.swift`, `AdScoreCommand.swift`,
+    `teachingSync.ts`, `ios/PodcastAdFinder+Ahead.swift`,
+    `ios/PodcastAdFinder+New.swift` and `ios/PodcastStreamHead+Local.swift`.
 - Review fixes to W6 to W8 (branch `round-b/fixes`, nothing ticked):
   1. Lock (W7): `teach-ahead.sh` runs under `teach_store.py hold` for the whole
      night, ends quietly with exit 0 when another run holds the lock, and does
@@ -1555,8 +1555,8 @@ written here and the idea goes under Later.
 
 - Mo's asks of 2026-11-25 (Mac tools, no phone change):
   1. Marking at any hour: `Gather deeper and mark now.command` is the "tonight"
-     launcher with `TEACH_BETWEEN=0-24`; it is on the Mac and gets its copy and
-     test in the repo with the next push.
+     launcher with `TEACH_BETWEEN=0-24`; it is on the Mac and has its copy and
+     test in this pull request.
   2. Free the disk, learn first then free (Mo chose this 2026-11-25):
      `podcast-teach sounds` saves each learned episode's ad-sound material in
      `sound-bank/<id>.json` and rebuilds `ad-sounds.json` the same from audio or

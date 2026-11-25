@@ -44,6 +44,9 @@ public enum AheadAds {
   public static let fewestWords = 8
   /// The length of an ad found, against the length the Mac marked.
   public static let lengthBand = 0.5...1.5
+  /// And the copy may hold at most this many seconds more than the marked length: on a long ad the
+  /// band alone would let a stretch of other talk between two copies of an edge pass as the ad.
+  public static let mostExtraSeconds = 15.0
 
   /// The ads of `entry` in the words of one transcript (the whole of it or the head so far), by
   /// start. Nothing that overlaps a stretch in `judged` (the ones the listener undid, said no to or
@@ -118,7 +121,7 @@ public enum AheadAds {
     for (from, start) in starts.enumerated() {
       for (to, end) in ends.enumerated() {
         let seconds = heard.timed[end.last].end - heard.timed[start.first].start
-        guard seconds > 0, lengthBand.contains(seconds / length) else { continue }
+        guard seconds > 0, lengthBand.contains(seconds / length), seconds <= length + mostExtraSeconds else { continue }
         candidates.append((from, to, abs(seconds - length)))
       }
     }

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Not double-clicked: the launchd job "com.storyteller-lofi.podcast-read-ahead" runs it every night at
 # 2:00 (Install nightly read-ahead.command sets that up). It reads ahead the episodes the phone
-# expects to play next, so the phone knows where their ads are before Mo presses play:
+# expects to play next, so the phone knows where their ads are before the listener presses play:
 #   1. reads the phone's list of next episodes (Podcasts/phone-queue.json, the iCloud copy first) and
 #      picks at most 8 episodes that are not marked yet (teach_ahead.py pick)
 #   2. downloads them, with the teaching run's size and disk limits (teach_collect.py --only-ahead)

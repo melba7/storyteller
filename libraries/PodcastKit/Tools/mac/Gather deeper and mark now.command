@@ -1,12 +1,11 @@
 #!/bin/bash
 # Double-click in Finder. Same as "Gather deeper and mark tonight", except that the marking may happen
-# at any hour (Mo asked for it on 2026-11-25), not only between 11 at night and 7 in the morning: the
+# at any hour (the owner asked for it on 2026-11-25), not only between 11 at night and 7 in the morning: the
 # marking starts as soon as the episodes are gathered and written down. It uses the Claude plan's
 # usage allowance in the daytime too. The second step of a big run: the first pass can gather only a few new
 # episodes when the newest 12 of every show are already on disk, so this goes deeper: the newest 24
 # of each show (about 500 more episodes, about 25 GB of audio; the gathering stops by itself when the
-# disk has less than 15 GB free), writes them down, has Claude mark the ads at night (only between 11
-# at night and 7 in the morning) under the same budget as the run before it, and works out and copies
+# disk has less than 15 GB free), writes them down, has Claude mark the ads (at any hour) under the same budget as the run before it, and works out and copies
 # the results. It asks for a typed yes once (anything else starts nothing), then waits until the
 # teaching folder is free (the steps after the last marking may still be working; it asks every 60
 # seconds and says so once), and starts "Gather more episodes for teaching" with TEACH_PER_SHOW=24,

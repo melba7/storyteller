@@ -219,6 +219,18 @@ final class AheadAdsTests: XCTestCase {
       AheadAds.find(entry([marked]), words: episode(ad: shorter)).ads.count, 1)
   }
 
+  /// The band alone lets a 90 s mark take 110 s of words (1.2 times): a quarter of an hour of talk
+  /// between two copies of an edge is not an ad, so the copy may hold at most 15 s more than marked.
+  func testACopyThatHoldsMoreThanFifteenSecondsOverTheMarkedLengthIsNotAnAd() {
+    let ad = adWords("adone", 180)  // 90 s marked
+    let near = Array(ad.prefix(40)) + talk(120, from: 300) + Array(ad.suffix(40))  // 100 s of words
+    let far = Array(ad.prefix(40)) + talk(140, from: 300) + Array(ad.suffix(40))  // 110 s of words
+    XCTAssertEqual(
+      AheadAds.find(entry([mark(ad, start: 50, end: 140)]), words: episode(ad: near)).ads.count, 1)
+    XCTAssertTrue(
+      AheadAds.find(entry([mark(ad, start: 50, end: 140)]), words: episode(ad: far)).ads.isEmpty)
+  }
+
   func testOfTwoPlacesOfTheStartTheOneThatGivesTheMarkedLengthIsTaken() throws {
     // The ad's opening words are said once at 20 s (in a trailer) and again at the ad itself.
     let trailer = Array(adWords().prefix(40))
