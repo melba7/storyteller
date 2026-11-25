@@ -1616,10 +1616,8 @@ Questions only Mo can answer:
   score is the one more try. The weekly run also marks and downloads ahead
   episodes that are left unmarked, and ahead audio is never deleted, so the
   nightly fills the 12 GB audio limit the big runs share within weeks: delete
-  ahead audio after its marks are written. `AheadFile.entry` matches on the guid
-  alone (feeds with numeric guids can collide, though the words must still
-  match). Up Next episodes the weekly run already marked are never sent to the
-  phone.
+  ahead audio after its marks are written. Up Next episodes the weekly run
+  already marked are never sent to the phone.
 
 - Ad skipping to 95%, round A (2026-11-23), found and not fixed: the new word
   model's skips land more than 5 seconds past the ad in about 27 of 226 breaks
