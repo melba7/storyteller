@@ -743,8 +743,16 @@ spread over as many shows as it can (at most 2 from a show), and writes
 (episodes, hours, shows, and how many hold spoken ad phrases such as "brought to
 you by"). Only the turn text is public, so the times inside a turn are worked
 out from its start and end: an ad's edges are good to a few seconds, not to the
-word. The marking of this folder is a separate step with its own budget name and
-a cost cap you set (about $0.19 an episode); nothing is marked by this launcher.
+word. The marking of this folder is a separate step,
+`Mark the public transcripts.command`. It runs `teach_label.py` on that folder
+only, under the budget `sporc-1`, and asks for a typed yes. It marks at most 100
+episodes (`TEACH_SPORC_LIMIT`) and spends at most $20 (`TEACH_SPORC_CAP`) in
+all, counted over every double-click, and waits up to 12 hours
+(`TEACH_SPORC_WAIT_HOURS`) when the usage allowance is used up. It marks at any
+hour and can run next to a big run, because the other folder has its own lock.
+The fetch launcher marks nothing. The marks are not taught to the phone and not
+backed up by the teaching backups (they are cheap to make again, about 15 to 20
+cents an episode).
 
 ### Backups
 

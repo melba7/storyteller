@@ -8,8 +8,10 @@ import tempfile
 import unittest
 
 import sporc_sample as sporc
+import teach_label as label
 import teach_segments as seg
 import teach_store as store
+from teach_testing import answer
 
 try:
     import pyarrow as pa
@@ -126,6 +128,25 @@ class ReportTests(unittest.TestCase):
         self.assertIn("1.5 hours", text)
         self.assertIn("2 shows", text)
         self.assertIn("1 of 2 episodes hold a spoken ad phrase", text)
+
+
+class MarkingTests(unittest.TestCase):
+    def test_the_marking_step_accepts_the_folder_this_writes(self):
+        folder = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        turns = sporc.lines_from_turns([
+            {"turn_count": 0, "turn_text": "Welcome back. This episode is brought to you by Acme. Use code SHOW.",
+             "start_time": 0.0, "end_time": 12.0},
+            {"turn_count": 1, "turn_text": "Now to the news. Nothing happened.", "start_time": 12.0, "end_time": 20.0}])
+        sporc.write_folder(folder, [row(1)], {"e001": turns})
+        said = []
+        result = label.run(folder, "labels", "m", None, None,
+                           lambda prompt: {"text": answer((2, 3)), "cost": 0.1}, say=said.append)
+        self.assertEqual(result["done"], 1, said)
+        with open(os.path.join(folder, "labels", store.load_manifest(folder)[0]["id"] + ".json")) as handle:
+            segments = json.load(handle)["segments"]
+        self.assertEqual(len(segments), 1)
+        self.assertGreater(segments[0]["end"], segments[0]["start"])
 
 
 @unittest.skipUnless(pq, "pyarrow is not installed")
