@@ -149,6 +149,19 @@ final class SoundBankTests: XCTestCase {
     XCTAssertNil(try read(file(start: 0, duration: -0.026)))
   }
 
+  /// teach_free.py frees an episode's audio only when its bank is newer than its labels, so saving
+  /// the same bytes again must still say "this bank is current as of now".
+  func testSavingTheSameBytesAgainRefreshesTheModifiedTime() throws {
+    let stretches = [stretch(Array(0..<40))]
+    try SoundBank.save(stretches, episode: "abc", in: folder)
+    let old = Date(timeIntervalSinceNow: -3600)
+    try FileManager.default.setAttributes([.modificationDate: old], ofItemAtPath: file.path)
+    XCTAssertFalse(try SoundBank.save(stretches, episode: "abc", in: folder))
+    let modified = try XCTUnwrap(
+      try FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date)
+    XCTAssertGreaterThan(modified.timeIntervalSince(old), 3000)
+  }
+
   func testAThirtySecondAdTakesAboutEighteenKilobytes() throws {
     let frames = Int(30 / Snd.duration)
     let data = try SoundBank.data(episode: "0123456789ab", stretches: [stretch(Array(0..<frames))])

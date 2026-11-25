@@ -637,21 +637,24 @@ So the cleanup is "learn first, then free".
 learned episode's ad-sound material in a small file, `sound-bank/<id>.json`
 (about 12 bytes a frame, for the stretches Claude marked only), and rebuilds the
 ad-sound library from the audio where it is still on disk and from those files
-where it is not, so the library is the same either way. The backup includes
-`sound-bank/`.
+where it is not (also when the episode's entry in `episodes.json` has `file`
+null after the cleanup), so the library is the same either way. The backup
+includes `sound-bank/`.
 
 `Free up space from the teaching audio.command` (`teach_free.py`) then deletes
 the audio of an MP3 episode only when its transcript and its marks exist, its
-sound bank is saved, its second download was compared (`copies/<id>.truth.txt`)
-or given up on after three failures, and it is not on the shelf (`shelf.json`),
-in the exam (`exam.json`) or waiting in the nightly read-ahead (`ahead.json`).
-An episode that is not an MP3 needs no bank and no second download. The episode
-stays in `episodes.json` with `file` null, `bytes` 0 and the error
-`skipped: audio deleted ...`, so the gathering never downloads it again. An
-entry whose file is already gone is put right the same way. The shelf is chosen
-from transcripts and marks, so a show with no shelf episode yet can later get a
-freed one, and the score rows that need audio skip it: let a run train, which
-fills the shelf, before freeing.
+sound bank is saved and at least as new as its marks (`labels/`,
+`labels-snapped/`) and its second-download truth (the sounds step touches a bank
+it finds unchanged, so a run after the last change is enough), its second
+download was compared (`copies/<id>.truth.txt`) or given up on after three
+failures, and it is not on the shelf (`shelf.json`), in the exam (`exam.json`)
+or waiting in the nightly read-ahead (`ahead.json`). An episode that is not an
+MP3 needs no bank and no second download. The episode stays in `episodes.json`
+with `file` null, `bytes` 0 and the error `skipped: audio deleted ...`, so the
+gathering never downloads it again. An entry whose file is already gone is put
+right the same way. The shelf is chosen from transcripts and marks, so a show
+with no shelf episode yet can later get a freed one, and the score rows that
+need audio skip it: let a run train, which fills the shelf, before freeing.
 
 The launcher first shows how much would be freed and asks for a typed `yes`;
 anything else deletes nothing. When some episodes are still waiting for their
@@ -869,17 +872,17 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
 - `sound-bank/<id>.json`: the sound bank, written by `podcast-teach sounds` for
-  each episode it learns from, so that the episode's big MP3 file can be
-  deleted without shrinking the library. It holds no audio, only the numbers
-  the matching reads for each frame of the ads Claude marked (12 bytes a frame,
+  each episode it learns from, so that the episode's big MP3 file can be deleted
+  without shrinking the library. It holds no audio, only the numbers the
+  matching reads for each frame of the ads Claude marked (12 bytes a frame,
   about 18 KB for a 30 second ad). An episode with no ads gets a file with an
   empty list: the file means "learned". A file is written only when it is
-  missing or different. When the MP3 is gone and the file reads, `sounds`
-  learns from the file, and `ad-sounds.json` comes out byte for byte the same
-  as it did with the audio. The run says "Saved N sound-bank files", "Learned
-  from N saved summaries, their audio is gone" and, if a file could not be
-  written, "Could not save"; keep the audio of those episodes. An episode with
-  neither audio nor a file that reads is skipped as having no audio.
+  missing or different. When the MP3 is gone and the file reads, `sounds` learns
+  from the file, and `ad-sounds.json` comes out byte for byte the same as it did
+  with the audio. The run says "Saved N sound-bank files", "Learned from N saved
+  summaries, their audio is gone" and, if a file could not be written, "Could
+  not save"; keep the audio of those episodes. An episode with neither audio nor
+  a file that reads is skipped as having no audio.
 - `joints.json`: the joints of each episode's MP3 file (where an inserted ad was
   spliced in), made by `podcast-teach joints` once for each episode that has an
   audio file and no entry yet; existing entries are kept. `podcast-teach score`

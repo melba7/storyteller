@@ -35,14 +35,24 @@ class Setup(unittest.TestCase):
             handle.write(text)
 
     def learned(self, item, bank=True, truth=True):
-        """Gives an episode a transcript, marks, a sound bank and a second-download truth."""
+        """Gives an episode a transcript, marks, a second-download truth and a sound bank. The bank is
+        a little newer than the rest, as when the sounds step ran after the last change."""
         self.write("transcripts/%s.txt" % item["id"], transcript(5))
         self.write("labels/%s.json" % item["id"], "{}")
+        if truth:
+            self.write("copies/%s.truth.txt" % item["id"], "12.0 30.0\n")
         if bank:
             self.write("sound-bank/%s.json" % item["id"], json.dumps(
                 {"version": 1, "episode": item["id"], "stretches": []}))
-        if truth:
-            self.write("copies/%s.truth.txt" % item["id"], "12.0 30.0\n")
+        self.touch(item, "transcripts/%s.txt", 0)
+        self.touch(item, "labels/%s.json", 0)
+        self.touch(item, "copies/%s.truth.txt", 0)
+        self.touch(item, "sound-bank/%s.json", 10)
+
+    def touch(self, item, pattern, seconds):
+        path = self.folder.path(pattern % item["id"])
+        if os.path.exists(path):
+            os.utime(path, (1_700_000_000 + seconds, 1_700_000_000 + seconds))
 
     def listed(self, name, ids):
         self.write(name, json.dumps({"version": 1, "episodes": [
@@ -89,6 +99,27 @@ class FreeTests(Setup):
         self.assertEqual(self.run_it("--delete"), 0)
         self.assertEqual(self.audio(), sorted(item["id"] + ".mp3" for item in (second, third, fourth)))
         self.assertTrue(os.path.exists(self.folder.path("sound-bank", first["id"] + ".json")))
+
+    def test_a_bank_older_than_the_marks_or_the_second_download_is_not_enough(self):
+        first, second, third, fourth = self.episodes(4)
+        for item in (first, second, third, fourth):
+            self.learned(item)
+        self.touch(second, "labels/%s.json", 20)  # marked again after the bank was saved
+        self.touch(third, "copies/%s.truth.txt", 20)  # compared after the bank was saved
+        for item in (first, second, third, fourth):
+            self.write("labels-snapped/%s.json" % item["id"], "{}")
+            self.touch(item, "labels-snapped/%s.json", 20 if item is fourth else 0)  # fourth: after the bank
+        self.run_it("--delete")
+        self.assertEqual(self.audio(), sorted(item["id"] + ".mp3" for item in (second, third, fourth)))
+
+    def test_with_snapped_labels_every_episode_needs_its_snapped_label(self):
+        first, second = self.episodes(2)
+        self.learned(first)
+        self.learned(second)
+        self.write("labels-snapped/%s.json" % first["id"], "{}")
+        self.touch(first, "labels-snapped/%s.json", 0)
+        self.run_it("--delete")
+        self.assertEqual(self.audio(), [second["id"] + ".mp3"])
 
     def test_an_episode_not_compared_with_its_second_download_keeps_its_audio(self):
         first, second, third = self.episodes(3)

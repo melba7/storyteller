@@ -4,8 +4,8 @@ Standard library only. The audio is the big part of the teaching folder (about 6
 Three things still learn from an episode's audio after it has been written down and marked: the
 ad sounds (the Swift `podcast-teach sounds` step), the comparison with a second download of the
 same episode, and the exam. So an MP3 episode's audio goes only when all of its learning is kept:
-its sound bank (sound-bank/<id>.json, written by `podcast-teach sounds`, so the library is rebuilt
-whole without the audio) and its second-download truth (copies/<id>.truth.txt, or the episode was
+its sound bank (sound-bank/<id>.json, written by `podcast-teach sounds` after the last change to its
+marks and second download, so the library is rebuilt whole without the audio) and its second-download truth (copies/<id>.truth.txt, or the episode was
 given up on after three failures). teach_backup.py leaves the audio out of its backups on purpose
 and puts the sound bank in.
 
@@ -76,15 +76,35 @@ def has_text(path):
         return False
 
 
-def bank_is_saved(folder, identifier):
-    """True when sound-bank/<id>.json can be read as that episode's bank (Swift writes it and reads it
-    again in full: this only checks the part that says whose it is)."""
+def modified(path):
     try:
-        with open(os.path.join(folder, "sound-bank", identifier + ".json"), encoding="utf-8") as handle:
+        return os.path.getmtime(path)
+    except OSError:
+        return None
+
+
+def bank_is_saved(folder, identifier):
+    """True when sound-bank/<id>.json is that episode's bank and is at least as new as the marks the
+    sounds step cut it from (labels/, labels-snapped/) and the second-download truth that snapping
+    uses, so the bank holds the borders the library would get from the audio. Swift writes the bank
+    and reads it again in full; this only checks whose it is, and when it was saved."""
+    path = os.path.join(folder, "sound-bank", identifier + ".json")
+    try:
+        with open(path, encoding="utf-8") as handle:
             data = json.load(handle)
-        return data["version"] == 1 and data["episode"] == identifier and isinstance(data["stretches"], list)
+        if not (data["version"] == 1 and data["episode"] == identifier and isinstance(data["stretches"], list)):
+            return False
     except (OSError, ValueError, KeyError, TypeError):
         return False
+    saved = modified(path)
+    newest = [modified(os.path.join(folder, "labels", identifier + ".json")),
+              modified(os.path.join(folder, "copies", identifier + ".truth.txt"))]
+    if os.path.isdir(os.path.join(folder, "labels-snapped")):
+        snapped = modified(os.path.join(folder, "labels-snapped", identifier + ".json"))
+        if snapped is None:
+            return False  # the snapping has not reached this episode yet
+        newest.append(snapped)
+    return saved is not None and all(when is None or when <= saved for when in newest)
 
 
 def second_download_settled(folder, identifier, failures):

@@ -220,6 +220,32 @@ final class AdSoundCommandTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: libraryFile), first)
   }
 
+  /// What the cleanup in teach_free.py leaves behind: the audio is deleted and the episode's entry
+  /// in episodes.json has `file` null.
+  func testAFreedEpisodeWithNoFileInTheListIsStillLearnedFromItsBank() throws {
+    try addLearnedEpisodes()
+    XCTAssertEqual(go().code, 0)
+    let first = try Data(contentsOf: libraryFile)
+    try removeAudio("aaaaaaaaaaaa", "bbbbbbbbbbbb")
+    for index in entries.indices where ["aaaaaaaaaaaa", "bbbbbbbbbbbb"].contains(entries[index]["id"] as? String) {
+      entries[index]["file"] = NSNull()
+    }
+    try writeManifest()
+    let result = go()
+    XCTAssertEqual(result.code, 0)
+    XCTAssertTrue(result.said.contains("Learned from 2 saved summaries, their audio is gone."), result.said)
+    XCTAssertFalse(result.said.contains("with no audio"), result.said)
+    XCTAssertEqual(try Data(contentsOf: libraryFile), first)
+  }
+
+  func testAnEpisodeWithNoFileAndNoBankIsCountedAsBefore() throws {
+    try addLearnedEpisodes()
+    entries.append(["id": "ffffffffffff", "file": NSNull(), "show": "Show"])
+    try writeManifest()
+    let result = go()
+    XCTAssertTrue(result.said.contains("Skipped 1 episode with no audio."), result.said)
+  }
+
   func testAnEpisodeWithNeitherAudioNorBankIsCountedAsBefore() throws {
     try addLearnedEpisodes()
     XCTAssertEqual(go().code, 0)

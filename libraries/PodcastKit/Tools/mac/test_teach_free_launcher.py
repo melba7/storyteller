@@ -40,13 +40,19 @@ class LauncherTests(unittest.TestCase):
                 f.write(transcript(5))
             with open(os.path.join(self.folder, "labels", item["id"] + ".json"), "w") as f:
                 f.write("{}")
-            os.makedirs(os.path.join(self.folder, "sound-bank"), exist_ok=True)
-            with open(os.path.join(self.folder, "sound-bank", item["id"] + ".json"), "w") as f:
-                f.write('{"version": 1, "episode": "%s", "stretches": []}' % item["id"])
             if truth:
                 os.makedirs(os.path.join(self.folder, "copies"), exist_ok=True)
                 with open(os.path.join(self.folder, "copies", item["id"] + ".truth.txt"), "w") as f:
                     f.write("12.0 30.0\n")
+            os.makedirs(os.path.join(self.folder, "sound-bank"), exist_ok=True)
+            with open(os.path.join(self.folder, "sound-bank", item["id"] + ".json"), "w") as f:
+                f.write('{"version": 1, "episode": "%s", "stretches": []}' % item["id"])
+            # The sound bank is newer than the marks and the second download, as after the sounds step.
+            for name, when in (("transcripts/%s.txt", 0), ("labels/%s.json", 0), ("copies/%s.truth.txt", 0),
+                               ("sound-bank/%s.json", 10)):
+                path = os.path.join(self.folder, name % item["id"])
+                if os.path.exists(path):
+                    os.utime(path, (1_700_000_000 + when, 1_700_000_000 + when))
         return item
 
     def run_launcher(self, typed):

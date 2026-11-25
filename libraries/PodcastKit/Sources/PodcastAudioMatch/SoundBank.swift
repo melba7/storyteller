@@ -128,13 +128,19 @@ public enum SoundBank {
   }
 
   /// Writes the bank file of `episode`, atomically, but only when it is missing or different (a
-  /// file that does not read counts as different). True when it wrote the file. An episode with no
+  /// file that does not read counts as different; a file that is the same is touched so that it is
+  /// as new as this run). True when it wrote the file. An episode with no
   /// stretches gets a file too, with an empty list: the file says the episode was learned.
   @discardableResult
   public static func save(_ stretches: [BankedStretch], episode: String, in folder: URL) throws -> Bool {
     let bytes = try data(episode: episode, stretches: stretches)
     let url = fileURL(episode: episode, in: folder)
-    if let old = try? Data(contentsOf: url), old == bytes { return false }
+    if let old = try? Data(contentsOf: url), old == bytes {
+      // The same bytes, but the file is current as of now: teach_free.py frees an episode's audio only
+      // when its bank is newer than the marks it was cut from.
+      try? FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: url.path)
+      return false
+    }
     try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
     try bytes.write(to: url, options: .atomic)
     return true

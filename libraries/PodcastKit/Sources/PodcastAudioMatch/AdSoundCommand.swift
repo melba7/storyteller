@@ -71,8 +71,15 @@ public enum AdSoundCommand {
       }
       // The sealed exam never teaches anything.
       if exam.contains(id) { continue }
+      // An episode whose audio was deleted to free disk space has `file` null in the list (teach_free.py).
       guard let file = episode["file"] as? String else {
-        tally.noAudio += 1
+        if let kept = SoundBank.load(episode: id, in: folder) {
+          tally.banked += 1
+          tally.stretches += kept.count
+          builder.add(episode: id, stretches: kept)
+        } else {
+          tally.noAudio += 1
+        }
         continue
       }
       guard safe(file), URL(fileURLWithPath: file).pathExtension.lowercased() == "mp3" else {

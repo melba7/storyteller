@@ -224,3 +224,11 @@ One line per lesson.
   (2026-11-24).
 - Marks that cost $90 had no backup until Mo asked twice; a step that spends
   money needs a backup of what it buys (2026-11-25).
+- A cleanup that deletes audio was designed first as "delete what has a
+  transcript and marks"; the independent check found that the ad sounds and the
+  second-download comparison still learn from the audio, so deleting would have
+  shrunk the library. Before deleting an input, list every step that reads it
+  (2026-11-25).
+- The sound bank was first tested with the audio file gone but the list entry
+  intact; the cleanup sets `file` to null, and the sounds step skipped such
+  entries. Test the exact state the deleting tool leaves behind (2026-11-25).
