@@ -52,6 +52,8 @@ the app is not added again.
   `Mark the new episodes at night.command` and
   `Gather the exam episodes.command`: see "More episodes and the exam".
 - `Measure the sound at the edges.command`: see "The sound at the edges".
+- `Back up the teaching marks.command` and `Start another big run.command`: see
+  "Backups" and "Starting another big run".
 - `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
@@ -405,14 +407,15 @@ and `Teach the phone again.command` says so and stops.
    promotion in the written-down episodes. This is the step that uses your
    Claude plan: it shares your usage allowance, so it says what it is about to
    do and waits for you to type `yes`. Anything else marks nothing, and nothing
-   else runs. It stops by itself when the allowance is used up, and you can
-   double-click it again later. When the marking is over (also when it stopped
-   early) it runs the steps after marking, described below. To leave the Mac
-   alone for the night, double-click
-   `Mark ads when the gathering is done.command` instead, while the gathering is
-   still working: it asks for the `yes` at once, waits until the gathering has
-   finished (also when it failed or only waits for Return), and then does the
-   same without asking again.
+   else runs. Before it marks anything it backs up what is marked so far (see
+   "Backups"); a backup that fails is said in one line and the marking goes on.
+   It stops by itself when the allowance is used up, and you can double-click it
+   again later. When the marking is over (also when it stopped early) it runs
+   the steps after marking, described below. To leave the Mac alone for the
+   night, double-click `Mark ads when the gathering is done.command` instead,
+   while the gathering is still working: it asks for the `yes` at once, waits
+   until the gathering has finished (also when it failed or only waits for
+   Return), and then does the same without asking again.
 3. `Teach the phone again.command`. Reads the phone's notes, then runs the steps
    after marking on what is marked so far. It marks nothing new and uses no
    Claude allowance. Use it after you have listened for a while, or to send the
@@ -432,8 +435,10 @@ and `Teach the phone again.command` says so and stops.
    See "The weekly job" below.
 
 The steps after marking are done by `teach-finish.sh`, which is not
-double-clicked: the files above call it. When the folder `copies/` or
-`labels-snapped/` exists it first snaps the labels to the second download (see
+double-clicked: the files above call it. First of all it makes a backup of the
+marks and checks it (see "Backups"; it uses no Claude allowance, and when it
+fails that is said and the other steps still run). When the folder `copies/` or
+`labels-snapped/` exists it then snaps the labels to the second download (see
 item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
 sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
@@ -470,16 +475,18 @@ night. Use them in this order.
    between 11 at night and 7 in the morning, and waits for the night with the
    Mac kept awake), `--wait-hours 120` (when Claude's usage allowance is used up
    it waits 30 minutes and tries the same episode again, up to five days in all)
-   and `--cap 95 --budget more-episodes` (at most $95 of the plan's usage in
-   all, over every run: see "The budget" below). The environment can change
-   them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`.
-   Waiting for the allowance is not a failure of the episode. Not being signed
-   in still stops at once. When it ends (also stopped early) it runs the steps
-   after marking, and it says why it stopped: the spending limit is reached, the
-   usage allowance stayed used up for longer than it waits, or episodes failed
-   (how many, and that the list is `failures.json`). Only `TEACH_YES=1` counts
-   as a yes in the launchers, and a typed answer is trimmed at its ends only, so
-   "ye s" is not yes.
+   and `--cap 95 --budget NAME` (at most $95 of the plan's usage in all, over
+   every run: see "The budget" below). NAME is `TEACH_BUDGET` when that is set,
+   else the name in `current-budget.txt` in the teaching folder (written by
+   "Start another big run"), else `big-run-1`. The window says which one it
+   uses. The environment can change them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`,
+   `TEACH_CAP` and `TEACH_BUDGET`. Waiting for the allowance is not a failure of
+   the episode. Not being signed in still stops at once. When it ends (also
+   stopped early) it runs the steps after marking, and it says why it stopped:
+   the spending limit is reached, the usage allowance stayed used up for longer
+   than it waits, or episodes failed (how many, and that the list is
+   `failures.json`). Only `TEACH_YES=1` counts as a yes in the launchers, and a
+   typed answer is trimmed at its ends only, so "ye s" is not yes.
 3. `Gather the exam episodes.command`. See the next section. Run it after the
    two files above are done, so that the exam is newer than everything the phone
    learned from.
@@ -546,14 +553,92 @@ something). A run starts by saying what the budget has spent and what is left,
 never starts a call when the budget is spent, and ends with a line saying where
 it stands. A damaged file is a set-up problem, never a fresh start. Without
 `--budget` the cap is for one run only, and it is checked before every call. The
-launchers use the budgets `more-episodes` ($95), `exam` ($14) and `exam-second`
-($4).
+launchers use the budgets `big-run-1` (95 dollars, the first big run of
+2026-11-24 and the default when `current-budget.txt` says nothing; the run
+before it used `more-episodes`, which has 89.57 dollars spent), `exam` (14
+dollars) and `exam-second` (4 dollars), and "Start another big run" makes a new
+`big-run-` name with the date and minute each time and remembers it in
+`current-budget.txt`.
 
 Exit codes of `teach_label.py`: 0 done, nothing to do, or `--limit` reached; 2 a
 set-up problem or another run is working in the folder; 3 stopped early because
 the usage allowance wait ran out or Claude is not signed in; 4 you did not type
 yes; 5 the cap or the budget is reached; 6 stopped early because three episodes
 in a row failed.
+
+### Starting another big run
+
+`Start another big run.command` starts the 500-episode run again with a fresh
+budget of up to $95 (about $0.19 an episode, about 480 episodes). The window
+says so in plain words and asks for a typed `yes`; anything else (Return, `y`,
+`no`) changes nothing and starts nothing. `TEACH_YES` in the environment does
+not answer this question: spending is always asked. With `yes` it sets
+`TEACH_BUDGET=big-run-YYYYMMDD-HHMM` (the minute of the start, so every start is
+a new budget counted from zero and the older budgets keep what they spent) and
+`TEACH_YES=1`, and starts `Second downloads then gather more.command`, which
+gives the typed yes to the marking, so you are asked once. `TEACH_CAP` changes
+the 95.
+
+`Second downloads then gather more.command` is only on the Mac, in
+`~/Storyteller Lofi/Podcast teaching/`, and not in this folder. The launcher
+looks for it next to itself and then there; `TEACH_SECOND` names another file.
+
+The new budget's name is shown in the window and written in the log
+(`~/Storyteller Lofi/logs/podcast-teaching.log`). After the `yes` it is also
+written, as one line, to `current-budget.txt` in the teaching folder (through a
+temporary file that is moved into place; when it cannot be written nothing is
+started). `Mark the new episodes at night.command` takes its default budget from
+that file when `TEACH_BUDGET` is not set: the first line, trimmed, if it is 1 to
+40 letters, digits, `-` or `_` and starts with a letter or digit; with no file,
+or one that holds anything else, it uses `big-run-1` and says so. So a stopped
+big run is carried on by a double-click on
+`Mark the new episodes at night.command` (or
+`Gather more episodes for teaching.command`) under the same budget, and
+`TEACH_BUDGET=<a name>` in Terminal still wins. Typing `yes` here again starts
+yet another new budget and replaces the name in the file.
+
+### Backups
+
+Claude's marks cost about $0.19 an episode and live only in the teaching folder,
+so `teach_backup.py` keeps copies of them. A backup is one file,
+`teaching-YYYY-MM-DD-HHMM.tar.gz`, in
+`~/Storyteller Lofi/PodcastTeachingBackups` (next to the teaching folder). It
+holds `labels/`, `labels-snapped/`, `labels-second/`, `transcripts/` and
+`copies/`, and every `.json` file of the teaching folder itself
+(`episodes.json`, `shelf.json`, `exam.json`, `marking-spend.json` and the
+models, about 20 MB in all). It leaves out `audio/`, `meaning-cache/`,
+`passage-cache/`, the lock and hidden files: they are large and can be made
+again. The newest 14 backups are kept. Only files named like the tool's own are
+ever removed, so a `before-*.tar.gz` made by hand and anything else in that
+folder stay.
+
+It makes a backup in three places, all free of Claude usage: at the start of
+`Mark ads in the teaching episodes.command` (so the marks made so far are safe
+before more are made), as the first step of `teach-finish.sh` (so the new marks
+are safe as soon as marking is over, and after the weekly run), and when you
+double-click `Back up the teaching marks.command`, which makes one backup and
+checks it. A failing backup is said plainly and never stops the work. The
+nightly read-ahead and `Gather the exam episodes.command` do not back up by
+themselves; double-click the backup launcher after them.
+
+It only reads the teaching folder and takes no lock, so marking and training may
+run meanwhile. A backup is written under a temporary name and renamed when it is
+whole, so a stop leaves no half-written `teaching-*.tar.gz`.
+
+In Terminal (the launcher does the first two for you):
+
+- `python3 teach_backup.py make --folder F [--to DIR] [--keep 14] [--check]`
+  makes a backup (`--check` also checks the new file, and removes nothing old
+  when that check fails).
+- `python3 teach_backup.py check --file BACKUP [--folder F]` is the way to test
+  that a backup works. It reads the archive to its very end, parses every JSON
+  file in it, and with `--folder` says how many label files the folder has that
+  the backup lacks (marked since it was made). It exits 0 only when the backup
+  is whole.
+- `python3 teach_backup.py restore --file BACKUP --into DIR` unpacks into a new
+  or empty folder, after checking the backup, and refuses a folder that has
+  anything in it. It never writes into the live teaching folder: look in the
+  folder it made and copy back by hand what you need.
 
 ### The stream replay and Apple's model
 
@@ -925,6 +1010,26 @@ from, so install it again if you move that folder.
   printed, with a dated heading for each night.
 - `~/Storyteller Lofi/logs/podcast-read-ahead-job.log`: what launchd saw from
   the nightly job.
+
+### Putting new files on the Mac
+
+The Mac's copy of these tools is
+`~/Storyteller Lofi/podcast-teaching-tools/storyteller/libraries/PodcastKit/Tools/mac`,
+and each file in `~/Storyteller Lofi/Podcast teaching/` is a wrapper of two
+lines that runs the same-named file there:
+
+```
+#!/bin/bash
+exec "$HOME/Storyteller Lofi/podcast-teaching-tools/storyteller/libraries/PodcastKit/Tools/mac/Back up the teaching marks.command"
+```
+
+For the backups, copy `teach_backup.py`, `teach-finish.sh`,
+`Mark ads in the teaching episodes.command`,
+`Mark the new episodes at night.command`, `Back up the teaching marks.command`
+and `Start another big run.command` into that tools folder (keep them
+executable: `chmod +x` on the four `.command` files and `teach-finish.sh`), and
+make one wrapper for each of the two new `.command` files in
+`Podcast teaching/`, named the same, with `chmod +x`.
 
 ### Tests
 

@@ -222,3 +222,5 @@ One line per lesson.
   environment (`TEACH_LOCK_HELD`), and a test runs the real tool under it. Test
   the real tool, not a stub, wherever a lock or a file handle crosses a process
   (2026-11-24).
+- Marks that cost $90 had no backup until Mo asked twice; a step that spends
+  money needs a backup of what it buys (2026-11-25).
