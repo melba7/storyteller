@@ -25,7 +25,8 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Gather the exam episodes.command",
              "Ask Apple's model about the test episodes.command", "teach-ahead.sh",
              "Install nightly read-ahead.command", "Stop nightly read-ahead.command",
-             "Back up the teaching marks.command", "Start another big run.command"]
+             "Back up the teaching marks.command", "Start another big run.command",
+             "Gather deeper and mark tonight.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write

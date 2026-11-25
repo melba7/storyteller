@@ -52,8 +52,9 @@ the app is not added again.
   `Mark the new episodes at night.command` and
   `Gather the exam episodes.command`: see "More episodes and the exam".
 - `Measure the sound at the edges.command`: see "The sound at the edges".
-- `Back up the teaching marks.command` and `Start another big run.command`: see
-  "Backups" and "Starting another big run".
+- `Back up the teaching marks.command`, `Start another big run.command` and
+  `Gather deeper and mark tonight.command`: see "Backups", "Starting another big
+  run" and "Going deeper".
 - `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
@@ -596,6 +597,24 @@ big run is carried on by a double-click on
 `Gather more episodes for teaching.command`) under the same budget, and
 `TEACH_BUDGET=<a name>` in Terminal still wins. Typing `yes` here again starts
 yet another new budget and replaces the name in the file.
+
+### Going deeper
+
+`Gather deeper and mark tonight.command` is the second step of a big run, for
+when the first pass found few new episodes because the newest 12 of every show
+were already on disk. The window explains it (the newest 24 of each show, about
+500 more episodes, about 25 GB, stopping by itself when the disk has less than
+15 GB free; Claude marks only between 11 at night and 7 in the morning, under
+the budget it names; keep the Mac plugged in) and asks for a typed `yes`;
+anything else starts nothing. With `yes` it waits until the teaching folder is
+free (it asks every 60 seconds and says so once, because the steps after the
+last marking may still be working), then starts
+`Gather more episodes for teaching.command` with `TEACH_PER_SHOW=24`,
+`TEACH_MAX_GB=80`, the budget and `TEACH_YES=1`, so nothing asks again. That
+file takes both numbers from the environment when they are set (12 and 40 when
+not). The budget is `TEACH_BUDGET` when set, else the name in
+`current-budget.txt` (see "Starting another big run"), else `big-run-1`. Make a
+wrapper for it in `Podcast teaching/` like the others.
 
 ### Backups
 

@@ -163,7 +163,7 @@ class MoreTests(Setup):
 
     def test_it_explains_the_numbers_in_plain_words(self):
         done = self.run_script(MORE)
-        for text in ("about 500 more episodes", "newest 12", "40 GB", "15 GB", "11 at night",
+        for text in ("more episodes of the shows you follow", "newest 12", "40 GB", "15 GB", "11 at night",
                      "7 in the morning", "$95"):
             self.assertIn(text, done.stdout)
 
@@ -180,6 +180,24 @@ class MoreTests(Setup):
             "python3 teach_library.py --folder FOLDER", "python3 teach_settings.py --folder FOLDER",
             "python3 teach_publish.py --folder FOLDER"])
         self.assertEqual(self.source(MORE).count('read -r -p "Type yes'), 1)  # asked once at the start
+
+    def test_numbers_set_before_it_starts_reach_the_gathering_and_the_text_names_them(self):
+        done = self.run_script(MORE, typed="yes\n", TEACH_PER_SHOW="24", TEACH_MAX_GB="80")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.python_calls()[0], COLLECT + " --per-show 24 --max-gb 80")
+        self.assertIn("newest 24 of each", done.stdout)
+        self.assertIn("up to 80 GB", done.stdout)
+        self.assertNotIn("newest 12", done.stdout)
+        self.assertNotIn("40 GB", done.stdout)
+
+    def test_the_numbers_set_in_the_environment_also_reach_a_gather_only_run(self):
+        done = self.run_script(MORE, typed="\n", TEACH_PER_SHOW="24", TEACH_MAX_GB="80")
+        self.assertEqual(self.python_calls()[0], COLLECT + " --per-show 24 --max-gb 80")
+        self.assertEqual(self.labelling(), [])
+
+    def test_empty_numbers_in_the_environment_mean_the_defaults(self):
+        self.run_script(MORE, typed="\n", TEACH_PER_SHOW="", TEACH_MAX_GB="")
+        self.assertEqual(self.python_calls()[0], COLLECT + " --per-show 12 --max-gb 40")
 
     def test_yes_is_taken_in_any_case_with_spaces(self):
         self.run_script(MORE, typed="  YES \n")
