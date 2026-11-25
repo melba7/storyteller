@@ -1575,6 +1575,14 @@ written here and the idea goes under Later.
   4. Automatic big runs while they keep improving the ad skipping and the other
      model (not built; the limits wait on Mo's answers: how much to spend in
      all, what counts as improving, and whether to stop at night only).
+  5. Transcripts from outside (Mo, 2026-11-25: "find episodes with transcripts
+     already available online", for his own shows and for podcasts in general).
+     `Count publisher transcripts in my shows.command` counts the shows of his
+     63 that carry a publisher's transcript. No public set of podcasts has ad
+     marks that anyone may use; the biggest public transcripts (SPoRC, over a
+     million episodes, research use only, behind a Hugging Face login) have no
+     ad marks either, so they would need Claude's marking to be used. Nothing
+     more is built until Mo has the count and answers.
 
 **3. The exam**
 

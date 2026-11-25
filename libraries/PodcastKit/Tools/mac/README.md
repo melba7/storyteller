@@ -59,6 +59,8 @@ the app is not added again.
 - `Write down and mark together.command`: see "Writing down and marking
   together".
 - `Free up space from the teaching audio.command`: see "Freeing disk space".
+- `Count publisher transcripts in my shows.command`: see "Publisher
+  transcripts".
 - `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
@@ -698,6 +700,21 @@ again" first. In Terminal: `python3 teach_free.py --folder F` says what it would
 free and `--delete` frees it. Copy `teach_free.py` and the launcher into the
 tools folder (keep the launcher executable) and make a wrapper for it in
 `Podcast teaching/` like the others.
+
+### Publisher transcripts
+
+`Count publisher transcripts in my shows.command` reads the feed of every show
+you follow (the list the Apple Podcasts sync writes), once each, one second
+apart, and one transcript file (at most 300 KB) from each feed that has one. It
+needs no keys and no Xcode, downloads no audio, and writes one report to
+`~/Storyteller Lofi/logs/publisher-transcripts-<time>.txt`. The report says how
+many shows carry a `podcast:transcript` tag in their newest ten items, in which
+file types, and whether the newest transcript still has spoken ad reads in it
+("brought to you by", "promo code" and a few more phrases). A transcript made
+before the ads were stitched in has none of the inserted ads, so the words the
+app hears and the publisher does not have are those ads. A transcript that holds
+the host-read ads shows nothing about them. Either way a publisher's transcript
+has no ad marks, so it does not replace Claude's marking.
 
 ### Backups
 
