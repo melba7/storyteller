@@ -30,18 +30,56 @@ public struct AdSoundBuilder: Sendable {
 
   public init() {}
 
+  /// The stretches of an episode that can become sounds, as the sound bank keeps them: for each
+  /// marked stretch of a kept sort, the frames from the first that starts a margin into it to the
+  /// last that ends a margin before its end, when they last from `minSeconds` to `maxSeconds`.
+  /// Only the low 32 bits of each frame's hash are kept, which is all the matching reads, and its
+  /// time as seconds from the first frame of the stretch.
+  public static func slice(frames: [MP3Frame], marked: [MarkedStretch]) -> [BankedStretch] {
+    marked.compactMap { stretch in
+      guard AdSoundLibrary.sorts.contains(stretch.sort) else { return nil }
+      let from = firstFrame(startingAt: stretch.start + margin - 1e-9, in: frames)
+      var to = from
+      while to < frames.count, frames[to].start + frames[to].duration <= stretch.end - margin + 1e-9 {
+        to += 1
+      }
+      guard from < to else { return nil }
+      let origin = frames[from].start
+      let banked = BankedStretch(
+        sort: stretch.sort, who: stretch.who,
+        frames: frames[from..<to].map {
+          BankedFrame(
+            hash: UInt32(truncatingIfNeeded: $0.hash), start: Float($0.start - origin),
+            duration: Float($0.duration))
+        })
+      return fits(banked) ? banked : nil
+    }
+  }
+
+  /// Whether a stretch lasts long enough, and not too long, to be a sound.
+  private static func fits(_ stretch: BankedStretch) -> Bool {
+    (minSeconds...maxSeconds).contains(stretch.seconds)
+  }
+
   /// Adds one episode: its frames and its marked stretches. A stretch that is a sound already
   /// added counts that sound as seen once more; otherwise it becomes a new sound.
   public mutating func add(episode: String, frames: [MP3Frame], marked: [MarkedStretch]) {
-    for stretch in marked where AdSoundLibrary.sorts.contains(stretch.sort) {
-      let from = firstFrame(startingAt: stretch.start + Self.margin - 1e-9, in: frames)
-      var to = from
-      while to < frames.count, frames[to].start + frames[to].duration <= stretch.end - Self.margin + 1e-9 {
-        to += 1
+    add(episode: episode, stretches: Self.slice(frames: frames, marked: marked))
+  }
+
+  /// Adds one episode from its banked stretches, which is all it needs of the audio: this is
+  /// the one path that learns, so the library is the same whether the stretches were cut from
+  /// the audio just now or were read from the sound bank later.
+  public mutating func add(episode: String, stretches: [BankedStretch]) {
+    for stretch in stretches where AdSoundLibrary.sorts.contains(stretch.sort) && Self.fits(stretch) {
+      // Only the hash and the times of these frames matter; the rest is left plain.
+      let slice = stretch.frames.map {
+        MP3Frame(
+          offset: 0, length: 0, start: Double($0.start), duration: Double($0.duration),
+          hash: UInt64($0.hash), bitrate: 0, sampleRate: 0, channels: 0, hasInfoTag: false,
+          mainDataBegin: nil)
       }
-      let slice = Array(frames[from..<to])
-      let seconds = slice.reduce(0) { $0 + $1.duration }
-      guard seconds >= Self.minSeconds, seconds <= Self.maxSeconds else { continue }
+      let seconds = stretch.seconds
       if let index = knownSound(slice, seconds: seconds) {
         if episodes[index].insert(episode).inserted { sounds[index].seen += 1 }
         continue
@@ -58,7 +96,7 @@ public struct AdSoundBuilder: Sendable {
   }
 
   /// The number of the first frame that starts at `time` or later.
-  private func firstFrame(startingAt time: Double, in frames: [MP3Frame]) -> Int {
+  private static func firstFrame(startingAt time: Double, in frames: [MP3Frame]) -> Int {
     var low = 0
     var high = frames.count
     while low < high {
