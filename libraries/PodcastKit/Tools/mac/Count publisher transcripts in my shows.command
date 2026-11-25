@@ -11,7 +11,8 @@ LOGS="$HOME/Storyteller Lofi/logs"
 
 finish() {
   echo
-  read -r -p "$1 Press Return to close this window. " _
+  echo "$1"
+  read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 

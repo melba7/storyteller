@@ -716,6 +716,36 @@ app hears and the publisher does not have are those ads. A transcript that holds
 the host-read ads shows nothing about them. Either way a publisher's transcript
 has no ad marks, so it does not replace Claude's marking.
 
+### A sample of public transcripts
+
+`Fetch a sample of public transcripts.command` takes about 200 episodes (set
+`TEACH_SPORC_COUNT` for another number) from SPoRC, a public set of over a
+million podcast episodes with timed transcripts (Hugging Face `blitt/SPoRC`).
+Its ads are still in the text and nobody marked them, so Claude has to mark them
+like it marks your own episodes. SPoRC is released for research and educational
+use only: the files stay on this Mac in
+`~/Storyteller Lofi/PodcastTeachingSporc` (a teaching folder of its own, never
+your main one), are never committed or shared, and what is learned from them
+stays out of a build that is published to other people.
+
+You need a free Hugging Face account that has clicked Agree on the dataset's
+page (https://huggingface.co/datasets/blitt/SPoRC). The first time, the launcher
+makes its own Python folder (`~/Storyteller Lofi/venv-sporc`), installs
+`huggingface_hub` and `pyarrow` there, and asks you to paste a Read token into
+its window. It downloads the episode catalog and one part of the transcripts
+(the dataset page does not say how big; expect a few hundred MB to a couple of
+GB) into `~/Storyteller Lofi/hf-cache`, which you can delete when you are done.
+It uses no Claude usage and no audio.
+
+From the English episodes of that part it picks ones of 20 minutes to 2.5 hours,
+spread over as many shows as it can (at most 2 from a show), and writes
+`episodes.json`, `transcripts/<id>.txt`, `SOURCE.txt` and `SAMPLE-REPORT.txt`
+(episodes, hours, shows, and how many hold spoken ad phrases such as "brought to
+you by"). Only the turn text is public, so the times inside a turn are worked
+out from its start and end: an ad's edges are good to a few seconds, not to the
+word. The marking of this folder is a separate step with its own budget name and
+a cost cap you set (about $0.19 an episode); nothing is marked by this launcher.
+
 ### Backups
 
 Claude's marks cost about $0.19 an episode and live only in the teaching folder,

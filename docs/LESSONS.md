@@ -232,3 +232,6 @@ One line per lesson.
 - The sound bank was first tested with the audio file gone but the list entry
   intact; the cleanup sets `file` to null, and the sounds step skipped such
   entries. Test the exact state the deleting tool leaves behind (2026-11-25).
+- A launcher's `read -p "message"` prints nothing when its input is not a
+  terminal, so a test never saw the closing message. Print messages with `echo`
+  and keep `read` for the Return key only (2026-11-25).

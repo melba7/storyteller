@@ -1581,8 +1581,12 @@ written here and the idea goes under Later.
      63 that carry a publisher's transcript. No public set of podcasts has ad
      marks that anyone may use; the biggest public transcripts (SPoRC, over a
      million episodes, research use only, behind a Hugging Face login) have no
-     ad marks either, so they would need Claude's marking to be used. Nothing
-     more is built until Mo has the count and answers.
+     ad marks either, so they would need Claude's marking to be used. Mo chose
+     "Yes, small sample first" (card, 2026-11-25):
+     `Fetch a sample of public transcripts.command` (`sporc_sample.py`) writes
+     about 200 episodes as a teaching folder of its own after Mo makes a free
+     Hugging Face account and agrees to the terms. Marking them, and teaching
+     the model from them, wait for Mo's look at the sample and a spend cap.
 
 **3. The exam**
 
