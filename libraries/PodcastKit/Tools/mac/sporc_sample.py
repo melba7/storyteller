@@ -14,7 +14,7 @@ part it picks --count episodes of 20 minutes to 2.5 hours, spread over as many s
 SAMPLE-REPORT.txt. The data is only turn-level text: no audio, no word times. Nothing is committed
 or sent anywhere. Calling it again adds to what is there.
 
-  sporc_sample.py --out FOLDER [--count 200] [--part 0]
+  sporc_sample.py --out FOLDER [--count 500] [--part 0]
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -219,7 +219,7 @@ def _hub_fetch(name):
     return hf_hub_download(REPO, name, repo_type="dataset")
 
 
-def run(out, count=200, part=0, fetch=None, listing=None, say=print):
+def run(out, count=500, part=0, fetch=None, listing=None, say=print):
     """Makes the sample folder `out`. 0 when it did, 2 when it could not (the message says why)."""
     try:
         names = (listing or _hub_listing)()
@@ -265,7 +265,7 @@ def _gated_message(error):
 def main(argv):
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--out", required=True)
-    parser.add_argument("--count", type=int, default=200)
+    parser.add_argument("--count", type=int, default=500)
     parser.add_argument("--part", type=int, default=0)
     args = parser.parse_args(argv[1:])
     if args.count < 1 or args.part < 0:

@@ -80,7 +80,7 @@ class LauncherTests(unittest.TestCase):
         self.assertIn("Installing huggingface_hub and pyarrow", result.stdout)
         self.assertIn("Not logged in to Hugging Face yet", result.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.base, "hf-cache", "token")))
-        self.assertIn("--count 200", result.stdout)
+        self.assertIn("--count 500", result.stdout)
         self.assertTrue(os.path.isdir(os.path.join(self.base, "PodcastTeachingSporc")))
         self.assertIn("Saved:", result.stdout)
 
@@ -93,7 +93,7 @@ class LauncherTests(unittest.TestCase):
 
     def test_the_count_can_be_changed_and_a_bad_one_is_ignored(self):
         self.assertIn("--count 50", self.run_launcher("yes\n\n", TEACH_SPORC_COUNT="50").stdout)
-        self.assertIn("--count 200", self.run_launcher("yes\n\n", TEACH_SPORC_COUNT="lots").stdout)
+        self.assertIn("--count 500", self.run_launcher("yes\n\n", TEACH_SPORC_COUNT="lots").stdout)
 
 
 if __name__ == "__main__":

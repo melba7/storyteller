@@ -63,7 +63,7 @@ class LauncherTests(unittest.TestCase):
         text = self.call()
         self.assertIn("teach_label.py", text)
         self.assertIn(self.folder, text)
-        for part in ("--limit 100", "--cap 20", "--budget sporc-1", "--wait-hours 12"):
+        for part in ("--limit 500", "--cap 100", "--budget sporc-1", "--wait-hours 12"):
             self.assertIn(part, text)
         self.assertNotIn("--yes", text)
         self.assertNotIn("PodcastTeaching/", text)
@@ -72,7 +72,7 @@ class LauncherTests(unittest.TestCase):
         self.sample()
         self.run_launcher(TEACH_SPORC_LIMIT="30", TEACH_SPORC_CAP="lots", TEACH_SPORC_BUDGET="a b")
         text = self.call()
-        for part in ("--limit 30", "--cap 20", "--budget sporc-1"):
+        for part in ("--limit 30", "--cap 100", "--budget sporc-1"):
             self.assertIn(part, text)
 
     def test_each_exit_code_has_its_own_message(self):

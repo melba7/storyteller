@@ -3,8 +3,8 @@
 # transcripts that "Fetch a sample of public transcripts" wrote (teach_label.py, in the folder
 # ~/Storyteller Lofi/PodcastTeachingSporc). It uses the Claude plan this Mac is signed in to and
 # shares its usage allowance, at about 15 to 20 cents an episode, and asks you to type yes before
-# it starts. It marks at most TEACH_SPORC_LIMIT episodes (default 100) and spends at most
-# TEACH_SPORC_CAP dollars (default 20) in all, counted over every double-click under the budget
+# it starts. It marks at most TEACH_SPORC_LIMIT episodes (default 500) and spends at most
+# TEACH_SPORC_CAP dollars (default 100) in all, counted over every double-click under the budget
 # sporc-1 (TEACH_SPORC_BUDGET for another name), so a second double-click carries on and cannot
 # pass the cap. When the usage allowance is used up it waits up to TEACH_SPORC_WAIT_HOURS (default
 # 12) and carries on. It marks at any hour, runs next to a big run in the other folder, writes
@@ -24,10 +24,10 @@ finish() {
 }
 
 number() { printf '%s' "$1" | LC_ALL=C grep -Eq '^[0-9]{1,4}$' && [ "$1" -ge 1 ]; }
-LIMIT="${TEACH_SPORC_LIMIT:-100}"
-number "$LIMIT" || LIMIT=100
-CAP="${TEACH_SPORC_CAP:-20}"
-number "$CAP" || CAP=20
+LIMIT="${TEACH_SPORC_LIMIT:-500}"
+number "$LIMIT" || LIMIT=500
+CAP="${TEACH_SPORC_CAP:-100}"
+number "$CAP" || CAP=100
 WAIT="${TEACH_SPORC_WAIT_HOURS:-12}"
 number "$WAIT" || WAIT=12
 BUDGET="${TEACH_SPORC_BUDGET:-sporc-1}"

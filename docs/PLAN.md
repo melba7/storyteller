@@ -1586,10 +1586,16 @@ written here and the idea goes under Later.
      `Fetch a sample of public transcripts.command` (`sporc_sample.py`) writes
      about 200 episodes as a teaching folder of its own after Mo makes a free
      Hugging Face account and agrees to the terms. The sample is made (200
-     English episodes, 200 shows, 186 hours). Mo then chose "Bigger: 100
-     episodes, up to $20" (card, 2026-11-25) for the marking, which
-     `Mark the public transcripts.command` does under the budget `sporc-1`.
-     Teaching the model from the marks waits for a look at how well they mark.
+     English episodes, 200 shows, 186 hours). Mo chose "Bigger: 100 episodes, up
+     to $20" (card, 2026-11-25), then said up to $100 and asked to test whether
+     ad detection improved significantly afterwards. So the fetch takes 500
+     episodes and `Mark the public transcripts.command` marks up to 500 under
+     the budget `sporc-1` (cap $100). `Test the public marks.command` trains the
+     word model with and without them and compares the held-out shelf. Done
+     when: the word model's held-out precision and recall and the whole
+     pipeline's breaks passing (`podcast-teach score`, 140/131/109 before) are
+     measured with and without, and Mo has the answer. "Significantly" means the
+     round's own gate: 10 more breaks passing and at most 2 more wrong skips.
 
 **3. The exam**
 

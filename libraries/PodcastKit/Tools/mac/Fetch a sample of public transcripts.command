@@ -1,5 +1,5 @@
 #!/bin/bash
-# Double-click in Finder. Takes a small sample (200 episodes by default, TEACH_SPORC_COUNT changes it) of
+# Double-click in Finder. Takes a sample (500 episodes by default, TEACH_SPORC_COUNT changes it; a second double-click adds to what is there) of
 # the SPoRC public podcast transcripts from Hugging Face and writes them as a teaching folder,
 # ~/Storyteller Lofi/PodcastTeachingSporc, so Claude can mark their ads (a separate, asked-for step)
 # and the ad model can learn from many more shows than the ones you follow. SPoRC is released for
@@ -26,8 +26,8 @@ finish() {
   exit "${2:-0}"
 }
 
-COUNT="${TEACH_SPORC_COUNT:-200}"
-printf '%s' "$COUNT" | LC_ALL=C grep -Eq '^[0-9]{1,4}$' && [ "$COUNT" -ge 1 ] || COUNT=200
+COUNT="${TEACH_SPORC_COUNT:-500}"
+printf '%s' "$COUNT" | LC_ALL=C grep -Eq '^[0-9]{1,4}$' && [ "$COUNT" -ge 1 ] || COUNT=500
 
 echo "Storyteller Lofi: fetch a sample of public transcripts"
 echo

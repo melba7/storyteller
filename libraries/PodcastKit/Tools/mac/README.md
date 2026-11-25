@@ -718,8 +718,9 @@ has no ad marks, so it does not replace Claude's marking.
 
 ### A sample of public transcripts
 
-`Fetch a sample of public transcripts.command` takes about 200 episodes (set
-`TEACH_SPORC_COUNT` for another number) from SPoRC, a public set of over a
+`Fetch a sample of public transcripts.command` takes about 500 episodes (set
+`TEACH_SPORC_COUNT` for another number; a second double-click adds to what is
+there and keeps the marks already made) from SPoRC, a public set of over a
 million podcast episodes with timed transcripts (Hugging Face `blitt/SPoRC`).
 Its ads are still in the text and nobody marked them, so Claude has to mark them
 like it marks your own episodes. SPoRC is released for research and educational
@@ -745,14 +746,26 @@ you by"). Only the turn text is public, so the times inside a turn are worked
 out from its start and end: an ad's edges are good to a few seconds, not to the
 word. The marking of this folder is a separate step,
 `Mark the public transcripts.command`. It runs `teach_label.py` on that folder
-only, under the budget `sporc-1`, and asks for a typed yes. It marks at most 100
-episodes (`TEACH_SPORC_LIMIT`) and spends at most $20 (`TEACH_SPORC_CAP`) in
+only, under the budget `sporc-1`, and asks for a typed yes. It marks at most 500
+episodes (`TEACH_SPORC_LIMIT`) and spends at most $100 (`TEACH_SPORC_CAP`) in
 all, counted over every double-click, and waits up to 12 hours
 (`TEACH_SPORC_WAIT_HOURS`) when the usage allowance is used up. It marks at any
 hour and can run next to a big run, because the other folder has its own lock.
 The fetch launcher marks nothing. The marks are not taught to the phone and not
 backed up by the teaching backups (they are cheap to make again, about 15 to 20
 cents an episode).
+
+`Test the public marks.command` (`teach_public_compare.py`) answers whether the
+public marks help. It trains the word model twice in scratch folders of links in
+`~/Storyteller Lofi/PodcastTeachingPublicTest`, once on your teaching folder
+alone (`base`) and once with every marked public episode added (`with-public`),
+with the same settings the steps after marking use, and prints both models'
+precision and recall on the held-out shelf side by side (`COMPARE.txt`). The
+shelf and the sealed exam are the same in both, so only your own shows are
+tested and the public episodes are only ever trained on. It uses no Claude
+usage, downloads nothing and writes nothing into your teaching folder, the
+public folder or the model on the phone. The two models can then be scored on
+the shelf with `podcast-teach score` like any other model.
 
 ### Backups
 
