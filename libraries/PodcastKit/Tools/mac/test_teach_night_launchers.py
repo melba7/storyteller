@@ -28,6 +28,8 @@ NEW = [MORE, NIGHT, EXAM]
 CAFFEINATE = '#!/bin/bash\necho "caffeinate $*" >> "$CALLS"\nshift\nexec "$@"\n'
 # The step before the launchers' own: what the gathering does is played by the stand-in python3.
 COLLECT = "python3 teach_collect.py --folder FOLDER"
+# The backup of what is marked so far, which the marking launcher and the steps after marking each make.
+BACKUP = "python3 teach_backup.py make --check --folder FOLDER"
 
 
 class Setup(unittest.TestCase):
@@ -171,8 +173,9 @@ class MoreTests(Setup):
         self.assertEqual(self.python_calls(), [
             COLLECT + " --per-show 12 --max-gb 40",
             "python3 teach_transcribe.py --folder FOLDER --tool %s/podcast-transcribe" % self.bin,
-            "python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes --yes",
-            "python3 teach_habits.py --folder FOLDER",
+            BACKUP,
+            "python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget big-run-1 --yes",
+            BACKUP, "python3 teach_habits.py --folder FOLDER",
             "python3 teach_train.py --folder FOLDER --fit-tool %s/podcast-teach" % self.bin,
             "python3 teach_library.py --folder FOLDER", "python3 teach_settings.py --folder FOLDER",
             "python3 teach_publish.py --folder FOLDER"])
@@ -213,18 +216,18 @@ class NightTests(Setup):
         done = self.run_script(NIGHT)
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes"])
+                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget big-run-1"])
         self.assertIn("python3 teach_publish.py --folder FOLDER", self.called())
 
     def test_the_numbers_can_be_changed_from_the_environment(self):
         self.run_script(NIGHT, TEACH_BETWEEN="22-6", TEACH_WAIT_HOURS="48", TEACH_CAP="10")
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 22-6 --wait-hours 48 --cap 10 --budget more-episodes"])
+                         ["python3 teach_label.py --folder FOLDER --between 22-6 --wait-hours 48 --cap 10 --budget big-run-1"])
 
     def test_with_teach_yes_the_tool_is_not_asked_to_confirm_again(self):
         self.run_script(NIGHT, TEACH_YES="1")
         self.assertEqual(self.labelling(),
-                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget more-episodes --yes"])
+                         ["python3 teach_label.py --folder FOLDER --between 23-7 --wait-hours 120 --cap 95 --budget big-run-1 --yes"])
 
     def test_teach_yes_must_be_exactly_1_to_skip_the_question(self):
         for value in ("yes", "0", "true", "2"):
@@ -244,7 +247,7 @@ class NightTests(Setup):
 
     def test_not_typing_yes_runs_nothing_after_it(self):
         self.run_script(NIGHT, CODES="teach_label.py=4")
-        self.assertEqual(self.python_calls(), [self.labelling()[0]])
+        self.assertEqual(self.python_calls(), [BACKUP, self.labelling()[0]])
 
     def test_stopped_early_still_works_out_what_was_marked(self):
         done = self.run_script(NIGHT, CODES="teach_label.py=3")
@@ -277,7 +280,7 @@ class NightTests(Setup):
     def test_a_marking_that_could_not_start_does_not_run_the_steps_after_it(self):
         done = self.run_script(NIGHT, CODES="teach_label.py=2")
         self.assertEqual(done.returncode, 2)
-        self.assertEqual(self.python_calls(), [self.labelling()[0]])
+        self.assertEqual(self.python_calls(), [BACKUP, self.labelling()[0]])
 
     def test_everything_is_added_to_the_log(self):
         self.run_script(NIGHT)

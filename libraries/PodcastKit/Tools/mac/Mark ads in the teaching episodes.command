@@ -2,7 +2,9 @@
 # Double-click in Finder. Has Claude mark every advertisement and promotion in the transcribed
 # teaching episodes (teach_label.py), then runs the steps after marking (teach-finish.sh): the
 # snap (when there is a second download), habits, models, library, sounds, score, per-show
-# settings and the copy to the phone's folders. Only
+# settings and the copy to the phone's folders. Before it marks anything it backs up what is marked
+# so far (teach_backup.py, into ~/Storyteller Lofi/PodcastTeachingBackups), and teach-finish.sh does
+# so again at its start; a backup that fails is said and does not stop the marking. Only
 # the marking uses the Claude plan this Mac is signed in to (it shares its usage allowance), and it
 # asks you to type yes before it starts. A stopped run carries on where it was when you double-click
 # again. If you do not type yes, nothing else runs.
@@ -52,6 +54,12 @@ BUDGET=()
 [ -n "$TEACH_BUDGET" ] && BUDGET=(--budget "$TEACH_BUDGET")
 
 echo "=== $(date '+%Y-%m-%d %H:%M') mark ads ===" >> "$LOG"
+# First a backup of what is marked so far, because the marks cost money and are kept nowhere else
+# (teach_backup.py, no Claude usage). When it fails that is said in one line and the marking goes on.
+echo "First: backing up what is marked so far"
+python3 -u "$HERE/teach_backup.py" make --check --folder "$FOLDER" 2>&1 | tee -a "$LOG"
+[ "${PIPESTATUS[0]}" = 0 ] || echo "The backup did not work (see above). The marking goes on without it." | tee -a "$LOG"
+echo
 caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" "${MODEL[@]}" "${BETWEEN[@]}" "${WAIT[@]}" "${CAP[@]}" "${BUDGET[@]}" "${YES[@]}" 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 

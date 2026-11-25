@@ -16,6 +16,11 @@ NOT_READING_LABELS = ("python3 teach_settings.py", "python3 teach_publish.py")
 CODES = (0, 1, 2, 3, 130)
 
 
+def with_snap(order):
+    """The finish steps in order with the snap, which comes right after the backup."""
+    return order[:1] + ["python3 teach_snap.py"] + order[1:]
+
+
 class Steps(shell.Setup):
     def setUp(self):
         super().setUp()
@@ -47,14 +52,14 @@ class LabelsTests(Steps):
         # file as it is.
         self.make("labels-snapped")
         self.finish()
-        self.assertEqual(self.short(), ["python3 teach_snap.py"] + [
+        self.assertEqual(self.short(), with_snap([
             call + (" " + LABELS if call.startswith(READING_LABELS) else "")
-            for call in shell.FINISH_ORDER])
+            for call in shell.FINISH_ORDER]))
 
     def test_a_failed_snap_of_a_labels_snapped_folder_alone_leaves_it_unused(self):
         self.make("labels-snapped")
         done = self.finish(CODES="teach_snap.py=2")
-        self.assertEqual(self.short(), ["python3 teach_snap.py"] + shell.FINISH_ORDER)
+        self.assertEqual(self.short(), with_snap(shell.FINISH_ORDER))
         self.assertIn("  Snap: failed", done.stdout)
         for call in self.called():
             self.assertNotIn("--labels", call)
@@ -86,20 +91,20 @@ class LabelsTests(Steps):
     def test_second_downloads_are_snapped_first_and_the_snapped_labels_are_used(self):
         self.make("copies")
         done = self.finish()
-        self.assertEqual(self.short(), ["python3 teach_snap.py"] + [
+        self.assertEqual(self.short(), with_snap([
             call + (" " + LABELS if call.startswith(READING_LABELS) else "")
-            for call in shell.FINISH_ORDER])
+            for call in shell.FINISH_ORDER]))
         self.assertIn("  Snap: worked", done.stdout)
         # The run already holds the folder's lock: snap does not start its own.
         self.assertEqual(len([c for c in self.called() if " teach_store.py hold" in c]), 1)
         self.assertEqual(self.calls_of("python3 teach_snap.py"),
                          ["python3 teach_snap.py --folder %s" % self.folder])
 
-    def test_snap_is_the_first_step_after_the_lock(self):
+    def test_the_backup_comes_first_after_the_lock_and_then_the_snap(self):
         self.make("copies")
         self.finish()
         names = [c.split()[1] for c in self.called() if c.startswith("python3")]
-        self.assertEqual(names[:2], ["teach_store.py", "teach_snap.py"])
+        self.assertEqual(names[:3], ["teach_store.py", "teach_backup.py", "teach_snap.py"])
         self.assertLess(names.index("teach_snap.py"), names.index("teach_habits.py"))
 
     def test_snapping_again_with_the_same_result_is_nothing_to_do(self):
@@ -119,10 +124,10 @@ class LabelsTests(Steps):
         for code in CODES:
             open(self.calls, "w").close()
             done = self.finish(CODES="teach_snap.py=%d" % code)
-            self.assertEqual(self.short()[0], "python3 teach_snap.py", code)
-            self.assertEqual(self.short()[1:], [
+            self.assertEqual(self.short()[1], "python3 teach_snap.py", code)
+            self.assertEqual(self.short(), with_snap([
                 call + (" " + LABELS if code == 0 and call.startswith(READING_LABELS) else "")
-                for call in shell.FINISH_ORDER], code)
+                for call in shell.FINISH_ORDER]), code)
             if code:
                 self.assertIn("  Snap: failed", done.stdout, code)
                 self.assertIn("Claude's own labels are used this time", done.stdout, code)
@@ -142,7 +147,7 @@ class LabelsTests(Steps):
         self.finish(NOOP="teach_snap.py")  # the stand-in says "nothing to do" and writes nothing
         for call in self.called():
             self.assertNotIn("--labels", call)
-        self.assertEqual(self.short(), ["python3 teach_snap.py"] + shell.FINISH_ORDER)
+        self.assertEqual(self.short(), with_snap(shell.FINISH_ORDER))
 
 
 class MeaningTests(Steps):
@@ -264,7 +269,7 @@ class WholeRunTests(Steps):
         summary = done.stdout[done.stdout.index("Summary:"):]
         import re
         self.assertEqual(re.findall(r"^  (\w+): ", summary, re.M),
-                         ["Snap", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+                         ["Backup", "Snap", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
                           "Score", "Settings", "Publish"])
 
     def test_the_weekly_run_goes_through_the_same_steps(self):

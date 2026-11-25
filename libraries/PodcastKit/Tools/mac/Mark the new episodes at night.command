@@ -7,9 +7,10 @@
 # where it was when you double-click again. TEACH_YES set in the environment answers the typed
 # yes (only when it is exactly 1); without it the marking asks for it. These can be changed:
 # TEACH_BETWEEN (default 23-7), TEACH_WAIT_HOURS (default 120) and TEACH_CAP (default 95).
-# The 95 dollars are counted over every run, under the budget TEACH_BUDGET (default
-# more-episodes): double-clicking again carries on with what is left of them and never starts a
-# fresh 95. To start a new budget on purpose, set TEACH_BUDGET to a new name.
+# The 95 dollars are counted over every run, under the budget TEACH_BUDGET (default big-run-1, the
+# first big run of 2026-11-24; the run before it used more-episodes and has $89.57 spent):
+# double-clicking again carries on with what is left of them and never starts a fresh 95. To start
+# a new budget on purpose, set TEACH_BUDGET to a new name ("Start another big run" does).
 # The Mac is kept awake for the whole wait (caffeinate -i, in the file this starts).
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -27,7 +28,7 @@ finish() {
 TEACH_BETWEEN="${TEACH_BETWEEN:-23-7}"
 TEACH_WAIT_HOURS="${TEACH_WAIT_HOURS:-120}"
 TEACH_CAP="${TEACH_CAP:-95}"
-TEACH_BUDGET="${TEACH_BUDGET:-more-episodes}"
+TEACH_BUDGET="${TEACH_BUDGET:-big-run-1}"
 export TEACH_BETWEEN TEACH_WAIT_HOURS TEACH_CAP TEACH_BUDGET
 
 echo "Storyteller Lofi: mark the new episodes at night"
