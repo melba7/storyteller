@@ -113,14 +113,14 @@ final class PodcastTeaching: @unchecked Sendable {
 
   /// Saves what the app knows of its episodes (`{"<episode id>": {"feed", "guid", "title"}}`). A
   /// text that is not such an object, or a table that is the one saved already, changes nothing.
-  /// True when the table changed.
+  /// True when the table changed. The files already read stay; only their table is replaced.
   func setAheadEpisodes(json: String) -> Bool {
     guard let table = AheadEpisodes.parse(json) else { return false }
     return lock.withLock {
       guard table != AheadEpisodes.load(from: Self.folder) else { return false }
       do {
         try AheadEpisodes.save(table, to: Self.folder)
-        taught = nil
+        taught?.episodes = table
         return true
       } catch {
         NSLog("Podcasts: the table of episodes could not be saved: \(error)")

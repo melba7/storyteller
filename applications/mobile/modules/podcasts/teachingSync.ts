@@ -10,10 +10,12 @@ import { LofiScore } from "@/modules/lofi-score"
 
 import { type AppleExport, parseAppleExport } from "./applePodcasts"
 import { onLibraryChanged } from "./changes"
-import { listEpisodes, listShows } from "./db"
+import { listShows, rows } from "./db"
 import { Podcasts } from "./index"
-import { type StoredEpisode } from "./library"
+import { type StoredEpisode, episodeFromRow, sortEpisodes } from "./library"
+import { feedShows } from "./localFiles"
 import { currentQueue } from "./phoneNotesSync"
+import { type QueueEntry } from "./phoneQueue"
 import {
   TEACHING_LIST_FILE,
   aheadEpisodesText,
@@ -23,6 +25,7 @@ import {
   parseTeachingState,
   showTableText,
 } from "./teaching"
+import { aheadEpisodesQuery, textChanged } from "./teachingAhead"
 
 const APPLE_FILE = "Podcasts/apple-podcasts.json"
 let sentShows: string | null = null
@@ -58,25 +61,39 @@ export async function sendTeachingShows(): Promise<void> {
 /**
  * Tells the native side which episode is which (feed, guid and title by episode id), so the Mac's
  * marks of the night before find theirs. Only once the Mac has published marks, and at most once
- * a minute unless `force` says the marks have just come.
+ * a minute unless `force` says the marks have just come. The native side is told only when the
+ * table is not the one last sent. `readQueue` reads the phone's list of next episodes, which a
+ * run that needs it elsewhere too reads once for both.
  */
-export async function sendAheadEpisodes(force = false): Promise<void> {
+export async function sendAheadEpisodes(
+  force = false,
+  readQueue: () => Promise<QueueEntry[]> = currentQueue,
+): Promise<void> {
   if (!Podcasts || !aheadWanted) return
   const now = Date.now()
   if (!force && !dueForAhead(lastEpisodesLook, now)) return
   lastEpisodesLook = now
   const shows = await listShows()
-  const episodes: Record<string, StoredEpisode[]> = {}
-  for (const show of shows) episodes[show.id] = await listEpisodes(show.id)
   // The episodes of the phone's list for the Mac are the ones it marks, so they must be found
   // even when they are older than the newest few of their show. Without the list (a failed read)
   // the table is still worth sending.
-  const queue = await currentQueue().catch((cause) => {
+  const queue = await readQueue().catch((cause) => {
     console.warn("Couldn't read the phone's list of next episodes", cause)
     return []
   })
+  // Only what the table can hold is read from the database, show by show.
+  const episodes: Record<string, StoredEpisode[]> = {}
+  for (const show of feedShows(shows)) {
+    const guids = queue
+      .filter((one) => one.feed === show.feedUrl)
+      .map((one) => one.guid)
+    const query = aheadEpisodesQuery(show.id, guids)
+    episodes[show.id] = sortEpisodes(
+      (await rows(query.sql, query.params)).map(episodeFromRow),
+    )
+  }
   const text = aheadEpisodesText(shows, episodes, queue)
-  if (text === sentEpisodes) return
+  if (!textChanged(text, sentEpisodes)) return
   await Podcasts.setAheadEpisodes(text)
   sentEpisodes = text
 }
@@ -98,8 +115,13 @@ export function watchTeachingShows(): void {
   })
 }
 
-/** Fetches and installs the teaching files that are new. Never throws for a missing file. */
-export async function syncTeaching(): Promise<void> {
+/**
+ * Fetches and installs the teaching files that are new. Never throws for a missing file.
+ * `readQueue` is passed on to `sendAheadEpisodes`.
+ */
+export async function syncTeaching(
+  readQueue: () => Promise<QueueEntry[]> = currentQueue,
+): Promise<void> {
   if (!Podcasts || !LofiScore) return
   const read = await LofiScore.readLinkedFolderFileStatus(TEACHING_LIST_FILE)
   if (read.status !== "found") return
@@ -108,7 +130,7 @@ export async function syncTeaching(): Promise<void> {
   // The tables go first, so a file that names shows or episodes is read the moment it is installed.
   await sendTeachingShows()
   aheadWanted = list["ahead-ads.json"] !== undefined
-  await sendAheadEpisodes(true)
+  await sendAheadEpisodes(true, readQueue)
   const state = parseTeachingState(await Podcasts.getTeachingState())
   for (const name of filesToFetch(list, state.installed, refused)) {
     const listed = list[name]

@@ -114,7 +114,7 @@ final class AheadFileTests: XCTestCase {
   func testTheEpisodeIsFoundByItsGuid() {
     let read = AheadFile(
       data: file([episode(guid: "g1", title: "A", marked: fresh), episode(guid: "g2", title: "B", marked: fresh)]))
-    XCTAssertEqual(read.entry(guid: "g2", feed: "other", title: "other", now: now)?.title, "B")
+    XCTAssertEqual(read.entry(guid: "g2", feed: "show.test/rss", title: "other", now: now)?.title, "B")
     XCTAssertNil(read.entry(guid: "g9", feed: "https://show.test/rss", title: "A", now: now))
   }
 
@@ -136,6 +136,29 @@ final class AheadFileTests: XCTestCase {
     XCTAssertNotNil(read.entry(guid: "", feed: "show.test/rss", title: "Episode One", now: now))
   }
 
+  func testTheSameGuidOfAnotherShowIsNotTheSameEpisode() {
+    // Two shows may use the same style of guid (a number, or `?p=123`), so a guid alone is not
+    // enough when both sides name their feed.
+    let read = AheadFile(
+      data: file([episode(guid: "123", title: "A", feed: "https://show.test/rss", marked: fresh)]))
+    XCTAssertNil(read.entry(guid: "123", feed: "https://other.test/rss", title: "A", now: now))
+    XCTAssertNotNil(read.entry(guid: "123", feed: "https://show.test/rss", title: "A", now: now))
+  }
+
+  func testTheSameGuidAndTheSameFeedInAnotherSpellingIsTheSameEpisode() {
+    let read = AheadFile(
+      data: file([episode(guid: "123", feed: "https://Show.test/rss/", marked: fresh)]))
+    XCTAssertNotNil(read.entry(guid: "123", feed: "http://www.show.test/rss", title: "x", now: now))
+  }
+
+  func testAFeedMissingOnEitherSideStillMatchesByGuid() {
+    let withFeed = AheadFile(data: file([episode(guid: "123", feed: "https://show.test/rss", marked: fresh)]))
+    XCTAssertNotNil(withFeed.entry(guid: "123", feed: "", title: "x", now: now))
+    let noFeed = AheadFile(data: file([episode(guid: "123", feed: "", marked: fresh)]))
+    XCTAssertNotNil(noFeed.entry(guid: "123", feed: "https://show.test/rss", title: "x", now: now))
+    XCTAssertNotNil(noFeed.entry(guid: "123", feed: "", title: "x", now: now))
+  }
+
   func testAnEntryWithAGuidIsNeverMatchedByItsTitleWhenTheGuidsDiffer() {
     let read = AheadFile(data: file([episode(guid: "g1", title: "Episode One", marked: fresh)]))
     XCTAssertNil(read.entry(guid: "g2", feed: "show.test/rss", title: "Episode One", now: now))
@@ -155,13 +178,13 @@ final class AheadFileTests: XCTestCase {
         episode(guid: "edge", marked: now.timeIntervalSince1970 - 14 * day + 60),
       ]))
     XCTAssertEqual(AheadFile.maxAgeDays, 14)
-    XCTAssertNil(read.entry(guid: "old", feed: "f", title: "t", now: now))
-    XCTAssertNotNil(read.entry(guid: "edge", feed: "f", title: "t", now: now))
+    XCTAssertNil(read.entry(guid: "old", feed: "show.test/rss", title: "t", now: now))
+    XCTAssertNotNil(read.entry(guid: "edge", feed: "show.test/rss", title: "t", now: now))
   }
 
   func testAnEntryWithNoAdsIsNoEntry() {
     let read = AheadFile(data: file([episode(marked: fresh, ads: [])]))
-    XCTAssertNil(read.entry(guid: "g1", feed: "f", title: "t", now: now))
+    XCTAssertNil(read.entry(guid: "g1", feed: "show.test/rss", title: "t", now: now))
   }
 
   func testOfTwoEntriesOfOneEpisodeTheNewerMarkingIsTaken() {
@@ -170,6 +193,6 @@ final class AheadFileTests: XCTestCase {
         episode(title: "Old", marked: now.timeIntervalSince1970 - 5 * day),
         episode(title: "New", marked: now.timeIntervalSince1970 - 1 * day),
       ]))
-    XCTAssertEqual(read.entry(guid: "g1", feed: "f", title: "t", now: now)?.title, "New")
+    XCTAssertEqual(read.entry(guid: "g1", feed: "show.test/rss", title: "t", now: now)?.title, "New")
   }
 }
