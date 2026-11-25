@@ -136,9 +136,11 @@ export async function currentQueue(): Promise<QueueEntry[]> {
 }
 
 /** Writes the episodes the listener is likely to play next, when they are not what the file holds. */
-async function writeQueue(): Promise<void> {
+async function writeQueue(
+  readQueue: () => Promise<QueueEntry[]>,
+): Promise<void> {
   if (!Podcasts || !LofiScore) return
-  const entries = await currentQueue()
+  const entries = await readQueue()
   const text = queueToWrite(
     await LofiScore.readLinkedFolderFileStatus(QUEUE_FILE),
     entries,
@@ -147,9 +149,15 @@ async function writeQueue(): Promise<void> {
   if (text !== null) await LofiScore.writeLinkedFolderFile(QUEUE_FILE, text)
 }
 
-/** Sends the phone's notes and its list of next episodes to the Mac. One part failing does not stop the others. */
-export async function syncPhoneNotes(): Promise<void> {
-  for (const part of [writeNotes, writeDiary, writeQueue]) {
+/**
+ * Sends the phone's notes and its list of next episodes to the Mac. One part failing does not
+ * stop the others. `readQueue` reads the list of next episodes; a run that read it already for
+ * something else passes the same read.
+ */
+export async function syncPhoneNotes(
+  readQueue: () => Promise<QueueEntry[]> = currentQueue,
+): Promise<void> {
+  for (const part of [writeNotes, writeDiary, () => writeQueue(readQueue)]) {
     try {
       await part()
     } catch (cause) {

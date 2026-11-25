@@ -16,15 +16,19 @@ extension PodcastAdFinder {
   /// What the marks of this episode give in a whole transcript, or nil when the episode has no
   /// marks or iOS did not hold the time. `judged` are the stretches the listener undid, said no to
   /// or was asked about: nothing is given over them. The marks used are noted for the episode, so
-  /// the pass below does not look again unless newer marks come.
+  /// the pass below does not look again unless newer marks come; a caller that saves what the
+  /// marks gave itself passes `recordPass: false` and notes them once the save is done.
   func aheadFound(
-    _ id: String, transcript: Transcript, judged: [(start: Double, end: Double)]
+    _ id: String, transcript: Transcript, judged: [(start: Double, end: Double)],
+    recordPass: Bool = true
   ) -> AheadFound? {
     guard let entry = PodcastTeaching.shared.aheadEntry(episode: id) else { return nil }
     let found = PodcastFinderGuard.shared.hold([FinderNames.ahead], episode: id) { _ in
       AheadAds.find(entry, words: transcript.words, judged: judged)
     }
-    if found != nil { PodcastTeaching.shared.recordAheadPass(episode: id, marked: entry.marked) }
+    if recordPass, found != nil {
+      PodcastTeaching.shared.recordAheadPass(episode: id, marked: entry.marked)
+    }
     return found
   }
 
@@ -72,14 +76,20 @@ extension PodcastAdFinder {
       let (ads, transcripts) = stores(for: id, in: downloads), transcripts.hasTranscript,
       let file = ads.load(detector: Self.detectorName), let modes = newModes(id),
       modes.level(FinderNames.ahead) != .off, let transcript = transcripts.loadTranscript(),
-      let found = aheadFound(id, transcript: transcript, judged: AheadPass.judged(in: file))
+      let found = aheadFound(
+        id, transcript: transcript, judged: AheadPass.judged(in: file), recordPass: false)
     else { return }
     let made = AheadPass.merge(
       found, into: file, show: modes.show, listener: modes.listener, tuning: modes.tuning,
       level: modes.level(FinderNames.ahead))
     PodcastTimeline.mark(
       id, "marks of the night before: \(made.skips) ads, \(made.questions) questions")
-    guard made.file != file, (try? ads.save(made.file)) != nil else { return }
+    // The marks count as used once what they gave is saved, or when they gave nothing new. When
+    // the save fails they are not noted, so the next pass looks again.
+    let changed = made.file != file
+    if changed, (try? ads.save(made.file)) == nil { return }
+    PodcastTeaching.shared.recordAheadPass(episode: id, marked: marks.marked)
+    guard changed else { return }
     set(id, AdsRules.finished(ads.load(detector: Self.detectorName) ?? made.file))
     // The playing episode skips the new ads at once.
     Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }

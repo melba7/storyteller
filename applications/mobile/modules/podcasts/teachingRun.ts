@@ -5,8 +5,9 @@
 // go out. At most once in ten minutes, never waited for, and nothing here throws. Not imported
 // by any test, because the native modules are not there; the rule for "once in ten minutes" is
 // dueForTeaching in teaching.ts.
-import { syncPhoneNotes } from "./phoneNotesSync"
+import { currentQueue, syncPhoneNotes } from "./phoneNotesSync"
 import { dueForTeaching } from "./teaching"
+import { sharedRead } from "./teachingAhead"
 import { syncTeaching, watchTeachingShows } from "./teachingSync"
 
 let lastRun: number | null = null
@@ -19,14 +20,17 @@ export function runTeachingSync(): void {
   running = true
   lastRun = now
   void (async () => {
+    // The table of episodes and the phone's list for the Mac both need the list of next episodes:
+    // it is read once for the run, and only if one of them asks.
+    const queue = sharedRead(currentQueue)
     try {
       watchTeachingShows()
       try {
-        await syncTeaching()
+        await syncTeaching(queue)
       } catch (cause) {
         console.warn("Couldn't read the teaching files from the Mac", cause)
       }
-      await syncPhoneNotes()
+      await syncPhoneNotes(queue)
     } catch (cause) {
       console.warn("Couldn't exchange files with the Mac", cause)
     } finally {

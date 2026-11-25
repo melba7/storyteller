@@ -163,15 +163,21 @@ public struct AheadFile: Codable, Sendable, Equatable {
 
   /// The entry for an episode of the app, or nil: the newest marking that is not older than
   /// `maxAgeDays` at `now`, has at least one ad, and names the episode. An entry and an episode
-  /// that both have a guid are the same episode when the guids are equal. When either has none,
-  /// the feed (as a feed key) and the title (lower case, letters and digits only) must be equal.
+  /// that both have a guid are the same episode when the guids are equal and, when both name a
+  /// feed, the feeds are the same (as feed keys), since two shows can use the same style of guid.
+  /// When either has no guid, the feed (as a feed key) and the title (lower case, letters and
+  /// digits only) must be equal.
   public func entry(guid: String, feed: String, title: String, now: Date) -> AheadEntry? {
     let oldest = now.timeIntervalSince1970 - Self.maxAgeDays * 86_400
     let wantedFeed = FeedKey.key(feed)
     let wantedTitle = Self.plain(title)
     return episodes.filter { entry in
       guard entry.marked >= oldest, !entry.ads.isEmpty else { return false }
-      if !guid.isEmpty, !entry.guid.isEmpty { return entry.guid == guid }
+      if !guid.isEmpty, !entry.guid.isEmpty {
+        guard entry.guid == guid else { return false }
+        let entryFeed = FeedKey.key(entry.feed)
+        return wantedFeed.isEmpty || entryFeed.isEmpty || entryFeed == wantedFeed
+      }
       return !wantedTitle.isEmpty && Self.plain(entry.title) == wantedTitle
         && !wantedFeed.isEmpty && FeedKey.key(entry.feed) == wantedFeed
     }.max { $0.marked < $1.marked }
