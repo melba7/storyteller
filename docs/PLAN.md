@@ -1553,6 +1553,25 @@ written here and the idea goes under Later.
      expected call (19 cents), and every call is written in the budget file at
      once, not after the episode.
 
+- Mo's asks of 2026-11-25 (Mac tools, no phone change):
+  1. Marking at any hour: `Gather deeper and mark now.command` is the "tonight"
+     launcher with `TEACH_BETWEEN=0-24`; it is on the Mac and gets its copy and
+     test in the repo with the next push.
+  2. Free the disk, learn first then free (Mo chose this 2026-11-25):
+     `podcast-teach sounds` saves each learned episode's ad-sound material in
+     `sound-bank/<id>.json` and rebuilds `ad-sounds.json` the same from audio or
+     from the bank. `Free up space from the teaching audio.command`
+     (`teach_free.py`) then deletes the audio of an MP3 episode only when its
+     transcript, marks, sound bank and second-download truth are kept (not the
+     shelf, the exam or the read-ahead), after a checked backup and a typed yes;
+     typing `all` also frees those still waiting for a second download. Done
+     when: the Swift and Python tests pass (a library rebuilt after deleting an
+     audio file is byte-identical), an independent check finds nothing wrong,
+     and Mo has run "Teach the phone again" so the banks exist.
+  3. Automatic big runs while they keep improving the ad skipping and the other
+     model (not built; the limits wait on Mo's answers: how much to spend in
+     all, what counts as improving, and whether to stop at night only).
+
 **3. The exam**
 
 - [ ] **W9 Gather, mark and score the exam** (Mac, up to $18 of the plan, Mo's

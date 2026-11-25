@@ -6,7 +6,8 @@ copy of them that a bad disk, a wrong delete or a bug cannot take with it. Stand
   python3 teach_backup.py make --folder F [--to DIR] [--keep N] [--check]
       Writes DIR/teaching-YYYY-MM-DD-HHMM.tar.gz (DIR is "PodcastTeachingBackups" next to the
       teaching folder unless --to says otherwise) and keeps the newest N (14) of these. It holds
-      labels/, labels-snapped/, labels-second/, transcripts/ and copies/ and every .json file of the folder itself.
+      labels/, labels-snapped/, labels-second/, transcripts/, copies/ and sound-bank/ and every .json file
+      of the folder itself.
       The audio, the caches and anything hidden are left out: they are large or can be made again.
       With --check the new file is checked straight away (see below), and nothing old is removed
       when that check fails.
@@ -43,7 +44,7 @@ from teach_store import FOLDER
 BACKUPS = "PodcastTeachingBackups"
 KEEP = 14
 # The folders that are backed up whole; of the teaching folder itself only the .json files are.
-FOLDERS = ("labels", "labels-snapped", "labels-second", "transcripts", "copies")
+FOLDERS = ("labels", "labels-snapped", "labels-second", "transcripts", "copies", "sound-bank")
 LABEL_FOLDERS = ("labels", "labels-snapped", "labels-second")
 OWN_NAME = re.compile(r"^teaching-\d{4}-\d{2}-\d{2}-\d{4}\.tar\.gz$")
 # A file over this is left out and said, so a stray big file cannot swell every backup.

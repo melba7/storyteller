@@ -55,6 +55,8 @@ the app is not added again.
 - `Back up the teaching marks.command`, `Start another big run.command` and
   `Gather deeper and mark tonight.command`: see "Backups", "Starting another big
   run" and "Going deeper".
+- `Gather deeper and mark now.command`: see "Going deeper".
+- `Free up space from the teaching audio.command`: see "Freeing disk space".
 - `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
@@ -616,14 +618,63 @@ not). The budget is `TEACH_BUDGET` when set, else the name in
 `current-budget.txt` (see "Starting another big run"), else `big-run-1`. Make a
 wrapper for it in `Podcast teaching/` like the others.
 
+`Gather deeper and mark now.command` is the same launcher with
+`TEACH_BETWEEN=0-24` set, so Claude marks at any hour, as soon as the episodes
+are gathered and written down, instead of only between 11 at night and 7 in the
+morning. It uses the Claude plan's usage in the daytime too; the budget stops it
+the same way.
+
+### Freeing disk space
+
+The audio is the big part of the teaching folder (about 60 MB an episode), and
+the gathering never deletes it: when the disk has less than 15 GB free, or the
+audio reaches the size limit, it simply stops downloading. Three things still
+learn from an episode's audio after it has been written down and marked: the ad
+sounds, the comparison with a second download of the same episode, and the exam.
+So the cleanup is "learn first, then free".
+
+`podcast-teach sounds` (the "sounds" step of "Teach the phone again") saves each
+learned episode's ad-sound material in a small file, `sound-bank/<id>.json`
+(about 12 bytes a frame, for the stretches Claude marked only), and rebuilds the
+ad-sound library from the audio where it is still on disk and from those files
+where it is not, so the library is the same either way. The backup includes
+`sound-bank/`.
+
+`Free up space from the teaching audio.command` (`teach_free.py`) then deletes
+the audio of an MP3 episode only when its transcript and its marks exist, its
+sound bank is saved, its second download was compared (`copies/<id>.truth.txt`)
+or given up on after three failures, and it is not on the shelf (`shelf.json`),
+in the exam (`exam.json`) or waiting in the nightly read-ahead (`ahead.json`).
+An episode that is not an MP3 needs no bank and no second download. The episode
+stays in `episodes.json` with `file` null, `bytes` 0 and the error
+`skipped: audio deleted ...`, so the gathering never downloads it again. An
+entry whose file is already gone is put right the same way. The shelf is chosen
+from transcripts and marks, so a show with no shelf episode yet can later get a
+freed one, and the score rows that need audio skip it: let a run train, which
+fills the shelf, before freeing.
+
+The launcher first shows how much would be freed and asks for a typed `yes`;
+anything else deletes nothing. When some episodes are still waiting for their
+second download it says how many and how much, and typing `all` frees those too
+and gives up that comparison for them (`--without-copies`). Before it deletes it
+makes a backup of the marks and checks it; when that is not good, nothing is
+deleted. It takes the teaching folder's lock, so it says to wait while a gather,
+a writing down or a marking run is working. It costs nothing and uses no Claude
+usage. Run it between big runs, when the gathering has stopped because the disk
+is nearly full; if it says the sound bank is missing, run "Teach the phone
+again" first. In Terminal: `python3 teach_free.py --folder F` says what it would
+free and `--delete` frees it. Copy `teach_free.py` and the launcher into the
+tools folder (keep the launcher executable) and make a wrapper for it in
+`Podcast teaching/` like the others.
+
 ### Backups
 
 Claude's marks cost about $0.19 an episode and live only in the teaching folder,
 so `teach_backup.py` keeps copies of them. A backup is one file,
 `teaching-YYYY-MM-DD-HHMM.tar.gz`, in
 `~/Storyteller Lofi/PodcastTeachingBackups` (next to the teaching folder). It
-holds `labels/`, `labels-snapped/`, `labels-second/`, `transcripts/` and
-`copies/`, and every `.json` file of the teaching folder itself
+holds `labels/`, `labels-snapped/`, `labels-second/`, `transcripts/`, `copies/`
+and `sound-bank/`, and every `.json` file of the teaching folder itself
 (`episodes.json`, `shelf.json`, `exam.json`, `marking-spend.json` and the
 models, about 20 MB in all). It leaves out `audio/`, `meaning-cache/`,
 `passage-cache/`, the lock and hidden files: they are large and can be made
@@ -794,6 +845,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   in the list and not tried again.
 - `transcripts/`: one text file per episode (the writing-down step).
 - `labels/`: one file per episode with the stretches Claude marked.
+- `sound-bank/`: one small file per learned episode with the ad-sound material
+  of its marked stretches (written by the sounds step, so the audio can go).
 - `habits.json`: what is usual for each show.
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and

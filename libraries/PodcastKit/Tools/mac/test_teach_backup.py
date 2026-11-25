@@ -1,5 +1,5 @@
 """Tests for teach_backup.py: the backup of what the teaching runs have paid for (labels, snapped
-labels, transcripts, second-download copies and the small JSON files of the folder), the check that
+labels, transcripts, second-download copies, the sound bank and the small JSON files of the folder), the check that
 a backup can be read, and the restore into an empty folder. Temporary folders only; no Mac, no
 network, no Claude.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -41,6 +41,7 @@ class Setup(unittest.TestCase):
                 "labels-snapped/a1.json": '{"ads": [1.5]}', "labels-second/a1.json": '{"ads": [1.2]}',
                 "transcripts/a1.txt": "line one\nline two\n", "transcripts/b2.txt": "hello\n",
                 "copies/a1.truth.txt": "12.0 30.0\n", "copies/a1.json": "{}",
+                "sound-bank/a1.json": '{"version": 1, "episode": "a1", "stretches": []}',
                 "episodes.json": '{"version": 1, "episodes": []}', "shelf.json": "[]",
                 "marking-spend.json": '{"version": 1, "budgets": {}}',
                 # What is not backed up.
@@ -83,12 +84,12 @@ class Setup(unittest.TestCase):
 
 
 class MakeTests(Setup):
-    def test_a_backup_holds_the_marks_the_transcripts_the_copies_and_the_small_json_files(self):
+    def test_a_backup_holds_the_marks_the_transcripts_the_copies_the_sound_bank_and_the_small_json_files(self):
         path = self.made()
         self.assertEqual(self.names_in(path), [
             "copies/a1.json", "copies/a1.truth.txt", "episodes.json", "labels-second/a1.json",
             "labels-snapped/a1.json", "labels/a1.json", "labels/b2.json", "marking-spend.json", "shelf.json",
-            "transcripts/a1.txt", "transcripts/b2.txt"])
+            "sound-bank/a1.json", "transcripts/a1.txt", "transcripts/b2.txt"])
 
     def test_it_leaves_out_the_audio_the_caches_the_lock_and_temporary_files(self):
         names = " ".join(self.names_in(self.made()))
@@ -117,7 +118,7 @@ class MakeTests(Setup):
         backup.make_backup(self.folder, now=minute(), say=lines.append)
         self.assertEqual(len(lines), 1)
         self.assertIn("teaching-2026-11-25-0430.tar.gz: written.", lines[0])
-        self.assertIn("11 files", lines[0])
+        self.assertIn("12 files", lines[0])
         self.assertRegex(lines[0], r"\d+(\.\d)? (KB|MB)")
 
     def test_it_keeps_the_newest_n_and_removes_the_older_ones(self):
@@ -245,8 +246,8 @@ class CheckTests(Setup):
         code, said = self.run_main("check", "--file", path)
         self.assertEqual(code, 0, said)
         self.assertIn("is whole", said)
-        self.assertIn("11 files", said)
-        self.assertIn("8 JSON files", said)
+        self.assertIn("12 files", said)
+        self.assertIn("9 JSON files", said)
 
     def test_with_the_folder_it_says_how_many_label_files_the_backup_lacks(self):
         path = self.made()
@@ -321,7 +322,7 @@ class RestoreTests(Setup):
         os.makedirs(into)
         code, said = self.run_main("restore", "--file", path, "--into", into)
         self.assertEqual(code, 0, said)
-        self.assertIn("11 files", said)
+        self.assertIn("12 files", said)
         restored = {name: data for name, (data, _) in self.listing(into).items()}
         original = {name: data for name, (data, _) in self.listing(self.folder).items()
                     if name in self.names_in(path)}
