@@ -815,6 +815,18 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   here, and is for scoring only, so the scorecard's "plus the library" row does
   not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
+- `sound-bank/<id>.json`: the sound bank, written by `podcast-teach sounds` for
+  each episode it learns from, so that the episode's big MP3 file can be
+  deleted without shrinking the library. It holds no audio, only the numbers
+  the matching reads for each frame of the ads Claude marked (12 bytes a frame,
+  about 18 KB for a 30 second ad). An episode with no ads gets a file with an
+  empty list: the file means "learned". A file is written only when it is
+  missing or different. When the MP3 is gone and the file reads, `sounds`
+  learns from the file, and `ad-sounds.json` comes out byte for byte the same
+  as it did with the audio. The run says "Saved N sound-bank files", "Learned
+  from N saved summaries, their audio is gone" and, if a file could not be
+  written, "Could not save"; keep the audio of those episodes. An episode with
+  neither audio nor a file that reads is skipped as having no audio.
 - `joints.json`: the joints of each episode's MP3 file (where an inserted ad was
   spliced in), made by `podcast-teach joints` once for each episode that has an
   audio file and no entry yet; existing entries are kept. `podcast-teach score`
