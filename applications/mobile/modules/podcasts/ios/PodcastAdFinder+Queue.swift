@@ -97,7 +97,10 @@ extension PodcastAdFinder {
     let local = localAds(
       id, ads: ads, partial: partial, limit: isPlaying ? nil : PrepRules.headSeconds)
     if addLocalToPartial(local, ads: ads, duration: partial.duration) { refreshIfPlaying(id) }
-    guard let model = askableDetector() else {
+    // Apple's model is asked here only on a show where its level is skip: its answers elsewhere
+    // are questions, which only the full pass makes (PodcastAdFinder+Apple.swift).
+    let placing = Self.modelPlacing(forEpisode: id)
+    guard placing.level == .skip, let model = askableDetector() else {
       // Nothing more to ask: the list and the seek bar show the local ads.
       scan()
       return
@@ -106,7 +109,7 @@ extension PodcastAdFinder {
       let outcome = try await AdsRunner.runPartial(
         partial: partial, detector: model, store: ads,
         osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
-        limit: isPlaying ? nil : PrepRules.headSeconds,
+        limit: isPlaying ? nil : PrepRules.headSeconds, placing: placing,
         shouldContinue: { [weak self] in self?.mayContinue(step) ?? false })
       switch outcome {
       case .finished(let found):

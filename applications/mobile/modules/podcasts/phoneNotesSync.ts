@@ -5,12 +5,15 @@
 // the database), and the skip log and diary are written to `Podcasts/phone-diary.jsonl` when
 // they changed. A note leaves the phone's pending list only after the folder says it was
 // written, and a file that may exist but could not be read is not written over: it is tried
-// again at the next run. The rules are in phoneNotes.ts. Not imported by any test, because the
-// database and the native modules are not there.
+// again at the next run. The episodes the listener is likely to play next go to
+// `Podcasts/phone-queue.json` when they changed. The rules are in phoneNotes.ts and
+// phoneQueue.ts. Not imported by any test, because the database and the native modules are not
+// there.
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
 import { LofiScore } from "@/modules/lofi-score"
 
+import { getAdSkipSettings } from "./adsNative"
 import { rows } from "./db"
 import { Podcasts } from "./index"
 import {
@@ -25,6 +28,17 @@ import {
   oldNotesText,
   parsePendingNotes,
 } from "./phoneNotes"
+import {
+  QUEUE_FILE,
+  QUEUE_NEWEST_SQL,
+  type QueueEntry,
+  chooseQueue,
+  newestSince,
+  queueCandidate,
+  queueToWrite,
+  queueUpNextSql,
+} from "./phoneQueue"
+import { listUpNext } from "./upNextNative"
 
 const DIARY_STAMP_KEY = "podcasts.phoneDiary.stamp"
 
@@ -106,9 +120,44 @@ async function writeDiary(): Promise<void> {
     await AsyncStorage.setItem(DIARY_STAMP_KEY, stamp)
 }
 
-/** Sends the phone's notes to the Mac. One part failing does not stop the other. */
-export async function syncPhoneNotes(): Promise<void> {
-  for (const part of [writeNotes, writeDiary]) {
+/** The episodes the listener is likely to play next, as the file for the Mac holds them. */
+export async function currentQueue(): Promise<QueueEntry[]> {
+  const ids = (await listUpNext()).map((item) => item.id).slice(0, CHUNK)
+  const queued =
+    ids.length === 0 ? [] : await rows(queueUpNextSql(ids.length), ids)
+  const byId = new Map(
+    queued.map((row) => [String(row["id"]), queueCandidate(row)]),
+  )
+  const upNext = ids.flatMap((id) => byId.get(id) ?? [])
+  const newest = (await rows(QUEUE_NEWEST_SQL, [newestSince(Date.now())])).map(
+    queueCandidate,
+  )
+  return chooseQueue(upNext, newest, await getAdSkipSettings())
+}
+
+/** Writes the episodes the listener is likely to play next, when they are not what the file holds. */
+async function writeQueue(
+  readQueue: () => Promise<QueueEntry[]>,
+): Promise<void> {
+  if (!Podcasts || !LofiScore) return
+  const entries = await readQueue()
+  const text = queueToWrite(
+    await LofiScore.readLinkedFolderFileStatus(QUEUE_FILE),
+    entries,
+    Math.floor(Date.now() / 1000),
+  )
+  if (text !== null) await LofiScore.writeLinkedFolderFile(QUEUE_FILE, text)
+}
+
+/**
+ * Sends the phone's notes and its list of next episodes to the Mac. One part failing does not
+ * stop the others. `readQueue` reads the list of next episodes; a run that read it already for
+ * something else passes the same read.
+ */
+export async function syncPhoneNotes(
+  readQueue: () => Promise<QueueEntry[]> = currentQueue,
+): Promise<void> {
+  for (const part of [writeNotes, writeDiary, () => writeQueue(readQueue)]) {
     try {
       await part()
     } catch (cause) {

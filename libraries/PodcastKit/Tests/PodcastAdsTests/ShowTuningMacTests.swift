@@ -6,13 +6,15 @@ import XCTest
 /// wrote (through `write_json`, keys in order) for a made scorecard with three shows and notes: the
 /// "repeat-words" row was bad over all shows, the joints were bad on show C, "own-sound" was bad on
 /// show A, the notes had the meaning model undone twice on show B, and steady files found more over
-/// all shows but not on show B.
+/// all shows but not on show B. Apple's what-if row passed the bar on show C only, so Apple's model
+/// may skip there and asks everywhere else.
 final class ShowTuningMacTests: XCTestCase {
   static let macText = """
     {
      "default": {
       "ask": 0.35,
       "finders": {
+       "apple-model": "ask",
        "meaning": "skip",
        "own-sound": "skip",
        "repeat-sound": "ask",
@@ -24,6 +26,9 @@ final class ShowTuningMacTests: XCTestCase {
      "shows": [
       {
        "feed": "https://c.test/f",
+       "finders": {
+        "apple-model": "skip"
+       },
        "joints": false
       },
       {
@@ -77,6 +82,11 @@ final class ShowTuningMacTests: XCTestCase {
     XCTAssertTrue(set.joints(show: "a-id"))
     XCTAssertTrue(set.joints(show: "d-id"))
     XCTAssertEqual(set.level(forFinder: "own-sound", show: "c-id"), .skip)
+    // Apple's model asks everywhere but on the show where the Mac's bar let it skip.
+    for show in ["a-id", "b-id", "d-id", "never-heard-of"] {
+      XCTAssertEqual(set.level(forFinder: "apple-model", show: show), .ask, show)
+    }
+    XCTAssertEqual(set.level(forFinder: "apple-model", show: "c-id"), .skip)
   }
 
   func testTheKeysTheMacWritesAreTheOnesThePhoneLooksFor() throws {
@@ -85,8 +95,10 @@ final class ShowTuningMacTests: XCTestCase {
     XCTAssertEqual(Set(root.keys), ["version", "writtenAt", "default", "shows"])
     let block = try XCTUnwrap(root["default"] as? [String: Any])
     XCTAssertEqual(Set(block.keys), ["finders", "joints", "steadyJoints", "ask"])
+    // The Mac does not choose the "ahead" finder yet, so it stays at the built-in level (skip).
     XCTAssertEqual(
-      Set(try XCTUnwrap(block["finders"] as? [String: String]).keys), Set(ShowTuning.finderNames))
+      Set(try XCTUnwrap(block["finders"] as? [String: String]).keys),
+      Set(ShowTuning.finderNames).subtracting([ShowTuning.ahead]))
     let shows = try XCTUnwrap(root["shows"] as? [[String: Any]])
     XCTAssertEqual(shows.count, 3)
     XCTAssertTrue(shows.allSatisfy { Set($0.keys).isSubset(of: ["feed", "finders", "sorts", "joints", "steadyJoints"]) })

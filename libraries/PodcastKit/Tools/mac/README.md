@@ -51,6 +51,17 @@ the app is not added again.
 - `Gather more episodes for teaching.command`,
   `Mark the new episodes at night.command` and
   `Gather the exam episodes.command`: see "More episodes and the exam".
+- `Measure the sound at the edges.command`: see "The sound at the edges".
+- `Back up the teaching marks.command`, `Start another big run.command` and
+  `Gather deeper and mark tonight.command`: see "Backups", "Starting another big
+  run" and "Going deeper".
+- `Gather deeper and mark now.command`: see "Going deeper".
+- `Write down and mark together.command`: see "Writing down and marking
+  together".
+- `Free up space from the teaching audio.command`: see "Freeing disk space".
+- `Count publisher transcripts in my shows.command`: see "Publisher
+  transcripts".
+- `Teach the passage model.command`: see "The passage model (a trial)".
 
 To turn the hourly job off, run in Terminal:
 `launchctl bootout gui/$(id -u)/com.storyteller-lofi.apple-podcasts`, then
@@ -403,14 +414,15 @@ and `Teach the phone again.command` says so and stops.
    promotion in the written-down episodes. This is the step that uses your
    Claude plan: it shares your usage allowance, so it says what it is about to
    do and waits for you to type `yes`. Anything else marks nothing, and nothing
-   else runs. It stops by itself when the allowance is used up, and you can
-   double-click it again later. When the marking is over (also when it stopped
-   early) it runs the steps after marking, described below. To leave the Mac
-   alone for the night, double-click
-   `Mark ads when the gathering is done.command` instead, while the gathering is
-   still working: it asks for the `yes` at once, waits until the gathering has
-   finished (also when it failed or only waits for Return), and then does the
-   same without asking again.
+   else runs. Before it marks anything it backs up what is marked so far (see
+   "Backups"); a backup that fails is said in one line and the marking goes on.
+   It stops by itself when the allowance is used up, and you can double-click it
+   again later. When the marking is over (also when it stopped early) it runs
+   the steps after marking, described below. To leave the Mac alone for the
+   night, double-click `Mark ads when the gathering is done.command` instead,
+   while the gathering is still working: it asks for the `yes` at once, waits
+   until the gathering has finished (also when it failed or only waits for
+   Return), and then does the same without asking again.
 3. `Teach the phone again.command`. Reads the phone's notes, then runs the steps
    after marking on what is marked so far. It marks nothing new and uses no
    Claude allowance. Use it after you have listened for a while, or to send the
@@ -430,8 +442,10 @@ and `Teach the phone again.command` says so and stops.
    See "The weekly job" below.
 
 The steps after marking are done by `teach-finish.sh`, which is not
-double-clicked: the files above call it. When the folder `copies/` or
-`labels-snapped/` exists it first snaps the labels to the second download (see
+double-clicked: the files above call it. First of all it makes a backup of the
+marks and checks it (see "Backups"; it uses no Claude allowance, and when it
+fails that is said and the other steps still run). When the folder `copies/` or
+`labels-snapped/` exists it then snaps the labels to the second download (see
 item 5). Then, in this order, it works out each show's habits, trains the model,
 makes the library of known ads, builds `podcast-teach` and has it write the ad
 sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
@@ -468,16 +482,18 @@ night. Use them in this order.
    between 11 at night and 7 in the morning, and waits for the night with the
    Mac kept awake), `--wait-hours 120` (when Claude's usage allowance is used up
    it waits 30 minutes and tries the same episode again, up to five days in all)
-   and `--cap 95 --budget more-episodes` (at most $95 of the plan's usage in
-   all, over every run: see "The budget" below). The environment can change
-   them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`.
-   Waiting for the allowance is not a failure of the episode. Not being signed
-   in still stops at once. When it ends (also stopped early) it runs the steps
-   after marking, and it says why it stopped: the spending limit is reached, the
-   usage allowance stayed used up for longer than it waits, or episodes failed
-   (how many, and that the list is `failures.json`). Only `TEACH_YES=1` counts
-   as a yes in the launchers, and a typed answer is trimmed at its ends only, so
-   "ye s" is not yes.
+   and `--cap 95 --budget NAME` (at most $95 of the plan's usage in all, over
+   every run: see "The budget" below). NAME is `TEACH_BUDGET` when that is set,
+   else the name in `current-budget.txt` in the teaching folder (written by
+   "Start another big run"), else `big-run-1`. The window says which one it
+   uses. The environment can change them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`,
+   `TEACH_CAP` and `TEACH_BUDGET`. Waiting for the allowance is not a failure of
+   the episode. Not being signed in still stops at once. When it ends (also
+   stopped early) it runs the steps after marking, and it says why it stopped:
+   the spending limit is reached, the usage allowance stayed used up for longer
+   than it waits, or episodes failed (how many, and that the list is
+   `failures.json`). Only `TEACH_YES=1` counts as a yes in the launchers, and a
+   typed answer is trimmed at its ends only, so "ye s" is not yes.
 3. `Gather the exam episodes.command`. See the next section. Run it after the
    two files above are done, so that the exam is newer than everything the phone
    learned from.
@@ -544,14 +560,255 @@ something). A run starts by saying what the budget has spent and what is left,
 never starts a call when the budget is spent, and ends with a line saying where
 it stands. A damaged file is a set-up problem, never a fresh start. Without
 `--budget` the cap is for one run only, and it is checked before every call. The
-launchers use the budgets `more-episodes` ($95), `exam` ($14) and `exam-second`
-($4).
+launchers use the budgets `big-run-1` (95 dollars, the first big run of
+2026-11-24 and the default when `current-budget.txt` says nothing; the run
+before it used `more-episodes`, which has 89.57 dollars spent), `exam` (14
+dollars) and `exam-second` (4 dollars), and "Start another big run" makes a new
+`big-run-` name with the date and minute each time and remembers it in
+`current-budget.txt`.
 
 Exit codes of `teach_label.py`: 0 done, nothing to do, or `--limit` reached; 2 a
 set-up problem or another run is working in the folder; 3 stopped early because
 the usage allowance wait ran out or Claude is not signed in; 4 you did not type
 yes; 5 the cap or the budget is reached; 6 stopped early because three episodes
 in a row failed.
+
+### Starting another big run
+
+`Start another big run.command` starts the 500-episode run again with a fresh
+budget of up to $95 (about $0.19 an episode, about 480 episodes). The window
+says so in plain words and asks for a typed `yes`; anything else (Return, `y`,
+`no`) changes nothing and starts nothing. `TEACH_YES` in the environment does
+not answer this question: spending is always asked. With `yes` it sets
+`TEACH_BUDGET=big-run-YYYYMMDD-HHMM` (the minute of the start, so every start is
+a new budget counted from zero and the older budgets keep what they spent) and
+`TEACH_YES=1`, and starts `Second downloads then gather more.command`, which
+gives the typed yes to the marking, so you are asked once. `TEACH_CAP` changes
+the 95.
+
+`Second downloads then gather more.command` is only on the Mac, in
+`~/Storyteller Lofi/Podcast teaching/`, and not in this folder. The launcher
+looks for it next to itself and then there; `TEACH_SECOND` names another file.
+
+The new budget's name is shown in the window and written in the log
+(`~/Storyteller Lofi/logs/podcast-teaching.log`). After the `yes` it is also
+written, as one line, to `current-budget.txt` in the teaching folder (through a
+temporary file that is moved into place; when it cannot be written nothing is
+started). `Mark the new episodes at night.command` takes its default budget from
+that file when `TEACH_BUDGET` is not set: the first line, trimmed, if it is 1 to
+40 letters, digits, `-` or `_` and starts with a letter or digit; with no file,
+or one that holds anything else, it uses `big-run-1` and says so. So a stopped
+big run is carried on by a double-click on
+`Mark the new episodes at night.command` (or
+`Gather more episodes for teaching.command`) under the same budget, and
+`TEACH_BUDGET=<a name>` in Terminal still wins. Typing `yes` here again starts
+yet another new budget and replaces the name in the file.
+
+### Going deeper
+
+`Gather deeper and mark tonight.command` is the second step of a big run, for
+when the first pass found few new episodes because the newest 12 of every show
+were already on disk. The window explains it (the newest 24 of each show, about
+500 more episodes, about 25 GB, stopping by itself when the disk has less than
+15 GB free; Claude marks only between 11 at night and 7 in the morning, under
+the budget it names; keep the Mac plugged in) and asks for a typed `yes`;
+anything else starts nothing. With `yes` it waits until the teaching folder is
+free (it asks every 60 seconds and says so once, because the steps after the
+last marking may still be working), then starts
+`Gather more episodes for teaching.command` with `TEACH_PER_SHOW=24`,
+`TEACH_MAX_GB=80`, the budget and `TEACH_YES=1`, so nothing asks again. That
+file takes both numbers from the environment when they are set (12 and 40 when
+not). The budget is `TEACH_BUDGET` when set, else the name in
+`current-budget.txt` (see "Starting another big run"), else `big-run-1`. Make a
+wrapper for it in `Podcast teaching/` like the others.
+
+`Gather deeper and mark now.command` is the same launcher with
+`TEACH_BETWEEN=0-24` set, so Claude marks at any hour, as soon as the episodes
+are gathered and written down, instead of only between 11 at night and 7 in the
+morning. It uses the Claude plan's usage in the daytime too; the budget stops it
+the same way.
+
+### Writing down and marking together
+
+`Gather deeper and mark now.command` (and the other big-run launchers) write
+down every gathered episode first and mark only after that, so the marking, and
+the Claude usage it spends, can start hours late.
+`Write down and mark together.command` does both in a loop: it writes down 20
+episodes (`TEACH_CHUNK` changes the number), has Claude mark them at any hour
+(`teach_label.py --between 0-24 --yes`, under the budget in
+`current-budget.txt`, else `big-run-1`, up to $95 and waiting up to 120 hours
+when the usage allowance is used up), and goes on until nothing is left to write
+down, then runs the steps after marking. It asks for a typed `yes` once. When
+another teaching run still works in the folder it waits and says so once: close
+that run's window (or press Control-C in it) and this carries on from where that
+run was, because what is written down and marked is kept. It backs up once at
+the start, downloads nothing and deletes nothing. It stops at the spending
+limit, when the usage allowance stays used up longer than it waits, or when
+episodes fail, and then still runs the steps after marking. Make a wrapper for
+it in `Podcast teaching/` like the others.
+
+### Freeing disk space
+
+The audio is the big part of the teaching folder (about 60 MB an episode), and
+the gathering never deletes it: when the disk has less than 15 GB free, or the
+audio reaches the size limit, it simply stops downloading. Three things still
+learn from an episode's audio after it has been written down and marked: the ad
+sounds, the comparison with a second download of the same episode, and the exam.
+So the cleanup is "learn first, then free".
+
+`podcast-teach sounds` (the "sounds" step of "Teach the phone again") saves each
+learned episode's ad-sound material in a small file, `sound-bank/<id>.json`
+(about 12 bytes a frame, for the stretches Claude marked only), and rebuilds the
+ad-sound library from the audio where it is still on disk and from those files
+where it is not (also when the episode's entry in `episodes.json` has `file`
+null after the cleanup), so the library is the same either way. The backup
+includes `sound-bank/`.
+
+`Free up space from the teaching audio.command` (`teach_free.py`) then deletes
+the audio of an MP3 episode only when its transcript and its marks exist, its
+sound bank is saved, was cut from the labels the audio would be cut by
+(`labels-snapped` when that folder is there, else `labels`; the bank says which)
+and is at least as new as its marks and its second-download truth (the sounds
+step touches a bank it finds unchanged, so a run after the last change is
+enough), its second download was compared (`copies/<id>.truth.txt`) or given up
+on after three failures, and it is not on the shelf (`shelf.json`), in the exam
+(`exam.json`) or waiting in the nightly read-ahead (`ahead.json`). An episode
+that is not an MP3 needs no bank and no second download. The episode stays in
+`episodes.json` with `file` null, `bytes` 0 and the error
+`skipped: audio deleted ...`, so the gathering never downloads it again. An
+entry whose file is already gone is put right the same way. The shelf is chosen
+from transcripts and marks, so a show with no shelf episode yet can later get a
+freed one, and the score rows that need audio skip it: let a run train, which
+fills the shelf, before freeing. Two more things read the audio of earlier
+episodes and are not kept: the scorecard's "own sounds" and "repeated sounds"
+rows (they learn from the show's earlier labelled episodes when the score runs
+on the Mac) and `joints.json` for an episode whose joints were never cached. A
+Mac score after freeing has less history for those rows; the cloud score already
+runs without audio. `teach_free.py` exits 4 when some files could not be
+deleted.
+
+The launcher first shows how much would be freed and asks for a typed `yes`;
+anything else deletes nothing. When some episodes are still waiting for their
+second download it says how many and how much, and typing `all` frees those too
+and gives up that comparison for them (`--without-copies`). Before it deletes it
+makes a backup of the marks and checks it; when that is not good, nothing is
+deleted. It takes the teaching folder's lock, so it says to wait while a gather,
+a writing down or a marking run is working. It costs nothing and uses no Claude
+usage. Run it between big runs, when the gathering has stopped because the disk
+is nearly full; if it says the sound bank is missing, run "Teach the phone
+again" first. In Terminal: `python3 teach_free.py --folder F` says what it would
+free and `--delete` frees it. Copy `teach_free.py` and the launcher into the
+tools folder (keep the launcher executable) and make a wrapper for it in
+`Podcast teaching/` like the others.
+
+### Publisher transcripts
+
+`Count publisher transcripts in my shows.command` reads the feed of every show
+you follow (the list the Apple Podcasts sync writes), once each, one second
+apart, and one transcript file (at most 300 KB) from each feed that has one. It
+needs no keys and no Xcode, downloads no audio, and writes one report to
+`~/Storyteller Lofi/logs/publisher-transcripts-<time>.txt`. The report says how
+many shows carry a `podcast:transcript` tag in their newest ten items, in which
+file types, and whether the newest transcript still has spoken ad reads in it
+("brought to you by", "promo code" and a few more phrases). A transcript made
+before the ads were stitched in has none of the inserted ads, so the words the
+app hears and the publisher does not have are those ads. A transcript that holds
+the host-read ads shows nothing about them. Either way a publisher's transcript
+has no ad marks, so it does not replace Claude's marking.
+
+### A sample of public transcripts
+
+`Fetch a sample of public transcripts.command` takes about 500 episodes (set
+`TEACH_SPORC_COUNT` for another number; a second double-click adds to what is
+there and keeps the marks already made) from SPoRC, a public set of over a
+million podcast episodes with timed transcripts (Hugging Face `blitt/SPoRC`).
+Its ads are still in the text and nobody marked them, so Claude has to mark them
+like it marks your own episodes. SPoRC is released for research and educational
+use only: the files stay on this Mac in
+`~/Storyteller Lofi/PodcastTeachingSporc` (a teaching folder of its own, never
+your main one), are never committed or shared, and what is learned from them
+stays out of a build that is published to other people.
+
+You need a free Hugging Face account that has clicked Agree on the dataset's
+page (https://huggingface.co/datasets/blitt/SPoRC). The first time, the launcher
+makes its own Python folder (`~/Storyteller Lofi/venv-sporc`), installs
+`huggingface_hub` and `pyarrow` there, and asks you to paste a Read token into
+its window. It downloads the episode catalog and one part of the transcripts
+(the dataset page does not say how big; expect a few hundred MB to a couple of
+GB) into `~/Storyteller Lofi/hf-cache`, which you can delete when you are done.
+It uses no Claude usage and no audio.
+
+From the English episodes of that part it picks ones of 20 minutes to 2.5 hours,
+spread over as many shows as it can (at most 2 from a show), and writes
+`episodes.json`, `transcripts/<id>.txt`, `SOURCE.txt` and `SAMPLE-REPORT.txt`
+(episodes, hours, shows, and how many hold spoken ad phrases such as "brought to
+you by"). Only the turn text is public, so the times inside a turn are worked
+out from its start and end: an ad's edges are good to a few seconds, not to the
+word. The marking of this folder is a separate step,
+`Mark the public transcripts.command`. It runs `teach_label.py` on that folder
+only, under the budget `sporc-1`, and asks for a typed yes. It marks at most 500
+episodes (`TEACH_SPORC_LIMIT`) and spends at most $100 (`TEACH_SPORC_CAP`) in
+all, counted over every double-click, and waits up to 12 hours
+(`TEACH_SPORC_WAIT_HOURS`) when the usage allowance is used up. It marks at any
+hour and can run next to a big run, because the other folder has its own lock.
+The fetch launcher marks nothing. The marks are not taught to the phone and not
+backed up by the teaching backups (they are cheap to make again, about 15 to 20
+cents an episode).
+
+`Test the public marks.command` (`teach_public_compare.py`) answers whether the
+public marks help. It trains the word model twice in scratch folders of links in
+`~/Storyteller Lofi/PodcastTeachingPublicTest`, once on your teaching folder
+alone (`base`) and once with every marked public episode added (`with-public`),
+with the same settings the steps after marking use, and prints both models'
+precision and recall on the held-out shelf side by side (`COMPARE.txt`). The
+shelf and the sealed exam are the same in both, so only your own shows are
+tested and the public episodes are only ever trained on. It uses no Claude
+usage, downloads nothing and writes nothing into your teaching folder, the
+public folder or the model on the phone. The two models can then be scored on
+the shelf with `podcast-teach score` like any other model.
+
+### Backups
+
+Claude's marks cost about $0.19 an episode and live only in the teaching folder,
+so `teach_backup.py` keeps copies of them. A backup is one file,
+`teaching-YYYY-MM-DD-HHMM.tar.gz`, in
+`~/Storyteller Lofi/PodcastTeachingBackups` (next to the teaching folder). It
+holds `labels/`, `labels-snapped/`, `labels-second/`, `transcripts/`, `copies/`
+and `sound-bank/`, and every `.json` file of the teaching folder itself
+(`episodes.json`, `shelf.json`, `exam.json`, `marking-spend.json` and the
+models, about 20 MB in all). It leaves out `audio/`, `meaning-cache/`,
+`passage-cache/`, the lock and hidden files: they are large and can be made
+again. The newest 14 backups are kept. Only files named like the tool's own are
+ever removed, so a `before-*.tar.gz` made by hand and anything else in that
+folder stay.
+
+It makes a backup in three places, all free of Claude usage: at the start of
+`Mark ads in the teaching episodes.command` (so the marks made so far are safe
+before more are made), as the first step of `teach-finish.sh` (so the new marks
+are safe as soon as marking is over, and after the weekly run), and when you
+double-click `Back up the teaching marks.command`, which makes one backup and
+checks it. A failing backup is said plainly and never stops the work. The
+nightly read-ahead and `Gather the exam episodes.command` do not back up by
+themselves; double-click the backup launcher after them.
+
+It only reads the teaching folder and takes no lock, so marking and training may
+run meanwhile. A backup is written under a temporary name and renamed when it is
+whole, so a stop leaves no half-written `teaching-*.tar.gz`.
+
+In Terminal (the launcher does the first two for you):
+
+- `python3 teach_backup.py make --folder F [--to DIR] [--keep 14] [--check]`
+  makes a backup (`--check` also checks the new file, and removes nothing old
+  when that check fails).
+- `python3 teach_backup.py check --file BACKUP [--folder F]` is the way to test
+  that a backup works. It reads the archive to its very end, parses every JSON
+  file in it, and with `--folder` says how many label files the folder has that
+  the backup lacks (marked since it was made). It exits 0 only when the backup
+  is whole.
+- `python3 teach_backup.py restore --file BACKUP --into DIR` unpacks into a new
+  or empty folder, after checking the backup, and refuses a folder that has
+  anything in it. It never writes into the live teaching folder: look in the
+  folder it made and copy back by hand what you need.
 
 ### The stream replay and Apple's model
 
@@ -561,9 +818,12 @@ head scan and whole-file pass at an assumed standard pace and a slow one (the
 report prints the speeds, which are guesses), the player's own skip rules, and
 the same bar as above. "Ready" there means the same player with the finished
 file known before play, so it shows what streaming costs. The head scan waits
-for Apple's model in every row (a phone with Apple Intelligence on is assumed),
-and the first 3 minutes are also shown at speech speeds of 6 and 25 times real
-time, since the phone's real speed is not measured yet.
+for Apple's model only on a show whose `apple-model` level in
+`show-settings.json` is `skip` (it asks by default, and the phone then neither
+asks nor waits for the model on the head, so the replay does not either; a phone
+with Apple Intelligence on is assumed). The block says in how many episodes it
+waited. The first 3 minutes are also shown at speech speeds of 6 and 25 times
+real time, since the phone's real speed is not measured yet.
 
 `Ask Apple's model about the test episodes.command` builds `podcast-teach` and
 runs `podcast-teach apple` on the teaching folder under `caffeinate -i`. It asks
@@ -575,9 +835,105 @@ stops with exit 2 the window says to read what the tool printed above (no model,
 a model still downloading, a damaged or foreign `apple-model.json`, or a folder
 problem), and when every episode already had an answer it says so. A damaged
 `apple-model.json` only leaves the row out of the scorecard, with a note. The
-next scorecard then ends with the row "Plus Apple's model (asked on the Mac)"
-and streams it too. The settings and publish steps read rows by name, so the
-extra row changes nothing they decide.
+next scorecard then ends with two rows. "Plus Apple's model (asked on the Mac)"
+is what the phone does: Apple's answers go through the per-show settings first
+(the `apple-model` finder: `skip` joins the skips, `ask` becomes questions,
+`off` is dropped), so with the built-in default, which asks, this row is the row
+before it, and it streams too. The report says how many answers asked and how
+many skipped. "Plus Apple's model, if every show let it skip" lets every answer
+skip, which is not what the phone does: it is the evidence for the settings step
+(see `show-settings.json` below), so it does not move with the settings. The
+publish step reads rows by name and ignores both.
+
+### The sound at the edges
+
+`Measure the sound at the edges.command` builds `podcast-teach` and runs
+`podcast-teach edges` on the teaching folder under `caffeinate -i`. It answers
+one question before anything is built into the phone: does the sound itself say
+where an ad spot starts and ends? For every shelf episode that has an MP3 file
+it reads the sound once (Apple's decoder, so only on a Mac, at 16 kHz, mono) and
+works out, for every half second, the loudness, a 24-band spectrum and whether
+it is a pause. A change score compares the 3 seconds before a point with the 3
+seconds after it, and its peaks are the places where the sound changes most.
+Then it counts how often the strongest change within 10 seconds of an edge lies
+within 1, 2 and 5 seconds of it, for the exactly placed edges and for as many
+random points (a fixed seed).
+
+- The exact edges are the borders in `labels-snapped/` that the second download
+  moved (they differ from Claude's own `labels/`), and both borders of a stretch
+  that only the second download found (`"origin": "copy"`). Claude's own borders
+  are not exact, so an episode with no second download has none. The folder
+  needs `shelf.json` and `labels-snapped/`; the exam is never read.
+- The go rule is the plan's: the strongest change within 10 seconds lies within
+  1 second of at least 70% of exact edges, and of at most 10% of random points.
+  The report says "Go." or "No go." and the numbers behind it. An edge within 3
+  seconds of the start or end of an episode is left out, because its windows do
+  not fit.
+- `edges.json` keeps each shelf episode's strongest peaks (time in seconds and
+  strength, about the decibels the sound moves, at most 300 for an hour) so that
+  a later scorecard row can snap found edges onto them without the audio.
+  `edges-report.json` keeps the numbers. Each episode is saved as soon as it is
+  read, so the window may be closed and the file double-clicked again to carry
+  on; an episode that is in `edges.json` is not read again. A damaged file, or
+  one made by another version of the score (it is written into the file), is
+  ignored with one line and made again.
+- It costs nothing and uses no Claude allowance. The shelf is about 50 hours of
+  sound, so it may take an hour. It needs a Mac, and stops with exit 2 and a
+  plain sentence when there is no shelf, no `labels-snapped/`, or no decoder.
+
+### The passage model (a trial)
+
+`Teach the passage model.command` tries a small language model on the ad finding
+(milestone W5 of `docs/PLAN.md`). It is a trial: it is measured on the shelf
+first, nothing of it reaches the phone, and shrinking it to Core ML for the app
+happens only if the trial passes its go rule (below). It costs nothing and uses
+no Claude allowance.
+
+- **What it does.** `teach_passage.py` reads every transcript line of the marked
+  episodes that are not on the shelf (and not in the sealed exam, and not a
+  repeat of a shelf or exam episode) with the MiniLM sentence model
+  (`sentence-transformers/all-MiniLM-L6-v2`, the one the mood work uses). It
+  learns, from a window of five lines (two before, the line, two after), how
+  likely the middle line is each of the word model's classes. The classifier is
+  a softmax regression in numpy with L2, the word model trainer's class weights,
+  and a tenth of the episodes keeping the best pass and the best L2 strength. It
+  then answers for the shelf episodes only.
+- **What it needs.** The Mac's `python-mood` environment in `~/Storyteller Lofi`
+  (torch, transformers and numpy; `libraries/LofiScoreKit/Tools/mac/finetune.sh`
+  makes it) and Hugging Face's files in `~/Storyteller Lofi/.cache/huggingface`
+  (the first run downloads the model, about 90 MB, if the mood work did not
+  already). It needs the shelf: double-click `Teach the phone again.command`
+  first if `shelf.json` is missing.
+- **What it writes.** `passage-cache/`: the vectors of each episode's lines, so
+  a stopped run carries on where it was and a second run takes minutes (about
+  1.5 KB a line, a few hundred megabytes in all; it is only a speed-up and may
+  be deleted). `passage-model.json`:
+  `{"version": 1, "model", "decoder": 2, "classes", "thresholds", "trained", "episodes": {"<id>": {"lines": N, "rows": [[five probabilities], ...]}}}`,
+  five numbers for every line of every shelf episode and no words. `trained`
+  says what it learned from and how it did on the shelf lines (line accuracy,
+  precision and recall of "any ad", and the seconds the phone would cut). The
+  window prints the same, with the time left for each episode it embeds.
+- **How long.** The first run embeds about 700 episodes (a few hundred thousand
+  lines), which may take from under an hour to a few hours, depending on whether
+  torch finds the Mac's graphics chip. The cloud could not time it, so read the
+  "about N to go" of the first episodes. Run it at night.
+- **How to try it.** Double-click `Teach the passage model.command`, then
+  `Score the ad skipping.command`. The scorecard gets one more row after the
+  finders and Apple's row, "Plus the passage model", which adds the answers
+  (decoded as the word model's version 2 spans, all `unsure`) to the **last
+  finder row**, not to Apple's row, so the two can be compared with the finders.
+  An episode with no answer, or whose transcript no longer has the number of
+  lines of its answer, stays as the last finder row (the note says how many).
+  With no `passage-model.json` the row is not printed; a damaged one is left out
+  with one note. To score on both label sets run `podcast-teach score <folder>`
+  and `podcast-teach score <folder> --labels labels-snapped`.
+- **The go rule.** The plan goes on with the passage model only when its row
+  passes at least 10 more breaks than the last finder row on both label sets and
+  adds at most 2 more skips with no ad. The per-line numbers in the window are
+  only a first look; the row counts whole ad breaks.
+
+In Terminal (the launcher does the same): with the venv's python,
+`python teach_passage.py [--folder F] [--labels labels-snapped] [--epochs 8] [--seed 1] [--min-episodes 20]`.
 
 ### What the steps write
 
@@ -589,6 +945,8 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   in the list and not tried again.
 - `transcripts/`: one text file per episode (the writing-down step).
 - `labels/`: one file per episode with the stretches Claude marked.
+- `sound-bank/`: one small file per learned episode with the ad-sound material
+  of its marked stretches (written by the sounds step, so the audio can go).
 - `habits.json`: what is usual for each show.
 - `shelf.json` and `ad-model.json`: the training keeps back the newest episode
   of each show as a test shelf, then writes the small model that spots ads and
@@ -610,6 +968,18 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   here, and is for scoring only, so the scorecard's "plus the library" row does
   not know the shelf ads' own words.
 - `ad-sounds.json`: the sounds of the ads, made by `podcast-teach sounds`.
+- `sound-bank/<id>.json`: the sound bank, written by `podcast-teach sounds` for
+  each episode it learns from, so that the episode's big MP3 file can be deleted
+  without shrinking the library. It holds no audio, only the numbers the
+  matching reads for each frame of the ads Claude marked (12 bytes a frame,
+  about 18 KB for a 30 second ad). An episode with no ads gets a file with an
+  empty list: the file means "learned". A file is written only when it is
+  missing or different. When the MP3 is gone and the file reads, `sounds` learns
+  from the file, and `ad-sounds.json` comes out byte for byte the same as it did
+  with the audio. The run says "Saved N sound-bank files", "Learned from N saved
+  summaries, their audio is gone" and, if a file could not be written, "Could
+  not save"; keep the audio of those episodes. An episode with neither audio nor
+  a file that reads is skipped as having no audio.
 - `joints.json`: the joints of each episode's MP3 file (where an inserted ad was
   spliced in), made by `podcast-teach joints` once for each episode that has an
   audio file and no entry yet; existing entries are kept. `podcast-teach score`
@@ -617,9 +987,15 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   when it does not, so a folder with `joints.json` and no audio still gets those
   rows. A damaged file, or one made by another version of the joint finder (it
   is written into the file), is ignored with one line and made again.
+- `edges.json` and `edges-report.json`: the sound at the edges of ad spots, made
+  by `podcast-teach edges` (see "The sound at the edges").
 - `ad-meaning.json`: the small meaning model, made by `podcast-teach meaning`.
   It reads each transcript line as an Apple sentence vector (the Mac's own
   language model, so only on a Mac) and keeps its vectors in `meaning-cache/`.
+- `passage-model.json` and `passage-cache/`: the passage model trial's answers
+  for the shelf and the vectors it kept, made by
+  `Teach the passage model.command` (see "The passage model (a trial)"). They
+  are never copied to the phone.
 - `show-settings.json`: per show and per finder, whether the phone may skip, may
   only ask, or must leave it off, and whether joints are used, chosen by
   `teach_settings.py` from `scorecard.json` and the phone's notes. It is written
@@ -633,6 +1009,14 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   as before. The pull is only for a start that a word finder gave: an ad named
   by the repeated words, the meaning model or the word model, or an ad with no
   name that starts where an ad of the word rules or the word model starts.
+- Apple's on-device model (`apple-model` in `show-settings.json`) is the one
+  finder that is not only made stricter. It asks by default, because on the
+  owner's labels its skips did more harm than good. A show gets `skip` for it
+  only when the "Plus Apple's model, if every show let it skip" row passes at
+  least 3 more of that show's breaks than the last finder row and adds at most 1
+  skip with no ad there (the show's own bar, in `scorecard.json`); otherwise it
+  keeps asking. Two undone or two "not an ad" answers on a show still make it
+  ask or turn it off there.
 - `copies/` and `labels-snapped/`: the second download's findings and the labels
   snapped to them (see item 5 above).
 - `scorecard.json`: every scorecard `podcast-teach score` has made.
@@ -699,6 +1083,28 @@ gathered, is left out, and the window says so for a missing one. A damaged
 `wanted.json` is ignored with one line. `Teach the phone again.command` and the
 weekly job both run `teach_feedback.py` for you.
 
+### How fast the phone really is
+
+The phone also writes `Podcasts/phone-diary.jsonl` into the same folder (the
+skip log and the ad finder's diary, as "Send skip log" shares them). It holds
+one line for every play that starts (`play: ready`,
+`play: partly, transcript to N s` or `play: stream`) and one for every finished
+transcription (`N s of audio in M s, front` or `, background`). Those lines hold
+no word of an episode. `teach_pace.py` reads it (the iCloud copy first, then the
+Mac's own copy; or `--diary FILE`) and prints the share of plays that were ready
+and the speech pace, in seconds of audio per second of work, for all
+transcriptions and for those in front and in the background. It writes nothing.
+It ends with the line to replay the shelf at that pace, using the front pace
+when there is one, because a stream is played with the app open:
+
+```
+python3 libraries/PodcastKit/Tools/mac/teach_pace.py
+podcast-teach score <teaching folder> --stream --speech 12
+```
+
+Both numbers need a few days of listening on the phone. With no diary yet, or no
+play or transcription in it, the tool says so.
+
 ### The weekly job
 
 `Install weekly teaching.command` sets up a job that runs `teach-weekly.sh`
@@ -724,12 +1130,90 @@ to copy into iCloud Drive, give `/bin/bash` Full Disk Access once, as in "Set it
 up once" above. The job runs the files in the folder you installed it from, so
 install it again if you move that folder.
 
+### The nightly read-ahead
+
+`Install nightly read-ahead.command` sets up a job that runs `teach-ahead.sh`
+every night at 2:00, so the phone knows where the ads are in the episodes you
+are about to play before you press play. It first says what it will do, names
+the weekly cap and asks you to type `yes`, and installs nothing otherwise.
+
+Each night the job does this:
+
+1. The phone writes `Podcasts/phone-queue.json` into its linked folder: your Up
+   Next episodes in order, then the newest unplayed episode of each show you
+   played in the last 14 days, 12 at most, never a show with ad skipping off.
+   Each episode carries when it came out (`published`, in seconds since 1970),
+   which the job keeps so the exam only takes episodes newer than the ones the
+   model was taught on; an episode read ahead from an older list with no time
+   keeps its feed out of the exam. The job reads the iCloud copy first, then the
+   Mac's own copy.
+2. It picks up to 8 episodes that are not marked yet (not in the teaching set,
+   and not an episode picked on an earlier night), in the phone's order.
+3. It downloads them and writes down what is said, with the same tools as the
+   weekly job (`teach_collect.py`, `teach_transcribe.py`, both with
+   `--only-ahead` so they leave the other episodes alone).
+4. It has Claude mark the ads (`teach_label.py --only-ahead`). This is the only
+   step that uses your Claude plan. Each week has its own budget,
+   `ahead-<year>-W<week>`, with a hard stop at
+   $10: an episode is expected to
+   cost about $0.19, and the marking stops
+   before a call that would pass the cap, says so in the log and starts again
+   the next week. An episode that fails to mark is skipped. A call that timed
+   out or printed no cost counts as one episode's expected cost (about $0.19)
+   against the cap, and every call is written in the week's budget at once.
+5. It writes `ahead-ads.json` (the ads of the last 14 days' episodes, told in
+   words, with start and end times) and copies it to the phone's folders with
+   `teach_publish.py`, the way the weekly job does.
+
+The marked episodes join the teaching set with their labels, so the weekly run
+learns from them, but they are never put on the shelf or in the exam
+(`ahead.json` lists them). A night with no list from the phone, nothing new in
+it, no budget left or no network ends quietly with one line in the log and exit
+status 0. The job holds the teaching folder's lock for the whole night, so no
+other run starts between two of its steps; if another run is working in the
+folder, the job says so and ends. On Sunday morning it does nothing at all, so
+it never meets the weekly teaching run at 3:00 (the night of Saturday to Sunday
+is skipped). Change the limits with `TEACH_AHEAD_CAP` (dollars a week),
+`TEACH_AHEAD_ESTIMATE` (dollars an episode), `TEACH_AHEAD_MOST` (episodes a
+night) and `TEACH_MAX_GB`.
+
+The Mac has to be on or asleep at 2:00, not shut down. Give `/bin/bash` Full
+Disk Access once, as in "Set it up once" above, so the job can read and write
+the phone's iCloud folder. Double-click the installer again to replace the job
+(it never makes two), and `Stop nightly read-ahead.command` to turn it off;
+marks already made stay. The job runs the files in the folder you installed it
+from, so install it again if you move that folder.
+
 ### The logs
 
 - `~/Storyteller Lofi/logs/podcast-teaching.log`: what every window and the
   weekly job printed, with a dated heading for each run.
 - `~/Storyteller Lofi/logs/podcast-teaching-weekly.log`: what launchd saw from
   the weekly job.
+- `~/Storyteller Lofi/logs/podcast-read-ahead.log`: what the nightly read-ahead
+  printed, with a dated heading for each night.
+- `~/Storyteller Lofi/logs/podcast-read-ahead-job.log`: what launchd saw from
+  the nightly job.
+
+### Putting new files on the Mac
+
+The Mac's copy of these tools is
+`~/Storyteller Lofi/podcast-teaching-tools/storyteller/libraries/PodcastKit/Tools/mac`,
+and each file in `~/Storyteller Lofi/Podcast teaching/` is a wrapper of two
+lines that runs the same-named file there:
+
+```
+#!/bin/bash
+exec "$HOME/Storyteller Lofi/podcast-teaching-tools/storyteller/libraries/PodcastKit/Tools/mac/Back up the teaching marks.command"
+```
+
+For the backups, copy `teach_backup.py`, `teach-finish.sh`,
+`Mark ads in the teaching episodes.command`,
+`Mark the new episodes at night.command`, `Back up the teaching marks.command`
+and `Start another big run.command` into that tools folder (keep them
+executable: `chmod +x` on the four `.command` files and `teach-finish.sh`), and
+make one wrapper for each of the two new `.command` files in
+`Podcast teaching/`, named the same, with `chmod +x`.
 
 ### Tests
 

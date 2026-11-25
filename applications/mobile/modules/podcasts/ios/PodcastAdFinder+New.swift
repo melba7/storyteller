@@ -1,8 +1,9 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // The new finders, after the old ones: the phone's own sounds, the repeated sounds, the repeated
-// words and the meaning layer, then the joints. The old finders' ads (the words, the model, the
-// Mac's sounds, the chapters) are in the final ads file already, so a crash here loses nothing.
+// words, the meaning layer and the Mac's marks of the night before, then the joints. The old
+// finders' ads (the words, the model, the Mac's sounds, the chapters) are in the final ads file
+// already, so a crash here loses nothing.
 // Each new finder runs through `PodcastFinderGuard` (a mark on disk before, cleared after) and
 // only while iOS holds time for the app. The order, for each finder: find; keep only what lies
 // outside every ad that is in the file (so a new finder can only ADD stretches, never lengthen or
@@ -81,9 +82,12 @@ extension PodcastAdFinder {
   }
 
   /// Runs the new finders on the final ads file `file` of a whole transcript and saves what they
-  /// add. The result holds the file as saved (`file` itself when nothing changed).
+  /// add. The result holds the file as saved (`file` itself when nothing changed). `modelAsks` are
+  /// the answers of Apple's model that only ask on this show (`ModelPlacing.asked`): they take part
+  /// in the ranking of the questions like the other finders' stretches.
   func addNewFinders(
-    _ id: String, ads store: AdsStore, transcript: Transcript, file: AdsFile
+    _ id: String, ads store: AdsStore, transcript: Transcript, file: AdsFile,
+    modelAsks: [FoundAd] = []
   ) -> NewResult {
     var result = NewResult(file: file)
     guard let modes = newModes(id), let fresh = store.load(detector: Self.detectorName),
@@ -91,6 +95,7 @@ extension PodcastAdFinder {
     else { return result }
     result.modes = modes
     var collect = NewCollect(file: fresh, modes: modes)
+    if !modelAsks.isEmpty { collect.add(ShowTuning.appleModel, modelAsks) }
     let pass = soundResult(id, sha256: store.sha256, file: local, modes: modes)
     if modes.level(FinderNames.ownSound) != .off, let pass {
       collect.add(FinderNames.ownSound, NewAds.ads(ofSounds: pass.own))
@@ -119,6 +124,14 @@ extension PodcastAdFinder {
         collect.add(FinderNames.meaning, run.ads)
         meaningRows = (model, run.rows)
       }
+    }
+    // The Mac's marks of the night before (PodcastAdFinder+Ahead.swift): skips for the ads found
+    // by both edges, questions for the ads found by one.
+    if allowedNow, modes.level(FinderNames.ahead) != .off,
+      let found = aheadFound(id, transcript: transcript, judged: collect.judged)
+    {
+      collect.add(FinderNames.ahead, found.ads)
+      collect.add(FinderNames.ahead, found.asks, onlyAsk: true)
     }
     // The snap, the word model's questions and the meaning layer's are new work too: each runs
     // under the mark of the finder it belongs to, so a crash in it is not repeated every launch.
@@ -230,8 +243,9 @@ struct NewCollect {
   /// Takes the ads of one finder: of the sorts the listener skips, unsure at most, with the
   /// finder's name; only the parts outside every ad known so far, and not over a stretch the
   /// listener undid or said "no" to; then the settings and the guard decide which are skipped and
-  /// which are asked about.
-  mutating func add(_ finder: String, _ found: [FoundAd]) {
+  /// which are asked about. With `onlyAsk` none is skipped, whatever the level (a stretch the finder
+  /// is not sure of).
+  mutating func add(_ finder: String, _ found: [FoundAd], onlyAsk: Bool = false) {
     var list = found.filter { modes.listener.allows($0.kind) }.map { ad -> FoundAd in
       var one = ad
       one.source = finder
@@ -248,10 +262,22 @@ struct NewCollect {
     case .ask:
       asks += (placed.skip + placed.ask).map { AdAsks.Candidate(ad: $0, chance: Self.askChance) }
     case .skip:
-      taken += placed.skip
-      asks += placed.ask.map { AdAsks.Candidate(ad: $0, chance: Self.askChance) }
+      if onlyAsk {
+        asks += (placed.skip + placed.ask).map { AdAsks.Candidate(ad: $0, chance: Self.askChance) }
+      } else {
+        taken += placed.skip
+        asks += placed.ask.map { AdAsks.Candidate(ad: $0, chance: Self.askChance) }
+      }
     }
     counts.append((finder, list.count))
+  }
+
+  /// The stretches the listener judged or was asked about: the snap's pull and the Mac's marks keep
+  /// out of them.
+  var judged: [(start: Double, end: Double)] {
+    (file.denied ?? []).map { (start: $0.start, end: $0.end) }
+      + (file.asks ?? []).map { (start: $0.start, end: $0.end) }
+      + file.undone.map { (start: $0.start, end: $0.end) }
   }
 
   /// The file's ads and the skips, in order of time, with their borders put on the joints.
@@ -260,13 +286,8 @@ struct NewCollect {
     out.ads = (file.ads + AdJoin.join(taken)).sorted { $0.start < $1.start }
     var moved: [NewAds.Moved] = []
     if let joints {
-      // The stretches the listener judged or was asked about: the pull keeps out of them.
-      var judged: [(start: Double, end: Double)] = []
-      judged += (file.denied ?? []).map { (start: $0.start, end: $0.end) }
-      judged += (file.asks ?? []).map { (start: $0.start, end: $0.end) }
-      judged += file.undone.map { (start: $0.start, end: $0.end) }
       let snapped = NewAds.snap(
-        out.ads, joints: joints, steadyToo: steadyToo, judged: judged, words: words,
+        out.ads, joints: joints, steadyToo: steadyToo, judged: self.judged, words: words,
         leaving: { NewAds.isFixed($0, in: out, words: words) })
       out.ads = snapped.ads
       moved = snapped.moved

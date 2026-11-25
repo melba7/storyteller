@@ -24,6 +24,9 @@ FOLDER = "~/Storyteller Lofi/PodcastTeaching"
 MANIFEST = "episodes.json"
 VERSION = 1
 LOCK = ".lock"
+# Set by `hold` in the environment of the command it runs, to the real path of the folder it holds:
+# a tool that command starts may take the same lock again (see run_lock).
+HELD = "TEACH_LOCK_HELD"
 BUSY = ("Another teaching run is already working in this folder. Wait for it to finish, or close "
         "its window.")
 AUDIO_EXTENSIONS = ("mp3", "m4a", "aac", "ogg", "opus", "wav")
@@ -132,8 +135,13 @@ def save_manifest(folder, entries):
 def run_lock(folder):
     """Holds an exclusive lock on <folder>/.lock for the length of the `with` block, making the
     folder first. Raises Busy (with the sentence to show) when another run already holds it. The
-    lock goes when the block ends or the program stops, however it stops."""
+    lock goes when the block ends or the program stops, however it stops. A program that `hold`
+    started for this same folder is already inside the lock: flock belongs to each opened copy of
+    the file, so it would be refused by its own parent, and it passes without taking it."""
     os.makedirs(folder, exist_ok=True)
+    if os.environ.get(HELD) == os.path.realpath(folder):
+        yield
+        return
     handle = open(os.path.join(folder, LOCK), "a")
     try:
         try:
@@ -145,11 +153,16 @@ def run_lock(folder):
         handle.close()
 
 
-def hold(folder, command, runner=subprocess.call):
+def hold(folder, command, runner=None):
     """Runs `command` while holding the folder's run lock, and returns its exit code. When another
-    run holds the lock it says so and returns 3 without running anything."""
+    run holds the lock it says so and returns 3 without running anything. The command (and what it
+    starts) is told by the environment that the lock is held for it, so a tool that takes the
+    lock itself, as most of them do, is not refused by its own parent."""
     try:
         with run_lock(folder):
+            if runner is None:
+                env = dict(os.environ, **{HELD: os.path.realpath(folder)})
+                return subprocess.call(command, env=env)
             return runner(command)
     except Busy as error:
         print(error)

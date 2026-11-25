@@ -178,6 +178,34 @@ class HoldTests(unittest.TestCase):
         self.assertEqual((code, ran), (3, []))
         self.assertIn("Another teaching run is already working", said.getvalue())
 
+    def test_a_tool_that_hold_started_may_take_the_same_lock_again(self):
+        # The nightly read-ahead runs its tools (which each take the lock themselves) under `hold`.
+        # flock belongs to each opened copy of the lock file, so without a marker they would all be
+        # refused and the whole night would end as "nothing to do".
+        folder = Folder(self)
+        child = ("import sys; sys.path.insert(0, %r); import teach_store as s\n"
+                 "with s.run_lock(sys.argv[1]): pass" % os.path.dirname(os.path.abspath(__file__)))
+        self.assertEqual(store.hold(folder.dir, [sys.executable, "-c", child, folder.dir]), 0)
+        self.assertEqual(store.main(["busy", folder.dir]), 0)  # released afterwards
+
+    def test_a_program_that_hold_did_not_start_is_still_refused(self):
+        folder = Folder(self)
+        child = ("import sys; sys.path.insert(0, %r); import teach_store as s\n"
+                 "try:\n    with s.run_lock(sys.argv[1]): pass\nexcept s.Busy: sys.exit(9)"
+                 % os.path.dirname(os.path.abspath(__file__)))
+        with store.run_lock(folder.dir):
+            import subprocess
+            env = {k: v for k, v in os.environ.items() if k != store.HELD}
+            self.assertEqual(subprocess.call([sys.executable, "-c", child, folder.dir], env=env), 9)
+
+    def test_the_marker_is_for_that_folder_only(self):
+        held, other = Folder(self), Folder(self)
+        with store.run_lock(other.dir):
+            with mock.patch.dict(os.environ, {store.HELD: os.path.realpath(held.dir)}):
+                with self.assertRaises(store.Busy):
+                    with store.run_lock(other.dir):
+                        self.fail("another folder's marker opened this folder")
+
     def test_the_command_line_runs_a_real_command(self):
         folder = Folder(self)
         self.assertEqual(store.main(["hold", folder.dir, sys.executable, "-c", "raise SystemExit(5)"]), 5)

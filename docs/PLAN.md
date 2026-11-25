@@ -16,9 +16,10 @@ first teaching run, the merge and the phone (TestFlight 33.1) | The phone learns
 by itself (U1 to U11, Mo's ask 2026-11-23): all built, checked by Opus and fixed
 (PR #55, whole check green); waiting on the Fable final check, the merge and the
 TestFlight build | Ad skipping to 95%, round A (V1 to V8, Mo's ask 2026-11-23):
-V1 to V7 built, checked by Opus and fixed (PR #56); on the 63 shelf episodes 125
-of 219 ad breaks pass Mo's bar (was 101) with 13 skips where there is no ad (was
-75); waiting on Mo's OK, the one TestFlight build and the run on the Mac (V8)
+V1 to V7 built, checked by Opus and fixed (PR #56 merged, TestFlight 35.1); on
+the 63 shelf episodes 125 of 219 ad breaks pass Mo's bar (was 101) with 13 skips
+where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
+run and the exam (V8)
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1333,7 +1334,8 @@ where there is no ad.
     `joints.json`) passes more breaks than the row before it.
   - Result: 111 of 219 against 102 with the old word model; with the new word
     model 125 against 121, and 13 skips with no ad against 15. Mo approved 3
-    seconds for a joint in the round before, so the 60 seconds wait for his OK.
+    seconds for a joint in the round before and the 60 seconds on 2026-11-23,
+    knowing that two skips on the test started 12 and 26 seconds too early.
 - [x] **V6 Stream replay on the Mac** (test part 3): the shelf or exam episodes
       go down the phone's own path for a playing stream, Apple's model included,
       and are scored by the bar counting only skips known in time.
@@ -1345,10 +1347,321 @@ where there is no ad.
       how many skips Mo neither took back nor trimmed, against skips plus ads he
       marked as missed.
 - [ ] **V8 The run**: gather and mark the 500 and the exam on the Mac, teach
-      again, score the shelf, then the exam once, and bring Mo the numbers
-      before the merge and the one TestFlight build.
+      again, score the shelf, then the exam once, and bring Mo the numbers.
+  - Mo chose on 2026-11-23 to merge and build first, on the shelf numbers (PR
+    #56, TestFlight 35.1). The round A tools are on the Mac. The run starts with
+    his double-click on "Second downloads then gather more"; "Gather the exam
+    episodes" comes some days later, so the exam's inserted ads are not the same
+    day's.
+
+### Ad skipping to 95%, round B (2026-11-24)
+
+Mo's order (his card, 2026-11-24): "Do 1, 2 then 3": the free steps, then the
+Mac reading his next episodes at night, then the sealed exam. One pull request,
+one TestFlight build from the Mac, numbers before the merge, Mo's OK to merge.
+Sonnet builds (one or two at a time), Opus checks, Fable does the final check.
+
+Where the shelf stands (counted again from a `--dump`, within 3 breaks of the
+scorecard): 140 of 219 breaks pass (64%); as a stream at the assumed pace 109,
+ready before play 137, and the whole difference of 28 is in the first 3 minutes.
+Produced spots are 147 breaks and 106 pass (20 start late, 10 stop early, 8 land
+too far, 3 other). Host-read paid ads are 27 and 12 pass. The hosts' own promos
+and asks are 34 and 17 pass (9 missed). Half of the 34 late starts are late by
+18 to 97 seconds (an ad that opens with a story). On the exact labels (242
+breaks, 131 pass) 19 breaks are stretches that only the second download found
+and nobody marked, all missed, and 22 skips land too far, mostly by 5 to 19
+seconds. No single step below reaches 95%.
+
+The rule for every step: it is measured first on the shelf with the scorecard,
+on both label sets. A step that does not raise the bar score by its number, or
+adds skips where there is no ad, is not built into the app; its result is
+written here and the idea goes under Later.
+
+**1. Free steps**
+
+- [x] **W1 Measure real plays** (phone, small): one diary line for every play
+      that starts ("play: ready", "play: partly, transcript to N s" or "play:
+      stream") and one for every finished transcription ("N s of audio in M s",
+      front or background), kept apart from the 500-line trim. They reach the
+      linked folder as `Podcasts/phone-diary.jsonl` already. A new
+      `teach_pace.py` on the Mac reads the iCloud copy and prints the share of
+      plays that were ready and the speech pace, and `score --stream --speech N`
+      replays the shelf at that pace. Mo does nothing. First I look for 35.1's
+      diary on the Mac; if it is missing, the way back from the phone is broken
+      and is fixed here.
+  - Files: `ios/PodcastTimeline.swift`, the player's start, the transcriber,
+    `AdDiary.swift`, `StreamPace.swift`, `AdScoreCommand.swift`,
+    `Tools/mac/teach_pace.py`.
+  - Done when: the tests pass and, after three days on the phone, the Mac prints
+    both numbers. It cannot change a skip, so it has no bar number.
+  - Result: built (`PlayDiary`, `play-diary.jsonl`, `teach_pace.py`,
+    `score --stream --speech N`). The way back from the phone has no break (the
+    notes sync runs at app start and when the app comes to the front). Only
+    plays that start in the first minute count, and not the listener's own
+    files. The numbers wait for a build on the phone. The speech pace is the
+    largest lever on a stream: at 6, 12 and 25 times real time the shelf passes
+    99, 112 and 136 of 219 as a stream.
+- [x] **W2 Read ahead when Wi-Fi comes back** (phone, small): the look that
+      fetches the next two of Up Next runs only when Up Next changes or an
+      episode starts or ends, so episodes queued away from Wi-Fi are not fetched
+      when the phone comes home. It also runs when Wi-Fi returns, when the app
+      comes to the front and in the background refresh. More than two ahead
+      waits for W1's numbers.
+  - Files: `ios/PodcastDownloadAhead.swift`, `ios/PodcastNetwork.swift`,
+    `automaticRun.ts`; the rule stays `DownloadAhead.plan`.
+  - Done when: a test shows a queued episode starts after Wi-Fi returns. Worth
+    up to 28 breaks (13 points) on plays that would have been streams, nothing
+    on the finished number.
+  - Result: built. Nothing looked at Up Next on a Wi-Fi return, on the app
+    coming to the front or in the background refresh before (`automaticRun.ts`
+    did not call it at all); `DownloadAhead.NetworkWatch` and a native
+    `lookAhead` do now. The rule and the limit of two are as they were.
+- [x] **W3 Apple's row and the unmarked stretches** (cloud, free): when
+      `apple-model.json` is done on the Mac I score the shelf with both label
+      sets and `--stream`. Apple's model is already on in the app, so its row is
+      what today's phone really does. It stays as it is when the row passes at
+      least 3 more breaks than the row before with at most 1 more skip with no
+      ad. When it passes 3 fewer or adds 3 skips, a small milestone turns its
+      answers into questions through the per-show settings. I also read the 19
+      unmarked stretches: if they are ads, the exact labels become the headline.
+  - Done when: both tables and the decision are written here.
+  - Result (Apple's answers for all 63 shelf episodes, scored 2026-11-24): the
+    model makes the phone worse. On Claude's labels (219 breaks) the row before
+    passes 140 with 20 skips with no ad, with Apple's answers 118 with 183 (3.5
+    an hour). On the snapped labels (242 breaks) 131 and 19 against 109 and 181.
+    As a stream at the assumed pace 109 and 19 against 95 and 188; ready 137
+    against 115. Keeping only its sure answers gives 122 and 70, only sure ads
+    of the kind `ad` 126 and 53, sure ads and promos 122 and 68, so no part of
+    it helps. Of its 144 unsure answers of the kind `ad` 124 are wrong (under
+    20% of the stretch is a marked ad), and 121 of 129 unsure credits. Decision:
+    its answers become questions by default (W3b below). The head scan's wait
+    for the model costs 3 breaks as a stream (112 against 109 without the wait).
+    The 19 unmarked stretches are not read yet.
+- [x] **W3b Apple's model asks and does not skip** (phone and Mac settings,
+      small): a finder `apple-model` in `ShowTuning` with the built-in default
+      `ask`, applied to Apple's list before the join as for the other finders,
+      the head scan not waiting for the model unless it may skip, the
+      scorecard's Apple row applying the same settings, and `teach_settings.py`
+      choosing it per show by the same rule as the other finders.
+  - Done when: under the built-in default the Apple row equals the row before it
+    (140 of 219 on Claude's labels, 20 skips with no ad), and a show whose
+    setting is `skip` still gets the old behaviour.
+- [x] **W4 Sound at the edges, measured first** (built in the cloud, run on the
+      Mac's audio by an RC session or one double-click, free, about an hour):
+      `podcast-teach edges` works out, for every half second of each shelf MP3,
+      the loudness, a 24-band spectrum and whether it is a pause. A change score
+      compares the 3 seconds before a point with the 3 seconds after, at the
+      starts and ends of the exactly placed spots and at as many random points.
+  - Go: the strongest change within 10 seconds lies within 1 second of at least
+    70% of exact edges, and of at most 10% of random points. Then a scorecard
+    row "Plus the sound at the edges" moves found edges onto it, and it is built
+    into the app (beside the joint snap) only when that row passes at least 8
+    more breaks on the exact labels with no more skips with no ad. It can win at
+    most the 41 failing spot breaks.
+  - Files: `PodcastAudioMatch/EdgeSound.swift`, `podcast-teach`, one launcher.
+  - Result (2026-11-24, 43 shelf episodes, 232 exact edges, the same number of
+    random points): the strongest change is within 1 second of 84 exact edges
+    (36%), within 2 seconds of 117 (50%), within 5 seconds of 167 (72%); for
+    random points 14%, 18% and 40% (chance is about 10%, 20% and 50% inside 10
+    seconds). Verdict: no go. The sound does point at the edges, but not near
+    enough to the 70% in 1 second, so nothing of it goes into the app. The
+    change score's weights were a first guess; a trained one is the one more
+    try, but half of the late starts are 18 to 97 seconds late, out of any
+    snap's reach.
+- [x] **W5 A small language model, tried first** (Mac, free, some hours at
+      night): `teach_passage.py` runs in the Mac's `python-mood` environment
+      (MiniLM-L6, about 23 MB once shrunk). It reads five lines at a time and
+      says what the middle line is. It learns from the 651 marked episodes off
+      the shelf and answers for the shelf. The answers go through the word
+      model's decoder and are saved like Apple's (`passage-model.json`, no
+      words), so the scorecard gets a row "Plus the passage model".
+  - Go: the row passes at least 10 more breaks than the last finder row on both
+    label sets and adds at most 2 skips with no ad. Then it becomes a Core ML
+    model in the app (about 25 MB, an hour of episode in under 10 seconds), in
+    the whole-file pass only. It can win at most the 32 failing host-read breaks
+    and the 17 long late starts. The meaning model, a close relative, failed its
+    gate (68% right), so this has even odds.
+  - Files: `Tools/mac/teach_passage.py`, a launcher, `AppleScoreRow.swift` made
+    general; on a go `PodcastAdsOnDevice` and `modules/podcasts/ios`.
+  - Result (2026-11-24, trained on 651 episodes, answering for the shelf): line
+    accuracy 90%, any ad line by line precision 56% and recall 81%. The row
+    "Plus the passage model" passes 103 of 219 (47%) against 140 on Claude's
+    labels, with 370 skips with no ad (7.0 an hour) against 20, and 93 of 242
+    against 131 on the snapped labels. Verdict: no go. A small model that reads
+    five lines is wrong about as often as Apple's much larger one: host-read ads
+    are not told from the show by their words alone.
+
+**2. The Mac reads ahead** (about $0.19 an episode of Mo's Claude plan)
+
+- [x] **W6 The phone tells the Mac what is next** (phone, small):
+      `Podcasts/phone-queue.json` in the linked folder: Up Next in order, then
+      the newest unplayed episode of each show played in the last 14 days, 12 at
+      most, each with feed, guid, title and audio address.
+  - Files: `modules/podcasts/phoneQueue.ts` with tests, `phoneNotesSync.ts`.
+- [x] **W7 The nightly job** (Mac): `teach-ahead.sh`, made like
+      `teach-weekly.sh`: a launchd job at 2:00 at night reads the queue,
+      downloads at most 8 episodes it has not marked, writes them down, has
+      Claude mark them (budget `ahead-<year>-W<week>`, a hard stop at the weekly
+      cap) and publishes `ahead-ads.json`: for each episode (feed and guid) each
+      ad's kind and the 40 words at its start and at its end, kept 14 days. The
+      marked episodes also join the teaching set, never the shelf or the exam.
+  - Mo: one double-click on "Install nightly read-ahead.command" and a typed
+    yes. I ask before I leave it for him.
+  - Files: `Tools/mac/teach-ahead.sh`, `teach_ahead.py`, two launchers (install,
+    stop), `teach_publish.py`, the Mac README.
+- [x] **W8 The phone uses the marks, tested on the bar**: `AheadAds`, a finder
+      named "ahead", looks for an episode's start and end words in its
+      transcript (the whole file and the head of a stream) and gives the ad with
+      Claude's edges. Words, not times, because the phone's copy can carry other
+      inserted ads. With no file or no entry nothing changes: the phone still
+      skips alone.
+  - Go: `score --ahead` adds a row "Plus the Mac's marks from the night before",
+    which knows an episode's own marks but not its spots that differ between two
+    downloads (with no second download, none of its spots). At least 20 more
+    breaks pass with at most 1 more skip with no ad.
+  - Honest value: on the shelf the marks are also the truth, so this row only
+    proves the matching. The real number is the exam's 15 episodes marked twice,
+    with the second marking as the night's marks (W9). Only episodes that were
+    in the queue the night before are helped.
+  - Result (2026-11-24, shelf, `score --ahead`): on Claude's labels 140 to 166
+    of 219 breaks pass (75.8%) with no more skips with no ad (20); on the
+    snapped labels 131 to 149 of 242 (the go rule's 20 more is missed by 2); as
+    a stream at the standard pace 112 to 137 of 219 (ready: 163). Marks of low
+    confidence only ask; they never skip. As said above, the shelf's marks are
+    also its truth, so this is the matching's ceiling, not a measured gain: the
+    exam says what the phone gets from a second marking.
+  - Files: `PodcastAds/AheadAds.swift`, `AdScoreCommand.swift`,
+    `teachingSync.ts`, `ios/PodcastAdFinder+Ahead.swift`,
+    `ios/PodcastAdFinder+New.swift` and `ios/PodcastStreamHead+Local.swift`.
+- Review fixes to W6 to W8 (branch `round-b/fixes`, nothing ticked):
+  1. Lock (W7): `teach-ahead.sh` runs under `teach_store.py hold` for the whole
+     night, ends quietly with exit 0 when another run holds the lock, and does
+     nothing on Sunday, so it never meets the weekly run at 3:00. `hold` tells
+     the tools it starts that the lock is theirs (`TEACH_LOCK_HELD`); a first
+     version without that refused every tool and the night did nothing, found by
+     the second review.
+  2. Up Next always in the table (W6, W8): `aheadEpisodesText` always adds the
+     episodes of `phone-queue.json` to the phone's lookup table, older ones
+     included, besides the newest 12 of each show.
+  3. Low marks only ask (W8): a mark Claude gave "low" gives a question (at most
+     3 an episode), never a skip, and is not in a stream's head scan; high and
+     medium work as before.
+  4. The exam's "newer than" rule (W6, W7): the phone puts each episode's
+     published time in `phone-queue.json`, `teach_ahead.py` keeps it, and a
+     read-ahead episode with no time blocks exam picks from its feed.
+  5. The weekly cap (W7): a call that timed out or printed no cost counts as one
+     expected call (19 cents), and every call is written in the budget file at
+     once, not after the episode.
+
+- Mo's asks of 2026-11-25 (Mac tools, no phone change):
+  1. Marking at any hour: `Gather deeper and mark now.command` is the "tonight"
+     launcher with `TEACH_BETWEEN=0-24`; it is on the Mac and has its copy and
+     test in this pull request.
+  2. Free the disk, learn first then free (Mo chose this 2026-11-25):
+     `podcast-teach sounds` saves each learned episode's ad-sound material in
+     `sound-bank/<id>.json` and rebuilds `ad-sounds.json` the same from audio or
+     from the bank. `Free up space from the teaching audio.command`
+     (`teach_free.py`) then deletes the audio of an MP3 episode only when its
+     transcript, marks, sound bank and second-download truth are kept (not the
+     shelf, the exam or the read-ahead), after a checked backup and a typed yes;
+     typing `all` also frees those still waiting for a second download. Done
+     when: the Swift and Python tests pass (a library rebuilt after deleting an
+     audio file is byte-identical), an independent check finds nothing wrong,
+     and Mo has run "Teach the phone again" so the banks exist.
+  3. Marking sooner (Mo, 2026-11-25: "usage is the same"): the big-run launchers
+     write down every episode before any is marked, so the marking waited hours.
+     `Write down and mark together.command` writes down 20, marks them at any
+     hour, and repeats.
+  4. Automatic big runs while they keep improving the ad skipping and the other
+     model (not built; the limits wait on Mo's answers: how much to spend in
+     all, what counts as improving, and whether to stop at night only).
+  5. Transcripts from outside (Mo, 2026-11-25: "find episodes with transcripts
+     already available online", for his own shows and for podcasts in general).
+     `Count publisher transcripts in my shows.command` counts the shows of his
+     63 that carry a publisher's transcript. No public set of podcasts has ad
+     marks that anyone may use; the biggest public transcripts (SPoRC, over a
+     million episodes, research use only, behind a Hugging Face login) have no
+     ad marks either, so they would need Claude's marking to be used. Mo chose
+     "Yes, small sample first" (card, 2026-11-25):
+     `Fetch a sample of public transcripts.command` (`sporc_sample.py`) writes
+     about 200 episodes as a teaching folder of its own after Mo makes a free
+     Hugging Face account and agrees to the terms. The sample is made (200
+     English episodes, 200 shows, 186 hours). Mo chose "Bigger: 100 episodes, up
+     to $20" (card, 2026-11-25), then said up to $100 and asked to test whether
+     ad detection improved significantly afterwards. So the fetch takes 500
+     episodes and `Mark the public transcripts.command` marks up to 500 under
+     the budget `sporc-1` (cap $100). `Test the public marks.command` trains the
+     word model with and without them and compares the held-out shelf. Done
+     when: the word model's held-out precision and recall and the whole
+     pipeline's breaks passing (`podcast-teach score`, 140/131/109 before) are
+     measured with and without, and Mo has the answer. "Significantly" means the
+     round's own gate: 10 more breaks passing and at most 2 more wrong skips.
+
+**3. The exam**
+
+- [ ] **W9 Gather, mark and score the exam** (Mac, up to $18 of the plan, Mo's
+      typed yes): not before 2026-11-27. Mo double-clicks "Gather the exam
+      episodes" and types yes; the marking runs from 11 at night to 7. Then
+      "Check ads with a second download" (free) and Apple's model with `--exam`.
+      I score it twice and never tune on it: today's app (35.1) and the round B
+      branch, each with `score --exam`, the exact labels and `--stream`.
+      `podcast-teach agree` says how often two markings agree within 5 seconds,
+      which is the ceiling for any phone.
+  - Done when: Mo has the fair number, the ceiling and W8's real number.
+- [ ] **W10 One pull request, one build**: the parts that passed their gates,
+      the tables of W3 to W9 in the pull request, Fork CI green, the Fable
+      check, Mo's OK, then one TestFlight build from the Mac through RC.
+
+Order: today the cloud builds W1, W2 and the tools of W4 and W5, and I score W3
+when the Mac's Apple run ends. Tonight the Mac runs W4 and W5. Tomorrow the
+gates are read and the cloud builds W6 to W8, and the phone parts of W4 and W5
+only on a go. From 2026-11-27 the exam runs at night; W10 follows its score.
+
+What this can honestly reach. The finished number is 64% today. W1 and W2 move
+only the stream number (50%) toward the ready number (63%). Sound at the edges
+is worth 5 to 10 points if its measurement passes, and the passage model 0 to 7.
+So the phone alone ends near 65% to 78%, most likely the low 70s; the earlier
+"75% to 85%" was too hopeful. With the Mac's marks, queued episodes may reach
+80% to 90% against Claude's own marks, and never more than Claude agrees with
+itself, which the exam will say. 95% of all streamed breaks is unlikely in this
+round. The largest thing left is exact edges for inserted spots: the second
+download moved 159 of the shelf's 326 paid spots, so a second copy on the phone
+(idea 5, not on Mo's card) is the next candidate.
+
+Mo's answers (2026-11-24): the nightly cap is
+$10 a week (about 50 episodes), 8
+a night, a hard stop. He chose "Two big runs, then $10
+a week": two big teaching runs of up to
+$95 each a few days apart, then the nightly marking as
+maintenance. The exam (W9, up to $18,
+his typed yes) moves to about 2026-12-03, after the second run plus three days.
+
+Questions only Mo can answer:
+
+1. (answered) The nightly cap.
+2. May I leave "Install nightly read-ahead.command" for his double-click when W7
+   is checked? Recommended: yes.
+3. Do end-of-show "subscribe, rate us" count as ads? Open since round A.
+   Recommended: no.
+4. One tap on "Send skip log" in 35.1, only if W1 finds no diary on the Mac.
 
 ## Later
+
+- Ad skipping to 95%, round B (2026-11-24), found and not fixed: at the `off`
+  level a show still gets a whole-episode run of Apple's model (battery); skip
+  the model at `off` but save the final file with the model version. A per-show
+  `skip` for the Apple finder can never happen, because `teach_settings.py`
+  needs 3 scored episodes of a show and the shelf holds one per show (score the
+  training set per show, or document it). Four files grew over 300 lines:
+  `PodcastStreamHead` 480, `PodcastAdFinder+New` 322, `AdScoreCommand` 318,
+  `teach_settings.py` 348. The old phone parser ignores `apple-model`, so a Mac
+  setting for it only reaches phones that have this round's build. Half of the
+  late starts are 18 to 97 s late, out of the edge snap's reach: a trained edge
+  score is the one more try. The weekly run also marks and downloads ahead
+  episodes that are left unmarked, and ahead audio is never deleted, so the
+  nightly fills the 12 GB audio limit the big runs share within weeks: delete
+  ahead audio after its marks are written. Up Next episodes the weekly run
+  already marked are never sent to the phone.
 
 - Ad skipping to 95%, round A (2026-11-23), found and not fixed: the new word
   model's skips land more than 5 seconds past the ad in about 27 of 226 breaks
@@ -1443,3 +1756,11 @@ where there is no ad.
   `docs/PODCASTS-PLAN.md`): CarPlay, Apple Watch, widgets, Live Activities, Siri
   Shortcuts, Chromecast and Sonos, video podcasts, the iPad layout, app icons,
   and sync with other devices.
+- Freeing the teaching audio (2026-11-25), found and not fixed: the scorecard's
+  own-sounds and repeated-sounds rows and `joints.json` still read the audio of
+  earlier episodes, so a Mac score after freeing has less history for them (a
+  bank for the finders' sure ads, or a rule to keep each show's newest few,
+  would close it); the freshness rule uses file times, which are exact on the
+  Mac's own disk; the launcher's look and delete are two lock takes, so the
+  delete run may free a few more episodes than the look showed (all of them meet
+  the same rules).

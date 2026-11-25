@@ -2,8 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const download = vi.fn<(...args: unknown[]) => Promise<void>>()
+const lookAheadNative = vi.fn<() => Promise<void>>()
 
-vi.mock("./index", () => ({ Podcasts: { download } }))
+vi.mock("./index", () => ({
+  Podcasts: { download, lookAhead: lookAheadNative },
+}))
 
 describe("startDownload", () => {
   beforeEach(() => {
@@ -42,5 +45,18 @@ describe("startDownload", () => {
       null,
       null,
     )
+  })
+})
+
+describe("lookAhead", () => {
+  beforeEach(() => {
+    lookAheadNative.mockReset()
+    lookAheadNative.mockResolvedValue(undefined)
+  })
+
+  it("asks the native module to look at Up Next now", async () => {
+    const { lookAhead } = await import("./downloadsNative")
+    await lookAhead()
+    expect(lookAheadNative).toHaveBeenCalledTimes(1)
   })
 })

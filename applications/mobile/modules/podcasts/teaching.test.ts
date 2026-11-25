@@ -1,9 +1,14 @@
 // LOFI-FORK: the podcasts section's teaching files from the Mac (see FORK.md).
 import { describe, expect, it } from "vitest"
 
+import { LOCAL_FEED_URL } from "./localFiles"
 import {
+  AHEAD_MOST,
+  AHEAD_PER_SHOW,
   MAX_TEACHING_BYTES,
   TEACHING_NAMES,
+  aheadEpisodesText,
+  dueForAhead,
   dueForTeaching,
   filesToFetch,
   parseTeachingList,
@@ -62,12 +67,13 @@ describe("parseTeachingList", () => {
     ).toBeNull()
   })
 
-  it("keeps only the six known files", () => {
+  it("keeps only the seven known files", () => {
     const parsed = parseTeachingList(
       list({
         "ad-model.json": { sha256: SHA_A, bytes: 1 },
         "ad-meaning.json": { sha256: SHA_B, bytes: 2 },
         "show-settings.json": { sha256: SHA_B, bytes: 3 },
+        "ahead-ads.json": { sha256: SHA_A, bytes: 4 },
         "../secret.json": { sha256: SHA_A, bytes: 1 },
         "other.json": { sha256: SHA_A, bytes: 1 },
       }),
@@ -76,6 +82,7 @@ describe("parseTeachingList", () => {
       "ad-model.json",
       "ad-meaning.json",
       "show-settings.json",
+      "ahead-ads.json",
     ])
   })
 
@@ -94,7 +101,7 @@ describe("parseTeachingList", () => {
 })
 
 describe("TEACHING_NAMES", () => {
-  it("is the six files of the Mac's teach_publish.py, the model files first", () => {
+  it("is the seven files of the Mac's teach_publish.py, the model files first", () => {
     expect([...TEACHING_NAMES]).toEqual([
       "ad-model.json",
       "ad-library.json",
@@ -102,6 +109,7 @@ describe("TEACHING_NAMES", () => {
       "ad-sounds.json",
       "ad-meaning.json",
       "show-settings.json",
+      "ahead-ads.json",
     ])
   })
 })
@@ -130,6 +138,18 @@ describe("filesToFetch", () => {
     ])
     const changed = { ...files, "ad-model.json": { sha256: SHA_B, bytes: 100 } }
     expect(filesToFetch(changed, {}, refused)[0]).toBe("ad-model.json")
+  })
+
+  it("fetches the Mac's marks of the night before like the others", () => {
+    const marks = { "ahead-ads.json": { sha256: SHA_A, bytes: 20000 } }
+    expect(filesToFetch(marks, {})).toEqual(["ahead-ads.json"])
+    expect(filesToFetch(marks, { "ahead-ads.json": SHA_A })).toEqual([])
+    expect(
+      filesToFetch(
+        { "ahead-ads.json": { sha256: SHA_A, bytes: MAX_TEACHING_BYTES + 1 } },
+        {},
+      ),
+    ).toEqual([])
   })
 
   it("fetches the meaning model and the settings like the others", () => {
@@ -163,7 +183,7 @@ describe("filesToFetch", () => {
 
   it("asks for nothing when the list has nothing", () => {
     expect(filesToFetch({}, {})).toEqual([])
-    expect(TEACHING_NAMES).toHaveLength(6)
+    expect(TEACHING_NAMES).toHaveLength(7)
   })
 })
 
@@ -272,5 +292,180 @@ describe("parseTeachingState", () => {
       JSON.stringify({ model: { writtenAt: 5, episodes: "x" } }),
     )
     expect(state.model).toBeNull()
+  })
+})
+
+describe("dueForAhead", () => {
+  it("looks again after a minute, or when the clock went back", () => {
+    expect(dueForAhead(null, 5000)).toBe(true)
+    expect(dueForAhead(1000, 1000 + 59_999)).toBe(false)
+    expect(dueForAhead(1000, 1000 + 60_000)).toBe(true)
+    expect(dueForAhead(9000, 1000)).toBe(true)
+  })
+})
+
+describe("aheadEpisodesText", () => {
+  const show = (id: string, feedUrl = `https://${id}.test/feed`) => ({
+    id,
+    feedUrl,
+  })
+  const episode = (id: string, extra: object = {}) => ({
+    id,
+    guid: `guid-${id}`,
+    title: `Title ${id}`,
+    played: false,
+    archived: false,
+    ...extra,
+  })
+
+  it("tells each episode's feed, guid and title by its id", () => {
+    const text = aheadEpisodesText([show("s1")], { s1: [episode("e1")] })
+    expect(JSON.parse(text)).toEqual({
+      e1: { feed: "https://s1.test/feed", guid: "guid-e1", title: "Title e1" },
+    })
+  })
+
+  it("keeps the keys in order, so a table that did not change reads the same", () => {
+    const shows = [show("s1"), show("s2")]
+    const first = aheadEpisodesText(shows, {
+      s1: [episode("e9"), episode("e2")],
+      s2: [episode("e5")],
+    })
+    const second = aheadEpisodesText([...shows].reverse(), {
+      s2: [episode("e5")],
+      s1: [episode("e2"), episode("e9")],
+    })
+    expect(Object.keys(JSON.parse(first))).toEqual(["e2", "e5", "e9"])
+    expect(second).toBe(first)
+  })
+
+  it("leaves out played and archived episodes", () => {
+    const text = aheadEpisodesText([show("s1")], {
+      s1: [
+        episode("old", { played: true }),
+        episode("away", { archived: true }),
+        episode("next"),
+      ],
+    })
+    expect(Object.keys(JSON.parse(text))).toEqual(["next"])
+  })
+
+  it("takes the newest few of each show (the list is newest first)", () => {
+    const many = Array.from({ length: AHEAD_PER_SHOW + 5 }, (_, i) =>
+      episode(`e${String(i).padStart(2, "0")}`),
+    )
+    const ids = Object.keys(
+      JSON.parse(aheadEpisodesText([show("s1")], { s1: many })),
+    )
+    expect(ids).toHaveLength(AHEAD_PER_SHOW)
+    expect(ids).toContain("e00")
+    expect(ids).not.toContain(`e${String(AHEAD_PER_SHOW).padStart(2, "0")}`)
+  })
+
+  it("never tells more than the most the phone keeps, and skips shows with no feed", () => {
+    const shows = Array.from({ length: 60 }, (_, i) => show(`s${i}`))
+    const episodes: Record<string, ReturnType<typeof episode>[]> = {}
+    for (const one of shows)
+      episodes[one.id] = Array.from({ length: AHEAD_PER_SHOW }, (_, i) =>
+        episode(`${one.id}-${i}`),
+      )
+    const withLocal = [{ id: "files", feedUrl: LOCAL_FEED_URL }, ...shows]
+    episodes["files"] = [episode("a-file")]
+    const table = JSON.parse(aheadEpisodesText(withLocal, episodes))
+    expect(Object.keys(table)).toHaveLength(AHEAD_MOST)
+    expect(table["a-file"]).toBeUndefined()
+  })
+
+  it("is an empty table when there is nothing to tell", () => {
+    expect(aheadEpisodesText([], {})).toBe("{}")
+    expect(aheadEpisodesText([show("s1")], {})).toBe("{}")
+  })
+
+  describe("the episodes of the phone's list for the Mac", () => {
+    const many = (count: number, prefix = "e") =>
+      Array.from({ length: count }, (_, i) =>
+        episode(`${prefix}${String(i).padStart(2, "0")}`),
+      )
+    const listed = (feed: string, id: string) => ({
+      feed,
+      guid: `guid-${id}`,
+    })
+
+    it("are in the table even when they are older than the newest few of their show", () => {
+      const older = `e${String(AHEAD_PER_SHOW + 5).padStart(2, "0")}`
+      const text = aheadEpisodesText(
+        [show("s1")],
+        { s1: many(AHEAD_PER_SHOW + 8) },
+        [listed("https://s1.test/feed", older)],
+      )
+      const ids = Object.keys(JSON.parse(text))
+      expect(ids).toHaveLength(AHEAD_PER_SHOW + 1)
+      expect(ids).toContain(older)
+      expect(ids).toContain("e00")
+    })
+
+    it("are in the table whatever the library says about them being played or put away", () => {
+      const text = aheadEpisodesText(
+        [show("s1")],
+        {
+          s1: [
+            episode("played", { played: true }),
+            episode("away", { archived: true }),
+            episode("other", { played: true }),
+          ],
+        },
+        [
+          listed("https://s1.test/feed", "played"),
+          listed("https://s1.test/feed", "away"),
+        ],
+      )
+      expect(Object.keys(JSON.parse(text))).toEqual(["away", "played"])
+    })
+
+    it("are found by feed and guid together, so another show's guid is not taken", () => {
+      const text = aheadEpisodesText(
+        [show("s1"), show("s2")],
+        { s1: [], s2: many(AHEAD_PER_SHOW + 8) },
+        [listed("https://s1.test/feed", "e15")],
+      )
+      const ids = Object.keys(JSON.parse(text))
+      expect(ids).toHaveLength(AHEAD_PER_SHOW)
+      expect(ids).not.toContain("e15")
+    })
+
+    it("are left out of the table when the library does not have them", () => {
+      const text = aheadEpisodesText([show("s1")], { s1: many(2) }, [
+        listed("https://s1.test/feed", "gone"),
+      ])
+      expect(Object.keys(JSON.parse(text))).toEqual(["e00", "e01"])
+    })
+
+    it("stay in the table when it is full", () => {
+      const shows = Array.from({ length: 60 }, (_, i) => show(`s${i}`))
+      const episodes: Record<string, ReturnType<typeof episode>[]> = {}
+      for (const one of shows)
+        episodes[one.id] = Array.from({ length: AHEAD_PER_SHOW + 3 }, (_, i) =>
+          episode(`${one.id}-${String(i).padStart(2, "0")}`),
+        )
+      // The last show comes after the table is full, and this is not one of its newest.
+      const last = `s59-${String(AHEAD_PER_SHOW + 2).padStart(2, "0")}`
+      const table = JSON.parse(
+        aheadEpisodesText(shows, episodes, [
+          listed("https://s59.test/feed", last),
+        ]),
+      )
+      expect(Object.keys(table)).toHaveLength(AHEAD_MOST)
+      expect(table[last]).toBeDefined()
+    })
+
+    it("keep the keys in order, so a table that did not change reads the same", () => {
+      const queue = [listed("https://s1.test/feed", "e03")]
+      const first = aheadEpisodesText([show("s1")], { s1: many(20) }, queue)
+      const keys = Object.keys(JSON.parse(first))
+      expect(keys).toEqual([...keys].sort())
+      expect(aheadEpisodesText([show("s1")], { s1: many(20) }, queue)).toBe(
+        first,
+      )
+    })
   })
 })

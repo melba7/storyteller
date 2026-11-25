@@ -235,14 +235,24 @@ final class PodcastStreamHead: @unchecked Sendable {
     guard let speech = AppleSpeech.makeHeadTranscriber(locale: locale) else {
       return PodcastTimeline.mark(id, "head scan: this phone has no speech recogniser")
     }
-    // The model starts loading now, while the speech model does.
-    let detector = Self.warmDetector()
-    lock.withLock { detectorVersion = detector?.version ?? "1" }
-    PodcastTimeline.mark(id, "model prewarm asked")
+    // Apple's model is asked on the head only where the show's level for it is skip; elsewhere its
+    // answers are questions, which only the full pass makes (PodcastAdFinder+Apple.swift). It
+    // starts loading now, while the speech model does.
+    let placing = PodcastAdFinder.modelPlacing(forEpisode: id)
+    let detector = placing.level == .skip ? Self.warmDetector() : nil
+    // The version of the detector the whole pass uses, also when the model is not asked here, so
+    // the list does not show the head's ads as waiting for a later pass.
+    lock.withLock {
+      detectorVersion = detector?.version ?? PodcastAdFinder.shared.detector?.version ?? "1"
+    }
+    PodcastTimeline.mark(
+      id,
+      detector == nil
+        ? "model not asked on the head: level \(placing.level.rawValue)" : "model prewarm asked")
     do {
       try await speech.prepare()
       PodcastTimeline.mark(id, "speech analyzer ready")
-      try await scan(speech, detector)
+      try await scan(speech, detector, placing)
     } catch is CancellationError {
     } catch {
       // The error's type name and case name for the diary, not its words.
@@ -251,7 +261,9 @@ final class PodcastStreamHead: @unchecked Sendable {
     await speech.finish()
   }
 
-  private func scan(_ speech: HeadTranscribing, _ warm: PrewarmableAdDetector?) async throws {
+  private func scan(
+    _ speech: HeadTranscribing, _ warm: PrewarmableAdDetector?, _ placing: ModelPlacing
+  ) async throws {
     var detector = warm
     var iterator = arrivals.makeAsyncIterator()
     var available: Int64 = 0
@@ -351,7 +363,9 @@ final class PodcastStreamHead: @unchecked Sendable {
       }
 
       let warmOne: AdDetector? = detector
-      if plan.modelSteps.contains(target), let model = warmOne ?? AppleAds.makeDetector() {
+      if placing.level == .skip, plan.modelSteps.contains(target),
+        let model = warmOne ?? AppleAds.makeDetector()
+      {
         detector = nil  // a warm session is used once
         let startedModel = Date()
         do {
@@ -359,8 +373,8 @@ final class PodcastStreamHead: @unchecked Sendable {
           let answer = try await model.findAds(in: piece)
           // At the first model step only the sure answers count (the next step hears more), except
           // for a show that usually opens with an ad.
-          modelAds = AdCleanup.run(
-            ranges: plan.counted(answer, atStep: target), transcript: transcript)
+          modelAds = placing.keep(
+            AdCleanup.run(ranges: plan.counted(answer, atStep: target), transcript: transcript))
           PodcastTimeline.mark(
             episodeId,
             "model: \(modelAds.count) ads in \(Int(Date().timeIntervalSince(startedModel) * 1000)) ms")

@@ -20,15 +20,19 @@ public struct StreamNumbers: Codable, Sendable, Equatable {
   public var ready: BarTotals?
   /// How the standard pace does at other speech speeds (nil in an older file).
   public var speeds: [Speed]?
+  /// The speech speed that the `standard` numbers were replayed at when `--speech` gave one (the
+  /// pace the phone measured). Nil when they are at the assumed standard pace.
+  public var speech: Double?
 
   public init(
     standard: BarTotals = BarTotals(), slow: BarTotals = BarTotals(), ready: BarTotals? = nil,
-    speeds: [Speed]? = nil
+    speeds: [Speed]? = nil, speech: Double? = nil
   ) {
     self.standard = standard
     self.slow = slow
     self.ready = ready
     self.speeds = speeds
+    self.speech = speech
   }
 }
 
@@ -128,17 +132,37 @@ public enum StreamScore {
     return AdBar.score(episode: episode, found: StreamReplay.asAds(found), settings: settings)
   }
 
+  /// `pace` for a show: the head scan waits for Apple's model only where the show's Apple level
+  /// is "skip", as on the phone (`PodcastStreamHead` neither asks nor waits for it at the levels
+  /// "ask" and "off"). The pace's own flag is not used.
+  static func paced(_ pace: StreamPace, tuning: ShowTuning, show: String) -> StreamPace {
+    var one = pace
+    one.waitsForModel = tuning.level(forFinder: ShowTuning.appleModel, show: show) == .skip
+    return one
+  }
+
   /// The stream numbers of the finders' row, and of the row that adds the model's answers when
   /// `models` (the answers by episode id) has any. Each reach's finders run once for an episode.
   /// `whole` is the row's ads for the whole transcript; `detect` runs its finders on a cut one.
+  /// `speech` is the speech speed the phone measured: the `standard` numbers are then replayed at
+  /// it (`StreamPace.measured`) and not at the assumed one.
+  ///
+  /// `tuning` is the Mac's settings (the built-in ones when there is no file). Each show's Apple
+  /// level decides whether its episodes wait for the model in the head scan (`paced`) and which of
+  /// the model's answers skip (`AppleModelAds.place`): at "ask" and "off" the model is neither
+  /// waited for nor used, in either row. `waiting` is how many episodes waited for it.
   public static func run(
     episodes: [TeachingEpisode], habits: ShowHabits, settings: AdSkipSettings,
-    models: [String: [FoundAd]]?, whole: (TeachingEpisode) -> [FoundAd],
-    detect: (TeachingEpisode, Transcript) -> [FoundAd]
-  ) -> (finders: StreamNumbers, withModel: StreamNumbers?) {
+    models: [String: [FoundAd]]?, tuning: ShowTuning = ShowTuning(), speech: Double? = nil,
+    whole: (TeachingEpisode) -> [FoundAd], detect: (TeachingEpisode, Transcript) -> [FoundAd]
+  ) -> (finders: StreamNumbers, withModel: StreamNumbers?, waiting: Int) {
+    let standard = speech.map { StreamPace.measured(speech: $0) } ?? .standard
     var finders = StreamNumbers()
     var withModel = models == nil ? nil : StreamNumbers()
+    var waiting = 0
     for episode in episodes {
+      let level = tuning.level(forFinder: ShowTuning.appleModel, show: episode.feed)
+      if level == .skip { waiting += 1 }
       var cache: [Double: [FoundAd]] = [:]
       let duration = episode.transcript.duration
       func local(_ reach: Double) -> [FoundAd] {
@@ -152,12 +176,12 @@ public enum StreamScore {
       }
       func at(_ pace: StreamPace, _ model: [FoundAd]?) -> BarTotals {
         bar(
-          episode: episode, habits: habits, settings: settings, pace: pace, model: model,
-          local: local)
+          episode: episode, habits: habits, settings: settings,
+          pace: paced(pace, tuning: tuning, show: episode.feed), model: model, local: local)
       }
       func both(_ model: [FoundAd]?) -> StreamNumbers {
         StreamNumbers(
-          standard: at(.standard, model), slow: at(.slow, model), ready: at(.instant, model),
+          standard: at(standard, model), slow: at(.slow, model), ready: at(.instant, model),
           speeds: sensitivitySpeeds.map {
             .init(speech: $0, bar: at(StreamPace.standard.withSpeech($0), model))
           })
@@ -165,8 +189,14 @@ public enum StreamScore {
       let plain = both(nil)
       finders.add(plain)
       guard withModel != nil else { continue }
-      withModel?.add(models?[episode.id].map { both($0) } ?? plain)
+      let used = level == .skip ? models?[episode.id] : nil
+      let skips = used.map {
+        AppleModelAds.place($0, level: level, tuning: tuning, show: episode.feed).skip
+      }
+      withModel?.add(skips.map { both($0) } ?? plain)
     }
-    return (finders, withModel)
+    finders.speech = speech
+    withModel?.speech = speech
+    return (finders, withModel, waiting)
   }
 }

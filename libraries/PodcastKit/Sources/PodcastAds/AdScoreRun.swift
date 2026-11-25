@@ -53,6 +53,9 @@ public struct ShowScore: Codable, Sendable, Equatable {
   public var feed: String
   public var show: String
   public var total: ScoreTotals
+  /// The owner's bar for this show's episodes. Nil in a file saved before shows had one; the
+  /// Mac's settings step reads it to choose what Apple's model may do on a show.
+  public var bar: BarTotals?
 }
 
 public struct Scorecard: Codable, Sendable, Equatable {
@@ -117,13 +120,16 @@ public enum AdScoreRun {
     var scores = [[EpisodeScore]](repeating: [], count: each.count)
     var seconds: [String: Double] = [:]  // the show seconds of each episode, by id
     var bars = [BarTotals](repeating: BarTotals(), count: each.count)
+    var showBars = [[String: BarTotals]](repeating: [:], count: each.count)  // by feed
     for episode in episodes {
       let whole = detect(episode, episode.transcript)
       var made = each.map {
         AdScore.score(episode: episode, found: ads(whole, $0), settings: settings)
       }
       for row in each {
-        bars[row] += AdBar.score(episode: episode, found: ads(whole, row), settings: settings)
+        let bar = AdBar.score(episode: episode, found: ads(whole, row), settings: settings)
+        bars[row] += bar
+        showBars[row][episode.feed, default: BarTotals()] += bar
       }
       let openings = AdScore.openings(episode, settings)
       if !openings.isEmpty {
@@ -143,6 +149,7 @@ public enum AdScoreRun {
     return each.map { row in
       var made = card(scores[row], seconds: seconds)
       made.bar = bars[row]
+      for index in made.shows.indices { made.shows[index].bar = showBars[row][made.shows[index].feed] }
       return made
     }
   }

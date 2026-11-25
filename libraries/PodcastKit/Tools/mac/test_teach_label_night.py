@@ -191,6 +191,13 @@ class MainTests(unittest.TestCase):
         self.assertIn("$95.00", text)
         self.assertIn("120 hours", text)
 
+    def test_marking_at_any_hour_says_so_and_not_a_window_of_no_hours(self):
+        teaching = Teaching(self, 1)
+        self.main(teaching, "--between", "0-24", "--wait-hours", "120", "--cap", "95")
+        text = "\n".join(self.said)
+        self.assertIn("at any hour", text)
+        self.assertNotIn("00:00 and 00:00", text)
+
     def test_the_opening_message_is_as_before_without_the_new_options(self):
         teaching = Teaching(self, 1)
         self.main(teaching)

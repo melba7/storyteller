@@ -1,9 +1,10 @@
 // LOFI-FORK: the Storyteller Lofi fork's podcasts module (see FORK.md).
 //
 // What the Mac taught the phone, kept in `Podcasts/teaching/`: the small model, the library of
-// ads, the shows' habits, the table of feeds and the sounds. It is read the first time something
-// asks and again after each install, only from a background task: the head scan, the ad finder
-// and the module's own async functions. A missing or broken file is simply nothing taught.
+// ads, the shows' habits, the table of feeds, the Mac's marks of the night before (and the table
+// of episodes that tells which episode is which mark) and the sounds. It is read the first time
+// something asks and again after each install, only from a background task: the head scan, the
+// ad finder and the module's own async functions. A missing or broken file is simply nothing taught.
 // The rules (the shapes of the files, the table, the state) are PodcastAds and PodcastAudioMatch.
 import Foundation
 import PodcastAds
@@ -23,10 +24,13 @@ final class PodcastTeaching: @unchecked Sendable {
   private struct Taught {
     var files: TeachingFiles
     var sounds: AdSoundLibrary
+    /// What the app told of its episodes (guid, feed, title), to find an episode's Mac marks.
+    var episodes: [String: AheadEpisodes.Facts]
   }
 
   private let lock = NSLock()
   private var taught: Taught?
+  private var passes: AheadPasses?
   private var soundsInstallCount = 0
 
   private init() {}
@@ -47,7 +51,8 @@ final class PodcastTeaching: @unchecked Sendable {
       let folder = Self.folder
       let loaded = Taught(
         files: TeachingFiles.load(folder: folder, now: Date(), shows: TeachingShows.load(from: folder)),
-        sounds: AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName)))
+        sounds: AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName)),
+        episodes: AheadEpisodes.load(from: folder))
       taught = loaded
       return loaded
     }
@@ -97,6 +102,61 @@ final class PodcastTeaching: @unchecked Sendable {
         return false
       }
     }
+  }
+
+  /// The Mac's marks of the night before for an episode of the app (`ahead-ads.json`, found by the
+  /// episode's guid, or its feed and title, from the table the app sent), or nil.
+  func aheadEntry(episode: String, now: Date = Date()) -> AheadEntry? {
+    let taught = read()
+    return taught.files.aheadEntry(episode: episode, table: taught.episodes, now: now)
+  }
+
+  /// Saves what the app knows of its episodes (`{"<episode id>": {"feed", "guid", "title"}}`). A
+  /// text that is not such an object, or a table that is the one saved already, changes nothing.
+  /// True when the table changed. The files already read stay; only their table is replaced.
+  func setAheadEpisodes(json: String) -> Bool {
+    guard let table = AheadEpisodes.parse(json) else { return false }
+    return lock.withLock {
+      guard table != AheadEpisodes.load(from: Self.folder) else { return false }
+      do {
+        try AheadEpisodes.save(table, to: Self.folder)
+        taught?.episodes = table
+        return true
+      } catch {
+        NSLog("Podcasts: the table of episodes could not be saved: \(error)")
+        return false
+      }
+    }
+  }
+
+  // MARK: What the ahead finder has looked at
+
+  /// Whether the ahead finder has not looked at this episode yet with marks made at `marked`.
+  func aheadPassNeeded(episode: String, marked: Double) -> Bool {
+    lock.withLock { passesLoaded().needs(episode: episode, marked: marked) }
+  }
+
+  /// Notes that the ahead finder looked at this episode with marks made at `marked`, so the pass is
+  /// not made again at the next start, and is made when newer marks come.
+  func recordAheadPass(episode: String, marked: Double) {
+    lock.withLock {
+      var current = passesLoaded()
+      current.record(episode: episode, marked: marked)
+      passes = current
+      do {
+        try current.save(to: Self.folder)
+      } catch {
+        NSLog("Podcasts: the record of the Mac's marks could not be saved: \(error)")
+      }
+    }
+  }
+
+  /// The record, read when it has not been. Called with the lock held.
+  private func passesLoaded() -> AheadPasses {
+    if let passes { return passes }
+    let loaded = AheadPasses.load(from: Self.folder)
+    passes = loaded
+    return loaded
   }
 
   /// `getTeachingState()`: the installed files, the model's numbers and how much was taught.

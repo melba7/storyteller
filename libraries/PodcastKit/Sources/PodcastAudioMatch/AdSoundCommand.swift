@@ -5,6 +5,9 @@ public enum AdSoundCommand {
   /// What the owner needs to know about a run.
   private struct Tally {
     var read = 0
+    var banked = 0  // learned from the sound bank, because the audio is gone
+    var saved = 0  // sound-bank files written
+    var notSaved = 0  // sound-bank files that could not be written
     var noAudio = 0
     var notMP3 = 0
     var noLabel = 0
@@ -29,6 +32,8 @@ public enum AdSoundCommand {
 
   /// `<teaching folder> [--labels NAME]`. Writes `ad-sounds.json` into the folder and says what it
   /// did through `say`. Returns 0 when it worked (also with nothing to do) and 2 for a set-up problem.
+  /// What it learns from each episode is also kept in `sound-bank/<id>.json`, and an episode whose
+  /// audio is gone is learned from that file, so the audio can be deleted without losing sounds.
   public static func run(_ arguments: [String], say: (String) -> Void = { print($0) }) -> Int32 {
     var folderPath: String?
     var labels = "labels"
@@ -66,8 +71,15 @@ public enum AdSoundCommand {
       }
       // The sealed exam never teaches anything.
       if exam.contains(id) { continue }
+      // An episode whose audio was deleted to free disk space has `file` null in the list (teach_free.py).
       guard let file = episode["file"] as? String else {
-        tally.noAudio += 1
+        if let kept = SoundBank.load(episode: id, in: folder) {
+          tally.banked += 1
+          tally.stretches += kept.count
+          builder.add(episode: id, stretches: kept)
+        } else {
+          tally.noAudio += 1
+        }
         continue
       }
       guard safe(file), URL(fileURLWithPath: file).pathExtension.lowercased() == "mp3" else {
@@ -77,7 +89,13 @@ public enum AdSoundCommand {
       let audio = folder.appendingPathComponent(file)
       let label = folder.appendingPathComponent(labels).appendingPathComponent(id + ".json")
       guard FileManager.default.fileExists(atPath: audio.path) else {
-        tally.noAudio += 1
+        if let kept = SoundBank.load(episode: id, in: folder) {
+          tally.banked += 1
+          tally.stretches += kept.count
+          builder.add(episode: id, stretches: kept)
+        } else {
+          tally.noAudio += 1
+        }
         continue
       }
       guard FileManager.default.fileExists(atPath: label.path) else {
@@ -99,11 +117,13 @@ public enum AdSoundCommand {
       }
       tally.read += 1
       tally.stretches += marked.count
-      builder.add(episode: id, frames: frames, marked: marked)
+      let slices = AdSoundBuilder.slice(frames: frames, marked: marked)
+      keep(slices, episode: id, in: folder, labels: labels, &tally)
+      builder.add(episode: id, stretches: slices)
     }
 
     report(tally, say)
-    guard tally.read > 0 else {
+    guard tally.read + tally.banked > 0 else {
       say("Nothing to do: no episode has both an MP3 file and a label.")
       return 0
     }
@@ -126,8 +146,24 @@ public enum AdSoundCommand {
     return 0
   }
 
+  /// Writes the sound-bank file of an episode when it is missing or different. A file that cannot
+  /// be written is counted and said, but does not stop the learning.
+  private static func keep(
+    _ stretches: [BankedStretch], episode: String, in folder: URL, labels: String, _ tally: inout Tally
+  ) {
+    do {
+      if try SoundBank.save(stretches, episode: episode, in: folder, labels: labels) { tally.saved += 1 }
+    } catch {
+      tally.notSaved += 1
+    }
+  }
+
   private static func report(_ tally: Tally, _ say: (String) -> Void) {
     say("Read \(count(tally.read, "episode")).")
+    if tally.banked > 0 {
+      let summaries = count(tally.banked, "saved summary", plural: "saved summaries")
+      say("Learned from \(summaries), \(tally.banked == 1 ? "its" : "their") audio is gone.")
+    }
     let skipped = [
       (tally.noAudio, "with no audio"), (tally.notMP3, tally.notMP3 == 1 ? "that is not MP3" : "that are not MP3"),
       (tally.noLabel, "with no label"), (tally.unreadable, "that could not be read"),
@@ -136,6 +172,11 @@ public enum AdSoundCommand {
       say("Skipped \(count(number, "episode")) \(reason).")
     }
     say("Looked at \(count(tally.stretches, "marked stretch", plural: "marked stretches")).")
+    if tally.read > 0 { say("Saved \(count(tally.saved, "sound-bank file")).") }
+    if tally.notSaved > 0 {
+      let files = count(tally.notSaved, "sound-bank file")
+      say("Could not save \(files), so keep the audio of \(tally.notSaved == 1 ? "that episode" : "those episodes").")
+    }
   }
 
   private static func count(_ number: Int, _ noun: String, plural: String? = nil) -> String {

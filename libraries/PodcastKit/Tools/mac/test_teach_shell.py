@@ -9,6 +9,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -22,7 +23,10 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Gather more episodes for teaching.command",
              "Mark the new episodes at night.command",
              "Gather the exam episodes.command",
-             "Ask Apple's model about the test episodes.command"]
+             "Ask Apple's model about the test episodes.command", "teach-ahead.sh",
+             "Install nightly read-ahead.command", "Stop nightly read-ahead.command",
+             "Back up the teaching marks.command", "Start another big run.command",
+             "Gather deeper and mark tonight.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
@@ -31,7 +35,7 @@ script="$(basename "$1")"
 shift
 echo "python3 $script $*" >> "$CALLS"
 # The counting helpers are run for real when the test gives the real python3 (REAL_PYTHON).
-case "$script" in teach_exam.py|teach_failures.py)
+case "$script" in teach_exam.py|teach_failures.py|teach_backup.py)
   [ -n "$REAL_PYTHON" ] && exec "$REAL_PYTHON" "$TOOLS/$script" "$@" ;;
 esac
 case " $FAIL " in *" $script "*) echo "$script: pretending to fail"; exit 1 ;; esac
@@ -54,6 +58,7 @@ done
 case " $NOOP " in *" $script "*) echo "$script: nothing to do"; exit 0 ;; esac
 mkdir -p "$folder"
 case "$script" in
+  teach_backup.py) echo "teaching-2026-11-25-0430.tar.gz: written. 1 files, 1.0 KB, in somewhere." ;;
   teach_habits.py) echo "$RANDOM$RANDOM" > "$folder/habits.json" ;;
   teach_train.py) echo "$RANDOM$RANDOM" > "$folder/ad-model.json" ;;
   teach_library.py) echo "$RANDOM$RANDOM" > "$folder/ad-library.json" ;;
@@ -212,7 +217,8 @@ class Setup(unittest.TestCase):
 
 
 # The model step comes after the build of podcast-teach, which fits its weights (--fit-tool).
-FINISH_ORDER = ["python3 teach_habits.py", "swift build -c release --product podcast-teach",
+BACKUP = "python3 teach_backup.py make --check"
+FINISH_ORDER = [BACKUP, "python3 teach_habits.py", "swift build -c release --product podcast-teach",
                 "swift build -c release --show-bin-path", "python3 teach_train.py",
                 "python3 teach_library.py", "podcast-teach sounds",
                 "podcast-teach meaning", "podcast-teach joints", "podcast-teach score",
@@ -260,7 +266,7 @@ class FinishTests(Setup):
         done = self.run_script("teach-finish.sh")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), FINISH_ORDER)
-        for line in ("Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
+        for line in ("Backup: worked", "Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
                      "Meaning: worked", "Joints: worked", "Score: worked", "Settings: worked", "Publish: worked"):
             self.assertIn("  " + line, done.stdout)
         for number in range(1, 9):
@@ -270,7 +276,7 @@ class FinishTests(Setup):
         done = self.run_script("teach-finish.sh")
         summary = done.stdout[done.stdout.index("Summary:"):]
         labels = re.findall(r"^  (\w+): ", summary, re.M)
-        self.assertEqual(labels, ["Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+        self.assertEqual(labels, ["Backup", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
                                   "Score", "Settings", "Publish"])
 
     def test_the_podcast_teach_tools_get_the_teaching_folder(self):
@@ -292,7 +298,8 @@ class FinishTests(Setup):
         self.assertIn("  Publish: worked", done.stdout)
 
     def test_every_step_may_fail_without_stopping_the_next(self):
-        for failing, label in (("teach_habits.py", "Habits"), ("teach_library.py", "Library"),
+        for failing, label in (("teach_backup.py", "Backup"), ("teach_habits.py", "Habits"),
+                               ("teach_library.py", "Library"),
                                ("podcast-teach-sounds", "Sounds"), ("podcast-teach-meaning", "Meaning"),
                                ("podcast-teach-joints", "Joints"), ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
             open(self.calls, "w").close()
@@ -300,6 +307,41 @@ class FinishTests(Setup):
             self.assertEqual(done.returncode, 0, failing)
             self.assertEqual(self.short(), FINISH_ORDER, failing)
             self.assertIn("  %s: failed" % label, done.stdout)
+
+    def test_the_backup_is_the_first_step_and_costs_no_claude_usage(self):
+        self.run_script("teach-finish.sh")
+        self.assertEqual(self.short()[0], BACKUP)
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        self.assertEqual(self.called()[1], "python3 teach_backup.py make --check --folder " + folder)
+        self.assertFalse([c for c in self.called() if "teach_label.py" in c or c.startswith("claude")])
+
+    def test_a_failing_backup_is_said_plainly_and_every_later_step_still_runs(self):
+        done = self.run_script("teach-finish.sh", FAIL="teach_backup.py")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(self.short(), FINISH_ORDER)
+        self.assertIn("  Backup: failed", done.stdout)
+        self.assertIn("Backup did not work (see above). The steps after it still run.", done.stdout)
+        self.assertIn("  Habits: worked", done.stdout)
+        self.assertIn("  Publish: worked", done.stdout)
+        self.assertIn("Backup did not work", self.log())
+
+    def test_a_backup_that_made_nothing_new_is_nothing_to_do(self):
+        done = self.run_script("teach-finish.sh", NOOP="teach_backup.py")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("  Backup: nothing to do", done.stdout)
+
+    def test_the_real_backup_tool_takes_the_arguments_and_leaves_a_checked_backup(self):
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        os.makedirs(os.path.join(folder, "labels"))
+        with open(os.path.join(folder, "labels", "a.json"), "w") as f:
+            f.write('{"ads": []}')
+        done = self.run_script("teach-finish.sh", REAL_PYTHON=sys.executable, TEACH_TOOLS=HERE, TOOLS=HERE)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertIn("  Backup: worked", done.stdout)
+        self.assertIn("is whole", done.stdout)
+        backups = os.path.join(self.home, "Storyteller Lofi", "PodcastTeachingBackups")
+        self.assertRegex(" ".join(os.listdir(backups)), r"^teaching-\d{4}-\d\d-\d\d-\d{4}\.tar\.gz$")
+        self.assertIn("is whole", self.log())
 
     def test_a_failing_publish_exits_1(self):
         done = self.run_script("teach-finish.sh", FAIL="teach_publish.py")
@@ -310,7 +352,7 @@ class FinishTests(Setup):
     def test_when_the_build_fails_both_swift_steps_are_left_out_and_publish_still_runs(self):
         done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
         self.assertEqual(done.returncode, 0, done.stdout)
-        self.assertEqual(self.short(), ["python3 teach_habits.py",
+        self.assertEqual(self.short(), [BACKUP, "python3 teach_habits.py",
                                         "swift build -c release --product podcast-teach",
                                         "python3 teach_train.py", "python3 teach_library.py",
                                         "python3 teach_settings.py", "python3 teach_publish.py"])
@@ -418,7 +460,7 @@ class CommandTests(Setup):
         done = self.run_script(self.MARK, CODES="teach_label.py=2")
         self.assertEqual(done.returncode, 2)
         self.assertIn("the steps after marking did not run", done.stdout)
-        self.assertEqual([c.split()[1] for c in self.called()], ["teach_label.py"])
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_backup.py", "teach_label.py"])
 
     def test_marking_that_worked_runs_the_steps_after_it(self):
         done = self.run_script(self.MARK)
@@ -432,7 +474,22 @@ class CommandTests(Setup):
 
     def test_not_typing_yes_runs_nothing_after_it(self):
         self.run_script(self.MARK, CODES="teach_label.py=4")
-        self.assertEqual([c.split()[1] for c in self.called()], ["teach_label.py"])
+        self.assertEqual([c.split()[1] for c in self.called()], ["teach_backup.py", "teach_label.py"])
+
+    def test_what_is_marked_so_far_is_backed_up_before_more_is_marked(self):
+        done = self.run_script(self.MARK)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        self.assertEqual(self.called()[0], "python3 teach_backup.py make --check --folder " + folder)
+        self.assertEqual(self.called()[1].split()[1], "teach_label.py")
+        self.assertIn("teaching-2026-11-25-0430.tar.gz: written.", self.log())
+
+    def test_a_backup_that_fails_before_marking_is_one_plain_line_and_the_marking_goes_on(self):
+        done = self.run_script(self.MARK, FAIL="teach_backup.py")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertEqual(done.stdout.count("The backup did not work (see above). The marking goes on without it."), 1)
+        self.assertIn("teach_label.py", " ".join(self.called()))
+        self.assertIn("python3 teach_publish.py", " ".join(self.called()))
 
     def test_teaching_again_says_so_and_stops_when_a_run_is_busy(self):
         done = self.run_script(self.AGAIN, BUSY="1")

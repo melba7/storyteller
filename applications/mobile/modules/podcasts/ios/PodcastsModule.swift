@@ -303,6 +303,11 @@ public final class PodcastsModule: Module {
     AsyncFunction("listDownloads") { () -> [[String: Any]] in
       (PodcastDownloader.shared.store?.entries() ?? []).map(DownloadJSON.object)
     }
+    // Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never
+    // off Wi-Fi). The app asks when it comes to the front and in the background refresh.
+    AsyncFunction("lookAhead") { () async in
+      await MainActor.run { PodcastDownloadAhead.shared.look() }
+    }
     // Bytes taken by finished downloads.
     AsyncFunction("storageUsed") { () -> Double in
       Double(PodcastDownloader.shared.store?.storageUsed() ?? 0)
@@ -351,7 +356,8 @@ public final class PodcastsModule: Module {
     // MARK: Teaching
 
     // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json, ad-sounds.json,
-    // ad-meaning.json or show-settings.json) when its SHA-256 is right and it reads as that file.
+    // ad-meaning.json, show-settings.json or ahead-ads.json) when its SHA-256 is right and it reads
+    // as that file.
     // True when it was kept; the episodes are looked at again then.
     AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in
       let kept = PodcastTeaching.shared.install(name: name, text: text, sha256: sha256)
@@ -362,6 +368,12 @@ public final class PodcastsModule: Module {
     // the app does.
     AsyncFunction("setTeachingShows") { (json: String) in
       if PodcastTeaching.shared.setShows(json: json) { PodcastAdFinder.shared.teachingChanged() }
+    }
+    // What the app knows of its episodes, `{"<episode id>": {"feed", "guid", "title"}}`, so the
+    // Mac's marks of the night before (named by guid, or by feed and title) find their episode. A
+    // new table makes the finder look at the episodes whose ads are final once more.
+    AsyncFunction("setAheadEpisodes") { (json: String) in
+      if PodcastTeaching.shared.setAheadEpisodes(json: json) { PodcastAdFinder.shared.lookAhead() }
     }
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }

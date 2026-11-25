@@ -70,13 +70,13 @@ public struct TeachingFolderError: Error, LocalizedError, Equatable {
 
 /// Reads one value of a list and keeps nil when it is of the wrong shape, so one bad entry does
 /// not fail the whole list.
-private struct Lossy<Value: Decodable>: Decodable {
+struct Lossy<Value: Decodable>: Decodable {
   var value: Value?
   init(from decoder: Decoder) throws { value = try? Value(from: decoder) }
 }
 
 /// A segment of a label file. Any field of the wrong type is nil.
-private struct LabelSegment: Decodable {
+struct LabelSegment: Decodable {
   var sort: String?
   var start: Double?
   var end: Double?
@@ -93,7 +93,7 @@ private struct LabelSegment: Decodable {
   }
 }
 
-private struct LabelFile: Decodable { var segments: [Lossy<LabelSegment>] }
+struct LabelFile: Decodable { var segments: [Lossy<LabelSegment>] }
 
 public enum TeachingFolder {
   /// How long the last line of a text file lasts when the episode's length is not known.

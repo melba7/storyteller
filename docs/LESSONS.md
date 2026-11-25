@@ -195,3 +195,43 @@ One line per lesson.
 - The trainer's built-in loop could not match the reference fit on version 2
   features, so a weakened test crept in. Keep the old path writing the old file
   and never loosen a test to fit a new path (2026-11-23).
+- A remote session said the Mac's permission check had refused to start the
+  TestFlight build, but the build had started and uploaded. Read the logs on the
+  Mac before offering another way to start a job: a second start would have run
+  two builds at once (2026-11-23).
+- Apple's on-device model made the phone worse when the scorecard finally scored
+  it (2026-11-24): never leave a finder on skip without its own scorecard row,
+  and say which finders a number leaves out. I told Mo 64% before the Apple row
+  was scored.
+- Python tests need 15 GB free disk (teach_collect's keep-free default): they
+  failed at 14 GB after Docker volumes piled up. Prune unused volumes before a
+  full check (2026-11-24).
+- Two builders that add a file with the same name to two branches make an
+  add/add conflict at the merge: tell each builder its own test file names, and
+  read the merged tests by hand (2026-11-24).
+- A tool a builder changed in one branch (teach_publish.py's list of files)
+  changes tests in another: after a merge, run the whole Python suite, not just
+  the new files (2026-11-24).
+- Docker run logs in the scratchpad lag: read the exit line, not the tail. A
+  `for ... in infiniteSequence where cond` loop never ends: run swift test with
+  a timeout (2026-11-24).
+- A lock held around a job whose tools take the same lock themselves refuses
+  them all, because flock belongs to each opened copy of the file: the nightly
+  read-ahead would have done nothing every night and logged "skipped". Its shell
+  test used stubs and missed it. `hold` now tells the tools it started by the
+  environment (`TEACH_LOCK_HELD`), and a test runs the real tool under it. Test
+  the real tool, not a stub, wherever a lock or a file handle crosses a process
+  (2026-11-24).
+- Marks that cost $90 had no backup until Mo asked twice; a step that spends
+  money needs a backup of what it buys (2026-11-25).
+- A cleanup that deletes audio was designed first as "delete what has a
+  transcript and marks"; the independent check found that the ad sounds and the
+  second-download comparison still learn from the audio, so deleting would have
+  shrunk the library. Before deleting an input, list every step that reads it
+  (2026-11-25).
+- The sound bank was first tested with the audio file gone but the list entry
+  intact; the cleanup sets `file` to null, and the sounds step skipped such
+  entries. Test the exact state the deleting tool leaves behind (2026-11-25).
+- A launcher's `read -p "message"` prints nothing when its input is not a
+  terminal, so a test never saw the closing message. Print messages with `echo`
+  and keep `read` for the Return key only (2026-11-25).

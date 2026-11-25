@@ -1,6 +1,10 @@
 #!/bin/bash
 # Not double-clicked: the other teaching files call it. It does the steps after the ads are marked,
 # in this order:
+#   backup (teach_backup.py)  first of all: a copy of the marks, transcripts, second-download copies
+#                                    and the small JSON files in ~/Storyteller Lofi/PodcastTeachingBackups
+#                                    (the newest 14 are kept), checked at once. It costs no Claude
+#                                    usage; when it fails that is said and every step below still runs
 #   0. snap     (teach_snap.py)      only when the folder copies/ (second downloads) or
 #                                    labels-snapped/ exists: moves the borders of Claude's labels
 #                                    onto what the two downloads differ in, into labels-snapped/.
@@ -100,7 +104,14 @@ run_step() {
   return 0
 }
 
-echo "=== $(date '+%Y-%m-%d %H:%M') finish: habits, model, library, sounds, meaning, score, settings, publish ===" >> "$LOG"
+echo "=== $(date '+%Y-%m-%d %H:%M') finish: backup, habits, model, library, sounds, meaning, score, settings, publish ===" >> "$LOG"
+
+# Backup, before anything below changes the folder: the marks may have cost a lot of money and are
+# kept nowhere else. teach_backup.py only reads the folder and takes no lock of its own. When it
+# fails (or the new file does not check out) that is said and the steps below still run.
+say "First: backing up the marks and transcripts"
+run_step "Backup" "-" python3 -u "$TOOLS/teach_backup.py" make --check --folder "$FOLDER"
+say
 
 # Step 0: when second downloads were compared (copies/), or labels-snapped/ is there from an earlier
 # run, bring labels-snapped up to date: Claude's label borders are moved onto the second downloads and

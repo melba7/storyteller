@@ -8,15 +8,20 @@ import Foundation
 //
 //   {"version": 1, "writtenAt": 1700000000,
 //    "default": {"finders": {"own-sound": "skip", "repeat-sound": "ask", "repeat-words": "ask",
-//                            "meaning": "skip"}, "joints": true, "steadyJoints": false, "ask": 0.35},
+//                            "meaning": "skip", "apple-model": "ask"}, "joints": true,
+//                "steadyJoints": false, "ask": 0.35},
 //    "shows": [{"feed": "<feed address>", "finders": {"repeat-words": "skip"},
 //               "sorts": {"host_ask": "ask"}, "joints": false}]}
 //
-// Finder names are "own-sound", "repeat-sound", "repeat-words" and "meaning"; sort names are the
-// word model's classes ("sponsor", "network_promo", "host_ask", "intro_credits"); the levels are
-// "skip", "ask" and "off". Any other name or level is ignored. A show is named by its feed address
-// and turned into the app's show id when the file is read. A show entry overrides the default
-// block key by key, and the default block overrides the built-in default key by key.
+// Finder names are "own-sound", "repeat-sound", "repeat-words", "meaning", "apple-model" (Apple's
+// on-device model, which asks by default: its answers are questions, never skips, unless the file
+// says "skip" for a show or for every show) and "ahead" (the Mac's marks of the night before, which
+// skips by default; the Mac's teach_settings.py does not choose it yet); sort names are the word model's classes ("sponsor",
+// "network_promo", "host_ask", "intro_credits"); the levels are "skip", "ask" and "off". Any other
+// name or level is ignored, so a build that does not know "apple-model" reads the same file and the
+// file stays version 1. A show is named by its feed address and turned into the app's show id when
+// the file is read. A show entry overrides the default block key by key, and the default block
+// overrides the built-in default key by key.
 //
 // HOW THE PHONE USES IT. The phone takes the STRICTER of the finder guard's mode and the mode
 // here (`stricter`: off before ask before skip), so a finder the guard has silenced stays
@@ -33,7 +38,13 @@ import Foundation
 // and `repeatSound` are used as they are. `repeatWords` and `meaning` repeat the strings of
 // `RepeatedWords.source` and the meaning model's `MeaningAds.source`, which are in other packages
 // of this round and cannot be imported here; the wiring package must check that they are equal.
-// A finder whose `source` is not one of the four is not held back by finder levels.
+// `appleModel` is the `source` of Apple's model's ads: `AppleAnswers.ads(for:)` (the scorecard) and
+// `ModelPlacing` (the phone) both use it, through `AppleModelAds.source`. A finder whose `source`
+// is not one of the five is not held back by finder levels.
+//
+// APPLE'S MODEL is an older finder, whose ads are in the ads files before the new finders run, so
+// its level is applied where the model's ads are made (`ModelPlacing`, `AdsRunner`, the stream's
+// head scan), still before any join. See AppleModelAds.swift.
 
 /// The Mac's settings for each show, read from `show-settings.json`.
 public struct ShowTuning: Sendable, Equatable {
@@ -46,7 +57,11 @@ public struct ShowTuning: Sendable, Equatable {
   public static let repeatSound = "repeat-sound"
   public static let repeatWords = "repeat-words"
   public static let meaning = "meaning"
-  public static let finderNames = [ownSound, repeatSound, repeatWords, meaning]
+  public static let appleModel = "apple-model"
+  /// The Mac's marks of the night before, found again by their words (`AheadAds`). It skips unless
+  /// the file says otherwise: the marks are Claude's own, and nothing is found without them.
+  public static let ahead = "ahead"
+  public static let finderNames = [ownSound, repeatSound, repeatWords, meaning, appleModel, ahead]
   /// The word model's classes, which the file can set for each kind of ad.
   public static let sortNames = ["sponsor", "network_promo", "host_ask", "intro_credits"]
   public static let defaultAsk = 0.35
@@ -72,7 +87,10 @@ public struct ShowTuning: Sendable, Equatable {
 
   /// What the phone does when there is no file: the Mac's default block.
   static let builtIn = Choices(
-    finders: [ownSound: .skip, repeatSound: .ask, repeatWords: .ask, meaning: .skip],
+    finders: [
+      ownSound: .skip, repeatSound: .ask, repeatWords: .ask, meaning: .skip, appleModel: .ask,
+      ahead: .skip,
+    ],
     sorts: [:], joints: true, steadyJoints: false)
 
   /// The built-in default with the file's default block on top.
@@ -87,7 +105,7 @@ public struct ShowTuning: Sendable, Equatable {
 
   // MARK: Asking
 
-  /// What `finder` may do on `show`. A name that is not one of the four is not held back.
+  /// What `finder` may do on `show`. A name that is not one of the five is not held back.
   public func level(forFinder finder: String, show: String) -> FinderMode {
     shows[show]?.finders[finder] ?? base.finders[finder] ?? .skip
   }
@@ -125,7 +143,7 @@ public struct ShowTuning: Sendable, Equatable {
   /// Sorts `ads` for `show`. Call it on one finder's own list, before `AdJoin` (see the header). An
   /// ad whose finder (`source`) or sort is off is dropped; one whose finder or sort only asks goes
   /// to `ask`, the rest to `skip`; the stricter of the two levels decides. An ad with no source,
-  /// or the source of something that is not one of the four finders ("tap"), is not touched by
+  /// or the source of something that is not one of the five finders ("tap"), is not touched by
   /// finder levels. Order and ads are kept as they were.
   public func apply(to ads: [FoundAd], show: String) -> (skip: [FoundAd], ask: [FoundAd]) {
     var skip: [FoundAd] = []

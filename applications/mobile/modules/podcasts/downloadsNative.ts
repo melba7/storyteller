@@ -24,6 +24,14 @@ export async function startDownload(
   await Podcasts?.download(episodeId, url, type, automatic, language, showId)
 }
 
+/**
+ * Has the phone look at Up Next now and fetch the next episodes ahead, which it never does off
+ * Wi-Fi. The rule is native (DownloadAhead); this only asks for a look.
+ */
+export async function lookAhead(): Promise<void> {
+  await Podcasts?.lookAhead()
+}
+
 export async function cancelDownload(episodeId: string): Promise<void> {
   await Podcasts?.cancelDownload(episodeId)
 }

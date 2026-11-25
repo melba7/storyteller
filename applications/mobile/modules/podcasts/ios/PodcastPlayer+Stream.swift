@@ -63,6 +63,18 @@ extension PodcastPlayer {
     return AVPlayerItem(asset: loader.makeAsset())
   }
 
+  /// Play started (`startPlaying`): the play diary notes how the episode stands, a stream or a
+  /// download with its ads finished or not (PlayDiary), once for each episode that is played.
+  /// Only a start in the first minute counts, which is the kind the stream replay models: a
+  /// resume later in the episode, often after the app was closed, would always look ready. The
+  /// listener's own imported files (ids start with "file-") have no ads to find and do not count.
+  func notePlayStart() {
+    guard let id = current?.id, !id.hasPrefix("file-") else { return }
+    guard (seekPending ? seekTarget : position) < 60 else { return }
+    PodcastTimeline.playStarted(
+      id, isStream: streamDownload != nil || playsPlainAddress, duration: currentDuration)
+  }
+
   /// Playing from the download does not work (the server refused it or sends no length, or the
   /// listener removed it): the same place plays from the episode's plain address instead.
   func fallBackToStream(from loader: PodcastStreamDownload, reason: StreamFallback) {

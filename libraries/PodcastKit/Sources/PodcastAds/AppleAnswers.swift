@@ -52,7 +52,7 @@ public struct AppleAnswers: Codable, Sendable, Equatable {
     episodes[id]?.ads.filter { $0.start.isFinite && $0.end.isFinite && $0.end > $0.start }.map {
       FoundAd(
         start: $0.start, end: $0.end, kind: $0.kind, advertiser: "", confidence: $0.confidence,
-        firstWords: "", source: "apple-model")
+        firstWords: "", source: AppleModelAds.source)
     }
   }
 

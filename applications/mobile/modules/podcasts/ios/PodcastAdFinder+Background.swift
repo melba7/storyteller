@@ -91,6 +91,8 @@ extension PodcastAdFinder {
       scan()
       let running = lock.withLock { worker }
       await running?.value
+      // The look for the Mac's marks in the episodes that are done is quick: it ends with the turn.
+      await lock.withLock({ aheadWorker })?.value
       lock.withLock { inBackgroundTask = false }
       let left = hasWork
       if left { askForBackgroundTime(force: true) }

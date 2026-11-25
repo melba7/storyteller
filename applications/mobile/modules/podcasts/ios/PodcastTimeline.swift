@@ -8,7 +8,7 @@
 //
 // Every mark is also a line in the ad finder's diary (`ad-diary.jsonl`, see PodcastSkipLog.swift
 // and `AdDiary` in PodcastAds), for any episode and with or without a tap, so "Send skip log"
-// can say what the head scan and the model did.
+// can say what the head scan and the model did. A play that starts is a line in the play diary.
 import Foundation
 import os
 
@@ -17,6 +17,20 @@ enum PodcastTimeline {
   private static let lock = NSLock()
   private static var taps: [String: Date] = [:]
   private static var skipped: Set<String> = []
+  /// The episode whose play was last noted in the play diary, so a pause and a resume of it is
+  /// one play.
+  private static var lastPlayed: String?
+
+  /// Play started on `episodeId`. The first start of an episode, after another one was played, is
+  /// a line in the play diary on how it stood (ready, partly, or a stream; see `PlayDiary`).
+  static func playStarted(_ episodeId: String, isStream: Bool, duration: Double?) {
+    let isNew = lock.withLock { () -> Bool in
+      if lastPlayed == episodeId { return false }
+      lastPlayed = episodeId
+      return true
+    }
+    if isNew { SkipLogFile.appendPlayStart(episodeId, isStream: isStream, duration: duration) }
+  }
 
   /// The listener tapped Play on a stream that is fetched into a file.
   static func tap(_ episodeId: String) {

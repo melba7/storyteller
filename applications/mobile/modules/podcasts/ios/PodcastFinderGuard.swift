@@ -33,19 +33,23 @@ struct Held {
   let stop: StopFlag
 }
 
-/// The names of the new finders. Four are `ShowTuning`'s; the other two have no setting of their
-/// own beyond the sorts and `joints`.
+/// The names of the finders the guard and the settings know. Six are `ShowTuning`'s (Apple's
+/// model is the one that is not new: it only has a level of its own); the other two have no
+/// setting of their own beyond the sorts and `joints`.
 enum FinderNames {
   static let ownSound = ShowTuning.ownSound
   static let repeatSound = ShowTuning.repeatSound
   static let repeatWords = ShowTuning.repeatWords
   static let meaning = ShowTuning.meaning
+  static let appleModel = ShowTuning.appleModel
+  /// The Mac's marks of the night before, found again by their words (`AheadAds`).
+  static let ahead = ShowTuning.ahead
   static let joints = "joints"
   /// The word model's middle band, which only asks (AdAsks).
   static let wordModel = "word-model"
   /// The finders a skip or a question can come from: their answers go to the guard.
   static let answerable: Set<String> = [
-    ownSound, repeatSound, repeatWords, meaning, wordModel,
+    ownSound, repeatSound, repeatWords, meaning, appleModel, ahead, wordModel,
   ]
 }
 

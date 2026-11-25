@@ -152,7 +152,8 @@ class PublishTests(Setup):
 
     def test_nothing_to_publish_exits_0(self):
         self.assertEqual(self.main(self.one), 0)
-        self.assertEqual(len(self.messages), 6)  # one "skipped" line for each of the six files
+        self.assertEqual(len(self.messages), 6)  # one "skipped" line for each of the six files (the
+        # nightly read-ahead's file is quiet when it is absent)
         self.assertEqual(os.listdir(self.one), [])
 
     def test_an_invalid_source_is_refused_and_says_why(self):
