@@ -20,7 +20,8 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 finish() {
   echo
   echo "$1"
-  read -r -p "Press Return to close this window. " _
+  # TEACH_CHAIN=1 means "Fetch, mark and test the public transcripts" is running this step: it shows the message and carries on.
+  [ "${TEACH_CHAIN:-}" = 1 ] || read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 

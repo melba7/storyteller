@@ -91,6 +91,13 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn("Not logged in", result.stdout)
         self.assertEqual(result.returncode, 0)
 
+    def test_as_a_step_of_the_one_click_launcher_it_asks_nothing_and_does_not_wait_for_return(self):
+        result = self.run_launcher("", TEACH_CHAIN="1")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Type yes", result.stdout)
+        self.assertNotIn("Press Return", result.stdout)
+        self.assertIn("--count 500", result.stdout)
+
     def test_the_count_can_be_changed_and_a_bad_one_is_ignored(self):
         self.assertIn("--count 50", self.run_launcher("yes\n\n", TEACH_SPORC_COUNT="50").stdout)
         self.assertIn("--count 500", self.run_launcher("yes\n\n", TEACH_SPORC_COUNT="lots").stdout)

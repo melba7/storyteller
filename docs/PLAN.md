@@ -1591,11 +1591,14 @@ written here and the idea goes under Later.
      ad detection improved significantly afterwards. So the fetch takes 500
      episodes and `Mark the public transcripts.command` marks up to 500 under
      the budget `sporc-1` (cap $100). `Test the public marks.command` trains the
-     word model with and without them and compares the held-out shelf. Done
-     when: the word model's held-out precision and recall and the whole
-     pipeline's breaks passing (`podcast-teach score`, 140/131/109 before) are
-     measured with and without, and Mo has the answer. "Significantly" means the
-     round's own gate: 10 more breaks passing and at most 2 more wrong skips.
+     word model with and without them and compares the held-out shelf. Mo asked
+     for one click ("can you make it one click?"), so
+     `Fetch, mark and test the public transcripts.command` runs the three in
+     order after one typed yes. Done when: the word model's held-out precision
+     and recall and the whole pipeline's breaks passing (`podcast-teach score`,
+     140/131/109 before) are measured with and without, and Mo has the answer.
+     "Significantly" means the round's own gate: 10 more breaks passing and at
+     most 2 more wrong skips.
 
 **3. The exam**
 

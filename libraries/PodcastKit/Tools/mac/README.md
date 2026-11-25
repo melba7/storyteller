@@ -767,6 +767,18 @@ usage, downloads nothing and writes nothing into your teaching folder, the
 public folder or the model on the phone. The two models can then be scored on
 the shelf with `podcast-teach score` like any other model.
 
+`Fetch, mark and test the public transcripts.command` is the one-click way
+through all three: it asks for one typed yes and then runs the fetch, the
+marking and the test in that order in one window. It sets `TEACH_CHAIN=1` for
+the three launchers, which makes each one skip its own yes and its "Press
+Return" pause and, for marking, pass `--yes` to `teach_label.py` (the one yes
+and the $100 cap in the notice are what you agreed to). It stops at the first
+step that fails, tests what was marked when marking ends at the spending limit
+or with some failed episodes, and prints `COMPARE.txt` at the end. Marking takes
+many hours; if the window is closed, double-click it again and it carries on,
+because fetching adds, marking resumes under the same budget and cannot pass the
+cap, and the test runs last. The three single launchers still work alone.
+
 ### Backups
 
 Claude's marks cost about $0.19 an episode and live only in the teaching folder,
