@@ -79,5 +79,6 @@ case "$CODE" in
   0) finish "Done. The lines above say how much was freed." ;;
   1) finish "Nothing was deleted, because the backup of the marks was not good (see above). Double-click this again; if it keeps failing, tell Claude what the lines above say." 1 ;;
   3) finish "A teaching run started working in the folder meanwhile, so nothing was deleted. Double-click this again when it has finished." 3 ;;
+  4) finish "Most of it was deleted, but some files could not be (see above). Double-click this again to try those again." 4 ;;
   *) finish "It did not work (see above)." 2 ;;
 esac

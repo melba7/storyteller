@@ -1731,3 +1731,11 @@ Questions only Mo can answer:
   `docs/PODCASTS-PLAN.md`): CarPlay, Apple Watch, widgets, Live Activities, Siri
   Shortcuts, Chromecast and Sonos, video podcasts, the iPad layout, app icons,
   and sync with other devices.
+- Freeing the teaching audio (2026-11-25), found and not fixed: the scorecard's
+  own-sounds and repeated-sounds rows and `joints.json` still read the audio of
+  earlier episodes, so a Mac score after freeing has less history for them (a
+  bank for the finders' sure ads, or a rule to keep each show's newest few,
+  would close it); the freshness rule uses file times, which are exact on the
+  Mac's own disk; the launcher's look and delete are two lock takes, so the
+  delete run may free a few more episodes than the look showed (all of them meet
+  the same rules).

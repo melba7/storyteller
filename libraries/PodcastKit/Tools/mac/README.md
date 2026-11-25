@@ -643,18 +643,26 @@ includes `sound-bank/`.
 
 `Free up space from the teaching audio.command` (`teach_free.py`) then deletes
 the audio of an MP3 episode only when its transcript and its marks exist, its
-sound bank is saved and at least as new as its marks (`labels/`,
-`labels-snapped/`) and its second-download truth (the sounds step touches a bank
-it finds unchanged, so a run after the last change is enough), its second
-download was compared (`copies/<id>.truth.txt`) or given up on after three
-failures, and it is not on the shelf (`shelf.json`), in the exam (`exam.json`)
-or waiting in the nightly read-ahead (`ahead.json`). An episode that is not an
-MP3 needs no bank and no second download. The episode stays in `episodes.json`
-with `file` null, `bytes` 0 and the error `skipped: audio deleted ...`, so the
-gathering never downloads it again. An entry whose file is already gone is put
-right the same way. The shelf is chosen from transcripts and marks, so a show
-with no shelf episode yet can later get a freed one, and the score rows that
-need audio skip it: let a run train, which fills the shelf, before freeing.
+sound bank is saved, was cut from the labels the audio would be cut by
+(`labels-snapped` when that folder is there, else `labels`; the bank says which)
+and is at least as new as its marks and its second-download truth (the sounds
+step touches a bank it finds unchanged, so a run after the last change is
+enough), its second download was compared (`copies/<id>.truth.txt`) or given up
+on after three failures, and it is not on the shelf (`shelf.json`), in the exam
+(`exam.json`) or waiting in the nightly read-ahead (`ahead.json`). An episode
+that is not an MP3 needs no bank and no second download. The episode stays in
+`episodes.json` with `file` null, `bytes` 0 and the error
+`skipped: audio deleted ...`, so the gathering never downloads it again. An
+entry whose file is already gone is put right the same way. The shelf is chosen
+from transcripts and marks, so a show with no shelf episode yet can later get a
+freed one, and the score rows that need audio skip it: let a run train, which
+fills the shelf, before freeing. Two more things read the audio of earlier
+episodes and are not kept: the scorecard's "own sounds" and "repeated sounds"
+rows (they learn from the show's earlier labelled episodes when the score runs
+on the Mac) and `joints.json` for an episode whose joints were never cached. A
+Mac score after freeing has less history for those rows; the cloud score already
+runs without audio. `teach_free.py` exits 4 when some files could not be
+deleted.
 
 The launcher first shows how much would be freed and asks for a typed `yes`;
 anything else deletes nothing. When some episodes are still waiting for their

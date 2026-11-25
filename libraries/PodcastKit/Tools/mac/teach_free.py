@@ -28,7 +28,7 @@ a freed one; the score rows that need audio then skip it, and it is better to le
 It takes the folder's lock like every teaching tool, so it is refused while a gather, a writing
 down or a marking run is working. Exit codes: 0 well (also when there is nothing to free), 1 the
 backup was not good so nothing was deleted, 2 something to set right first, 3 another run is
-working in the folder.
+working in the folder, 4 some audio could not be deleted (the rest was).
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
@@ -87,7 +87,8 @@ def bank_is_saved(folder, identifier):
     """True when sound-bank/<id>.json is that episode's bank and is at least as new as the marks the
     sounds step cut it from (labels/, labels-snapped/) and the second-download truth that snapping
     uses, so the bank holds the borders the library would get from the audio. Swift writes the bank
-    and reads it again in full; this only checks whose it is, and when it was saved."""
+    and reads it again in full; this only checks whose it is, which labels it was cut from and when
+    it was saved."""
     path = os.path.join(folder, "sound-bank", identifier + ".json")
     try:
         with open(path, encoding="utf-8") as handle:
@@ -99,7 +100,12 @@ def bank_is_saved(folder, identifier):
     saved = modified(path)
     newest = [modified(os.path.join(folder, "labels", identifier + ".json")),
               modified(os.path.join(folder, "copies", identifier + ".truth.txt"))]
-    if os.path.isdir(os.path.join(folder, "labels-snapped")):
+    snapping = os.path.isdir(os.path.join(folder, "labels-snapped"))
+    # teach-finish.sh gives the steps labels-snapped when that folder is there (and the snapping
+    # worked), else Claude's own labels. The bank must come from the labels the audio would be cut by.
+    if data.get("labels") != ("labels-snapped" if snapping else "labels"):
+        return False
+    if snapping:
         snapped = modified(os.path.join(folder, "labels-snapped", identifier + ".json"))
         if snapped is None:
             return False  # the snapping has not reached this episode yet
@@ -191,6 +197,7 @@ def free_space(folder, delete, say=print, backup=teach_backup.make_backup, with_
         % (len(found) - failed, total / GB, shutil.disk_usage(folder).free / GB))
     if failed:
         say("%d could not be deleted. Run this again to try them again." % failed)
+        return 4
     return 0
 
 

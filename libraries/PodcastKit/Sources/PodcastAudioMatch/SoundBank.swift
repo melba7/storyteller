@@ -56,6 +56,10 @@ public enum SoundBank {
   private struct File: Codable {
     var version: Int
     var episode: String
+    /// The folder of labels the stretches were cut from ("labels" or "labels-snapped"). A file
+    /// without it still reads: the name only tells the cleanup in teach_free.py whether the bank
+    /// is as exact as the audio would be.
+    var labels: String?
     var stretches: [Wire]
   }
 
@@ -64,11 +68,11 @@ public enum SoundBank {
   }
 
   /// The file's bytes, with sorted keys, so the same stretches always make the same bytes.
-  public static func data(episode: String, stretches: [BankedStretch]) throws -> Data {
+  public static func data(episode: String, stretches: [BankedStretch], labels: String = "labels") throws -> Data {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     return try encoder.encode(
-      File(version: currentVersion, episode: episode, stretches: stretches.map(wire)))
+      File(version: currentVersion, episode: episode, labels: labels, stretches: stretches.map(wire)))
   }
 
   private static func wire(_ stretch: BankedStretch) -> Wire {
@@ -132,8 +136,10 @@ public enum SoundBank {
   /// as new as this run). True when it wrote the file. An episode with no
   /// stretches gets a file too, with an empty list: the file says the episode was learned.
   @discardableResult
-  public static func save(_ stretches: [BankedStretch], episode: String, in folder: URL) throws -> Bool {
-    let bytes = try data(episode: episode, stretches: stretches)
+  public static func save(
+    _ stretches: [BankedStretch], episode: String, in folder: URL, labels: String = "labels"
+  ) throws -> Bool {
+    let bytes = try data(episode: episode, stretches: stretches, labels: labels)
     let url = fileURL(episode: episode, in: folder)
     if let old = try? Data(contentsOf: url), old == bytes {
       // The same bytes, but the file is current as of now: teach_free.py frees an episode's audio only

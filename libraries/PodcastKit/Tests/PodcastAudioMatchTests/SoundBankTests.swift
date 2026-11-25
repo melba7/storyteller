@@ -162,12 +162,28 @@ final class SoundBankTests: XCTestCase {
     XCTAssertGreaterThan(modified.timeIntervalSince(old), 3000)
   }
 
+  /// The bank says which folder of labels it was cut from, so that teach_free.py can tell a bank cut
+  /// from Claude's own labels from one cut from the snapped ones.
+  func testTheFileSaysWhichLabelsItWasCutFrom() throws {
+    let stretches = [stretch(Array(0..<40))]
+    func labels(_ data: Data) throws -> String? {
+      (try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]))["labels"] as? String
+    }
+    XCTAssertEqual(try labels(SoundBank.data(episode: "abc", stretches: stretches)), "labels")
+    XCTAssertEqual(
+      try labels(SoundBank.data(episode: "abc", stretches: stretches, labels: "labels-snapped")), "labels-snapped")
+    try SoundBank.save(stretches, episode: "abc", in: folder)
+    XCTAssertTrue(try SoundBank.save(stretches, episode: "abc", in: folder, labels: "labels-snapped"))
+    XCTAssertEqual(try labels(Data(contentsOf: file)), "labels-snapped")
+    XCTAssertEqual(SoundBank.load(episode: "abc", in: folder), stretches)
+  }
+
   func testAThirtySecondAdTakesAboutEighteenKilobytes() throws {
     let frames = Int(30 / Snd.duration)
     let data = try SoundBank.data(episode: "0123456789ab", stretches: [stretch(Array(0..<frames))])
     // 12 bytes a frame, a third more as base64 text, and a few dozen bytes of JSON around it.
     XCTAssertEqual(frames, 1148)
-    XCTAssertEqual(data.count, 18_476)
+    XCTAssertEqual(data.count, 18_494)
     XCTAssertGreaterThan(data.count, frames * 12 * 4 / 3)
   }
 }

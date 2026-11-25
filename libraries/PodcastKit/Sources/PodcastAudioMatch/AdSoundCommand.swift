@@ -118,7 +118,7 @@ public enum AdSoundCommand {
       tally.read += 1
       tally.stretches += marked.count
       let slices = AdSoundBuilder.slice(frames: frames, marked: marked)
-      keep(slices, episode: id, in: folder, &tally)
+      keep(slices, episode: id, in: folder, labels: labels, &tally)
       builder.add(episode: id, stretches: slices)
     }
 
@@ -148,9 +148,11 @@ public enum AdSoundCommand {
 
   /// Writes the sound-bank file of an episode when it is missing or different. A file that cannot
   /// be written is counted and said, but does not stop the learning.
-  private static func keep(_ stretches: [BankedStretch], episode: String, in folder: URL, _ tally: inout Tally) {
+  private static func keep(
+    _ stretches: [BankedStretch], episode: String, in folder: URL, labels: String, _ tally: inout Tally
+  ) {
     do {
-      if try SoundBank.save(stretches, episode: episode, in: folder) { tally.saved += 1 }
+      if try SoundBank.save(stretches, episode: episode, in: folder, labels: labels) { tally.saved += 1 }
     } catch {
       tally.notSaved += 1
     }

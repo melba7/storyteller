@@ -34,7 +34,7 @@ class Setup(unittest.TestCase):
         with open(self.folder.path(name), "w") as handle:
             handle.write(text)
 
-    def learned(self, item, bank=True, truth=True):
+    def learned(self, item, bank=True, truth=True, cut_from="labels"):
         """Gives an episode a transcript, marks, a second-download truth and a sound bank. The bank is
         a little newer than the rest, as when the sounds step ran after the last change."""
         self.write("transcripts/%s.txt" % item["id"], transcript(5))
@@ -43,7 +43,7 @@ class Setup(unittest.TestCase):
             self.write("copies/%s.truth.txt" % item["id"], "12.0 30.0\n")
         if bank:
             self.write("sound-bank/%s.json" % item["id"], json.dumps(
-                {"version": 1, "episode": item["id"], "stretches": []}))
+                {"version": 1, "episode": item["id"], "labels": cut_from, "stretches": []}))
         self.touch(item, "transcripts/%s.txt", 0)
         self.touch(item, "labels/%s.json", 0)
         self.touch(item, "copies/%s.truth.txt", 0)
@@ -103,7 +103,7 @@ class FreeTests(Setup):
     def test_a_bank_older_than_the_marks_or_the_second_download_is_not_enough(self):
         first, second, third, fourth = self.episodes(4)
         for item in (first, second, third, fourth):
-            self.learned(item)
+            self.learned(item, cut_from="labels-snapped")
         self.touch(second, "labels/%s.json", 20)  # marked again after the bank was saved
         self.touch(third, "copies/%s.truth.txt", 20)  # compared after the bank was saved
         for item in (first, second, third, fourth):
@@ -112,10 +112,51 @@ class FreeTests(Setup):
         self.run_it("--delete")
         self.assertEqual(self.audio(), sorted(item["id"] + ".mp3" for item in (second, third, fourth)))
 
-    def test_with_snapped_labels_every_episode_needs_its_snapped_label(self):
+    def test_a_bank_cut_from_the_unsnapped_labels_is_not_enough_once_there_are_snapped_ones(self):
+        first, second, third = self.episodes(3)
+        self.learned(first, cut_from="labels-snapped")
+        self.learned(second, cut_from="labels")  # the snapping failed that time
+        self.learned(third)
+        self.write("sound-bank/%s.json" % third["id"], json.dumps(
+            {"version": 1, "episode": third["id"], "stretches": []}))  # a bank that does not say
+        self.touch(third, "sound-bank/%s.json", 10)
+        for item in (first, second, third):
+            self.write("labels-snapped/%s.json" % item["id"], "{}")
+            self.touch(item, "labels-snapped/%s.json", 0)
+        self.run_it("--delete")
+        self.assertEqual(self.audio(), sorted(item["id"] + ".mp3" for item in (second, third)))
+
+    def test_a_bank_cut_from_the_snapped_labels_is_not_what_is_wanted_without_them(self):
+        first, = self.episodes(1)
+        self.learned(first, cut_from="labels-snapped")  # the snapped folder was taken away since
+        self.run_it("--delete")
+        self.assertEqual(self.audio(), [first["id"] + ".mp3"])
+
+    def test_a_delete_that_fails_is_said_and_is_not_a_clean_exit(self):
         first, second = self.episodes(2)
         self.learned(first)
         self.learned(second)
+        real = os.remove
+
+        def refuse(path):
+            if first["id"] in path:
+                raise PermissionError("no")
+            real(path)
+        os.remove = refuse
+        try:
+            code = self.run_it("--delete")
+        finally:
+            os.remove = real
+        self.assertEqual(code, 4)
+        self.assertEqual(self.audio(), [first["id"] + ".mp3"])
+        self.assertTrue(any("could not be deleted" in line for line in self.said))
+        self.assertIsNotNone(self.manifest()[first["id"]]["file"])
+        self.assertIsNone(self.manifest()[second["id"]]["file"])
+
+    def test_with_snapped_labels_every_episode_needs_its_snapped_label(self):
+        first, second = self.episodes(2)
+        self.learned(first, cut_from="labels-snapped")
+        self.learned(second, cut_from="labels-snapped")
         self.write("labels-snapped/%s.json" % first["id"], "{}")
         self.touch(first, "labels-snapped/%s.json", 0)
         self.run_it("--delete")

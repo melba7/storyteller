@@ -246,6 +246,22 @@ final class AdSoundCommandTests: XCTestCase {
     XCTAssertTrue(result.said.contains("Skipped 1 episode with no audio."), result.said)
   }
 
+  func testTheBankSaysWhichLabelsItWasCutFromAndIsMadeAgainWhenTheyChange() throws {
+    try addLearnedEpisodes()
+    func labelsOfBank() throws -> String? {
+      let data = try Data(contentsOf: bank("aaaaaaaaaaaa"))
+      return (try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any]))["labels"] as? String
+    }
+    XCTAssertEqual(go().code, 0)
+    XCTAssertEqual(try labelsOfBank(), "labels")
+    let snapped = folder.appendingPathComponent("labels-snapped")
+    try FileManager.default.copyItem(at: folder.appendingPathComponent("labels"), to: snapped)
+    XCTAssertTrue(go([folder.path, "--labels", "labels-snapped"]).said.contains("Saved 4 sound-bank files."))
+    XCTAssertEqual(try labelsOfBank(), "labels-snapped")
+    XCTAssertTrue(go().said.contains("Saved 4 sound-bank files."))
+    XCTAssertEqual(try labelsOfBank(), "labels")
+  }
+
   func testAnEpisodeWithNeitherAudioNorBankIsCountedAsBefore() throws {
     try addLearnedEpisodes()
     XCTAssertEqual(go().code, 0)
