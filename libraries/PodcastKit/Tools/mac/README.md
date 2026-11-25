@@ -475,17 +475,18 @@ night. Use them in this order.
    between 11 at night and 7 in the morning, and waits for the night with the
    Mac kept awake), `--wait-hours 120` (when Claude's usage allowance is used up
    it waits 30 minutes and tries the same episode again, up to five days in all)
-   and `--cap 95 --budget big-run-1` (at most $95 of the plan's usage in all,
-   over every run: see "The budget" below; "Start another big run" sets a new
-   budget name instead). The environment can change them: `TEACH_BETWEEN`,
-   `TEACH_WAIT_HOURS`, `TEACH_CAP` and `TEACH_BUDGET`. Waiting for the allowance
-   is not a failure of the episode. Not being signed in still stops at once.
-   When it ends (also stopped early) it runs the steps after marking, and it
-   says why it stopped: the spending limit is reached, the usage allowance
-   stayed used up for longer than it waits, or episodes failed (how many, and
-   that the list is `failures.json`). Only `TEACH_YES=1` counts as a yes in the
-   launchers, and a typed answer is trimmed at its ends only, so "ye s" is not
-   yes.
+   and `--cap 95 --budget NAME` (at most $95 of the plan's usage in all, over
+   every run: see "The budget" below). NAME is `TEACH_BUDGET` when that is set,
+   else the name in `current-budget.txt` in the teaching folder (written by
+   "Start another big run"), else `big-run-1`. The window says which one it
+   uses. The environment can change them: `TEACH_BETWEEN`, `TEACH_WAIT_HOURS`,
+   `TEACH_CAP` and `TEACH_BUDGET`. Waiting for the allowance is not a failure of
+   the episode. Not being signed in still stops at once. When it ends (also
+   stopped early) it runs the steps after marking, and it says why it stopped:
+   the spending limit is reached, the usage allowance stayed used up for longer
+   than it waits, or episodes failed (how many, and that the list is
+   `failures.json`). Only `TEACH_YES=1` counts as a yes in the launchers, and a
+   typed answer is trimmed at its ends only, so "ye s" is not yes.
 3. `Gather the exam episodes.command`. See the next section. Run it after the
    two files above are done, so that the exam is newer than everything the phone
    learned from.
@@ -553,9 +554,11 @@ never starts a call when the budget is spent, and ends with a line saying where
 it stands. A damaged file is a set-up problem, never a fresh start. Without
 `--budget` the cap is for one run only, and it is checked before every call. The
 launchers use the budgets `big-run-1` (95 dollars, the first big run of
-2026-11-24; the run before it used `more-episodes`, which has 89.57 dollars
-spent), `exam` (14 dollars) and `exam-second` (4 dollars), and "Start another
-big run" makes a new `big-run-` name with the date and minute each time.
+2026-11-24 and the default when `current-budget.txt` says nothing; the run
+before it used `more-episodes`, which has 89.57 dollars spent), `exam` (14
+dollars) and `exam-second` (4 dollars), and "Start another big run" makes a new
+`big-run-` name with the date and minute each time and remembers it in
+`current-budget.txt`.
 
 Exit codes of `teach_label.py`: 0 done, nothing to do, or `--limit` reached; 2 a
 set-up problem or another run is working in the folder; 3 stopped early because
@@ -581,11 +584,18 @@ the 95.
 looks for it next to itself and then there; `TEACH_SECOND` names another file.
 
 The new budget's name is shown in the window and written in the log
-(`~/Storyteller Lofi/logs/podcast-teaching.log`). Carrying on a stopped run with
-a plain double-click on `Mark the new episodes at night.command` uses its
-default budget, `big-run-1`; to carry on the new budget, set
-`TEACH_BUDGET=<the name>` in Terminal first. Typing `yes` here again starts yet
-another new budget.
+(`~/Storyteller Lofi/logs/podcast-teaching.log`). After the `yes` it is also
+written, as one line, to `current-budget.txt` in the teaching folder (through a
+temporary file that is moved into place; when it cannot be written nothing is
+started). `Mark the new episodes at night.command` takes its default budget from
+that file when `TEACH_BUDGET` is not set: the first line, trimmed, if it is 1 to
+40 letters, digits, `-` or `_` and starts with a letter or digit; with no file,
+or one that holds anything else, it uses `big-run-1` and says so. So a stopped
+big run is carried on by a double-click on
+`Mark the new episodes at night.command` (or
+`Gather more episodes for teaching.command`) under the same budget, and
+`TEACH_BUDGET=<a name>` in Terminal still wins. Typing `yes` here again starts
+yet another new budget and replaces the name in the file.
 
 ### Backups
 

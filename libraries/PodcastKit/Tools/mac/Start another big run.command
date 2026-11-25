@@ -10,12 +10,15 @@
 # launchers' wrappers, not in the repo). TEACH_SECOND names another file to start; it is also looked
 # for next to this file. TEACH_CAP changes the 95. TEACH_YES in the environment does NOT answer the
 # question here: spending money is always asked.
-# A run that was stopped is carried on with the double-click on "Mark the new episodes at night" (its
-# default budget is big-run-1) or, for this budget, TEACH_BUDGET=<its name> set in Terminal; the name
-# is in the window and in ~/Storyteller Lofi/logs/podcast-teaching.log. Typing yes here again starts
-# yet another new budget.
+# The new name is also written, as one line, to current-budget.txt in the teaching folder (through a
+# temporary file that is moved into place, so it is never half written), and only after the yes.
+# "Mark the new episodes at night" takes its default budget from that file, so a stopped run is
+# carried on by a double-click on it under the same budget. The name is also in the window and in
+# ~/Storyteller Lofi/logs/podcast-teaching.log. When the file cannot be written nothing is started.
+# Typing yes here again starts yet another new budget.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SECOND_NAME="Second downloads then gather more.command"
+FOLDER="$HOME/Storyteller Lofi/PodcastTeaching"
 LOG_FOLDER="$HOME/Storyteller Lofi/logs"
 LOG="$LOG_FOLDER/podcast-teaching.log"
 
@@ -62,12 +65,19 @@ fi
 
 # The name is made after the yes, so it is the minute of the start.
 TEACH_BUDGET="big-run-$(date +%Y%m%d-%H%M)"
+BUDGET_FILE="$FOLDER/current-budget.txt"
+BUDGET_TMP="$FOLDER/.current-budget.$$"
+if ! { mkdir -p "$FOLDER" && echo "$TEACH_BUDGET" > "$BUDGET_TMP" && mv "$BUDGET_TMP" "$BUDGET_FILE"; }; then
+  rm -f "$BUDGET_TMP" 2> /dev/null
+  finish "Could not write $BUDGET_FILE, so nothing was started: a stopped run could not be carried on under its budget." 2
+fi
 TEACH_CAP="$CAP"
 TEACH_YES=1
 export TEACH_BUDGET TEACH_CAP TEACH_YES
 echo "=== $(date '+%Y-%m-%d %H:%M') big run: new budget $TEACH_BUDGET ===" >> "$LOG"
 echo
 echo "Starting under the new budget \"$TEACH_BUDGET\" (up to \$$CAP)."
-echo "To carry on this same run after a stop, keep that name: it is also in the log."
+echo "To carry on this run after a stop, double-click \"Mark the new episodes at night\": it takes this"
+echo "budget from $BUDGET_FILE."
 echo
 exec "$SECOND"

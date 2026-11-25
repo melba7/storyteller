@@ -170,7 +170,7 @@ class BigRunTests(Setup):
         self.run_big(FAKE_STAMP="20261125-0501")
         name = re.search(r"budget=(\S+)", self.started()[0]).group(1)
         self.assertRegex(name, teach_budget.NAME)
-        os.makedirs(self.folder)
+        os.makedirs(self.folder, exist_ok=True)  # the launcher made it to write current-budget.txt
         with open(os.path.join(self.folder, "marking-spend.json"), "w") as f:
             f.write('{"version": 1, "budgets": {"big-run-1": {"dollars": 40.0, "episodes": 200}}}')
         budget = teach_budget.Budget(self.folder, name, 95)
@@ -201,6 +201,64 @@ class BigRunTests(Setup):
         self.assertIn("is missing, so nothing can be started", done.stdout)
         self.assertNotIn("NEW budget", done.stdout)
         self.assertEqual(self.called(), [])
+
+    def written(self):
+        path = os.path.join(self.folder, "current-budget.txt")
+        if not os.path.exists(path):
+            return None
+        with open(path, "rb") as f:
+            return f.read()
+
+    def test_a_typed_yes_writes_the_new_budget_name_to_current_budget_txt_as_one_line(self):
+        self.run_big()
+        self.assertEqual(self.written(), b"big-run-20261125-0501\n")
+        self.assertEqual([n for n in os.listdir(self.folder) if n != "current-budget.txt"], [])  # no temporary file
+
+    def test_the_file_is_written_by_a_rename_so_it_is_never_half_written(self):
+        self.assertIn("mv ", self.source(BIG))
+
+    def test_it_replaces_the_name_of_an_earlier_run(self):
+        os.makedirs(self.folder)
+        with open(os.path.join(self.folder, "current-budget.txt"), "w") as f:
+            f.write("big-run-20261124-1000\n")
+        self.run_big()
+        self.assertEqual(self.written(), b"big-run-20261125-0501\n")
+
+    def test_without_a_typed_yes_the_file_is_not_written_and_the_folder_is_not_made(self):
+        for typed in ("\n", "", "no\n", "y\n", "ye s\n"):
+            self.run_big(typed=typed)
+            self.assertIsNone(self.written(), typed)
+            self.assertFalse(os.path.exists(self.folder), typed)
+
+    def test_without_a_typed_yes_an_earlier_name_stays_as_it_was(self):
+        os.makedirs(self.folder)
+        with open(os.path.join(self.folder, "current-budget.txt"), "w") as f:
+            f.write("big-run-20261124-1000\n")
+        self.run_big(typed="no\n")
+        self.assertEqual(self.written(), b"big-run-20261124-1000\n")
+
+    def test_the_file_is_written_before_the_old_launcher_starts(self):
+        # The stand-in reads the file when it starts, as a stopped run would find it.
+        with open(self.second, "w") as f:
+            f.write('#!/bin/bash\necho "second saw $(cat "%s")" >> "$CALLS"\n' % os.path.join(self.folder, "current-budget.txt"))
+        self.run_big()
+        self.assertEqual(self.called(), ["second saw big-run-20261125-0501"])
+
+    def test_when_the_file_cannot_be_written_nothing_is_started(self):
+        os.makedirs(os.path.dirname(self.folder), exist_ok=True)
+        with open(self.folder, "w") as f:  # a file where the teaching folder should be
+            f.write("in the way")
+        done = self.run_big()
+        self.assertEqual(done.returncode, 2, done.stdout)
+        self.assertEqual(self.called(), [])
+        self.assertIn("current-budget.txt", done.stdout)
+        self.assertIn("nothing was started", done.stdout)
+
+    def test_a_stopped_run_is_carried_on_by_the_night_launcher_under_the_same_budget(self):
+        self.run_big(FAKE_STAMP="20261125-0501")
+        done = self.run_script("Mark the new episodes at night.command")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        self.assertIn("--budget big-run-20261125-0501", self.labelling()[-1])
 
     def test_the_new_budget_reaches_the_marking_through_the_whole_chain(self):
         done = self.run_big(CHAIN="1", typed="yes\n")

@@ -7,13 +7,19 @@
 # where it was when you double-click again. TEACH_YES set in the environment answers the typed
 # yes (only when it is exactly 1); without it the marking asks for it. These can be changed:
 # TEACH_BETWEEN (default 23-7), TEACH_WAIT_HOURS (default 120) and TEACH_CAP (default 95).
-# The 95 dollars are counted over every run, under the budget TEACH_BUDGET (default big-run-1, the
-# first big run of 2026-11-24; the run before it used more-episodes and has $89.57 spent):
-# double-clicking again carries on with what is left of them and never starts a fresh 95. To start
-# a new budget on purpose, set TEACH_BUDGET to a new name ("Start another big run" does).
+# The 95 dollars are counted over every run, under the budget TEACH_BUDGET: double-clicking again
+# carries on with what is left of them and never starts a fresh 95. When TEACH_BUDGET is not set the
+# budget is the name in current-budget.txt in the teaching folder, which "Start another big run"
+# writes, so a stopped run is carried on under its own budget; with no such file, or one that does
+# not hold a usable name (1 to 40 letters, digits, - or _, starting with a letter or digit), it is
+# big-run-1 (the first big run of 2026-11-24; the run before it used more-episodes and has $89.57
+# spent). The window says which budget it uses. To start a new budget on purpose, set TEACH_BUDGET
+# to a new name or double-click "Start another big run".
 # The Mac is kept awake for the whole wait (caffeinate -i, in the file this starts).
 # What it prints is also added to ~/Storyteller Lofi/logs/podcast-teaching.log.
 HERE="$(cd "$(dirname "$0")" && pwd)"
+FOLDER="$HOME/Storyteller Lofi/PodcastTeaching"
+BUDGET_FILE="$FOLDER/current-budget.txt"
 MARK="$HERE/Mark ads in the teaching episodes.command"
 
 finish() {
@@ -28,7 +34,24 @@ finish() {
 TEACH_BETWEEN="${TEACH_BETWEEN:-23-7}"
 TEACH_WAIT_HOURS="${TEACH_WAIT_HOURS:-120}"
 TEACH_CAP="${TEACH_CAP:-95}"
-TEACH_BUDGET="${TEACH_BUDGET:-big-run-1}"
+# Where the budget comes from: the environment, then the name in current-budget.txt (its first line,
+# trimmed, which must be a name the budget file accepts), then big-run-1.
+BUDGET_FROM="the environment"
+if [ -z "$TEACH_BUDGET" ]; then
+  TEACH_BUDGET="big-run-1"
+  BUDGET_FROM="the default"
+  if [ -f "$BUDGET_FILE" ]; then
+    NAME=""
+    IFS= read -r NAME < "$BUDGET_FILE" 2> /dev/null
+    NAME="$(printf '%s' "$NAME" | LC_ALL=C sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' 2> /dev/null)"
+    if printf '%s' "$NAME" | LC_ALL=C grep -Eq '^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$'; then
+      TEACH_BUDGET="$NAME"
+      BUDGET_FROM="$BUDGET_FILE"
+    else
+      BUDGET_FROM="the default, because $BUDGET_FILE is not a usable budget name"
+    fi
+  fi
+fi
 export TEACH_BETWEEN TEACH_WAIT_HOURS TEACH_CAP TEACH_BUDGET
 
 echo "Storyteller Lofi: mark the new episodes at night"
@@ -39,6 +62,7 @@ echo "allowance is used up it waits and carries on, for up to $TEACH_WAIT_HOURS 
 echo "most \$$TEACH_CAP of the plan's usage in all, counted over every night: double-clicking this"
 echo "file again carries on with what is left and never starts a new \$$TEACH_CAP. Keep the Mac"
 echo "plugged in with the lid open."
+echo "It counts the spending under the budget \"$TEACH_BUDGET\" (from $BUDGET_FROM)."
 echo "Then the results are worked out and copied to the phone's folders."
 echo
 exec "$MARK"

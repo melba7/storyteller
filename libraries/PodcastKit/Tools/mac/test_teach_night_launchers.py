@@ -287,6 +287,82 @@ class NightTests(Setup):
         self.assertRegex(self.log(), r"=== \d{4}-\d\d-\d\d \d\d:\d\d mark ads ===")
 
 
+class NightBudgetFileTests(Setup):
+    """The default budget of "Mark the new episodes at night" is the name in current-budget.txt, which
+    "Start another big run" writes, so a stopped run is carried on under its own budget."""
+
+    def put(self, content):
+        os.makedirs(self.folder, exist_ok=True)
+        with open(os.path.join(self.folder, "current-budget.txt"), "wb") as f:
+            f.write(content if isinstance(content, bytes) else content.encode())
+
+    def budget(self, **more):
+        done = self.run_script(NIGHT, **more)
+        self.assertEqual(done.returncode, 0, done.stdout)
+        return re.search(r"--budget (\S+)", self.labelling()[-1]).group(1), done.stdout
+
+    def test_the_name_in_the_file_is_the_default_budget(self):
+        self.put("big-run-20261125-0501\n")
+        name, shown = self.budget()
+        self.assertEqual(name, "big-run-20261125-0501")
+        self.assertIn("big-run-20261125-0501", shown)
+        self.assertIn("current-budget.txt", shown)
+
+    def test_the_name_is_trimmed_and_only_its_first_line_counts(self):
+        for content in ("  big-run-a1  \n", "big-run-a1\r\n", "\tbig-run-a1", "big-run-a1\nsecond line\n"):
+            open(self.calls, "w").close()
+            self.put(content)
+            self.assertEqual(self.budget()[0], "big-run-a1", repr(content))
+
+    def test_without_the_file_the_default_is_big_run_1_and_it_says_so(self):
+        name, shown = self.budget()
+        self.assertEqual(name, "big-run-1")
+        self.assertIn("big-run-1", shown)
+        self.assertNotIn("current-budget.txt is not a usable", shown)
+
+    def test_a_file_with_anything_odd_in_it_is_ignored_and_it_says_so(self):
+        for content in ("", "\n", "   \n", "has a space\n", "big.run\n", "../../etc\n", "a/b\n", "$(date)\n",
+                        "x" * 41 + "\n", b"\xff\xfe\x00junk\n", "\nbig-run-a1\n", "big-run-a1;ls\n", "--cap 1\n", "--cap\n", "-x\n", "_x\n"):
+            open(self.calls, "w").close()
+            self.put(content)
+            name, shown = self.budget()
+            self.assertEqual(name, "big-run-1", repr(content))
+            self.assertIn("current-budget.txt is not a usable budget name", shown, repr(content))
+
+    def test_a_name_of_40_letters_digits_dashes_and_underscores_is_taken(self):
+        for name in ("a", "Big_Run-2", "x" * 40):
+            open(self.calls, "w").close()
+            self.put(name + "\n")
+            self.assertEqual(self.budget()[0], name)
+
+    def test_a_directory_in_place_of_the_file_is_ignored(self):
+        os.makedirs(os.path.join(self.folder, "current-budget.txt"))
+        self.assertEqual(self.budget()[0], "big-run-1")
+
+    def test_an_explicit_teach_budget_still_wins(self):
+        self.put("big-run-20261125-0501\n")
+        name, shown = self.budget(TEACH_BUDGET="again")
+        self.assertEqual(name, "again")
+        self.assertIn("again", shown)
+        self.assertNotIn("big-run-20261125-0501", shown)
+
+    def test_an_empty_teach_budget_counts_as_not_set(self):
+        self.put("big-run-20261125-0501\n")
+        self.assertEqual(self.budget(TEACH_BUDGET="")[0], "big-run-20261125-0501")
+
+    def test_it_never_changes_the_file(self):
+        self.put("big-run-a1\n")
+        self.budget()
+        with open(os.path.join(self.folder, "current-budget.txt")) as f:
+            self.assertEqual(f.read(), "big-run-a1\n")
+        self.assertEqual(sorted(os.listdir(self.folder)).count("current-budget.txt"), 1)
+
+    def test_the_name_reaches_the_gather_more_chain_too(self):
+        self.put("big-run-a1\n")
+        self.run_script(MORE, typed="yes\n")
+        self.assertIn("--budget big-run-a1 --yes", self.labelling()[0])
+
+
 class ExamTests(Setup):
     def setUp(self):
         super().setUp()
