@@ -1568,7 +1568,11 @@ written here and the idea goes under Later.
      when: the Swift and Python tests pass (a library rebuilt after deleting an
      audio file is byte-identical), an independent check finds nothing wrong,
      and Mo has run "Teach the phone again" so the banks exist.
-  3. Automatic big runs while they keep improving the ad skipping and the other
+  3. Marking sooner (Mo, 2026-11-25: "usage is the same"): the big-run launchers
+     write down every episode before any is marked, so the marking waited hours.
+     `Write down and mark together.command` writes down 20, marks them at any
+     hour, and repeats.
+  4. Automatic big runs while they keep improving the ad skipping and the other
      model (not built; the limits wait on Mo's answers: how much to spend in
      all, what counts as improving, and whether to stop at night only).
 

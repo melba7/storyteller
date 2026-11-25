@@ -56,6 +56,8 @@ the app is not added again.
   `Gather deeper and mark tonight.command`: see "Backups", "Starting another big
   run" and "Going deeper".
 - `Gather deeper and mark now.command`: see "Going deeper".
+- `Write down and mark together.command`: see "Writing down and marking
+  together".
 - `Free up space from the teaching audio.command`: see "Freeing disk space".
 - `Teach the passage model.command`: see "The passage model (a trial)".
 
@@ -623,6 +625,25 @@ wrapper for it in `Podcast teaching/` like the others.
 are gathered and written down, instead of only between 11 at night and 7 in the
 morning. It uses the Claude plan's usage in the daytime too; the budget stops it
 the same way.
+
+### Writing down and marking together
+
+`Gather deeper and mark now.command` (and the other big-run launchers) write
+down every gathered episode first and mark only after that, so the marking, and
+the Claude usage it spends, can start hours late.
+`Write down and mark together.command` does both in a loop: it writes down 20
+episodes (`TEACH_CHUNK` changes the number), has Claude mark them at any hour
+(`teach_label.py --between 0-24 --yes`, under the budget in
+`current-budget.txt`, else `big-run-1`, up to $95 and waiting up to 120 hours
+when the usage allowance is used up), and goes on until nothing is left to write
+down, then runs the steps after marking. It asks for a typed `yes` once. When
+another teaching run still works in the folder it waits and says so once: close
+that run's window (or press Control-C in it) and this carries on from where that
+run was, because what is written down and marked is kept. It backs up once at
+the start, downloads nothing and deletes nothing. It stops at the spending
+limit, when the usage allowance stays used up longer than it waits, or when
+episodes fail, and then still runs the steps after marking. Make a wrapper for
+it in `Podcast teaching/` like the others.
 
 ### Freeing disk space
 
