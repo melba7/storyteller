@@ -25,8 +25,8 @@ mkdir -p "$LOG_FOLDER" || finish "Could not make $LOG_FOLDER." 2
 
 echo "Storyteller Lofi: gather more episodes for teaching"
 echo
-echo "This downloads about 500 more episodes of the shows you follow: the newest 12 of each"
-echo "show, up to 40 GB of audio in all. It keeps 15 GB of the disk free, and it writes down what"
+echo "This downloads more episodes of the shows you follow: the newest ${TEACH_PER_SHOW:-12} of each"
+echo "show, up to ${TEACH_MAX_GB:-40} GB of audio in all. It keeps 15 GB of the disk free, and it writes down what"
 echo "is said in them. That takes hours. Keep the Mac plugged in with the lid open."
 echo
 echo "Then Claude can mark the ads in them, but only between 11 at night and 7 in the morning,"
@@ -44,8 +44,10 @@ fi
 # Only the ends are trimmed: "ye s" is not yes.
 TYPED="$(echo "$TYPED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
 
-TEACH_PER_SHOW=12
-TEACH_MAX_GB=40
+# Both can be set before this file starts (a deeper run asks for more of each show); the default is
+# the newest 12 of each show and 40 GB.
+TEACH_PER_SHOW="${TEACH_PER_SHOW:-12}"
+TEACH_MAX_GB="${TEACH_MAX_GB:-40}"
 export TEACH_PER_SHOW TEACH_MAX_GB
 unset TEACH_EXAM  # this is never the exam
 if [ "$TYPED" = yes ]; then
