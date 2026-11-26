@@ -1644,6 +1644,24 @@ round. The largest thing left is exact edges for inserted spots: the second
 download moved 159 of the shelf's 326 paid spots, so a second copy on the phone
 (idea 5, not on Mo's card) is the next candidate.
 
+The second copy, measured (Mo, 2026-11-26: "test it and tell me if the 2
+downloads is worth it"). A trial scorecard row skipped the stretches where the
+Mac's second download differs (5 s or longer, as sure ads, outside the ads the
+row stands on), using the Mac's second downloads of the 63 shelf episodes, made
+about a day after the first, so it is the best case. With Claude's labels it
+passed 142 to 147 of 219 alone and 162 to 167 with the night-before marks; with
+the exact labels 129 to 133 and 147 to 151 of 222. Never a wrong skip more, but
+4 or 5 breaks where the gate needs 10, so no go: the finders already skip most
+inserted spots, and what fails is edges. Trimming the found ads to the differing
+stretches' edges made Claude's labels worse (142 to 126: breaks also hold a
+lead-in or a promo that is the same in both copies), and its +19 on the exact
+labels is circular, because `teach_snap.py` moved those labels' borders onto the
+same stretches. One re-edited episode (The Daily, `b97026c08408`, 86% differing)
+is two versions, not other ads, so the rows leave out an episode whose stretches
+cover more than half of it. The trial code is not kept; the patch and both
+scorecards are in the project files (`podcast-bar/trials/second-copy/`). Not
+built, and the phone test "Test two quick downloads of my shows" is not needed.
+
 Mo's answers (2026-11-24): the nightly cap is
 $10 a week (about 50 episodes), 8
 a night, a hard stop. He chose "Two big runs, then $10
@@ -1663,6 +1681,11 @@ Questions only Mo can answer:
 
 ## Later
 
+- The second-copy trial (2026-11-26), found and not fixed: `teach_snap.py` adds
+  every unmarked differing stretch of 10 to 300 s as a sponsor label, so an
+  episode whose second download is another version of it (The Daily
+  `b97026c08408` on the shelf, 86% differing) gets show content labelled as ads
+  in `labels-snapped`; it needs the same more-than-half guard.
 - Ad skipping to 95%, round B (2026-11-24), found and not fixed: at the `off`
   level a show still gets a whole-episode run of Apple's model (battery); skip
   the model at `off` but save the final file with the model version. A per-show
