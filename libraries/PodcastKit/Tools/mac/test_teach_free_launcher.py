@@ -3,6 +3,7 @@ for a typed yes, and deletes only after it. It runs the real teach_free.py and t
 temporary home, with a copy of the running Python as the Mac's python3. No Mac, no network, no Claude.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import os
+import pty
 import re
 import shutil
 import stat
@@ -144,6 +145,36 @@ class AskingTests(LauncherTests):
         self.assertEqual(done.returncode, 3, done.stdout)
         self.assertIn("still working", done.stdout)
         self.assertEqual(self.audio(), [learned["id"] + ".mp3"])
+
+    def finished_on_a_terminal(self, chain, seconds):
+        """Runs the launcher on a pseudo terminal, which is where its Press Return pause waits, and says
+        whether it ended within the seconds. Nothing is typed, so only a launcher that does not wait ends."""
+        master, slave = pty.openpty()
+        os.set_blocking(master, False)
+        env = {"HOME": self.home, "PATH": "%s:/usr/bin:/bin" % self.bin}
+        if chain:
+            env["TEACH_CHAIN"] = "1"
+        proc = subprocess.Popen(["bash", os.path.join(HERE, NAME)], env=env, stdin=slave, stdout=slave,
+                                stderr=slave)
+        os.close(slave)
+        try:
+            proc.wait(timeout=seconds)
+            return True
+        except subprocess.TimeoutExpired:
+            return False
+        finally:
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            os.close(master)
+
+    def test_run_by_itself_it_waits_for_return_at_the_end(self):
+        store.save_manifest(self.folder, [])
+        self.assertFalse(self.finished_on_a_terminal(chain=False, seconds=3))
+
+    def test_as_a_step_of_a_chain_it_does_not_wait_for_return(self):
+        store.save_manifest(self.folder, [])
+        self.assertTrue(self.finished_on_a_terminal(chain=True, seconds=30))
 
     def test_it_makes_a_backup_before_it_deletes(self):
         learned = self.episode(1, learned=True)

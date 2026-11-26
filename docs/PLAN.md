@@ -1603,7 +1603,15 @@ written here and the idea goes under Later.
      precision and recall and the whole pipeline's breaks passing
      (`podcast-teach score`, 140/131/109 before) are measured with and without,
      and Mo has the answer. "Significantly" means the round's own gate: 10 more
-     breaks passing and at most 2 more wrong skips.
+     breaks passing and at most 2 more wrong skips. Result (2026-11-26, cloud
+     score on the 63-episode shelf): the public marks did not help and made it
+     slightly worse (the model with the library 142 to 132 breaks passing,
+     per-show settings streamed 115 to 107, skips with no ad 15 to 18), so the
+     gate failed and the public set stays out of training (it is research-use
+     only anyway). Mo then asked to free the disk and prepare another run on his
+     own shows, so `Free space and start the next run.command` runs the audio
+     cleanup and then starts a new $95 budget with the newest 30 of each show,
+     marking at any hour.
 
 **3. The exam**
 

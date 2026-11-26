@@ -59,6 +59,8 @@ the app is not added again.
 - `Write down and mark together.command`: see "Writing down and marking
   together".
 - `Free up space from the teaching audio.command`: see "Freeing disk space".
+- `Free space and start the next run.command`: see "Free the disk, then run
+  again".
 - `Count publisher transcripts in my shows.command`: see "Publisher
   transcripts".
 - `Teach the passage model.command`: see "The passage model (a trial)".
@@ -700,6 +702,31 @@ again" first. In Terminal: `python3 teach_free.py --folder F` says what it would
 free and `--delete` frees it. Copy `teach_free.py` and the launcher into the
 tools folder (keep the launcher executable) and make a wrapper for it in
 `Podcast teaching/` like the others.
+
+### Free the disk, then run again
+
+`Free space and start the next run.command` is one double-click for the two
+things Mo asked for together (2026-11-26: delete the audio that is not needed,
+and prepare another run on his own shows). Step 1 is
+`Free up space from the teaching audio.command` run as a step of a chain
+(`TEACH_CHAIN=1` skips its Press Return pause, as in the public-transcripts
+chains): it shows how much would go and asks for a typed yes (audio whose
+lessons are kept) or `all` (also the episodes still waiting for a second
+download, which gives that comparison up). It stops the whole chain when the
+backup was not good (exit 1), when a teaching run is still working (exit 3) or
+when it could not look at the folder (exit 2); a partial delete (exit 4) goes
+on. Step 2 asks one more typed yes for a NEW budget of up to
+$95 (`TEACH_CAP`),
+named `big-run-YYYYMMDD-HHMM` and saved in `current-budget.txt` the way
+`Start another big run.command` saves it, then starts
+`Gather more episodes for teaching.command` with the newest 30 of each show
+(`TEACH_PER_SHOW`; the shows hold 24 each after the deeper run, so 30 is about
+400 more episodes, and with the 150 or so waiting to be written down that is
+about what $95
+can mark), 80 GB, the yes given and the marking allowed at any hour
+(`TEACH_BETWEEN=0-24`), which is what `Gather deeper and mark now.command`
+gives. `TEACH_YES` in the environment never answers the question. After a stop,
+`Gather deeper and mark now.command` carries on under the same budget.
 
 ### Publisher transcripts
 
