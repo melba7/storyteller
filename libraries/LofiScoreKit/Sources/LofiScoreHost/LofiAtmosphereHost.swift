@@ -521,7 +521,9 @@ public final class LofiAtmosphereHost: @unchecked Sendable {
             completion(.success(summary))
         case let .failure(error):
             syncUnfinished = true
-            settings.lastSyncResult = "Could not read the folder: \(error.localizedDescription)"
+            // A folder with nothing to copy says what to pick instead; it was read fine.
+            settings.lastSyncResult = (error as? SoundsFolderImport.ImportError)?.description
+                ?? "Could not read the folder: \(error.localizedDescription)"
             HostLog.error("sounds folder (\(reason.rawValue)): \(error)")
             completion(.failure(error))
         }

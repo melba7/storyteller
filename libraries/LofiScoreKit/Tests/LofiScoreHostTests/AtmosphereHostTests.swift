@@ -446,6 +446,15 @@ final class AtmosphereHostTests: XCTestCase {
         status = await host.status()
         XCTAssertTrue(status.folder.linkedFolder?.lastResult?.hasPrefix("Could not read the folder") == true)
 
+        // A folder with nothing to copy says what to pick instead, in a sentence.
+        try fileManager.createDirectory(at: folder.appendingPathComponent("Documents/Notes"), withIntermediateDirectories: true)
+        do {
+            _ = try await host.linkSoundsFolder(folder.appendingPathComponent("Documents"))
+            XCTFail("a folder without sounds should throw")
+        } catch {}
+        status = await host.status()
+        XCTAssertEqual(status.folder.linkedFolder?.lastResult, SoundsFolderImport.ImportError.noSounds("Documents").description)
+
         // Removing the sounds forgets the link too.
         await host.removeImportedSounds()
         status = try await waitFor(host) { $0.atmosphere.sounds == 0 }

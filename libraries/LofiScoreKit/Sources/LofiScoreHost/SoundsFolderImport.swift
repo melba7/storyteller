@@ -33,18 +33,27 @@ public enum SoundsFolderImport {
         }
     }
 
-    public enum ImportError: Error, Equatable, CustomStringConvertible {
+    /// `LocalizedError`, so the sentence reaches the phone's screen: the app shows an error's
+    /// `localizedDescription`.
+    public enum ImportError: Error, Equatable, CustomStringConvertible, LocalizedError {
         case noSounds(String)
+        /// The picked folder is the Atmosphere folder itself (its sound folders are at its
+        /// top), not the folder that holds it and the book scores.
+        case atmosphereFolderPicked(String)
         case unreadable(String)
 
         public var description: String {
             switch self {
             case let .noSounds(name):
-                return "\(name) has no atmosphere sounds: it needs an Atmosphere folder with one subfolder per sound (Rain, Fireplace, Crowd, …), or book scores from the Mac"
+                return "“\(name)” has no Atmosphere folder in it. Pick the folder the Mac copies the sounds into (LofiMusic in iCloud Drive), which holds the Atmosphere folder and the book scores."
+            case let .atmosphereFolderPicked(name):
+                return "“\(name)” holds the sounds themselves. Pick the folder one level up (LofiMusic in iCloud Drive), so the book scores come with the sounds."
             case let .unreadable(reason):
                 return "The folder could not be read: \(reason)"
             }
         }
+
+        public var errorDescription: String? { description }
     }
 
     /// The atmosphere's sounds, one folder per sound (see `AmbienceLibrary`).
@@ -83,7 +92,7 @@ public enum SoundsFolderImport {
         defer { if !keepStaging { try? fileManager.removeItem(at: staging) } }
 
         let plan = try plan(for: source, fileManager: fileManager)
-        guard !plan.items.isEmpty else { throw ImportError.noSounds(source.lastPathComponent) }
+        guard !plan.items.isEmpty else { throw nothingToImport(in: source, fileManager: fileManager) }
         for item in plan.items {
             let target = staging.appendingPathComponent(item.relativePath)
             try fileManager.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -212,6 +221,16 @@ public enum SoundsFolderImport {
         guard keep else { return nil }
         // Under one spelling of the folder, where the host looks.
         return atmosphereFolderName + "/" + components.dropFirst().joined(separator: "/")
+    }
+
+    /// Why a picked folder gave nothing to copy: it is the Atmosphere folder itself (named so,
+    /// or with a sound's folder such as Rain at its top), or it simply has no sounds.
+    static func nothingToImport(in source: URL, fileManager: FileManager) -> ImportError {
+        let name = source.lastPathComponent
+        let top = (try? fileManager.contentsOfDirectory(atPath: source.path)) ?? []
+        let looksLikeAtmosphere = name.lowercased() == atmosphereFolderName.lowercased()
+            || top.contains { AmbientSound(lenient: $0) != nil || SoundVariant.parseFolder($0) != nil }
+        return looksLikeAtmosphere ? .atmosphereFolderPicked(name) : .noSounds(name)
     }
 
     static func plan(for source: URL, fileManager: FileManager) throws -> Plan {
@@ -422,7 +441,7 @@ extension SoundsFolderImport {
 
         let plan = try plan(for: source, fileManager: fileManager)
         if summary.fresh, plan.items.isEmpty, plan.notDownloaded == 0 {
-            throw ImportError.noSounds(source.lastPathComponent)
+            throw nothingToImport(in: source, fileManager: fileManager)
         }
         summary.notDownloaded = plan.notDownloaded
         plan.placeholders.forEach(downloads.request)
