@@ -1662,6 +1662,28 @@ cover more than half of it. The trial code is not kept; the patch and both
 scorecards are in the project files (`podcast-bar/trials/second-copy/`). Not
 built, and the phone test "Test two quick downloads of my shows" is not needed.
 
+Why breaks fail, and quick trials of timing fixes (Mo, 2026-11-26: "how can we
+improve this timing. Think of creative ways"). Without host reads the same row
+passes 122 of 161 breaks (76%), streamed 98 (61%). Of the 77 breaks that fail
+with Claude's labels, 26 are off by 10 s or less, 9 are missed (all hosts' plugs
+for their own things), and 42 are bigger: in 35 of them a piece of the break of
+10 to 100 s is not recognised (sponsored content that reads like news, a
+story-style spot after a handoff, a host read that starts as normal talk).
+Replays of the bar on `score --dump` (Python, not in the repo; the scripts are
+in the project files, `podcast-bar/trials/timing/`) gave: moving every start or
+end by a fixed 1 to 5 s, and joining skips that lie close together, make it
+worse; pulling a skip's start back to a learned opening line (a line prefix that
+starts a marked segment in 5 or more training episodes, 9 times in 10) passes
+142 to 147 (exact labels 129 to 133) with no wrong skip more at any setting
+tried; filling a hole of up to 60 s between two skips that shares a rare word
+with them and few words with the show passes 4 more, but its limits were picked
+on the shelf; both together 151 of 219 and 137 of 222. The test is also too
+harsh at ad ends: the Mac's transcripts hold only line starts, so a line ends at
+the next line's start, while the phone's lines end at their last word. Exact ad
+starts lie within 1 s of a line start 86 times in 100, exact ends 46, and 13 of
+the 25 "lands too far" breaks on the exact labels lose no spoken line. Nothing
+is built; Mo's card asks whether to build the two fixes.
+
 Mo's answers (2026-11-24): the nightly cap is
 $10 a week (about 50 episodes), 8
 a night, a hard stop. He chose "Two big runs, then $10
