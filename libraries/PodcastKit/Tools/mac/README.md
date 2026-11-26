@@ -779,6 +779,18 @@ many hours; if the window is closed, double-click it again and it carries on,
 because fetching adds, marking resumes under the same budget and cannot pass the
 cap, and the test runs last. The three single launchers still work alone.
 
+`Fetch and mark 500 more public transcripts.command` is the second pull (Mo,
+2026-11-26: "another $100, so it is $200"). It asks for one typed yes and then
+runs the fetch launcher with `TEACH_SPORC_COUNT=1000` (the sample grows from 500
+to 1000 episodes; `sporc_sample.py` leaves a transcript that is already there
+with the same text untouched, so nothing a marking or a test reads is rewritten)
+and the mark launcher with `TEACH_SPORC_LIMIT=1000`, a cap of
+$100 and the budget
+`sporc-2`, so the two pulls come to $200 and a second
+double-click carries on under its own $100. It does not run the test (that step
+replaces the folder of the earlier test), runs next to the big run and a test
+that is still training, and ends with a plain message for each exit code.
+
 ### Backups
 
 Claude's marks cost about $0.19 an episode and live only in the teaching folder,

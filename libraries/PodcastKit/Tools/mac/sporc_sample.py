@@ -130,9 +130,19 @@ def _entry(item):
             "size": None, "file": None, "bytes": 0, "sha256": None, "host": "sporc", "error": None}
 
 
+def _read(path):
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
 def write_folder(folder, rows, turns):
     """Writes transcripts/<id>.txt for every row whose id has lines in `turns` ({episode id:
     [lines]}), adds the entries to episodes.json (what was there stays) and writes SOURCE.txt.
+    A transcript that is already there with the same text is left alone, so a bigger sample
+    adds episodes without touching the ones a marking or a test may be reading.
     Returns the rows that were written."""
     try:
         entries = {entry["id"]: entry for entry in store.load_manifest(folder)}
@@ -145,8 +155,11 @@ def write_folder(folder, rows, turns):
         if not lines:
             continue
         entry = _entry(item)
-        with open(os.path.join(folder, "transcripts", entry["id"] + ".txt"), "w", encoding="utf-8") as out:
-            out.write("\n".join(lines) + "\n")
+        path = os.path.join(folder, "transcripts", entry["id"] + ".txt")
+        text = "\n".join(lines) + "\n"
+        if _read(path) != text:
+            with open(path, "w", encoding="utf-8") as out:
+                out.write(text)
         entries[entry["id"]] = entry
         written.append(item)
     store.save_manifest(folder, list(entries.values()))

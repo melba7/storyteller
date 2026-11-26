@@ -1590,15 +1590,20 @@ written here and the idea goes under Later.
      to $20" (card, 2026-11-25), then said up to $100 and asked to test whether
      ad detection improved significantly afterwards. So the fetch takes 500
      episodes and `Mark the public transcripts.command` marks up to 500 under
-     the budget `sporc-1` (cap $100). `Test the public marks.command` trains the
+     the budget `sporc-1` (cap
+     $100). `Test the public marks.command` trains the
      word model with and without them and compares the held-out shelf. Mo asked
      for one click ("can you make it one click?"), so
      `Fetch, mark and test the public transcripts.command` runs the three in
-     order after one typed yes. Done when: the word model's held-out precision
-     and recall and the whole pipeline's breaks passing (`podcast-teach score`,
-     140/131/109 before) are measured with and without, and Mo has the answer.
-     "Significantly" means the round's own gate: 10 more breaks passing and at
-     most 2 more wrong skips.
+     order after one typed yes. Mo then asked for another $100
+     pull ("so it is
+     $200"), so `Fetch and mark 500 more public transcripts.command`
+     fetches up to 1000 episodes and marks under the budget `sporc-2` (cap $100),
+     leaving the running test alone. Done when: the word model's held-out
+     precision and recall and the whole pipeline's breaks passing
+     (`podcast-teach score`, 140/131/109 before) are measured with and without,
+     and Mo has the answer. "Significantly" means the round's own gate: 10 more
+     breaks passing and at most 2 more wrong skips.
 
 **3. The exam**
 

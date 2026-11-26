@@ -111,6 +111,22 @@ class FolderTests(unittest.TestCase):
         sporc.write_folder(self.folder, [row(1), row(2)], {"e001": ["[00:00:01.0] Hi."], "e002": []})
         self.assertEqual(len(store.load_manifest(self.folder)), 1)
 
+    def test_an_unchanged_transcript_is_not_written_again(self):
+        sporc.write_folder(self.folder, [row(1)], {"e001": ["[00:00:01.0] Hi."]})
+        path = os.path.join(self.folder, "transcripts", store.load_manifest(self.folder)[0]["id"] + ".txt")
+        os.utime(path, (1000.0, 1000.0))
+        sporc.write_folder(self.folder, [row(1), row(2, podcast="p2")],
+                           {"e001": ["[00:00:01.0] Hi."], "e002": ["[00:00:02.0] New."]})
+        self.assertEqual(os.stat(path).st_mtime, 1000.0)
+        self.assertEqual(len(store.load_manifest(self.folder)), 2)
+
+    def test_a_changed_transcript_is_written_again(self):
+        sporc.write_folder(self.folder, [row(1)], {"e001": ["[00:00:01.0] Hi."]})
+        path = os.path.join(self.folder, "transcripts", store.load_manifest(self.folder)[0]["id"] + ".txt")
+        sporc.write_folder(self.folder, [row(1)], {"e001": ["[00:00:01.0] Hello again."]})
+        with open(path, encoding="utf-8") as handle:
+            self.assertIn("Hello again.", handle.read())
+
     def test_the_same_episode_gets_the_same_id(self):
         sporc.write_folder(self.folder, [row(1)], {"e001": ["[00:00:01.0] Hi."]})
         first = store.load_manifest(self.folder)[0]["id"]
