@@ -53,7 +53,7 @@ extension PodcastAdFinder {
     saved.ads = saved.ads.map { NewAds.restored($0, from: moved) }
     let counted =
       saved.ads.filter { $0.source == AdAsking.source }
-      + (saved.asks ?? []).filter { $0.confidence != .guess }
+      + ((saved.asks ?? []) + (saved.maybes ?? [])).filter { $0.confidence != .guess }
     saved.ads.removeAll { ad in counted.contains { NewAds.overlap($0, ad) } }
     PodcastKnownAds.shared.learn(file: saved, transcript: transcript, show: show)
   }
@@ -107,7 +107,9 @@ extension PodcastAdFinder {
             - NewAds.trimReach(for: NewAds.restored(ad, from: moved), words: words)
             && $0.adStart < ad.end
         }
-        && !(saved.asks ?? []).contains { $0.confidence != .guess && NewAds.overlap($0, ad) }
+        && !((saved.asks ?? []) + (saved.maybes ?? [])).contains {
+          $0.confidence != .guess && NewAds.overlap($0, ad)
+        }
     }.map { ad -> MarkedStretch in
       let found = NewAds.restored(ad, from: moved)
       return MarkedStretch(

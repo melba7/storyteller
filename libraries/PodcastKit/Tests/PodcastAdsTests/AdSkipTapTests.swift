@@ -200,7 +200,13 @@ final class AdSkipTapTests: XCTestCase {
     XCTAssertEqual(decide(.infinity, plain: 5, one), .plain(to: 5))
     XCTAssertEqual(decide(150, plain: 100, one), .plain(to: 150))
     XCTAssertEqual(decide(150, plain: .infinity, one), .plain(to: 150))
+    // Ads with times that are no numbers: whatever the tap does, it never goes back.
     let strange = file([ad(.nan, 10), ad(5, .infinity)])
-    if case .plain(let to) = decide(7, strange) { XCTAssertGreaterThanOrEqual(to, 7) }
+    switch decide(7, strange) {
+    case .plain(let to): XCTAssertGreaterThanOrEqual(to, 7)
+    case .skip(let skip): XCTAssertGreaterThanOrEqual(skip.target, 7)
+    case .bridge(let to, _): XCTAssertGreaterThanOrEqual(to, 7)
+    case .answer, .confirm: XCTFail("there is no question and no maybe")
+    }
   }
 }

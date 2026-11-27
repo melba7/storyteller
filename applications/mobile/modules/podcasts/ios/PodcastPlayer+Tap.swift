@@ -64,9 +64,19 @@ extension PodcastAdSkipping {
     // A confirmation after the stretch is over teaches but has nothing left to skip.
     let place = owner.place
     if place < ad.end {
-      let skip = AdSkip(ad: ad, target: AdSkipper.target(for: ad, duration: owner.currentDuration))
+      let from = max(place, ad.start)
+      var skip = AdSkip(ad: ad, target: AdSkipper.target(for: ad, duration: owner.currentDuration))
+      // The stretch is a known ad of the saved file now, so the rule gives the skip with the ads
+      // that follow it at once: one jump, one note and one Undo for all of them.
+      if case .skip(let whole) = AdSkipTap.decide(
+        position: from, plain: from, duration: owner.currentDuration,
+        file: store.best(detector: PodcastAdFinder.detectorName), settings: settings,
+        lastSkip: nil, lastSkipAge: .infinity)
+      {
+        skip = whole
+      }
       skipper.noteSkip(skip, now: now)
-      jump(skip, from: max(place, ad.start))
+      jump(skip, from: from)
     }
     refresh()
     return true

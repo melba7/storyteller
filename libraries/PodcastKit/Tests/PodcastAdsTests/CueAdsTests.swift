@@ -43,10 +43,10 @@ final class CueAdsTests: XCTestCase {
     XCTAssertEqual(first.firstWords, "now a word from our friends at acme")
   }
 
-  func testTheLineIsAtMostOneHundredTwentySecondsBeforeTheSkip() {
-    XCTAssertEqual(opened([line(100, "now a word from us")], [skip(220, 260)]).count, 1)
-    XCTAssertEqual(opened([line(100, "now a word from us")], [skip(220.5, 260)]).count, 0)
-    XCTAssertEqual(CueAds.reach, 120)
+  func testTheLineIsAtMostSixtySecondsBeforeTheSkip() {
+    XCTAssertEqual(opened([line(100, "now a word from us")], [skip(160, 200)]).count, 1)
+    XCTAssertEqual(opened([line(100, "now a word from us")], [skip(160.5, 200)]).count, 0)
+    XCTAssertEqual(CueAds.reach, 60)
   }
 
   func testAReturnLineBetweenStopsThePull() {

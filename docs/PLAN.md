@@ -1759,10 +1759,13 @@ is never committed):
 of the whole transcript and the skips so far (the ads that are skipped, joined
 into stretches whatever their kind): for each line in order of time that is not
 inside a stretch and matches a start cue (a general one or its show's), take the
-stretch with the nearest start after the line, at most 120 s after it. When no
+stretch with the nearest start after the line, at most 60 s after it. When no
 return line starts between the two, the stretch from the line's start to that
 start is added as an ad of the kind of the stretch's first ad, unsure, with the
-finder's name. A stretch is pulled back once.
+finder's name. A stretch is pulled back once. The reach was 120 s in the first
+build; one of the seven pulls on the shelf went back 83 s over the show to a
+line that only sounded like an opening, and no right pull was longer than 50 s,
+so it is a minute now (see the results below).
 
 **Filled holes** (finder `filled-holes`, `CueAds.holes`). Given the same, after
 the opening lines are added: for two stretches next to each other with a hole of
@@ -1776,8 +1779,10 @@ stretches; (topic) at most a quarter of the hole's content words (counted as
 often as they occur) occur in a line of the show outside the hole and outside
 every stretch. A hole with no content word is not filled. A filled hole is added
 as an ad of the kind of the stretch before it, unsure, with the finder's name;
-the two stretches and the hole then count as one stretch and the next hole is
-looked at.
+the two stretches and the hole then count as one stretch (for the echo) and the
+next hole is looked at. The lines of the show are counted once, from the skips
+as they were given, so the lines of a filled hole still count as the show's for
+the holes after it (as in the trial that was measured).
 
 Both add stretches that touch the ads they stand next to, on purpose: the other
 new finders keep 0.6 s away from every ad, which would leave a blip of the ad to
@@ -1791,17 +1796,27 @@ and only kinds the listener skips. With no `ad-cues.json` they add nothing.
 `PodcastPlayer.skip(by:)` for a move forward). In this order:
 
 1. Right after an automatic skip (as `AdSkipNow` defines it) the tap is a plain
-   move, as today.
+   move (taken to the end of a skipped ad it would land in, as in case 6).
 2. The playhead is in a known ad (from 2 s before its start, any kind, cut by
    the listener's trims, not undone): leave it and the ads that follow it at
    once, like the Skip ad button, with the note and Undo.
 3. The playhead is in an open question: the tap is the answer yes.
-4. The playhead is in a maybe: it becomes a confirmed ad (as a yes does) and is
-   left, with the ads that follow it at once.
+4. The playhead is in a maybe (from 2 s before its start, as for a known ad):
+   it becomes a confirmed ad (as a yes does) and is left, with the ads that
+   follow it at once.
 5. The playhead is in a hole of 60 s or less between two ads that are skipped:
    go to the end of the ads after the hole, and note a miss for the hole.
 6. Otherwise move ahead by the button's seconds; when that lands inside an ad
    that is skipped, go on to its end (today the ad then plays).
+
+**Undo and the two finders** (`AdSkip.takenBack`, found by the Opus check). A
+stretch of the opening lines or the filled holes is skipped in one jump with the
+ads it touches. An Undo of such a skip takes back only those stretches: the
+playhead goes to the first of them, and the other ads are skipped again when it
+reaches them, with an Undo of their own. So a pull that started too early costs
+the listener no ad to hear, and the finder that found the ad is not blamed (two
+Undos turn a finder to "ask" for a show). A skip with none of these stretches,
+or of them alone, is taken back whole, as before.
 
 A maybe is a stretch kept in the ads file (`maybes`, a new optional list, so old
 files and old builds read on): the word model's spans at a start chance of 0.30
@@ -1834,7 +1849,7 @@ tap); its proof is the rule's tests and the phone.
       its feed, as `ShowTuning` does; a damaged file reads as empty) and
       `CueAds` holds the two rules.
   - Done when: tests pin each rule on made-up transcripts (the return line that
-    stops a pull, the 120 s and 60 s limits, echo and topic, a chain of two
+    stops a pull, the two 60 s limits, echo and topic, a chain of two
     holes) and bad input adds nothing.
 - [ ] **X3 The scorecard rows**: "Plus opening lines" and "Plus filled holes",
       last in the scorecard, standing on the Mac's marks row when `--ahead` is

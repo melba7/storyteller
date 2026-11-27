@@ -6,8 +6,11 @@ import Foundation
 import PodcastTranscripts
 
 public enum CueAds {
-  /// An opening line may lie at most this many seconds before the skip it is pulled to.
-  public static let reach = 120.0
+  /// An opening line may lie at most this many seconds before the skip it is pulled to. A minute:
+  /// a longer pull cuts too much of the show when the line is not the start of an ad (on the
+  /// teaching episodes about 1 matching line in 250 is not), and on the shelf no right pull was
+  /// longer than 50 seconds.
+  public static let reach = 60.0
   /// A hole between two skips is filled only when it is no longer than this.
   public static let longestHole = 60.0
   /// The hole's lines start from this long before its start to this long before its end.
@@ -87,8 +90,10 @@ public enum CueAds {
   /// hole and the stretches, and (topic) at most a quarter of the hole's content words, counted as
   /// often as they occur, are in a line of the show outside the hole and the stretches. A filled
   /// hole is returned as an unsure ad of the kind of the stretch before it; the three then count as
-  /// one stretch and the next hole is looked at. A hole with no content word is not filled. Call it
-  /// with the skips plus what `openings` returned. Bad input adds nothing.
+  /// one stretch (for the echo of the next hole) and the next hole is looked at. The lines of the
+  /// show are counted once, from the skips as they were given, so the lines of a hole that was
+  /// filled still count as the show's for the holes after it. A hole with no content word is not
+  /// filled. Call it with the skips plus what `openings` returned. Bad input adds nothing.
   public static func holes(
     lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String
   ) -> [FoundAd] {

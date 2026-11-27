@@ -283,10 +283,11 @@ public struct AdSkipper: Sendable {
   public mutating func undo(now: Double) -> FoundAd? { undoSkip(now: now)?.ad }
 
   /// Like `undo`, but gives back the whole skip, so the ads that were skipped with the first
-  /// one (an ad and then the hosts' plug) can be saved as undone as well.
+  /// one (an ad and then the hosts' plug) can be saved as undone as well. What is undone is
+  /// `AdSkip.takenBack`.
   public mutating func undoSkip(now: Double) -> AdSkip? {
     guard let last, now - last.at <= Self.undoSeconds + Self.undoGrace else { return nil }
-    for undid in [last.skip.ad] + last.skip.chained { undone.append((undid.start, undid.end)) }
+    for undid in last.skip.takenBack { undone.append((undid.start, undid.end)) }
     self.last = nil
     return last.skip
   }

@@ -165,9 +165,13 @@ final class PodcastAdSkipping {
   /// The listener tapped Undo on the note. False when there is nothing to undo any more.
   func undo() -> Bool {
     guard let skip = skipper.undoSkip(now: now), let episodeId else { return false }
-    let ad = skip.ad
-    // The ads that were skipped with it (an ad and then the hosts' plug) are undone too.
-    for undone in [ad] + skip.chained {
+    // The ads that were skipped with it (an ad and then the hosts' plug) are undone too. When the
+    // skip holds stretches of the opening lines or the filled holes next to other ads, only those
+    // are taken back (`AdSkip.takenBack`): the playhead goes to the first of them and the other
+    // ads are skipped again when it reaches them.
+    let back = skip.takenBack
+    let ad = back.first ?? skip.ad
+    for undone in back {
       if streamHead?.markUndone(undone) != true {
         store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
       }
@@ -178,7 +182,7 @@ final class PodcastAdSkipping {
     // again by its words in the next episode. The finder that made each ad hears of it (and the
     // guard of its show). Both wait in the finder's queue behind a yes that is still learned.
     let heard = owner.streamDownload?.head.memory.words ?? []
-    for undone in [ad] + skip.chained {
+    for undone in back {
       PodcastAdFinder.shared.forgetUndone(
         episodeId, start: undone.start, end: undone.end, heard: heard, source: undone.source)
     }
@@ -186,8 +190,8 @@ final class PodcastAdSkipping {
     // What the skip put on the tally is what comes off it: only the seconds really jumped. The
     // note names the finder of the ad; an ad that was confirmed by a tap has lost that name.
     note(
-      .undone, start: ad.start, end: skip.end, kind: ad.kind, seconds: lastNoted.takeCounted(),
-      by: ad.source == AdAsking.source ? nil : ad.source)
+      .undone, start: ad.start, end: back.last?.end ?? skip.end, kind: ad.kind,
+      seconds: lastNoted.takeCounted(), by: ad.source == AdAsking.source ? nil : ad.source)
     owner.seek(to: ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
