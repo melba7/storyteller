@@ -1259,6 +1259,74 @@ the phone's iCloud folder. Double-click the installer again to replace the job
 marks already made stay. The job runs the files in the folder you installed it
 from, so install it again if you move that folder.
 
+### Episode preparing
+
+`Install episode preparing.command` sets up a job that runs `teach-prepare.sh`
+once an hour. The Mac prepares the new episodes of every show you follow, and
+the phone plays the very file the Mac marked, so the Mac's times for the ads
+hold to the frame. A host puts other ads into every download, so marks made on
+the Mac's copy do not hold on the phone's own copy; on the same copy they do. It
+takes the place of the nightly read-ahead: the installer turns that job off when
+it is on. It first says what it will do, what it costs and how much iCloud it
+takes, and asks you to type `yes`; it installs nothing otherwise.
+
+Each hour the job does this:
+
+1. It picks up to 6 episodes (`teach_prepare.py pick`): first the phone's list
+   of next episodes, whatever their age, then the episodes of every show you
+   follow that came out in the last 72 hours, newest first. An episode that is
+   already marked or in the teaching set is left out, and so is one of the exam
+   or the shelf, and an episode of a feed with no guid (the phone cannot match
+   it). A feed that cannot be read is said in one line and passed over.
+2. It downloads them, writes down what is said and has Claude mark the ads,
+   with the same tools as the nightly read-ahead (all with `--only-ahead`). Each
+   week has its own budget, `prepare-<year>-W<week>`, with a hard stop at $35 a
+   week of Claude usage (about $0.19 an episode, so about 180 episodes). The
+   marking stops before a call that would pass the cap and starts again the next
+   week. This is the only step that costs anything.
+3. It downloads each marked episode a second time, compares the two files
+   (`teach_copies.py --only-ahead`) and moves the marks onto the exact borders
+   (`teach_snap.py`).
+4. It puts the Mac's copy of the audio into the phone's iCloud folder
+   (`teach_prepared.py publish`), as `Podcasts/prepared/<id>.<ext>`, and notes
+   it with its SHA-256 in `prepared.json` in the teaching folder. It makes the
+   copy as a clone (`cp -c`, which takes no extra disk space) written as
+   `.part` and renamed. It publishes nothing, and says so in one line, when
+   iCloud Drive is missing, when this Mac has under 15 GB free, or when
+   `brctl quota` says iCloud has under 2 GB left.
+5. It cleans up (also in `teach_prepared.py publish`, before each copy):
+   prepared audio older than 7 days goes, and then the oldest first until the
+   copies are under 10 GB. With a copy, the Mac's own audio of that episode is
+   deleted too, and its entry in `episodes.json` is put right so it is never
+   downloaded again. Only files that `prepared.json` lists are removed, only
+   names of the form `<12 hex>.<ext>`, never an episode of the exam or the
+   shelf, and never a transcript, a label or any other file.
+6. It writes `ahead-ads.json`, with a `copy` (file, SHA-256, size) for every
+   episode whose audio is in iCloud and the ads' times in that very file, and
+   copies it with the other files to the phone's folders (`teach_publish.py`).
+   Run `python3 teach_prepared.py clean` alone to clean up without publishing.
+
+A step that fails is said in the log and the next ones still run; one episode
+that fails a step does not keep the others from the phone. An hour with nothing
+new still finishes earlier work (a second download, a copy into iCloud). The job
+holds the teaching folder's lock for the whole hour, so when another run is
+working in the folder the hour passes quietly. It does not skip Sundays. The Mac
+has to be awake and online. Change the limits with `TEACH_PREPARE_KEEP_DAYS`
+(days a copy stays in iCloud, 7), `TEACH_PREPARE_GB` (the most GB of copies,
+10; the installer passes both to the job, so run it with
+`TEACH_PREPARE_GB=5 TEACH_PREPARE_KEEP_DAYS=3` for another choice),
+`TEACH_PREPARE_CAP` (dollars a week), `TEACH_PREPARE_ESTIMATE`,
+`TEACH_PREPARE_MOST` (episodes an hour) and `TEACH_MAX_GB`.
+
+Start it by double-clicking `Install episode preparing.command` and typing
+`yes`; stop it with `Stop episode preparing.command` (the marks and the copies
+already made stay; nothing cleans the copies while the job is off, so delete
+`Podcasts/prepared` in the iCloud copy of `LofiMusic` yourself if you turn it
+off for good). Give `/bin/bash` Full Disk Access once, as in "Set it up once"
+above. The log is `~/Storyteller Lofi/logs/podcast-prepare.log` (what launchd
+saw is in `podcast-prepare-job.log`). The job runs the files in the folder you
+installed it from, so install it again if you move that folder.
+
 ### The logs
 
 - `~/Storyteller Lofi/logs/podcast-teaching.log`: what every window and the
@@ -1269,6 +1337,10 @@ from, so install it again if you move that folder.
   printed, with a dated heading for each night.
 - `~/Storyteller Lofi/logs/podcast-read-ahead-job.log`: what launchd saw from
   the nightly job.
+- `~/Storyteller Lofi/logs/podcast-prepare.log`: what episode preparing printed,
+  with a dated heading for each hour.
+- `~/Storyteller Lofi/logs/podcast-prepare-job.log`: what launchd saw from the
+  hourly job.
 
 ### Putting new files on the Mac
 
