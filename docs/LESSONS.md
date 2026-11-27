@@ -235,6 +235,11 @@ One line per lesson.
 - A launcher's `read -p "message"` prints nothing when its input is not a
   terminal, so a test never saw the closing message. Print messages with `echo`
   and keep `read` for the Return key only (2026-11-25).
+- A Swift error that reaches the phone's screen must be a `LocalizedError`: the
+  app shows `localizedDescription`, so the sounds import showed "The operation
+  couldn't be completed. (LofiScoreHost.SoundsFolderImport.ImportError error
+  0.)" instead of its own sentence, which hid that the Atmosphere folder had
+  been picked instead of LofiMusic (2026-11-26).
 - Two builders each added a teaching file in their own worktree, and two tests
   that pin how many teaching files there are failed after the merge. Run the
   whole check right after merging parallel work, before anything is built on it

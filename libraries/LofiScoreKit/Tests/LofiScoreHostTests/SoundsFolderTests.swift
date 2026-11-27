@@ -174,6 +174,46 @@ final class SoundsFolderTests: XCTestCase {
         XCTAssertEqual(files(under: destination), ["Atmosphere/Rain/kept.mp3"])
     }
 
+    func testPickingTheAtmosphereFolderItselfSaysToPickTheFolderThatHoldsIt() throws {
+        // Mo picked LofiMusic/Atmosphere instead of LofiMusic (2026-11-26).
+        try touch("LofiMusic/Atmosphere/Rain/rain.m4a")
+        try touch("LofiMusic/Atmosphere/Aircraft.Airliner/cabin.m4a")
+        try touch("LofiMusic/Atmosphere/sounds.json")
+        try touch("LofiMusic/tracks/Book One.score.json")
+        try touch("app/Music/Atmosphere/Rain/kept.mp3")
+        let picked = folder.appendingPathComponent("LofiMusic/Atmosphere", isDirectory: true)
+        let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
+        let expected = SoundsFolderImport.ImportError.atmosphereFolderPicked("Atmosphere")
+        XCTAssertThrowsError(try SoundsFolderImport.importFolder(picked, into: destination)) { error in
+            XCTAssertEqual(error as? SoundsFolderImport.ImportError, expected)
+        }
+        XCTAssertThrowsError(try SoundsFolderImport.sync(picked, into: destination)) { error in
+            XCTAssertEqual(error as? SoundsFolderImport.ImportError, expected)
+        }
+        XCTAssertEqual(files(under: destination), ["Atmosphere/Rain/kept.mp3"])
+
+        // A folder of sound folders under another name is the same mistake.
+        try touch("Sounds/Fireplace/fire.m4a")
+        XCTAssertThrowsError(try SoundsFolderImport.sync(folder.appendingPathComponent("Sounds"), into: destination)) { error in
+            XCTAssertEqual(error as? SoundsFolderImport.ImportError, .atmosphereFolderPicked("Sounds"))
+        }
+    }
+
+    func testImportErrorsReadAsSentencesOnThePhone() {
+        // The app shows `localizedDescription`: without it the phone said
+        // "The operation couldn't be completed. (LofiScoreHost.SoundsFolderImport.ImportError error 0.)".
+        let errors: [SoundsFolderImport.ImportError] = [
+            .noSounds("Documents"), .atmosphereFolderPicked("Atmosphere"), .unreadable("no access"),
+        ]
+        for error in errors {
+            let shown = (error as Error).localizedDescription
+            XCTAssertEqual(shown, error.description)
+            XCTAssertFalse(shown.contains("ImportError"), shown)
+        }
+        XCTAssertTrue(SoundsFolderImport.ImportError.noSounds("Documents").description.contains("LofiMusic"))
+        XCTAssertTrue(SoundsFolderImport.ImportError.atmosphereFolderPicked("Atmosphere").description.contains("LofiMusic"))
+    }
+
     func testSyncCopiesOnlyWhatIsNewAndNeverDeletes() throws {
         let source = folder.appendingPathComponent("Linked", isDirectory: true)
         let destination = folder.appendingPathComponent("app/Music", isDirectory: true)
