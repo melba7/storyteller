@@ -152,7 +152,7 @@ public enum AdAsking {
         insert(tapAd(for: ask, from: part.start, to: part.end), into: &carried.ads)
       }
     }
-    return carried
+    return AdMaybes.carrying(earlier, into: carried)
   }
 
   /// The questions of a list that may hold the same one twice: real stretches only, answered
@@ -186,7 +186,7 @@ public enum AdAsking {
   }
 
   /// The parts of the question's stretch that no ad covers and that last `sliver` or more.
-  private static func uncovered(_ ask: FoundAd, by ads: [FoundAd]) -> [(start: Double, end: Double)] {
+  static func uncovered(_ ask: FoundAd, by ads: [FoundAd]) -> [(start: Double, end: Double)] {
     var parts: [(start: Double, end: Double)] = []
     var from = ask.start
     for ad in ads.filter({ AdAsks.overlap($0, ask) }).sorted(by: { $0.start < $1.start }) {
@@ -207,7 +207,7 @@ public enum AdAsking {
   }
 
   /// The sure ad that a yes puts in `ads`, for the part from `start` to `end` of the question.
-  private static func tapAd(for ask: FoundAd, from start: Double, to end: Double) -> FoundAd {
+  static func tapAd(for ask: FoundAd, from start: Double, to end: Double) -> FoundAd {
     var ad = ask
     ad.start = start
     ad.end = end
@@ -216,7 +216,7 @@ public enum AdAsking {
     return ad
   }
 
-  private static func insert(_ ad: FoundAd, into ads: inout [FoundAd]) {
+  static func insert(_ ad: FoundAd, into ads: inout [FoundAd]) {
     ads.insert(ad, at: ads.firstIndex(where: { $0.start > ad.start }) ?? ads.count)
   }
 
@@ -227,13 +227,13 @@ public enum AdAsking {
       .min { abs($0.start - start) < abs($1.start - start) }
   }
 
-  private static func valid(_ ask: FoundAd) -> Bool {
+  static func valid(_ ask: FoundAd) -> Bool {
     ask.start.isFinite && ask.end.isFinite && ask.end > ask.start
   }
 
   /// Whether the file already has an ad over the question, or the listener undid that stretch
   /// or said "not an ad" to it. Ads are never compared with `denied`; this is the other way.
-  private static func covered(_ ask: FoundAd, by file: AdsFile) -> Bool {
+  static func covered(_ ask: FoundAd, by file: AdsFile) -> Bool {
     func over(_ stretch: UndoneAd) -> Bool {
       abs(stretch.start - ask.start) < startTolerance
         || (stretch.start < ask.end && ask.start < stretch.end)

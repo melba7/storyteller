@@ -93,12 +93,16 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// a real ad that is found next to it later. Ads are never compared with this list. Nil when
   /// there are none (and in a file saved before it existed).
   public var denied: [UndoneAd]?
+  /// Stretches the word model gave a weak chance of being an ad (`AdMaybes`). A tap on Skip
+  /// inside one makes it an ad. Never shown or asked about. Nil when there are none (and in a
+  /// file saved before maybes existed).
+  public var maybes: [FoundAd]?
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
     coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil,
-    asks: [FoundAd]? = nil, denied: [UndoneAd]? = nil
+    asks: [FoundAd]? = nil, denied: [UndoneAd]? = nil, maybes: [FoundAd]? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -113,6 +117,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.trims = trims
     self.asks = asks
     self.denied = denied
+    self.maybes = maybes
   }
 
   /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.

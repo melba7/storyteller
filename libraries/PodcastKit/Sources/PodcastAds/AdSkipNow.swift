@@ -42,7 +42,7 @@ public enum AdSkipNow {
 
   /// The ad that holds `place` (from `leadSeconds` before its start to its end) and the ads that
   /// follow it within half a second, in order. Nil when no ad holds it.
-  private static func holder(of place: Double, in ads: [FoundAd]) -> (FoundAd, [FoundAd])? {
+  static func holder(of place: Double, in ads: [FoundAd]) -> (FoundAd, [FoundAd])? {
     let sorted = ads.sorted { $0.start < $1.start }
     guard let first = sorted.first(where: { $0.start - leadSeconds <= place && place < $0.end })
     else { return nil }
@@ -74,6 +74,12 @@ public enum AdSkipNow {
     case miss(to: Double)
   }
 
+  /// Whether a tap at `place` is the listener catching up with the skip just made.
+  static func isJustAfter(_ place: Double, lastSkip: AdSkip?, age: Double) -> Bool {
+    guard let lastSkip, age <= justSkippedSeconds else { return false }
+    return place >= lastSkip.target - justBeforeReach && place < lastSkip.target + justAfterReach
+  }
+
   /// What the tap does at `position`, by the episode's ads `file` (nil when it has none), the
   /// switches, and the last skip (`lastSkip`, made `lastSkipAge` seconds ago, nil when none).
   /// A known ad is skipped whatever the switches say. A jump ahead that lands inside an ad the
@@ -83,11 +89,7 @@ public enum AdSkipNow {
     lastSkip: AdSkip?, lastSkipAge: Double
   ) -> Action {
     let place = position.isFinite ? position : 0
-    if let lastSkip, lastSkipAge <= justSkippedSeconds,
-      place >= lastSkip.target - justBeforeReach, place < lastSkip.target + justAfterReach
-    {
-      return .nothing(at: place)
-    }
+    if isJustAfter(place, lastSkip: lastSkip, age: lastSkipAge) { return .nothing(at: place) }
     let trims = file?.trims ?? []
     let ads = (file?.ads ?? []).map { $0.trimmed(by: trims) }.filter { $0.end > $0.start }
     if let (first, chained) = holder(of: place, in: ads) {
