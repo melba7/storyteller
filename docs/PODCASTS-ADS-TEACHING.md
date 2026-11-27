@@ -117,12 +117,12 @@ what was found. `ShowTuning.apply` must run on each finder's own list before the
 join, because a joined ad loses its `source`.
 
 Two more finders use the Mac's `ad-cues.json` (`CueAds`, run by
-`PodcastAdFinder+Cues.swift` after the snap to joints). `opening-lines` pulls the
-start of a skip back to the line that opens the break, and `filled-holes` closes
-a gap of up to 60 seconds between two skips when the words of the gap belong to
-the ads. They only skip, never ask, and the stretches they add touch the ads
-they extend, so they are not cut back from them and the player skips both in one
-jump.
+`PodcastAdFinder+Cues.swift` after the snap to joints). `opening-lines` pulls
+the start of a skip back to the line that opens the break, and `filled-holes`
+closes a gap of up to 60 seconds between two skips when the words of the gap
+belong to the ads. They only skip, never ask, and the stretches they add touch
+the ads they extend, so they are not cut back from them and the player skips
+both in one jump.
 
 - **A repeat only asks.** A repeated stretch is not always an ad, so a repeat
   never skips on its own: the phone's built-in level for repeats is `ask`, and
@@ -384,11 +384,11 @@ after an automatic skip only the last of these applies, so a second tap moves
 on.
 
 A maybe is a stretch that is only weakly likely to be an ad: what a finder only
-asked about without getting a question, and the weak
-spans of the word model. The whole-transcript pass sets them in the ads file
-(`maybes`) after its questions, and each pass replaces the open ones. A maybe is
-never shown and never asked about. The rule is `AdSkipTap` and `AdMaybes` in
-PodcastAds, and the wiring is `PodcastPlayer+Tap.swift` on the phone.
+asked about without getting a question, and the weak spans of the word model.
+The whole-transcript pass sets them in the ads file (`maybes`) after its
+questions, and each pass replaces the open ones. A maybe is never shown and
+never asked about. The rule is `AdSkipTap` and `AdMaybes` in PodcastAds, and the
+wiring is `PodcastPlayer+Tap.swift` on the phone.
 
 ## The bridge between Swift and TypeScript
 

@@ -450,20 +450,20 @@ fails that is said and the other steps still run). When the folder `copies/` or
 `labels-snapped/` exists it then snaps the labels to the second download (see
 item 5). Then, in this order, it works out each show's habits, trains the model,
 learns the lines that open and end an ad (`teach_cues.py`, see "The opening
-lines" below), makes the library of known ads, builds `podcast-teach` and has
-it write the ad sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
-finds the joints of each episode's audio once (`podcast-teach joints`, see
-`joints.json` below), scores the ad skipping, chooses the per-show settings
-(`teach_settings.py`), and copies the results to the folders the phone reads.
-Every step prints a heading ("Step N of 9"; the joints belong to step 7, with
-the score). A step that fails is said plainly and the later steps still run,
-except that the Swift steps are left out together when `podcast-teach` does not
-build. The meaning step ending with a set-up problem (no shelf, no vector for
-any line, no usable model) or the settings step ending without a scorecard does
-not stop the run. When `labels-snapped/` exists the habits, model, opening
-lines, library, sounds, meaning and score steps read it instead of `labels/`. At the end it
-prints one line per step (worked, nothing to do or failed). It counts as done
-when the copy to the phone worked.
+lines" below), makes the library of known ads, builds `podcast-teach` and has it
+write the ad sounds, trains the small meaning model (`podcast-teach meaning`,
+only on a Mac), finds the joints of each episode's audio once
+(`podcast-teach joints`, see `joints.json` below), scores the ad skipping,
+chooses the per-show settings (`teach_settings.py`), and copies the results to
+the folders the phone reads. Every step prints a heading ("Step N of 9"; the
+joints belong to step 7, with the score). A step that fails is said plainly and
+the later steps still run, except that the Swift steps are left out together
+when `podcast-teach` does not build. The meaning step ending with a set-up
+problem (no shelf, no vector for any line, no usable model) or the settings step
+ending without a scorecard does not stop the run. When `labels-snapped/` exists
+the habits, model, opening lines, library, sounds, meaning and score steps read
+it instead of `labels/`. At the end it prints one line per step (worked, nothing
+to do or failed). It counts as done when the copy to the phone worked.
 
 ### More episodes and the exam
 
@@ -1083,20 +1083,20 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
 ### The opening lines
 
 `teach_cues.py [--folder F] [--labels labels]` writes `ad-cues.json`: the first
-three to six words of the lines that, in the marked episodes, open an ad or
-come back after one. It learns from the episodes `teach_train.py` learns from
-(a transcript and a label, not on the shelf in `shelf.json`, not in the exam and
+three to six words of the lines that, in the marked episodes, open an ad or come
+back after one. It learns from the episodes `teach_train.py` learns from (a
+transcript and a label, not on the shelf in `shelf.json`, not in the exam and
 not a repeat of either), which is why the finish steps run it right after the
 model is trained. A line opens when it starts within a second of a marked
-segment's start. A start line is written when it opens in 5 or more episodes
-and 9 in 10 or more of all the lines that begin with it open (in 3 or more
-episodes of one show for that show's own list); return lines are learned the
-same way. Only the shortest such cue is written. The file also holds the words
-of 4 letters or more that are in more than 15 in 100 episodes (`common`) and in
-more than 5 up to 15 in 100 (`usual`). It holds words of transcripts, so it is
-never committed. With too few episodes it says so and leaves an old file alone,
-and a label or transcript that cannot be read is skipped and counted. The
-phone's finders that read it come in later milestones of the plan.
+segment's start. A start line is written when it opens in 5 or more episodes and
+9 in 10 or more of all the lines that begin with it open (in 3 or more episodes
+of one show for that show's own list); return lines are learned the same way.
+Only the shortest such cue is written. The file also holds the words of 4
+letters or more that are in more than 15 in 100 episodes (`common`) and in more
+than 5 up to 15 in 100 (`usual`). It holds words of transcripts, so it is never
+committed. With too few episodes it says so and leaves an old file alone, and a
+label or transcript that cannot be read is skipped and counted. The phone's
+finders that read it come in later milestones of the plan.
 
 ### What the phone gets
 

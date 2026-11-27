@@ -186,7 +186,7 @@ describe("filesToFetch", () => {
 
   it("asks for nothing when the list has nothing", () => {
     expect(filesToFetch({}, {})).toEqual([])
-    expect(TEACHING_NAMES).toHaveLength(7)
+    expect(TEACHING_NAMES).toHaveLength(8)
   })
 })
 
