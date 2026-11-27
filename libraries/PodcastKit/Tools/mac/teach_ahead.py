@@ -156,14 +156,19 @@ def plural(count, one, many):
     return "%d %s" % (count, one if count == 1 else many)
 
 
+def room_for(budget, most, estimate):
+    """How many more episodes may be picked: at most `most`, and one more fits while what is spent
+    plus its estimate stays under the cap, the same rule teach_label.py --reserve uses before each
+    call, so what is picked can be marked."""
+    return min(most, max(math.ceil(budget.left() / estimate - 1e-9) - 1, 0))
+
+
 def choosing(folder, items, options, shows, say, now):
     """pick, once the queue is read and the folder is locked."""
     entries = teach_store.load_manifest(folder)
     budget = teach_budget.Budget(folder, options.budget, options.cap)
     say(budget.line())
-    # One more episode fits while what is spent plus its estimate stays under the cap: the same rule
-    # teach_label.py --reserve uses before each call, so what is picked can be marked.
-    room = min(options.most, max(math.ceil(budget.left() / options.estimate - 1e-9) - 1, 0))
+    room = room_for(budget, options.most, options.estimate)
     if room < 1:
         say("The weekly cap of $%.2f leaves no room for another episode (about $%.2f each), so "
             "nothing is read ahead tonight." % (options.cap, options.estimate))
