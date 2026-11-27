@@ -1149,6 +1149,11 @@ matches a show you follow (the same feed key as the phone's: no scheme, no
 the followed show's own feed address. When the phone has sent no notes yet it
 says so and writes nothing, and when macOS does not let the tool read the notes
 it says that instead.
+After the table it prints up to three lines about prepared episodes (see
+"Episode preparing"): ads the phone skipped by the Mac's marks, skips you took
+back, and times you pressed Skip ad on the Mac's copy. Each is counted by a note
+that says `by: "prepared"`, which the phone writes while it plays the Mac's
+copy; with no such notes it says nothing.
 
 The next gather plans the wanted episodes before the newest episodes of each
 show, at most 20 in one run (`--wanted 20`), even when that is more than the

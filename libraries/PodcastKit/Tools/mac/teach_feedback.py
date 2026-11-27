@@ -24,8 +24,8 @@ or, without a guid, (feed, audio address). teach_collect.py gathers those first.
 valid notes are counted and skipped. Having no notes is not an error: nothing is written.
 
 After the table it prints up to three lines about prepared episodes (teach_feedback_prepared.py):
-ads the phone skipped by the Mac's marks (notes with by "prepared"), skips taken back, and taps on
-Skip ad in episodes prepared.json lists as published. It says nothing when there are none.
+ads the phone skipped by the Mac's marks, skips taken back, and taps on Skip ad on the Mac's
+copy, each counted by a note that says by "prepared". It says nothing when there are none.
 
 Exit code: 0 it worked (also with no notes), 2 a set-up problem.
 

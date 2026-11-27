@@ -429,11 +429,11 @@ The log is `~/Storyteller Lofi/logs/podcast-prepare.log` (what launchd saw is in
 breaks with no skip where there is no ad, before any border was moved to where
 two downloads differ; the phone's own finders passed 132 of those 242. Mo's week
 of listening is the real test: `teach_feedback.py` prints, from the phone's
-notes, how many ads the phone skipped by the Mac's marks (notes with
-`by: "prepared"`), how many of those skips were taken back, and how many times
-Skip ad was pressed in episodes that `prepared.json` lists as published. The
-notes do not yet say whether the listener was on the Mac's copy when pressing
-Skip ad, so a press in a published episode may have been on the stream.
+notes, how many ads the phone skipped by the Mac's marks, how many of those
+skips were taken back, and how many times Skip ad was pressed on the Mac's copy
+where its marks had no ad. Each is counted by a note that says `by: "prepared"`
+(the phone writes it on a skip, an Undo or a "missed" note when it was playing
+the Mac's copy), so a press on the stream does not count.
 
 ## From the phone back to the Mac
 

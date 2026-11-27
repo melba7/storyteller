@@ -1,6 +1,6 @@
 """Tests for the summary of prepared episodes that teach_feedback.py prints from the phone's notes:
-ads skipped by the Mac's marks (by "prepared"), skips taken back, and taps on Skip ad in episodes
-prepared.json lists as published; nothing is said when there are no such notes.
+ads skipped by the Mac's marks, skips taken back, and taps on Skip ad, each counted by a note that
+says by "prepared"; nothing is said when there are no such notes.
 Run: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
@@ -57,7 +57,7 @@ class CountTests(PreparedSetup):
         text = self.text()
         self.assertIn("the phone skipped 4 ads by the Mac's marks", text)
         self.assertIn("you took back 1 of those skips", text)
-        self.assertIn("you pressed Skip ad 2 times where the Mac's marks had no ad", text)
+        self.assertIn("you pressed Skip ad 2 times on the Mac's copy where its marks had no ad", text)
 
     def test_a_third_line_gives_the_same_per_show(self):
         self.prepared(1)
@@ -74,33 +74,34 @@ class CountTests(PreparedSetup):
         self.assertEqual(len(added), 3)
         self.assertIn("That is 1 skip taken back in 4 (25%)", self.text())
 
-    def test_only_notes_by_prepared_count_as_skips_and_undos(self):
+    def test_only_notes_by_prepared_count_as_skips_undos_and_misses(self):
         self.prepared(1)
-        notes = (self.notes_for(1, "skipped", "undone", by="ahead") + self.notes_for(1, "skipped", by="")
-                 + self.notes_for(1, "skipped"))
+        notes = (self.notes_for(1, "skipped", "undone", "missed", by="ahead")
+                 + self.notes_for(1, "skipped", "missed", by="") + self.notes_for(1, "skipped", "missed"))
         self.lines(notes)
         self.assertIn("the phone skipped 1 ad by the Mac's marks", self.text())
         self.assertIn("you took back 0 of those skips", self.text())
+        self.assertIn("you pressed Skip ad 1 time on the Mac's copy where its marks had no ad", self.text())
 
-    def test_a_miss_counts_only_in_an_episode_prepared_json_lists_as_published(self):
+    def test_a_miss_counts_by_its_note_and_not_by_the_episode_being_listed_in_prepared_json(self):
         self.prepared(1)
         self.prepared(2, published=False)
-        elsewhere = [note("missed", feed="https://other.example/f", guid="x")]
-        self.lines(self.notes_for(1, "skipped", "missed", by="") + self.notes_for(2, "missed", by="")
-                   + elsewhere)
-        self.assertIn("you pressed Skip ad 1 time where", self.text())
+        elsewhere = [note("missed", feed="https://other.example/f", guid="x", by="prepared")]
+        self.lines(self.notes_for(1, "missed", by="") + self.notes_for(2, "missed") + elsewhere)
+        self.assertIn("you pressed Skip ad 2 times on the Mac's copy", self.text())
 
-    def test_an_episode_whose_copy_was_removed_still_counts(self):
-        self.prepared(1, removed=500)
-        self.lines(self.notes_for(1, "missed", by=""))
-        self.assertIn("you pressed Skip ad 1 time where", self.text())
-
-    def test_another_spelling_of_the_feed_and_the_audio_address_match_too(self):
+    def test_a_miss_in_a_published_episode_with_no_by_is_not_counted(self):
         self.prepared(1)
-        spelled = note("missed", feed="http://www.a.example/feed1/", guid="g1", by="")
-        by_address = note("missed", feed=FEED % 1, guid="", address="https://a.example/1.mp3", by="")
-        self.lines([spelled, by_address])
-        self.assertIn("you pressed Skip ad 2 times", self.text())
+        self.lines(self.notes_for(1, "missed", by=""))
+        self.assertFalse(any("Prepared" in line for line in self.said))
+
+    def test_a_show_is_named_from_episodes_json_or_by_its_feed(self):
+        self.prepared(1, show="Show A")
+        other = note("skipped", feed="https://zzz.example/f", guid="q", by="prepared")
+        self.lines(self.notes_for(1, "skipped") + [other])
+        line = [line for line in self.said if line.startswith("Per show")][0]
+        self.assertIn("Show A: 1 skipped", line)
+        self.assertIn("zzz.example/f: 1 skipped", line)
 
     def test_nothing_is_said_when_there_are_no_such_notes(self):
         self.prepared(1)
@@ -112,17 +113,10 @@ class CountTests(PreparedSetup):
         self.lines([note("skipped"), note("missed")])
         self.assertFalse(any("Prepared" in line for line in self.said))
 
-    def test_a_skip_by_prepared_counts_even_when_prepared_json_is_missing(self):
-        self.lines(self.notes_for(1, "skipped"))
+    def test_prepared_notes_count_with_no_prepared_json_at_all(self):
+        self.lines(self.notes_for(1, "skipped", "missed"))
         self.assertIn("the phone skipped 1 ad by the Mac's marks", self.text())
-
-    def test_a_damaged_prepared_json_is_said_and_the_rest_still_runs(self):
-        self.prepared(1)
-        with open(os.path.join(self.teaching, "prepared.json"), "w") as f:
-            f.write("nope")
-        self.assertEqual(self.put(self.cloud, self.notes_for(1, "skipped")) and self.run_main(), 0)
-        self.assertTrue(any("prepared.json" in line for line in self.said))
-        self.assertTrue(os.path.exists(os.path.join(self.teaching, "wanted.json")))
+        self.assertIn("you pressed Skip ad 1 time", self.text())
 
     def test_the_summary_comes_after_the_table_and_before_the_closing_sentence(self):
         self.prepared(1)
