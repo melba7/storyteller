@@ -106,6 +106,15 @@ final class AdMaybesTests: XCTestCase {
     XCTAssertEqual(found.count, 1)
   }
 
+  func testALineWithNoLengthDoesNotLoseTheEpisodesMaybes() {
+    var lines = numbered(plain(6) + Array(repeating: "weak", count: 6) + plain(6))
+    lines[1].end = lines[1].start
+    lines[8].end = lines[8].start
+    let found = AdMaybes.weak(
+      model: model(), lines: lines, duration: 100, outside: [], source: "word-model")
+    XCTAssertEqual(found.count, 1)
+  }
+
   func testBadInputGivesNothing() {
     let none = AdMaybes.weak(model: model(), lines: [], duration: nil, outside: [], source: "s")
     XCTAssertTrue(none.isEmpty)

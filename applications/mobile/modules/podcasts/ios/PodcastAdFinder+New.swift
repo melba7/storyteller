@@ -156,6 +156,7 @@ extension PodcastAdFinder {
     }
     var out = snapped ?? collect.written(joints: nil, steadyToo: modes.steadyToo)
     result.moved = out.moved
+    let cued = addCueStretches(id, modes, transcript, to: &out.file)
     result.words = collect.words
     let lines = AdChunker.number(transcript.lines)
     let picked =
@@ -166,7 +167,7 @@ extension PodcastAdFinder {
     let maybes = settingMaybes(id, modes, transcript, collect, picked: picked, in: &out.file)
     PodcastTimeline.mark(
       id,
-      "new finders: \(collect.summary), \(out.moved.count) borders on joints, \(picked.count) questions, \(maybes) maybes"
+      "new finders: \(collect.summary), \(out.moved.count) borders on joints, \(picked.count) questions, opening lines \(cued.openings), filled holes \(cued.holes), \(maybes) maybes"
     )
     guard out.file != fresh, (try? store.save(out.file)) != nil else { return result }
     result.file = store.load(detector: Self.detectorName) ?? out.file

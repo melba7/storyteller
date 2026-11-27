@@ -1,6 +1,6 @@
 // LOFI-FORK: the podcasts section's teaching files from the Mac (see FORK.md).
 //
-// The Mac writes seven teaching files and a list of them, `Podcasts/teaching.json`, into the
+// The Mac writes eight teaching files and a list of them, `Podcasts/teaching.json`, into the
 // linked folder (docs/PODCASTS-ADS-TEACHING.md). These are the rules for which files the phone
 // fetches and for the table of feeds it sends to the native side. Nothing here touches the
 // folder or the native modules (teachingSync.ts does).
@@ -11,8 +11,8 @@ export const TEACHING_LIST_FILE = "Podcasts/teaching.json"
 
 /**
  * The files the Mac may teach with, in the order they are fetched. The Mac's teach_publish.py
- * writes the same seven (its test compares the two lists) and the phone's `TeachingFiles.install`
- * and `AdSoundLibrary.install` take the same seven.
+ * writes the same eight (its test compares the two lists) and the phone's `TeachingFiles.install`
+ * and `AdSoundLibrary.install` take the same eight.
  */
 export const TEACHING_NAMES = [
   "ad-model.json",
@@ -22,6 +22,7 @@ export const TEACHING_NAMES = [
   "ad-meaning.json",
   "show-settings.json",
   "ahead-ads.json",
+  "ad-cues.json",
 ] as const
 
 export type TeachingName = (typeof TEACHING_NAMES)[number]

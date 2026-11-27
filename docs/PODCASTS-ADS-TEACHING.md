@@ -116,6 +116,14 @@ choice (`ShowTuning.apply`, and the finder guard's mode), join the ads that skip
 what was found. `ShowTuning.apply` must run on each finder's own list before the
 join, because a joined ad loses its `source`.
 
+Two more finders use the Mac's `ad-cues.json` (`CueAds`, run by
+`PodcastAdFinder+Cues.swift` after the snap to joints). `opening-lines` pulls the
+start of a skip back to the line that opens the break, and `filled-holes` closes
+a gap of up to 60 seconds between two skips when the words of the gap belong to
+the ads. They only skip, never ask, and the stretches they add touch the ads
+they extend, so they are not cut back from them and the player skips both in one
+jump.
+
 - **A repeat only asks.** A repeated stretch is not always an ad, so a repeat
   never skips on its own: the phone's built-in level for repeats is `ask`, and
   the Mac's rules only make the phone stricter, never looser. (A hand edit of

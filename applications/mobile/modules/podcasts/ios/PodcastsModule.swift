@@ -356,7 +356,7 @@ public final class PodcastsModule: Module {
     // MARK: Teaching
 
     // Keeps a file the Mac made (ad-model.json, ad-library.json, show-habits.json, ad-sounds.json,
-    // ad-meaning.json, show-settings.json or ahead-ads.json) when its SHA-256 is right and it reads
+    // ad-meaning.json, show-settings.json, ahead-ads.json or ad-cues.json) when its SHA-256 is right and it reads
     // as that file.
     // True when it was kept; the episodes are looked at again then.
     AsyncFunction("installTeachingFile") { (name: String, text: String, sha256: String) -> Bool in

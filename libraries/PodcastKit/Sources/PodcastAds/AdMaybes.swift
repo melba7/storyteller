@@ -26,11 +26,13 @@ public enum AdMaybes {
   /// stay threshold of `stayChance`, of the three ad sorts only (never credits), joined where they
   /// overlap and cut to the parts outside every stretch in `outside`. Parts of `minLength`
   /// seconds or more and at most `AdRules.maxLength` are kept, each a `guess` with the span's
-  /// kind and `source`. Lines with no real time are left out, so bad input gives nothing.
+  /// kind and `source`. A line whose start or end is not a finite time gives nothing for the whole
+  /// episode; a line with no length (a one-word line) is fine, since only the first line's start
+  /// and the last line's end of a span are used.
   public static func weak(
     model: AdWordModel, lines: [NumberedLine], duration: Double?, outside: [FoundAd], source: String
   ) -> [FoundAd] {
-    let real = lines.filter { $0.start.isFinite && $0.end.isFinite && $0.end > $0.start }
+    let real = lines.filter { $0.start.isFinite && $0.end.isFinite }
     guard real.count == lines.count, !lines.isEmpty else { return [] }
     var cutoffs = AdWordModel.Thresholds()
     cutoffs.start = startChance

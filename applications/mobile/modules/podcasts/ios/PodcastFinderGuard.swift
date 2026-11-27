@@ -45,11 +45,15 @@ enum FinderNames {
   /// The Mac's marks of the night before, found again by their words (`AheadAds`).
   static let ahead = ShowTuning.ahead
   static let joints = "joints"
+  /// The two finders that move skips with the Mac's cues (CueAds): they only skip, never ask.
+  static let openingLines = ShowTuning.openingLines
+  static let filledHoles = ShowTuning.filledHoles
   /// The word model's middle band, which only asks (AdAsks).
   static let wordModel = "word-model"
   /// The finders a skip or a question can come from: their answers go to the guard.
   static let answerable: Set<String> = [
-    ownSound, repeatSound, repeatWords, meaning, appleModel, ahead, wordModel,
+    ownSound, repeatSound, repeatWords, meaning, appleModel, ahead, wordModel, openingLines,
+    filledHoles,
   ]
 }
 

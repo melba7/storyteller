@@ -67,13 +67,14 @@ describe("parseTeachingList", () => {
     ).toBeNull()
   })
 
-  it("keeps only the seven known files", () => {
+  it("keeps only the eight known files", () => {
     const parsed = parseTeachingList(
       list({
         "ad-model.json": { sha256: SHA_A, bytes: 1 },
         "ad-meaning.json": { sha256: SHA_B, bytes: 2 },
         "show-settings.json": { sha256: SHA_B, bytes: 3 },
         "ahead-ads.json": { sha256: SHA_A, bytes: 4 },
+        "ad-cues.json": { sha256: SHA_B, bytes: 5 },
         "../secret.json": { sha256: SHA_A, bytes: 1 },
         "other.json": { sha256: SHA_A, bytes: 1 },
       }),
@@ -83,6 +84,7 @@ describe("parseTeachingList", () => {
       "ad-meaning.json",
       "show-settings.json",
       "ahead-ads.json",
+      "ad-cues.json",
     ])
   })
 
@@ -101,7 +103,7 @@ describe("parseTeachingList", () => {
 })
 
 describe("TEACHING_NAMES", () => {
-  it("is the seven files of the Mac's teach_publish.py, the model files first", () => {
+  it("is the eight files of the Mac's teach_publish.py, the model files first", () => {
     expect([...TEACHING_NAMES]).toEqual([
       "ad-model.json",
       "ad-library.json",
@@ -110,6 +112,7 @@ describe("TEACHING_NAMES", () => {
       "ad-meaning.json",
       "show-settings.json",
       "ahead-ads.json",
+      "ad-cues.json",
     ])
   })
 })
