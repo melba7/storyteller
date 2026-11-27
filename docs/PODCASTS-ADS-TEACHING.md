@@ -189,7 +189,8 @@ The teaching folder is `~/Storyteller Lofi/PodcastTeaching` on the Mac. It is
 never committed. `teach_publish.py` copies seven files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
 the phone has linked. It also copies `ahead-ads.json` (see "The nightly
-read-ahead" below) when the nightly job has made one.
+read-ahead" below) when the nightly job has made one, and `ad-cues.json` when
+`teach_cues.py` has written one.
 
 | File                 | Made by                 | Holds                                                |
 | -------------------- | ----------------------- | ---------------------------------------------------- |
@@ -200,7 +201,8 @@ read-ahead" below) when the nightly job has made one.
 | `ad-meaning.json`    | `podcast-teach meaning` | weights of the meaning model, with two probe vectors |
 | `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
 | `ahead-ads.json`     | the Mac's read-ahead    | the ads marked in the next episodes, by their words  |
-| `teaching.json`      | `teach_publish.py`      | the seven files' sizes and SHA-256, read first       |
+| `ad-cues.json`       | `teach_cues.py`         | the lines that open an ad or come back after one     |
+| `teaching.json`      | `teach_publish.py`      | the files' sizes and SHA-256, read first             |
 
 All are JSON objects with `"version": 1` (the word model may be 2) and stay
 under 4.5 MB (the phone refuses a file over 5 MB).
@@ -256,6 +258,17 @@ under 4.5 MB (the phone refuses a file over 5 MB).
   out when the file is read. `teach_publish.py` copies it from `ahead-ads.json`
   in the teaching folder to `Podcasts/ahead-ads.json` and lists it in
   `teaching.json`, as the nightly read-ahead (`teach_ahead.py`) writes it.
+- `ad-cues.json`:
+  `{"version": 1, "writtenAt", "episodes", "starts": [...], "returns": [...], "shows": [{"feed", "starts", "returns"}], "common": [...], "usual": [...]}`.
+  A cue is the first 3 to 6 words of a transcript line (made as
+  `teach_features.py` makes words), joined by one space. `starts` are the cues
+  of lines that open an ad and `returns` those of the first line after an ad;
+  `shows` holds the same per show (by feed address), only for shows that have
+  one. `common` and `usual` are words of 4 letters or more that occur in more
+  than 15 in 100, and in more than 5 up to 15 in 100, of the episodes it learned
+  from. It holds words of transcripts and is never committed. The file is under
+  100 KB; the phone refuses one over 5 MB or without the five lists.
+  `teach_publish.py` lists it in `teaching.json` and its absence is quiet.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
 
@@ -319,9 +332,10 @@ beside Claude's `labels/`, which are never overwritten, and the later steps use
 the snapped labels when they exist. The snap step is left out when there is no
 second download.
 
-**The finish steps.** `teach-finish.sh` prints "Step N of 8": the snap (only
+**The finish steps.** `teach-finish.sh` prints "Step N of 9": the snap (only
 when `copies/` or `labels-snapped/` exists), then habits, the word model, the
-library, the sounds, the meaning model, the joints of the audio
+opening and return lines (`teach_cues.py`, after the model so `shelf.json` is
+current), the library, the sounds, the meaning model, the joints of the audio
 (`podcast-teach joints`, kept in `joints.json` so the score needs no audio for
 its joint rows), the score, the per-show settings and the copy to the phone's
 folders. `podcast-teach meaning` exits 2 for a set-up problem (for example, no

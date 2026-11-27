@@ -10,7 +10,7 @@ import test_teach_shell as shell
 
 LABELS = "--labels labels-snapped"
 # What the steps that read labels are, by the start of the call the stand-ins record.
-READING_LABELS = ("python3 teach_habits.py", "python3 teach_train.py", "python3 teach_library.py",
+READING_LABELS = ("python3 teach_habits.py", "python3 teach_train.py", "python3 teach_cues.py", "python3 teach_library.py",
                   "podcast-teach sounds", "podcast-teach meaning", "podcast-teach score")
 NOT_READING_LABELS = ("python3 teach_settings.py", "python3 teach_publish.py")
 CODES = (0, 1, 2, 3, 130)
@@ -177,7 +177,7 @@ class MeaningTests(Steps):
         self.program("caffeinate", '#!/bin/bash\necho "caffeinate $*" >> "$CALLS"\nshift\nexec "$@"\n')
         self.finish()
         wrapped = [c for c in self.called() if c.startswith("caffeinate -i ")]
-        for step in ("teach_habits.py", "teach_train.py", "teach_library.py"):
+        for step in ("teach_habits.py", "teach_train.py", "teach_cues.py", "teach_library.py"):
             self.assertEqual(len([c for c in wrapped if step in c]), 1, step)
         meaning = [c for c in wrapped if " meaning " in c]
         self.assertEqual(meaning, ["caffeinate -i %s/podcast-teach meaning %s" % (self.bin, self.folder)])
@@ -269,7 +269,7 @@ class WholeRunTests(Steps):
         summary = done.stdout[done.stdout.index("Summary:"):]
         import re
         self.assertEqual(re.findall(r"^  (\w+): ", summary, re.M),
-                         ["Backup", "Snap", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+                         ["Backup", "Snap", "Habits", "Model", "Cues", "Library", "Sounds", "Meaning", "Joints",
                           "Score", "Settings", "Publish"])
 
     def test_the_weekly_run_goes_through_the_same_steps(self):
