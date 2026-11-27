@@ -235,3 +235,19 @@ One line per lesson.
 - A launcher's `read -p "message"` prints nothing when its input is not a
   terminal, so a test never saw the closing message. Print messages with `echo`
   and keep `read` for the Return key only (2026-11-25).
+- Two builders each added a teaching file in their own worktree, and two tests
+  that pin how many teaching files there are failed after the merge. Run the
+  whole check right after merging parallel work, before anything is built on it
+  (2026-11-26).
+- The quick trial joined stretches only when they touch; the player and the
+  scorer chain ads that lie within half a second. The real scorer passed one
+  break fewer than the trial. A trial replays the bar with the player's own
+  chain rule (2026-11-26).
+- The opening lines passed their trial with a reach of 120 s, and one of the
+  seven pulls on the shelf cut 83 s of show. A total hides that. Before a finder
+  that moves a border ships, list each break it makes worse and how far it went
+  (2026-11-27).
+- A finder that only extends another finder's ad was undone together with that
+  ad, and the Undo counted against the finder that was right. When a new finder
+  chains its stretches to other ads, decide what an Undo of the chain takes back
+  (2026-11-27).

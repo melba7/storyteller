@@ -1801,9 +1801,9 @@ and only kinds the listener skips. With no `ad-cues.json` they add nothing.
    the listener's trims, not undone): leave it and the ads that follow it at
    once, like the Skip ad button, with the note and Undo.
 3. The playhead is in an open question: the tap is the answer yes.
-4. The playhead is in a maybe (from 2 s before its start, as for a known ad):
-   it becomes a confirmed ad (as a yes does) and is left, with the ads that
-   follow it at once.
+4. The playhead is in a maybe (from 2 s before its start, as for a known ad): it
+   becomes a confirmed ad (as a yes does) and is left, with the ads that follow
+   it at once.
 5. The playhead is in a hole of 60 s or less between two ads that are skipped:
    go to the end of the ads after the hole, and note a miss for the hole.
 6. Otherwise move ahead by the button's seconds; when that lands inside an ad
@@ -1849,8 +1849,8 @@ tap); its proof is the rule's tests and the phone.
       its feed, as `ShowTuning` does; a damaged file reads as empty) and
       `CueAds` holds the two rules.
   - Done when: tests pin each rule on made-up transcripts (the return line that
-    stops a pull, the two 60 s limits, echo and topic, a chain of two
-    holes) and bad input adds nothing.
+    stops a pull, the two 60 s limits, echo and topic, a chain of two holes) and
+    bad input adds nothing.
 - [ ] **X3 The scorecard rows**: "Plus opening lines" and "Plus filled holes",
       last in the scorecard, standing on the Mac's marks row when `--ahead` is
       given and on the last finder row otherwise, with the verdict line of the
@@ -1876,6 +1876,20 @@ cues arrived, and per-show levels for them from `teach_settings.py`.
 
 ## Later
 
+- Timing fixes and the skip tap (2026-11-27), found by the Opus check and not
+  fixed: a pull that the phone then throws away (it lies over an undone stretch,
+  a "no" or an ad of a kind that is not skipped) still uses up the stretch's one
+  pull, so a later opening line of the same ad is lost; the questions are picked
+  before the two finders' stretches are known, so the timeline's count of
+  questions can include one that was dropped; the meaning model's middle band
+  makes no maybes; a tap whose answer or confirmation cannot be saved falls back
+  to the plain move without the landing rule.
+- The same round, seen on the Mac (2026-11-27): the "Score" step of
+  `teach-finish.sh` failed in the last two finishes and the log does not say why
+  (`scorecard.json` is of 2026-11-23). The steps after it ran.
+- The same round, in the scorecard: when a new stretch joins a skip with no ad
+  to a skip of an ad, "skips with no ad" falls by one although the same show
+  time is cut. Read that number together with the breaks that start early.
 - The second-copy trial (2026-11-26), found and not fixed: `teach_snap.py` adds
   every unmarked differing stretch of 10 to 300 s as a sponsor label, so an
   episode whose second download is another version of it (The Daily
