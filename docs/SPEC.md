@@ -130,6 +130,16 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   uses them to start a skip on the break's first line and to skip a short
   unrecognised piece between two ads. Check: the scorecard's rows "Plus opening
   lines" and "Plus filled holes".
+- The Mac prepares new episodes and the phone plays the Mac's copy (Mo's pick,
+  2026-11-27: "All new episodes, all shows"). Every hour the Mac looks at every
+  followed show, downloads each new episode twice, writes it down, has Claude
+  mark the ads, and puts that very file with the ads' times into the linked
+  iCloud folder, under a weekly limit of $35 of Claude usage and 10 GB of iCloud
+  space. The phone takes that file in place of its own download for the episodes
+  it expects to play next and skips by the Mac's times. An episode with no
+  prepared copy plays and is skipped as before. Check: an episode the Mac
+  prepared says "Prepared by your Mac" and its ads are skipped at the marked
+  times, and with the Mac off a new episode still plays and skips as before.
 
 ## Out of scope (v1)
 
