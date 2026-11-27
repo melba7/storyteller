@@ -131,7 +131,9 @@ final class PodcastAdFinder: @unchecked Sendable {
       guard let (ads, transcripts) = stores(for: id, in: downloads) else { continue }
       // The Mac's marks on a copy it prepared are final: nothing is found again for it, and no
       // transcript is waited for to say what it holds (PreparedAds).
-      let preparedFile = ads.load(detector: Self.detectorName).flatMap { $0.isPrepared ? $0 : nil }
+      let preparedFile = ads.load(detector: Self.detectorName).flatMap {
+        $0.isPrepared ? $0 : nil
+      }
       notePrepared(id, preparedFile != nil)
       if let preparedFile {
         present.insert(id)
@@ -214,7 +216,9 @@ final class PodcastAdFinder: @unchecked Sendable {
       guard let sink else { return nil }
       return (sink, preparedIds.contains(id))
     }
-    if let (sink, prepared) = send { sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared)) }
+    if let (sink, prepared) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared))
+    }
   }
 
   /// Notes whether the episode's final ads file is the Mac's prepared one, and tells the app
@@ -226,7 +230,9 @@ final class PodcastAdFinder: @unchecked Sendable {
       guard let sink, let status = statuses[id] else { return nil }
       return (sink, status)
     }
-    if let (sink, status) = send { sink("onAdsChange", AdsJSON.object(id, status, prepared: on)) }
+    if let (sink, status) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: on))
+    }
   }
 
   // MARK: Working

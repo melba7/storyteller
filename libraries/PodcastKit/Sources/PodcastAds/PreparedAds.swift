@@ -29,6 +29,12 @@ public enum PreparedAds {
     source == Self.source ? Self.source : nil
   }
 
+  /// The finder name a "missed" note carries: "prepared" when the player's file is a prepared copy
+  /// (the Mac's marks missed an ad), nil for any other file or none.
+  public static func noteName(forFile file: AdsFile?) -> String? {
+    file?.isPrepared == true ? source : nil
+  }
+
   /// The ads file of the copy `entry` names, or nil when the entry has no copy or `duration` (the
   /// copy's length in seconds) is not a real length. Its SHA-256 is the copy's.
   ///

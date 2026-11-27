@@ -4,7 +4,7 @@ import XCTest
 
 /// Which of the Mac's copies the phone takes and which it gives back.
 final class PreparedCopiesTests: XCTestCase {
-  private func copy(_ tag: String = "a") -> PreparedCopy {
+  private func aCopy(_ tag: String = "a") -> PreparedCopy {
     PreparedCopy(
       file: "prepared/\(tag).mp3", sha256: String(repeating: tag == "a" ? "a" : "b", count: 64),
       bytes: 10)
@@ -17,7 +17,7 @@ final class PreparedCopiesTests: XCTestCase {
   ) -> PreparedCopies.Candidate {
     PreparedCopies.Candidate(
       id: id, listPlace: place, download: download, started: started, inPlayer: playing,
-      copyForListOnly: forList, listed: listed ?? copy())
+      copyForListOnly: forList, listed: listed ?? aCopy())
   }
 
   private func plan(_ candidates: [PreparedCopies.Candidate], most: Int = 3) -> PreparedCopies.Plan {
@@ -60,7 +60,7 @@ final class PreparedCopiesTests: XCTestCase {
   }
 
   func testAnEpisodeThatHasThatVeryCopyIsNotTakenAgain() {
-    let same = copy().sha256
+    let same = aCopy().sha256
     XCTAssertEqual(plan([candidate("a", place: 0, download: .downloaded(sha256: same))]).take, [])
     XCTAssertEqual(
       plan([candidate("a", place: 0, download: .downloaded(sha256: same.uppercased()))]).take, [])
@@ -80,10 +80,10 @@ final class PreparedCopiesTests: XCTestCase {
     XCTAssertEqual(taken, ["l0", "l1", "l2", "x", "y"])
   }
 
-  func testAtMostThreeARunUnlessToldOtherwise() {
-    let list = (0..<6).map { (n: Int) in candidate("e\(n)", place: n) }
-    XCTAssertEqual(PreparedCopies.most, 3)
-    XCTAssertEqual(PreparedCopies.plan(list).take, ["e0", "e1", "e2"])
+  func testAtMostTheWholeListARunUnlessToldOtherwise() {
+    let list = (0..<15).map { (n: Int) in candidate("e\(n)", place: n) }
+    XCTAssertEqual(PreparedCopies.most, 12)
+    XCTAssertEqual(PreparedCopies.plan(list).take, (0..<12).map { "e\($0)" })
     XCTAssertEqual(plan(list, most: 5).take.count, 5)
     XCTAssertEqual(plan(list, most: 0).take, [])
     XCTAssertEqual(plan(list, most: -2).take, [])
@@ -106,26 +106,26 @@ final class PreparedCopiesTests: XCTestCase {
   // MARK: What is given back
 
   func testACopyTakenForTheListIsGivenBackOnceTheEpisodeLeavesIt() {
-    let held = PreparedCopies.Download.downloaded(sha256: copy().sha256)
+    let held = PreparedCopies.Download.downloaded(sha256: aCopy().sha256)
     XCTAssertEqual(plan([candidate("a", download: held, forList: true)]).giveBack, ["a"])
   }
 
   func testItStaysWhileTheEpisodeIsOnTheListStartedOrInThePlayer() {
-    let held = PreparedCopies.Download.downloaded(sha256: copy().sha256)
+    let held = PreparedCopies.Download.downloaded(sha256: aCopy().sha256)
     XCTAssertEqual(plan([candidate("a", place: 3, download: held, forList: true)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: held, started: true, forList: true)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: held, playing: true, forList: true)]).giveBack, [])
   }
 
   func testACopyNotTakenForTheListIsNeverGivenBack() {
-    let held = PreparedCopies.Download.downloaded(sha256: copy().sha256)
+    let held = PreparedCopies.Download.downloaded(sha256: aCopy().sha256)
     XCTAssertEqual(plan([candidate("a", download: held, forList: false)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: .none, forList: true)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: .moving, forList: true)]).giveBack, [])
   }
 
   func testGivingBackIsNotCappedAndKeepsTheOrder() {
-    let held = PreparedCopies.Download.downloaded(sha256: copy().sha256)
+    let held = PreparedCopies.Download.downloaded(sha256: aCopy().sha256)
     let back = plan((0..<5).map { candidate("e\($0)", download: held, forList: true) }).giveBack
     XCTAssertEqual(back, ["e0", "e1", "e2", "e3", "e4"])
   }

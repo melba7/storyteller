@@ -1,8 +1,9 @@
 // LOFI-FORK: the podcasts section's teaching files from the Mac (see FORK.md).
 //
 // Runs the exchange with the Mac where the Apple Podcasts list is read (the app's start and
-// coming to the front): first the teaching files come in, then the Mac's prepared copies of
-// episodes (preparedRun.ts), then the phone's notes go out. At most once in ten minutes, never waited for, and nothing here throws. Not imported
+// coming to the front): first the teaching files come in, then the phone's notes go out, then
+// the Mac's prepared copies of episodes are taken (preparedRun.ts), so a slow copy never delays
+// the notes. At most once in ten minutes, never waited for, and nothing here throws. Not imported
 // by any test, because the native modules are not there; the rule for "once in ten minutes" is
 // dueForTeaching in teaching.ts.
 import { currentQueue, syncPhoneNotes } from "./phoneNotesSync"
@@ -31,8 +32,8 @@ export function runTeachingSync(): void {
       } catch (cause) {
         console.warn("Couldn't read the teaching files from the Mac", cause)
       }
-      await runPrepared(queue)
       await syncPhoneNotes(queue)
+      await runPrepared(queue)
     } catch (cause) {
       console.warn("Couldn't exchange files with the Mac", cause)
     } finally {

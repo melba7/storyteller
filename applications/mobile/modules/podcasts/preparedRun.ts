@@ -95,6 +95,14 @@ export async function runPrepared(
         tempFile: (take) =>
           `${tempFolder()}${take.id.replace(/[^A-Za-z0-9_-]/g, "_")}.${take.fileExtension}`,
         removeFile: (uri) => FileSystem.deleteAsync(uri, { idempotent: true }),
+        now: () => Date.now(),
+        later: (ms, run) => {
+          setTimeout(() => {
+            run().catch((cause: unknown) =>
+              console.warn("Couldn't take the Mac's prepared copies", cause),
+            )
+          }, ms)
+        },
         clearTemp: async () => {
           await FileSystem.deleteAsync(tempFolder(), { idempotent: true })
           await FileSystem.makeDirectoryAsync(tempFolder(), {
