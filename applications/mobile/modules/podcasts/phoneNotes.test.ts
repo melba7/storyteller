@@ -120,6 +120,20 @@ describe("noteLine", () => {
     expect(Object.keys(JSON.parse(line) as object).at(-1)).toBe("by")
   })
 
+  it("passes by prepared through for the skip and the Undo of a prepared ad", () => {
+    for (const what of ["skipped", "undone"]) {
+      const [prepared] = parsePendingNotes(
+        pending({ what, by: "prepared" }),
+      ).notes
+      const line = JSON.parse(noteLine(prepared!, null)) as Record<
+        string,
+        unknown
+      >
+      expect(line["by"]).toBe("prepared")
+      expect(line["what"]).toBe(what)
+    }
+  })
+
   it("writes empty text for an episode that is gone and null for no end", () => {
     const [missed] = parsePendingNotes(pending({ end: null })).notes
     const line = JSON.parse(noteLine(missed!, null)) as Record<string, unknown>

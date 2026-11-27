@@ -55,6 +55,32 @@ describe("adsStatus", () => {
     )
   })
 
+  it("says a copy the Mac prepared is prepared, with ads or without", () => {
+    expect(adsStatus(info("found", { count: 3, prepared: true }))).toBe(
+      "Prepared by your Mac",
+    )
+    expect(adsStatus(info("noAds", { prepared: true }))).toBe(
+      "Prepared by your Mac",
+    )
+    expect(
+      withAds("Downloaded", info("found", { count: 1, prepared: true })),
+    ).toBe("Downloaded · Prepared by your Mac")
+    // Not prepared, or not saying: the words are the ordinary ones.
+    expect(adsStatus(info("found", { count: 3, prepared: false }))).toBe(
+      "3 ads found",
+    )
+    expect(adsStatus(info("noAds"))).toBe("No ads found")
+  })
+
+  it("does not call a copy prepared while it is still being found or cannot be", () => {
+    expect(adsStatus(info("finding", { prepared: true }))).toBe("Finding ads")
+    expect(
+      adsStatus(
+        info("unavailable", { reason: "Needs iOS 26", prepared: true }),
+      ),
+    ).toBe("Needs iOS 26")
+  })
+
   it("gives the reason when ads can't be found", () => {
     expect(
       adsStatus(info("unavailable", { reason: "Apple Intelligence is off" })),
@@ -148,6 +174,14 @@ describe("parseAdsFile", () => {
     )
     expect(file?.ads.map((item) => item.start)).toEqual([60, 300])
     expect(file?.undone).toEqual([{ start: 300, end: 360 }])
+  })
+
+  it("says whether the file is the Mac's prepared one", () => {
+    const text = (extra: object) =>
+      JSON.stringify({ ads: [ad(60, 120)], undone: [], ...extra })
+    expect(parseAdsFile(text({ prepared: true }))?.prepared).toBe(true)
+    expect(parseAdsFile(text({}))?.prepared).toBeUndefined()
+    expect(parseAdsFile(text({ prepared: "yes" }))?.prepared).toBeUndefined()
   })
 
   it("reads all four sorts and takes an unknown one for an ad", () => {

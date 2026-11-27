@@ -200,6 +200,29 @@ describe("playerAdLine", () => {
     ).toBe("Finding ads")
   })
 
+  it("says a prepared episode is prepared by the Mac, before its transcript is done", () => {
+    const line = (adsInfo: AdsInfo, transcriptInfo?: TranscriptInfo) =>
+      playerAdLine({
+        ...base,
+        download: download("downloaded"),
+        transcript: transcriptInfo,
+        ads: adsInfo,
+      })
+    expect(line(ads("found", { count: 2, prepared: true }))).toBe(
+      "Prepared by your Mac",
+    )
+    expect(
+      line(ads("noAds", { prepared: true }), transcript("transcribing")),
+    ).toBe("Prepared by your Mac")
+    expect(
+      adsToShow(
+        true,
+        transcript("waiting"),
+        ads("found", { count: 2, prepared: true }),
+      ),
+    ).toEqual(ads("found", { count: 2, prepared: true }))
+  })
+
   it("counts the ads found, and says when there are none", () => {
     const line = (adsInfo: AdsInfo) =>
       playerAdLine({
