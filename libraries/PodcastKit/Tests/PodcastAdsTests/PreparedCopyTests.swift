@@ -5,7 +5,7 @@ import XCTest
 /// The copy an entry of `ahead-ads.json` may carry: how the phone reads it and what a bad one means.
 final class PreparedCopyTests: XCTestCase {
   private let now = Date(timeIntervalSince1970: 1_800_000_000)
-  private let hash = String(repeating: "ab", count: 32)
+  private let goodSha = String(repeating: "ab", count: 32)
 
   private func mark() -> String {
     #"{"kind": "ad", "confidence": "high", "start": 50, "end": 80, "startWords": "one two three four five six seven eight", "endWords": "nine ten eleven twelve thirteen fourteen fifteen sixteen"}"#
@@ -22,13 +22,13 @@ final class PreparedCopyTests: XCTestCase {
   private func copy(
     file: String = "prepared/0123456789ab.mp3", sha: String? = nil, bytes: String = "48123456"
   ) -> String {
-    #"{"file": "\#(file)", "sha256": "\#(sha ?? hash)", "bytes": \#(bytes)}"#
+    #"{"file": "\#(file)", "sha256": "\#(sha ?? goodSha)", "bytes": \#(bytes)}"#
   }
 
   func testAGoodCopyIsRead() {
     let read = entry(copy: copy())
     XCTAssertEqual(
-      read?.copy, PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: hash, bytes: 48_123_456))
+      read?.copy, PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: goodSha, bytes: 48_123_456))
     XCTAssertEqual(read?.ads.count, 1)
   }
 
@@ -39,7 +39,7 @@ final class PreparedCopyTests: XCTestCase {
 
   func testTheHashIsKeptInLowerCase() {
     let upper = String(repeating: "AB", count: 32)
-    XCTAssertEqual(entry(copy: copy(sha: upper))?.copy?.sha256, hash)
+    XCTAssertEqual(entry(copy: copy(sha: upper))?.copy?.sha256, goodSha)
   }
 
   func testACopyThatIsNotPlainReadsAsNoCopyAndTheEntryIsStillRead() {
@@ -51,7 +51,7 @@ final class PreparedCopyTests: XCTestCase {
       copy(sha: String(repeating: "a", count: 63)), copy(sha: String(repeating: "a", count: 65)),
       copy(sha: String(repeating: "g", count: 64)), copy(sha: ""),
       copy(bytes: "0"), copy(bytes: "-5"), copy(bytes: "1.5"), copy(bytes: #""big""#),
-      #"{"file": "prepared/a.mp3", "sha256": "\#(hash)"}"#, "3", #""prepared/a.mp3""#, "null",
+      #"{"file": "prepared/a.mp3", "sha256": "\#(goodSha)"}"#, "3", #""prepared/a.mp3""#, "null",
     ]
     for text in bad {
       let read = entry(copy: text)
@@ -85,7 +85,7 @@ final class PreparedCopyTests: XCTestCase {
     XCTAssertFalse(text.contains("copy"))
     XCTAssertTrue(text.contains(#""version":1"#))
     var carried = plain
-    carried.copy = PreparedCopy(file: "prepared/a.mp3", sha256: hash, bytes: 7)
+    carried.copy = PreparedCopy(file: "prepared/a.mp3", sha256: goodSha, bytes: 7)
     let again = AheadFile(data: try XCTUnwrap(AheadFile(episodes: [carried]).encoded()))
     XCTAssertEqual(again.episodes.first?.copy, carried.copy)
   }

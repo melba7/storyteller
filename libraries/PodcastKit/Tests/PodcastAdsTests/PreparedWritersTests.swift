@@ -5,11 +5,11 @@ import XCTest
 
 /// Everything that writes found ads into an ads file leaves a prepared file exactly as it is.
 final class PreparedWritersTests: XCTestCase {
-  private let hash = String(repeating: "ef", count: 32)
+  private let sha = String(repeating: "ef", count: 32)
   private let detector = "apple-on-device"
 
   private func prepared() -> AdsFile {
-    let copy = PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: hash, bytes: 1000)
+    let copy = PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: sha, bytes: 1000)
     let marks = [
       AheadMark(
         kind: .ad, confidence: .high, start: 100, end: 160, startWords: "one two three",
@@ -30,7 +30,7 @@ final class PreparedWritersTests: XCTestCase {
   }
 
   private func savedStore() throws -> (AdsStore, Data) {
-    let store = AdsStore(folder: try temporaryFolder(), sha256: hash)
+    let store = AdsStore(folder: try temporaryFolder(), sha256: sha)
     try store.save(prepared())
     return (store, try Data(contentsOf: store.url(detector: detector)))
   }
@@ -82,7 +82,7 @@ final class PreparedWritersTests: XCTestCase {
       asked.add()
       return [range(1, 2)]
     }
-    let transcript = makeTranscript(talk(60), sha: hash)
+    let transcript = makeTranscript(talk(60), sha: sha)
     let outcome = try await AdsRunner.run(
       transcript: transcript, detector: detect, store: store, osVersion: "26")
     XCTAssertEqual(outcome, .finished(prepared()))
@@ -100,7 +100,7 @@ final class PreparedWritersTests: XCTestCase {
     let (store, _) = try savedStore()
     XCTAssertTrue(store.hasPrepared(detector: detector))
     XCTAssertFalse(store.hasPrepared(detector: "other"))
-    XCTAssertFalse(AdsStore(folder: try temporaryFolder(), sha256: hash).hasPrepared(detector: detector))
+    XCTAssertFalse(AdsStore(folder: try temporaryFolder(), sha256: sha).hasPrepared(detector: detector))
     XCTAssertTrue(prepared().isPrepared)
     var plain = prepared()
     plain.prepared = false

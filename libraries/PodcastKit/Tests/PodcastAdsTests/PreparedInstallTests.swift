@@ -4,13 +4,13 @@ import XCTest
 
 /// What the phone checks before it swaps in a copy the Mac prepared.
 final class PreparedInstallTests: XCTestCase {
-  private let hash = String(repeating: "ab", count: 32)
+  private let goodSha = String(repeating: "ab", count: 32)
   private let other = String(repeating: "cd", count: 32)
 
   private func copy(_ file: String = "prepared/0123456789ab.mp3", bytes: Int64 = 1000)
     -> PreparedCopy
   {
-    PreparedCopy(file: file, sha256: hash, bytes: bytes)
+    PreparedCopy(file: file, sha256: goodSha, bytes: bytes)
   }
 
   // MARK: Before the file is read
@@ -40,20 +40,20 @@ final class PreparedInstallTests: XCTestCase {
   // MARK: After the file is read
 
   func testTheRightSizeAndHashPass() {
-    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: hash))
+    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: goodSha))
   }
 
   func testTheHashMayBeInUpperCase() {
-    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: hash.uppercased()))
+    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: goodSha.uppercased()))
   }
 
   func testAWrongSizeIsRefusedWhateverTheHash() {
-    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 999, sha256: hash), .size)
+    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 999, sha256: goodSha), .size)
     XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 999, sha256: other), .size)
   }
 
   func testAWrongHashIsRefused() {
-    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: other), .hash)
+    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: other), .goodSha)
   }
 
   // MARK: The file's extension
