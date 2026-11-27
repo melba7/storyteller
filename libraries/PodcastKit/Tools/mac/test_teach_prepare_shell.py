@@ -467,6 +467,28 @@ class JobTests(Setup):
         self.assertFalse(os.path.exists(self.plist))
         self.assertEqual(self.launchctl(), ["launchctl bootout gui/501/" + self.LABEL])
         self.assertIn("Episode preparing is off", done.stdout + done.stderr)
+        self.assertEqual(self.cleaning(), [])
+
+    def cleaning(self):
+        return [c for c in self.called() if c.startswith("python3 teach_prepared.py")]
+
+    def test_the_stopper_asks_and_on_yes_cleans_with_zero_keep_days_through_the_same_tool(self):
+        done = self.run_file(self.STOP, answer="yes\n\n")
+        self.assertEqual(done.returncode, 0, done.stdout)
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        self.assertEqual(self.cleaning(), ["python3 teach_prepared.py clean --folder %s --keep-days 0" % folder])
+        self.assertEqual(self.launchctl(), ["launchctl bootout gui/501/" + self.LABEL])
+        self.assertIn("prepared episodes from iCloud", done.stdout)
+
+    def test_the_stopper_keeps_the_copies_on_any_other_answer_and_says_they_stay(self):
+        for answer in ("\n\n", "no\n\n", "y\n\n", "yes please\n\n"):
+            open(self.calls, "w").close()
+            done = self.run_file(self.STOP, answer=answer)
+            self.assertEqual(done.returncode, 0, answer)
+            self.assertEqual(self.cleaning(), [], answer)
+            self.assertIn("stay", done.stdout)
+            self.assertIn("take space until the job runs again or you remove them by hand", done.stdout)
+            self.assertEqual(self.launchctl(), ["launchctl bootout gui/501/" + self.LABEL], answer)
 
     def test_the_nightly_installer_and_stopper_still_work_on_their_own_job(self):
         done = self.run_file("Install nightly read-ahead.command")

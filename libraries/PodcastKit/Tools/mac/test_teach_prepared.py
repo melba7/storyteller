@@ -36,7 +36,9 @@ class Base(unittest.TestCase):
     def prepared_folder(self):
         return os.path.join(self.dest, "Podcasts", "prepared")
 
-    def episode(self, number, size=1000, label=True, audio=True, ahead_too=True, extension="mp3"):
+    def episode(self, number, size=1000, label=True, audio=True, ahead_too=True, extension="mp3",
+                settled=True):
+        """An episode of ahead.json; `settled` gives it a truth file (its second download is done)."""
         item = teach_testing.entry(number, audio=audio)
         if audio:
             item["file"] = "audio/%s.%s" % (item["id"], extension)
@@ -50,6 +52,10 @@ class Base(unittest.TestCase):
                 json.dump({"version": 1, "episode": item["id"], "writtenAt": NOW * 1000, "segments": []}, f)
         self.entries.append(item)
         self.folder.write_manifest(self.entries)
+        if settled:
+            os.makedirs(self.folder.path("copies"), exist_ok=True)
+            with open(self.folder.path("copies", item["id"] + ".truth.txt"), "w") as f:
+                f.write("# the two downloads agree\n")
         if ahead_too:
             ahead.add_ahead(self.folder.dir, [{"id": item["id"], "feed": "https://phone/%d" % number,
                                                "guid": "g%d" % number, "title": "T%d" % number,

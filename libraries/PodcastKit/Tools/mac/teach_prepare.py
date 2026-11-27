@@ -39,6 +39,7 @@ import teach_store
 from apple_podcasts_export import default_folders
 from teach_ahead import NOTHING, plural
 from teach_ahead_set import add_ahead, read_ahead
+from teach_prepared_file import add_picked
 
 HOURS = 72
 MOST = 6
@@ -101,7 +102,10 @@ def choosing(folder, items, options, shows, say, now):
         say("There is nothing to prepare: the %s looked at %s already marked or in the teaching "
             "set." % (plural(len(items), "episode", "episodes"), "is" if len(items) == 1 else "are"))
         return NOTHING
-    add_ahead(folder, picked)  # the flag first, so a stop half way cannot lose it
+    # prepared.json first (a damaged one stops here with nothing changed), then the flag, so a stop
+    # half way cannot lose either.
+    add_picked(folder, [item["id"] for item in picked], now)
+    add_ahead(folder, picked)
     teach_store.save_manifest(folder, entries + new)
     say(budget.line())
     say("This hour %s will be prepared (%d more were already known):"

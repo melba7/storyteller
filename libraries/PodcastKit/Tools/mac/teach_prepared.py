@@ -13,8 +13,10 @@ it, and teach_ahead_ads.py then tells the phone about that copy.
 --to is the iCloud copy of the phone's folder that teach_publish.py also writes to (the default is
 the same one, apple_podcasts_export.default_folders()[1]). Audio goes to
 <to>/Podcasts/prepared/<id>.<ext>. publish cleans first (so there is room), then copies each episode
-of ahead.json that has a label, has audio on this Mac, is not in the exam or on the shelf and is not
-published yet. A copy is made with `cp -c` (an APFS clone, which takes no disk space), or with a
+of ahead.json that has a label, has audio on this Mac, is not in the exam or on the shelf, is not
+published yet and has its second download settled (a truth file, or given up on, or not an MP3; the
+rule of teach_free.py), so the times the phone gets with a copy never change. An episode that is not
+settled waits for a later hour. A copy is made with `cp -c` (an APFS clone, which takes no disk space), or with a
 plain `cp` when that fails, into <name>.part, and renamed when it is whole; its SHA-256 (read in
 chunks) and size go into prepared.json before the rename. prepared.json lives in the teaching
 folder:
@@ -31,7 +33,10 @@ at most --max-gb, and before each new file enough to make room for it. With a co
 audio/<id>.<ext> of that episode is deleted too and its entry in episodes.json is put right the way
 teach_free.py does it, so it is never downloaded again. Hard rules: only ids that prepared.json
 lists are touched, only a file named prepared/<that id>.<ext> (12 hex digits), never an episode of
-exam.json or shelf.json, and never a transcript, a label, a truth file or any other file.
+exam.json or shelf.json, and never a transcript, a label, a truth file or any other file. Also
+cleaned: the Mac's own audio of an episode the pick listed but that was never published and was
+picked --keep-days ago, and a leftover <id>.<ext>.part of a listed id that is over a day old.
+--keep-days may be 0 (everything listed goes; "Stop episode preparing.command" uses it).
 
 prepared.json is read and written by teach_prepared_file.py and the cleaning is
 teach_prepared_clean.py.
@@ -51,11 +56,13 @@ import sys
 import time
 
 import teach_exam
+import teach_free
 import teach_shelf
 import teach_store
 from apple_podcasts_export import default_folders
 from teach_ahead_set import read_ahead
 from teach_prepared_clean import GB, Tidy
+from teach_second import Failures
 from teach_prepared_file import FOLDER_NAME, SUBFOLDER, copies, read_prepared, write_prepared
 
 QUOTA = re.compile(r"([0-9][0-9,]*)\s+bytes of quota remaining")
@@ -106,9 +113,11 @@ def sha256_of(path):
 # MARK: Publishing
 
 def waiting(folder, to):
-    """[(entry of episodes.json, its label exists)]: the marked episodes of ahead.json with audio on
-    this Mac that are not published (and still there) and were not removed before, in ahead.json's
-    order."""
+    """The marked episodes of ahead.json with audio on this Mac that are not published (and still
+    there), were not removed before and whose second download is settled, in ahead.json's order.
+    Settled is the rule of teach_free.py: a truth file, or given up on, or not an MP3. Until then the
+    episode waits for a later hour, so the times the phone gets with a copy never change."""
+    failures = Failures(os.path.join(folder, "copies"))
     manifest = {e["id"]: e for e in teach_store.load_manifest(folder)}
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder))
     before = {e["id"] for e in read_prepared(folder) if e["removed"] is not None}
@@ -118,7 +127,9 @@ def waiting(folder, to):
         one = manifest.get(item["id"])
         if (one and one["file"] and item["id"] not in kept | before | there
                 and os.path.exists(os.path.join(folder, one["file"]))
-                and os.path.exists(os.path.join(folder, "labels", item["id"] + ".json"))):
+                and os.path.exists(os.path.join(folder, "labels", item["id"] + ".json"))
+                and (not one["file"].lower().endswith(".mp3")
+                     or teach_free.second_download_settled(folder, item["id"], failures))):
             found.append(one)
     return found
 
@@ -142,10 +153,14 @@ def copy_one(tidy, one, run):
             return text.strip() or "cp failed"
         if os.path.getsize(part) != os.path.getsize(source):
             return "the copy is not the size of the original"
-        entries = [e for e in read_prepared(tidy.folder) if e["id"] != one["id"]]
+        entries = read_prepared(tidy.folder)
+        picked = [e.get("picked") for e in entries if e["id"] == one["id"] and e.get("picked")]
+        entries = [e for e in entries if e["id"] != one["id"]]
         entries.append({"id": one["id"], "file": "%s/%s" % (FOLDER_NAME, os.path.basename(final)),
                         "sha256": sha256_of(part), "bytes": os.path.getsize(part),
                         "published": tidy.now, "removed": None})
+        if picked:
+            entries[-1]["picked"] = picked[0]
         write_prepared(tidy.folder, entries)  # noted before the rename, so it can always be cleaned
         os.replace(part, final)
         return None
@@ -193,13 +208,20 @@ def positive(text):
     return value
 
 
+def not_negative(text):
+    value = float(text)
+    if not math.isfinite(value) or value < 0:
+        raise argparse.ArgumentTypeError("%r is not a number from zero up" % text)
+    return value
+
+
 def main(argv, say=print, now=time.time, run=run_command, free=disk_free, defaults=default_folders):
     parser = argparse.ArgumentParser(prog="teach_prepared.py")
     parser.add_argument("command", choices=("publish", "clean"))
     parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--to")
     parser.add_argument("--keep-free-gb", type=positive, default=KEEP_FREE_GB)
-    parser.add_argument("--keep-days", type=positive, default=KEEP_DAYS)
+    parser.add_argument("--keep-days", type=not_negative, default=KEEP_DAYS)
     parser.add_argument("--max-gb", type=positive, default=MAX_GB)
     try:
         options = parser.parse_args(argv)

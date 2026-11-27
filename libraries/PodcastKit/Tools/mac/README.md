@@ -1287,7 +1287,9 @@ Each hour the job does this:
 3. It downloads each marked episode a second time, compares the two files
    (`teach_copies.py --only-ahead`) and moves the marks onto the exact borders
    (`teach_snap.py`).
-4. It puts the Mac's copy of the audio into the phone's iCloud folder
+4. Once an episode's second download is settled (compared, given up on after
+   three failures, or not an MP3, so the times never change afterwards), it
+   puts the Mac's copy of the audio into the phone's iCloud folder
    (`teach_prepared.py publish`), as `Podcasts/prepared/<id>.<ext>`, and notes
    it with its SHA-256 in `prepared.json` in the teaching folder. It makes the
    copy as a clone (`cp -c`, which takes no extra disk space) written as
@@ -1301,6 +1303,9 @@ Each hour the job does this:
    downloaded again. Only files that `prepared.json` lists are removed, only
    names of the form `<12 hex>.<ext>`, never an episode of the exam or the
    shelf, and never a transcript, a label or any other file.
+   The same cleaning deletes the Mac's own audio of an episode that was picked
+   and never reached iCloud once it is that old, and a leftover `.part` file of
+   a listed episode over a day old.
 6. It writes `ahead-ads.json`, with a `copy` (file, SHA-256, size) for every
    episode whose audio is in iCloud and the ads' times in that very file, and
    copies it with the other files to the phone's folders (`teach_publish.py`).
@@ -1319,10 +1324,10 @@ has to be awake and online. Change the limits with `TEACH_PREPARE_KEEP_DAYS`
 `TEACH_PREPARE_MOST` (episodes an hour) and `TEACH_MAX_GB`.
 
 Start it by double-clicking `Install episode preparing.command` and typing
-`yes`; stop it with `Stop episode preparing.command` (the marks and the copies
-already made stay; nothing cleans the copies while the job is off, so delete
-`Podcasts/prepared` in the iCloud copy of `LofiMusic` yourself if you turn it
-off for good). Give `/bin/bash` Full Disk Access once, as in "Set it up once"
+`yes`; stop it with `Stop episode preparing.command`. It turns the job off and
+then asks whether to also remove the prepared episodes from iCloud now (type
+`yes`; anything else keeps them, and they take space until the job runs again
+or you remove them by hand). The marks stay either way. Give `/bin/bash` Full Disk Access once, as in "Set it up once"
 above. The log is `~/Storyteller Lofi/logs/podcast-prepare.log` (what launchd
 saw is in `podcast-prepare-job.log`). The job runs the files in the folder you
 installed it from, so install it again if you move that folder.

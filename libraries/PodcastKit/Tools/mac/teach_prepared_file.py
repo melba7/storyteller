@@ -7,6 +7,9 @@ Standard library only.
   {"version": 1, "episodes": [{"id": "<12 hex>", "file": "prepared/<id>.<ext>", "sha256": "<64 hex>",
                                "bytes": <int>, "published": <seconds>, "removed": <seconds or null>}]}
 
+The pick (teach_prepare.py) first lists an episode as only picked: file, sha256 and published are
+null, bytes is 0 and "picked" is when. Publishing replaces that entry (keeping "picked").
+
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
@@ -21,13 +24,24 @@ FOLDER_NAME = "prepared"
 NAME = re.compile(r"^prepared/([0-9a-f]{12})\.(%s)$" % "|".join(AUDIO_EXTENSIONS))
 
 
+def whole(value):
+    return isinstance(value, int) and not isinstance(value, bool)
+
+
 def shaped(one):
-    return (isinstance(one, dict) and isinstance(one.get("id"), str) and isinstance(one.get("file"), str)
-            and isinstance(one.get("sha256"), str)
-            and all(isinstance(one.get(key), int) and not isinstance(one[key], bool)
-                    for key in ("bytes", "published"))
-            and (one.get("removed") is None
-                 or (isinstance(one["removed"], int) and not isinstance(one["removed"], bool))))
+    """True for an entry that was published (a file, its hash, its size and when) or one that was
+    only picked (file, sha256 and published are null, "picked" says when), with "removed" null or
+    a time."""
+    if not isinstance(one, dict) or not isinstance(one.get("id"), str):
+        return False
+    if one.get("removed") is not None and not whole(one["removed"]):
+        return False
+    if one.get("file") is None:
+        return (one.get("sha256") is None and one.get("published") is None and one.get("bytes") == 0
+                and whole(one.get("picked")))
+    return (isinstance(one["file"], str) and isinstance(one.get("sha256"), str)
+            and whole(one.get("bytes")) and whole(one.get("published"))
+            and (one.get("picked") is None or whole(one["picked"])))
 
 
 def read_prepared(folder):
@@ -51,9 +65,19 @@ def write_prepared(folder, entries):
     teach_store.write_json(os.path.join(folder, FILE), {"version": 1, "episodes": entries})
 
 
+def add_picked(folder, ids, now):
+    """Notes the ids the pick took (no file yet) in prepared.json, those that are not listed yet."""
+    entries = read_prepared(folder)
+    known = {one["id"] for one in entries}
+    new = [{"id": i, "file": None, "sha256": None, "bytes": 0, "published": None, "picked": now,
+            "removed": None} for i in ids if i not in known]
+    if new:
+        write_prepared(folder, entries + new)
+
+
 def name_belongs(one):
     """True when the entry's file is prepared/<its own id>.<ext>, the only kind of name removed."""
-    found = NAME.match(one["file"])
+    found = NAME.match(one["file"]) if one["file"] else None
     return bool(found) and found.group(1) == one["id"] and bool(ID_PATTERN.match(one["id"]))
 
 
