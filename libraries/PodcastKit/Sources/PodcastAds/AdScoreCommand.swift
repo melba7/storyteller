@@ -21,10 +21,12 @@ public enum AdScoreCommand {
     public var speech: Double?
     /// Also add the row "Plus the Mac's marks from the night before" (AheadScoreRow.swift).
     public var ahead = false
+    /// Also add the row "Prepared copy" (PreparedScoreRow.swift).
+    public var prepared = false
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]] [--ahead]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]] [--ahead] [--prepared]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -38,6 +40,7 @@ public enum AdScoreCommand {
       case "--exam": options.exam = true
       case "--stream": options.stream = true
       case "--ahead": options.ahead = true
+      case "--prepared": options.prepared = true
       case "--speech":
         index += 1
         guard index < arguments.count, let speech = Double(arguments[index]), speech.isFinite,
@@ -193,6 +196,11 @@ public enum AdScoreCommand {
     let ahead = options.ahead
       ? AheadScoreRow.Run(
         folder: folder, episodes: chosen, tuning: tuning, now: now, standingOn: finalAds) : nil
+    // The row of a prepared copy (--prepared) is the very last: the Mac's marks as they are, played on
+    // the file they were made on, with none of the phone's own finders added.
+    let prepared = options.prepared
+      ? PreparedScoreRow.Run(folder: folder, labels: options.labels, episodes: chosen, now: now)
+      : nil
     // The last two rows (CueScoreRows.swift): the Mac's opening lines and filled holes, after all the rest.
     let cueRun = CueScoreRows.Run(
       folder: folder, tuning: tuning, onMarks: ahead != nil, standingOn: finalAds)
@@ -200,7 +208,7 @@ public enum AdScoreCommand {
     // episode of a show, so the labelled episodes that are not scored come first and only teach.
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
     let layers = [plan.finders.baseRow] + plan.layers + [remembering(finalAds)]
-    let allLayers =
+    var allLayers: [AdScoreLayer] =
       layers
       + (apple.flatMap { all in
         placed.map { AppleScoreRow.layers(all, placed: $0, standingOn: finalAds) }
@@ -209,8 +217,11 @@ public enum AdScoreCommand {
         [AnswerScoreRow.layer(name: PassageScoreRow.name, $0, standingOn: finalAds)]
       } ?? [])
       + (ahead.map { [$0.layer] } ?? []) + cueRun.layers
-    let made = AdScoreRun.runLayers(
+    if let prepared { allLayers.append(prepared.layer) }
+    let everyRow = AdScoreRun.runLayers(
       episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
+    // The row of the prepared copy is the last one; the rows before it are as without it.
+    let made = prepared == nil ? everyRow : Array(everyRow.dropLast())
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
       cards.append(card)
       rows.append(ScorecardRow(name: layer.name, card: card))
@@ -259,6 +270,12 @@ public enum AdScoreCommand {
       Array(made.suffix(cueRun.layers.count)), last: ahead == nil ? rows.last : saved.last)
     var cueRows = cueShown.rows
     text += "\n\n" + cueShown.text
+    var preparedRow: ScorecardRow?
+    if let prepared, let card = everyRow.last {
+      let shown = prepared.report(card, last: rows.last, scored: chosen.count)
+      text += "\n\n" + shown.text
+      preparedRow = shown.row
+    }
     if options.stream {
       func detecting(_ more: [AdScoreLayer]) -> (TeachingEpisode, Transcript) -> [FoundAd] {
         { episode, transcript in
@@ -296,6 +313,7 @@ public enum AdScoreCommand {
       text += "\n\n" + StreamReport.lines(shown, waiting: waiting).joined(separator: "\n")
     }
     saved += cueRows
+    if let preparedRow { saved.append(preparedRow) }
     out(text)
     history.append(
       ScorecardRun(

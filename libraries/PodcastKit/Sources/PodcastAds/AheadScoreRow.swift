@@ -65,7 +65,7 @@ enum AheadScoreRow {
     return made
   }
 
-  private struct Label {
+  struct Label {
     var kind: AdKind
     var confidence: AheadMark.Confidence
     var start: Double
@@ -74,8 +74,10 @@ enum AheadScoreRow {
 
   /// The stretches of Claude's own label file that are ads of a kind the Mac marks, with their
   /// confidence (low ones too). Nothing when the file cannot be read.
-  private static func claudeLabels(in folder: URL, id: String) -> [Label] {
-    guard let data = try? Data(contentsOf: folder.appendingPathComponent("labels/\(id).json")),
+  /// `labels` names the label folder: Claude's own `labels` for this row, the run's for the row of a
+  /// prepared copy.
+  static func claudeLabels(in folder: URL, id: String, labels: String = "labels") -> [Label] {
+    guard let data = try? Data(contentsOf: folder.appendingPathComponent("\(labels)/\(id).json")),
       let file = try? JSONDecoder().decode(LabelFile.self, from: data)
     else { return [] }
     return file.segments.compactMap { item in
@@ -90,7 +92,7 @@ enum AheadScoreRow {
 
   /// The mark of a label: its first and last words in the transcript (those whose middle lies in
   /// the stretch).
-  private static func mark(_ label: Label, words: [TranscriptWord]) -> AheadMark {
+  static func mark(_ label: Label, words: [TranscriptWord]) -> AheadMark {
     let inside = words.filter {
       (label.start...label.end).contains(($0.start + $0.end) / 2)
     }.map(\.text)
