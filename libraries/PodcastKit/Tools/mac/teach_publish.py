@@ -13,6 +13,11 @@ that apple_podcasts_export.py uses (<folder>/Podcasts):
   ahead-ads.json   from <folder>/ahead-ads.json   (teach_ahead.py write, the nightly read-ahead:
                    where the ads are in the episodes it marked, told in words). It has no gate: it
                    has to be a version 1 file with a list of episodes, within the size limit.
+  ad-cues.json     from <folder>/ad-cues.json     (teach_cues.py: the lines that open an ad and the
+                   lines that come back after one, in words of transcripts). It has no gate: it has
+                   to be a version 1 file with the lists starts, returns, shows, common and usual,
+                   within the size limit. Like ahead-ads.json it is listed in teaching.json, and
+                   its absence is quiet.
   teaching.json    a small list of the files above that are in the Podcasts folder now,
                    each with its sha256 and size, so the phone fetches a big file only when its
                    hash changed. It is rewritten only when that list changes.
@@ -58,7 +63,7 @@ import time
 
 import teach_store
 from teach_phone_rule import refusals
-from teach_publish_gates import ahead_shape, percent, scorecard_reason, settings_shape
+from teach_publish_gates import ahead_shape, cues_shape, percent, scorecard_reason, settings_shape
 from apple_podcasts_export import default_folders
 
 LIMIT = 4500000
@@ -69,6 +74,9 @@ FILES = (("ad-model.json", "ad-model.json"), ("ad-library.json", "ad-library.jso
 # The nightly read-ahead's file. It goes where the others go and into teaching.json, but it exists
 # only when the nightly read-ahead is on, so it is kept apart from FILES: its absence is quiet.
 AHEAD = ("ahead-ads.json", "ahead-ads.json")
+# The opening and return lines. Same treatment: kept apart, quiet when it is not there yet.
+CUES = ("ad-cues.json", "ad-cues.json")
+OPTIONAL = (AHEAD, CUES)
 MODEL = "ad-model.json"
 MEANING = "ad-meaning.json"
 SETTINGS = "show-settings.json"
@@ -214,7 +222,7 @@ def update_list(destination, writer, now):
     if not os.path.isdir(directory):
         return None
     files = {}
-    for _, target in FILES + (AHEAD,):
+    for _, target in FILES + OPTIONAL:
         try:
             with open(os.path.join(directory, target), "rb") as f:
                 data = f.read()
@@ -260,16 +268,19 @@ def main(argv, say=print, writer=write_atomically, limit=LIMIT, defaults=default
         if destination not in broken:
             broken.append(destination)
 
-    for source, target in FILES + (AHEAD,):
+    for source, target in FILES + OPTIONAL:
         try:
             data = checked(os.path.join(folder, source), limit, (1, 2) if target == MODEL else (1,))
             if target == SETTINGS:
                 settings_shape(data)
             if target == AHEAD[1]:
                 ahead_shape(data)
+            if target == CUES[1]:
+                cues_shape(data)
         except FileNotFoundError:
-            # ahead-ads.json exists only when the nightly read-ahead is on, so its absence is quiet.
-            if (source, target) != AHEAD:
+            # ahead-ads.json exists only when the nightly read-ahead is on and ad-cues.json only
+            # after the Mac has learned from enough episodes, so their absence is quiet.
+            if (source, target) not in OPTIONAL:
                 say("%s: skipped, there is no %s in %s." % (target, source, folder))
             continue
         except (OSError, ValueError) as error:

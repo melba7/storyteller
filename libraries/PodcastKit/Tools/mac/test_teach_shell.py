@@ -61,6 +61,7 @@ case "$script" in
   teach_backup.py) echo "teaching-2026-11-25-0430.tar.gz: written. 1 files, 1.0 KB, in somewhere." ;;
   teach_habits.py) echo "$RANDOM$RANDOM" > "$folder/habits.json" ;;
   teach_train.py) echo "$RANDOM$RANDOM" > "$folder/ad-model.json" ;;
+  teach_cues.py) echo "$RANDOM$RANDOM" > "$folder/ad-cues.json" ;;
   teach_library.py) echo "$RANDOM$RANDOM" > "$folder/ad-library.json" ;;
   teach_snap.py) mkdir -p "$folder/labels-snapped"; echo "$RANDOM$RANDOM" > "$folder/labels-snapped/a.json" ;;
   teach_settings.py) echo "$RANDOM$RANDOM" > "$folder/show-settings.json" ;;
@@ -220,7 +221,7 @@ class Setup(unittest.TestCase):
 BACKUP = "python3 teach_backup.py make --check"
 FINISH_ORDER = [BACKUP, "python3 teach_habits.py", "swift build -c release --product podcast-teach",
                 "swift build -c release --show-bin-path", "python3 teach_train.py",
-                "python3 teach_library.py", "podcast-teach sounds",
+                "python3 teach_cues.py", "python3 teach_library.py", "podcast-teach sounds",
                 "podcast-teach meaning", "podcast-teach joints", "podcast-teach score",
                 "python3 teach_settings.py",
                 "python3 teach_publish.py"]
@@ -266,17 +267,17 @@ class FinishTests(Setup):
         done = self.run_script("teach-finish.sh")
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         self.assertEqual(self.short(), FINISH_ORDER)
-        for line in ("Backup: worked", "Habits: worked", "Model: worked", "Library: worked", "Sounds: worked",
+        for line in ("Backup: worked", "Habits: worked", "Model: worked", "Cues: worked", "Library: worked", "Sounds: worked",
                      "Meaning: worked", "Joints: worked", "Score: worked", "Settings: worked", "Publish: worked"):
             self.assertIn("  " + line, done.stdout)
-        for number in range(1, 9):
-            self.assertIn("Step %d of 8" % number, done.stdout)
+        for number in range(1, 10):
+            self.assertIn("Step %d of 9" % number, done.stdout)
 
     def test_the_summary_comes_last_in_the_order_of_the_steps(self):
         done = self.run_script("teach-finish.sh")
         summary = done.stdout[done.stdout.index("Summary:"):]
         labels = re.findall(r"^  (\w+): ", summary, re.M)
-        self.assertEqual(labels, ["Backup", "Habits", "Model", "Library", "Sounds", "Meaning", "Joints",
+        self.assertEqual(labels, ["Backup", "Habits", "Model", "Cues", "Library", "Sounds", "Meaning", "Joints",
                                   "Score", "Settings", "Publish"])
 
     def test_the_podcast_teach_tools_get_the_teaching_folder(self):
@@ -299,7 +300,7 @@ class FinishTests(Setup):
 
     def test_every_step_may_fail_without_stopping_the_next(self):
         for failing, label in (("teach_backup.py", "Backup"), ("teach_habits.py", "Habits"),
-                               ("teach_library.py", "Library"),
+                               ("teach_cues.py", "Cues"), ("teach_library.py", "Library"),
                                ("podcast-teach-sounds", "Sounds"), ("podcast-teach-meaning", "Meaning"),
                                ("podcast-teach-joints", "Joints"), ("podcast-teach-score", "Score"), ("teach_settings.py", "Settings")):
             open(self.calls, "w").close()
@@ -354,7 +355,8 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertEqual(self.short(), [BACKUP, "python3 teach_habits.py",
                                         "swift build -c release --product podcast-teach",
-                                        "python3 teach_train.py", "python3 teach_library.py",
+                                        "python3 teach_train.py", "python3 teach_cues.py",
+                                        "python3 teach_library.py",
                                         "python3 teach_settings.py", "python3 teach_publish.py"])
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)
@@ -399,7 +401,7 @@ class FinishTests(Setup):
     def test_everything_is_added_to_the_log(self):
         done = self.run_script("teach-finish.sh")
         log = self.log()
-        self.assertIn("Step 1 of 8", log)
+        self.assertIn("Step 1 of 9", log)
         self.assertIn("Summary:", log)
         self.assertIn("Publish: worked", log)
         self.assertEqual(done.returncode, 0)
