@@ -4,9 +4,11 @@ import XCTest
 
 /// What a tap on Skip ad does: nothing, a skip of a known ad, or a jump that notes a miss.
 final class AdSkipNowDecideTests: XCTestCase {
-  private func ad(_ start: Double, _ end: Double, kind: AdKind = .ad) -> FoundAd {
+  private func ad(
+    _ start: Double, _ end: Double, kind: AdKind = .ad, _ confidence: AdConfidence = .sure
+  ) -> FoundAd {
     FoundAd(
-      start: start, end: end, kind: kind, advertiser: "A", confidence: .sure, firstWords: "")
+      start: start, end: end, kind: kind, advertiser: "A", confidence: confidence, firstWords: "")
   }
 
   private func file(_ ads: [FoundAd], undone: [UndoneAd] = []) -> AdsFile {
@@ -54,6 +56,49 @@ final class AdSkipNowDecideTests: XCTestCase {
     let off = AdSkipSettings(skipAds: false, skipOwnPlugs: false, skipPromos: false)
     let found = ad(100, 160)
     XCTAssertEqual(decide(110, file([found]), settings: off), .skip(AdSkip(ad: found, target: 160)))
+  }
+
+  func testTheButtonCarriesOverHolesOfFifteenSecondsOrLess() {
+    let first = ad(100, 130)
+    let second = ad(145, 170)
+    let third = ad(180, 200)
+    XCTAssertEqual(
+      decide(110, file([first, second, third])),
+      .skip(AdSkip(ad: first, target: 200, chained: [second, third])))
+    XCTAssertEqual(
+      decide(110, file([first, ad(145.5, 170)])), .skip(AdSkip(ad: first, target: 130)))
+    // A hole with an undone stretch in it stops the carry.
+    let stretch = [UndoneAd(start: 135, end: 140)]
+    XCTAssertEqual(
+      decide(110, file([first, second], undone: stretch)), .skip(AdSkip(ad: first, target: 130)))
+  }
+
+  func testTheButtonDoesNotCarryIntoAnUndoneAdButMayStartInOne() {
+    let first = ad(100, 130)
+    let second = ad(140, 170)
+    let undoneSecond = file([first, second], undone: [UndoneAd(start: 140, end: 170)])
+    XCTAssertEqual(decide(110, undoneSecond), .skip(AdSkip(ad: first, target: 130)))
+    // The ad the playhead is in may itself be an undone one, as before.
+    let undoneFirst = file([first, second], undone: [UndoneAd(start: 100, end: 130)])
+    XCTAssertEqual(
+      decide(110, undoneFirst), .skip(AdSkip(ad: first, target: 170, chained: [second])))
+  }
+
+  func testTheButtonCarriesOnlyIntoAdsTheSwitchesSkip() {
+    let first = ad(100, 130)
+    let plug = ad(140, 170, kind: .ownPlug)
+    let keepsPlugs = AdSkipSettings(skipOwnPlugs: false)
+    XCTAssertEqual(
+      decide(110, file([first, plug]), settings: keepsPlugs), .skip(AdSkip(ad: first, target: 130)))
+    XCTAssertEqual(
+      decide(110, file([first, plug])), .skip(AdSkip(ad: first, target: 170, chained: [plug])))
+    XCTAssertEqual(
+      decide(110, file([first, ad(140, 170, .guess)])), .skip(AdSkip(ad: first, target: 130)))
+    // A plug the listener keeps, in the hole before the next ad, stops the carry.
+    XCTAssertEqual(
+      decide(
+        110, file([first, ad(132, 140, kind: .ownPlug), ad(141, 170)]), settings: keepsPlugs),
+      .skip(AdSkip(ad: first, target: 130)))
   }
 
   func testWithNoAdKnownItJumpsAheadAndNotesAMiss() {

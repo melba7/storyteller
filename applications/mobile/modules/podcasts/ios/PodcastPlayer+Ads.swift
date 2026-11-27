@@ -168,9 +168,12 @@ final class PodcastAdSkipping {
     // The ads that were skipped with it (an ad and then the hosts' plug) are undone too. When the
     // skip holds stretches of the opening lines or the filled holes next to other ads, only those
     // are taken back (`AdSkip.takenBack`): the playhead goes to the first of them and the other
-    // ads are skipped again when it reaches them.
+    // ads are skipped again when it reaches them. A skip that a tap carried over a hole takes no
+    // ad back: the playhead goes to the hole (`carriedFrom`) and the note blames no finder.
     let back = skip.takenBack
     let ad = back.first ?? skip.ad
+    let carriedFrom = skip.carriedFrom
+    let wasCarried = carriedFrom != nil
     for undone in back {
       if streamHead?.markUndone(undone) != true {
         store?.markUndone(detector: PodcastAdFinder.detectorName, adStart: undone.start)
@@ -190,9 +193,10 @@ final class PodcastAdSkipping {
     // What the skip put on the tally is what comes off it: only the seconds really jumped. The
     // note names the finder of the ad; an ad that was confirmed by a tap has lost that name.
     note(
-      .undone, start: ad.start, end: back.last?.end ?? skip.end, kind: ad.kind,
-      seconds: lastNoted.takeCounted(), by: ad.source == AdAsking.source ? nil : ad.source)
-    owner.seek(to: ad.start)
+      .undone, start: carriedFrom ?? ad.start, end: back.last?.end ?? skip.end,
+      kind: wasCarried ? nil : ad.kind, seconds: lastNoted.takeCounted(),
+      by: wasCarried || ad.source == AdAsking.source ? nil : ad.source)
+    owner.seek(to: carriedFrom ?? ad.start)
     if !owner.wantsToPlay { owner.play() }
     owner.sink?("onAdUndone", ["episodeId": episodeId, "start": ad.start])
     return true
@@ -272,13 +276,13 @@ final class PodcastAdSkipping {
   /// The listener tapped Skip ad. Says where the playhead went and whether an ad was known
   /// there. Nil when nothing is loaded. What it does is `AdSkipNow.decide`: nothing right after
   /// an automatic skip (the playhead is at its end), a skip of the known ad the playhead is in
-  /// (with its note, stats and Undo, as an automatic skip), or a jump 30 seconds ahead that
-  /// notes a miss. The jump is the player's own move, so it is no seek of the listener's: it
-  /// cannot save a trim of an earlier ad and it leaves an end-of-chapter sleep timer alone. Where
-  /// no ad is known and the playhead is inside a question the phone asked (PodcastPlayer+Ask.swift)
-  /// the tap is the answer "yes" instead of a miss. With `onlyInAd`, only the skip of a known ad
-  /// is made and any other tap does nothing and gives nil (the answer "yes" to a question that an
-  /// ad has covered since).
+  /// and the ads that follow it, also after a hole of 15 seconds or less (one jump with its note,
+  /// stats and Undo, as an automatic skip), or a jump 30 seconds ahead that notes a miss. The jump
+  /// is the player's own move, so it is no seek of the listener's: it cannot save a trim of an
+  /// earlier ad and it leaves an end-of-chapter sleep timer alone. Where no ad is known and the
+  /// playhead is inside a question the phone asked (PodcastPlayer+Ask.swift) the tap is the answer
+  /// "yes" instead of a miss. With `onlyInAd`, only the skip of a known ad is made and any other
+  /// tap does nothing and gives nil (the answer "yes" to a question that an ad has covered since).
   func skipAdNow(onlyInAd: Bool = false) -> (to: Double, known: Bool)? {
     guard let episodeId, owner.current != nil else { return nil }
     let place = owner.place

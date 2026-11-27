@@ -73,6 +73,99 @@ final class AdSkipTapTests: XCTestCase {
     XCTAssertEqual(decide(110, undone), .skip(AdSkip(ad: first, target: 130)))
   }
 
+  // MARK: Case 2, carried over a short hole (X7)
+
+  func testAHoleOfFifteenSecondsIsCarriedAndOneOfFifteenAndAHalfIsNot() {
+    let first = ad(100, 130)
+    let second = ad(145, 170)
+    XCTAssertEqual(
+      decide(110, file([first, second])),
+      .skip(AdSkip(ad: first, target: 170, chained: [second])))
+    XCTAssertEqual(
+      decide(110, file([first, ad(145.5, 170)])), .skip(AdSkip(ad: first, target: 130)))
+  }
+
+  func testSeveralHolesInARowAreCarriedInOneSkip() {
+    let first = ad(100, 130)
+    let second = ad(140, 160)
+    let third = ad(170, 200)
+    let fourth = ad(212, 230)
+    XCTAssertEqual(
+      decide(110, file([first, second, third, fourth])),
+      .skip(AdSkip(ad: first, target: 230, chained: [second, third, fourth])))
+  }
+
+  func testAnAdWhoseSwitchIsOffAGuessAndAnUndoneAdAreNotCarriedInto() {
+    let first = ad(100, 130)
+    let plug = ad(140, 170, kind: .ownPlug)
+    XCTAssertEqual(
+      decide(110, file([first, plug]), settings: AdSkipSettings(skipOwnPlugs: false)),
+      .skip(AdSkip(ad: first, target: 130)))
+    XCTAssertEqual(
+      decide(110, file([first, plug])), .skip(AdSkip(ad: first, target: 170, chained: [plug])))
+    XCTAssertEqual(
+      decide(110, file([first, ad(140, 170, .guess)])), .skip(AdSkip(ad: first, target: 130)))
+    let undone = file([first, ad(140, 170)], undone: [UndoneAd(start: 140, end: 170)])
+    XCTAssertEqual(decide(110, undone), .skip(AdSkip(ad: first, target: 130)))
+  }
+
+  func testAnUndoneOrDeniedStretchInTheHoleStopsTheCarry() {
+    let first = ad(100, 130)
+    let second = ad(145, 170)
+    let stretch = [UndoneAd(start: 135, end: 140)]
+    XCTAssertEqual(
+      decide(110, file([first, second], undone: stretch)), .skip(AdSkip(ad: first, target: 130)))
+    XCTAssertEqual(
+      decide(110, file([first, second], denied: stretch)), .skip(AdSkip(ad: first, target: 130)))
+    // A stretch that is elsewhere does not.
+    XCTAssertEqual(
+      decide(110, file([first, second], denied: [UndoneAd(start: 5, end: 15)])),
+      .skip(AdSkip(ad: first, target: 170, chained: [second])))
+  }
+
+  func testAnAdOfAKindTheListenerKeepsInTheHoleStopsTheCarry() {
+    let first = ad(100, 130)
+    let plug = ad(132, 140, kind: .ownPlug)
+    let second = ad(141, 170)
+    let keepsPlugs = AdSkipSettings(skipOwnPlugs: false)
+    XCTAssertEqual(
+      decide(110, file([first, plug, second]), settings: keepsPlugs),
+      .skip(AdSkip(ad: first, target: 130)))
+    // A plug that runs on past the next ad is not jumped into either.
+    XCTAssertEqual(
+      decide(110, file([first, ad(135, 180, kind: .ownPlug), ad(140, 150)]), settings: keepsPlugs),
+      .skip(AdSkip(ad: first, target: 130)))
+    // With the switch on the plug is one of the ads that follow.
+    XCTAssertEqual(
+      decide(110, file([first, plug, second])),
+      .skip(AdSkip(ad: first, target: 170, chained: [plug, second])))
+  }
+
+  func testAGuessInTheHoleDoesNotStopTheCarry() {
+    let first = ad(100, 130)
+    let second = ad(141, 170)
+    XCTAssertEqual(
+      decide(110, file([first, ad(132, 138, .guess), second])),
+      .skip(AdSkip(ad: first, target: 170, chained: [second])))
+  }
+
+  func testWhatATrimCutOffAnAdStopsTheCarry() {
+    // The listener went back to 128 to listen: what follows is the show to them.
+    let trimmed = file([ad(100, 140), ad(140, 170)], trims: [AdTrim(adStart: 100, end: 128)])
+    XCTAssertEqual(decide(110, trimmed), .skip(AdSkip(ad: ad(100, 128), target: 128)))
+  }
+
+  func testTheHolesOfASkipAreListed() {
+    let first = ad(100, 130)
+    let touching = ad(130.3, 140)
+    let second = ad(150, 160)
+    let third = ad(170, 200)
+    let skip = AdSkip(ad: first, target: 200, chained: [touching, second, third])
+    XCTAssertEqual(skip.holes.map { [$0.start, $0.end] }, [[140, 150], [160, 170]])
+    XCTAssertTrue(AdSkip(ad: first, target: 140, chained: [touching]).holes.isEmpty)
+    XCTAssertTrue(AdSkip(ad: first, target: 130).holes.isEmpty)
+  }
+
   // MARK: Case 1, just skipped
 
   func testJustAfterAnAutomaticSkipTheTapIsPlain() {

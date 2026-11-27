@@ -10,6 +10,12 @@ public enum AdSkipNow {
   public static let jumpSeconds = 30.0
   /// ... and never to within this long of the end of the episode.
   public static let endMargin = 1.0
+  /// A tap inside an ad also takes the next ad when the hole before it is this long or shorter.
+  /// Why 15 seconds: on the 63 shelf episodes, 12 of the 14 holes of 15 seconds or less between
+  /// two skipped stretches were ad for three quarters of their length or more (16 seconds of show
+  /// in 114 seconds), while of the 16 holes of 15 to 30 seconds, 9 held more than 5 seconds of
+  /// show.
+  public static let carryHole = 15.0
 
   /// Like `target(position:duration:ads:)` for an ads file (nil when the episode has none): all
   /// its ads, cut short by the listener's trims, with undone ones and every kind included.
@@ -41,15 +47,26 @@ public enum AdSkipNow {
   }
 
   /// The ad that holds `place` (from `leadSeconds` before its start to its end) and the ads that
-  /// follow it within half a second, in order. Nil when no ad holds it.
-  static func holder(of place: Double, in ads: [FoundAd]) -> (FoundAd, [FoundAd])? {
+  /// follow it, in order. An ad of `ads` follows when it starts within `AdSkipper.chainGap` of the
+  /// end of the chain so far. An ad of `carrying` also follows when it starts within `carryHole`
+  /// of that end, unless a stretch of `blocked` (something the listener keeps) overlaps the hole.
+  /// Nil when no ad holds `place`.
+  static func holder(
+    of place: Double, in ads: [FoundAd], carrying: [FoundAd] = [],
+    unless blocked: [(start: Double, end: Double)] = []
+  ) -> (FoundAd, [FoundAd])? {
     let sorted = ads.sorted { $0.start < $1.start }
     guard let first = sorted.first(where: { $0.start - leadSeconds <= place && place < $0.end })
     else { return nil }
     var chained: [FoundAd] = []
     var end = first.end
     for next in sorted where next.start > first.start && next != first {
-      if next.start <= end + AdSkipper.chainGap && next.end > end {
+      guard next.end > end else { continue }
+      let joins =
+        next.start <= end + AdSkipper.chainGap
+        || (next.start <= end + carryHole && carrying.contains(next)
+          && !blocked.contains(where: { $0.start < next.start && end < $0.end }))
+      if joins {
         chained.append(next)
         end = next.end
       }
@@ -82,8 +99,11 @@ public enum AdSkipNow {
 
   /// What the tap does at `position`, by the episode's ads `file` (nil when it has none), the
   /// switches, and the last skip (`lastSkip`, made `lastSkipAge` seconds ago, nil when none).
-  /// A known ad is skipped whatever the switches say. A jump ahead that lands inside an ad the
-  /// switches skip (and that was not undone) goes to the end of that ad instead.
+  /// A known ad is skipped whatever the switches say, together with the ads that follow it: those
+  /// within half a second, and those after a hole of `carryHole` seconds or less when the switches
+  /// skip them, they were not undone, and nothing the listener keeps lies in the hole
+  /// (`AdsFile.carryBlocks`). A jump ahead that lands inside an ad the switches skip (and that was
+  /// not undone) goes to the end of that ad instead.
   public static func decide(
     position: Double, duration: Double?, file: AdsFile?, settings: AdSkipSettings,
     lastSkip: AdSkip?, lastSkipAge: Double
@@ -92,7 +112,10 @@ public enum AdSkipNow {
     if isJustAfter(place, lastSkip: lastSkip, age: lastSkipAge) { return .nothing(at: place) }
     let trims = file?.trims ?? []
     let ads = (file?.ads ?? []).map { $0.trimmed(by: trims) }.filter { $0.end > $0.start }
-    if let (first, chained) = holder(of: place, in: ads) {
+    let carry = file.map { AdSkipTap.skippedAds(in: $0, settings: settings) } ?? []
+    if let (first, chained) = holder(
+      of: place, in: ads, carrying: carry, unless: file?.carryBlocks(settings: settings) ?? [])
+    {
       let target = AdSkipper.target(for: chained.last ?? first, duration: duration)
       return .skip(AdSkip(ad: first, target: max(place, target), chained: chained))
     }
