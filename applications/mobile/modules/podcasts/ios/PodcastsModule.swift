@@ -375,6 +375,23 @@ public final class PodcastsModule: Module {
     AsyncFunction("setAheadEpisodes") { (json: String) in
       if PodcastTeaching.shared.setAheadEpisodes(json: json) { PodcastAdFinder.shared.lookAhead() }
     }
+    // Prepared copies (see PodcastPrepared.swift). `preparedPlan` takes the candidates as JSON text
+    // (`[{"id", "listPlace", "started", "showId"}]`) and answers `{"take": [...], "giveBack": [...]}`
+    // as JSON text. `installPreparedCopy` answers "installed" or why not in one word.
+    AsyncFunction("preparedPlan") { (candidates: String) async -> String in
+      await PodcastPrepared.plan(json: candidates)
+    }
+    AsyncFunction("installPreparedCopy") {
+      (episodeId: String, uri: String, address: String, forListOnly: Bool) async -> String in
+      await PodcastPrepared.install(
+        episodeId: episodeId, uri: uri, address: address, forListOnly: forListOnly)
+    }
+    AsyncFunction("giveBackPreparedCopy") { (episodeId: String) async -> Bool in
+      await PodcastPrepared.giveBack(episodeId: episodeId)
+    }
+    // Whether the phone is on Wi-Fi now, by the test the automatic downloads use.
+    AsyncFunction("isOnWiFi") { () -> Bool in PodcastNetwork.shared.onWiFi }
+
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }
 

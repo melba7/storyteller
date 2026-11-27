@@ -23,6 +23,12 @@ public enum PreparedAds {
   /// nothing that looks for local-only files finds it.
   public static let detectorVersion = "prepared"
 
+  /// The finder name a note of a skip or an Undo carries for an ad of this source: "prepared" for a
+  /// prepared ad, nil for any other or for none (a note of a skip names no finder, as before).
+  public static func noteName(forSource source: String?) -> String? {
+    source == Self.source ? Self.source : nil
+  }
+
   /// The ads file of the copy `entry` names, or nil when the entry has no copy or `duration` (the
   /// copy's length in seconds) is not a real length. Its SHA-256 is the copy's.
   ///

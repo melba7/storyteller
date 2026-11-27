@@ -133,6 +133,55 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertEqual(store.entry(for: "b")?.ahead, false)
   }
 
+  // MARK: A copy taken only for the list
+
+  func testTheForListFlagSurvivesARestartAndAnOldIndexMeansFalse() throws {
+    let store = try DownloadStore(root: root)
+    var listed = entry("a", .queued)
+    listed.copyForList = true
+    try store.put(listed)
+    try store.put(entry("b", .queued))
+
+    let reopened = try DownloadStore(root: root)
+    XCTAssertEqual(reopened.entry(for: "a")?.copyForList, true)
+    XCTAssertEqual(reopened.entry(for: "b")?.copyForList, false)
+
+    // An index from before the flag existed still reads, and the flag means false.
+    let old = """
+      {"version":1,"entries":[{"episodeId":"c","url":"https://x.example/c.mp3",\
+      "fileExtension":"mp3","state":{"kind":"queued"},"updatedAt":"2026-11-17T10:00:00Z",\
+      "automatic":true,"ahead":true}]}
+      """
+    try Data(old.utf8).write(to: root.appendingPathComponent("index.json"))
+    let read = try DownloadStore(root: root).entry(for: "c")
+    XCTAssertEqual(read?.copyForList, false)
+    XCTAssertEqual(read?.ahead, true)
+    XCTAssertEqual(read?.automatic, true)
+  }
+
+  func testInstallingOverAnEntryKeepsItsForListFlag() throws {
+    let store = try DownloadStore(root: root)
+    var listed = entry("a", .queued)
+    listed.copyForList = true
+    try store.put(listed)
+    XCTAssertTrue(try finish(store, "a").copyForList)
+    try store.put(entry("b", .queued))
+    XCTAssertFalse(try finish(store, "b").copyForList)
+  }
+
+  func testClearingTheAheadMarkAlsoMakesAListCopyTheListenersOwn() throws {
+    let store = try DownloadStore(root: root)
+    var listed = entry("a", .queued)
+    listed.copyForList = true
+    try store.put(listed)
+    try finish(store, "a")
+    let cleared = try store.clearAhead(episodeId: "a")
+    XCTAssertEqual(cleared?.copyForList, false)
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "a")?.copyForList, false)
+    // Nothing to clear the second time.
+    XCTAssertNil(try store.clearAhead(episodeId: "a"))
+  }
+
   func testAnIndexThatCannotBeReadIsSetAsideAndTheStoreStartsEmpty() throws {
     try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
     try Data("not json".utf8).write(to: root.appendingPathComponent("index.json"))

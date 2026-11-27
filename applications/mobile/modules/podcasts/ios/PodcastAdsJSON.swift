@@ -5,8 +5,15 @@
 import PodcastAds
 
 enum AdsJSON {
-  /// What the app receives for an episode's ads.
-  static func object(_ id: String, _ status: AdsStatus) -> [String: Any] {
+  /// What the app receives for an episode's ads. `prepared` says the file is the Mac's prepared
+  /// one, which the app shows as "Prepared by your Mac".
+  static func object(_ id: String, _ status: AdsStatus, prepared: Bool = false) -> [String: Any] {
+    var object = fields(id, status)
+    if prepared { object["prepared"] = true }
+    return object
+  }
+
+  private static func fields(_ id: String, _ status: AdsStatus) -> [String: Any] {
     switch status {
     case .waiting: return ["episodeId": id, "state": "waiting"]
     case .finding(let percent): return ["episodeId": id, "state": "finding", "percent": percent]

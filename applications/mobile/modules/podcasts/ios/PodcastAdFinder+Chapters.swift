@@ -14,7 +14,10 @@ extension PodcastAdFinder {
   func withChapterAds(
     _ id: String, ads: AdsStore, finished file: AdsFile, transcript: Transcript
   ) async -> AdsFile {
-    guard let local = PodcastDownloader.shared.localFile(for: id) else { return file }
+    // The Mac's marks on a copy it prepared are final: no chapter ad is merged into them.
+    guard !ads.hasPrepared(detector: Self.detectorName),
+      let local = PodcastDownloader.shared.localFile(for: id)
+    else { return file }
     let marks = await PodcastChapterSource.fromFile(local).map {
       ChapterAds.Mark(start: $0.start, end: $0.end, title: $0.title)
     }

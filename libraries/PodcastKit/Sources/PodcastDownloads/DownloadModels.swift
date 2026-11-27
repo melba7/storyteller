@@ -89,11 +89,15 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
   /// started by the listener. Always an automatic download as well. It is cleared once the
   /// episode plays, and an entry still marked is deleted when its episode leaves Up Next.
   public var ahead: Bool
+  /// The file is the Mac's prepared copy, taken only because the episode is on the phone's list of
+  /// next episodes (see PreparedCopies). It is given back when the episode leaves the list. The
+  /// listener's own download of the episode, or playing it, takes the mark off.
+  public var copyForList: Bool
 
   public init(
     episodeId: String, url: String, fileExtension: String, state: DownloadState,
     updatedAt: Date = Date(), automatic: Bool = false, plainURL: String? = nil,
-    playThrough: Bool = false, ahead: Bool = false
+    playThrough: Bool = false, ahead: Bool = false, copyForList: Bool = false
   ) {
     self.episodeId = episodeId
     self.url = url
@@ -104,6 +108,7 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
     self.plainURL = plainURL
     self.playThrough = playThrough
     self.ahead = ahead
+    self.copyForList = copyForList
   }
 
   /// Switches to the original http address, once: the entry keeps no second chance after.
@@ -115,12 +120,14 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
 
   private enum Keys: String, CodingKey {
     case episodeId, url, fileExtension, state, updatedAt, automatic, plainURL, playThrough, ahead
+    case copyForList
   }
 
   /// An index written before automatic downloads has no `automatic` (it means false), and one
   /// written before the plain http fallback has no `plainURL` (it means none), and one written
   /// before play-through downloads has no `playThrough` (it means false), and one written before
-  /// downloads ahead has no `ahead` (it means false).
+  /// downloads ahead has no `ahead` (it means false), and one written before prepared copies has no
+  /// `copyForList` (it means false).
   public init(from decoder: Decoder) throws {
     let c = try decoder.container(keyedBy: Keys.self)
     self.init(
@@ -132,7 +139,8 @@ public struct DownloadEntry: Sendable, Equatable, Codable {
       automatic: try c.decodeIfPresent(Bool.self, forKey: .automatic) ?? false,
       plainURL: try c.decodeIfPresent(String.self, forKey: .plainURL),
       playThrough: try c.decodeIfPresent(Bool.self, forKey: .playThrough) ?? false,
-      ahead: try c.decodeIfPresent(Bool.self, forKey: .ahead) ?? false)
+      ahead: try c.decodeIfPresent(Bool.self, forKey: .ahead) ?? false,
+      copyForList: try c.decodeIfPresent(Bool.self, forKey: .copyForList) ?? false)
   }
 }
 

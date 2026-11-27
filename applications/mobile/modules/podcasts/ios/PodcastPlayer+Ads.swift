@@ -249,7 +249,9 @@ final class PodcastAdSkipping {
     if lastNoted.isNew(episode: episodeId, start: skip.ad.start, end: skip.end) {
       StatsStore.shared.countAd(.skipped)
       let jumped = AdTally.seconds(from: from, to: skip.target)
-      note(.skipped, start: skip.ad.start, end: skip.end, kind: skip.ad.kind, seconds: jumped)
+      note(
+        .skipped, start: skip.ad.start, end: skip.end, kind: skip.ad.kind, seconds: jumped,
+        by: PreparedAds.noteName(forSource: skip.ad.source))
       lastNoted.counted(seconds: jumped)
     }
     owner.movePlayhead(to: skip.target)
