@@ -120,8 +120,8 @@ describe("noteLine", () => {
     expect(Object.keys(JSON.parse(line) as object).at(-1)).toBe("by")
   })
 
-  it("passes by prepared through for the skip and the Undo of a prepared ad", () => {
-    for (const what of ["skipped", "undone"]) {
+  it("passes by prepared through for the skip, the Undo and the miss of a prepared ad", () => {
+    for (const what of ["skipped", "undone", "missed"]) {
       const [prepared] = parsePendingNotes(
         pending({ what, by: "prepared" }),
       ).notes

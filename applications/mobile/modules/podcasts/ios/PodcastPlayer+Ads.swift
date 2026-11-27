@@ -308,7 +308,9 @@ final class PodcastAdSkipping {
       {
         return (owner.place, true)
       }
-      note(.missed, start: place, end: to, kind: nil)
+      note(
+        .missed, start: place, end: to, kind: nil,
+        by: PreparedAds.noteName(forFile: store?.load(detector: PodcastAdFinder.detectorName)))
       owner.movePlayheadByPlayer(to: to)
       return (to, false)
     }

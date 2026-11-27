@@ -9,6 +9,8 @@ import {
   type PreparedDeps,
   type PreparedTake,
   PREPARED_FOLDER,
+  SECOND_PASS_MS,
+  START_BUDGET_MS,
   candidatesJson,
   parsePreparedPlan,
   preparedCandidates,
@@ -50,8 +52,12 @@ function phone(
       id: string,
     ) => PreparedInstallAnswer | Promise<PreparedInstallAnswer>
     giveBack?: (id: string) => boolean | Promise<boolean>
+    /** How long each copy takes on the clock, in milliseconds. */
+    copyMs?: number
   } = {},
 ) {
+  const clock = { now: 1_000_000 }
+  const later: { ms: number; run: () => Promise<void> }[] = []
   const calls: string[] = []
   const planned: string[] = []
   const installs: {
@@ -84,6 +90,7 @@ function phone(
     },
     copy: async (path, to) => {
       calls.push(`copy ${path}`)
+      clock.now += options.copyMs ?? 0
       files.add(to)
       return (await options.copy?.(path)) ?? { status: "copied", bytes: 1000 }
     },
@@ -106,8 +113,12 @@ function phone(
       calls.push("clearTemp")
       files.clear()
     },
+    now: () => clock.now,
+    later: (ms, run) => {
+      later.push({ ms, run })
+    },
   }
-  return { deps, calls, planned, installs, files }
+  return { deps, calls, planned, installs, files, later }
 }
 
 describe("syncPrepared: when it runs", () => {
@@ -282,6 +293,79 @@ describe("syncPrepared: taking copies", () => {
     expect(run.calls.filter((call) => call.startsWith("copy "))).toEqual([
       `copy Podcasts/prepared/e1.mp3`,
     ])
+  })
+})
+
+describe("syncPrepared: the time it takes", () => {
+  const six = Array.from({ length: 6 }, (_, n) => `e${n}`)
+  const many = () =>
+    phone({
+      candidates: six.map((id, n) => candidate(id, { listPlace: n })),
+      plan: { take: six.map((id) => take(id)) },
+      copyMs: 8_000,
+    })
+  const copies = (calls: string[]) =>
+    calls.filter((call) => call.startsWith("copy ")).length
+
+  it("starts no copy once the budget has passed since the run began", async () => {
+    const run = many()
+    const report = await syncPrepared(run.deps)
+    // Copies start at 0, 8 and 16 seconds; the one due at 24 seconds is not started.
+    expect(START_BUDGET_MS).toBe(20_000)
+    expect(copies(run.calls)).toBe(3)
+    expect(report.installed).toEqual(["e0", "e1", "e2"])
+  })
+
+  it("starts every copy when each is quick", async () => {
+    const run = phone({
+      candidates: six.map((id, n) => candidate(id, { listPlace: n })),
+      plan: { take: six.map((id) => take(id)) },
+    })
+    await syncPrepared(run.deps)
+    expect(copies(run.calls)).toBe(6)
+  })
+
+  it("leaves a waiting copy and goes on to the next at once", async () => {
+    const run = phone({
+      candidates: six.map((id, n) => candidate(id, { listPlace: n })),
+      plan: { take: six.map((id) => take(id)) },
+      copy: (path) =>
+        path.endsWith("e0.mp3")
+          ? { status: "waiting" }
+          : { status: "copied", bytes: 1 },
+    })
+    const report = await syncPrepared(run.deps)
+    expect(report.waiting).toEqual(["e0"])
+    expect(report.installed).toHaveLength(5)
+  })
+
+  it("runs one more pass 45 seconds later when a copy was waiting, and only one", async () => {
+    const run = phone({
+      plan: { take: [take("e1")] },
+      copy: () => ({ status: "waiting" }),
+    })
+    await syncPrepared(run.deps)
+    expect(run.later).toHaveLength(1)
+    expect(run.later[0]?.ms).toBe(SECOND_PASS_MS)
+    expect(SECOND_PASS_MS).toBe(45_000)
+    expect(copies(run.calls)).toBe(1)
+
+    // The second pass asks again, and it schedules nothing, even if the copy still waits.
+    await run.later[0]?.run()
+    expect(copies(run.calls)).toBe(2)
+    expect(run.later).toHaveLength(1)
+  })
+
+  it("does not run a second pass when nothing was waiting", async () => {
+    const run = phone({ plan: { take: [take("e1")] } })
+    await syncPrepared(run.deps)
+    expect(run.later).toEqual([])
+  })
+
+  it("does not run a second pass off Wi-Fi or without a folder", async () => {
+    const off = phone({ wifi: false })
+    await syncPrepared(off.deps)
+    expect(off.later).toEqual([])
   })
 })
 

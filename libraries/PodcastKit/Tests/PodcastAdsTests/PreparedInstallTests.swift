@@ -4,13 +4,13 @@ import XCTest
 
 /// What the phone checks before it swaps in a copy the Mac prepared.
 final class PreparedInstallTests: XCTestCase {
-  private let hash = String(repeating: "ab", count: 32)
+  private let goodSha = String(repeating: "ab", count: 32)
   private let other = String(repeating: "cd", count: 32)
 
-  private func copy(_ file: String = "prepared/0123456789ab.mp3", bytes: Int64 = 1000)
+  private func aCopy(_ file: String = "prepared/0123456789ab.mp3", bytes: Int64 = 1000)
     -> PreparedCopy
   {
-    PreparedCopy(file: file, sha256: hash, bytes: bytes)
+    PreparedCopy(file: file, sha256: goodSha, bytes: bytes)
   }
 
   // MARK: Before the file is read
@@ -21,52 +21,52 @@ final class PreparedInstallTests: XCTestCase {
 
   func testAnEpisodeInThePlayerIsRefused() {
     XCTAssertEqual(
-      PreparedInstall.early(listed: copy(), inPlayer: true, moving: false), .playing)
+      PreparedInstall.early(listed: aCopy(), inPlayer: true, moving: false), .playing)
   }
 
   func testAnEpisodeBeingDownloadedIsRefused() {
     XCTAssertEqual(
-      PreparedInstall.early(listed: copy(), inPlayer: false, moving: true), .downloading)
+      PreparedInstall.early(listed: aCopy(), inPlayer: false, moving: true), .downloading)
   }
 
   func testTheEpisodeInThePlayerComesBeforeTheDownload() {
-    XCTAssertEqual(PreparedInstall.early(listed: copy(), inPlayer: true, moving: true), .playing)
+    XCTAssertEqual(PreparedInstall.early(listed: aCopy(), inPlayer: true, moving: true), .playing)
   }
 
   func testAFreeEpisodeWithACopyPassesTheEarlyChecks() {
-    XCTAssertNil(PreparedInstall.early(listed: copy(), inPlayer: false, moving: false))
+    XCTAssertNil(PreparedInstall.early(listed: aCopy(), inPlayer: false, moving: false))
   }
 
   // MARK: After the file is read
 
   func testTheRightSizeAndHashPass() {
-    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: hash))
+    XCTAssertNil(PreparedInstall.late(listed: aCopy(), bytes: 1000, sha256: goodSha))
   }
 
   func testTheHashMayBeInUpperCase() {
-    XCTAssertNil(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: hash.uppercased()))
+    XCTAssertNil(PreparedInstall.late(listed: aCopy(), bytes: 1000, sha256: goodSha.uppercased()))
   }
 
   func testAWrongSizeIsRefusedWhateverTheHash() {
-    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 999, sha256: hash), .size)
-    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 999, sha256: other), .size)
+    XCTAssertEqual(PreparedInstall.late(listed: aCopy(), bytes: 999, sha256: goodSha), .size)
+    XCTAssertEqual(PreparedInstall.late(listed: aCopy(), bytes: 999, sha256: other), .size)
   }
 
   func testAWrongHashIsRefused() {
-    XCTAssertEqual(PreparedInstall.late(listed: copy(), bytes: 1000, sha256: other), .hash)
+    XCTAssertEqual(PreparedInstall.late(listed: aCopy(), bytes: 1000, sha256: other), .hash)
   }
 
   // MARK: The file's extension
 
   func testTheExtensionIsTheCopysOwnInLowerCase() {
-    XCTAssertEqual(PreparedInstall.fileExtension(of: copy("prepared/x.mp3")), "mp3")
-    XCTAssertEqual(PreparedInstall.fileExtension(of: copy("prepared/x.M4A")), "m4a")
+    XCTAssertEqual(PreparedInstall.fileExtension(of: aCopy("prepared/x.mp3")), "mp3")
+    XCTAssertEqual(PreparedInstall.fileExtension(of: aCopy("prepared/x.M4A")), "m4a")
   }
 
   func testACopyWithNoUsableExtensionHasNone() {
-    XCTAssertNil(PreparedInstall.fileExtension(of: copy("prepared/noextension")))
-    XCTAssertNil(PreparedInstall.fileExtension(of: copy("prepared/x.toolong")))
-    XCTAssertNil(PreparedInstall.fileExtension(of: copy("prepared/x.m-4")))
+    XCTAssertNil(PreparedInstall.fileExtension(of: aCopy("prepared/noextension")))
+    XCTAssertNil(PreparedInstall.fileExtension(of: aCopy("prepared/x.toolong")))
+    XCTAssertNil(PreparedInstall.fileExtension(of: aCopy("prepared/x.m-4")))
   }
 
   // MARK: The for-list flag
@@ -96,5 +96,29 @@ final class PreparedInstallTests: XCTestCase {
         JSONSerialization.jsonObject(with: Data(note.line.utf8)) as? [String: Any])
       XCTAssertEqual(object["by"] as? String, "prepared")
     }
+  }
+
+  // MARK: A miss
+
+  func testAMissedNoteOnAPreparedFileCarriesByPrepared() throws {
+    var file = AdsFile(
+      sha256: goodSha, detector: "d", detectorVersion: "v", osVersion: "", duration: 100, ads: [])
+    file.prepared = true
+    XCTAssertEqual(PreparedAds.noteName(forFile: file), "prepared")
+    let note = PhoneNote(
+      at: 1, what: .missed, episode: "e", show: "s", start: 10, end: 40, kind: nil,
+      by: PreparedAds.noteName(forFile: file))
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(note.line.utf8)) as? [String: Any])
+    XCTAssertEqual(object["by"] as? String, "prepared")
+  }
+
+  func testAMissedNoteOnAnyOtherFileNamesNoFinder() {
+    var plain = AdsFile(
+      sha256: goodSha, detector: "d", detectorVersion: "v", osVersion: "", duration: 100, ads: [])
+    XCTAssertNil(PreparedAds.noteName(forFile: plain))
+    plain.prepared = false
+    XCTAssertNil(PreparedAds.noteName(forFile: plain))
+    XCTAssertNil(PreparedAds.noteName(forFile: nil))
   }
 }

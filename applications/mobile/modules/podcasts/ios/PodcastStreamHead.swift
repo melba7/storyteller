@@ -105,7 +105,8 @@ final class PodcastStreamHead: @unchecked Sendable {
     guard let entry = store.entry(for: episodeId), case .downloaded(_, let sha, _, _) = entry.state,
       let folder = try? store.folder(for: episodeId)
     else { return false }
-    return AdsStore(folder: folder, sha256: sha).hasPrepared(detector: PodcastAdFinder.detectorName)
+    return AdsStore(folder: folder, sha256: sha)
+      .hasPrepared(detector: PodcastAdFinder.detectorName)
   }
 
   /// Runs `work` once the head scan is over (finished, stopped, failed, or never started), or

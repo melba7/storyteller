@@ -23,6 +23,10 @@ like "missed" and "denied" like "undone"), the most recent first, at most 40, on
 or, without a guid, (feed, audio address). teach_collect.py gathers those first. Lines that are not
 valid notes are counted and skipped. Having no notes is not an error: nothing is written.
 
+After the table it prints up to three lines about prepared episodes (teach_feedback_prepared.py):
+ads the phone skipped by the Mac's marks, skips taken back, and taps on Skip ad on the Mac's
+copy, each counted by a note that says by "prepared". It says nothing when there are none.
+
 Exit code: 0 it worked (also with no notes), 2 a set-up problem.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
@@ -33,6 +37,7 @@ import os
 import sys
 import time
 
+import teach_feedback_prepared
 import teach_store
 from apple_podcasts_export import default_folders
 from teach_feed import is_web_address
@@ -228,6 +233,8 @@ def main(argv, say=print, defaults=default_folders, now=lambda: int(time.time() 
         say("The teaching folder cannot be used: %s" % error)
         return 2
     for line in table(notes, show_names(folder)):
+        say(line)
+    for line in teach_feedback_prepared.summary(notes, folder):
         say(line)
     if bad:
         say("%d line%s in the notes %s not valid and %s skipped."

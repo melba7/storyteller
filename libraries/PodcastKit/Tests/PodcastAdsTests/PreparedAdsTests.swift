@@ -5,7 +5,7 @@ import XCTest
 /// The ads file of a prepared copy: made from the Mac's marks at their own times, skipped by default
 /// when Claude was sure and asked about when it was not.
 final class PreparedAdsTests: XCTestCase {
-  private let hash = String(repeating: "cd", count: 32)
+  private let sha = String(repeating: "cd", count: 32)
 
   private func mark(
     _ start: Double, _ end: Double, _ confidence: AheadMark.Confidence = .high,
@@ -20,7 +20,7 @@ final class PreparedAdsTests: XCTestCase {
   private func entry(_ marks: [AheadMark], copy: Bool = true) -> AheadEntry {
     AheadEntry(
       feed: "https://f.test/rss", guid: "g1", title: "One", marked: 0, ads: marks,
-      copy: copy ? PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: hash, bytes: 1000) : nil)
+      copy: copy ? PreparedCopy(file: "prepared/0123456789ab.mp3", sha256: sha, bytes: 1000) : nil)
   }
 
   private func made(_ marks: [AheadMark], duration: Double = 1800) throws -> AdsFile {
@@ -31,7 +31,7 @@ final class PreparedAdsTests: XCTestCase {
 
   func testTheFileIsTheCopysAndMarkedPrepared() throws {
     let file = try made([mark(100, 160)])
-    XCTAssertEqual(file.sha256, hash)
+    XCTAssertEqual(file.sha256, sha)
     XCTAssertEqual(file.prepared, true)
     XCTAssertEqual(file.duration, 1800)
     XCTAssertEqual(file.version, AdsFile.currentVersion)
@@ -183,7 +183,7 @@ final class PreparedAdsTests: XCTestCase {
 
   func testTheUndoOfAPreparedAdSavesItAsUndoneAndBlamesNoFinder() throws {
     let file = try made([mark(100, 160), mark(400, 460)])
-    let store = AdsStore(folder: try temporaryFolder(), sha256: hash)
+    let store = AdsStore(folder: try temporaryFolder(), sha256: sha)
     try store.save(file)
     var skipper = AdSkipper(file: file, settings: AdSkipSettings())
     let skip = try XCTUnwrap(skipper.reached(position: 100.2, rate: 1, duration: 1800, now: 0))
@@ -200,7 +200,7 @@ final class PreparedAdsTests: XCTestCase {
 
   func testATrimAndANoStillWriteToAPreparedFile() throws {
     let file = try made([mark(100, 160), mark(500, 540, .low)])
-    let store = AdsStore(folder: try temporaryFolder(), sha256: hash)
+    let store = AdsStore(folder: try temporaryFolder(), sha256: sha)
     try store.save(file)
     XCTAssertTrue(store.markTrimmed(detector: file.detector, AdTrim(adStart: 100, end: 120)))
     XCTAssertEqual(store.load(detector: file.detector)?.ads.first?.trimmed(by: store.load(detector: file.detector)?.trims ?? []).end, 120)

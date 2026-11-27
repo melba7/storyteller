@@ -34,7 +34,7 @@ enum PodcastPrepared {
     var candidates: [PreparedCopies.Candidate] = []
     var shows: [String: String] = [:]
     for one in asked where !one.id.isEmpty {
-      // An episode of a show whose ad skipping is off gets no copy: the Mac's marks would not be used.
+      // An episode of a show whose ad skipping is off gets no copy: the Mac's marks are not used.
       if let show = one.showId, !show.isEmpty {
         guard PodcastAdFinder.listenerSwitches(forShow: show).skipsAnySort else { continue }
         shows[one.id] = show
@@ -98,7 +98,8 @@ enum PodcastPrepared {
     {
       return refusal.rawValue
     }
-    guard let entry = listed, let copy = entry.copy, let ext = PreparedInstall.fileExtension(of: copy)
+    guard let entry = listed, let copy = entry.copy,
+      let ext = PreparedInstall.fileExtension(of: copy)
     else { return "noCopy" }
     let existing = store.entry(for: episodeId)
     guard existing != nil || isWebAddress(address) else { return "failed" }
@@ -121,7 +122,7 @@ enum PodcastPrepared {
     if let refusal = PreparedInstall.late(listed: copy, bytes: bytes, sha256: sha256) {
       return refusal.rawValue
     }
-    // The ads file is made before the swap, so a copy that cannot be given its ads is not installed.
+    // The ads file is made before the swap, so a copy with no ads file is not installed.
     guard let seconds = await duration(of: source),
       let ads = PreparedAds.file(
         for: entry, duration: seconds, detector: PodcastAdFinder.detectorName)
@@ -199,7 +200,9 @@ enum PodcastPrepared {
   }
 
   private static func isWebAddress(_ address: String) -> Bool {
-    guard let url = URL(string: address), let scheme = url.scheme?.lowercased() else { return false }
+    guard let url = URL(string: address), let scheme = url.scheme?.lowercased() else {
+      return false
+    }
     return (scheme == "http" || scheme == "https") && url.host != nil
   }
 

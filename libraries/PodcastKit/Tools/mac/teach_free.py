@@ -152,6 +152,18 @@ def size_on_disk(folder, item):
         return 0
 
 
+def drop_audio(folder, item):
+    """Deletes the audio file of an entry of episodes.json (one that is already gone is fine) and
+    puts the entry right: file null, bytes 0 and the error FREED, so the gathering never downloads
+    it again. Raises OSError when the file cannot be deleted, and then the entry is not changed.
+    teach_prepared.py uses it too."""
+    try:
+        os.remove(os.path.join(folder, item["file"]))
+    except FileNotFoundError:
+        pass
+    item.update(file=None, bytes=0, error=FREED)
+
+
 def free_space(folder, delete, say=print, backup=teach_backup.make_backup, with_copies=True):
     """Says what could be freed and, with `delete`, frees it. Returns the exit code."""
     entries = teach_store.require_manifest(folder)
@@ -181,15 +193,13 @@ def free_space(folder, delete, say=print, backup=teach_backup.make_backup, with_
         return 1
     failed = 0
     for number, item in enumerate(found, 1):
+        file = item["file"]
         try:
-            os.remove(os.path.join(folder, item["file"]))
-        except FileNotFoundError:
-            pass
+            drop_audio(folder, item)
         except OSError as error:
             failed += 1
-            say("Could not delete %s: %s" % (item["file"], error))
+            say("Could not delete %s: %s" % (file, error))
             continue
-        item.update(file=None, bytes=0, error=FREED)
         if number % SAVE_EVERY == 0:
             save_manifest(folder, entries)
     save_manifest(folder, entries)

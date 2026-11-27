@@ -75,7 +75,17 @@ export type PreparedDeps = {
   removeFile(uri: string): Promise<void>
   /** Removes what an earlier run left in the temporary place. */
   clearTemp(): Promise<void>
+  /** The clock, in milliseconds. */
+  now(): number
+  /** Runs `run` once, `ms` milliseconds from now. */
+  later(ms: number, run: () => Promise<void>): void
 }
+
+/** No copy is started once a run has been going this long (milliseconds). */
+export const START_BUDGET_MS = 20_000
+
+/** When a run left a copy waiting, one more pass runs this long after it (milliseconds). */
+export const SECOND_PASS_MS = 45_000
 
 // MARK: The candidates
 
@@ -203,12 +213,17 @@ const ABOUT_THE_FILE: readonly PreparedInstallAnswer[] = [
  * One run. Does nothing without a linked folder or off Wi-Fi. `refused` maps an episode to the
  * SHA-256 of the file the native side refused, so that file is not copied again until the Mac
  * lists another one (it is kept for the launch). Never throws: a part that fails is told in the
- * log and the rest goes on.
+ * log and the rest goes on. No copy is started after `START_BUDGET_MS`; asking iCloud for a
+ * waiting copy costs nothing, so the plan is gone through and a waiting copy is simply left. When
+ * a copy was left waiting, one more pass runs `SECOND_PASS_MS` later (`again` is false for that
+ * pass, which schedules nothing).
  */
 export async function syncPrepared(
   deps: PreparedDeps,
   refused: Map<string, string> = new Map(),
+  again = true,
 ): Promise<PreparedReport> {
+  const began = deps.now()
   const report: PreparedReport = {
     installed: [],
     waiting: [],
@@ -234,8 +249,13 @@ export async function syncPrepared(
     for (const take of plan.take) {
       const episode = asked.get(take.id)
       if (!episode || refused.get(take.id) === take.sha256) continue
+      if (deps.now() - began >= START_BUDGET_MS) break
       await takeOne(deps, take, episode, refused, report)
     }
+    if (again && report.waiting.length > 0)
+      deps.later(SECOND_PASS_MS, async () => {
+        await syncPrepared(deps, refused, false)
+      })
   } catch (cause) {
     console.warn("Couldn't take the Mac's prepared copies", cause)
   }

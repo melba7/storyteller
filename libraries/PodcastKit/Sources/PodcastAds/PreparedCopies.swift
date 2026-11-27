@@ -4,8 +4,8 @@
 import Foundation
 
 public enum PreparedCopies {
-  /// At most this many copies are taken in one run.
-  public static let most = 3
+  /// At most this many copies are taken in one run: the whole list of next episodes.
+  public static let most = 12
 
   /// What the phone has of an episode's audio.
   public enum Download: Sendable, Equatable {
