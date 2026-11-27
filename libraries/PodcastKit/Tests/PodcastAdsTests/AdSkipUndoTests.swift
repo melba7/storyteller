@@ -3,7 +3,7 @@ import XCTest
 @testable import PodcastAds
 
 /// Which ads an Undo takes back when the skip holds stretches of the opening lines or the filled
-/// holes next to the ads of other finders.
+/// holes next to the ads of other finders, or when a tap carried it over a hole.
 final class AdSkipUndoTests: XCTestCase {
   private func ad(_ start: Double, _ end: Double, by source: String? = nil) -> FoundAd {
     FoundAd(
@@ -50,5 +50,29 @@ final class AdSkipUndoTests: XCTestCase {
     skipper.seeked(to: 100)
     XCTAssertNil(skipper.reached(position: 100.1, rate: 1, duration: 1000, now: 2))
     XCTAssertEqual(skipper.reached(position: 150.1, rate: 1, duration: 1000, now: 52)?.target, 200)
+  }
+
+  func testASkipCarriedOverAHoleTakesNoAdBackAndGoesToTheHole() {
+    let carried = AdSkip(
+      ad: ad(100, 130), target: 200, chained: [ad(130.2, 140), ad(150, 170), ad(180, 200)])
+    XCTAssertEqual(carried.takenBack, [])
+    XCTAssertEqual(carried.carriedFrom, 140, "the first hole starts where the touching ads end")
+    // A pull in a carried skip is not singled out: the Undo is about the carry.
+    let pull = ad(100, 130, by: ShowTuning.openingLines)
+    XCTAssertEqual(AdSkip(ad: pull, target: 170, chained: [ad(142, 170)]).takenBack, [])
+    // A skip of touching ads was not carried.
+    XCTAssertNil(AdSkip(ad: ad(100, 130), target: 140, chained: [ad(130.2, 140)]).carriedFrom)
+  }
+
+  func testAfterTheUndoOfACarriedSkipNoAdIsUndoneAndTheNextOneIsSkippedAgain() {
+    let first = ad(100, 130)
+    let second = ad(142, 170)
+    var skipper = skipper([first, second])
+    skipper.noteSkip(AdSkip(ad: first, target: 170, chained: [second]), now: 0)
+    XCTAssertEqual(skipper.undoSkip(now: 1)?.carriedFrom, 130)
+    XCTAssertEqual(skipper.ads.map(\.start), [100, 142], "no ad was taken back")
+    // The Undo puts the playhead at the hole; the hole plays and the next ad is skipped.
+    skipper.seeked(to: 130)
+    XCTAssertEqual(skipper.reached(position: 142.1, rate: 1, duration: 1000, now: 13)?.target, 170)
   }
 }

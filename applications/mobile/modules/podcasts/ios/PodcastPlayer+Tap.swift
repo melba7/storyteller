@@ -2,7 +2,8 @@
 //
 // What a tap on skip forward does in an episode with ads. Every skip-forward button (the app, the
 // lock screen, the headphones) ends in `PodcastPlayer.skip(by:)`, which asks here first. The rule
-// is `AdSkipTap` in PodcastAds: in a known ad the tap leaves it like the Skip ad button, in an
+// is `AdSkipTap` in PodcastAds: in a known ad the tap leaves it like the Skip ad button (the ad
+// and the ads that follow it, also after a hole of 15 seconds or less; one jump, one Undo), in an
 // open question it is the answer yes, in a maybe it confirms the maybe, in a short hole between
 // two skipped ads it goes to the next one, and anywhere else it is the plain move (taken to the
 // end of a skipped ad it would land in).

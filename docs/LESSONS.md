@@ -256,3 +256,14 @@ One line per lesson.
   ad, and the Undo counted against the finder that was right. When a new finder
   chains its stretches to other ads, decide what an Undo of the chain takes back
   (2026-11-27).
+- Two pushes to a pull request got no Fork CI run at all: the branch conflicted
+  with main, where another pull request had appended a lesson at the end of this
+  file too, and GitHub starts no pull request run while there is a conflict.
+  When a push gets no run, look at whether the pull request can be merged first,
+  and merge main into the branch (2026-11-27).
+- The same gap came back a day later: the plan for the tap that carries over
+  short holes said nothing about its Undo (it blamed both ads) or about what the
+  listener keeps in the hole (a kind whose switch is off, what a trim cut off).
+  The Opus check found both. A rule that makes a skip longer needs two answers
+  in the plan before it is built: what its Undo takes back, and what in its way
+  stops it (2026-11-27).

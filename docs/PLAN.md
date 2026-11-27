@@ -20,9 +20,10 @@ V1 to V7 built, checked by Opus and fixed (PR #56 merged, TestFlight 35.1); on
 the 63 shelf episodes 125 of 219 ad breaks pass Mo's bar (was 101) with 13 skips
 where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
 run and the exam (V8) | Timing fixes and the skip tap (X1 to X6, Mo's ask
-2026-11-26): X1 to X5 built, checked by Opus and fixed (PR #58); on the shelf
-152 of 219 breaks pass (was 142), 138 of 222 with the exact labels (was 129);
-waiting on Fork CI, the merge and the TestFlight build
+2026-11-26): X1 to X6 done (PR #58 merged, TestFlight 37.1; Mo taught the phone
+again on 2026-11-27); on the shelf 152 of 219 breaks pass (was 142), 138 of 222
+with the exact labels (was 129); X7 (one tap leaves the whole break) built,
+waiting on Fork CI, the merge and TestFlight 38.1
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1801,7 +1802,8 @@ and only kinds the listener skips. With no `ad-cues.json` they add nothing.
    move (taken to the end of a skipped ad it would land in, as in case 6).
 2. The playhead is in a known ad (from 2 s before its start, any kind, cut by
    the listener's trims, not undone): leave it and the ads that follow it at
-   once, like the Skip ad button, with the note and Undo.
+   once, like the Skip ad button, with the note and Undo. The tap also carries
+   over holes of 15 s or less to the ads that follow (see X7).
 3. The playhead is in an open question: the tap is the answer yes.
 4. The playhead is in a maybe (from 2 s before its start, as for a known ad): it
    becomes a confirmed ad (as a yes does) and is left, with the ads that follow
@@ -1895,25 +1897,62 @@ shows):
       gate and a stream number with `--stream`.
   - Done when: `podcast-teach score` on the shelf prints both rows for both
     label sets and the numbers are written here.
-- [ ] **X4 The phone runs them**: `ad-cues.json` is synced, checked and loaded
+- [x] **X4 The phone runs them**: `ad-cues.json` is synced, checked and loaded
       with the other teaching files; the two finders run as said above.
   - Done when: Fork CI builds the app, and the timeline of an episode says how
     many stretches each finder added.
-- [ ] **X5 The skip tap**: `AdSkipTap`, the maybes (`AdMaybes`, `AdsFile`), the
+- [x] **X5 The skip tap**: `AdSkipTap`, the maybes (`AdMaybes`, `AdsFile`), the
       player's `skip(by:)`.
   - Done when: tests pin each of the six cases and the carrying of a confirmed
     maybe, and Fork CI builds the app.
-- [ ] **X6 One pull request, one build**: the whole check, the Opus check, the
+- [x] **X6 One pull request, one build**: the whole check, the Opus check, the
       Fable check, Fork CI green, the merge, one TestFlight build from the Mac,
       and the Mac's teaching tools brought up to date so its next "Teach the
       phone again" writes and publishes `ad-cues.json`.
+  - Done 2026-11-27: PR #58 merged as b10119d, TestFlight 37.1 uploaded from the
+    Mac. The Mac wrote `ad-cues.json` from 1,581 episodes; publishing it from
+    here was refused by the Mac's permission check, so it reaches the phone with
+    Mo's next "Teach the phone again" or the weekly run.
+- [ ] **X7 One tap leaves the whole break** (Mo's ask, 2026-11-27: "if two ads
+      back to back, one click should skip both"): a tap on Skip ad or skip
+      forward inside a known ad also takes the ads that follow after a hole of
+      15 s or less (`AdSkipNow.carryHole`), when the switches skip them, they
+      were not undone, and nothing the listener keeps lies in the hole: an
+      undone or "no" stretch, an ad of a kind whose switch is off, or what a
+      trim cut off an ad (`AdsFile.carryBlocks`). It stays one jump with one
+      Undo. Automatic skips do not carry.
+  - Why 15 s: on the 63 shelf episodes 12 of the 14 holes of 15 s or less
+    between two skipped stretches were ad for three quarters of their length or
+    more (16 s of show in 114 s); of the 16 holes of 15 to 30 s, 9 held more
+    than 5 s of show.
+  - The Undo of a carried skip is about the carry, since the listener chose to
+    leave the ad: the playhead goes to the first hole (`AdSkip.carriedFrom`), no
+    ad is saved as undone and no finder is blamed. The ads behind the hole are
+    skipped again when the playhead reaches them, with an Undo of their own.
+  - Not carried into: a maybe or an open question. The phone is unsure there,
+    and a second tap inside it confirms it and carries on.
+  - A carried hole leaves no note. A miss would count against the phone on the
+    tally for a tap the listener made inside an ad the phone knew.
+  - Done when: tests pin the carry (the 15 s limit, several holes in a row, the
+    switches, what stops it, both buttons) and its Undo, and Fork CI builds the
+    app.
 
 Left for later: the two finders in the first minutes of a stream (they need the
 whole transcript), an own pass for episodes whose ads file was final before the
-cues arrived, and per-show levels for them from `teach_settings.py`.
+cues arrived, per-show levels for them from `teach_settings.py`, and a tap's
+carry into a maybe or an open question (the shelf labels hold no maybes, so
+nothing says how often that would take show).
 
 ## Later
 
+- One tap leaves the whole break (X7, 2026-11-27), found by the Opus check and
+  left: a carry or a bridge passes over an open question or a maybe that lies in
+  the hole, so it is never asked; the Undo of a carried skip is not remembered,
+  so a later tap in the same ad carries over the same hole again; when the tap
+  itself was the mistake (the ad was no ad), the Undo of a carried skip does not
+  save that ad as undone; a carried hole leaves no note, so the Mac does not
+  hear that the phone saw a hole inside a break; `PodcastPlayer+Ads.swift` is
+  314 lines.
 - Timing fixes and the skip tap (2026-11-27), found by the Opus check and not
   fixed: a pull that the phone then throws away (it lies over an undone stretch,
   a "no" or an ad of a kind that is not skipped) still uses up the stretch's one
