@@ -59,6 +59,8 @@ the app is not added again.
 - `Write down and mark together.command`: see "Writing down and marking
   together".
 - `Free up space from the teaching audio.command`: see "Freeing disk space".
+- `Free space and start the next run.command`: see "Free the disk, then run
+  again".
 - `Count publisher transcripts in my shows.command`: see "Publisher
   transcripts".
 - `Teach the passage model.command`: see "The passage model (a trial)".
@@ -447,20 +449,21 @@ marks and checks it (see "Backups"; it uses no Claude allowance, and when it
 fails that is said and the other steps still run). When the folder `copies/` or
 `labels-snapped/` exists it then snaps the labels to the second download (see
 item 5). Then, in this order, it works out each show's habits, trains the model,
-makes the library of known ads, builds `podcast-teach` and has it write the ad
-sounds, trains the small meaning model (`podcast-teach meaning`, only on a Mac),
-finds the joints of each episode's audio once (`podcast-teach joints`, see
-`joints.json` below), scores the ad skipping, chooses the per-show settings
-(`teach_settings.py`), and copies the results to the folders the phone reads.
-Every step prints a heading ("Step N of 8"; the joints belong to step 6, with
-the score). A step that fails is said plainly and the later steps still run,
-except that the Swift steps are left out together when `podcast-teach` does not
-build. The meaning step ending with a set-up problem (no shelf, no vector for
-any line, no usable model) or the settings step ending without a scorecard does
-not stop the run. When `labels-snapped/` exists the habits, model, library,
-sounds, meaning and score steps read it instead of `labels/`. At the end it
-prints one line per step (worked, nothing to do or failed). It counts as done
-when the copy to the phone worked.
+learns the lines that open and end an ad (`teach_cues.py`, see "The opening
+lines" below), makes the library of known ads, builds `podcast-teach` and has it
+write the ad sounds, trains the small meaning model (`podcast-teach meaning`,
+only on a Mac), finds the joints of each episode's audio once
+(`podcast-teach joints`, see `joints.json` below), scores the ad skipping,
+chooses the per-show settings (`teach_settings.py`), and copies the results to
+the folders the phone reads. Every step prints a heading ("Step N of 9"; the
+joints belong to step 7, with the score). A step that fails is said plainly and
+the later steps still run, except that the Swift steps are left out together
+when `podcast-teach` does not build. The meaning step ending with a set-up
+problem (no shelf, no vector for any line, no usable model) or the settings step
+ending without a scorecard does not stop the run. When `labels-snapped/` exists
+the habits, model, opening lines, library, sounds, meaning and score steps read
+it instead of `labels/`. At the end it prints one line per step (worked, nothing
+to do or failed). It counts as done when the copy to the phone worked.
 
 ### More episodes and the exam
 
@@ -701,6 +704,31 @@ free and `--delete` frees it. Copy `teach_free.py` and the launcher into the
 tools folder (keep the launcher executable) and make a wrapper for it in
 `Podcast teaching/` like the others.
 
+### Free the disk, then run again
+
+`Free space and start the next run.command` is one double-click for the two
+things Mo asked for together (2026-11-26: delete the audio that is not needed,
+and prepare another run on his own shows). Step 1 is
+`Free up space from the teaching audio.command` run as a step of a chain
+(`TEACH_CHAIN=1` skips its Press Return pause, as in the public-transcripts
+chains): it shows how much would go and asks for a typed yes (audio whose
+lessons are kept) or `all` (also the episodes still waiting for a second
+download, which gives that comparison up). It stops the whole chain when the
+backup was not good (exit 1), when a teaching run is still working (exit 3) or
+when it could not look at the folder (exit 2); a partial delete (exit 4) goes
+on. Step 2 asks one more typed yes for a NEW budget of up to
+$95 (`TEACH_CAP`),
+named `big-run-YYYYMMDD-HHMM` and saved in `current-budget.txt` the way
+`Start another big run.command` saves it, then starts
+`Gather more episodes for teaching.command` with the newest 30 of each show
+(`TEACH_PER_SHOW`; the shows hold 24 each after the deeper run, so 30 is about
+400 more episodes, and with the 150 or so waiting to be written down that is
+about what $95
+can mark), 80 GB, the yes given and the marking allowed at any hour
+(`TEACH_BETWEEN=0-24`), which is what `Gather deeper and mark now.command`
+gives. `TEACH_YES` in the environment never answers the question. After a stop,
+`Gather deeper and mark now.command` carries on under the same budget.
+
 ### Publisher transcripts
 
 `Count publisher transcripts in my shows.command` reads the feed of every show
@@ -766,6 +794,30 @@ tested and the public episodes are only ever trained on. It uses no Claude
 usage, downloads nothing and writes nothing into your teaching folder, the
 public folder or the model on the phone. The two models can then be scored on
 the shelf with `podcast-teach score` like any other model.
+
+`Fetch, mark and test the public transcripts.command` is the one-click way
+through all three: it asks for one typed yes and then runs the fetch, the
+marking and the test in that order in one window. It sets `TEACH_CHAIN=1` for
+the three launchers, which makes each one skip its own yes and its "Press
+Return" pause and, for marking, pass `--yes` to `teach_label.py` (the one yes
+and the $100 cap in the notice are what you agreed to). It stops at the first
+step that fails, tests what was marked when marking ends at the spending limit
+or with some failed episodes, and prints `COMPARE.txt` at the end. Marking takes
+many hours; if the window is closed, double-click it again and it carries on,
+because fetching adds, marking resumes under the same budget and cannot pass the
+cap, and the test runs last. The three single launchers still work alone.
+
+`Fetch and mark 500 more public transcripts.command` is the second pull (Mo,
+2026-11-26: "another $100, so it is $200"). It asks for one typed yes and then
+runs the fetch launcher with `TEACH_SPORC_COUNT=1000` (the sample grows from 500
+to 1000 episodes; `sporc_sample.py` leaves a transcript that is already there
+with the same text untouched, so nothing a marking or a test reads is rewritten)
+and the mark launcher with `TEACH_SPORC_LIMIT=1000`, a cap of
+$100 and the budget
+`sporc-2`, so the two pulls come to $200 and a second
+double-click carries on under its own $100. It does not run the test (that step
+replaces the folder of the earlier test), runs next to the big run and a test
+that is still training, and ends with a plain message for each exit code.
 
 ### Backups
 
@@ -1028,6 +1080,24 @@ Everything is in `~/Storyteller Lofi/PodcastTeaching`:
   `python3 teach_label.py --retry-failed` in the folder with these tools.
 - `.lock`: how a second run notices the first. Leave it alone.
 
+### The opening lines
+
+`teach_cues.py [--folder F] [--labels labels]` writes `ad-cues.json`: the first
+three to six words of the lines that, in the marked episodes, open an ad or come
+back after one. It learns from the episodes `teach_train.py` learns from (a
+transcript and a label, not on the shelf in `shelf.json`, not in the exam and
+not a repeat of either), which is why the finish steps run it right after the
+model is trained. A line opens when it starts within a second of a marked
+segment's start. A start line is written when it opens in 5 or more episodes and
+9 in 10 or more of all the lines that begin with it open (in 3 or more episodes
+of one show for that show's own list); return lines are learned the same way.
+Only the shortest such cue is written. The file also holds the words of 4
+letters or more that are in more than 15 in 100 episodes (`common`) and in more
+than 5 up to 15 in 100 (`usual`). It holds words of transcripts, so it is never
+committed. With too few episodes it says so and leaves an old file alone, and a
+label or transcript that cannot be read is skipped and counted. The phone's
+finders that read it come in later milestones of the plan.
+
 ### What the phone gets
 
 `teach_publish.py` copies the results into the `Podcasts` folder of
@@ -1049,6 +1119,11 @@ it, with at least 85% of the added seconds right, and the scorecard is not older
 than the model. With about four marked episodes a show this will often not hold;
 then the phone never runs the meaning model, which is the safe default.
 `show-settings.json` is copied when it is a valid version 1 file.
+
+`ad-cues.json` (see "The opening lines" below) is copied like `ahead-ads.json`:
+when it exists, with no gate but its shape (version 1 and the lists `starts`,
+`returns`, `shows`, `common` and `usual`), and it is listed in `teaching.json`.
+Its absence is quiet.
 
 `Podcasts/teaching.json` is a short list of the files that are in that folder,
 each with its hash and size. The phone reads this small file first and downloads

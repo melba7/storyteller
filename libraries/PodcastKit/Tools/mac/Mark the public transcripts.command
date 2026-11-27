@@ -19,7 +19,8 @@ LOG="$LOG_FOLDER/podcast-teaching.log"
 finish() {
   echo
   echo "$1"
-  read -r -p "Press Return to close this window. " _
+  # TEACH_CHAIN=1 means "Fetch, mark and test the public transcripts" is running this step: it shows the message and carries on.
+  [ "${TEACH_CHAIN:-}" = 1 ] || read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 
@@ -43,7 +44,9 @@ command -v python3 > /dev/null || finish "python3 is missing. Install Apple's co
 mkdir -p "$LOG_FOLDER" || finish "Could not make $LOG_FOLDER." 2
 
 echo "=== $(date '+%Y-%m-%d %H:%M') mark the public transcripts: up to $LIMIT episodes, \$$CAP ===" >> "$LOG"
-caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" --limit "$LIMIT" --cap "$CAP" --budget "$BUDGET" --wait-hours "$WAIT" 2>&1 | tee -a "$LOG"
+YES=""
+[ "${TEACH_CHAIN:-}" = 1 ] && YES="--yes"
+caffeinate -i python3 -u "$HERE/teach_label.py" --folder "$FOLDER" --limit "$LIMIT" --cap "$CAP" --budget "$BUDGET" --wait-hours "$WAIT" $YES 2>&1 | tee -a "$LOG"
 CODE="${PIPESTATUS[0]}"
 case "$CODE" in
   0) finish "Done. The marks are in $FOLDER/labels. Tell Claude it is finished." 0 ;;

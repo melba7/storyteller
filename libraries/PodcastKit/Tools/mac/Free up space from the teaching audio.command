@@ -21,7 +21,8 @@ TOOL="$HERE/teach_free.py"
 finish() {
   echo
   echo "$1"
-  read -r -p "Press Return to close this window. " _
+  # TEACH_CHAIN=1 means "Free space and start the next run" is running this step: it shows the message and carries on.
+  [ "${TEACH_CHAIN:-}" = 1 ] || read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 

@@ -79,7 +79,8 @@ final class RoundThreeEpisodesOffTests: XCTestCase {
     // the Mac's marks of the episode, which this show does not have, so it does not run (AheadAdsTests).
     XCTAssertEqual(
       Set(made.phone.ran),
-      Set(ShowTuning.finderNames).subtracting([ShowTuning.appleModel, ShowTuning.ahead]))
+      Set(ShowTuning.finderNames).subtracting(
+        [ShowTuning.appleModel, ShowTuning.ahead, ShowTuning.openingLines, ShowTuning.filledHoles]))
     for (episode, file) in zip(episodes, made.files) {
       // Rule 2 of the round: a new finder only adds. Every older ad is in the file as it was.
       for ad in before(episode) { XCTAssertTrue(file.ads.contains(ad), "\(episode.id): \(ad)") }

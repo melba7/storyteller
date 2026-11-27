@@ -240,3 +240,19 @@ One line per lesson.
   couldn't be completed. (LofiScoreHost.SoundsFolderImport.ImportError error
   0.)" instead of its own sentence, which hid that the Atmosphere folder had
   been picked instead of LofiMusic (2026-11-26).
+- Two builders each added a teaching file in their own worktree, and two tests
+  that pin how many teaching files there are failed after the merge. Run the
+  whole check right after merging parallel work, before anything is built on it
+  (2026-11-26).
+- The quick trial joined stretches only when they touch; the player and the
+  scorer chain ads that lie within half a second. The real scorer passed one
+  break fewer than the trial. A trial replays the bar with the player's own
+  chain rule (2026-11-26).
+- The opening lines passed their trial with a reach of 120 s, and one of the
+  seven pulls on the shelf cut 83 s of show. A total hides that. Before a finder
+  that moves a border ships, list each break it makes worse and how far it went
+  (2026-11-27).
+- A finder that only extends another finder's ad was undone together with that
+  ad, and the Undo counted against the finder that was right. When a new finder
+  chains its stretches to other ads, decide what an Undo of the chain takes back
+  (2026-11-27).

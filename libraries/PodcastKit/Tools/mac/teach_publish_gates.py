@@ -140,3 +140,13 @@ def ahead_shape(data):
     ahead-ads.json: it must have a list of episodes, which the Mac always writes."""
     if not isinstance(json.loads(data).get("episodes"), list):
         raise ValueError("it has no list of episodes")
+
+
+def cues_shape(data):
+    """Raises ValueError (with the reason in plain words) when the phone would refuse these bytes of
+    ad-cues.json: it must have the lists starts, returns, shows, common and usual, which the Mac
+    always writes."""
+    value = json.loads(data)
+    for name in ("starts", "returns", "shows", "common", "usual"):
+        if not isinstance(value.get(name), list):
+            raise ValueError("it has no list of %s" % name)

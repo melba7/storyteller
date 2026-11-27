@@ -116,6 +116,14 @@ choice (`ShowTuning.apply`, and the finder guard's mode), join the ads that skip
 what was found. `ShowTuning.apply` must run on each finder's own list before the
 join, because a joined ad loses its `source`.
 
+Two more finders use the Mac's `ad-cues.json` (`CueAds`, run by
+`PodcastAdFinder+Cues.swift` after the snap to joints). `opening-lines` pulls
+the start of a skip back to the line that opens the break, and `filled-holes`
+closes a gap of up to 60 seconds between two skips when the words of the gap
+belong to the ads. They only skip, never ask, and the stretches they add touch
+the ads they extend, so they are not cut back from them and the player skips
+both in one jump.
+
 - **A repeat only asks.** A repeated stretch is not always an ad, so a repeat
   never skips on its own: the phone's built-in level for repeats is `ask`, and
   the Mac's rules only make the phone stricter, never looser. (A hand edit of
@@ -189,7 +197,8 @@ The teaching folder is `~/Storyteller Lofi/PodcastTeaching` on the Mac. It is
 never committed. `teach_publish.py` copies seven files and a list of them into
 `Podcasts/` of the `LofiMusic` folder and its iCloud copy, which is the folder
 the phone has linked. It also copies `ahead-ads.json` (see "The nightly
-read-ahead" below) when the nightly job has made one.
+read-ahead" below) when the nightly job has made one, and `ad-cues.json` when
+`teach_cues.py` has written one.
 
 | File                 | Made by                 | Holds                                                |
 | -------------------- | ----------------------- | ---------------------------------------------------- |
@@ -200,7 +209,8 @@ read-ahead" below) when the nightly job has made one.
 | `ad-meaning.json`    | `podcast-teach meaning` | weights of the meaning model, with two probe vectors |
 | `show-settings.json` | `teach_settings.py`     | per show: skip, ask or off for each finder and sort  |
 | `ahead-ads.json`     | the Mac's read-ahead    | the ads marked in the next episodes, by their words  |
-| `teaching.json`      | `teach_publish.py`      | the seven files' sizes and SHA-256, read first       |
+| `ad-cues.json`       | `teach_cues.py`         | the lines that open an ad or come back after one     |
+| `teaching.json`      | `teach_publish.py`      | the files' sizes and SHA-256, read first             |
 
 All are JSON objects with `"version": 1` (the word model may be 2) and stay
 under 4.5 MB (the phone refuses a file over 5 MB).
@@ -256,6 +266,17 @@ under 4.5 MB (the phone refuses a file over 5 MB).
   out when the file is read. `teach_publish.py` copies it from `ahead-ads.json`
   in the teaching folder to `Podcasts/ahead-ads.json` and lists it in
   `teaching.json`, as the nightly read-ahead (`teach_ahead.py`) writes it.
+- `ad-cues.json`:
+  `{"version": 1, "writtenAt", "episodes", "starts": [...], "returns": [...], "shows": [{"feed", "starts", "returns"}], "common": [...], "usual": [...]}`.
+  A cue is the first 3 to 6 words of a transcript line (made as
+  `teach_features.py` makes words), joined by one space. `starts` are the cues
+  of lines that open an ad and `returns` those of the first line after an ad;
+  `shows` holds the same per show (by feed address), only for shows that have
+  one. `common` and `usual` are words of 4 letters or more that occur in more
+  than 15 in 100, and in more than 5 up to 15 in 100, of the episodes it learned
+  from. It holds words of transcripts and is never committed. The file is under
+  100 KB; the phone refuses one over 5 MB or without the five lists.
+  `teach_publish.py` lists it in `teaching.json` and its absence is quiet.
 - `teaching.json`:
   `{"version", "writtenAt", "files": {"<name>": {"sha256", "bytes"}}}`.
 
@@ -319,9 +340,10 @@ beside Claude's `labels/`, which are never overwritten, and the later steps use
 the snapped labels when they exist. The snap step is left out when there is no
 second download.
 
-**The finish steps.** `teach-finish.sh` prints "Step N of 8": the snap (only
+**The finish steps.** `teach-finish.sh` prints "Step N of 9": the snap (only
 when `copies/` or `labels-snapped/` exists), then habits, the word model, the
-library, the sounds, the meaning model, the joints of the audio
+opening and return lines (`teach_cues.py`, after the model so `shelf.json` is
+current), the library, the sounds, the meaning model, the joints of the audio
 (`podcast-teach joints`, kept in `joints.json` so the score needs no audio for
 its joint rows), the score, the per-show settings and the copy to the phone's
 folders. `podcast-teach meaning` exits 2 for a set-up problem (for example, no
@@ -348,6 +370,25 @@ The phone writes two files into `Podcasts/` of its linked folder:
   ads not finished) or `play: stream`, and one for every finished transcription
   (the whole episode or its head), `N s of audio in M s, front` or
   `, background`. `teach_pace.py` reads them.
+
+### The skip forward tap and the maybes
+
+A tap on skip forward (in the app, on the lock screen or on the headphones) asks
+the ad skipping first, the same way the Skip ad button does. In a known ad it
+leaves the ad, with its note and Undo. In an open question it is the answer yes.
+In a maybe it confirms the maybe, which becomes a sure ad that is skipped, noted
+as "confirmed" and learned like a yes. In a short hole of 60 seconds or less
+between two skipped ads it goes to the next one and notes a miss. Anywhere else
+it is the plain move, taken to the end of a skipped ad it would land in. Right
+after an automatic skip only the last of these applies, so a second tap moves
+on.
+
+A maybe is a stretch that is only weakly likely to be an ad: what a finder only
+asked about without getting a question, and the weak spans of the word model.
+The whole-transcript pass sets them in the ads file (`maybes`) after its
+questions, and each pass replaces the open ones. A maybe is never shown and
+never asked about. The rule is `AdSkipTap` and `AdMaybes` in PodcastAds, and the
+wiring is `PodcastPlayer+Tap.swift` on the phone.
 
 ## The bridge between Swift and TypeScript
 

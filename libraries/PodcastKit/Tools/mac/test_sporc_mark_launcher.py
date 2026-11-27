@@ -68,6 +68,13 @@ class LauncherTests(unittest.TestCase):
         self.assertNotIn("--yes", text)
         self.assertNotIn("PodcastTeaching/", text)
 
+    def test_as_a_step_of_the_one_click_launcher_it_passes_yes_and_does_not_wait_for_return(self):
+        self.sample()
+        result = self.run_launcher(TEACH_CHAIN="1")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("--yes", self.call())
+        self.assertNotIn("Press Return", result.stdout)
+
     def test_the_numbers_can_be_changed_and_bad_ones_are_ignored(self):
         self.sample()
         self.run_launcher(TEACH_SPORC_LIMIT="30", TEACH_SPORC_CAP="lots", TEACH_SPORC_BUDGET="a b")

@@ -22,7 +22,8 @@ export HF_HOME="$BASE/hf-cache"
 finish() {
   echo
   echo "$1"
-  read -r -p "Press Return to close this window. " _
+  # TEACH_CHAIN=1 means "Fetch, mark and test the public transcripts" is running this step: it shows the message and carries on.
+  [ "${TEACH_CHAIN:-}" = 1 ] || read -r -p "Press Return to close this window. " _
   exit "${2:-0}"
 }
 
@@ -38,8 +39,12 @@ echo "It needs a free Hugging Face account that has agreed to the terms at"
 echo "https://huggingface.co/datasets/blitt/SPoRC and downloads a few hundred MB to a couple of GB."
 echo
 command -v python3 > /dev/null || finish "python3 is missing (install the Xcode command line tools: xcode-select --install)." 1
-read -r -p "Type yes to go on: " TYPED
-TYPED="$(echo "$TYPED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
+if [ "${TEACH_CHAIN:-}" = 1 ]; then
+  TYPED=yes
+else
+  read -r -p "Type yes to go on: " TYPED
+  TYPED="$(echo "$TYPED" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' | tr '[:upper:]' '[:lower:]')"
+fi
 [ "$TYPED" = yes ] || finish "Nothing was started, because you did not type yes." 0
 
 mkdir -p "$BASE" "$LOGS" || finish "Could not make $BASE." 1
@@ -73,5 +78,5 @@ CODE="${PIPESTATUS[0]}"
 [ "$CODE" = 0 ] || finish "Nothing was written (see above)." "$CODE"
 echo
 echo "Saved: $OUT"
-command -v open > /dev/null && open "$OUT"
+[ "${TEACH_CHAIN:-}" = 1 ] || { command -v open > /dev/null && open "$OUT"; }
 finish "Done. Tell Claude it is finished; the report is in the folder and in $LOGS."
