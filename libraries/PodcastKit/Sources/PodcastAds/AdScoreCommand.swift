@@ -193,6 +193,9 @@ public enum AdScoreCommand {
     let ahead = options.ahead
       ? AheadScoreRow.Run(
         folder: folder, episodes: chosen, tuning: tuning, now: now, standingOn: finalAds) : nil
+    // The last two rows (CueScoreRows.swift): the Mac's opening lines and filled holes, after all the rest.
+    let cueRun = CueScoreRows.Run(
+      folder: folder, tuning: tuning, onMarks: ahead != nil, standingOn: finalAds)
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one
     // episode of a show, so the labelled episodes that are not scored come first and only teach.
     plan.teach(labelled.filter { episode in !chosen.contains { $0.id == episode.id } }, audio: audio, base: base)
@@ -205,7 +208,7 @@ public enum AdScoreCommand {
       + (passageAds.map {
         [AnswerScoreRow.layer(name: PassageScoreRow.name, $0, standingOn: finalAds)]
       } ?? [])
-      + (ahead.map { [$0.layer] } ?? [])
+      + (ahead.map { [$0.layer] } ?? []) + cueRun.layers
     let made = AdScoreRun.runLayers(
       episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
@@ -232,7 +235,7 @@ public enum AdScoreCommand {
     if !bar.isEmpty { text += "\n\n" + bar.joined(separator: "\n") }
     var saved = rows
     // Apple's two rows, then the passage row, as far as they exist (the Mac's marks row is the last one).
-    let extra = Array(made.dropFirst(layers.count).dropLast(ahead == nil ? 0 : 1))
+    let extra = Array(made.dropFirst(layers.count).dropLast((ahead == nil ? 0 : 1) + cueRun.layers.count))
     if let apple, let placed, extra.count >= 2 {
       let both = AppleScoreRow.report(extra, answered: apple.count, of: chosen.count, placed: placed)
       text += "\n\n" + both.text
@@ -247,11 +250,15 @@ public enum AdScoreCommand {
       text += "\n\n" + PassageScoreRow.staleNote(stale)
     }
     if let note = passage.note { text += "\n\n" + note }
-    if let ahead, let card = made.last {
+    if let ahead, let card = made.dropLast(cueRun.layers.count).last {
       let shown = ahead.report(card, last: rows.last, scored: chosen.count)
       text += "\n\n" + shown.text
       saved.append(shown.row)
     }
+    let cueShown = cueRun.report(
+      Array(made.suffix(cueRun.layers.count)), last: ahead == nil ? rows.last : saved.last)
+    var cueRows = cueShown.rows
+    text += "\n\n" + cueShown.text
     if options.stream {
       func detecting(_ more: [AdScoreLayer]) -> (TeachingEpisode, Transcript) -> [FoundAd] {
         { episode, transcript in
@@ -278,9 +285,17 @@ public enum AdScoreCommand {
         shown.append((AheadScoreRow.name, more))
         saved[saved.count - 1].stream = more
       }
+      let cueStreams = cueRun.streamed(
+        episodes: chosen, habits: habits, tuning: tuning, speech: options.speech,
+        detect: detecting(ahead.map { [$0.layer] } ?? []))
+      for (index, numbers) in cueStreams.enumerated() where index < cueRows.count {
+        shown.append((cueRows[index].name, numbers))
+        cueRows[index].stream = numbers
+      }
       let waiting = (episodes: streamed.waiting, of: chosen.count)
       text += "\n\n" + StreamReport.lines(shown, waiting: waiting).joined(separator: "\n")
     }
+    saved += cueRows
     out(text)
     history.append(
       ScorecardRun(

@@ -170,8 +170,13 @@ final class ShowTuningTests: XCTestCase {
       ShowTuning.finderNames,
       [
         ShowTuning.ownSound, ShowTuning.repeatSound, ShowTuning.repeatWords, ShowTuning.meaning,
-        ShowTuning.appleModel, ShowTuning.ahead,
+        ShowTuning.appleModel, ShowTuning.ahead, ShowTuning.openingLines, ShowTuning.filledHoles,
       ])
+    XCTAssertEqual(ShowTuning.openingLines, "opening-lines")
+    XCTAssertEqual(ShowTuning.filledHoles, "filled-holes")
+    for name in [ShowTuning.openingLines, ShowTuning.filledHoles] {
+      XCTAssertEqual(ShowTuning().level(forFinder: name, show: "any"), .skip)
+    }
   }
 
   // MARK: Apple's model

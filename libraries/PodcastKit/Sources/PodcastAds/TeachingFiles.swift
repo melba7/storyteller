@@ -4,7 +4,7 @@ import Foundation
 /// The files the Mac's teaching run gives the phone, kept in one folder of the app. They are the
 /// Mac's own files: a show is named in them by its feed address, and `load` turns that into the
 /// app's show id with a table. The ad sounds are another file kept in the same folder
-/// (`AdSoundLibrary`), so the folder holds seven files in all.
+/// (`AdSoundLibrary`), so the folder holds eight files in all.
 public struct TeachingFiles: Sendable {
   public static let maxBytes = 5_000_000
   public var model: AdWordModel?
@@ -19,6 +19,8 @@ public struct TeachingFiles: Sendable {
   public var tuning: ShowTuning
   /// The ads the Mac marked the night before in the episodes to come. No file reads as no marks.
   public var ahead: AheadFile
+  /// The opening and return lines the Mac learned. No file reads as no cues.
+  public var cues: AdCues
   public var local: LocalAds { LocalAds(model: model) }
 
   /// Nothing taught yet.
@@ -29,6 +31,7 @@ public struct TeachingFiles: Sendable {
     habits = ShowHabits()
     tuning = ShowTuning()
     ahead = AheadFile()
+    cues = AdCues()
   }
 
   /// What the folder holds. A missing or unreadable file gives no model, no meaning model, no
@@ -55,6 +58,9 @@ public struct TeachingFiles: Sendable {
       files.habits = habits
     }
     if let data = read(AheadFile.fileName, in: folder) { files.ahead = AheadFile(data: data) }
+    if let data = read(AdCues.fileName, in: folder) {
+      files.cues = AdCues(data: data, showOf: showOf)
+    }
     return files
   }
 
@@ -75,7 +81,7 @@ public struct TeachingFiles: Sendable {
   }
 
   /// Checks `data` and writes it as `name` in `folder`. False when the name is not one of the
-  /// six files, the data is larger than `maxBytes`, or it is not what the Mac writes under that
+  /// seven files it keeps (not the ad sounds), the data is larger than `maxBytes`, or it is not what the Mac writes under that
   /// name (a model the phone can run, or a version 1 file with the right list). A refused file
   /// leaves the old one in place. The settings are only checked for their shape here: the Mac
   /// always writes a `shows` list, and each entry is read leniently by `ShowTuning` later.
@@ -94,6 +100,8 @@ public struct TeachingFiles: Sendable {
       guard isVersion1(data, list: "shows") else { return false }
     case AheadFile.fileName:
       guard isVersion1(data, list: "episodes") else { return false }
+    case AdCues.fileName:
+      guard AdCues.isShape(data) else { return false }
     default:
       return false
     }

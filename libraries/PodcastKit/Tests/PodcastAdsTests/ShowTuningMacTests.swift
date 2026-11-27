@@ -98,7 +98,8 @@ final class ShowTuningMacTests: XCTestCase {
     // The Mac does not choose the "ahead" finder yet, so it stays at the built-in level (skip).
     XCTAssertEqual(
       Set(try XCTUnwrap(block["finders"] as? [String: String]).keys),
-      Set(ShowTuning.finderNames).subtracting([ShowTuning.ahead]))
+      Set(ShowTuning.finderNames).subtracting(
+        [ShowTuning.ahead, ShowTuning.openingLines, ShowTuning.filledHoles]))
     let shows = try XCTUnwrap(root["shows"] as? [[String: Any]])
     XCTAssertEqual(shows.count, 3)
     XCTAssertTrue(shows.allSatisfy { Set($0.keys).isSubset(of: ["feed", "finders", "sorts", "joints", "steadyJoints"]) })
