@@ -11,7 +11,13 @@ because the phone's finder reads exactly this:
         {"kind": "ad" | "promo" | "ownPlug", "confidence": "high" | "medium" | "low",
          "start": <seconds>, "end": <seconds>,
          "startWords": "the first up to 40 words of the ad as written in the transcript",
-         "endWords": "the last up to 40 words of the ad"}]}]}
+         "endWords": "the last up to 40 words of the ad"}],
+      "copy": {"file": "prepared/<id>.<ext>", "sha256": "<64 hex>", "bytes": <int>}}]}
+
+"copy" is there only when the Mac prepared the episode's audio (teach_prepared.py) and the file is in
+the iCloud copy of the phone's folder now. Then "start" and "end" of its ads are seconds in that very
+file, taken from labels-snapped/<id>.json when it exists and else from labels/, and an entry with no
+ads is kept, because that says the episode has none. An entry without a copy is as it always was.
 
 The kinds are the scorecard's (AdKind(sort:) in AdLibrary.swift): sponsor is ad, network_promo is
 promo, host_ask is ownPlug. The intro and the credits are left out. Claude's confidence is passed on
@@ -24,6 +30,7 @@ import json
 import os
 
 import teach_exam
+import teach_prepared_file
 import teach_segments as seg
 import teach_shelf
 from teach_ahead_set import read_ahead
@@ -63,10 +70,10 @@ def ads_of(label, lines):
     return found
 
 
-def read_label(folder, identifier):
-    """(label, transcript lines) of an episode. Raises OSError or ValueError when either is missing,
-    damaged or has nothing in it."""
-    with open(os.path.join(folder, "labels", identifier + ".json"), encoding="utf-8") as f:
+def read_label(folder, identifier, labels="labels"):
+    """(label, transcript lines) of an episode, the label from <folder>/<labels>. Raises OSError or
+    ValueError when either is missing, damaged or has nothing in it."""
+    with open(os.path.join(folder, labels, identifier + ".json"), encoding="utf-8") as f:
         label = json.load(f)
     if not isinstance(label, dict) or not isinstance(label.get("segments"), list) \
             or not number(label.get("writtenAt")):
@@ -79,17 +86,32 @@ def read_label(folder, identifier):
     return label, lines
 
 
-def build(folder, now, say):
+def read_prepared_label(folder, identifier, say):
+    """(label, lines) for an episode with a copy: the snapped label when there is one that can be
+    read, else the label (an unreadable snapped one is said)."""
+    try:
+        return read_label(folder, identifier, "labels-snapped")
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError) as error:
+        say("The snapped label of %s cannot be used (%s), so its label is used." % (identifier, error))
+    return read_label(folder, identifier)
+
+
+def build(folder, now, say, to=None):
     """The episodes of the file, oldest pick first: the episodes of ahead.json that have a label and
     a transcript, were marked in the last 14 days and are not in the exam or on the shelf. One that
-    cannot be read is left out with one line."""
+    cannot be read is left out with one line. `to` is the iCloud copy of the phone's folder, where
+    the prepared audio is looked for (None: there is none)."""
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder))
+    prepared = teach_prepared_file.copies(folder, to) if to else {}
     episodes = []
     for item in read_ahead(folder):
         if item["id"] in kept:
             continue
         try:
-            label, lines = read_label(folder, item["id"])
+            label, lines = (read_prepared_label(folder, item["id"], say) if item["id"] in prepared
+                            else read_label(folder, item["id"]))
         except FileNotFoundError:
             continue
         except (OSError, ValueError) as error:
@@ -98,8 +120,11 @@ def build(folder, now, say):
         marked = int(label["writtenAt"] / 1000)
         if now - marked > KEEP_SECONDS:
             continue
-        episodes.append({"feed": item["feed"], "guid": item["guid"], "title": item["title"],
-                         "marked": marked, "ads": ads_of(label, lines)})
+        found = {"feed": item["feed"], "guid": item["guid"], "title": item["title"],
+                 "marked": marked, "ads": ads_of(label, lines)}
+        if item["id"] in prepared:
+            found["copy"] = prepared[item["id"]]
+        episodes.append(found)
     return episodes
 
 
@@ -108,10 +133,11 @@ def encode(episodes, now):
                       ensure_ascii=False).encode("utf-8")
 
 
-def write(folder, now, say, limit=LIMIT):
+def write(folder, now, say, limit=LIMIT, to=None):
     """Writes <folder>/ahead-ads.json. Answers "written", "unchanged" (the file already says the
-    same, so it keeps its time), or "nothing" (there is nothing to tell and no file). Raises OSError."""
-    episodes = build(folder, now, say)
+    same, so it keeps its time), or "nothing" (there is nothing to tell and no file). `to` is as in
+    build. Raises OSError."""
+    episodes = build(folder, now, say, to)
     data = encode(episodes, now)
     dropped = 0
     while len(data) > limit and episodes:
