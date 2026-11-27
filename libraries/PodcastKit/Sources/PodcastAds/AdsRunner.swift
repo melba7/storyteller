@@ -25,6 +25,10 @@ public enum AdsRunner {
     progress: @Sendable (Int, Int) -> Void = { _, _ in },
     shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> AdsOutcome {
+    // A prepared file is the Mac's marks on that very copy: the model is not asked about it.
+    if let prepared = store.load(detector: detector.name), prepared.isPrepared {
+      return .finished(prepared)
+    }
     let pieces = AdChunker.pieces(
       of: AdChunker.number(transcript.lines), tokenBudget: detector.tokenBudget, overlap: overlap)
     progress(0, pieces.count)
@@ -79,6 +83,9 @@ public enum AdsRunner {
     limit: Double? = nil, placing: ModelPlacing? = nil,
     shouldContinue: @Sendable () -> Bool = { true }
   ) async throws -> AdsOutcome {
+    if let prepared = store.load(detector: detector.name), prepared.isPrepared {
+      return .finished(prepared)
+    }
     var partial = full
     if let limit, partial.reached > limit {
       partial.reached = limit

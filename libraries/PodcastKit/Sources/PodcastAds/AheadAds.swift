@@ -142,15 +142,26 @@ public enum AheadAds {
     _ mark: AheadMark, from: Double, to: Double, words: [TranscriptWord]
   ) -> FoundAd {
     let edges = AdLanding.edges(start: from, end: to, words: words)
-    return FoundAd(
-      start: edges.start, end: edges.end, kind: mark.kind, advertiser: "",
+    return found(mark, start: edges.start, end: edges.end)
+  }
+
+  /// The ad of `mark` between two given times, sure and named after the finder. `PreparedAds`
+  /// makes its ads the same way, with the times of the Mac's own copy.
+  static func found(_ mark: AheadMark, start: Double, end: Double) -> FoundAd {
+    FoundAd(
+      start: start, end: end, kind: mark.kind, advertiser: "",
       confidence: .sure, firstWords: firstWords(mark), source: source)
   }
 
   private static func ask(
     _ mark: AheadMark, from: Double, to: Double, words: [TranscriptWord]
   ) -> FoundAd {
-    var found = ad(mark, from: from, to: to, words: words)
+    asking(ad(mark, from: from, to: to, words: words))
+  }
+
+  /// The stretch as a question: unsure, so it never skips.
+  static func asking(_ ad: FoundAd) -> FoundAd {
+    var found = ad
     found.confidence = .unsure
     return found
   }

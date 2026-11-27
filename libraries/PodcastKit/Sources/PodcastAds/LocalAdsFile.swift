@@ -41,9 +41,11 @@ public enum LocalAdsFile {
   }
 
   /// Adds `found` to the episode's final ads file. The file as it is now, or nil when there is none.
+  /// A prepared file takes nothing.
   @discardableResult
   public static func addToFinal(_ found: [FoundAd], store: AdsStore, detector: String) -> AdsFile? {
     guard var file = store.load(detector: detector) else { return nil }
+    guard !file.isPrepared else { return file }
     let ads = joined(file, adding: found.filter { !file.isUndone($0) })
     guard ads != file.ads else { return file }
     let before = file
@@ -62,6 +64,8 @@ public enum LocalAdsFile {
     _ found: [FoundAd], store: AdsStore, detector: String, detectorVersion: String,
     osVersion: String, duration: Double, afterFailure: Bool = false
   ) throws -> AdsFile {
+    // A prepared file is the Mac's marks on that very copy: it is given back as it is.
+    if let prepared = store.load(detector: detector), prepared.isPrepared { return prepared }
     let partial = store.loadPartial(detector: detector)
     var file = AdsFile(
       sha256: store.sha256, detector: detector, detectorVersion: detectorVersion,

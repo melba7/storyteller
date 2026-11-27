@@ -97,12 +97,20 @@ public struct AdsFile: Codable, Sendable, Equatable {
   /// inside one makes it an ad. Never shown or asked about. Nil when there are none (and in a
   /// file saved before maybes existed).
   public var maybes: [FoundAd]?
+  /// True for the file of a copy the Mac prepared (`PreparedAds`): its ads are the Mac's marks in
+  /// that very file, and no finder of the phone adds to it. Nil in every other file, and in a file
+  /// saved before this key existed.
+  public var prepared: Bool?
+
+  /// Whether this is the file of a prepared copy.
+  public var isPrepared: Bool { prepared == true }
 
   public init(
     sha256: String, detector: String, detectorVersion: String, osVersion: String, duration: Double,
     ads: [FoundAd], undone: [UndoneAd] = [],
     coveredUntil: Double? = nil, refusedPieces: Int? = nil, trims: [AdTrim]? = nil,
-    asks: [FoundAd]? = nil, denied: [UndoneAd]? = nil, maybes: [FoundAd]? = nil
+    asks: [FoundAd]? = nil, denied: [UndoneAd]? = nil, maybes: [FoundAd]? = nil,
+    prepared: Bool? = nil
   ) {
     self.version = Self.currentVersion
     self.sha256 = sha256
@@ -118,6 +126,7 @@ public struct AdsFile: Codable, Sendable, Equatable {
     self.asks = asks
     self.denied = denied
     self.maybes = maybes
+    self.prepared = prepared
   }
 
   /// Adds a trim. For the same ad the earlier end stays, so a trim never makes an ad longer.
@@ -204,6 +213,10 @@ public struct AdsStore: Sendable {
     else { return nil }
     return file
   }
+
+  /// Whether the final file saved for this detector is the file of a prepared copy. The code that
+  /// writes found ads into a store asks this first and leaves such a file alone.
+  public func hasPrepared(detector: String) -> Bool { load(detector: detector)?.isPrepared == true }
 
   /// The detector's result as saved, for the app to read, or nil as for `load`.
   public func json(detector: String) -> String? {

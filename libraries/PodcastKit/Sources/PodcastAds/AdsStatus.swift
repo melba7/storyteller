@@ -24,7 +24,7 @@ public enum AdsRules {
   ///   - file: the saved result of the detector, if any.
   ///   - partial: the result for the transcript made so far, if any (no use once `file` is there).
   ///   - detectorVersion: the running detector's version; a result of another version is old
-  ///     and the episode is checked again.
+  ///     and the episode is checked again. A prepared file is never old.
   ///   - finding: the percent done while a run is going.
   ///   - unavailable: why the model cannot be used now, or nil when it can.
   ///   - failure: why the last run in this launch failed, so it is not retried in a loop.
@@ -32,6 +32,8 @@ public enum AdsRules {
     file: AdsFile?, partial: AdsFile? = nil, detectorVersion: String, finding: Int?,
     unavailable: AdUnavailable?, failure: String?
   ) -> AdsStatus {
+    // The Mac's marks on a copy it prepared are final: no detector version makes them old.
+    if let file, file.isPrepared { return finished(file) }
     if let finding { return .finding(percent: finding) }
     if let file, file.detectorVersion == detectorVersion { return finished(file) }
     // The local finders' own result is the finished one while the model cannot be asked. When it
