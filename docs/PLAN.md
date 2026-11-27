@@ -20,9 +20,10 @@ V1 to V7 built, checked by Opus and fixed (PR #56 merged, TestFlight 35.1); on
 the 63 shelf episodes 125 of 219 ad breaks pass Mo's bar (was 101) with 13 skips
 where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
 run and the exam (V8) | Timing fixes and the skip tap (X1 to X6, Mo's ask
-2026-11-26): X1 to X5 built, checked by Opus and fixed (PR #58); on the shelf
-152 of 219 breaks pass (was 142), 138 of 222 with the exact labels (was 129);
-waiting on Fork CI, the merge and the TestFlight build
+2026-11-26): all built, checked by Opus and fixed (PR #58 merged, TestFlight
+37.1); on the shelf 152 of 219 breaks pass (was 142), 138 of 222 with the exact
+labels (was 129); waiting on Mo's double-click on "Teach the phone again", which
+sends `ad-cues.json` to the phone, and on his try
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1895,18 +1896,22 @@ shows):
       gate and a stream number with `--stream`.
   - Done when: `podcast-teach score` on the shelf prints both rows for both
     label sets and the numbers are written here.
-- [ ] **X4 The phone runs them**: `ad-cues.json` is synced, checked and loaded
+- [x] **X4 The phone runs them**: `ad-cues.json` is synced, checked and loaded
       with the other teaching files; the two finders run as said above.
   - Done when: Fork CI builds the app, and the timeline of an episode says how
     many stretches each finder added.
-- [ ] **X5 The skip tap**: `AdSkipTap`, the maybes (`AdMaybes`, `AdsFile`), the
+- [x] **X5 The skip tap**: `AdSkipTap`, the maybes (`AdMaybes`, `AdsFile`), the
       player's `skip(by:)`.
   - Done when: tests pin each of the six cases and the carrying of a confirmed
     maybe, and Fork CI builds the app.
-- [ ] **X6 One pull request, one build**: the whole check, the Opus check, the
+- [x] **X6 One pull request, one build**: the whole check, the Opus check, the
       Fable check, Fork CI green, the merge, one TestFlight build from the Mac,
       and the Mac's teaching tools brought up to date so its next "Teach the
       phone again" writes and publishes `ad-cues.json`.
+  - Done 2026-11-27: PR #58 merged as b10119d, TestFlight 37.1 uploaded from the
+    Mac. The Mac wrote `ad-cues.json` from 1,581 episodes; publishing it from
+    here was refused by the Mac's permission check, so it reaches the phone with
+    Mo's next "Teach the phone again" or the weekly run.
 
 Left for later: the two finders in the first minutes of a stream (they need the
 whole transcript), an own pass for episodes whose ads file was final before the

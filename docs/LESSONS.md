@@ -256,3 +256,8 @@ One line per lesson.
   ad, and the Undo counted against the finder that was right. When a new finder
   chains its stretches to other ads, decide what an Undo of the chain takes back
   (2026-11-27).
+- Two pushes to a pull request got no Fork CI run at all: the branch conflicted
+  with main, where another pull request had appended a lesson at the end of this
+  file too, and GitHub starts no pull request run while there is a conflict.
+  When a push gets no run, look at whether the pull request can be merged first,
+  and merge main into the branch (2026-11-27).
