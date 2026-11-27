@@ -19,7 +19,8 @@ TestFlight build | Ad skipping to 95%, round A (V1 to V8, Mo's ask 2026-11-23):
 V1 to V7 built, checked by Opus and fixed (PR #56 merged, TestFlight 35.1); on
 the 63 shelf episodes 125 of 219 ad breaks pass Mo's bar (was 101) with 13 skips
 where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
-run and the exam (V8)
+run and the exam (V8) | Timing fixes and the skip tap (X1 to X6, Mo's ask
+2026-11-26): being built
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1700,6 +1701,163 @@ Questions only Mo can answer:
 3. Do end-of-show "subscribe, rate us" count as ads? Open since round A.
    Recommended: no.
 4. One tap on "Send skip log" in 35.1, only if W1 finds no diary on the Mac.
+
+### Ad skipping: timing fixes and the skip tap (Mo's ask, 2026-11-26)
+
+Mo: "Build 1-3. If I skip at a part of an ad, skip the whole ad not just the 15
+seconds. Also if not sure and I skip, skip the whole ad then. It's probably an
+ad then". Fixes 1 to 3 are the trials above: learned opening lines (1), handoff
+lines (2) and filled holes (3). Handoff lines learned on their own (the show's
+line just before a break) add nothing on top of the opening lines (147 of 219
+either way), because Claude marks most handoffs as the first line of the break,
+so they are learned as opening lines and have no list of their own. Fable
+planned it, Sonnet builds, Opus checks, Fable checks last. One pull request
+(#58) and one TestFlight build.
+
+How I read the ask (Mo was away, so these are my choices):
+
+- "Skip" is the skip-forward button, in the app, on the lock screen and on
+  headphones. The Skip ad button, skip back and the seek bar stay as they are.
+- "Not sure" is one of three things: a question the phone would ask, a stretch
+  the word model gives a weak chance of being an ad (a "maybe", new), or a hole
+  of a minute or less between two ads.
+- A stretch the listener took back with Undo is never left this way.
+
+**The file `ad-cues.json`** (the Mac writes it, the phone and the scorecard read
+it; it goes the way `ahead-ads.json` goes and holds words of transcripts, so it
+is never committed):
+
+    {"version": 1, "writtenAt": 1700000000, "episodes": 1170,
+     "starts": ["this episode is brought", "..."], "returns": ["..."],
+     "shows": [{"feed": "<feed address>", "starts": ["..."], "returns": ["..."]}],
+     "common": ["about", "..."], "usual": ["..."]}
+
+- A cue is the first 3 to 6 words of a transcript line, as
+  `teach_features.tokens` and `AdWordModel.tokens` make words, joined by one
+  space. A line matches a list when one of its own first 3, 4, 5 or 6 words,
+  joined the same way, is in the list.
+- It is learned from the marked episodes that have a transcript and are not on
+  the shelf, not on the exam and not a repeat of one (the episodes
+  `teach_train.py` learns from). The marked segments are those of the sorts
+  sponsor, network_promo and host_ask with confidence high or medium; segments
+  that lie within 1 s of each other are one break.
+- A line "opens" when it starts within 1 s of a marked segment's start. A line
+  is "in an ad" when it starts from 0.3 s before a break's start to 0.5 s before
+  its end. A line is a "return" when it is not in an ad and the line before it
+  is.
+- `starts`: a cue that opens in 5 or more episodes, where 9 in 10 or more of all
+  the lines that begin with it open. A show's `starts`: the same within the
+  show, with 3 or more of its episodes. `returns` and a show's `returns`: the
+  same for return lines. Only the shortest cue that qualifies is written (a
+  longer one that begins with a written cue of the same list, or with a general
+  one, matches nothing more).
+- `common`: the words of 4 letters or more that occur in more than 15 in 100 of
+  those episodes. `usual`: those in more than 5 and at most 15 in 100.
+- It is about 150 KB. The phone refuses a file over 5 MB.
+
+**Opening lines** (finder `opening-lines`, `CueAds.openings`). Given the lines
+of the whole transcript and the skips so far (the ads that are skipped, joined
+into stretches whatever their kind): for each line in order of time that is not
+inside a stretch and matches a start cue (a general one or its show's), take the
+stretch with the nearest start after the line, at most 120 s after it. When no
+return line starts between the two, the stretch from the line's start to that
+start is added as an ad of the kind of the stretch's first ad, unsure, with the
+finder's name. A stretch is pulled back once.
+
+**Filled holes** (finder `filled-holes`, `CueAds.holes`). Given the same, after
+the opening lines are added: for two stretches next to each other with a hole of
+more than 0 and at most 60 s between them and no return line starting in the
+hole, look at the lines that start in the hole (from 0.2 s before it to 0.2 s
+before its end). A content word is a word of 4 letters or more that is not
+common; a rare word is a content word that is not usual. The hole is filled when
+both hold: (echo) at least one rare word of the hole also occurs in a line of
+one of the two stretches and in no line of the show outside the hole and the
+stretches; (topic) at most a quarter of the hole's content words (counted as
+often as they occur) occur in a line of the show outside the hole and outside
+every stretch. A hole with no content word is not filled. A filled hole is added
+as an ad of the kind of the stretch before it, unsure, with the finder's name;
+the two stretches and the hole then count as one stretch and the next hole is
+looked at.
+
+Both add stretches that touch the ads they stand next to, on purpose: the other
+new finders keep 0.6 s away from every ad, which would leave a blip of the ad to
+hear. On the phone they run last in the whole-transcript pass, after the borders
+were put on the joints, under the finder guard, at the level `skip` by default
+(`show-settings.json` can switch them off for a show; "ask" reads as off, they
+ask nothing). They never add over a stretch the listener undid or said no to,
+and only kinds the listener skips. With no `ad-cues.json` they add nothing.
+
+**The skip tap** (`AdSkipTap.decide`, a rule next to `AdSkipNow.decide`, used by
+`PodcastPlayer.skip(by:)` for a move forward). In this order:
+
+1. Right after an automatic skip (as `AdSkipNow` defines it) the tap is a plain
+   move, as today.
+2. The playhead is in a known ad (from 2 s before its start, any kind, cut by
+   the listener's trims, not undone): leave it and the ads that follow it at
+   once, like the Skip ad button, with the note and Undo.
+3. The playhead is in an open question: the tap is the answer yes.
+4. The playhead is in a maybe: it becomes a confirmed ad (as a yes does) and is
+   left, with the ads that follow it at once.
+5. The playhead is in a hole of 60 s or less between two ads that are skipped:
+   go to the end of the ads after the hole, and note a miss for the hole.
+6. Otherwise move ahead by the button's seconds; when that lands inside an ad
+   that is skipped, go on to its end (today the ad then plays).
+
+A maybe is a stretch kept in the ads file (`maybes`, a new optional list, so old
+files and old builds read on): the word model's spans at a start chance of 0.30
+and a stay chance of 0.15, of the three ad sorts, the parts of 8 s or more that
+lie outside every ad and question of the file, plus the finders' stretches that
+were not sure enough to skip and did not become one of the three questions. At
+most 20 an episode. A maybe is never shown or asked; it is made only by the
+whole-transcript pass; one that a tap confirmed is kept through later writes of
+the file the way an answered question is. On the 60 breaks of the shelf that
+fail with ad left to hear, a listener who taps skip 3 s into each piece needs 5
+taps a break today and about 2 with this, and 24 breaks instead of 3 are left
+with one tap.
+
+**The gate**, as for every finder: on the 63 shelf episodes the two rows
+together must pass 10 more breaks than the row they stand on, with at most 2
+more skips with no ad. The Python trial (the app's own way of making words) gave
+152 of 219 (+10) with Claude's labels and 138 of 222 (+9) with the exact ones,
+no wrong skip more. The skip tap has no bar number (the bar counts skips with no
+tap); its proof is the rule's tests and the phone.
+
+- [ ] **X1 The Mac learns the opening lines** (Mac): `teach_cues.py` writes
+      `<folder>/ad-cues.json` by the rules above (`--folder`, `--labels`);
+      `teach-finish.sh` runs it after the model is trained (the shelf is then up
+      to date) and `teach_publish.py` copies it like the other files, with no
+      gate but its shape (version 1 and the lists).
+  - Done when: its tests pass (made-up lines only), and on the cloud's copy of
+    the teaching folder it writes about 600 general and 1,800 per-show opening
+    lines from the 1,170 episodes that teach.
+- [ ] **X2 The two finders** (PodcastAds): `AdCues` reads the file (a show by
+      its feed, as `ShowTuning` does; a damaged file reads as empty) and
+      `CueAds` holds the two rules.
+  - Done when: tests pin each rule on made-up transcripts (the return line that
+    stops a pull, the 120 s and 60 s limits, echo and topic, a chain of two
+    holes) and bad input adds nothing.
+- [ ] **X3 The scorecard rows**: "Plus opening lines" and "Plus filled holes",
+      last in the scorecard, standing on the Mac's marks row when `--ahead` is
+      given and on the last finder row otherwise, with the verdict line of the
+      gate and a stream number with `--stream`.
+  - Done when: `podcast-teach score` on the shelf prints both rows for both
+    label sets and the numbers are written here.
+- [ ] **X4 The phone runs them**: `ad-cues.json` is synced, checked and loaded
+      with the other teaching files; the two finders run as said above.
+  - Done when: Fork CI builds the app, and the timeline of an episode says how
+    many stretches each finder added.
+- [ ] **X5 The skip tap**: `AdSkipTap`, the maybes (`AdMaybes`, `AdsFile`), the
+      player's `skip(by:)`.
+  - Done when: tests pin each of the six cases and the carrying of a confirmed
+    maybe, and Fork CI builds the app.
+- [ ] **X6 One pull request, one build**: the whole check, the Opus check, the
+      Fable check, Fork CI green, the merge, one TestFlight build from the Mac,
+      and the Mac's teaching tools brought up to date so its next "Teach the
+      phone again" writes and publishes `ad-cues.json`.
+
+Left for later: the two finders in the first minutes of a stream (they need the
+whole transcript), an own pass for episodes whose ads file was final before the
+cues arrived, and per-show levels for them from `teach_settings.py`.
 
 ## Later
 

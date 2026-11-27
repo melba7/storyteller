@@ -120,6 +120,16 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   those episodes first. An "Ad skipping results" page shows the tally per show.
   Check: a tap on Skip ad jumps ahead, and the next "Teach the phone again"
   lists that episode.
+- The skip-forward button knows about ads (Mo's ask, 2026-11-26): a tap while an
+  ad plays leaves the whole ad, not only the button's seconds, and a tap inside
+  a stretch the phone was not sure about (a question, a weak guess it keeps to
+  itself, or a short hole between two ads) leaves that whole stretch and counts
+  it as an ad. Check: in an episode with an ad that was not skipped, one tap on
+  skip forward lands at the end of the ad.
+- The Mac also learns the lines that open each show's ad breaks, and the phone
+  uses them to start a skip on the break's first line and to skip a short
+  unrecognised piece between two ads. Check: the scorecard's rows "Plus opening
+  lines" and "Plus filled holes".
 
 ## Out of scope (v1)
 
