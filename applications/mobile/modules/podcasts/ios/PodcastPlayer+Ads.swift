@@ -48,8 +48,9 @@ final class PodcastAdSkipping {
     return loader.head
   }
 
-  /// The listener's switches, with the loaded show's own choices where it has them (P5a).
-  private var settings: AdSkipSettings {
+  /// The listener's switches, with the loaded show's own choices where it has them (P5a). Not
+  /// private: the tap on skip forward (PodcastPlayer+Tap.swift) decides with the same switches.
+  var settings: AdSkipSettings {
     let show = owner.showState.settings
     return AdSkipDefaults.settings.overridden(skipAds: show.skipAds, skipOwnPlugs: show.skipPlugs)
   }

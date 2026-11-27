@@ -260,7 +260,11 @@ final class PodcastPlayer {
   }
 
   func skip(by seconds: Double) {
-    seek(to: Skip.target(from: place, by: seconds, duration: currentDuration))
+    let target = Skip.target(from: place, by: seconds, duration: currentDuration)
+    // A tap forward asks the ad skipping first (PodcastPlayer+Tap.swift): it may leave an ad, say
+    // yes to a question or confirm a maybe instead of the plain move.
+    if seconds > 0, adSkipping.tappedForward(plain: target) { return }
+    seek(to: target)
   }
 
   /// Sets the speed (clamped to 0.5x to 3x in tenths) and returns the speed now in use.

@@ -285,9 +285,12 @@ extension AdsStore {
     load(detector: detector) ?? loadPartial(detector: detector)
   }
 
-  /// The question that was answered over this stretch (a yes keeps it in the file's questions).
+  /// The question that was answered over this stretch (a yes keeps it in the file's questions),
+  /// else the maybe (a confirmed one stays in the file's maybes).
   fileprivate func asked(start: Double, end: Double, detector: String) -> FoundAd? {
-    saved(detector: detector)?.asks?.first { $0.start < end && start < $0.end }
+    let file = saved(detector: detector)
+    return file?.asks?.first { $0.start < end && start < $0.end }
+      ?? file?.maybes?.first { $0.start < end && start < $0.end }
   }
 
   /// The ad that the stretch lies over, whatever its confidence.

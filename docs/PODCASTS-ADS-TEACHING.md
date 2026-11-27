@@ -349,6 +349,25 @@ The phone writes two files into `Podcasts/` of its linked folder:
   (the whole episode or its head), `N s of audio in M s, front` or
   `, background`. `teach_pace.py` reads them.
 
+### The skip forward tap and the maybes
+
+A tap on skip forward (in the app, on the lock screen or on the headphones) asks
+the ad skipping first, the same way the Skip ad button does. In a known ad it
+leaves the ad, with its note and Undo. In an open question it is the answer yes.
+In a maybe it confirms the maybe, which becomes a sure ad that is skipped, noted
+as "confirmed" and learned like a yes. In a short hole of 60 seconds or less
+between two skipped ads it goes to the next one and notes a miss. Anywhere else
+it is the plain move, taken to the end of a skipped ad it would land in. Right
+after an automatic skip only the last of these applies, so a second tap moves
+on.
+
+A maybe is a stretch that is only weakly likely to be an ad: what a finder only
+asked about without getting a question, and the weak
+spans of the word model. The whole-transcript pass sets them in the ads file
+(`maybes`) after its questions, and each pass replaces the open ones. A maybe is
+never shown and never asked about. The rule is `AdSkipTap` and `AdMaybes` in
+PodcastAds, and the wiring is `PodcastPlayer+Tap.swift` on the phone.
+
 ## The bridge between Swift and TypeScript
 
 Native module `Podcasts` (`modules/podcasts/ios/PodcastsModule.swift`):
