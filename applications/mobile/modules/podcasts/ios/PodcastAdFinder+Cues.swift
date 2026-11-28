@@ -5,7 +5,9 @@
 // the borders were put on the joints and before the questions are picked, so what they add is in
 // the file's ads when the questions and the maybes look at it. Each runs under its own mark in
 // `PodcastFinderGuard`, and only at the level skip: these finders never ask, so a level of ask
-// reads as off.
+// reads as off. After the filled holes the playbook's pull (`CueAds.playbook`) runs as a part of
+// the opening lines, under their setting and their mark: it pulls the start of a skip back to a
+// line that holds a phrase of the show's playbook, and what it adds counts as opening lines.
 import Foundation
 import PodcastAds
 import PodcastTranscripts
@@ -38,6 +40,13 @@ extension PodcastAdFinder {
           lines: transcript.lines, skips: skips, cues: cues, show: modes.show, marks: marks)
       }
       holes = keepCueStretches(found ?? [], in: &file, modes)
+    }
+    if modes.level(FinderNames.openingLines) == .skip, cues.showPhrases > 0 {
+      let skips = cueSkips(file, modes)
+      let found = guardian.hold([FinderNames.openingLines], episode: id) { _ in
+        CueAds.playbook(lines: transcript.lines, skips: skips, cues: cues, show: modes.show)
+      }
+      openings += keepCueStretches(found ?? [], in: &file, modes)
     }
     return (openings, holes)
   }

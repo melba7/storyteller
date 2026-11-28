@@ -1,7 +1,9 @@
 // LOFI-FORK: two finders that move skips with the cues the Mac learned (`ad-cues.json`): opening
 // lines pull the start of a skip back to the line that opens the break, and filled holes close the
 // short gap between two skips when the words of the gap belong to the ads (see FORK.md, AdCues.swift
-// and the round plan, "Ad skipping: timing fixes"). Foundation and PodcastTranscripts only.
+// and the round plan, "Ad skipping: timing fixes"). The playbook's pull is part of the opening
+// lines: it pulls the start of a skip back to a line that holds a phrase of the show's playbook.
+// Foundation and PodcastTranscripts only.
 import Foundation
 import PodcastTranscripts
 
@@ -13,6 +15,9 @@ public enum CueAds {
   public static let reach = 60.0
   /// A hole between two skips is filled only when it is no longer than this.
   public static let longestHole = 60.0
+  /// A playbook line pulls a skip only when it starts at least this long before the skip: a line
+  /// that starts with the skip is its first line already.
+  static let nearest = 0.5
   /// The hole's lines start from this long before its start to this long before its end.
   private static let edge = 0.2
 
@@ -78,6 +83,44 @@ public enum CueAds {
       added.append(
         ad(time, stretches[next].start, stretches[next].kind, words: words[index], source: ShowTuning.openingLines))
       stretches[next].start = time
+    }
+    return added
+  }
+
+  // MARK: Playbook lines
+
+  /// A playbook line is a line that holds a handoff, segment or plug phrase of the playbook of
+  /// `show` as whole words. For each stretch of skips: when playbook lines start from `reach`
+  /// seconds before the stretch up to `nearest` seconds before it, the stretch starts at the
+  /// latest of them instead. A line inside an earlier stretch counts too. What is returned is the
+  /// part of the moved stretches that no stretch covered before: each piece ends where a stretch
+  /// started, and is an unsure ad of that stretch's kind with the opening lines as its finder,
+  /// because the pull runs as a part of that finder (its setting, guard and Undo). Call it with
+  /// the skips as they stand after the filled holes. No phrases for the show, no skips or bad
+  /// input add nothing.
+  public static func playbook(
+    lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String
+  ) -> [FoundAd] {
+    let stretches = stretches(skips)
+    guard cues.showPhrases > 0, !stretches.isEmpty else { return [] }
+    let (lines, words) = read(lines)
+    let phrased = lines.indices.filter { cues.playbookOpens(words[$0], show: show) }.map { lines[$0].start }
+    guard !phrased.isEmpty else { return [] }
+    // Where each stretch starts after the pull, nil when no playbook line is in reach.
+    let moved = stretches.map { stretch in
+      phrased.filter { stretch.start - reach <= $0 && $0 < stretch.start - nearest }.max()
+    }
+    var added: [FoundAd] = []
+    for (index, stretch) in stretches.enumerated() {
+      // This stretch's own pull, or one of a later stretch that reaches over this one.
+      guard let pull = moved[index...].compactMap({ $0 }).filter({ $0 < stretch.start }).min()
+      else { continue }
+      let start = index > 0 ? max(pull, stretches[index - 1].end) : pull
+      guard start < stretch.start else { continue }
+      let first = lines.indices.first { start <= lines[$0].start && lines[$0].start < stretch.start }
+      added.append(
+        ad(start, stretch.start, stretch.kind, words: first.map { words[$0] } ?? [],
+          source: ShowTuning.openingLines))
     }
     return added
   }

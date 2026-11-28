@@ -96,6 +96,46 @@ final class AdCuesTests: XCTestCase {
     XCTAssertFalse(AdCues.isShape(Data(#"{"version": 1, "starts": []}"#.utf8)))
   }
 
+  // MARK: The playbook's phrases
+
+  private let withPhrases = """
+    {"version": 1, "starts": [], "returns": [],
+     "shows": [{"feed": "https://one.test/rss", "starts": [], "returns": [],
+                "phrases": ["a word from", "After the  Break!", "single", "", 4, null]},
+               {"feed": "https://other.test/rss", "phrases": ["other show phrase"]},
+               {"feed": "https://third.test/rss", "starts": ["x y z"], "phrases": "oops"}],
+     "common": [], "usual": []}
+    """
+
+  func testAShowsPhrasesAreReadAndAFileOfOnlyPhrasesIsNotEmpty() {
+    let known = ["https://one.test/rss", "https://other.test/rss", "https://third.test/rss"]
+    let read = cues(withPhrases, known: known)
+    XCTAssertFalse(read.isEmpty)
+    XCTAssertEqual(read.showPhrases, 3, "two of the first show (one word is too few) and one of the second")
+    XCTAssertEqual(read.phraseShows, 2)
+    XCTAssertEqual(read.showStarts, 1)
+    XCTAssertTrue(AdCues.isShape(Data(withPhrases.utf8)))
+    XCTAssertEqual(cues().showPhrases, 0, "a file without phrases has none")
+    XCTAssertEqual(cues().phraseShows, 0)
+  }
+
+  func testALineMatchesAPhraseOfItsShowAsWholeWordsAnywhereInIt() {
+    let read = cues(withPhrases, known: ["https://one.test/rss", "https://other.test/rss"])
+    let one = "https://one.test/rss"
+    XCTAssertTrue(read.playbookOpens(["and", "now", "a", "word", "from", "them"], show: one), "in the middle")
+    XCTAssertTrue(read.playbookOpens(["a", "word", "from"], show: one), "the whole line")
+    XCTAssertTrue(read.playbookOpens(AdWordModel.tokens("More after the break."), show: one), "re-made as words")
+    XCTAssertFalse(read.playbookOpens(["a", "wordy", "from"], show: one), "whole words only")
+    XCTAssertFalse(read.playbookOpens(["extra", "word", "from"], show: one))
+    XCTAssertFalse(read.playbookOpens(["single"], show: one), "a phrase of one word is not kept")
+    XCTAssertFalse(read.playbookOpens([], show: one))
+    XCTAssertFalse(read.playbookOpens(["a", "word", "from"], show: "https://other.test/rss"), "another show's phrase")
+    XCTAssertTrue(read.playbookOpens(["other", "show", "phrase"], show: "https://other.test/rss"))
+    XCTAssertFalse(read.playbookOpens(["a", "word", "from"], show: "nobody"))
+    XCTAssertFalse(read.opens(["a", "word", "from"], show: one), "a phrase is not a start cue")
+    XCTAssertFalse(AdCues().playbookOpens(["a", "word", "from"], show: one))
+  }
+
   // MARK: Among the other files
 
   func testTheFileIsKeptAndLoadedWithTheOtherFiles() throws {
