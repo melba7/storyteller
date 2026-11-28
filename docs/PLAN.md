@@ -2444,6 +2444,15 @@ How I read the picks (my choices, told to Mo):
   - Done when: Swift tests pin the lining up on a stream that arrives in pieces,
     that no match means the phone's own finders work as before, and that the
     player line of Z2 shows.
+  - Found on the Mac (2026-11-28): the preparing job wrote no map at all. Run on
+    the copy in iCloud Drive and told to write there, `podcast-ads --map`
+    printed nothing for five minutes and was stopped, for every copy (six in the
+    first run, 30 minutes of the lock). The same tool read the Mac's own copies
+    fine in the same job (the second downloads), and made the map of one of
+    those very files on Linux in 0.04 s. So the map is now made of the Mac's own
+    copy of the audio (checked by its SHA-256) into a temporary folder, and
+    `teach_maps.py` copies it into iCloud as the other files are copied there.
+    Done on the Mac once a run says "Map of" for each copy.
 - [ ] **Z20 Swap a started episode** (E): the phone finds the listener's place
       in the Mac's copy by matching the show's own audio around it, then goes on
       in the copy at that place. No match means no swap.

@@ -309,7 +309,11 @@ One line per lesson.
   without one every chunk can stay in memory until macOS kills the program
   (signal 9, nothing printed). Linux has no such pool, so cloud runs never show
   it (2026-11-28).
-- Fork CI's iOS job also runs the PodcastKit tests on macOS, where a folder
-  does not open as a file at all (on Linux it opens but cannot be read). A test
-  that relies on Linux behaviour fails there, so write such tests for both
+- Fork CI's iOS job also runs the PodcastKit tests on macOS, where a folder does
+  not open as a file at all (on Linux it opens but cannot be read). A test that
+  relies on Linux behaviour fails there, so write such tests for both
   (2026-11-28).
+- On the Mac, a Swift command the background jobs run must read and write only
+  local files: `podcast-ads --map`, run on a file in iCloud Drive and told to
+  write there, hung, while Python's plain copies into iCloud worked. Make the
+  file locally and let the Python script copy it in (2026-11-28).
