@@ -123,6 +123,60 @@ class OrderTests(Prepare):
         self.assertEqual(self.titles(), ["Has one"])
 
 
+class LanguageTests(Prepare):
+    def feed_in(self, language, *items):
+        data = feed_of(*items).decode()
+        tag = "" if language is None else "<language>%s</language>" % language
+        return data.replace("<title>T</title>", "<title>T</title>" + tag, 1).encode()
+
+    def test_a_feed_that_says_it_is_not_english_is_left_out_and_counted_in_the_summary(self):
+        feeds = {SHOW["feed"]: self.feed_in("de-DE", ("a1", "Eins", 5, "https://cdn/1.mp3"),
+                                            ("a2", "Zwei", 6, "https://cdn/2.mp3")),
+                 OTHER["feed"]: self.feed_in("en-US", ("b1", "One", 5, "https://cdn/b1.mp3"))}
+        self.assertEqual(self.run_pick(feeds=feeds, shows=(SHOW, OTHER)), 0, self.said)
+        self.assertEqual(self.titles(), ["One"])
+        self.assertTrue(any("2 episodes" in line and "not in English" in line for line in self.said))
+
+    def test_english_in_any_spelling_and_a_feed_with_no_language_count_as_english(self):
+        spellings = ("en", "EN", "en-us", "en_GB", "en-AU")
+        for number, language in enumerate(spellings + (None, "")):
+            feeds = {SHOW["feed"]: self.feed_in(language, ("g%d" % number, "E%d" % number, 5,
+                                                           "https://cdn/%d.mp3" % number))}
+            self.run_pick(feeds=feeds)
+        self.assertEqual(len(self.titles()), len(spellings) + 2)
+        self.assertFalse(any("not in English" in line for line in self.said))
+
+    def test_only_episodes_of_the_window_are_counted(self):
+        feeds = {SHOW["feed"]: self.feed_in("fr", ("a1", "Un", 5, "https://cdn/1.mp3"),
+                                            ("a2", "Vieux", 500, "https://cdn/2.mp3"))}
+        self.run_pick(feeds=feeds)
+        self.assertTrue(any("1 episode " in line and "not in English" in line for line in self.said))
+
+    def test_when_only_other_languages_are_new_it_is_still_nothing_to_do_and_says_why(self):
+        feeds = {SHOW["feed"]: self.feed_in("es", ("a1", "Uno", 5, "https://cdn/1.mp3"))}
+        self.assertEqual(self.run_pick(feeds=feeds), 3)
+        self.assertEqual(len(self.said), 1)
+        self.assertIn("not in English", self.said[0])
+
+    def test_a_phones_list_episode_of_a_followed_show_that_is_not_english_is_left_out_and_counted(self):
+        self.write_queue([queued(1, feed="http://www.mac.example/a.xml/", guid="p1"), queued(2)])
+        feeds = {SHOW["feed"]: self.feed_in("de", ("a1", "Eins", 5, "https://cdn/1.mp3"))}
+        self.assertEqual(self.run_pick(feeds=feeds), 0, self.said)
+        self.assertEqual(self.titles(), ["Episode 2"])
+        self.assertTrue(any("2 episodes" in line and "not in English" in line for line in self.said))
+
+    def test_a_phones_list_episode_of_a_show_the_mac_does_not_follow_stays(self):
+        self.write_queue([queued(1)])
+        self.assertEqual(self.run_pick(feeds={SHOW["feed"]: self.feed_in("de")}), 0)
+        self.assertEqual(self.titles(), ["Episode 1"])
+        self.assertFalse(any("not in English" in line for line in self.said))
+
+    def test_a_phones_list_episode_of_an_english_followed_show_stays(self):
+        self.write_queue([queued(1, feed=SHOW["feed"], guid="p1")])
+        self.run_pick(feeds={SHOW["feed"]: self.feed_in("en-GB")})
+        self.assertEqual(self.titles(), ["Episode 1"])
+
+
 class KnownTests(Prepare):
     def feeds(self):
         return {SHOW["feed"]: feed_of(("a1", "A1", 5, "https://cdn/a1.mp3"),
@@ -183,6 +237,28 @@ class LimitTests(Prepare):
         self.run_pick(feeds=self.many(10))
         self.assertEqual(self.titles(), ["E0", "E1", "E2", "E3", "E4"])
         self.assertTrue(any("$1.00 left" in line for line in self.said))
+
+    def test_a_reserve_keeps_the_pick_inside_what_the_marking_will_still_do(self):
+        # Cap 35, estimate 0.19, reserve 1.00: the marking refuses a call once spent + 1.00 reaches 35.
+        for spent, expected in ((34.0, 0), (34.5, 0), (33.9, 1), (33.0, 6)):
+            self.setUp()
+            teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(spent, 180)
+            self.run_pick("--reserve", "1.00", feeds=self.many(10))
+            self.assertEqual(len(self.manifest()), expected, spent)
+
+    def test_without_a_reserve_it_is_the_estimate_and_the_old_numbers_hold(self):
+        for spent, expected in ((34.0, 5), (34.81, 0), (34.5, 2)):
+            self.setUp()
+            teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(spent, 180)
+            self.run_pick(feeds=self.many(10))
+            self.assertEqual(len(self.manifest()), expected, spent)
+
+    def test_the_no_room_sentence_is_true_with_a_reserve(self):
+        teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(34.0, 180)
+        self.assertEqual(self.run_pick("--reserve", "1.00", feeds=self.many(3)), 3)
+        self.assertEqual(len(self.said), 1)
+        self.assertIn("leaves no room", self.said[0])
+        self.assertIn("with $1.00 kept in reserve", self.said[0])
 
     def test_a_spent_budget_picks_nothing_and_says_so_in_one_line(self):
         teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(35.0, 183)

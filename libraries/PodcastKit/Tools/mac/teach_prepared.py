@@ -9,6 +9,7 @@ it, and teach_ahead_ads.py then tells the phone about that copy.
   teach_prepared.py publish [--folder F] [--to ICLOUD_COPY] [--keep-free-gb 15] [--keep-days 7]
                             [--max-gb 10]
   teach_prepared.py clean   [the same options]
+  teach_prepared.py ready   [the same options]
 
 --to is the iCloud copy of the phone's folder that teach_publish.py also writes to (the default is
 the same one, apple_podcasts_export.default_folders()[1]). Audio goes to
@@ -24,6 +25,13 @@ folder:
   {"version": 1, "episodes": [{"id": "<12 hex>", "file": "prepared/<id>.<ext>", "sha256": "<64 hex>",
                                "bytes": <int>, "published": <seconds>, "removed": <seconds or null>}]}
 
+ready is the check teach-prepare.sh makes first, before it picks or marks anything, so that no money
+is spent in an hour that cannot publish. It answers 0 when the iCloud copy is there, a small
+temporary file (its name starts with a dot) can really be written into the prepared folder and
+removed again (macOS refuses a background job at the write, which os.access does not show), the
+cleaning has run, this Mac has --keep-free-gb free and `brctl quota` (when understood) says iCloud has
+2 GB left. Otherwise it says why in one line and answers 3. It copies nothing.
+
 Stops, each said in one line (exit 3, and what was published before stays): no iCloud folder; under
 --keep-free-gb free on the Mac's disk; `brctl quota` saying iCloud has less than 2 GB plus the
 file's size left (a missing brctl, or words this does not understand, do not stop it).
@@ -36,7 +44,9 @@ lists are touched, only a file named prepared/<that id>.<ext> (12 hex digits), n
 exam.json or shelf.json, and never a transcript, a label, a truth file or any other file. Also
 cleaned: the Mac's own audio of an episode the pick listed but that was never published and was
 picked --keep-days ago, and a leftover <id>.<ext>.part of a listed id that is over a day old.
---keep-days may be 0 (everything listed goes; "Stop episode preparing.command" uses it).
+--keep-days may be 0 (everything listed goes; "Stop episode preparing.command" uses it, with
+--all-parts, which also removes every <id>.<ext>.part in the prepared folder, whatever its age and
+whether it is listed, because with the job stopped nobody else would).
 
 prepared.json is read and written by teach_prepared_file.py and the cleaning is
 teach_prepared_clean.py.
@@ -49,8 +59,6 @@ import argparse
 import hashlib
 import math
 import os
-import re
-import shutil
 import subprocess
 import sys
 import time
@@ -62,44 +70,20 @@ import teach_store
 from apple_podcasts_export import default_folders
 from teach_ahead_set import read_ahead
 from teach_prepared_clean import GB, Tidy
+from teach_prepared_outside import ICLOUD_ROOM, disk_free, quota_left, run_command, writable
 from teach_second import Failures
 from teach_prepared_file import FOLDER_NAME, SUBFOLDER, copies, read_prepared, write_prepared
 
-QUOTA = re.compile(r"([0-9][0-9,]*)\s+bytes of quota remaining")
 CHUNK = 1024 * 1024
 KEEP_FREE_GB = 15
 KEEP_DAYS = 7
 MAX_GB = 10
-ICLOUD_ROOM = 2 * GB  # what iCloud must have left after a file
 STOPPED = 3
 
 
 def icloud_copy(defaults=default_folders):
     """The iCloud copy of the phone's folder, the one teach_publish.py writes last."""
     return defaults()[-1]
-
-
-# MARK: Outside the program
-
-def run_command(command):
-    """(exit code, what it printed). Raises OSError when the program cannot be started."""
-    done = subprocess.run(command, capture_output=True, text=True, timeout=None if command[0] == "cp" else 30)
-    return done.returncode, done.stdout + done.stderr
-
-
-def disk_free(path):
-    return shutil.disk_usage(path).free
-
-
-def quota_left(run):
-    """The bytes iCloud says it has left, or None when `brctl quota` is missing, fails or says
-    something this does not understand."""
-    try:
-        code, text = run(["brctl", "quota"])
-    except (OSError, subprocess.SubprocessError):
-        return None
-    found = QUOTA.search(text or "") if code == 0 else None
-    return int(found.group(1).replace(",", "")) if found else None
 
 
 def sha256_of(path):
@@ -199,6 +183,29 @@ def publish(tidy, options, run, free):
     return 1 if failed or tidy.failed else 0
 
 
+def ready(tidy, options, run, free):
+    """The check the hourly job makes before it picks or marks anything, so that nothing is spent in
+    an hour that cannot publish: a real small write into the prepared folder, then the cleaning, then
+    the disk and iCloud room. One plain line and STOPPED for the first reason that is not met."""
+    reason = writable(os.path.join(tidy.to, SUBFOLDER, FOLDER_NAME))
+    if reason:
+        tidy.say("The Mac cannot write into the phone's iCloud folder (%s), so nothing is picked or "
+                 "marked. Give /bin/bash Full Disk Access once: System Settings > Privacy & Security "
+                 "> Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on "
+                 "(or fix iCloud Drive)." % reason)
+        return STOPPED
+    tidy.clean()
+    if free(tidy.folder) < options.keep_free_gb * GB:
+        tidy.say("The Mac's disk has under %g GB free, so nothing is picked or marked."
+                 % options.keep_free_gb)
+        return STOPPED
+    left = quota_left(run)
+    if left is not None and left < ICLOUD_ROOM:
+        tidy.say("iCloud has under 2 GB left (%.1f GB), so nothing is picked or marked." % (left / GB))
+        return STOPPED
+    return 1 if tidy.failed else 0
+
+
 # MARK: Command line
 
 def positive(text):
@@ -217,12 +224,13 @@ def not_negative(text):
 
 def main(argv, say=print, now=time.time, run=run_command, free=disk_free, defaults=default_folders):
     parser = argparse.ArgumentParser(prog="teach_prepared.py")
-    parser.add_argument("command", choices=("publish", "clean"))
+    parser.add_argument("command", choices=("publish", "clean", "ready"))
     parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--to")
     parser.add_argument("--keep-free-gb", type=positive, default=KEEP_FREE_GB)
     parser.add_argument("--keep-days", type=not_negative, default=KEEP_DAYS)
     parser.add_argument("--max-gb", type=positive, default=MAX_GB)
+    parser.add_argument("--all-parts", action="store_true")
     try:
         options = parser.parse_args(argv)
     except SystemExit as stop:
@@ -239,6 +247,8 @@ def main(argv, say=print, now=time.time, run=run_command, free=disk_free, defaul
             if options.command == "clean":
                 tidy.clean()
                 return 1 if tidy.failed else 0
+            if options.command == "ready":
+                return ready(tidy, options, run, free)
             return publish(tidy, options, run, free)
     except teach_store.Busy:
         say("Another teaching run is already working in the teaching folder.")

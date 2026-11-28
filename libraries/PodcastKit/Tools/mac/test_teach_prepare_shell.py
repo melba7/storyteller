@@ -20,6 +20,11 @@ from test_teach_shell import HERE, Setup
 
 FILES = ("teach-prepare.sh", "Install episode preparing.command", "Stop episode preparing.command")
 
+# The stand-in tells teach_prepared.py's commands apart too (ready, publish), as it does teach_ahead.py's.
+PYTHON = PYTHON.replace('[ "$script" = teach_ahead.py ] && key="$script:$1"',
+                        '[ "$script" = teach_ahead.py ] && key="$script:$1"\n'
+                        '[ "$script" = teach_prepared.py ] && key="$script:$1"')
+
 # A swift that builds both programs, and fails for one of them when asked.
 SWIFT = """#!/bin/bash
 echo "swift $*" >> "$CALLS"
@@ -74,7 +79,7 @@ class HourTests(Setup):
         for line in self.called():
             parts = line.split()
             if parts[0] == "python3":
-                words.append(" ".join(parts[:3] if parts[1] in ("teach_ahead.py", "teach_store.py")
+                words.append(" ".join(parts[:3] if parts[1] in ("teach_ahead.py", "teach_store.py", "teach_prepared.py")
                                       else parts[:2]))
             else:
                 words.append(" ".join(parts[:4]))
@@ -87,11 +92,11 @@ class HourTests(Setup):
         with open(os.path.join(self.home, "Storyteller Lofi", "logs", "podcast-prepare.log")) as f:
             return f.read()
 
-    ORDER = ["python3 teach_store.py hold", "python3 teach_prepare.py", "python3 teach_collect.py",
+    ORDER = ["python3 teach_store.py hold", "python3 teach_prepared.py ready", "python3 teach_prepare.py", "python3 teach_collect.py",
              "python3 teach_ahead.py ready", "swift build -c release", "swift build -c release",
              "python3 teach_transcribe.py", "python3 teach_label.py", "swift build -c release",
              "swift build -c release", "python3 teach_copies.py", "python3 teach_snap.py",
-             "python3 teach_prepared.py", "python3 teach_ahead.py write", "python3 teach_publish.py"]
+             "python3 teach_prepared.py publish", "python3 teach_ahead.py write", "python3 teach_publish.py"]
 
     def test_the_steps_run_in_order_and_everything_worked(self):
         done = self.hour()
@@ -111,8 +116,10 @@ class HourTests(Setup):
         pick, label = self.line("teach_prepare.py"), self.line("teach_label.py")
         for words in ("pick", "--cap 35", "--estimate 0.19", "--most 6"):
             self.assertIn(words, pick)
-        for words in ("--yes", "--limit 6", "--cap 35", "--reserve 0.19"):
+        for words in ("--yes", "--limit 6", "--cap 35", "--reserve 1.00"):
             self.assertIn(words, label)
+        self.assertIn("--estimate 0.19", pick)
+        self.assertIn("--reserve 1.00", pick)
         budget = re.search(r"--budget (\S+)", pick).group(1)
         self.assertRegex(budget, r"^prepare-\d{4}-W\d{2}$")
         self.assertIn("--budget %s " % budget, label + " ")
@@ -131,25 +138,59 @@ class HourTests(Setup):
 
     def test_the_audio_step_gets_the_days_and_the_gigabytes_and_they_can_be_changed(self):
         self.hour()
-        self.assertTrue(self.line("teach_prepared.py").startswith("python3 teach_prepared.py publish "))
+        self.assertTrue(self.line("teach_prepared.py publish").startswith("python3 teach_prepared.py publish "))
         for words in ("--keep-days 7", "--max-gb 10"):
-            self.assertIn(words, self.line("teach_prepared.py"))
+            self.assertIn(words, self.line("teach_prepared.py publish"))
         self.assertIn("--max-gb 25", self.line("teach_collect.py"))
         open(self.calls, "w").close()
         self.hour(TEACH_PREPARE_KEEP_DAYS="3", TEACH_PREPARE_GB="5", TEACH_PREPARE_CAP="20",
                   TEACH_PREPARE_MOST="2", TEACH_MAX_GB="30")
         for words in ("--keep-days 3", "--max-gb 5"):
-            self.assertIn(words, self.line("teach_prepared.py"))
+            self.assertIn(words, self.line("teach_prepared.py publish"))
         self.assertIn("--cap 20", self.line("teach_label.py"))
+        self.assertIn("--reserve 1.00", self.line("teach_label.py"))
         self.assertIn("--limit 2", self.line("teach_label.py"))
         self.assertIn("--max-gb 30", self.line("teach_collect.py"))
+
+    def test_the_reserve_can_be_changed_and_the_pick_keeps_its_estimate(self):
+        self.hour(TEACH_PREPARE_RESERVE="2.50", TEACH_PREPARE_ESTIMATE="0.30")
+        self.assertIn("--reserve 2.50", self.line("teach_label.py"))
+        self.assertIn("--estimate 0.30", self.line("teach_prepare.py"))
+
+    def test_a_failed_preflight_means_no_pick_no_download_no_marking_and_nothing_spent(self):
+        for code in ("3", "2", "1"):
+            open(self.calls, "w").close()
+            done = self.hour(CODES="teach_prepared.py:ready=" + code)
+            self.assertEqual(done.returncode, 1, code)
+            self.assertEqual(self.first_words(), ["python3 teach_store.py hold", "python3 teach_prepared.py ready"], code)
+            for tool in ("teach_prepare.py", "teach_collect.py", "teach_label.py", "swift"):
+                self.assertNotIn(tool, " ".join(self.called()), code)
+            self.assertIn("Nothing was picked or marked this hour, so nothing was spent.", done.stdout)
+            self.assertIn("Nothing was picked or marked this hour", self.log())
+
+    def test_the_preflight_is_the_first_step_and_gets_the_folder_the_days_and_the_gigabytes(self):
+        self.hour(TEACH_PREPARE_KEEP_DAYS="3", TEACH_PREPARE_GB="5")
+        self.assertEqual(self.first_words()[:3], ["python3 teach_store.py hold", "python3 teach_prepared.py ready",
+                                                  "python3 teach_prepare.py"])
+        ready = self.line("teach_prepared.py ready")
+        for words in ("--folder", "--keep-days 3", "--max-gb 5"):
+            self.assertIn(words, ready)
+
+    def test_the_pick_and_the_marking_get_the_same_reserve(self):
+        self.hour()
+        self.assertIn("--reserve 1.00", self.line("teach_prepare.py"))
+        self.assertIn("--reserve 1.00", self.line("teach_label.py"))
+        open(self.calls, "w").close()
+        self.hour(TEACH_PREPARE_RESERVE="3")
+        self.assertIn("--reserve 3", self.line("teach_prepare.py"))
+        self.assertIn("--reserve 3", self.line("teach_label.py"))
 
     def test_ahead_ads_are_written_after_the_audio_is_published_and_before_the_phone_is_told(self):
         self.hour()
         names = [w for w in self.first_words() if w.startswith("python3")]
-        self.assertLess(names.index("python3 teach_prepared.py"), names.index("python3 teach_ahead.py write"))
+        self.assertLess(names.index("python3 teach_prepared.py publish"), names.index("python3 teach_ahead.py write"))
         self.assertLess(names.index("python3 teach_ahead.py write"), names.index("python3 teach_publish.py"))
-        self.assertLess(names.index("python3 teach_snap.py"), names.index("python3 teach_prepared.py"))
+        self.assertLess(names.index("python3 teach_snap.py"), names.index("python3 teach_prepared.py publish"))
         self.assertLess(names.index("python3 teach_copies.py"), names.index("python3 teach_snap.py"))
 
     def test_an_hour_with_nothing_to_pick_still_finishes_earlier_work_and_is_not_an_error(self):
@@ -164,22 +205,22 @@ class HourTests(Setup):
         self.assertNotIn("python3 teach_transcribe.py", words)
         self.assertNotIn("python3 teach_label.py", words)
         self.assertEqual(words[-5:], ["python3 teach_copies.py", "python3 teach_snap.py",
-                                      "python3 teach_prepared.py", "python3 teach_ahead.py write",
+                                      "python3 teach_prepared.py publish", "python3 teach_ahead.py write",
                                       "python3 teach_publish.py"])
 
     def test_a_pick_that_fails_is_an_error_and_nothing_goes_on(self):
         done = self.hour(FAIL="teach_prepare.py")
         self.assertEqual(done.returncode, 1)
-        self.assertEqual(len(self.called()), 2)
+        self.assertEqual(len(self.called()), 3)  # the hold, the preflight, the pick
         self.assertIn("nothing was prepared", done.stdout)
 
     def test_a_failing_step_does_not_stop_the_others_so_every_other_episode_reaches_the_phone(self):
         for failing in ("teach_collect.py", "teach_transcribe.py", "teach_label.py", "teach_copies.py",
-                        "teach_snap.py", "teach_prepared.py", "teach_ahead.py:write", "teach_publish.py"):
+                        "teach_snap.py", "teach_prepared.py:publish", "teach_ahead.py:write", "teach_publish.py"):
             open(self.calls, "w").close()
             done = self.hour(FAIL=failing)
             self.assertEqual(done.returncode, 1, failing)
-            self.assertEqual(self.first_words()[-3:], ["python3 teach_prepared.py", "python3 teach_ahead.py write",
+            self.assertEqual(self.first_words()[-3:], ["python3 teach_prepared.py publish", "python3 teach_ahead.py write",
                                                        "python3 teach_publish.py"], failing)
             self.assertIn("not every step worked", done.stdout, failing)
 
@@ -196,12 +237,12 @@ class HourTests(Setup):
         self.assertEqual(done.returncode, 1)
         words = self.first_words()
         self.assertNotIn("python3 teach_copies.py", words)
-        self.assertEqual(words[-3:], ["python3 teach_prepared.py", "python3 teach_ahead.py write",
+        self.assertEqual(words[-3:], ["python3 teach_prepared.py publish", "python3 teach_ahead.py write",
                                       "python3 teach_publish.py"])
         self.assertIn("python3 teach_snap.py", words)
 
     def test_the_weekly_cap_reached_and_a_stop_for_space_are_not_failures(self):
-        done = self.hour(CODES="teach_label.py=5 teach_prepared.py=3 teach_copies.py=3")
+        done = self.hour(CODES="teach_label.py=5 teach_prepared.py:publish=3 teach_copies.py=3")
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("cap of $35 is reached", done.stdout)
         self.assertEqual(self.first_words()[-1], "python3 teach_publish.py")
@@ -231,7 +272,8 @@ class HourTests(Setup):
         self.assertTrue(holds[0].endswith("teach-prepare.sh"), holds[0])
         during = [c for c in self.called() if c.startswith("lock-during")]
         self.assertEqual([c.split()[1] for c in during],
-                         ["teach_prepare.py", "teach_collect.py", "teach_ahead.py", "teach_transcribe.py",
+                         ["teach_prepared.py", "teach_prepare.py", "teach_collect.py", "teach_ahead.py",
+                          "teach_transcribe.py",
                           "teach_label.py", "teach_copies.py", "teach_snap.py", "teach_prepared.py",
                           "teach_ahead.py", "teach_publish.py"])
         self.assertEqual({c.split()[2] for c in during}, {"3"}, during)
@@ -367,6 +409,7 @@ class JobTests(Setup):
                      "$0.19 an episode"):
             self.assertIn(text, words)
         self.assertIn("the oldest go", words)
+        self.assertIn("keeps one dollar in reserve and marking stops at about 34 dollars", words)
 
     def test_the_words_follow_the_days_and_the_gigabytes_chosen(self):
         done = self.run_file(self.NAME, TEACH_PREPARE_KEEP_DAYS="14", TEACH_PREPARE_GB="20")
@@ -417,13 +460,19 @@ class JobTests(Setup):
         self.assertTrue(os.path.exists(self.plist))
         self.assertIn("nightly read-ahead was on, and is turned off", done.stdout)
 
-    def test_a_nightly_read_ahead_that_is_not_loaded_is_left_alone(self):
+    def test_a_nightly_read_ahead_job_file_that_is_not_loaded_is_removed_too_and_not_booted_out(self):
         os.makedirs(self.agents)
         with open(self.old_plist, "w") as f:
             f.write("nightly")
-        self.run_file(self.NAME)
+        done = self.run_file(self.NAME)
         self.assertNotIn("launchctl bootout gui/501/" + self.OLD, self.launchctl())
-        self.assertTrue(os.path.exists(self.old_plist))
+        self.assertFalse(os.path.exists(self.old_plist))
+        self.assertIn("job file was removed", done.stdout)
+
+    def test_no_nightly_job_file_and_nothing_loaded_changes_nothing_about_it(self):
+        done = self.run_file(self.NAME)
+        self.assertNotIn("job file was removed", done.stdout)
+        self.assertNotIn("launchctl bootout gui/501/" + self.OLD, self.launchctl())
 
     def test_a_missing_claude_or_swift_stops_it_before_anything_is_changed(self):
         for missing, words in (("claude", "Install Claude Code"), ("swift", "Install Xcode 26")):
@@ -458,6 +507,8 @@ class JobTests(Setup):
         done = self.run_file(self.NAME, BOOT_FAILS="9")
         self.assertEqual(done.returncode, 1)
         self.assertIn("Could not start the job", done.stdout)
+        self.assertIn("removed again", done.stdout)
+        self.assertFalse(os.path.exists(self.plist))
 
     def test_the_stopper_turns_the_job_off_and_keeps_everything_else(self):
         self.run_file(self.NAME)
@@ -476,9 +527,18 @@ class JobTests(Setup):
         done = self.run_file(self.STOP, answer="yes\n\n")
         self.assertEqual(done.returncode, 0, done.stdout)
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
-        self.assertEqual(self.cleaning(), ["python3 teach_prepared.py clean --folder %s --keep-days 0" % folder])
+        self.assertEqual(self.cleaning(), ["python3 teach_prepared.py clean --folder %s --keep-days 0 --all-parts" % folder])
         self.assertEqual(self.launchctl(), ["launchctl bootout gui/501/" + self.LABEL])
-        self.assertIn("prepared episodes from iCloud", done.stdout)
+        self.assertIn("That removed the prepared episodes from iCloud", done.stdout)
+
+    def test_the_stopper_says_what_happened_when_the_cleaning_did_not_work(self):
+        for code, words in (("3", "Nothing was removed"), ("1", "Not everything could be removed"),
+                            ("2", "Not everything could be removed")):
+            done = self.run_file(self.STOP, answer="yes\n\n", CODES="teach_prepared.py=" + code)
+            self.assertEqual(done.returncode, 0, code)
+            self.assertIn(words, done.stdout, code)
+            self.assertNotIn("That removed", done.stdout, code)
+            self.assertIn("stay", done.stdout, code)
 
     def test_the_stopper_keeps_the_copies_on_any_other_answer_and_says_they_stay(self):
         for answer in ("\n\n", "no\n\n", "y\n\n", "yes please\n\n"):

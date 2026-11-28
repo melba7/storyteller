@@ -158,11 +158,13 @@ def plural(count, one, many):
     return "%d %s" % (count, one if count == 1 else many)
 
 
-def room_for(budget, most, estimate):
+def room_for(budget, most, estimate, reserve=None):
     """How many more episodes may be picked: at most `most`, and one more fits while what is spent
-    plus its estimate stays under the cap, the same rule teach_label.py --reserve uses before each
-    call, so what is picked can be marked."""
-    return min(most, max(math.ceil(budget.left() / estimate - 1e-9) - 1, 0))
+    plus its estimate plus the `reserve` less one estimate stays under the cap. The reserve is what
+    teach_label.py --reserve keeps below the cap before each call (the estimate when none is given),
+    so what is picked can be marked."""
+    reserve = estimate if reserve is None else reserve
+    return min(most, max(math.ceil((budget.left() - reserve) / estimate - 1e-9), 0))
 
 
 def choosing(folder, items, options, shows, say, now):

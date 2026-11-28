@@ -82,7 +82,7 @@ echo "  - tells the phone where the ads are."
 echo "The phone still skips ads by itself for every episode the Mac has not prepared."
 echo
 echo "It runs every hour and uses at most \$$CAP a week of Claude usage (about \$0.19 an episode, so about 180 episodes a week)."
-echo "It stops for the week at that cap, before the call that would pass it. Nothing else costs anything."
+echo "It stops for the week before a call that could pass that cap. One call can cost more than an episode's usual share, so it keeps one dollar in reserve and marking stops at about $((CAP - 1)) dollars. Nothing else costs anything."
 echo "It keeps at most $ICLOUD_GB GB of audio in iCloud for $KEEP_DAYS days. When a copy is $KEEP_DAYS days old, or the copies pass $ICLOUD_GB GB, the oldest go."
 echo "After $KEEP_DAYS days it deletes the audio it downloaded itself, here on the Mac and in iCloud. Your other files are never touched."
 if [ -n "$FREE_TEXT" ]; then
@@ -90,6 +90,7 @@ if [ -n "$FREE_TEXT" ]; then
 else
   echo "It never fills iCloud: it stops with under 2 GB left, and with under 15 GB free on this Mac."
 fi
+echo "If the job cannot put files into iCloud, it spends nothing and says so in the log."
 echo "The Mac has to be awake and online at that time. If it was asleep, the job runs when the Mac wakes up. If it was shut down, that hour is skipped."
 echo "It replaces the nightly read-ahead: if that job is on, this turns it off."
 echo "The job runs the files in this folder: $HERE"
@@ -147,8 +148,12 @@ fi
 # that it does not come back at the next login.
 if launchctl print "gui/$(id -u)/$OLD_LABEL" > /dev/null 2>&1; then
   launchctl bootout "gui/$(id -u)/$OLD_LABEL" 2>/dev/null
-  rm -f "$OLD_PLIST"
   echo "The nightly read-ahead was on, and is turned off now."
+fi
+# A job file that is on disk but not loaded would start at the next login, so it goes too.
+if [ -e "$OLD_PLIST" ]; then
+  rm -f "$OLD_PLIST"
+  echo "The nightly read-ahead's job file was removed, so it does not come back at the next login."
 fi
 
 mv "$NEW_PLIST" "$PLIST" || { rm -f "$NEW_PLIST"; finish "Could not put the job file in $PLIST." 1; }
@@ -157,7 +162,10 @@ mv "$NEW_PLIST" "$PLIST" || { rm -f "$NEW_PLIST"; finish "Could not put the job 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
 if ! launchctl bootstrap "gui/$(id -u)" "$PLIST"; then
   sleep 1
-  launchctl bootstrap "gui/$(id -u)" "$PLIST" || finish "Could not start the job (launchctl)." 1
+  if ! launchctl bootstrap "gui/$(id -u)" "$PLIST"; then
+    rm -f "$PLIST"
+    finish "Could not start the job (launchctl), so its job file was removed again and nothing will start at the next login." 1
+  fi
 fi
 
 echo
