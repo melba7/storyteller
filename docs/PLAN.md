@@ -22,10 +22,11 @@ where there is no ad (was 75); waiting on Mo's double-click on the Mac for the
 run and the exam (V8) | Timing fixes and the skip tap (X1 to X6, Mo's ask
 2026-11-26): X1 to X6 done (PR #58 merged, TestFlight 37.1; Mo taught the phone
 again on 2026-11-27); on the shelf 152 of 219 breaks pass (was 142), 138 of 222
-with the exact labels (was 129); X7 (one tap leaves the whole break) built,
-merged (PR #60), TestFlight 38.1 waits on Mo's double-click on the Mac |
-Prepared episodes (Y1 to Y8, Mo's pick 2026-11-27): Y1 to Y7 built and checked
-(PR #61), Y8 (merge, TestFlight, the installer on the Mac) next
+with the exact labels (was 129); X7 (one tap leaves the whole break) merged (PR
+#60), shipped in TestFlight 39.1 | Prepared episodes (Y1 to Y8, Mo's pick
+2026-11-27): all done (PR #61 merged, TestFlight 39.1, the hourly job installed
+on Mo's Mac 2026-11-28); next: learn from Mo's taps, prepare sooner and Claude's
+second look (Mo's pick 2026-11-28)
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1915,7 +1916,7 @@ shows):
     Mac. The Mac wrote `ad-cues.json` from 1,581 episodes; publishing it from
     here was refused by the Mac's permission check, so it reaches the phone with
     Mo's next "Teach the phone again" or the weekly run.
-- [ ] **X7 One tap leaves the whole break** (Mo's ask, 2026-11-27: "if two ads
+- [x] **X7 One tap leaves the whole break** (Mo's ask, 2026-11-27: "if two ads
       back to back, one click should skip both"): a tap on Skip ad or skip
       forward inside a known ad also takes the ads that follow after a hole of
       15 s or less (`AdSkipNow.carryHole`), when the switches skip them, they
@@ -2178,13 +2179,15 @@ trusts a copy only when its size and its SHA-256 match.
     short for 50 of the 63 episodes (see `docs/LESSONS.md`). The summary counts
     skips, Undos and misses by the notes' `by: "prepared"`
     (`teach_feedback_prepared.py`).
-- [ ] **Y8 Check and ship**: the Opus check against every "done when" above,
+- [x] **Y8 Check and ship**: the Opus check against every "done when" above,
       with a close look at what deletes (the Mac's clean, the phone's give-back)
       and at the swap of a download; fixes test first; the whole check; one pull
       request; Fork CI; the merge; one TestFlight build; the Mac's tools copy
       updated; "Install episode preparing.command" left for Mo's double-click.
   - Done when: the pull request is merged, the build is on TestFlight, and Mo
     has the installer and knows what it costs.
+  - Done 2026-11-28: PR #61 merged, TestFlight 39.1 uploaded (it also carries
+    X7, because 38.1 was never built), and Mo ran "Install episode preparing".
 
 Left for later: cutting the ads out of the prepared file so that nothing has to
 be skipped; the app not downloading the publisher's copy at all when the Mac's
