@@ -63,6 +63,22 @@ class PlaybookTests(Setup):
         self.assertEqual(shows[1]["phrases"], ["a word from"])
         self.assertEqual(shows[1]["starts"], ["quick message from"], "the show's own cues stay")
 
+    def test_a_show_spelt_two_ways_keeps_both_cue_entries(self):
+        for number in range(1, 4):
+            self.episode(number, lines=lines_of(number, opener=OPENER))
+        for number in range(4, 7):
+            self.episode(number, feed="http://www.show/a/",
+                         lines=lines_of(number, opener="Time for a short break now."))
+        self.playbook(self.show(feed="https://other/b", plugs=["leave a review"]),
+                      self.show(handoffs=["a word from"]))
+        self.assertEqual(self.run_it("--with-playbook"), 0)
+        shows = {s["feed"]: s for s in self.written()["shows"]}
+        self.assertEqual(sorted(shows), ["http://www.show/a/", "https://other/b", SHOW])
+        self.assertEqual(shows[SHOW]["starts"], ["quick message from"])
+        self.assertEqual(shows["http://www.show/a/"]["starts"], ["time for a"])
+        self.assertEqual(shows[SHOW]["phrases"], ["a word from"])
+        self.assertEqual(shows["http://www.show/a/"]["phrases"], ["a word from"])
+
     def test_only_phrases_of_two_words_or_more_that_are_text_are_kept(self):
         self.six()
         self.playbook(self.show(handoffs=["word", "", 7, None, "  Two   WORDS ", ["a list"]], segments="no list"),

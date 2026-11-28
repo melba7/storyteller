@@ -273,14 +273,17 @@ def learn(episodes):
 
 
 def add_phrases(content, folder, say):
-    """Puts each playbook show's phrases into its entry of content["shows"] (a new entry when the
-    show has no cue) and returns (phrases, shows) added. Raises Problem on a damaged playbook."""
+    """Puts each playbook show's phrases into its entries of content["shows"] (every entry whose feed
+    has the same feed key, as one show spelt two ways has two; a new entry when the show has no cue)
+    and returns (phrases, shows) added. Raises Problem on a damaged playbook."""
     import teach_playbook  # Here and not at the top: teach_playbook imports this module.
     from teach_feed import feed_key
     if not os.path.exists(os.path.join(folder, teach_playbook.FILE)):
         say("There is no %s, so no phrases of the playbook were added." % teach_playbook.FILE)
         return 0, 0
-    entries = {feed_key(one["feed"]): one for one in content["shows"]}
+    entries = {}
+    for one in content["shows"]:
+        entries.setdefault(feed_key(one["feed"]), []).append(one)
     for show in teach_playbook.read_playbook(folder):
         if not isinstance(show, dict) or not isinstance(show.get("feed"), str):
             continue
@@ -289,9 +292,12 @@ def add_phrases(content, folder, say):
         phrases = {" ".join(w) for w in words if len(w) >= 2}
         if not phrases:
             continue
-        entry = entries.setdefault(feed_key(show["feed"]), {"feed": show["feed"], "starts": [], "returns": []})
-        entry["phrases"] = sorted(phrases | set(entry.get("phrases", [])))
-    content["shows"] = sorted(entries.values(), key=lambda one: one["feed"])
+        same = entries.setdefault(feed_key(show["feed"]), [])
+        if not same:
+            same.append({"feed": show["feed"], "starts": [], "returns": []})
+        for entry in same:
+            entry["phrases"] = sorted(phrases | set(entry.get("phrases", [])))
+    content["shows"] = sorted((one for same in entries.values() for one in same), key=lambda one: one["feed"])
     with_phrases = [one["phrases"] for one in content["shows"] if "phrases" in one]
     return sum(len(p) for p in with_phrases), len(with_phrases)
 

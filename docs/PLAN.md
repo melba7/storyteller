@@ -2560,6 +2560,14 @@ is the measure that decides.
 
 ## Later
 
+- The show playbook on the phone (2026-11-28), from the Opus check, left: the
+  scorecard looks a show's phrases (and its own cues) up by the exact feed
+  address while the phone uses the feed key, so a shelf episode whose feed is
+  spelt another way gets none in the scorecard (no feed on the Mac is spelt two
+  ways today); the phone drops a pulled piece that lies over any ad of the file,
+  a guess too, where the scorecard joins it (the opening lines have the same
+  gap); a cue file with phrases and no learned cues now counts as not empty, so
+  the filled holes and the ad-end check run on it. `teach_cues.py` is 370 lines.
 - Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
   lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
   `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
