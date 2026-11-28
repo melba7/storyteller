@@ -29,7 +29,8 @@ on Mo's Mac 2026-11-28); the phone's folder link fixed (PR #62, TestFlight 40.1;
 the phone's first files reached the Mac 2026-11-28) | After prepared episodes
 (Z1 to Z23, Mo's picks 2026-11-28): part 1, the map and the ad-end check built
 and checked three times (PR #63); the Mac's tests run by themselves after the
-merge
+merge | The show playbook on the phone (PB1 to PB3, Mo's OK 2026-11-28):
+building
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -2518,12 +2519,47 @@ How I read the picks (my choices, told to Mo):
 Left for later: an external server in place of iCloud (held unless Mo asks);
 cutting the ads out of the file (Mo said no for now).
 
+### The show playbook on the phone (Mo's OK, 2026-11-28)
+
+Mo said "Sure" to building the playbook (Z22) into the app. Before building, the
+three replay rules were replayed one at a time on the Mac (the same shelf dump,
+free): the pull alone gives 124 of 226 breaks (+6) with 26 skips where there is
+no ad (-1); all three rules give +5, the three without the pull +0, and the new
+skips alone +1. So only the pull is built. The replay's evaluator (teach_bar.py)
+counts 226 breaks where the Swift scorecard counts 219, so the Swift row below
+is the measure that decides.
+
+- [ ] **PB1 The phrases reach the phone**: `teach_cues.py` copies each show's
+      handoff, segment and plug phrases from `playbook.json` into that show's
+      entry of `ad-cues.json` as a list `phrases` (a show with phrases and no
+      cues gets an entry of its own), only with `--with-playbook` or when the
+      switch file `playbook-on` is in the teaching folder. `AdCues` reads the
+      list for each show; a line matches when it holds a phrase as whole words
+      (`AdWordModel.tokens`). Old builds ignore the list, the version stays 1.
+  - Done when: tests with made-up lines show the phrases written only when
+    asked, read per show on the phone, and matched as whole words only.
+- [ ] **PB2 The pull on the phone and in the scorecard**: `CueAds.playbook`: a
+      skip stretch that starts up to 60 s after a phrase line (and not within
+      0.5 s of it) starts at the nearest such line before it; what it adds is
+      the pulled part that no skip covers, as unsure opening-line stretches. The
+      phone runs it after the filled holes, under the opening-lines setting,
+      guard and Undo. The scorecard gets a row "Plus playbook lines" after "Plus
+      filled holes" (whole files and as a stream) when the cue file has phrases,
+      with the keep rule of Z22: at least 4 more breaks pass than "Plus filled
+      holes" and no more skips where there is no ad.
+  - Done when: tests with made-up lines show each case of the rule, the row and
+    its verdict; the whole check passes.
+- [ ] **PB3 Measure and ship**: the Opus check, one pull request, Fork CI, the
+      merge; the Mac's tools copy updated when no run uses it; Mo double-clicks
+      one launcher that scores the shelf with the phrases and then writes
+      `ad-cues.json` as before, and the TestFlight launcher. The switch file is
+      written only when the row is kept, so the nightly run publishes the
+      phrases from then on.
+  - Done when: the build is on TestFlight, the row's numbers and verdict stand
+    here, and the phrases are published only if the row is kept.
+
 ## Later
 
-- Round Z (2026-11-28), from the Mac's results: the show playbook passed its
-  replay (+5 breaks, one fewer wrong skip) but the phone cannot use it yet. Its
-  cue lines need a Swift change in the phone's cue rules and a publish step like
-  `ad-cues.json` (never committed). Ask Mo before building it.
 - Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
   lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
   `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
