@@ -45,6 +45,18 @@ def is_number(value):
     return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
 
 
+SWITCH = "word-ends-on"
+
+
+def switch_path(folder):
+    """The file whose presence turns on label ends at the last word (teach_label.py)."""
+    return os.path.join(folder, SWITCH)
+
+
+def switched_on(folder):
+    return os.path.exists(switch_path(folder))
+
+
 def read_words(path):
     """The side file as a dict, or None when it is missing or is not a version 1 file whose lines are
     pairs of numbers, in order of time."""

@@ -66,7 +66,7 @@ from teach_failures import IN_A_ROW, Failures, given_up_line
 from teach_label_files import (candidates, cap_text, counts_text, held_second,  # noqa: F401
                                waiting)
 from teach_store import FOLDER, Busy, Problem, require_manifest, run_lock, write_json  # noqa: F401
-from teach_words import word_ends
+from teach_words import switched_on, word_ends
 
 DEFAULT_MODEL = "claude-opus-5-5"
 NOT_CONFIRMED = 4
@@ -163,6 +163,7 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
         result["stop"], result["reason"] = kind, reason
         return result
 
+    on = switched_on(folder)  # label ends at the last word only once word-ends-on is there
     in_a_row = 0
     attempted = held_second(folder, labels, only_exam)
     for number, (item, lines) in enumerate(items, 1):
@@ -177,7 +178,7 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
             while True:
                 try:
                     made = label_episode(item, lines, model, counted, kept=kept,
-                                         ends=word_ends(folder, item["id"], lines))
+                                         ends=word_ends(folder, item["id"], lines) if on else None)
                     break
                 except UsageLimit as error:
                     if isinstance(error, SignedOut) or is_signed_out(str(error)) \

@@ -128,12 +128,26 @@ class LabelEndsTests(unittest.TestCase):
         side = {"version": 1, "duration": 10.0, "lines": [[n, n + 0.8] for n in range(10)], "words": []}
         with open(teaching.path("transcripts", first["id"] + ".words.json"), "w") as handle:
             json.dump(side, handle)
+        with open(teaching.path("word-ends-on"), "w") as handle:
+            handle.write("on\n")
         label.run(teaching.dir, "labels", "m", None, None, self.ask, say=lambda text: None)
         ends = []
         for item in (first, second):
             with open(teaching.label_path(item)) as handle:
                 ends.append(json.load(handle)["segments"][0]["end"])
         self.assertEqual(ends, [3.8, 4.0])
+
+
+class SwitchTests(unittest.TestCase):
+    def test_side_files_are_not_used_while_the_switch_file_is_missing(self):
+        teaching = Teaching(self, 1)
+        item = teaching.entries[0]
+        side = {"version": 1, "duration": 10.0, "lines": [[n, n + 0.8] for n in range(10)], "words": []}
+        with open(teaching.path("transcripts", item["id"] + ".words.json"), "w") as handle:
+            json.dump(side, handle)
+        label.run(teaching.dir, "labels", "m", None, None, LabelEndsTests.ask, say=lambda text: None)
+        with open(teaching.label_path(item)) as handle:
+            self.assertEqual(json.load(handle)["segments"][0]["end"], 4.0)
 
 
 if __name__ == "__main__":

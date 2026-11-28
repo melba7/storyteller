@@ -145,6 +145,55 @@ class ScoreTests(Base):
         self.assertEqual(len(self.said), 2)
 
 
+class SwitchTests(Base):
+    def good(self, count=20):
+        for number in range(1, count + 1):
+            self.episode(number, [label(3, 4, 10.0, 20.0)], [("0:10.000", "0:17.400")], ends={4: 17.3})
+
+    def switch(self):
+        return self.teaching.path("word-ends-on")
+
+    def test_the_report_has_a_plain_line_and_no_switch_without_the_flag(self):
+        self.good()
+        self.assertEqual(score.main(["--folder", self.teaching.dir], say=self.said.append), 0)
+        self.assertTrue(any(line.startswith("The word ends passed the bar") for line in self.said), self.said)
+        self.assertFalse(os.path.exists(self.switch()))
+
+    def test_the_flag_writes_the_switch_when_the_bar_passes_and_no_kind_got_worse(self):
+        self.good()
+        score.main(["--folder", self.teaching.dir, "--switch-on-pass"], say=self.said.append)
+        self.assertTrue(os.path.exists(self.switch()))
+        self.assertTrue(any("switched on" in line for line in self.said))
+
+    def test_the_flag_writes_nothing_when_the_bar_fails(self):
+        self.good()
+        self.episode(21, [label(3, 4, 10.0, 20.0)], [("0:10.000", "0:40.000")], ends={4: 17.3})
+        self.episode(22, [label(3, 4, 10.0, 20.0)], [("0:10.000", "0:40.000")], ends={4: 17.3})
+        score.main(["--folder", self.teaching.dir, "--switch-on-pass"], say=self.said.append)
+        self.assertFalse(os.path.exists(self.switch()))
+        self.assertTrue(any("did not pass the bar" in line for line in self.said))
+
+    def test_the_flag_writes_nothing_when_one_kind_of_break_got_worse(self):
+        self.good()
+        # A host ask whose ad ends before the next line, so the last word end is further away.
+        self.episode(30, [dict(label(3, 4, 10.0, 20.0), sort="host_ask")], [("0:10.000", "0:19.000")],
+                     ends={4: 12.0})
+        report = score.score(self.teaching.dir)
+        self.assertTrue(report["bar"]["met"])
+        self.assertFalse(report["bar"]["noKindWorse"])
+        score.main(["--folder", self.teaching.dir, "--switch-on-pass"], say=self.said.append)
+        self.assertFalse(os.path.exists(self.switch()))
+
+    def test_before_and_after_are_reported_whether_or_not_the_switch_exists(self):
+        self.good(1)
+        for _ in range(2):
+            report = score.score(self.teaching.dir)
+            self.assertEqual(report["endsBefore"]["within5"], 1)
+            self.assertEqual(report["endsAfter"]["within1"], 1)
+            with open(self.switch(), "w") as handle:
+                handle.write("on\n")
+
+
 class MainTests(Base):
     def test_writes_the_report_and_says_the_numbers(self):
         self.episode(1, [label(3, 4, 10.0, 20.0)], [("0:10.000", "0:17.400")], ends={4: 17.3})

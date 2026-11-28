@@ -22,7 +22,11 @@ plan's bar is that ends within 5 s reach 95 in 100 ("bar"). "withWordTimes" says
 the episodes that have word times, so a run that has written down only some of them is still read
 right. The report is saved as JSON (--out, default <folder>/end-edges.json) and said in a few lines.
 
-  teach_end_score.py [--folder F] [--labels labels] [--out FILE]
+  teach_end_score.py [--folder F] [--labels labels] [--out FILE] [--switch-on-pass]
+
+Label ends at the last word are off until the file word-ends-on is in the teaching folder
+(teach_label.py). With --switch-on-pass this tool writes it, only when the bar is reached and ends
+within 5 s are not worse after than before for any sort of stretch; it never removes it.
 
 Exit codes: 0 it worked (also when there was nothing to score), 2 something is not set up.
 
@@ -38,7 +42,7 @@ import teach_segments as seg
 from teach_snap import FOLDER_NAME, MAX_STRETCH_SECONDS, claims, is_time
 from teach_store import FOLDER, Problem, write_json
 from teach_truth import LABELS, read_truth, truth_path
-from teach_words import word_ends
+from teach_words import SWITCH, switch_path, word_ends
 
 LABEL_FILE = re.compile(r"^([0-9a-f]{12})\.json$")
 WITHIN = (1, 2, 5)
@@ -77,7 +81,7 @@ def edges(segments, lines, ends, stretches):
         first = min(members, key=lambda i: before[i]["start"])
         last = max(members, key=lambda i: before[i]["end"])
         found.append((stretches[j][0], stretches[j][1], before[first]["start"], before[last]["end"],
-                      after[last]["end"]))
+                      after[last]["end"], before[last].get("sort")))
     return found
 
 
@@ -110,6 +114,7 @@ def score(folder, labels=LABELS, say=print):
                 "exam": 0}
     stretches = {"differing": 0, "marked": 0, "notMarked": 0, "tooLong": 0}
     starts, before, after = Counts(), Counts(), Counts()
+    kinds = {}
     with_words = {"marked": 0, "starts": Counts(), "endsBefore": Counts(), "endsAfter": Counts()}
     for name in names:
         identifier = name[:-5]
@@ -143,7 +148,10 @@ def score(folder, labels=LABELS, say=print):
         found = edges(usable_segments(label), lines, ends, wanted)
         stretches["marked"] += len(found)
         stretches["notMarked"] += len(wanted) - len(found)
-        for truth_start, truth_end, start, end_before, end_after in found:
+        for truth_start, truth_end, start, end_before, end_after, sort in found:
+            kind = kinds.setdefault(sort, (Counts(), Counts()))
+            kind[0].add(abs(end_before - truth_end))
+            kind[1].add(abs(end_after - truth_end))
             starts.add(abs(start - truth_start))
             before.add(abs(end_before - truth_end))
             after.add(abs(end_after - truth_end))
@@ -153,12 +161,14 @@ def score(folder, labels=LABELS, say=print):
                 with_words["endsBefore"].add(abs(end_before - truth_end))
                 with_words["endsAfter"].add(abs(end_after - truth_end))
     share = after.report()["share5"]
+    worse = sorted(str(sort) for sort, (b, a) in kinds.items() if a.within[5] < b.within[5])
+    met = share is not None and share >= BAR
     return {"version": VERSION, "labels": labels, "episodes": episodes, "stretches": stretches,
             "starts": starts.report(), "endsBefore": before.report(), "endsAfter": after.report(),
             "withWordTimes": {"marked": with_words["marked"], "endsBefore": with_words["endsBefore"].report(),
                               "endsAfter": with_words["endsAfter"].report()},
-            "bar": {"edge": "ends within 5 s", "needed": BAR, "share": share,
-                    "met": share is not None and share >= BAR}}
+            "bar": {"edge": "ends within 5 s", "needed": BAR, "share": share, "met": met,
+                    "worseKinds": worse, "noKindWorse": not worse}}
 
 
 def percent(share):
@@ -183,6 +193,10 @@ def lines_of(report):
     out.append("The bar is %s of the ends within 5 s: %s%s." % (
         percent(bar["needed"]), "reached" if bar["met"] else "not reached",
         "" if bar["share"] is None else " (%s)" % percent(bar["share"])))
+    passed = bar["met"] and bar["noKindWorse"]
+    out.append("The word ends %s the bar%s." % (
+        "passed" if passed else "did not pass",
+        "" if bar["noKindWorse"] else " (ends within 5 s got worse for: %s)" % ", ".join(bar["worseKinds"])))
     if episodes["withWordTimes"] < episodes["scored"]:
         out.append("Only %d of %d scored episodes have word times, so \"after\" is as \"before\" for the "
                    "others. Write the rest down with teach_words.py." % (episodes["withWordTimes"],
@@ -195,6 +209,7 @@ def main(argv=None, say=print):
     parser.add_argument("--folder", default=FOLDER)
     parser.add_argument("--labels", default=LABELS)
     parser.add_argument("--out")
+    parser.add_argument("--switch-on-pass", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     if not FOLDER_NAME.match(args.labels) or not os.path.isdir(os.path.join(folder, args.labels)):
@@ -211,6 +226,17 @@ def main(argv=None, say=print):
         return 2
     for line in lines_of(report):
         say(line)
+    if args.switch_on_pass:
+        if report["bar"]["met"] and report["bar"]["noKindWorse"]:
+            try:
+                with open(switch_path(folder), "w", encoding="utf-8") as handle:
+                    handle.write("on\n")
+            except OSError as error:
+                say("Could not write the switch file: %s" % error)
+                return 2
+            say("Label ends at the last word are switched on (%s)." % SWITCH)
+        else:
+            say("Label ends at the last word stay off.")
     return 0
 
 
