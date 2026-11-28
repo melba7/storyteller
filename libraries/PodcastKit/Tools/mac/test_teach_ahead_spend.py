@@ -84,10 +84,10 @@ class CountingTests(unittest.TestCase):
     def setUp(self):
         self.said = []
 
-    def run_label(self, teaching, ask, cap=10, reserve=ESTIMATE, name="ahead-2026-W48"):
+    def run_label(self, teaching, ask, cap=10, reserve=ESTIMATE, name="ahead-2026-W48", **more):
         budget = teach_budget.Budget(teaching.dir, name, cap)
         result = label.run(teaching.dir, "labels", "m", None, cap, ask, say=self.said.append,
-                           budget=budget, reserve=reserve)
+                           budget=budget, reserve=reserve, **more)
         return result, budget
 
     def spent(self, teaching, name="ahead-2026-W48"):
@@ -111,6 +111,28 @@ class CountingTests(unittest.TestCase):
         self.assertAlmostEqual(result["cost"], 3 * ESTIMATE)
         self.assertAlmostEqual(budget.dollars, 3 * ESTIMATE)
         self.assertEqual(self.spent(teaching), {"dollars": round(3 * ESTIMATE, 6), "episodes": 0})
+
+    def test_an_unknown_cost_counts_as_the_unknown_cost_not_as_a_big_reserve(self):
+        teaching = Teaching(self, 6)
+        result, budget = self.run_label(teaching, self.unknown_failure, reserve=1.0, unknown_cost=0.19)
+        self.assertEqual((result["failed"], result["stop"]), (3, "failures"))
+        self.assertAlmostEqual(budget.dollars, 3 * 0.19)
+
+    def test_with_no_unknown_cost_it_counts_as_the_reserve_as_before(self):
+        teaching = Teaching(self, 6)
+        _, budget = self.run_label(teaching, self.unknown_failure, reserve=1.0)
+        self.assertAlmostEqual(budget.dollars, 3.0)
+
+    def test_the_unknown_cost_is_never_less_than_what_was_printed(self):
+        teaching = Teaching(self, 1)
+        error = claude.ClaudeError("broke")
+        error.cost, error.cost_unknown = 0.5, True
+
+        def raising(prompt):
+            raise error
+
+        result, _ = self.run_label(teaching, raising, reserve=1.0, unknown_cost=0.19)
+        self.assertAlmostEqual(result["cost"], 0.5)
 
     def test_without_a_reserve_an_unknown_cost_counts_nothing_as_before(self):
         teaching = Teaching(self, 6)
@@ -246,3 +268,14 @@ class NightlyMarkingTests(LabelBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnknownCostFlagTests(LabelBase):
+    def test_a_bad_unknown_cost_is_refused_in_one_line(self):
+        teaching = Teaching(self, 1)
+        for bad in ("-1", "abc", "nan"):
+            self.said.clear()
+            code, _ = self.main(teaching, "--unknown-cost", bad)
+            self.assertEqual(code, 2, bad)
+            self.assertEqual(len(self.said), 1, bad)
+            self.assertIn("--unknown-cost", self.said[0])

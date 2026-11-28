@@ -1297,8 +1297,9 @@ that cannot publish. Then it does this:
    of Claude usage (about 19 cents an episode, so about 180 episodes). One call
    can cost more than that, so the marking keeps one dollar in reserve
    (`TEACH_PREPARE_RESERVE`) and stops at about 34 dollars, before a call that
-   could pass the cap, and starts again the next week. This is the only step
-   that costs anything.
+   could pass the cap, and starts again the next week. A call whose cost is not
+   known (it timed out) is counted as one episode's estimate, not as the whole
+   reserve. This is the only step that costs anything.
 3. It downloads each marked episode a second time, compares the two files
    (`teach_copies.py --only-ahead`) and moves the marks onto the exact borders
    (`teach_snap.py`).

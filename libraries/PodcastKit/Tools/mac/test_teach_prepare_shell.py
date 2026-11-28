@@ -150,6 +150,7 @@ class HourTests(Setup):
             self.assertIn(words, self.line("teach_prepared.py publish"))
         self.assertIn("--cap 20", self.line("teach_label.py"))
         self.assertIn("--reserve 1.00", self.line("teach_label.py"))
+        self.assertIn("--unknown-cost 0.19", self.line("teach_label.py"))
         self.assertIn("--limit 2", self.line("teach_label.py"))
         self.assertIn("--own-gb 30", self.line("teach_collect.py"))
         self.assertNotIn("--max-gb", self.line("teach_collect.py"))
@@ -157,6 +158,7 @@ class HourTests(Setup):
     def test_the_reserve_can_be_changed_and_the_pick_keeps_its_estimate(self):
         self.hour(TEACH_PREPARE_RESERVE="2.50", TEACH_PREPARE_ESTIMATE="0.30")
         self.assertIn("--reserve 2.50", self.line("teach_label.py"))
+        self.assertIn("--unknown-cost 0.30", self.line("teach_label.py"))
         self.assertIn("--estimate 0.30", self.line("teach_prepare.py"))
 
     def test_a_failed_preflight_means_no_pick_no_download_no_marking_and_nothing_spent(self):
