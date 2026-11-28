@@ -65,9 +65,13 @@ final class PodcastEpisodeMaps: @unchecked Sendable {
 
   private init() {}
 
-  /// Where the phone keeps the map an entry names (`maps/<name>.json`).
-  private static func file(_ path: String) -> URL {
-    folder.appendingPathComponent((path as NSString).lastPathComponent)
+  /// Where the phone keeps the map an entry names, or nil when the entry names no map or no
+  /// copy. The file is named by the copy's SHA-256 (`EpisodeMap.fileName`), so when the Mac
+  /// makes another copy of the episode its map is fetched and the old copy's map is not used.
+  private static func file(_ entry: AheadEntry) -> URL? {
+    guard entry.map != nil, let name = EpisodeMap.fileName(sha256: entry.copy?.sha256 ?? "")
+    else { return nil }
+    return folder.appendingPathComponent(name)
   }
 
   /// The episode's downloaded file and its SHA-256, or nil when it has none.
@@ -80,11 +84,11 @@ final class PodcastEpisodeMaps: @unchecked Sendable {
   }
 
   /// The map the app should fetch for this episode (`maps/<name>.json`, below `Podcasts/` of the
-  /// linked folder), or nil: the Mac made none, the phone has it already, or the phone has the
-  /// Mac's own copy of the episode, whose marks need no map.
+  /// linked folder), or nil: the Mac made none, the phone has the map of that copy already, or
+  /// the phone has the Mac's own copy of the episode, whose marks need no map.
   func wanted(episode: String) -> String? {
     guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode), let path = entry.map,
-      !FileManager.default.fileExists(atPath: Self.file(path).path),
+      let file = Self.file(entry), !FileManager.default.fileExists(atPath: file.path),
       Self.downloaded(episode)?.sha256 != entry.copy?.sha256
     else { return nil }
     return path
@@ -94,13 +98,14 @@ final class PodcastEpisodeMaps: @unchecked Sendable {
   /// of the copy the episode's entry names.
   func install(episode: String, text: String) -> Bool {
     let data = Data(text.utf8)
-    guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode), let path = entry.map,
-      let copy = entry.copy, let map = EpisodeMap(data: data), map.sha256 == copy.sha256
+    guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode),
+      let copy = entry.copy, let kept = Self.file(entry), let map = EpisodeMap(data: data),
+      map.sha256 == copy.sha256
     else { return false }
     do {
       try FileManager.default.createDirectory(at: Self.folder, withIntermediateDirectories: true)
       Self.removeOld()
-      try data.write(to: Self.file(path), options: .atomic)
+      try data.write(to: kept, options: .atomic)
       return true
     } catch {
       NSLog("Podcasts: the episode map could not be saved: \(error)")
@@ -128,15 +133,15 @@ final class PodcastEpisodeMaps: @unchecked Sendable {
   /// seconds and the stretches only this copy has. Empty when the episode has no map on the phone,
   /// the file is the Mac's own copy, or the copy does not line up with the map.
   func carried(episode: String, staged: URL? = nil, following: MapFollowing? = nil) -> [FoundAd] {
-    guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode), let path = entry.map,
-      FileManager.default.fileExists(atPath: Self.file(path).path)
+    guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode),
+      let mapFile = Self.file(entry), FileManager.default.fileExists(atPath: mapFile.path)
     else { return [] }
     let file = Self.downloaded(episode)
     if let file, file.sha256 == entry.copy?.sha256 { return [] }
     guard let source = file?.file ?? staged else { return [] }
     let follow = following ?? wholeFollowing(file?.sha256 ?? "")
     guard
-      let carry = follow.carry(mapFile: Self.file(path), file: source, complete: file != nil),
+      let carry = follow.carry(mapFile: mapFile, file: source, complete: file != nil),
       carry.lined
     else { return [] }
     let stretches =
@@ -163,8 +168,8 @@ final class PodcastEpisodeMaps: @unchecked Sendable {
   /// the look, so what an earlier look gave still stands.
   func skips(episode: String, staged: URL? = nil, following: MapFollowing? = nil) -> [FoundAd]? {
     // No map on the phone: nothing is read and no guard mark is written.
-    guard let path = PodcastTeaching.shared.aheadEntry(episode: episode)?.map,
-      FileManager.default.fileExists(atPath: Self.file(path).path)
+    guard let entry = PodcastTeaching.shared.aheadEntry(episode: episode),
+      let mapFile = Self.file(entry), FileManager.default.fileExists(atPath: mapFile.path)
     else { return [] }
     guard let show = EpisodeShows.shared.show(for: episode), !show.isEmpty else { return [] }
     let listener = PodcastAdFinder.listenerSwitches(forShow: show)

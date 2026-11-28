@@ -123,6 +123,25 @@ final class AdEndCheckTests: XCTestCase {
     XCTAssertEqual(moved(lines, [skip(100, 120, source: ShowTuning.ahead), skip(110, 130)]), [[130, 136]])
   }
 
+  func testAMarkOfTheMacThatLostItsNameInAJoinStillKeepsItsEnd() {
+    let lines = [line(131, code), line(136, talk), line(140, talk)]
+    // A mark of the Mac (100.3 to 130) within half a second of a skip of the phone (70 to 100)
+    // is one ad with no finder's name after `AdJoin.join`.
+    let mark = skip(100.3, 130, source: ShowTuning.ahead)
+    let joined = AdJoin.join([skip(70, 100, source: "meaning"), mark])
+    XCTAssertEqual(joined.map(\.source), [nil])
+    XCTAssertEqual(AdEndCheck.stretches(lines: lines, skips: joined).map(\.end), [136])
+    XCTAssertTrue(AdEndCheck.stretches(lines: lines, skips: joined, marks: [mark]).isEmpty)
+    // The same when the end was moved a little since (a joint), or the mark is not finite.
+    let near = [skip(100.3, 129.6, source: ShowTuning.ahead), skip(.nan, 130)]
+    XCTAssertTrue(AdEndCheck.stretches(lines: lines, skips: joined, marks: near).isEmpty)
+    // A mark that ends earlier in the stretch, or lies elsewhere, leaves the end to the phone.
+    for other in [skip(80, 120), skip(129.8, 160), skip(200, 230)] {
+      XCTAssertEqual(
+        AdEndCheck.stretches(lines: lines, skips: joined, marks: [other]).map(\.end), [136])
+    }
+  }
+
   func testLinesInAnyOrderAndBadInput() {
     let lines = [line(139, address), line(131, code), line(143, talk), line(135, talk), line(147, talk)]
     XCTAssertEqual(moved(lines, [skip(100, 130)]), [[130, 143]])

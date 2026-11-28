@@ -98,13 +98,14 @@ public enum CueAds {
   /// After the holes comes the ad-end check (`AdEndCheck`): the end of each stretch, as it stands
   /// with the filled holes, moves on while the next lines still sell. What it adds is returned
   /// after the holes. It is here because this is the last step that changes the phone's skips with
-  /// the transcript at hand, on the phone and in the scorecard alike.
+  /// the transcript at hand, on the phone and in the scorecard alike. `marks` are the Mac's marks
+  /// in this copy's seconds, whose ends the check leaves alone.
   public static func holes(
-    lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String
+    lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String, marks: [FoundAd] = []
   ) -> [FoundAd] {
     guard !cues.isEmpty else { return [] }
     let filled = fill(lines: lines, skips: skips, cues: cues, show: show)
-    return filled + AdEndCheck.stretches(lines: lines, skips: skips + filled)
+    return filled + AdEndCheck.stretches(lines: lines, skips: skips + filled, marks: marks)
   }
 
   /// The filled holes alone (see `holes`).

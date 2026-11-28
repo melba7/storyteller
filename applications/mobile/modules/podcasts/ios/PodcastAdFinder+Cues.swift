@@ -12,9 +12,12 @@ import PodcastTranscripts
 
 extension PodcastAdFinder {
   /// Adds the stretches of both finders to `file` and says how many each added. Nothing when the
-  /// Mac taught no cues or the finder may not work now.
+  /// Mac taught no cues or the finder may not work now. `marks` are the Mac's marks of this
+  /// episode: the ad-end check leaves an end that is a mark's end, also when the mark lost its
+  /// finder's name in a join.
   func addCueStretches(
-    _ id: String, _ modes: NewModes, _ transcript: Transcript, to file: inout AdsFile
+    _ id: String, _ modes: NewModes, _ transcript: Transcript, to file: inout AdsFile,
+    marks: [FoundAd]
   ) -> (openings: Int, holes: Int) {
     let cues = PodcastTeaching.shared.files.cues
     guard !cues.isEmpty, allowedNow else { return (0, 0) }
@@ -31,7 +34,8 @@ extension PodcastAdFinder {
     if modes.level(FinderNames.filledHoles) == .skip {
       let skips = cueSkips(file, modes)
       let found = guardian.hold([FinderNames.filledHoles], episode: id) { _ in
-        CueAds.holes(lines: transcript.lines, skips: skips, cues: cues, show: modes.show)
+        CueAds.holes(
+          lines: transcript.lines, skips: skips, cues: cues, show: modes.show, marks: marks)
       }
       holes = keepCueStretches(found ?? [], in: &file, modes)
     }

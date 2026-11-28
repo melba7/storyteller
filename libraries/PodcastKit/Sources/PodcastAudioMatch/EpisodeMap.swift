@@ -39,6 +39,13 @@ public struct EpisodeMap: Codable, Sendable, Equatable {
   public static let folder = "maps"
   /// A file bigger than this reads as no map (a ten hour episode is under 2 MB).
   public static let maxBytes = 4_000_000
+  /// A map's file is read only when a frame is this long, in seconds (an MP3 frame is 0.024 to
+  /// 0.072), and the copy is at most this long. So no number of the file is too big to count
+  /// frames with.
+  static let frameRange = 0.005...0.2
+  static let maxDuration = 1_000_000.0
+  /// A mark may end this long after the copy does (the two are rounded apart).
+  static let markSlack = 1.0
 
   public var version = EpisodeMap.currentVersion
   public var feed: String
@@ -75,15 +82,30 @@ public struct EpisodeMap: Codable, Sendable, Equatable {
     return UInt8(truncatingIfNeeded: folded)
   }
 
-  /// The map in `data`, or nil when it is damaged, too big, of another version, or has no frames
-  /// or no real frame length. A mark that is not a real stretch is left out.
+  /// The name of the file a phone keeps the map of the copy with this SHA-256 under, or nil when
+  /// that is not 64 hex digits. The file is named by the copy and not by the episode, so the map
+  /// of an older copy never passes for the map of the copy the Mac made since.
+  public static func fileName(sha256: String) -> String? {
+    let hex = sha256.lowercased()
+    guard hex.utf8.count == 64,
+      hex.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+    else { return nil }
+    return hex + ".json"
+  }
+
+  /// The map in `data`, or nil when it is damaged, too big, of another version, or has no frames,
+  /// no real frame length or no real length. A mark that is not a real stretch inside the copy is
+  /// left out.
   public init?(data: Data) {
     guard data.count <= Self.maxBytes,
       var map = try? JSONDecoder().decode(EpisodeMap.self, from: data),
       map.version == Self.currentVersion, !map.frames.isEmpty,
-      map.frameSeconds.isFinite, map.frameSeconds > 0, map.duration.isFinite
+      Self.frameRange.contains(map.frameSeconds), map.duration > 0,
+      map.duration <= Self.maxDuration
     else { return nil }
-    map.marks = map.marks.filter { $0.start.isFinite && $0.end.isFinite && $0.end > $0.start }
+    map.marks = map.marks.filter {
+      $0.start >= 0 && $0.end <= map.duration + Self.markSlack && $0.end > $0.start
+    }
     self = map
   }
 

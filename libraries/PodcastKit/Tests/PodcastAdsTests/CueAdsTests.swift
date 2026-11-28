@@ -225,5 +225,11 @@ final class CueAdsTests: XCTestCase {
     XCTAssertTrue(
       CueAds.holes(lines: [line(131, code)], skips: [skip(100, 130)], cues: AdCues(), show: show)
         .isEmpty)
+    // The Mac's marks are handed on to the check: an end that is a mark's end stays.
+    XCTAssertTrue(
+      CueAds.holes(
+        lines: [line(131, code), line(136, "plain talk")], skips: [skip(100, 130)], cues: cues,
+        show: show, marks: [skip(110, 130)]
+      ).isEmpty)
   }
 }

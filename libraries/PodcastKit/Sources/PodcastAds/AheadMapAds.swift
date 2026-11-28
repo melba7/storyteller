@@ -53,6 +53,13 @@ extension AheadAds {
     return AdJoin.join(ads, touching: 0)
   }
 
+  /// `ads` without the ones that lie over a stretch of `gone` (what the map gave before and
+  /// gives no more). An ad the map gave may have been joined with a neighbour or shortened since
+  /// it was written (`AdJoin`), so it is known by where it lies and not by being equal.
+  public static func without(_ gone: [FoundAd], from ads: [FoundAd]) -> [FoundAd] {
+    ads.filter { ad in !gone.contains { $0.start < ad.end && ad.start < $0.end } }
+  }
+
   /// `found` (what the words gave) with the map's ads: the map's ads skip, outside the stretches
   /// in `judged`. An ad the words found stays only where it overlaps none of the map's, since the
   /// map's borders are exact, and a question stays only outside every skip.
