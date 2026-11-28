@@ -362,7 +362,12 @@ phone its own copy of the audio.
 `Install episode preparing.command` sets up an hourly job
 (`com.storyteller-lofi.podcast-prepare`, `teach-prepare.sh`). It first says what
 it does and costs and asks for a typed `yes`, and it turns the nightly
-read-ahead off when that is on. Each hour it:
+read-ahead off when that is on. Each hour it first checks that its audio can
+reach iCloud: the iCloud copy of the phone's folder is there, a small test file
+can really be written into it (macOS refuses a background job without Full Disk
+Access for `/bin/bash`), and the Mac and iCloud have room. If not, it says why
+in the log and ends the hour before anything is picked, downloaded or marked, so
+nothing is spent in an hour that cannot publish. Then it:
 
 1. picks up to 6 episodes (`teach_prepare.py pick`): the phone's list of next
    episodes first, whatever their age, then the episodes of every followed show

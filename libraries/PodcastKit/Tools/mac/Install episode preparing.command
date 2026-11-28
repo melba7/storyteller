@@ -90,6 +90,7 @@ if [ -n "$FREE_TEXT" ]; then
 else
   echo "It never fills iCloud: it stops with under 2 GB left, and with under 15 GB free on this Mac."
 fi
+echo "If the job cannot put files into iCloud, it spends nothing and says so in the log."
 echo "The Mac has to be awake and online at that time. If it was asleep, the job runs when the Mac wakes up. If it was shut down, that hour is skipped."
 echo "It replaces the nightly read-ahead: if that job is on, this turns it off."
 echo "The job runs the files in this folder: $HERE"

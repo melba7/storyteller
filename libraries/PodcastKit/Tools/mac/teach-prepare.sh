@@ -20,6 +20,10 @@
 #   7. writes ahead-ads.json, with the copy of each prepared episode and the times in that very file
 #      (teach_ahead.py write), and copies it with the other files to the phone's folders
 #      (teach_publish.py)
+# Before step 1 it checks that the audio can reach iCloud (teach_prepared.py ready): when it cannot
+# (no Full Disk Access for /bin/bash, iCloud or this Mac full) it says why and exits 1 without
+# picking, downloading or marking anything, so no Claude usage is spent in an hour that cannot
+# publish.
 # It takes the place of the nightly read-ahead (teach-ahead.sh). The episodes join the teaching set
 # with their labels, but never become shelf or exam episodes (ahead.json).
 # An hour with nothing new to pick still runs the steps that finish earlier work (the second
@@ -115,6 +119,15 @@ build() {
     BUILT="$(cd "$KIT" && swift build -c release --show-bin-path)/$1"
   fi
 }
+
+# Before anything is picked or paid for: can this hour's audio reach iCloud at all? (The iCloud copy
+# is there, a file can really be written into it, this Mac and iCloud have room; the cleaning of old
+# copies runs here too.) When not, the reason is said in one line and nothing is spent this hour.
+python3 -u "$TOOLS/teach_prepared.py" ready --folder "$FOLDER" --keep-days "$KEEP_DAYS" --max-gb "$ICLOUD_GB" 2>&1 | tee -a "$LOG"
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+  say "Nothing was picked or marked this hour, so nothing was spent."
+  exit 1
+fi
 
 # Exit 3 of teach_prepare.py is "nothing to do this hour", said in one line by the tool itself.
 step "Step 1 of 7: choosing this hour's episodes" python3 -u "$TOOLS/teach_prepare.py" pick --folder "$FOLDER" --budget "$BUDGET" --cap "$CAP" --estimate "$ESTIMATE" --reserve "$RESERVE" --most "$MOST"

@@ -1274,7 +1274,13 @@ takes the place of the nightly read-ahead: the installer turns that job off when
 it is on. It first says what it will do, what it costs and how much iCloud it
 takes, and asks you to type `yes`; it installs nothing otherwise.
 
-Each hour the job does this:
+Each hour the job first checks that its audio can reach iCloud
+(`teach_prepared.py ready`): the iCloud copy of the phone's folder is there, a
+small file can really be written into it (without Full Disk Access for
+`/bin/bash` macOS refuses a background job here), and this Mac and iCloud have
+room. When one of these is not so, it says why in the log and ends the hour
+before picking, downloading or marking anything, so it spends nothing in an hour
+that cannot publish. Then it does this:
 
 1. It picks up to 6 episodes (`teach_prepare.py pick`): first the phone's list
    of next episodes, whatever their age, then the episodes of every show you
