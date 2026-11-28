@@ -141,16 +141,18 @@ class HourTests(Setup):
         self.assertTrue(self.line("teach_prepared.py publish").startswith("python3 teach_prepared.py publish "))
         for words in ("--keep-days 7", "--max-gb 10"):
             self.assertIn(words, self.line("teach_prepared.py publish"))
-        self.assertIn("--max-gb 25", self.line("teach_collect.py"))
+        self.assertIn("--own-gb 25", self.line("teach_collect.py"))
+        self.assertNotIn("--max-gb", self.line("teach_collect.py"))
         open(self.calls, "w").close()
         self.hour(TEACH_PREPARE_KEEP_DAYS="3", TEACH_PREPARE_GB="5", TEACH_PREPARE_CAP="20",
-                  TEACH_PREPARE_MOST="2", TEACH_MAX_GB="30")
+                  TEACH_PREPARE_MOST="2", TEACH_PREPARE_OWN_GB="30")
         for words in ("--keep-days 3", "--max-gb 5"):
             self.assertIn(words, self.line("teach_prepared.py publish"))
         self.assertIn("--cap 20", self.line("teach_label.py"))
         self.assertIn("--reserve 1.00", self.line("teach_label.py"))
         self.assertIn("--limit 2", self.line("teach_label.py"))
-        self.assertIn("--max-gb 30", self.line("teach_collect.py"))
+        self.assertIn("--own-gb 30", self.line("teach_collect.py"))
+        self.assertNotIn("--max-gb", self.line("teach_collect.py"))
 
     def test_the_reserve_can_be_changed_and_the_pick_keeps_its_estimate(self):
         self.hour(TEACH_PREPARE_RESERVE="2.50", TEACH_PREPARE_ESTIMATE="0.30")
@@ -250,7 +252,8 @@ class HourTests(Setup):
     def test_a_full_audio_folder_ends_non_zero_with_one_plain_sentence(self):
         done = self.hour(CODES="teach_collect.py=3")
         self.assertEqual(done.returncode, 1)
-        self.assertIn("reached its limit of 25 GB", done.stdout)
+        self.assertIn("own episodes has reached its limit of 25 GB", done.stdout)
+        self.assertIn("TEACH_PREPARE_OWN_GB", done.stdout)
 
     def test_a_publish_that_missed_icloud_is_said(self):
         done = self.hour(CODES="teach_publish.py=3")

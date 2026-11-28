@@ -42,8 +42,9 @@
 # (the most GB of copies kept in iCloud, 10), TEACH_PREPARE_CAP (dollars a week, 35),
 # TEACH_PREPARE_ESTIMATE (dollars one episode is expected to cost, 0.19, used by the pick),
 # TEACH_PREPARE_RESERVE (dollars the pick and the marking keep below the cap, 1.00), TEACH_PREPARE_MOST
-# (episodes an hour, 6) and TEACH_MAX_GB (the most audio the teaching folder keeps, 25: the copies
-# still on this Mac count). For the tests, TEACH_TOOLS, TEACH_KIT and TEACH_FOLDER can be set too.
+# (episodes an hour, 6) and TEACH_PREPARE_OWN_GB (the most GB of audio this job's own episodes keep on
+# this Mac, 25: the copies waiting for their second download count; other audio in the teaching
+# folder from earlier runs does not). For the tests, TEACH_TOOLS, TEACH_KIT and TEACH_FOLDER can be set too.
 HERE="$(cd "$(dirname "$0")" && pwd)"
 TOOLS="${TEACH_TOOLS:-$HERE}"
 FOLDER="${TEACH_FOLDER:-$HOME/Storyteller Lofi/PodcastTeaching}"
@@ -53,7 +54,7 @@ CAP="${TEACH_PREPARE_CAP:-35}"
 ESTIMATE="${TEACH_PREPARE_ESTIMATE:-0.19}"
 RESERVE="${TEACH_PREPARE_RESERVE:-1.00}"
 MOST="${TEACH_PREPARE_MOST:-6}"
-MAX_GB="${TEACH_MAX_GB:-25}"
+OWN_GB="${TEACH_PREPARE_OWN_GB:-25}"
 LOG_FOLDER="$HOME/Storyteller Lofi/logs"
 LOG="$LOG_FOLDER/podcast-prepare.log"
 export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.claude/local"
@@ -137,10 +138,10 @@ if [ "$PICKED" -ne 0 ] && [ "$PICKED" -ne 3 ]; then
   exit 1
 fi
 
-step "Step 2 of 7: downloading them" $CAFFEINATE python3 -u "$TOOLS/teach_collect.py" --folder "$FOLDER" --only-ahead --max-gb "$MAX_GB"
+step "Step 2 of 7: downloading them" $CAFFEINATE python3 -u "$TOOLS/teach_collect.py" --folder "$FOLDER" --only-ahead --own-gb "$OWN_GB"
 GATHERED="$?"
 if [ "$GATHERED" -eq 3 ]; then
-  say "Not everything can be downloaded: the audio kept in the teaching folder has reached its limit of $MAX_GB GB. To go on, raise TEACH_MAX_GB (the number near the top of teach-prepare.sh). The hour goes on with what was downloaded."
+  say "Not everything can be downloaded: the audio of this job's own episodes has reached its limit of $OWN_GB GB on this Mac. To go on, raise TEACH_PREPARE_OWN_GB (the number near the top of teach-prepare.sh). The hour goes on with what was downloaded."
   STATUS=1
 elif [ "$GATHERED" -ne 0 ]; then
   say "Downloading did not work (see above). The hour goes on with what is already there."

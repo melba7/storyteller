@@ -1337,7 +1337,10 @@ the installer passes both to the job, so run it with
 `TEACH_PREPARE_GB=5 TEACH_PREPARE_KEEP_DAYS=3` for another choice),
 `TEACH_PREPARE_CAP` (dollars a week), `TEACH_PREPARE_ESTIMATE` (what the pick
 counts an episode at), `TEACH_PREPARE_RESERVE` (what the marking keeps below the
-cap), `TEACH_PREPARE_MOST` (episodes an hour) and `TEACH_MAX_GB`.
+cap), `TEACH_PREPARE_MOST` (episodes an hour) and `TEACH_PREPARE_OWN_GB` (the
+most GB of audio that the job's own episodes keep on this Mac, 25). Only that
+audio is counted, not the rest of the teaching folder, so audio from earlier big
+runs never stops the hour (`teach_collect.py --only-ahead --own-gb`).
 
 Start it by double-clicking `Install episode preparing.command` and typing
 `yes`; stop it with `Stop episode preparing.command`. It turns the job off and

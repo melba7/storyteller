@@ -40,6 +40,11 @@ gather that are still waiting too), the other waiting ones after them if the siz
 --max-gb is the limit for all the audio kept in the folder, not for one run, and audio is never
 deleted, so once the folder is full nothing more is downloaded, the wanted episodes included.
 
+--own-gb N (only with --only-ahead; the hourly episode preparing uses it, teach_prepare.py) is the
+most GB of audio that the episodes of ahead.json may keep on this Mac. Only their audio is counted,
+and the --max-gb check on the whole folder is not made, so the audio of earlier big runs does not stop
+the hour. The free disk check stays as it is.
+
 --only-ahead is for the nightly read-ahead (teach_ahead.py): it reads no feed and downloads only the
 episodes in ahead.json that have no file yet, with the same size and disk limits. Nothing else in
 episodes.json is touched.
@@ -143,6 +148,16 @@ def positive(text):
     return number
 
 
+def gigabytes(text):
+    try:
+        value = float(text)
+    except ValueError:
+        value = 0.0
+    if not 0 < value < float("inf"):
+        raise argparse.ArgumentTypeError("%r is not a number above zero" % text)
+    return value
+
+
 def is_skipped(entry):
     return (entry["error"] or "").startswith(SKIPPED)
 
@@ -161,7 +176,8 @@ def refresh(entries, listed):
 def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.fetch_feed,
             download=fetching.download, free_space=lambda path: shutil.disk_usage(path).free,
             pause=probe.PAUSE, sleep=time.sleep, say=print, max_file=fetching.MAX_FILE,
-            wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST, only=None):
+            wanted=(), wanted_most=WANTED, exam=False, exam_most=teach_exam.MOST, only=None,
+            own_bytes=None):
     """Adds the new episodes to episodes.json and downloads every entry that has no file yet, in
     list order (with `exam`, the exam's episodes first). Stops before a download that would take the audio on disk over `max_bytes`, or
     when the free disk space, less the file about to come (the feed's size, when known), is under
@@ -172,7 +188,9 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
     With `exam`, the wanted list is ignored and only the episodes that teach_exam.pick_new takes are
     added; their ids go into exam.json before episodes.json is saved and before any download, and
     the downloads start with the exam's episodes. With `only` (a set of ids) only those episodes are
-    downloaded, and `shows` is normally empty so no feed is read."""
+    downloaded, and `shows` is normally empty so no feed is read. With `own_bytes` (only with `only`)
+    the size check counts just the audio of the ids in `only` and is made against `own_bytes`, not
+    against `max_bytes`, so other audio kept in the folder does not stop these downloads."""
     entries = load_manifest(folder)
     os.makedirs(os.path.join(folder, "audio"), exist_ok=True)
     stats = {}
@@ -204,8 +222,12 @@ def collect(folder, shows, per_show, max_bytes, keep_free_bytes, fetch=fetching.
             result["skipped"] += 1
             save_manifest(folder, entries)
             continue
-        on_disk = sum(other["bytes"] for other in entries if other["file"])
-        if on_disk + (entry["size"] or 0) > max_bytes:
+        if own_bytes is None:
+            on_disk, limit = sum(other["bytes"] for other in entries if other["file"]), max_bytes
+        else:
+            on_disk = sum(other["bytes"] for other in entries if other["file"] and other["id"] in only)
+            limit = own_bytes
+        if on_disk + (entry["size"] or 0) > limit:
             result["why"] = "size"
         elif free_space(folder) - (entry["size"] or 0) < keep_free_bytes:
             result["why"] = "space"
@@ -270,9 +292,13 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
     parser.add_argument("--exam", action="store_true")
     parser.add_argument("--exam-most", type=positive, default=teach_exam.MOST)
     parser.add_argument("--only-ahead", action="store_true")
+    parser.add_argument("--own-gb", type=gigabytes)
     parser.add_argument("--list", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
+    if args.own_gb is not None and not args.only_ahead:
+        say("--own-gb limits the audio of the episodes of ahead.json, so it needs --only-ahead.")
+        return 2
     try:
         shows = [] if args.only_ahead else probe.load_shows(args.shows)
     except (OSError, ValueError, AttributeError, TypeError) as error:
@@ -291,7 +317,8 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
                              wanted=() if args.exam or args.only_ahead
                              else teach_wanted.load_wanted(folder, say),
                              wanted_most=args.wanted, exam=args.exam, exam_most=args.exam_most,
-                             only=ahead_ids(folder) if args.only_ahead else None)
+                             only=ahead_ids(folder) if args.only_ahead else None,
+                             own_bytes=None if args.own_gb is None else int(args.own_gb * GB))
     except (Busy, teach_store.Problem) as error:
         say(str(error))
         return 2
@@ -307,6 +334,8 @@ def main(argv=None, fetch=fetching.fetch_feed, download=fetching.download, sleep
         say("%d were left out for good because the file is too big." % result["skipped"])
     if result["waiting"]:
         why = ("the %.0f GB size limit on all kept audio was reached" % args.max_gb
+               if result["why"] == "size" and args.own_gb is None
+               else "the %g GB limit on the job's own audio was reached" % args.own_gb
                if result["why"] == "size" else "free disk space is under %.0f GB" % args.keep_free_gb)
         say("%d are still waiting because %s." % (result["waiting"], why))
     return SIZE_LIMIT if result["why"] == "size" else 0
