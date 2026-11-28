@@ -2240,25 +2240,33 @@ How I read the picks (my choices, told to Mo):
 
 **Part 1 (tonight)**
 
-- [ ] **Z1 When the phone last heard from the Mac** (H): Podcasts, profile, "Ad
+- [x] **Z1 When the phone last heard from the Mac** (H): Podcasts, profile, "Ad
       skipping results" and Settings get one plain line, "Last exchange with
       your Mac: today 9:42 PM", with what came (marks, copies, teaching files)
       and what went (the list, the notes). When nothing ever moved it says so
       and names the step to take.
   - Done when: tests pin the line's words for never, today and older than a day,
     and `phone-queue.json` in the Mac's iCloud folder proves the phone wrote.
-- [ ] **Z2 "Your Mac's marks" in the player** (G): an episode that plays with
+  - Built 2026-11-28 (builder A, joined by builder G): `macExchange.ts` words,
+    kept in AsyncStorage; the copies count comes from `runPrepared`. The phone's
+    first `phone-queue.json` reached the Mac at 11:10 PM Eastern on build 40.1.
+- [x] **Z2 "Your Mac's marks" in the player** (G): an episode that plays with
       the Mac's marks shows the line "Your Mac's marks" with a Mac symbol, for a
       prepared copy and for marks placed on a stream. An episode without them
       shows nothing new. It takes the place of "Prepared by your Mac".
   - Done when: jest tests pin when the line shows, and a screenshot shows it.
-- [ ] **Z3 Look for Mac work at Play and in the background** (G): the phone
+  - Built: `MAC_MARKS` with a laptop symbol; `macMarks` from Swift for prepared
+    copies, ahead marks and streams (the stream flag in `PodcastPlayer.swift` is
+    not compiled in the cloud; Fork CI compiles it).
+- [x] **Z3 Look for Mac work at Play and in the background** (G): the phone
       reads the Mac's files when Play is pressed and in its background refresh,
       not only when the app opens. Marks that arrive for the episode that is
       playing are used from the next ad on.
   - Done when: tests pin both moments and that a read at Play never delays the
     start by more than a second.
-- [ ] **Z4 The episode map, tested tonight** (G; free): Mo: "This should be a
+  - Built: at Play at most once a minute (`dueForPlay`), and the background task
+    waits at most 25 s for the exchange (`waitAtMost`).
+- [x] **Z4 The episode map, tested tonight** (G; free): Mo: "This should be a
       much smoother process with the map you're doing tonight right?" The Mac
       makes a small map of an episode (about 100 KB): a fingerprint of its
       file's show audio and Claude's marks. A phone would line its own stream or
@@ -2270,6 +2278,14 @@ How I read the picks (my choices, told to Mo):
     before it is lined up and how many episodes do not line up at all. The map
     goes into the app (Z19) only when the row passes at least 20 more exact
     breaks than the stream row with no more wrong skips.
+  - Result (simulation, `/home/user/scratch-z/z4.py`, `z4b.py`): on the shelf's
+    copy B, 125 of 142 breaks with the map against 61 for the finders alone; 18
+    wrong skips (finders 20) once carried pieces under 5 s are dropped (49
+    without that rule). On 97 other twice-downloaded episodes the rule holds:
+    140 of 158, 22 wrong skips (58 without). Most of the gain is Claude's marks
+    themselves; exact carry adds up to about 16 breaks over placing them by
+    words. 1 of 160 episodes never lines up (a re-edit); 150 or more line up
+    within 10 s. Go for Z19.
 - [x] **Z5 Prepare sooner, and the phone waits** (pick 2): the Mac's job runs
       every 20 minutes instead of every hour. As soon as it picks an episode it
       writes a "coming" entry to `ahead-ads.json`, before the marking. The phone
@@ -2306,7 +2322,12 @@ How I read the picks (my choices, told to Mo):
       is fixed test first.
   - Done when: the cause stands here, a test pins the fix, and a finish on the
     Mac writes a new `scorecard.json`.
-- [ ] **Z9 Teach the phone again every night by itself** (B): a nightly job runs
+  - So far (builder D): every failed finish step now prints its exit code and
+    signal. In the cloud the scorer ran 12 minutes and exited 0 on a copy
+    without audio; every non-zero exit in it prints a line, so the Mac's silent
+    failure is a signal (killed or a crash) in the audio steps. The next Mac run
+    shows the code.
+- [x] **Z9 Teach the phone again every night by itself** (B): a nightly job runs
       the finish steps (habits, model, library, sounds, cues, score, settings,
       publish) on what was marked that day. It spends nothing. It comes after
       Z8, so that it never publishes stale settings: when the score fails, the
@@ -2316,6 +2337,8 @@ How I read the picks (my choices, told to Mo):
 
 **Free measurements (the app changes only where the bar is passed)**
 
+- Built: `teach-nightly.sh` at 3:30 AM under the shared lock, no Claude calls; a
+  failed score leaves the settings out. Installed by the round's Mac script.
 - [ ] **Z10 This week's ad sounds every hour** (A): the sounds of the ads in
       prepared episodes go to the phone hourly. Measured first with a scorecard
       row that gives each test episode only sounds from the week before it.
@@ -2347,18 +2370,20 @@ How I read the picks (my choices, told to Mo):
   - Done when: on the twice-downloaded episodes, split by week, the share of
     inserted ads with a sound twin from earlier stands here. Built only at 50 in
     100 or more, then held to Z10's bar.
-- [ ] **Z15 The ad-length ruler** (Mo's pick "All seven"; free): 41 in 100
+- [x] **Z15 The ad-length ruler** (Mo's pick "All seven"; free): 41 in 100
       inserted stretches are within 1 s of a multiple of 15 s. A skip that
       starts at a joint or a known sound and ends near such a multiple is moved
       to it, and a hole exactly one ad long is filled.
   - Done when: the replay's numbers stand here. Kept by the round's bar.
+  - Result: no gain (142 to 142, 129 to 129; only 2 of 290 skips start at a
+    joint near a multiple of 15 s). Not kept.
 - [ ] **Z16 The lightest copy** (Mo's pick "All seven"; free): of the Mac's
       downloads of an episode (Z14), the shortest becomes the prepared copy,
       because some downloads carry fewer ads. Nothing is cut out of a file.
   - Done when: the ad seconds of the shorter and the longer copy of the
     twice-downloaded episodes stand here. Built only when the shorter copy has
     at least 20 in 100 fewer ad seconds.
-- [ ] **Z17 Walk a host read back to the brand's first mention** (Mo's pick "All
+- [x] **Z17 Walk a host read back to the brand's first mention** (Mo's pick "All
       seven"; free): when a host read is known by its code, its web address or a
       sponsor name from the notes, its start moves back to the first earlier
       mention of that brand within 2 minutes. It is for the host reads that
@@ -2367,6 +2392,8 @@ How I read the picks (my choices, told to Mo):
 
 **The paid test**
 
+- Result: web addresses only, reach 90 s (picked on training): 13 skips move, no
+  break changes (142, 129). Not kept.
 - [ ] **Z18 Claude's second look at every break's start and end** (pick 3):
       Claude reads the lines around each edge once more and may move it. Tested
       first on the twice-downloaded episodes, where the answer key does not come
