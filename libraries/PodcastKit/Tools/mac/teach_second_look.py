@@ -39,6 +39,7 @@ from teach_budget import CapReached
 from teach_claude import EXTRA_FOLDERS, UsageLimit
 from teach_exam import read_exam
 from teach_label import DEFAULT_MODEL
+from teach_overlap import same_episode_ids
 from teach_second_look_report import OUT, REPORT, report  # noqa: F401
 from teach_paid import (CAP_REACHED, FAILED_IN_A_ROW, IN_A_ROW, NOT_CONFIRMED, USAGE_STOP,
                         Spender, claude_asker)
@@ -234,10 +235,15 @@ def run(folder, ask, budget, cap, reserve, say=print, limit=None):
     """Looks at the waiting episodes. Returns {"done", "failed", "cost", "stop"}; `stop` is None,
     "limit", "cap", "usage" or "failures"."""
     spender = Spender(ask, budget, cap, reserve)
+    entries = sorted(require_manifest(folder), key=lambda e: e["id"])
+    by_id = {entry["id"]: entry for entry in entries}
     sealed = set(read_exam(folder))
+    # An exam episode downloaded again under another id has the exam's words, so it is sealed too.
+    sealed |= set(same_episode_ids(folder, by_id, sorted(i for i in sealed if i in by_id),
+                                   [i for i in by_id if i not in sealed]))
     result = {"done": 0, "failed": 0, "cost": 0.0, "stop": None}
     tried = in_a_row = 0
-    for entry in sorted(require_manifest(folder), key=lambda e: e["id"]):
+    for entry in entries:
         identifier = entry["id"]
         if identifier in sealed or os.path.exists(os.path.join(folder, OUT, identifier + ".json")):
             continue

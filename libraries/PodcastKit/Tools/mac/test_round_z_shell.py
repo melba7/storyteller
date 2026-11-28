@@ -58,8 +58,9 @@ class RoundSetup(shell.Setup):
         self.program("python3", PYTHON)
         self.program("tar", TAR)
         self.program("plutil", '#!/bin/bash\necho "plutil $*" >> "$CALLS"\nexit 0\n')
+        # launchctl says whether the lock is held when it stops a job (bootout).
         self.program("launchctl", '#!/bin/bash\necho "launchctl $*" >> "$CALLS"\n'
-                     'case "$1" in print) exit 1 ;; esac\nexit 0\n')
+                     'case "$1" in print) exit 1 ;; bootout) ' + PROBE % "bootout" + ' ;; esac\nexit 0\n')
         self.program("id", "#!/bin/bash\necho 501\n")
         later = os.path.join(self.home, ".local", "bin")
         os.makedirs(later)
@@ -138,7 +139,7 @@ class RoundTests(RoundSetup):
              "podcast-teach score F --labels labels-snapped --stream --week",
              "python3 teach_end_score.py --folder F",
              "swift build -c release --show-bin-path",
-             "python3 teach_words.py --folder F --tool BIN/podcast-transcribe",
+             "python3 teach_words.py --folder F --tool BIN/podcast-transcribe --no-lock",
              "python3 teach_end_score.py --folder F --switch-on-pass"]
 
     def order(self):
@@ -181,8 +182,12 @@ class RoundTests(RoundSetup):
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
         # The rewrite of the shelf's words (hours long, and only side files of old episodes) runs
         # without the lock, so episode preparing goes on meanwhile.
-        self.assertEqual(self.locked(), {"tar": "3", "teach_second_look.py": "3", "teach_playbook.py": "3",
-                                         "teach_end_score.py": "3", "teach_words.py": "0"})
+        # The installers hold it too, so stopping the old job never ends a preparing run half way.
+        self.assertEqual(self.locked(), {"tar": "3", "bootout": "3", "teach_second_look.py": "3",
+                                         "teach_playbook.py": "3", "teach_end_score.py": "3",
+                                         "teach_words.py": "0"})
+        boots = [line for line in self.called() if line.startswith("launchctl bootout")]
+        self.assertEqual(len(boots), 2)
         with run_lock(self.folder):
             pass
 
@@ -218,6 +223,24 @@ class RoundTests(RoundSetup):
         first = self.summary()["steps"][0]
         self.assertEqual((first["step"], first["code"]), ("Update the Mac's tools", 3))
         self.assertNotIn("teach_second_look.py", " ".join(self.called()))
+
+    def test_when_the_tools_copy_fails_the_jobs_are_not_installed_and_the_rest_still_runs(self):
+        # The packing stops half way, so the tools copy may be half new and half old.
+        self.program("tar", '#!/bin/bash\ncase "$*" in *-cf*) echo "tar: the disk is full" >&2; exit 1 ;; esac\n'
+                     'exec "$REAL_TAR" "$@"\n')
+        os.makedirs(os.path.join(self.copy, "Tools", "mac"))
+        done = self.round()
+        self.assertEqual(done.returncode, 1)
+        self.assertNotIn("launchctl", " ".join(self.called()))
+        self.assertFalse(os.path.exists(os.path.join(self.home, "Library", "LaunchAgents")))
+        self.assertEqual(done.stdout.count("so the two jobs are not installed again"), 1)
+        self.assertNotIn("No commands were given", done.stdout.split("=== 3.")[0])
+        steps = [step["step"] for step in self.summary()["steps"]]
+        self.assertEqual(steps[:2], ["Update the Mac's tools", "Score the ad skipping"])
+        self.assertNotIn("Install episode preparing", steps)
+        self.assertIn("python3 teach_second_look.py test F --cap 5 --yes", self.tools())
+        headings = [line for line in done.stdout.splitlines() if line.startswith("=== ")]
+        self.assertEqual(len(headings), 10)
 
     def test_a_failed_step_says_its_code_and_the_next_ones_still_run(self):
         done = self.round(FAIL="teach_second_look.py:test teach_playbook.py:build", TEACH_CODES="score=137")

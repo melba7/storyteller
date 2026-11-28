@@ -3,11 +3,15 @@ import { readFileSync } from "node:fs"
 
 import { describe, expect, it } from "vitest"
 
+import { type NewEpisode, parseFollowUps } from "./automatic"
+
 import {
   COMING_HOLD_MS,
   comingKey,
   heldKeys,
   parseComing,
+  sortHeld,
+  WAITING_KEEP_MS,
   withoutHeld,
 } from "./coming"
 
@@ -70,6 +74,28 @@ describe("heldKeys", () => {
   })
 })
 
+describe("comingKey", () => {
+  it("is the same for two spellings of one feed address, as on the phone's native side", () => {
+    const key = comingKey("https://feeds.example.com/show", "g1")
+    for (const spelled of [
+      "http://feeds.example.com/show",
+      "https://www.Feeds.Example.com/show/",
+      " https://feeds.example.com/show#top ",
+    ])
+      expect(comingKey(spelled, "g1")).toBe(key)
+    expect(comingKey("https://feeds.example.com/Show", "g1")).not.toBe(key)
+    expect(comingKey("https://feeds.example.com/show", "g2")).not.toBe(key)
+  })
+  it("holds an episode whose feed the Mac spelled differently", () => {
+    const coming = [
+      { feed: "http://www.example.com/feed/", guid: "g", since: sec(NOW) },
+    ]
+    expect(
+      heldKeys(coming, NOW).has(comingKey("https://example.com/feed", "g")),
+    ).toBe(true)
+  })
+})
+
 describe("withoutHeld", () => {
   it("leaves out the held episodes of an automatic download", () => {
     const list = [{ id: "a" }, { id: "b" }, { id: "c" }]
@@ -78,6 +104,66 @@ describe("withoutHeld", () => {
       { id: "c" },
     ])
     expect(withoutHeld(list, new Set())).toEqual(list)
+  })
+})
+
+describe("sortHeld", () => {
+  const episode: NewEpisode = {
+    id: "e1",
+    showId: "s1",
+    publishedAt: 5,
+    audioUrl: "https://x/e1.mp3",
+    audioType: "audio/mpeg",
+  }
+  const coming = [{ feed: "f", guid: "g", since: sec(NOW) }]
+  // The library says episode e1 is the one with this feed and guid.
+  const heldIds = (now: number) =>
+    new Set(heldKeys(coming, now).has(comingKey("f", "g")) ? ["e1"] : [])
+  /** One run: what starts now, and what is saved for the next run (through the saved text). */
+  const run = (saved: NewEpisode[], now: number) => {
+    const { start, waiting } = sortHeld(saved, heldIds(now), now)
+    return { start, saved: parseFollowUps(JSON.stringify(waiting)) }
+  }
+
+  it("downloads a held new episode on a later run, once the hold has ended", () => {
+    const first = run([episode], NOW)
+    expect(first.start).toEqual([])
+    expect(first.saved).toEqual([{ ...episode, waitingSince: NOW }])
+    // Still held an hour later: it stays kept, with the time it was first held.
+    const second = run(first.saved, NOW + 60 * 60 * 1000)
+    expect(second.start).toEqual([])
+    expect(second.saved).toEqual([{ ...episode, waitingSince: NOW }])
+    // The Mac's copy never came and the 2 hours are over: it downloads now and is kept no more.
+    const third = run(second.saved, NOW + COMING_HOLD_MS)
+    expect(third.start.map((one) => one.id)).toEqual(["e1"])
+    expect(third.saved).toEqual([])
+  })
+  it("downloads it as soon as the entry is gone from the Mac's list", () => {
+    const { saved } = run([episode], NOW)
+    const later = sortHeld(saved, new Set<string>(), NOW + 60_000)
+    expect(later.start.map((one) => one.id)).toEqual(["e1"])
+    expect(later.waiting).toEqual([])
+  })
+  it("starts what is not held at once", () => {
+    expect(sortHeld([episode], new Set<string>(), NOW)).toEqual({
+      start: [episode],
+      waiting: [],
+    })
+  })
+  it("forgets an episode that is still held after 2 days, so the list cannot grow for ever", () => {
+    const old = { ...episode, waitingSince: NOW - WAITING_KEEP_MS }
+    expect(sortHeld([old], new Set(["e1"]), NOW)).toEqual({
+      start: [],
+      waiting: [],
+    })
+    const young = { ...episode, waitingSince: NOW - WAITING_KEEP_MS + 1000 }
+    expect(sortHeld([young], new Set(["e1"]), NOW).waiting).toEqual([young])
+  })
+  it("does not believe a time it was first held that is ahead of the clock", () => {
+    const ahead = { ...episode, waitingSince: NOW + 10 * WAITING_KEEP_MS }
+    expect(sortHeld([ahead], new Set(["e1"]), NOW).waiting).toEqual([
+      { ...episode, waitingSince: NOW },
+    ])
   })
 })
 
@@ -93,5 +179,7 @@ describe("what never waits", () => {
     ])
       expect(read(name)).not.toMatch(/\.\/coming/)
     expect(read("automaticRun.ts")).toMatch(/withoutHeld/)
+    // The newest-episode download keeps the held ones for the next run instead of dropping them.
+    expect(read("newEpisodesRun.ts")).toMatch(/sortHeld/)
   })
 })

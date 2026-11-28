@@ -6,7 +6,7 @@ import { archivesByItself, episodesToArchive } from "./archive"
 // what the Mac wrote from Apple Podcasts (appleSync.ts), have the phone look at Up Next and
 // fetch the next two episodes ahead (on Wi-Fi), read every feed, download each show's
 // newest new episode (always on Wi-Fi), download the first episodes of the playlists that
-// ask for it, put new episodes in Up Next where a show says so,
+// ask for it, put new episodes in Up Next where a show says so (both in newEpisodesRun.ts),
 // delete played downloads after a day and archive what each show's rules say. The rules are
 // in automatic.ts and archive.ts. Not imported by any test, because the database and the
 // native module are not there.
@@ -14,8 +14,6 @@ import {
   type AutomaticSettings,
   EXCHANGE_WAIT_MS,
   downloadsToDelete,
-  episodesForUpNext,
-  episodesToDownload,
   mergeFollowUps,
   refreshDue,
   waitAtMost,
@@ -29,7 +27,7 @@ import {
 } from "./automaticSettings"
 import { withoutHeld } from "./coming"
 import { heldEpisodeIds } from "./comingRun"
-import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
+import { listEpisodes, listEpisodesByIds, listShows } from "./db"
 import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
 import { listPlaylists, smartEpisodes } from "./dbPlaylists"
@@ -40,42 +38,15 @@ import {
   lookAhead,
   startDownload,
 } from "./downloadsNative"
-import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
+import { followUp } from "./newEpisodesRun"
 import { player } from "./playerInstance"
 import { filterDownloaded, playlistDownloads } from "./playlistRules"
 import { runTeachingSync, teachingSyncDone } from "./teachingRun"
-import { listUpNext, queueEpisode } from "./upNextNative"
+import { listUpNext } from "./upNextNative"
 
 let running: Promise<void> | null = null
 
 type Added = Awaited<ReturnType<typeof refreshAllShows>>["added"]
-
-async function startNew(added: Added, settings: AutomaticSettings) {
-  const shows = await listShows()
-  const downloads = new Map(shows.map((s) => [s.id, s.settings.autoDownload]))
-  // A show unfollowed during or after the refresh is not in the list: nothing of it downloads.
-  const followed = added.filter((episode) => downloads.has(episode.showId))
-  // The Mac's copy of an episode it is preparing is awaited, not downloaded here (coming.ts).
-  const wanted = withoutHeld(
-    episodesToDownload(followed, settings, downloads),
-    await heldEpisodeIds(),
-  )
-  for (const episode of wanted) {
-    try {
-      const show = await getShow(episode.showId)
-      await startDownload(
-        episode.id,
-        episode.audioUrl,
-        episode.audioType,
-        true,
-        show?.language ?? null,
-        episode.showId,
-      )
-    } catch (cause) {
-      console.warn("Couldn't start an automatic download", cause)
-    }
-  }
-}
 
 /**
  * Downloads the first few episodes of each playlist that asks for it, on Wi-Fi only. What
@@ -138,31 +109,6 @@ async function lookAheadInUpNext() {
     )
 }
 
-/** Puts new episodes in Up Next for the shows that ask for it, through the native queue. */
-async function queueNew(added: Added) {
-  const shows = new Map((await listShows()).map((s) => [s.id, s]))
-  const modes = new Map(
-    [...shows].map(([id, s]) => [id, s.settings.autoUpNext]),
-  )
-  const picks = episodesForUpNext(added, modes)
-  if (picks.length === 0) return
-  const stored = new Map(
-    (await listEpisodesByIds(picks.map((p) => p.episode.id))).map((e) => [
-      e.id,
-      e,
-    ]),
-  )
-  for (const { episode, place } of picks) {
-    const found = stored.get(episode.id)
-    if (!found) continue
-    try {
-      await queueEpisode(found, shows.get(found.showId) ?? null, place)
-    } catch (cause) {
-      console.warn("Couldn't add a new episode to Up Next", cause)
-    }
-  }
-}
-
 /**
  * What happens for episodes a refresh just added: the newest downloads by itself where the
  * show says so, they go in Up Next where it says so, and the listener is told. The automatic
@@ -172,14 +118,10 @@ export async function followUpNew(
   added: Added,
   settings?: AutomaticSettings,
 ): Promise<void> {
-  if (added.length === 0) return
-  try {
-    await startNew(added, settings ?? (await loadSettings()))
-    await queueNew(added)
-    await notifyAboutNewEpisodes(added)
-  } catch (cause) {
-    console.warn("Couldn't act on the new episodes", cause)
-  }
+  const waiting = await followUp(added, settings, [])
+  // Kept for the automatic run, which offers them for download again.
+  if (waiting.length > 0)
+    await saveFollowUps(mergeFollowUps(await loadFollowUps(), waiting))
 }
 
 /** Archives what each show's rules say, never the loaded episode or one in Up Next. */
@@ -254,19 +196,22 @@ export function runAutomatic(): Promise<void> {
       runTeachingSync()
       // The new episodes are kept as each show is read, so a run that is cut short (the
       // background task's time ran out) still follows them up next time.
-      let todo = await loadFollowUps()
+      // Kept with them are the new episodes that waited for the Mac's copy on earlier runs:
+      // they were queued and announced then, and are only offered for download again.
+      const saved = await loadFollowUps()
+      const waited = saved.filter((e) => e.waitingSince !== undefined)
+      let todo = saved.filter((e) => e.waitingSince === undefined)
       await refreshAllShows({
         appleSync: false,
         onAdded: async (batch) => {
           todo = mergeFollowUps(todo, batch)
-          await saveFollowUps(todo)
+          await saveFollowUps([...waited, ...todo])
         },
       })
       await syncShowSettings().catch((cause) =>
         console.warn("Couldn't save the show settings for the player", cause),
       )
-      await followUpNew(todo, settings)
-      await saveFollowUps([])
+      await saveFollowUps(await followUp(todo, settings, waited))
       await downloadForPlaylists(now, settings).catch((cause) =>
         console.warn("Couldn't download for the playlists", cause),
       )

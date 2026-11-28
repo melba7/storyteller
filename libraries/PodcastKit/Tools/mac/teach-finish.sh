@@ -212,6 +212,8 @@ if [ -z "$TEACH_TOOL" ]; then
   note "Meaning" "failed (left out because podcast-teach is not built)"
   note "Joints" "failed (left out because podcast-teach is not built)"
   note "Score" "failed (left out because podcast-teach is not built)"
+  # No new score: the settings step below must not read the scorecard of an earlier run.
+  SCORE_FAILED=1
   say "The sounds, the meaning model, the joints and the score are left out."
 else
   run_step "Sounds" "$FOLDER/ad-sounds.json" "$TEACH_TOOL" sounds "$FOLDER" $LABELS

@@ -1,7 +1,8 @@
 // LOFI-FORK: the podcasts section's wait for the Mac's copy (see FORK.md).
 //
 // Reads the Mac's `coming` list from the linked folder and says which episodes of the library the
-// phone must not download by itself now (the rules are in coming.ts). Not imported by any test,
+// phone must not download by itself now (the rules are in coming.ts, which also makes one key of
+// two spellings of a feed address). Not imported by any test,
 // because the database and the native module are not there.
 import { LofiScore } from "@/modules/lofi-score"
 

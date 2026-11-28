@@ -25,9 +25,12 @@ class NightlyScriptTests(shell.Setup):
         self.assertTrue(calls[1].startswith("python3 teach_store.py hold "), calls[1])
         self.assertTrue(calls[1].endswith("teach-finish.sh"), calls[1])
 
-    def test_when_another_run_holds_the_lock_it_skips_quietly_and_does_nothing(self):
-        done = self.run_script("teach-nightly.sh", BUSY="1")
+    def test_when_another_run_holds_the_lock_all_along_it_skips_quietly_and_does_nothing(self):
+        done = self.run_script("teach-nightly.sh", BUSY="1", TEACH_NIGHTLY_WAIT_SECONDS="0",
+                               TEACH_NIGHTLY_WAIT_TRIES="3")
         self.assertEqual(done.returncode, 0)
+        self.assertEqual(len(self.short()), 3)
+        self.assertEqual(done.stdout.count("Waiting for it"), 1)
         self.assertEqual(self.short(), [c for c in self.short() if c.startswith("python3 teach_store.py busy")])
         self.assertNotIn("python3 teach_habits.py", " ".join(self.called()))
         self.assertEqual(done.stdout.count("tonight's teaching is skipped"), 1)
@@ -37,10 +40,31 @@ class NightlyScriptTests(shell.Setup):
         # The question says free (exit 0) and the hold says busy (exit 3).
         self.program("python3", shell.PYTHON.replace(
             '  [ -n "$BUSY" ] && {', '  [ "$1" = hold ] && [ -n "$BUSY" ] && {', 1))
-        done = self.run_script("teach-nightly.sh", BUSY="1")
+        done = self.run_script("teach-nightly.sh", BUSY="1", TEACH_NIGHTLY_WAIT_SECONDS="0",
+                               TEACH_NIGHTLY_WAIT_TRIES="2")
         self.assertEqual(done.returncode, 0, done.stdout)
         self.assertIn("tonight's teaching is skipped", done.stdout)
         self.assertNotIn("python3 teach_habits.py", " ".join(self.called()))
+
+    def test_it_waits_for_a_run_that_holds_the_lock_and_teaches_when_it_is_done(self):
+        # Episode preparing started at 3:25 and still works at 3:30: the lock is busy for the
+        # first two looks and free at the third.
+        self.program("python3", shell.PYTHON.replace(
+            '  [ -n "$BUSY" ] && {',
+            '  [ -n "$BUSY" ] && [ "$(grep -c "teach_store.py busy" "$CALLS")" -le 2 ] && {', 1))
+        done = self.run_script("teach-nightly.sh", BUSY="1", TEACH_NIGHTLY_WAIT_SECONDS="0")
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        steps = [c for c in self.short() if not c.startswith("python3 teach_store.py busy")]
+        self.assertEqual(steps, shell.FINISH_ORDER)
+        self.assertEqual(len(self.short()) - len(steps), 3)
+        self.assertEqual(done.stdout.count("Waiting for it"), 1)
+        self.assertNotIn("tonight's teaching is skipped", done.stdout)
+
+    def test_it_looks_every_minute_for_45_minutes_unless_told_otherwise(self):
+        with open(os.path.join(shell.HERE, "teach-nightly.sh"), encoding="utf-8") as f:
+            text = f.read()
+        self.assertIn('WAIT_SECONDS="${TEACH_NIGHTLY_WAIT_SECONDS:-60}"', text)
+        self.assertIn('WAIT_TRIES="${TEACH_NIGHTLY_WAIT_TRIES:-45}"', text)
 
     def test_it_makes_no_call_to_claude(self):
         self.run_script("teach-nightly.sh")

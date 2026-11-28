@@ -356,11 +356,13 @@ class FinishTests(Setup):
     def test_when_the_build_fails_both_swift_steps_are_left_out_and_publish_still_runs(self):
         done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
         self.assertEqual(done.returncode, 0, done.stdout)
+        # The rule changed on purpose: this list used to have teach_settings.py before the
+        # publish. With no build there is no new score, and settings made from the scorecard of
+        # an earlier run would be old news (ScoreFailedTests), so the settings step is left out.
         self.assertEqual(self.short(), [BACKUP, "python3 teach_habits.py",
                                         "swift build -c release --product podcast-teach",
                                         "python3 teach_train.py", "python3 teach_cues.py",
-                                        "python3 teach_library.py",
-                                        "python3 teach_settings.py", "python3 teach_publish.py"])
+                                        "python3 teach_library.py", "python3 teach_publish.py"])
         self.assertIn("podcast-teach did not build", done.stdout)
         self.assertIn("  Sounds: failed", done.stdout)
         self.assertIn("  Meaning: failed", done.stdout)
@@ -458,6 +460,19 @@ class ScoreFailedTests(Setup):
         self.assertIn("  Settings: left out (the score failed)", done.stdout)
         self.assertEqual(done.stdout.count("The score failed, so no new settings are made"), 1)
         self.assertIn("The score failed, so no new settings", self.log())
+
+    def test_a_failed_build_leaves_the_settings_out_too_because_there_is_no_new_score(self):
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "scorecard.json"), "w") as f:
+            f.write("an earlier run's scorecard\n")
+        done = self.run_script("teach-finish.sh", BUILD_FAILS="1")
+        self.assertIn("  Score: failed (left out because podcast-teach is not built)", done.stdout)
+        self.assertNotIn("python3 teach_settings.py", " ".join(self.short()))
+        self.assertIn("  Settings: left out (the score failed)", done.stdout)
+        self.assertEqual(done.stdout.count("The score failed, so no new settings are made"), 1)
+        self.assertIn("python3 teach_publish.py", self.short())
+        self.assertEqual(done.returncode, 0, done.stdout)
 
     def test_publish_still_runs_and_the_old_settings_file_is_not_touched(self):
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")

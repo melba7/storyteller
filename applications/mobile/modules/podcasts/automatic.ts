@@ -67,6 +67,8 @@ export type NewEpisode = {
   publishedAt: number | null
   audioUrl: string
   audioType: string
+  /** Set while the episode waits for the Mac's copy: when it was first held (coming.ts). */
+  waitingSince?: number
 }
 
 /**
@@ -87,7 +89,9 @@ export function parseFollowUps(saved: string | null): NewEpisode[] {
         typeof (item as NewEpisode).audioUrl === "string" &&
         typeof (item as NewEpisode).audioType === "string" &&
         ((item as NewEpisode).publishedAt === null ||
-          typeof (item as NewEpisode).publishedAt === "number"),
+          typeof (item as NewEpisode).publishedAt === "number") &&
+        ((item as NewEpisode).waitingSince === undefined ||
+          typeof (item as NewEpisode).waitingSince === "number"),
     )
   } catch {
     return []

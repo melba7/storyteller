@@ -5,6 +5,7 @@ libraries/PodcastKit/Tools/mac"""
 import json
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -178,6 +179,41 @@ class RedoTests(unittest.TestCase):
         store.save_manifest(self.folder, [entry(1)])
         result = self.run_redo(FakeRunner())
         self.assertEqual((result["done"], result["left"]), (0, 0))
+
+
+class NoLockTests(RedoTests):
+    """The real teach_words.py as its own program, with a stand-in transcriber, while another run
+    (episode preparing, say) holds the folder's lock."""
+    TOOL = ("#!/bin/sh\n"
+            "printf '%s' '{\"version\": 1, \"duration\": 9.0, \"lines\": [[0.0, 1.0]], \"words\": [[0.0, 1.0]]}'"
+            " > \"$4\"\n")
+
+    def program(self, *more):
+        tool = os.path.join(self.folder, "tool")
+        with open(tool, "w", encoding="utf-8") as handle:
+            handle.write(self.TOOL)
+        os.chmod(tool, 0o755)
+        script = os.path.join(os.path.dirname(os.path.abspath(words.__file__)), "teach_words.py")
+        return subprocess.run([sys.executable, script, "--folder", self.folder, "--tool", tool] + list(more),
+                              capture_output=True, text=True, timeout=60)
+
+    def test_with_no_lock_it_writes_the_side_files_while_another_run_holds_the_lock(self):
+        episodes = [entry(1), entry(2)]
+        self.add(episodes, [item["id"] for item in episodes])
+        with store.run_lock(self.folder):
+            done = self.program("--no-lock")
+            self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+            for item in episodes:
+                self.assertIsNotNone(words.read_words(words.words_path(self.folder, item["id"])))
+        self.assertIn("2 written down, 0 failed, 0 still to do.", done.stdout)
+
+    def test_without_the_flag_a_held_lock_still_stops_it(self):
+        episodes = [entry(1)]
+        self.add(episodes, [episodes[0]["id"]])
+        with store.run_lock(self.folder):
+            done = self.program()
+        self.assertEqual(done.returncode, 2, done.stdout + done.stderr)
+        self.assertFalse(os.path.exists(words.words_path(self.folder, episodes[0]["id"])))
 
 
 class MainTests(unittest.TestCase):

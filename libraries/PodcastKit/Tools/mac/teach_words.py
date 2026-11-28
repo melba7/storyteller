@@ -14,9 +14,12 @@ side file is skipped, so a stopped run carries on where it was. It runs the Swif
 audio (Apple's speech recognition, on this Mac, nothing is sent anywhere, nothing is paid) and
 keeps only the side file: the plain transcripts and the labels are never changed.
 
-  teach_words.py --tool PATH [--folder F] [--locale en-US] [--limit N] [--all]
+  teach_words.py --tool PATH [--folder F] [--locale en-US] [--limit N] [--all] [--no-lock]
 
-Three failures in a row stop the run. Only one run works in the folder at a time.
+Three failures in a row stop the run. Only one run works in the folder at a time, unless --no-lock
+is given: then it neither takes nor waits for the folder's lock, so the hours it needs do not stop
+episode preparing. That is safe because it only writes side files of episodes that are already
+written down, each through a .part file, and no other run touches those.
 
 Exit codes: 0 everything pending was done (or nothing was), 2 something is not set up, 3 it stopped
 early because of failures.
@@ -24,6 +27,7 @@ early because of failures.
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
 import bisect
+import contextlib
 import json
 import math
 import os
@@ -190,6 +194,7 @@ def main(argv=None, runner=subprocess.run, clock=time.monotonic, say=print):
     parser.add_argument("--locale", default=LOCALE)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--all", action="store_true")
+    parser.add_argument("--no-lock", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     tool = os.path.expanduser(args.tool)
@@ -200,7 +205,7 @@ def main(argv=None, runner=subprocess.run, clock=time.monotonic, say=print):
         say("There is no %s in %s yet. Gather the episodes first (teach_collect.py)." % (MANIFEST, folder))
         return 2
     try:
-        with run_lock(folder):
+        with contextlib.nullcontext() if args.no_lock else run_lock(folder):
             result = run(folder, tool, args.locale, args.limit, args.all, runner=runner, clock=clock,
                          say=say)
     except (Busy, Problem, ManifestError) as error:

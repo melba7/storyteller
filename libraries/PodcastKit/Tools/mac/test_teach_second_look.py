@@ -103,6 +103,31 @@ class Choosing(Setup):
         self.assertNotIn("EXAMWORD", claude.prompts[0])
         self.assertFalse(os.path.exists(self.folder.path(look.OUT, sealed + ".json")))
 
+    def test_a_second_download_of_an_exam_episode_is_never_sent_either(self):
+        sealed = self.episode(1, marker="EXAMWORD")
+        # The same episode again under another id and feed: its words are the exam's words.
+        again = self.episode(2, marker="EXAMWORD")
+        # And once more with other words (another cut), known by its feed and guid.
+        self.entries[0]["guid"] = "guid-1"
+        third = teach_testing.entry(3, feed="http://www.feed/1/", guid="guid-1")
+        self.entries.append(third)
+        self.folder.write_manifest(self.entries)
+        self.write("transcripts/%s.txt" % third["id"], "".join(
+            "%s OTHERCUT %d\n" % (stamp(n * 5), n + 1) for n in range(120)))
+        self.write("labels/%s.json" % third["id"], json.dumps(
+            {"version": 1, "episode": third["id"], "show": "Show", "length": 600.0, "segments": [BREAK_ONE]}))
+        self.write("copies/%s.truth.txt" % third["id"], TRUTH)
+        free = self.episode(4)
+        self.write("exam.json", json.dumps({"episodes": [sealed]}))
+        claude = FakeClaude()
+        self.run_look(claude)
+        self.assertEqual(len(claude.prompts), 1)
+        for word in ("EXAMWORD", "OTHERCUT"):
+            self.assertNotIn(word, claude.prompts[0])
+        for identifier in (sealed, again, third["id"]):
+            self.assertFalse(os.path.exists(self.folder.path(look.OUT, identifier + ".json")))
+        self.assertTrue(os.path.exists(self.folder.path(look.OUT, free + ".json")))
+
     def test_episodes_go_in_a_fixed_order(self):
         for number in (3, 1, 2):
             self.episode(number)

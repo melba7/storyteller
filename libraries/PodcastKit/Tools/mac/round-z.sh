@@ -7,6 +7,7 @@
 #   1. updates the Mac's copy of the teaching tools (~/Storyteller Lofi/podcast-teaching-tools)
 #      from the clone, without the .build folders, so the copy keeps its own build
 #   2. installs the 20-minute episode preparing and the nightly teaching again, from that copy
+#      (not when step 1 failed: the copy may then be half new and half old)
 #   3. scores the ad skipping ("Score the ad skipping.command", which says its exit code)
 #   4. runs the test of Claude's second look (paid, capped at 5 dollars)
 #   5. builds the show playbook (paid, capped at 15 dollars), then replays it on the shelf (free)
@@ -17,8 +18,9 @@
 #      switches the word-exact ends on only when the bar passes
 # The preparing job runs from the tools copy and holds the teaching folder's run lock
 # (teach_store.py hold), so step 1 and every step that works in the teaching folder takes the same
-# lock first. When another run holds it, this waits: it looks every 30 seconds, for 30 minutes at
-# most, and then gives the step up with exit code 3.
+# lock first. So do the installers of step 2, which stop the old job: a preparing run is never
+# ended half way. When another run holds it, this waits: it looks every 30 seconds, for 30 minutes
+# at most, and then gives the step up with exit code 3.
 # A step that fails says its exit code and the next one still runs. The end lists every step and
 # writes ~/Storyteller Lofi/logs/round-z-summary.json (each step, its exit code, its seconds).
 # What the steps print is shown and added to ~/Storyteller Lofi/logs/round-z-steps.log. It exits 0
@@ -94,6 +96,7 @@ step() {
   began="$(date +%s)"
   "$@" 2>&1 | tee -a "$LOG"
   code="${PIPESTATUS[0]}"
+  LAST_CODE="$code"
   seconds=$(( $(date +%s) - began ))
   printf '%s\t%s\t%s\n' "$code" "$seconds" "$label" >> "$RESULTS"
   COUNT=$((COUNT + 1))
@@ -108,7 +111,7 @@ group() {
   local before="$COUNT"
   heading "$1"
   "$2"
-  [ "$COUNT" -eq "$before" ] && say "No commands were given for this step."
+  [ "$COUNT" -eq "$before" ] && [ "$2" != install_the_jobs ] && say "No commands were given for this step."
 }
 
 # build_tool PRODUCT: builds one Swift program in the tools copy. built PRODUCT: where it is then.
@@ -117,13 +120,18 @@ built() { echo "$(cd "$COPY" && swift build -c release --show-bin-path 2> /dev/n
 
 update_the_tools() {
   step "Update the Mac's tools" locked copy_tools
+  [ "$LAST_CODE" -eq 0 ] && TOOLS_UPDATED=1
   # The steps below run from the tools copy, so a command may name a tool without its folder.
   cd "$TOOLS" || say "Could not open $TOOLS, so the steps below will fail."
 }
 
 install_the_jobs() {
-  step "Install episode preparing" env TEACH_INSTALL_YES=1 /bin/bash "$TOOLS/Install episode preparing.command"
-  step "Install nightly teaching" env TEACH_INSTALL_YES=1 /bin/bash "$TOOLS/Install nightly teaching.command"
+  if [ -z "$TOOLS_UPDATED" ]; then
+    say "Step 1 did not work, so the two jobs are not installed again: the tools copy may be half new and half old. The jobs that are installed now stay as they are."
+    return
+  fi
+  step "Install episode preparing" locked env TEACH_INSTALL_YES=1 /bin/bash "$TOOLS/Install episode preparing.command"
+  step "Install nightly teaching" locked env TEACH_INSTALL_YES=1 /bin/bash "$TOOLS/Install nightly teaching.command"
 }
 
 score_the_ad_skipping() {
@@ -162,7 +170,7 @@ maps_for_the_prepared_copies() {
 
 # Step 8, the long one, so it is the last: word-exact ends.
 word_exact_ends() {
-  step "Write down the words of the shelf episodes again" python3 -u "$TOOLS/teach_words.py" --folder "$F" --tool "$(built podcast-transcribe)"
+  step "Write down the words of the shelf episodes again" python3 -u "$TOOLS/teach_words.py" --folder "$F" --tool "$(built podcast-transcribe)" --no-lock
   step "Measure the ends again and switch on if the bar passes" locked python3 -u "$TOOLS/teach_end_score.py" --folder "$F" --switch-on-pass
 }
 
@@ -173,6 +181,7 @@ MARKER="$RESULTS.held"
 trap 'rm -f "$RESULTS" "$MARKER"' EXIT
 COUNT=0
 FAILED=0
+TOOLS_UPDATED=""
 STARTED="$(date +%s)"
 # Keep the Mac awake for as long as this runs.
 command -v caffeinate > /dev/null && caffeinate -i -w "$$" > /dev/null 2>&1 &
