@@ -32,9 +32,10 @@ class OwnBase(unittest.TestCase):
         return {"bytes": 40 * MB, "sha256": "a" * 64, "host": "cdn.example"}
 
     def go(self, *extra):
-        return collect.main(["--folder", self.folder, "--shows", os.path.join(self.folder, "none.json")]
-                            + list(extra), download=self.download, sleep=lambda s: None,
-                            say=self.said.append)
+        # No free disk is asked for unless a test asks, so the tests do not depend on this machine's disk.
+        return collect.main(["--folder", self.folder, "--shows", os.path.join(self.folder, "none.json"),
+                             "--keep-free-gb", "0"] + list(extra), download=self.download,
+                            sleep=lambda s: None, say=self.said.append)
 
     def downloaded(self):
         return len(self.downloads)
