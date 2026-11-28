@@ -267,3 +267,15 @@ One line per lesson.
   The Opus check found both. A rule that makes a skip longer needs two answers
   in the plan before it is built: what its Undo takes back, and what in its way
   stops it (2026-11-27).
+- On macOS a test class is an NSObject. A property named `hash` or a helper
+  named `copy` in an XCTestCase subclass does not compile there (two failed CI
+  builds), though Linux and Docker accept it. Name test helpers so that they
+  cannot be NSObject's (2026-11-27).
+- The first run of the scorecard row "Prepared copy" passed 159 of 222 breaks
+  although its marks were the truth. The row had cut the marks to the length the
+  feed states, which is shorter than the audio for 50 of 63 shelf episodes. A
+  number that should be 100% by construction and is not is a bug to trace before
+  it is reported, and a length comes from the audio, never from the feed
+  (2026-11-28).
+- The formatter reads two dollar amounts in one paragraph of Markdown as maths
+  and breaks the lines around them. Write one of them in words (2026-11-27).
