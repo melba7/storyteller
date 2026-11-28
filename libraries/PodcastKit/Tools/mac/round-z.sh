@@ -162,7 +162,7 @@ maps_for_the_prepared_copies() {
 
 # Step 8, the long one, so it is the last: word-exact ends.
 word_exact_ends() {
-  step "Write down the words of the shelf episodes again" locked python3 -u "$TOOLS/teach_words.py" --folder "$F" --tool "$(built podcast-transcribe)"
+  step "Write down the words of the shelf episodes again" python3 -u "$TOOLS/teach_words.py" --folder "$F" --tool "$(built podcast-transcribe)"
   step "Measure the ends again and switch on if the bar passes" locked python3 -u "$TOOLS/teach_end_score.py" --folder "$F" --switch-on-pass
 }
 

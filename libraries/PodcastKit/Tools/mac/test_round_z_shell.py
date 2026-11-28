@@ -179,8 +179,10 @@ class RoundTests(RoundSetup):
     def test_the_lock_is_held_for_the_copy_and_every_tool_and_free_afterwards(self):
         done = self.round()
         self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        # The rewrite of the shelf's words (hours long, and only side files of old episodes) runs
+        # without the lock, so episode preparing goes on meanwhile.
         self.assertEqual(self.locked(), {"tar": "3", "teach_second_look.py": "3", "teach_playbook.py": "3",
-                                         "teach_end_score.py": "3", "teach_words.py": "3"})
+                                         "teach_end_score.py": "3", "teach_words.py": "0"})
         with run_lock(self.folder):
             pass
 
