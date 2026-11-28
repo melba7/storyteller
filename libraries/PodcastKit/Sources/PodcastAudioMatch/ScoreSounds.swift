@@ -35,7 +35,7 @@ public enum ScoreSounds {
     defer { try? handle.close() }
     var reader = MP3FrameReader()
     // A folder opens but cannot be read: that ends the loop at once, like the end of a file.
-    while let chunk = try? handle.read(upToCount: min(chunkSize, mostChunkSize)), !chunk.isEmpty {
+    while let chunk = ChunkRead.next(handle, upTo: min(chunkSize, mostChunkSize)) {
       body(reader.feed([UInt8](chunk)))
     }
     return true
