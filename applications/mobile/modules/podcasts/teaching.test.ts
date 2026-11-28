@@ -9,6 +9,7 @@ import {
   TEACHING_NAMES,
   aheadEpisodesText,
   dueForAhead,
+  dueForPlay,
   dueForTeaching,
   filesToFetch,
   parseTeachingList,
@@ -247,6 +248,18 @@ describe("dueForTeaching", () => {
 
   it("runs when the clock went back", () => {
     expect(dueForTeaching(9000, 1000)).toBe(true)
+  })
+})
+
+describe("dueForPlay", () => {
+  it("runs at Play the first time, then at most once a minute", () => {
+    expect(dueForPlay(null, 5000)).toBe(true)
+    expect(dueForPlay(1000, 1000 + 59_999)).toBe(false)
+    expect(dueForPlay(1000, 1000 + 60_000)).toBe(true)
+  })
+
+  it("runs when the clock went back", () => {
+    expect(dueForPlay(9000, 1000)).toBe(true)
   })
 })
 

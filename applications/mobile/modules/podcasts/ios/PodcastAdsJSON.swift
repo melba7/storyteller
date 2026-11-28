@@ -6,10 +6,14 @@ import PodcastAds
 
 enum AdsJSON {
   /// What the app receives for an episode's ads. `prepared` says the file is the Mac's prepared
-  /// one, which the app shows as "Prepared by your Mac".
-  static func object(_ id: String, _ status: AdsStatus, prepared: Bool = false) -> [String: Any] {
+  /// one. `macMarks` says the Mac's marks of the night before (`ahead-ads.json`) are for this
+  /// episode, so they are what skips on its copy. The app shows either as "Your Mac's marks".
+  static func object(
+    _ id: String, _ status: AdsStatus, prepared: Bool = false, macMarks: Bool = false
+  ) -> [String: Any] {
     var object = fields(id, status)
     if prepared { object["prepared"] = true }
+    if macMarks { object["macMarks"] = true }
     return object
   }
 

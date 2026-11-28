@@ -1,5 +1,10 @@
 // LOFI-FORK: the podcasts section's player screen (see FORK.md).
+import { Laptop } from "lucide-react-native"
+import { View } from "react-native"
+
+import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
+import { MAC_MARKS } from "@/modules/podcasts/ads"
 import { playerAdLine } from "@/modules/podcasts/adLine"
 import { skippingAnyFor } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
@@ -47,7 +52,7 @@ export function AdFindingLine({
     checkingStart,
   })
   if (line === "") return null
-  return (
+  const text = (
     <Text
       className="text-center text-xs"
       style={{ color: sheet.muted }}
@@ -56,5 +61,14 @@ export function AdFindingLine({
     >
       {line}
     </Text>
+  )
+  // The Mac's marks come with a laptop symbol.
+  return line === MAC_MARKS ? (
+    <View className="flex-row items-center justify-center gap-1">
+      <Icon as={Laptop} size={12} color={sheet.muted} />
+      {text}
+    </View>
+  ) : (
+    text
   )
 }

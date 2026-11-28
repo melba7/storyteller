@@ -23,6 +23,8 @@ final class PodcastAdFinder: @unchecked Sendable {
   private var statuses: [String: AdsStatus] = [:]
   /// The episodes whose final ads file is the Mac's prepared one (the app says so on the row).
   private var preparedIds: Set<String> = []
+  /// The episodes the Mac's marks of the night before are for (the app says so on the line).
+  private var macMarkIds: Set<String> = []
   var waiting: [String] = []
   /// The episode that is loaded in the player: it goes first, and the one at work makes way.
   var urgent: String?
@@ -84,6 +86,7 @@ final class PodcastAdFinder: @unchecked Sendable {
       failureCounts[episodeId] = nil
       partialFailures[episodeId] = nil
       preparedIds.remove(episodeId)
+      macMarkIds.remove(episodeId)
       guard statuses.removeValue(forKey: episodeId) != nil else { return nil }
       return sink
     }
@@ -97,8 +100,11 @@ final class PodcastAdFinder: @unchecked Sendable {
 
   /// Every episode's state, for the app to read at start.
   func all() -> [[String: Any]] {
-    let (known, prepared) = lock.withLock { (statuses, preparedIds) }
-    return known.map { AdsJSON.object($0.key, $0.value, prepared: prepared.contains($0.key)) }
+    let (known, prepared, marks) = lock.withLock { (statuses, preparedIds, macMarkIds) }
+    return known.map {
+      AdsJSON.object(
+        $0.key, $0.value, prepared: prepared.contains($0.key), macMarks: marks.contains($0.key))
+    }
   }
 
   /// An episode's saved ads as JSON (`AdsFile` in PodcastAds), or nil when there are none. While
@@ -210,28 +216,46 @@ final class PodcastAdFinder: @unchecked Sendable {
   }
 
   func set(_ id: String, _ status: AdsStatus) {
-    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), Bool)? in
+    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), Bool, Bool)? in
       guard statuses[id] != status else { return nil }
       statuses[id] = status
       guard let sink else { return nil }
-      return (sink, preparedIds.contains(id))
+      return (sink, preparedIds.contains(id), macMarkIds.contains(id))
     }
-    if let (sink, prepared) = send {
-      sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared))
+    if let (sink, prepared, marks) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared, macMarks: marks))
     }
   }
 
   /// Notes whether the episode's final ads file is the Mac's prepared one, and tells the app
   /// again when that changed for a status it already has.
   func notePrepared(_ id: String, _ on: Bool) {
-    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), AdsStatus)? in
+    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), AdsStatus, Bool)? in
       guard preparedIds.contains(id) != on else { return nil }
       if on { preparedIds.insert(id) } else { preparedIds.remove(id) }
       guard let sink, let status = statuses[id] else { return nil }
-      return (sink, status)
+      return (sink, status, macMarkIds.contains(id))
     }
-    if let (sink, status) = send {
-      sink("onAdsChange", AdsJSON.object(id, status, prepared: on))
+    if let (sink, status, marks) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: on, macMarks: marks))
+    }
+  }
+
+  /// Notes which known episodes the Mac's marks are for, and tells the app again for each one
+  /// that changed. Called when marks or the table of episodes came.
+  func refreshMacMarks() {
+    let ids = lock.withLock { Array(statuses.keys) }
+    for id in ids {
+      let on = PodcastTeaching.shared.aheadEntry(episode: id) != nil
+      let send = lock.withLock { () -> (((String, [String: Any]) -> Void), AdsStatus, Bool)? in
+        guard macMarkIds.contains(id) != on else { return nil }
+        if on { macMarkIds.insert(id) } else { macMarkIds.remove(id) }
+        guard let sink, let status = statuses[id] else { return nil }
+        return (sink, status, preparedIds.contains(id))
+      }
+      if let (sink, status, prepared) = send {
+        sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared, macMarks: on))
+      }
     }
   }
 

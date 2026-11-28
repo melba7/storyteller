@@ -1,12 +1,18 @@
 // LOFI-FORK: the podcasts section's screens (see FORK.md).
-import { ArrowDownToLine, Check, CircleAlert, X } from "lucide-react-native"
+import {
+  ArrowDownToLine,
+  Check,
+  CircleAlert,
+  Laptop,
+  X,
+} from "lucide-react-native"
 import { ActivityIndicator, Pressable, View } from "react-native"
 import { useCSSVariable } from "uniwind"
 
 import { Icon } from "@/components/ui/icon"
 import { Text } from "@/components/ui/text"
 import { adsToShow } from "@/modules/podcasts/adLine"
-import { withAds } from "@/modules/podcasts/ads"
+import { MAC_MARKS, withAds } from "@/modules/podcasts/ads"
 import { downloadLook } from "@/modules/podcasts/downloads"
 import { Podcasts } from "@/modules/podcasts/index"
 import { type StoredEpisode } from "@/modules/podcasts/library"
@@ -52,9 +58,17 @@ export function useDownloadStatus(episode: Props["episode"]): string {
 /** The status line on the episode card. */
 export function DownloadStatusLine({ episode }: { episode: Props["episode"] }) {
   const status = useDownloadStatus(episode)
-  return status ? (
-    <Text className="text-muted-foreground text-sm">{status}</Text>
-  ) : null
+  if (!status) return null
+  const text = <Text className="text-muted-foreground text-sm">{status}</Text>
+  // The Mac's marks come with a laptop symbol.
+  return status.includes(MAC_MARKS) ? (
+    <View className="flex-row items-center gap-1">
+      <Icon as={Laptop} size={14} className="text-muted-foreground" />
+      {text}
+    </View>
+  ) : (
+    text
+  )
 }
 
 const WHITE = "#ffffff"

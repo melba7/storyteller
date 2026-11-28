@@ -204,6 +204,8 @@ export type AdsInfo = {
   unchecked?: boolean
   /** The file is a copy the Mac prepared, and its ads are the Mac's marks on that very file. */
   prepared?: boolean
+  /** The Mac's marks of the night before (`ahead-ads.json`) are for this episode, so they skip on its copy. */
+  macMarks?: boolean
 }
 
 /** An episode's ad finding changed, or (state "none") went with its download. */
