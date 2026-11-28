@@ -322,3 +322,7 @@ One line per lesson.
   deadlock avoided". Readers of the phone's files call `setiopolicy_np` first
   (`teach_feedback.allow_icloud_downloads`), and a log line that says "could not
   be read" every run is a bug to chase, not noise (2026-11-28).
+- The Python replay of the show playbook (`teach_playbook_replay.py`, scored by
+  `teach_bar.py`) said +6 breaks; the Swift scorecard row said -10. Decide on a
+  Swift scorecard row only, and keep a new rule switched off until it has one
+  (2026-11-28).
