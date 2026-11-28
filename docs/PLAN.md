@@ -2083,7 +2083,13 @@ trusts a copy only when its size and its SHA-256 match.
     job's file whether the job is loaded or not, and takes its own file away
     again when loading fails. The stopper asks whether the prepared episodes
     should also go from iCloud (a typed yes), says so only when they did, and
-    then removes leftover `.part` files too.
+    then removes leftover `.part` files too. Found in the last read and fixed:
+    the job first checks with a real write that audio can reach iCloud and that
+    this Mac and iCloud have room (`teach_prepared.py ready`), and spends
+    nothing in an hour when it cannot; the pick knows the marking's reserve, so
+    it picks nothing the marking would refuse; the download limit counts only
+    the job's own audio (`--own-gb`), because Mo's teaching folder already holds
+    75 GB and a limit over all audio would have stopped every hour.
 - [x] **Y4 The phone's rules for a prepared copy** (PodcastKit, plain Swift):
   - `AheadEntry.copy` (`PreparedCopy`: file, SHA-256, bytes). A copy whose file
     is not `prepared/<plain name>` or whose hash is not 64 hex digits reads as

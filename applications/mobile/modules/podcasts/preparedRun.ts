@@ -12,13 +12,13 @@ import { getEpisode, listEpisodesByIds, rows } from "./db"
 import { listDownloads } from "./downloadsNative"
 import { Podcasts } from "./index"
 import type { QueueEntry } from "./phoneQueue"
-import { listUpNext } from "./upNextNative"
 import {
   type PreparedEpisode,
   preparedCandidates,
   singleRun,
   syncPrepared,
 } from "./preparedSync"
+import { listUpNext } from "./upNextNative"
 
 /** The guids go to the database a few at a time, well under SQLite's limit on placeholders. */
 const CHUNK = 200

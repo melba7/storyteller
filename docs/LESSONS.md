@@ -279,3 +279,13 @@ One line per lesson.
   (2026-11-28).
 - The formatter reads two dollar amounts in one paragraph of Markdown as maths
   and breaks the lines around them. Write one of them in words (2026-11-27).
+- The hourly preparing job would have done nothing on Mo's Mac: its download
+  limit of 25 GB counted all the audio in the teaching folder, which already
+  held 75 GB. Every test passed, because no test folder was that full. Before a
+  job for the Mac is called ready, look at the Mac's real folders (sizes,
+  counts, free space) and run the job's limits against those numbers
+  (2026-11-28).
+- The same job paid Claude in step 4 and found out in step 6 that it could not
+  put the audio into iCloud. A job that spends money checks first, in the same
+  run and with a real write, that its result can be delivered, and spends
+  nothing when it cannot (2026-11-28).
