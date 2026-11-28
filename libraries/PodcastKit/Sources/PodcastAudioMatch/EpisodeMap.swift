@@ -82,6 +82,17 @@ public struct EpisodeMap: Codable, Sendable, Equatable {
     return UInt8(truncatingIfNeeded: folded)
   }
 
+  /// The name of the file a phone keeps the map of the copy with this SHA-256 under, or nil when
+  /// that is not 64 hex digits. The file is named by the copy and not by the episode, so the map
+  /// of an older copy never passes for the map of the copy the Mac made since.
+  public static func fileName(sha256: String) -> String? {
+    let hex = sha256.lowercased()
+    guard hex.utf8.count == 64,
+      hex.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+    else { return nil }
+    return hex + ".json"
+  }
+
   /// The map in `data`, or nil when it is damaged, too big, of another version, or has no frames,
   /// no real frame length or no real length. A mark that is not a real stretch inside the copy is
   /// left out.

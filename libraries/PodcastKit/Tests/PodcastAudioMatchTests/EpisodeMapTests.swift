@@ -80,6 +80,16 @@ final class EpisodeMapTests: XCTestCase {
     XCTAssertNil(EpisodeMap(data: Data(count: EpisodeMap.maxBytes + 1)))
   }
 
+  func testAPhonesFileIsNamedByTheCopySoANewCopysMapIsNeverTheOldOnes() {
+    XCTAssertEqual(EpisodeMap.fileName(sha256: sha), sha + ".json")
+    XCTAssertNotEqual(
+      EpisodeMap.fileName(sha256: sha), EpisodeMap.fileName(sha256: String(repeating: "c", count: 64)))
+    XCTAssertEqual(EpisodeMap.fileName(sha256: String(repeating: "AB", count: 32)), String(repeating: "ab", count: 32) + ".json")
+    for bad in ["", "abc", String(repeating: "g", count: 64), "../" + String(repeating: "a", count: 61)] {
+      XCTAssertNil(EpisodeMap.fileName(sha256: bad), bad)
+    }
+  }
+
   /// 400 frames that are all different from their neighbours.
   private let made = (0..<400).map { UInt8(truncatingIfNeeded: $0 &* 131) }
 
