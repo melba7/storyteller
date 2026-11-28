@@ -305,8 +305,9 @@ public final class PodcastsModule: Module {
     }
     // Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never
     // off Wi-Fi). The app asks when it comes to the front and in the background refresh.
-    AsyncFunction("lookAhead") { () async in
-      await MainActor.run { PodcastDownloadAhead.shared.look() }
+    // `held` are the episodes the Mac is preparing a copy of: they are not fetched ahead.
+    AsyncFunction("lookAhead") { (held: [String]) async in
+      await MainActor.run { PodcastDownloadAhead.shared.look(held: Set(held)) }
     }
     // Bytes taken by finished downloads.
     AsyncFunction("storageUsed") { () -> Double in

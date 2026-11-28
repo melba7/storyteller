@@ -419,9 +419,10 @@ type PodcastsNativeModule = {
   listDownloads(): Promise<DownloadInfo[]>
   /**
    * Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never off
-   * Wi-Fi). Called when the app comes to the front and in the background refresh.
+   * Wi-Fi). Called when the app comes to the front and in the background refresh. `held` are the
+   * episodes the Mac is preparing a copy of: they are not fetched ahead.
    */
-  lookAhead(): Promise<void>
+  lookAhead(held: string[]): Promise<void>
   /** Where each downloaded episode's transcript is. */
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */

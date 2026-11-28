@@ -13,6 +13,10 @@ import Foundation
 //                           "startWords": "the first up to 40 words of the ad",
 //                           "endWords": "the last up to 40 words of the ad"}]}]}
 //
+// The file may also carry a top-level `coming` list, `{"feed", "guid", "since"}` for each episode
+// the Mac is preparing a copy of (since: unix seconds). The app reads it in JavaScript (coming.ts)
+// to wait for the copy; this reader ignores it, as any unknown key.
+//
 // The marks are by WORDS and not by times: the phone's copy of an episode can carry other inserted
 // ads than the Mac's copy, so the times of the Mac's copy do not hold on the phone (the times are
 // only the length an ad had). An entry is ignored 14 days after `marked`. Anything of the wrong

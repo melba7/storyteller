@@ -25,6 +25,8 @@ import {
   saveFollowUps,
   saveLastRun,
 } from "./automaticSettings"
+import { withoutHeld } from "./coming"
+import { heldEpisodeIds } from "./comingRun"
 import { getShow, listEpisodes, listEpisodesByIds, listShows } from "./db"
 import { importPendingBookmarks } from "./dbBookmarks"
 import { refreshAllShows } from "./dbFeeds"
@@ -51,7 +53,12 @@ async function startNew(added: Added, settings: AutomaticSettings) {
   const downloads = new Map(shows.map((s) => [s.id, s.settings.autoDownload]))
   // A show unfollowed during or after the refresh is not in the list: nothing of it downloads.
   const followed = added.filter((episode) => downloads.has(episode.showId))
-  for (const episode of episodesToDownload(followed, settings, downloads)) {
+  // The Mac's copy of an episode it is preparing is awaited, not downloaded here (coming.ts).
+  const wanted = withoutHeld(
+    episodesToDownload(followed, settings, downloads),
+    await heldEpisodeIds(),
+  )
+  for (const episode of wanted) {
     try {
       const show = await getShow(episode.showId)
       await startDownload(
@@ -96,11 +103,9 @@ async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
     )
   }
   const languages = new Map((await listShows()).map((s) => [s.id, s.language]))
-  for (const episode of playlistDownloads(
-    playlists,
-    matches,
-    known,
-    skipPlayed,
+  for (const episode of withoutHeld(
+    playlistDownloads(playlists, matches, known, skipPlayed),
+    await heldEpisodeIds(),
   )) {
     try {
       await startDownload(
@@ -124,9 +129,11 @@ async function downloadForPlaylists(now: number, settings: AutomaticSettings) {
  * failure is logged, not thrown.
  */
 async function lookAheadInUpNext() {
-  await lookAhead().catch((cause: unknown) =>
-    console.warn("Couldn't look ahead in Up Next", cause),
-  )
+  await heldEpisodeIds()
+    .then((held) => lookAhead([...held]))
+    .catch((cause: unknown) =>
+      console.warn("Couldn't look ahead in Up Next", cause),
+    )
 }
 
 /** Puts new episodes in Up Next for the shows that ask for it, through the native queue. */

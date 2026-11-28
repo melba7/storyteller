@@ -27,6 +27,9 @@ final class PodcastDownloadAhead {
   /// Set when an ahead download failed for lack of room, and kept until the app is opened anew:
   /// with a full phone, nothing more is fetched ahead.
   private var phoneFull = false
+  /// The episodes the Mac is preparing a copy of, as the app last told (automaticRun.ts). Not
+  /// fetched ahead; the app tells again each time it looks, so a wait that is over is dropped.
+  private var held = Set<String>()
 
   private init() {}
 
@@ -54,7 +57,8 @@ final class PodcastDownloadAhead {
   /// Asks the rule what to do now and does it. JavaScript asks for this when the app comes to the
   /// front and in the background refresh (automaticRun.ts), at once because the refresh may end,
   /// and the app be suspended, before the few seconds of `changed()` are up.
-  func look() {
+  func look(held newHeld: Set<String>? = nil) {
+    if let newHeld { held = newHeld }
     let player = PodcastPlayer.shared
     let downloader = PodcastDownloader.shared
     guard let store = downloader.store else { return }
@@ -67,7 +71,7 @@ final class PodcastDownloadAhead {
         DownloadAhead.Item(id: $0.id, url: $0.url, skipAds: player.skipAds(forShow: $0.showId))
       },
       playingId: player.current?.id, entries: entries, started: started,
-      onWiFi: network.onWiFi, lowData: network.isConstrained, phoneFull: phoneFull)
+      onWiFi: network.onWiFi, lowData: network.isConstrained, phoneFull: phoneFull, held: held)
 
     for id in plan.adopt { handOver(id) }
     for id in plan.drop {
