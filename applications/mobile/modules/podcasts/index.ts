@@ -499,6 +499,13 @@ type PodcastsNativeModule = {
    * theirs: `{"<episode id>": {"feed": "<feed address>", "guid": "...", "title": "..."}}`.
    */
   setAheadEpisodes(json: string): Promise<void>
+  /**
+   * The Mac's map to read for the episode from the linked folder (`maps/<name>.json`, below
+   * `Podcasts/`), or null when there is none to fetch (see episodeMap.ts).
+   */
+  episodeMapWanted(episodeId: string): Promise<string | null>
+  /** Keeps the text of the Mac's map of the episode. True when it was the episode's map. */
+  installEpisodeMap(episodeId: string, text: string): Promise<boolean>
   /** What is installed from the Mac, as JSON text (see teaching.ts). */
   getTeachingState(): Promise<string>
   /**

@@ -82,6 +82,16 @@ final class AheadMapAdsTests: XCTestCase {
     XCTAssertEqual(AheadAds.withMap(words, carried: []), words)
   }
 
+  func testAnEpisodeWhoseMapCameIsLookedAtOnceMoreWithTheSameMarks() {
+    var passes = AheadPasses()
+    passes.record(episode: "e1", marked: 1_800_000_000)
+    passes.record(episode: "e2", marked: 1_800_000_000)
+    XCTAssertFalse(passes.needs(episode: "e1", marked: 1_800_000_000))
+    passes.forget(episode: "e1")
+    XCTAssertTrue(passes.needs(episode: "e1", marked: 1_800_000_000))
+    XCTAssertFalse(passes.needs(episode: "e2", marked: 1_800_000_000))
+  }
+
   // MARK: The entry's map
 
   private func file(map: String) -> Data {

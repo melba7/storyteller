@@ -151,6 +151,21 @@ final class PodcastTeaching: @unchecked Sendable {
     }
   }
 
+  /// Forgets that the ahead finder looked at this episode, so it looks once more: the episode's
+  /// map came after its marks (PodcastEpisodeMaps.swift).
+  func forgetAheadPass(episode: String) {
+    lock.withLock {
+      var current = passesLoaded()
+      current.forget(episode: episode)
+      passes = current
+      do {
+        try current.save(to: Self.folder)
+      } catch {
+        NSLog("Podcasts: the record of the Mac's marks could not be saved: \(error)")
+      }
+    }
+  }
+
   /// The record, read when it has not been. Called with the lock held.
   private func passesLoaded() -> AheadPasses {
     if let passes { return passes }
