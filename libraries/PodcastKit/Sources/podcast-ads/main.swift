@@ -27,12 +27,15 @@
 // reservoir or a change of encoding sits at each edge (Shared.swift). With --truth-from-copies
 // (two MP3 files, two downloads of one episode) it writes the stretches where the first differs
 // from the second as "<first file>.truth.txt", a file of marked ads for --edges --truth. These
-// two need no speech or model either. Needs macOS 26 with Apple Intelligence on, except for
-// --probe, --shared and --truth-from-copies. Where there is no Foundation Models framework
+// two need no speech or model either. With --map (one MP3 file the Mac marked, `--out`,
+// `--marks` and `--sha256`) it writes that file's episode map (EpisodeMapCommand in
+// PodcastAudioMatch), which needs neither. Needs macOS 26 with Apple Intelligence on, except for
+// --probe, --shared, --truth-from-copies and --map. Where there is no Foundation Models framework
 // (Linux) it only says so, so `swift build` and `swift test` still work there.
 import Foundation
 import PodcastAds
 import PodcastAdsOnDevice
+import PodcastAudioMatch
 import PodcastDownloads
 import PodcastSpeech
 import PodcastTranscripts
@@ -95,6 +98,10 @@ if let at = arguments.firstIndex(of: "--probe") {
     fail("Usage: podcast-ads --probe <episode address>")
   }
   exit(Probe.run(arguments[at + 1]))
+}
+if let at = arguments.firstIndex(of: "--map") {
+  arguments.remove(at: at)
+  exit(EpisodeMapCommand.run(arguments))
 }
 for flag in ["--shared", "--truth-from-copies"] {
   guard let at = arguments.firstIndex(of: flag) else { continue }

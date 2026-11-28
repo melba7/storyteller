@@ -8,10 +8,8 @@
 //   swift run -c release podcast-teach joints <teaching folder>
 //   swift run -c release podcast-teach apple <teaching folder> [options]
 //   swift run -c release podcast-teach edges <teaching folder>
-//   swift run -c release podcast-teach map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <hex>
 //
-// "map" writes the episode map of one MP3 file the Mac marked (EpisodeMapCommand in
-// PodcastAudioMatch); it needs only Foundation. "score" replays the phone's ad finders on the marked episodes of the teaching folder and
+// "score" replays the phone's ad finders on the marked episodes of the teaching folder and
 // prints a scorecard (Score.swift). "sounds" makes the library of ad sounds from the marked
 // episodes' audio (Sounds.swift). Both need only Foundation, so they also run on Linux.
 // "meaning" trains the small model that reads what a line means (Meaning.swift); it needs a
@@ -22,7 +20,6 @@
 // keeps its answers for the scorecard (Apple.swift). "edges" measures whether the sound changes at
 // the exact edges of ad spots and keeps the change peaks in edges.json (Edges.swift); it needs a Mac.
 import Foundation
-import PodcastAudioMatch
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 switch arguments.first {
@@ -34,12 +31,11 @@ case "fit": exit(FitTool.run(Array(arguments.dropFirst())))
 case "joints": exit(JointsCommand.run(Array(arguments.dropFirst())))
 case "apple": exit(await AppleTool.run(Array(arguments.dropFirst())))
 case "edges": exit(await EdgesTool.run(Array(arguments.dropFirst())))
-case "map": exit(EpisodeMapCommand.run(Array(arguments.dropFirst())))
 default:
   FileHandle.standardError.write(
     Data(
       """
-      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder> | podcast-teach apple <teaching folder> | podcast-teach edges <teaching folder> | podcast-teach map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <hex>
+      Usage: podcast-teach score <teaching folder> | podcast-teach agree <teaching folder> | podcast-teach sounds <teaching folder> | podcast-teach meaning <teaching folder> | podcast-teach fit <examples file> <output file> | podcast-teach joints <teaching folder> | podcast-teach apple <teaching folder> | podcast-teach edges <teaching folder>
 
       """.utf8))
   exit(2)

@@ -2,7 +2,7 @@ import XCTest
 
 @testable import PodcastAudioMatch
 
-/// `podcast-teach map`: an MP3 file and its marks in, the map's file out.
+/// `podcast-ads --map`: an MP3 file and its marks in, the map's file out.
 final class EpisodeMapCommandTests: XCTestCase {
   private var folder: URL!
   private let sha = String(repeating: "c", count: 64)

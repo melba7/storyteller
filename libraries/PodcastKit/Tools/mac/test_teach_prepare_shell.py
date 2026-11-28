@@ -97,7 +97,7 @@ class HourTests(Setup):
              "python3 teach_ahead.py ready", "swift build -c release", "swift build -c release",
              "python3 teach_transcribe.py", "python3 teach_label.py", "swift build -c release",
              "swift build -c release", "python3 teach_copies.py", "python3 teach_snap.py",
-             "python3 teach_prepared.py publish", "python3 teach_coming_publish.py",
+             "python3 teach_prepared.py publish", "python3 teach_maps.py", "python3 teach_coming_publish.py",
              "python3 teach_ahead.py write", "python3 teach_publish.py"]
 
     def test_the_steps_run_in_order_and_everything_worked(self):
@@ -137,6 +137,15 @@ class HourTests(Setup):
         self.assertIn("--tool %s/podcast-ads" % self.bin, self.line("teach_copies.py"))
         built = [c for c in self.called() if c.startswith("swift build") and "--product" in c]
         self.assertEqual([c.split()[-1] for c in built], ["podcast-transcribe", "podcast-ads"])
+
+    def test_the_maps_are_written_with_the_built_podcast_ads_and_left_out_when_it_did_not_build(self):
+        self.hour()
+        self.assertIn("publish", self.line("teach_maps.py"))
+        self.assertIn("--tool %s/podcast-ads" % self.bin, self.line("teach_maps.py"))
+        open(self.calls, "w").close()
+        self.hour(ADS_FAILS="1")
+        self.assertNotIn("python3 teach_maps.py", self.first_words())
+        self.assertIn("python3 teach_prepared.py publish", self.first_words())
 
     def test_the_audio_step_gets_the_days_and_the_gigabytes_and_they_can_be_changed(self):
         self.hour()
@@ -210,8 +219,8 @@ class HourTests(Setup):
         words = self.first_words()
         self.assertNotIn("python3 teach_transcribe.py", words)
         self.assertNotIn("python3 teach_label.py", words)
-        self.assertEqual(words[-6:], ["python3 teach_copies.py", "python3 teach_snap.py",
-                                      "python3 teach_prepared.py publish", "python3 teach_coming_publish.py",
+        self.assertEqual(words[-7:], ["python3 teach_copies.py", "python3 teach_snap.py",
+                                      "python3 teach_prepared.py publish", "python3 teach_maps.py", "python3 teach_coming_publish.py",
                                       "python3 teach_ahead.py write",
                                       "python3 teach_publish.py"])
 
@@ -243,7 +252,7 @@ class HourTests(Setup):
             open(self.calls, "w").close()
             done = self.hour(FAIL=failing)
             self.assertEqual(done.returncode, 1, failing)
-            self.assertEqual(self.first_words()[-4:], ["python3 teach_prepared.py publish", "python3 teach_coming_publish.py",
+            self.assertEqual(self.first_words()[-5:], ["python3 teach_prepared.py publish", "python3 teach_maps.py", "python3 teach_coming_publish.py",
                                                        "python3 teach_ahead.py write",
                                                        "python3 teach_publish.py"], failing)
             self.assertIn("not every step worked", done.stdout, failing)
@@ -301,7 +310,7 @@ class HourTests(Setup):
                          ["teach_prepared.py", "teach_taps.py", "teach_prepare.py", "teach_collect.py", "teach_ahead.py",
                           "teach_transcribe.py",
                           "teach_label.py", "teach_copies.py", "teach_snap.py", "teach_prepared.py",
-                          "teach_coming_publish.py", "teach_ahead.py", "teach_publish.py"])
+                          "teach_maps.py", "teach_coming_publish.py", "teach_ahead.py", "teach_publish.py"])
         self.assertEqual({c.split()[2] for c in during}, {"3"}, during)
         free = subprocess.run([sys.executable, os.path.join(HERE, "teach_store.py"), "busy", folder])
         self.assertEqual(free.returncode, 0)

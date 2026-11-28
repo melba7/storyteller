@@ -18,6 +18,8 @@ because the phone's finder reads exactly this:
 the iCloud copy of the phone's folder now. Then "start" and "end" of its ads are seconds in that very
 file, taken from labels-snapped/<id>.json when it exists and else from labels/, and an entry with no
 ads is kept, because that says the episode has none. An entry without a copy is as it always was.
+An entry with a copy also gets "map": "maps/<id>.json" when the Mac wrote the map of that very file
+(teach_maps.py); the phone's readers ignore a key they do not know.
 
 The top-level array "coming" lists the episodes the Mac has picked and not finished
 (teach_coming.py): [{"feed": ..., "guid": ..., "since": <seconds>}]. The file stays version 1 and the
@@ -112,6 +114,8 @@ def build(folder, now, say, to=None):
     the prepared audio is looked for (None: there is none)."""
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder))
     prepared = teach_prepared_file.copies(folder, to) if to else {}
+    import teach_maps  # here and not at the top: teach_maps.py reads the labels with this module
+    mapped = teach_maps.maps(folder, to) if to else {}
     episodes = []
     for item in read_ahead(folder):
         if item["id"] in kept:
@@ -131,6 +135,8 @@ def build(folder, now, say, to=None):
                  "marked": marked, "ads": ads_of(label, lines)}
         if item["id"] in prepared:
             found["copy"] = prepared[item["id"]]
+        if item["id"] in mapped:
+            found["map"] = mapped[item["id"]]
         episodes.append(found)
     return episodes
 

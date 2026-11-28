@@ -1,9 +1,9 @@
-// LOFI-FORK: `podcast-teach map`, which writes the episode map of one MP3 file (see FORK.md and
+// LOFI-FORK: `podcast-ads --map`, which writes the episode map of one MP3 file (see FORK.md and
 // EpisodeMap.swift). The Mac's preparing run calls it for each copy it publishes (teach_maps.py).
 // Foundation only, so tests can call it and it runs on Linux too.
 //
-//   podcast-teach map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <64 hex>
-//                     [--feed <feed address>] [--guid <episode guid>]
+//   podcast-ads --map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <64 hex>
+//                      [--feed <feed address>] [--guid <episode guid>]
 //
 // <marks.json> is a list of the marks made on that file, in its seconds:
 // [{"start": 612.0, "end": 671.5, "kind": "ad"}]. The map is written whole or not at all.
@@ -12,7 +12,7 @@ import Foundation
 
 public enum EpisodeMapCommand {
   static let usage =
-    "Usage: podcast-teach map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <64 hex> [--feed <feed address>] [--guid <episode guid>]"
+    "Usage: podcast-ads --map <audio.mp3> --out <map.json> --marks <marks.json> --sha256 <64 hex> [--feed <feed address>] [--guid <episode guid>]"
 
   /// Runs the command and returns its exit code. What it says goes to `say`, one line.
   public static func run(_ arguments: [String], say: (String) -> Void = { print($0) }) -> Int32 {
