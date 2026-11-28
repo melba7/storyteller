@@ -204,14 +204,20 @@ def merge(segments):
     return joined
 
 
-def with_times(segments, lines):
+def with_times(segments, lines, ends=None):
     """Copies of the segments with `start` and `end` in seconds (one decimal). The end is the time
-    of the line after the segment, or 5 seconds after the last line when it ends the transcript."""
+    of the line after the segment, or 5 seconds after the last line when it ends the transcript.
+    With `ends` (the exact end of each line, in the order of `lines`, None where it is not known:
+    see teach_words.word_ends) the end is where the segment's last line ends, that is where its last
+    word ends, whenever that is known and after the start."""
     timed = []
     for item in segments:
         item = dict(item)
         item["start"] = round(lines[item["first"] - 1][0], 1)
-        if item["last"] < len(lines):
+        exact = ends[item["last"] - 1] if ends and len(ends) == len(lines) else None
+        if exact is not None and round(exact, 1) > item["start"]:
+            item["end"] = round(exact, 1)
+        elif item["last"] < len(lines):
             item["end"] = round(lines[item["last"]][0], 1)
         else:
             item["end"] = round(lines[-1][0] + LAST_LINE_SECONDS, 1)
