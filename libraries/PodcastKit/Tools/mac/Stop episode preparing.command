@@ -16,7 +16,7 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null
 rm -f "$PLIST"
 echo
-echo "Episode preparing is off. Nothing will run every hour."
+echo "Episode preparing is off. Nothing will run every 20 minutes."
 echo
 echo "The prepared episodes are still in iCloud Drive and take space there."
 read -r -p "Type yes to remove the prepared episodes from iCloud now (and the Mac's own copy of their audio), or just press Return to keep them: " answer

@@ -2270,7 +2270,7 @@ How I read the picks (my choices, told to Mo):
     before it is lined up and how many episodes do not line up at all. The map
     goes into the app (Z19) only when the row passes at least 20 more exact
     breaks than the stream row with no more wrong skips.
-- [ ] **Z5 Prepare sooner, and the phone waits** (pick 2): the Mac's job runs
+- [x] **Z5 Prepare sooner, and the phone waits** (pick 2): the Mac's job runs
       every 20 minutes instead of every hour. As soon as it picks an episode it
       writes a "coming" entry to `ahead-ads.json`, before the marking. The phone
       does not download the publisher's copy of a coming episode by itself; it
@@ -2280,11 +2280,19 @@ How I read the picks (my choices, told to Mo):
     when the copy is ready or the marking failed; jest tests pin the wait, its 2
     hour end and that Play streams at once. A new installer launcher is left for
     Mo.
+  - Mac part done (round Z, builder C): the job runs at minutes 5, 25 and 45
+    (the same $35 weekly cap and per-run limits; the budget is one for the week
+    and is checked before every call, so three times the runs cannot pass it).
+    The pick writes `coming` to `ahead-ads.json` (both folders) before marking;
+    the run closes it before the last write. Mo double-clicks "Install episode
+    preparing" again. The phone part is done too (builder B): the phone holds
+    its own automatic downloads of a coming episode for up to 2 hours; Play and
+    a download by hand never wait.
 - [x] **Z6 Copies on mobile data** (D): with Mo's switch on, the phone takes the
       Mac's copy on mobile data too, for its next 3 episodes only.
   - Done when: jest tests pin 3 on mobile data, 12 on Wi-Fi, and nothing with
     the switch off.
-- [ ] **Z7 Learn from Mo's taps** (pick 1): every hour the Mac reads the phone's
+- [x] **Z7 Learn from Mo's taps** (pick 1): every hour the Mac reads the phone's
       notes of prepared episodes (Undo, Skip ad, skip forward inside an ad). It
       keeps per-show notes that Claude gets when it marks that show's next
       episodes. Mac only, never committed. A tap moves no skip by itself.

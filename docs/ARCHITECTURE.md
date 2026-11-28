@@ -409,3 +409,21 @@ in `FORK.md`.
   carries it with the book.
 - **Touch point:** a marked edit to an upstream file (`LOFI-FORK`).
 - **Sounds folder:** `LofiMusic` on the Mac and in iCloud; the phone imports it.
+
+## Round Z, Mac side (2026-11-28)
+
+- Episode preparing runs every 20 minutes (minutes 5, 25, 45). The weekly budget
+  `prepare-<ISO week>` is shared by all runs and checked before every call, so
+  more runs do not raise the $35 cap.
+- `ahead-ads.json` gains an optional top-level `coming` array (`feed`, `guid`,
+  `since` in unix seconds), only while something is coming. Version stays 1; the
+  phone's decoder reads `version` and `episodes` by name. The list lives in
+  `coming.json` of the teaching folder: the pick adds to it and publishes at
+  once, `teach_coming_publish.py settle` empties it before the last write of the
+  run.
+- The phone's notes of prepared episodes (Undo, Skip ad, a skip that went too
+  far) become up to 20 short lines per show in `show-taps.json` (Mac only, in
+  `.gitignore`), read by `teach_taps.py learn` at the start of each run and put
+  into the prompt of the marking (`--only-ahead` only). Build 40.1 writes no
+  separate note for a skip forward inside an ad; the three kinds above are what
+  it writes.

@@ -97,9 +97,14 @@ def clock(seconds):
     return "%d:%02d:%02d" % (whole // 3600, whole % 3600 // 60, whole % 60)
 
 
-def prompt(show, title, lines, first, last):
-    """The user message for lines `first` to `last` (numbers start at 1)."""
+def prompt(show, title, lines, first, last, guidance=()):
+    """The user message for lines `first` to `last` (numbers start at 1). `guidance` is short lines
+    about what the listener's taps showed for this show (teach_taps.py): hints, never rules."""
     head = "Show: %s\nEpisode: %s\n\n" % (show, title)
+    if guidance:
+        head += ("What the listener's taps showed about earlier marks in this show. Each line is one "
+                 "tap. They are hints about where marks were wrong, not rules; mark what the "
+                 "transcript says:\n%s\n\n" % "\n".join("- " + one for one in guidance))
     if first != 1 or last != len(lines):
         head += ("These are lines %d to %d of %d. A stretch may have begun before them or carry "
                  "on after them.\n\n" % (first, last, len(lines)))
