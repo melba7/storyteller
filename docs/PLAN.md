@@ -2560,10 +2560,6 @@ is the measure that decides.
 
 ## Later
 
-- Round Z (2026-11-28), from the Mac's results: the show playbook passed its
-  replay (+5 breaks, one fewer wrong skip) but the phone cannot use it yet. Its
-  cue lines need a Swift change in the phone's cue rules and a publish step like
-  `ad-cues.json` (never committed). Ask Mo before building it.
 - Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
   lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
   `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
