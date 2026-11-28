@@ -209,7 +209,7 @@ public enum AdScoreCommand {
     // last finder row. Without the audio code or an MP3 file there is no row and the report says so.
     let week = options.week
       ? plan.weekScan.map { WeekScoreRow.Run(scan: $0, tuning: tuning, standingOn: finalAds) } : nil
-    // The last two rows (CueScoreRows.swift): the Mac's opening lines and filled holes, after all the rest.
+    // The last rows (CueScoreRows.swift): the Mac's opening lines, filled holes and playbook lines, after all the rest.
     let cueRun = CueScoreRows.Run(
       folder: folder, tuning: tuning, onMarks: ahead != nil, standingOn: finalAds)
     // Own sounds and the repeat finders learn from the earlier episodes of a show. The shelf is one

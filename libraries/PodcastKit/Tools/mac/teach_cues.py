@@ -5,12 +5,18 @@ ad-cues.json for the phone's two timing finders (opening lines and filled holes)
 Standard library only. It reads <folder>/episodes.json, <folder>/transcripts/<id>.txt and
 <folder>/<labels>/<id>.json (written by teach_label.py), and writes <folder>/ad-cues.json.
 
-  teach_cues.py [--folder F] [--labels labels] [--min-episodes 20]
+  teach_cues.py [--folder F] [--labels labels] [--min-episodes 20] [--with-playbook]
 
 The file has "version": 1, "writtenAt", "episodes" (how many episodes it learned from), the general
 lists "starts" and "returns", "shows" (each with its "feed" address and its own "starts" and
 "returns", only shows that have a cue), "common" and "usual". Every list is sorted, so the same
 input gives the same file. It holds words of transcripts, so it is never committed.
+
+With --with-playbook, or when the switch file playbook-on is in the folder, each show of
+playbook.json (teach_playbook.py) also gets "phrases": its handoff, segment and plug phrases of 2
+words or more, sorted. A show with phrases and no cue gets an entry with empty "starts" and
+"returns". Without the option and the switch no entry has "phrases". With no playbook.json nothing
+is added; a damaged one is a set-up problem.
 
 The rules (docs/PLAN.md, "The file ad-cues.json"):
 - A cue is the first 3 to 6 words of a transcript line, made by teach_features.tokens and joined by
@@ -65,6 +71,8 @@ MIN_EPISODES_SHOW = 3
 MIN_WORD_LETTERS = 4
 MIN_EPISODES = 20
 KINDS = ("starts", "returns")
+PLAYBOOK_SWITCH = "playbook-on"
+PLAYBOOK_LISTS = ("handoffs", "segments", "plugs")
 
 
 # MARK: One episode
@@ -264,6 +272,30 @@ def learn(episodes):
     return everything, shows, words
 
 
+def add_phrases(content, folder, say):
+    """Puts each playbook show's phrases into its entry of content["shows"] (a new entry when the
+    show has no cue) and returns (phrases, shows) added. Raises Problem on a damaged playbook."""
+    import teach_playbook  # Here and not at the top: teach_playbook imports this module.
+    from teach_feed import feed_key
+    if not os.path.exists(os.path.join(folder, teach_playbook.FILE)):
+        say("There is no %s, so no phrases of the playbook were added." % teach_playbook.FILE)
+        return 0, 0
+    entries = {feed_key(one["feed"]): one for one in content["shows"]}
+    for show in teach_playbook.read_playbook(folder):
+        if not isinstance(show, dict) or not isinstance(show.get("feed"), str):
+            continue
+        lists = [show.get(name) for name in PLAYBOOK_LISTS]
+        words = [tokens(p) for one in lists if isinstance(one, list) for p in one if isinstance(p, str)]
+        phrases = {" ".join(w) for w in words if len(w) >= 2}
+        if not phrases:
+            continue
+        entry = entries.setdefault(feed_key(show["feed"]), {"feed": show["feed"], "starts": [], "returns": []})
+        entry["phrases"] = sorted(phrases | set(entry.get("phrases", [])))
+    content["shows"] = sorted(entries.values(), key=lambda one: one["feed"])
+    with_phrases = [one["phrases"] for one in content["shows"] if "phrases" in one]
+    return sum(len(p) for p in with_phrases), len(with_phrases)
+
+
 def same_but_time(old, new):
     return isinstance(old, dict) and {k: v for k, v in old.items() if k != "writtenAt"} == new
 
@@ -277,6 +309,7 @@ def main(argv, say=print, now=None):
     parser.add_argument("--folder", default=teach_store.FOLDER)
     parser.add_argument("--labels", default="labels")
     parser.add_argument("--min-episodes", type=int, default=MIN_EPISODES)
+    parser.add_argument("--with-playbook", action="store_true")
     try:
         options = parser.parse_args(argv)
     except SystemExit as stop:
@@ -292,6 +325,8 @@ def main(argv, say=print, now=None):
                 "opening lines, so %s was not written." % (len(episodes), options.min_episodes, CUES_FILE))
             return 0
         content, unpruned = build(*learn(episodes))
+        playbook = options.with_playbook or os.path.exists(os.path.join(folder, PLAYBOOK_SWITCH))
+        phrases = add_phrases(content, folder, say) if playbook else None
         try:
             with open(path, encoding="utf-8") as f:
                 old = json.load(f)
@@ -315,11 +350,13 @@ def main(argv, say=print, now=None):
         "%d and %d for single shows." % (unpruned["general"]["starts"], unpruned["general"]["returns"],
                                          unpruned["shows"]["starts"], unpruned["shows"]["returns"]))
     say("Wrote %s: %d opening and %d return lines for every show, %d and %d for %s, %d common and "
-        "%d usual words, %d bytes." % (
+        "%d usual words, %d bytes.%s" % (
             path, len(content["starts"]), len(content["returns"]),
             sum(len(s["starts"]) for s in content["shows"]), sum(len(s["returns"]) for s in content["shows"]),
             plural(len(content["shows"]), "show", "shows"), len(content["common"]),
-            len(content["usual"]), size))
+            len(content["usual"]), size,
+            " With %s of the playbook for %s." % (plural(phrases[0], "phrase", "phrases"),
+                                                  plural(phrases[1], "show", "shows")) if phrases else ""))
     return 0
 
 

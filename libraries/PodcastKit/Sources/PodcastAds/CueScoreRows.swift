@@ -1,9 +1,10 @@
-// LOFI-FORK: the scorecard's last two rows, "Plus opening lines" and "Plus filled holes" (see FORK.md,
-// CueAds.swift, AheadScoreRow.swift and AdScoreLayer.swift). Foundation only.
+// LOFI-FORK: the scorecard's last rows, "Plus opening lines", "Plus filled holes" and "Plus playbook
+// lines" (see FORK.md, CueAds.swift, AheadScoreRow.swift and AdScoreLayer.swift). Foundation only.
 //
-// Both rows are rewriting layers, as the Mac's marks row is. The first stands on the Mac's marks row
-// when `--ahead` was given and on the last finder row otherwise; the second stands on the first.
-// They read the cues from `<teaching folder>/ad-cues.json`; with no such file there are no rows.
+// The rows are rewriting layers, as the Mac's marks row is. The first stands on the Mac's marks row
+// when `--ahead` was given and on the last finder row otherwise; each of the others stands on the
+// one before it. They read the cues from `<teaching folder>/ad-cues.json`; with no such file there
+// are no rows, and the playbook row is there only when the file holds phrases of a playbook.
 import Foundation
 import PodcastTranscripts
 
@@ -14,6 +15,11 @@ enum CueScoreRows {
   /// on, with at most this many more skips with no ad.
   static let neededMore = 10
   static let mostMoreSkips = 2
+  static let playbookName = "Plus playbook lines"
+  /// The keep rule of the playbook row: this many more breaks pass than in the filled holes row,
+  /// with at most this many more skips with no ad.
+  static let playbookNeededMore = 4
+  static let playbookMostMoreSkips = 0
 
   /// The ads of a row the finders look at: the ones the phone skips, those that are at least
   /// unsure and of a kind the listener's switches allow.
@@ -33,13 +39,15 @@ enum CueScoreRows {
     return skips.isEmpty ? base : AdJoin.join(base + skips)
   }
 
-  /// The two rows. A row changes nothing on the head of an episode: the finders need the whole
-  /// transcript. `kept` keep each row's ads for every whole episode, for the stream replay.
+  /// The two rows, and the playbook row when the cues hold phrases. A row changes nothing on the
+  /// head of an episode: the finders need the whole transcript. `kept` and `playbook` keep each
+  /// row's ads for every whole episode, for the stream replay.
   static func layers(
     _ cues: AdCues, tuning: ShowTuning, onMarks: Bool, standingOn finders: ScoreEpisodeAds,
-    kept: (openings: ScoreEpisodeAds, holes: ScoreEpisodeAds)
+    kept: (openings: ScoreEpisodeAds, holes: ScoreEpisodeAds),
+    playbook: ScoreEpisodeAds = ScoreEpisodeAds()
   ) -> [AdScoreLayer] {
-    [
+    let two: [AdScoreLayer] = [
       .rewriting(name: openingName) { input, soFar in
         guard !input.isHead else { return soFar }
         let base = onMarks ? soFar : finders.ads(for: input.episode.id) ?? soFar
@@ -60,15 +68,28 @@ enum CueScoreRows {
         return made
       },
     ]
+    guard cues.showPhrases > 0 else { return two }
+    return two + [
+      .rewriting(name: playbookName) { input, soFar in
+        guard !input.isHead else { return soFar }
+        let show = input.episode.feed
+        let found = CueAds.playbook(
+          lines: input.transcript.lines, skips: skipping(soFar), cues: cues, show: show)
+        let made = add(found, to: soFar, tuning: tuning, show: show)
+        playbook.put(made, for: input.episode.id)
+        return made
+      }
+    ]
   }
 
   // MARK: What a run of the scorecard adds
 
-  /// The two rows of one run: the cues, the layers (none without a cue file) and what they kept.
+  /// The rows of one run: the cues, the layers (none without a cue file) and what they kept.
   struct Run {
     let cues: AdCues?
     let layers: [AdScoreLayer]
     private let kept: (openings: ScoreEpisodeAds, holes: ScoreEpisodeAds)
+    private let playbook = ScoreEpisodeAds()
 
     init(folder: URL, tuning: ShowTuning, onMarks: Bool, standingOn finders: ScoreEpisodeAds) {
       let read = (try? Data(contentsOf: folder.appendingPathComponent(AdCues.fileName)))
@@ -78,31 +99,32 @@ enum CueScoreRows {
       cues = found
       kept = box
       layers =
-        found.map {
-          CueScoreRows.layers($0, tuning: tuning, onMarks: onMarks, standingOn: finders, kept: box)
+        found.map { [playbook] in
+          CueScoreRows.layers(
+            $0, tuning: tuning, onMarks: onMarks, standingOn: finders, kept: box, playbook: playbook)
         } ?? []
     }
 
-    /// The two rows made of their scorecards (`cards` are the last two of the run), and the text
-    /// about them. `last` is the row they stand on. With no cue file the text says so.
+    /// The rows made of their scorecards (`cards` are the last of the run, one for each layer), and
+    /// the text about them. `last` is the row they stand on. With no cue file the text says so.
     func report(_ cards: [Scorecard], last: ScorecardRow?) -> (rows: [ScorecardRow], text: String) {
-      guard let cues, cards.count == 2 else {
+      guard let cues, cards.count >= 2, cards.count == layers.count else {
         return (
           [],
           "Opening lines and filled holes: left out, there is no \(AdCues.fileName) with cues in the teaching folder."
         )
       }
-      let rows = zip([openingName, holesName], cards).map { ScorecardRow(name: $0, card: $1) }
+      let rows = zip(layers.map(\.name), cards).map { ScorecardRow(name: $0, card: $1) }
       return (rows, CueScoreRows.lines(rows, cues: cues, last: last).joined(separator: "\n"))
     }
 
-    /// The numbers of the two rows played as streams. `detect` is what the phone finds in the first
+    /// The numbers of the rows played as streams. `detect` is what the phone finds in the first
     /// seconds of an episode (the finders change nothing there).
     func streamed(
       episodes: [TeachingEpisode], habits: ShowHabits, tuning: ShowTuning, speech: Double?,
       detect: (TeachingEpisode, Transcript) -> [FoundAd]
     ) -> [StreamNumbers] {
-      [kept.openings, kept.holes].map { row in
+      ([kept.openings, kept.holes] + (layers.count > 2 ? [playbook] : [])).map { row in
         StreamScore.run(
           episodes: episodes, habits: habits, settings: AdSkipSettings(), models: nil, tuning: tuning,
           speech: speech, whole: { row.ads(for: $0.id) ?? [] }, detect: detect
@@ -129,10 +151,31 @@ enum CueScoreRows {
     )
   }
 
+  /// The keep rule for the playbook row against the filled holes row it stands on, in a sentence
+  /// that starts with the verdict.
+  static func playbookVerdict(holes: BarTotals, playbook: BarTotals) -> (kept: Bool, line: String) {
+    let more = playbook.passed - holes.passed
+    let skips = playbook.noAdSkips - holes.noAdSkips
+    let kept = more >= playbookNeededMore && skips <= playbookMostMoreSkips
+    func change(_ number: Int, _ noun: String) -> String {
+      number < 0 ? "\(-number) fewer \(noun)" : "\(number) more \(noun)"
+    }
+    return (
+      kept,
+      (kept ? "Playbook verdict: kept. " : "Playbook verdict: not kept. ")
+        + "\(change(more, "breaks pass")) than in \"\(holesName)\" (\(playbookNeededMore) more are needed), with \(change(skips, "skips")) with no ad (none more is allowed)."
+    )
+  }
+
   /// What the file holds (numbers only), each row's bar and why breaks fail in it, and the verdict.
   static func lines(_ rows: [ScorecardRow], cues: AdCues, last: ScorecardRow?) -> [String] {
+    let phrases =
+      cues.showPhrases > 0
+      ? " It also holds \(cues.showPhrases) playbook phrases for \(cues.phraseShows) \(cues.phraseShows == 1 ? "show" : "shows")."
+      : ""
     var out = [
       "Opening lines and filled holes: \(AdCues.fileName) holds \(cues.generalStarts) opening and \(cues.generalReturns) return lines for every show, \(cues.showStarts) opening and \(cues.showReturns) return lines for \(cues.showCount) shows, \(cues.commonWords) common and \(cues.usualWords) usual words, learned from \(cues.episodes) episodes."
+        + phrases
     ]
     for row in rows {
       guard let bar = row.bar else { continue }
@@ -144,8 +187,13 @@ enum CueScoreRows {
           + (failing.isEmpty
             ? "no break fails." : failing.map { "\($0.0.label) \($0.1)" }.joined(separator: ", ") + "."))
     }
-    if let before = last?.bar, let after = rows.last?.bar {
-      out.append(verdict(last: before, both: after).line)
+    // The first verdict is about the first two rows; the playbook row has its own.
+    let holes = rows.count >= 2 ? rows[1].bar : nil
+    if let before = last?.bar, let holes {
+      out.append(verdict(last: before, both: holes).line)
+    }
+    if rows.count > 2, let holes, let after = rows[2].bar {
+      out.append(playbookVerdict(holes: holes, playbook: after).line)
     }
     return out
   }

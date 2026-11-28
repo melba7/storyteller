@@ -7,7 +7,8 @@ import Foundation
 //
 //   {"version": 1, "writtenAt": 1700000000, "episodes": 1170,
 //    "starts": ["this episode is brought", "..."], "returns": ["..."],
-//    "shows": [{"feed": "<feed address>", "starts": ["..."], "returns": ["..."]}],
+//    "shows": [{"feed": "<feed address>", "starts": ["..."], "returns": ["..."],
+//               "phrases": ["a word from", "..."]}],
 //    "common": ["about", "..."], "usual": ["..."]}
 //
 // A cue is the first 3 to 6 words of a transcript line, as `AdWordModel.tokens` makes words,
@@ -15,6 +16,11 @@ import Foundation
 // the same way, is in the list. `starts` are lines that open an ad and `returns` are lines where
 // the show comes back. `common` words occur in more than 15 in 100 episodes and `usual` ones in
 // more than 5 and at most 15 in 100; the rest of the words are rare.
+//
+// A show's `phrases` are optional: the handoff, segment and plug phrases of the show's playbook
+// (teach_playbook.py), each 2 words or more joined by one space. A line matches when it holds a
+// phrase of its show as whole words, anywhere in the line. Builds that do not know the list
+// ignore it, so the version stays 1.
 
 /// The cues the Mac learned, for every show and for each show on its own.
 public struct AdCues: Sendable, Equatable {
@@ -27,7 +33,9 @@ public struct AdCues: Sendable, Equatable {
   struct Lists: Sendable, Equatable {
     var starts: Set<String> = []
     var returns: Set<String> = []
-    var isEmpty: Bool { starts.isEmpty && returns.isEmpty }
+    /// The phrases of the show's playbook; only a show's own lists have any.
+    var phrases: Set<String> = []
+    var isEmpty: Bool { starts.isEmpty && returns.isEmpty && phrases.isEmpty }
   }
 
   var general = Lists()
@@ -51,6 +59,9 @@ public struct AdCues: Sendable, Equatable {
   public var showStarts: Int { shows.values.reduce(0) { $0 + $1.starts.count } }
   public var showReturns: Int { shows.values.reduce(0) { $0 + $1.returns.count } }
   public var showCount: Int { shows.count }
+  public var showPhrases: Int { shows.values.reduce(0) { $0 + $1.phrases.count } }
+  /// How many shows have a phrase.
+  public var phraseShows: Int { shows.values.filter { !$0.phrases.isEmpty }.count }
   public var commonWords: Int { common.count }
   public var usualWords: Int { usual.count }
 
@@ -65,6 +76,14 @@ public struct AdCues: Sendable, Equatable {
   /// Whether the line with these words is where the show comes back, in the same way.
   public func returns(_ words: [String], show: String) -> Bool {
     matches(words) { general.returns.contains($0) || shows[show]?.returns.contains($0) == true }
+  }
+
+  /// Whether the line with these words holds a phrase of the playbook of `show` as whole words,
+  /// anywhere in the line. Another show's phrases never match.
+  public func playbookOpens(_ words: [String], show: String) -> Bool {
+    guard let phrases = shows[show]?.phrases, !phrases.isEmpty, !words.isEmpty else { return false }
+    let line = " " + words.joined(separator: " ") + " "
+    return phrases.contains { line.contains(" " + $0 + " ") }
   }
 
   private func matches(_ words: [String], _ isCue: (String) -> Bool) -> Bool {
@@ -100,14 +119,16 @@ public struct AdCues: Sendable, Equatable {
     var feed: String?
     var starts: [Lossy<String>] = []
     var returns: [Lossy<String>] = []
+    var phrases: [Lossy<String>] = []
 
-    private enum Keys: String, CodingKey { case feed, starts, returns }
+    private enum Keys: String, CodingKey { case feed, starts, returns, phrases }
 
     init(from decoder: Decoder) throws {
       let box = try decoder.container(keyedBy: Keys.self)
       feed = try? box.decode(String.self, forKey: .feed)
       starts = (try? box.decode(Words.self, forKey: .starts))?.list ?? []
       returns = (try? box.decode(Words.self, forKey: .returns))?.list ?? []
+      phrases = (try? box.decode(Words.self, forKey: .phrases))?.list ?? []
     }
   }
 
@@ -138,6 +159,14 @@ public struct AdCues: Sendable, Equatable {
     Set(list.compactMap(\.value).filter { !$0.isEmpty })
   }
 
+  /// The phrases of a list, each made into words again and joined by one space; one of fewer
+  /// than 2 words is left out.
+  private static func phrases(_ list: [Lossy<String>]) -> Set<String> {
+    Set(
+      list.compactMap(\.value).map { AdWordModel.tokens($0) }.filter { $0.count >= 2 }
+        .map { $0.joined(separator: " ") })
+  }
+
   /// The cues in `data`. A file that is damaged, is of another version or is over 5 MB reads as
   /// no cues. An entry of the wrong shape is skipped. A show's feed address is turned into the
   /// app's show id by `showOf`; a show it does not know is left out.
@@ -157,6 +186,7 @@ public struct AdCues: Sendable, Equatable {
       var lists = shows[show] ?? Lists()
       lists.starts.formUnion(Self.words(entry.starts))
       lists.returns.formUnion(Self.words(entry.returns))
+      lists.phrases.formUnion(Self.phrases(entry.phrases))
       shows[show] = lists
     }
   }
