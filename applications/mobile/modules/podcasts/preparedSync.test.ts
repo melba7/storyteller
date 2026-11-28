@@ -12,6 +12,7 @@ import {
   PREPARED_FOLDER,
   SECOND_PASS_MS,
   START_BUDGET_MS,
+  copiesInstalled,
   candidatesJson,
   parsePreparedPlan,
   preparedCandidates,
@@ -702,5 +703,29 @@ describe("syncPrepared: on mobile data", () => {
     expect(report.waiting).toEqual(["e1"])
     expect(run.later.map((one) => one.ms)).toEqual([SECOND_PASS_MS])
     expect(SECOND_PASS_MS).toBe(45_000)
+  })
+})
+
+describe("copiesInstalled", () => {
+  it("counts the copies installed in the run", async () => {
+    const run = phone({
+      candidates: [candidate("e1"), candidate("e2")],
+      plan: { take: [take("e1"), take("e2")] },
+      install: async (id) => (id === "e2" ? "hash" : "installed"),
+    })
+    expect(copiesInstalled(await syncPrepared(run.deps))).toBe(1)
+  })
+
+  it("is 0 when nothing came, when the run was skipped and when it failed", async () => {
+    expect(copiesInstalled(await syncPrepared(phone({}).deps))).toBe(0)
+    expect(copiesInstalled(null)).toBe(0)
+    const run = phone({
+      candidates: [candidate("e1")],
+      plan: { take: [take("e1")] },
+      copy: async () => {
+        throw new Error("boom")
+      },
+    })
+    expect(copiesInstalled(await syncPrepared(run.deps))).toBe(0)
   })
 })

@@ -315,6 +315,13 @@ final class PodcastPlayer {
     if let episodeId { object["episodeId"] = episodeId }
     if let duration = currentDuration { object["duration"] = duration }
     if startHold != nil { object["checkingStart"] = true }
+    // A stream that plays through its own download is skipped by the head scan, which uses the
+    // Mac's marks of the episode when it has them; a stream is not in the ads table, so say it here.
+    if streamDownload != nil, let episodeId,
+      PodcastTeaching.shared.aheadEntry(episode: episodeId) != nil
+    {
+      object["macMarks"] = true
+    }
     return object
   }
 

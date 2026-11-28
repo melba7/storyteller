@@ -1,5 +1,5 @@
 // LOFI-FORK: the podcasts section's automatic downloads and clean-up (see FORK.md).
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 import {
   type AutomaticSettings,
@@ -14,6 +14,7 @@ import {
   newEpisodes,
   parseSettings,
   refreshDue,
+  waitAtMost,
   serializeSettings,
   mergeFollowUps,
   parseFollowUps,
@@ -371,5 +372,44 @@ describe("follow-ups kept between runs", () => {
       one("a"),
       one("b"),
     ])
+  })
+})
+
+describe("waitAtMost", () => {
+  it("gives back when the work is done, before the limit", async () => {
+    vi.useFakeTimers()
+    let done = false
+    const waited = waitAtMost(
+      new Promise<void>((resolve) => setTimeout(resolve, 1000)),
+      25_000,
+    ).then(() => {
+      done = true
+    })
+    await vi.advanceTimersByTimeAsync(1000)
+    await waited
+    expect(done).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it("gives up at the limit when the work goes on", async () => {
+    vi.useFakeTimers()
+    let done = false
+    const waited = waitAtMost(new Promise<void>(() => undefined), 25_000).then(
+      () => {
+        done = true
+      },
+    )
+    await vi.advanceTimersByTimeAsync(24_999)
+    expect(done).toBe(false)
+    await vi.advanceTimersByTimeAsync(1)
+    await waited
+    expect(done).toBe(true)
+    vi.useRealTimers()
+  })
+
+  it("does not throw when the work fails", async () => {
+    await expect(
+      waitAtMost(Promise.reject(new Error("no")), 25_000),
+    ).resolves.toBeUndefined()
   })
 })

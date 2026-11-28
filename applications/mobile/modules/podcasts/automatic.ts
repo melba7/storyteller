@@ -259,3 +259,25 @@ export function refreshDue(lastRunAt: number | null, now: number): boolean {
   if (lastRunAt === null || lastRunAt > now) return true
   return now - lastRunAt >= FOREGROUND_GAP_MS
 }
+
+/** The most the background task waits for the exchange with the Mac at its end. */
+export const EXCHANGE_WAIT_MS = 25_000
+
+/**
+ * Waits for `work`, but never longer than `ms`, so the background task's time is respected. It
+ * never rejects: work that fails or is still going is simply not waited for.
+ */
+export async function waitAtMost(
+  work: Promise<unknown>,
+  ms: number,
+): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const limit = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, ms)
+  })
+  try {
+    await Promise.race([work.catch(() => undefined), limit])
+  } finally {
+    clearTimeout(timer)
+  }
+}

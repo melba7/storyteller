@@ -39,6 +39,8 @@ export function playerAdLine(input: {
   streamsPlain?: boolean
   /** Play is waiting a moment for the first look at the start of a stream (Swift reports it). */
   checkingStart?: boolean
+  /** The skips of the stream that plays come from the Mac's marks (Swift reports it). */
+  macMarks?: boolean
 }): string {
   const { episodeId, skipAds, download, transcript, ads } = input
   if (!skipAds) return ""
@@ -46,6 +48,9 @@ export function playerAdLine(input: {
   // Play waits for the first look at a stream's start while its download is still arriving,
   // which would read "Getting ready", so this comes first.
   if (input.checkingStart === true) return CHECKING
+  // A stream is not in the table of downloads, so the player says when its skips are the Mac's.
+  if (input.macMarks === true && download?.state !== "downloaded")
+    return MAC_MARKS
   const noFile = download === undefined || download.state === "failed"
   // The Mac's marks skip in the head of a stream too, when the phone knows them for the episode.
   if (noFile) return ads?.macMarks === true ? MAC_MARKS : STREAMING

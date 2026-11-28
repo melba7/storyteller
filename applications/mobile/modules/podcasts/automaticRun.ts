@@ -12,11 +12,13 @@ import { archivesByItself, episodesToArchive } from "./archive"
 // native module are not there.
 import {
   type AutomaticSettings,
+  EXCHANGE_WAIT_MS,
   downloadsToDelete,
   episodesForUpNext,
   episodesToDownload,
   mergeFollowUps,
   refreshDue,
+  waitAtMost,
 } from "./automatic"
 import {
   loadFollowUps,
@@ -41,7 +43,7 @@ import {
 import { notifyAboutNewEpisodes } from "./newEpisodeNotify"
 import { player } from "./playerInstance"
 import { filterDownloaded, playlistDownloads } from "./playlistRules"
-import { runTeachingSync } from "./teachingRun"
+import { runTeachingSync, teachingSyncDone } from "./teachingRun"
 import { listUpNext, queueEpisode } from "./upNextNative"
 
 let running: Promise<void> | null = null
@@ -271,6 +273,9 @@ export function runAutomatic(): Promise<void> {
       await deletePlayed(now, settings)
       await archiveByRules(now)
       await saveLastRun(now)
+      // The exchange with the Mac was started without waiting: the background task is not ended
+      // in the middle of it, but is not held for more than a short while either.
+      await waitAtMost(teachingSyncDone(), EXCHANGE_WAIT_MS)
     } finally {
       running = null
     }

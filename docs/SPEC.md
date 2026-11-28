@@ -138,7 +138,7 @@ Podcasts, planned (Mo's ask, approved 2026-11-16; design in
   space. The phone takes that file in place of its own download for the episodes
   it expects to play next and skips by the Mac's times. An episode with no
   prepared copy plays and is skipped as before. Check: an episode the Mac
-  prepared says "Prepared by your Mac" and its ads are skipped at the marked
+  prepared says "Your Mac's marks" and its ads are skipped at the marked
   times, and with the Mac off a new episode still plays and skips as before.
 
 ## Out of scope (v1)

@@ -345,6 +345,11 @@ async function takeOne(
   }
 }
 
+/** How many copies a run installed; 0 when the run was skipped (null) or nothing came. */
+export function copiesInstalled(report: PreparedReport | null): number {
+  return report?.installed.length ?? 0
+}
+
 /**
  * Lets one run at a time through: a call made while another is going gives null at once and does
  * nothing. A run that throws frees the way for the next.

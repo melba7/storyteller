@@ -79,6 +79,8 @@ export type PlaybackState = {
    * so an ad at 0:00 can be left before it is heard.
    */
   checkingStart?: boolean
+  /** The skips of the stream that plays come from the Mac's marks (see `AdsInfo.macMarks`). */
+  macMarks?: boolean
 }
 
 export type PlaybackLoadOptions = {
