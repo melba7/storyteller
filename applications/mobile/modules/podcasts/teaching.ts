@@ -133,6 +133,14 @@ export function dueForTeaching(last: number | null, now: number): boolean {
   return last === null || now < last || now - last >= TEACHING_EVERY_MS
 }
 
+/** At Play the exchange runs at most this often (milliseconds). */
+export const PLAY_EVERY_MS = 60 * 1000
+
+/** Whether a Play may start a run: the first one, or a minute since the last (or the clock moved back). */
+export function dueForPlay(last: number | null, now: number): boolean {
+  return last === null || now < last || now - last >= PLAY_EVERY_MS
+}
+
 /** The table of episodes is looked at again at most this often (milliseconds). */
 export const AHEAD_EVERY_MS = 60 * 1000
 
