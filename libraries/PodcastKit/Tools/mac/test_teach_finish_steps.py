@@ -251,9 +251,14 @@ class SettingsTests(Steps):
         self.assertIn("  Settings: worked", done.stdout)
         self.assertTrue(os.path.exists(os.path.join(self.folder, "show-settings.json")))
 
-    def test_it_still_runs_when_the_swift_steps_were_left_out(self):
-        self.finish(BUILD_FAILS="1")
-        self.assertEqual(len(self.calls_of("python3 teach_settings.py")), 1)
+    def test_it_is_left_out_when_the_swift_steps_were_left_out(self):
+        # The rule changed on purpose: this test used to say the settings step still runs. With
+        # no build there is no new score, so the settings would be made from the scorecard of an
+        # earlier run, which a failed score already forbids. Publish still runs.
+        done = self.finish(BUILD_FAILS="1")
+        self.assertEqual(self.calls_of("python3 teach_settings.py"), [])
+        self.assertIn("  Settings: left out (the score failed)", done.stdout)
+        self.assertEqual(len(self.calls_of("python3 teach_publish.py")), 1)
 
     def test_a_failing_publish_still_decides_the_exit_code(self):
         done = self.run_script("teach-finish.sh", CODES="teach_settings.py=2 teach_publish.py=2")

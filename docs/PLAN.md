@@ -25,8 +25,11 @@ again on 2026-11-27); on the shelf 152 of 219 breaks pass (was 142), 138 of 222
 with the exact labels (was 129); X7 (one tap leaves the whole break) merged (PR
 #60), shipped in TestFlight 39.1 | Prepared episodes (Y1 to Y8, Mo's pick
 2026-11-27): all done (PR #61 merged, TestFlight 39.1, the hourly job installed
-on Mo's Mac 2026-11-28); next: learn from Mo's taps, prepare sooner and Claude's
-second look (Mo's pick 2026-11-28)
+on Mo's Mac 2026-11-28); the phone's folder link fixed (PR #62, TestFlight 40.1;
+the phone's first files reached the Mac 2026-11-28) | After prepared episodes
+(Z1 to Z23, Mo's picks 2026-11-28): part 1, the map and the ad-end check built
+and checked three times (PR #63); the Mac's tests run by themselves after the
+merge
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -2195,8 +2198,284 @@ copy is on its way; skipping the phone's own writing down of a prepared copy; a
 show the Mac should not prepare (an ad-free feed); learning from the Undo of a
 prepared ad.
 
+### After prepared episodes: taps, sooner, second look and a clear Mac link (Mo's picks, 2026-11-28)
+
+Mo: "Do all except last one. do it at 11 today". And later the same evening:
+"the mac to iphone thing needs to be smoother. Right now I have no idea if the
+mac episode is playing." He asked why a started episode is never swapped
+("Shouldnt it?") and tapped "Also on mobile data". Fable planned it, Sonnet
+builds, Opus checks, Fable checks last. One pull request and one TestFlight
+build for the round.
+
+What changed tonight: until build 40.1 the phone's link to the Mac's folder
+failed silently, so nothing the Mac made ever reached the phone and no tap ever
+reached the Mac. 40.1 is on Mo's phone and Settings says "Kept up to date with
+LofiMusic". Everything below runs on a real phone for the first time, so each
+milestone that moves a file says how the move is proven.
+
+How I read the picks (my choices, told to Mo):
+
+- "All except last one" is: learn from his taps, prepare sooner, and Claude's
+  second look at break edges. Cutting the ads out of the file is not built.
+- The second look costs about $10 to $15 a week more, which Mo accepted. Its
+  test has a small spend that Mo is told before it runs. Mo is asked again when
+  a week would clearly pass $15.
+- Mobile data is for the phone's next 3 episodes only (about 50 MB each).
+- On the card with seven more ideas Mo tapped "All seven" (Z13 to Z17, Z21 and
+  Z22). Six are free. The show playbook costs about $10 to $15 of Claude usage
+  once, which that tap approved. Each is measured first and kept only if it
+  helps.
+- Notes from taps and the per-show notes made from them hold transcript words.
+  They stay on the Mac and are never committed.
+- The sealed exam rule holds: anything that changes what is skipped is measured
+  on the answer key first, with its limits picked on the training episodes only.
+  The bar for keeping a change: more breaks pass on the exact labels (138 of 222
+  as a stream, 152 of 219 on Claude's labels), and no more skips where there is
+  no ad. The exam episodes stay unseen.
+- On Mo's Mac, auto mode refuses `swift test`, `swift run`, fetch scripts and
+  the build start. Every Mac step that needs one is a double-clickable
+  `.command` launcher.
+- The round is split. Part 1 is useful by itself and is built tonight, and it
+  holds the map's test, so we know tonight whether the map works. Part 2 (the
+  map in the app, the swap of a started episode, the voice print and the show
+  playbook) may slip to the next round, and Z23 ships whatever is finished.
+
+**Part 1 (tonight)**
+
+- [x] **Z1 When the phone last heard from the Mac** (H): Podcasts, profile, "Ad
+      skipping results" and Settings get one plain line, "Last exchange with
+      your Mac: today 9:42 PM", with what came (marks, copies, teaching files)
+      and what went (the list, the notes). When nothing ever moved it says so
+      and names the step to take.
+  - Done when: tests pin the line's words for never, today and older than a day,
+    and `phone-queue.json` in the Mac's iCloud folder proves the phone wrote.
+  - Built 2026-11-28 (builder A, joined by builder G): `macExchange.ts` words,
+    kept in AsyncStorage; the copies count comes from `runPrepared`. The phone's
+    first `phone-queue.json` reached the Mac at 11:10 PM Eastern on build 40.1.
+- [x] **Z2 "Your Mac's marks" in the player** (G): an episode that plays with
+      the Mac's marks shows the line "Your Mac's marks" with a Mac symbol, for a
+      prepared copy and for marks placed on a stream. An episode without them
+      shows nothing new. It takes the place of "Prepared by your Mac".
+  - Done when: jest tests pin when the line shows, and a screenshot shows it.
+  - Built: `MAC_MARKS` with a laptop symbol; `macMarks` from Swift for prepared
+    copies, ahead marks and streams (the stream flag in `PodcastPlayer.swift` is
+    not compiled in the cloud; Fork CI compiles it).
+- [x] **Z3 Look for Mac work at Play and in the background** (G): the phone
+      reads the Mac's files when Play is pressed and in its background refresh,
+      not only when the app opens. Marks that arrive for the episode that is
+      playing are used from the next ad on.
+  - Done when: tests pin both moments and that a read at Play never delays the
+    start by more than a second.
+  - Built: at Play at most once a minute (`dueForPlay`), and the background task
+    waits at most 25 s for the exchange (`waitAtMost`).
+- [x] **Z4 The episode map, tested tonight** (G; free): Mo: "This should be a
+      much smoother process with the map you're doing tonight right?" The Mac
+      makes a small map of an episode (about 100 KB): a fingerprint of its
+      file's show audio and Claude's marks. A phone would line its own stream or
+      download up against it as the audio arrives: what matches carries the
+      marks over, what does not match is an ad that differs. The test runs on
+      the Mac's 161 twice-downloaded episodes, map from copy A played on copy B,
+      as a scorecard row. No app change here.
+  - Done when: the row's number stands here, with how much audio the phone needs
+    before it is lined up and how many episodes do not line up at all. The map
+    goes into the app (Z19) only when the row passes at least 20 more exact
+    breaks than the stream row with no more wrong skips.
+  - Result (simulation, `/home/user/scratch-z/z4.py`, `z4b.py`): on the shelf's
+    copy B, 125 of 142 breaks with the map against 61 for the finders alone; 18
+    wrong skips (finders 20) once carried pieces under 5 s are dropped (49
+    without that rule). On 97 other twice-downloaded episodes the rule holds:
+    140 of 158, 22 wrong skips (58 without). Most of the gain is Claude's marks
+    themselves; exact carry adds up to about 16 breaks over placing them by
+    words. 1 of 160 episodes never lines up (a re-edit); 150 or more line up
+    within 10 s. Go for Z19.
+- [x] **Z5 Prepare sooner, and the phone waits** (pick 2): the Mac's job runs
+      every 20 minutes instead of every hour. As soon as it picks an episode it
+      writes a "coming" entry to `ahead-ads.json`, before the marking. The phone
+      does not download the publisher's copy of a coming episode by itself; it
+      waits for the Mac's copy, for 2 hours at most. Pressing Play never waits.
+      The file stays version 1, so an older build ignores the new field.
+  - Done when: Python tests pin the 20 minutes, the coming entry and its removal
+    when the copy is ready or the marking failed; jest tests pin the wait, its 2
+    hour end and that Play streams at once. A new installer launcher is left for
+    Mo.
+  - Mac part done (round Z, builder C): the job runs at minutes 5, 25 and 45
+    (the same $35 weekly cap and per-run limits; the budget is one for the week
+    and is checked before every call, so three times the runs cannot pass it).
+    The pick writes `coming` to `ahead-ads.json` (both folders) before marking;
+    the run closes it before the last write. Mo double-clicks "Install episode
+    preparing" again. The phone part is done too (builder B): the phone holds
+    its own automatic downloads of a coming episode for up to 2 hours; Play and
+    a download by hand never wait.
+- [x] **Z6 Copies on mobile data** (D): with Mo's switch on, the phone takes the
+      Mac's copy on mobile data too, for its next 3 episodes only.
+  - Done when: jest tests pin 3 on mobile data, 12 on Wi-Fi, and nothing with
+    the switch off.
+- [x] **Z7 Learn from Mo's taps** (pick 1): every hour the Mac reads the phone's
+      notes of prepared episodes (Undo, Skip ad, skip forward inside an ad). It
+      keeps per-show notes that Claude gets when it marks that show's next
+      episodes. Mac only, never committed. A tap moves no skip by itself.
+  - Done when: Python tests pin how a note becomes a per-show line, that a show
+    gets 20 lines at most, and that the folder is in `.gitignore`; the Mac's log
+    names the notes it read.
+- [ ] **Z8 Find why the Mac's "Score" step fails**: it has failed silently since
+      2026-11-23, so `scorecard.json` and the per-show settings made from it are
+      stale. The step logs its exit code and its last error lines. A launcher
+      "Score the ad skipping and show the error" is left for Mo, and the cause
+      is fixed test first.
+  - Done when: the cause stands here, a test pins the fix, and a finish on the
+    Mac writes a new `scorecard.json`.
+  - So far (builder D): every failed finish step now prints its exit code and
+    signal. In the cloud the scorer ran 12 minutes and exited 0 on a copy
+    without audio; every non-zero exit in it prints a line, so the Mac's silent
+    failure is a signal (killed or a crash) in the audio steps. The next Mac run
+    shows the code.
+- [x] **Z9 Teach the phone again every night by itself** (B): a nightly job runs
+      the finish steps (habits, model, library, sounds, cues, score, settings,
+      publish) on what was marked that day. It spends nothing. It comes after
+      Z8, so that it never publishes stale settings: when the score fails, the
+      settings are not published and the log says so.
+  - Done when: Python tests pin the order, the lock shared with preparing, and
+    the stop on a failed score. An installer launcher is left for Mo.
+
+**Free measurements (the app changes only where the bar is passed)**
+
+- Built: `teach-nightly.sh` at 3:30 AM under the shared lock, no Claude calls; a
+  failed score leaves the settings out. Installed by the round's Mac script.
+- [ ] **Z10 This week's ad sounds every hour** (A): the sounds of the ads in
+      prepared episodes go to the phone hourly. Measured first with a scorecard
+      row that gives each test episode only sounds from the week before it.
+  - Done when: the row's number stands here. Kept when the stream row passes at
+    least 3 more breaks and no more wrong skips.
+- [ ] **Z11 The Mac's marks on a streamed prepared episode** (C): when the phone
+      streams the publisher's copy of an episode the Mac prepared, the Mac's
+      marks are placed by matching words. Check that this works on the
+      twice-downloaded episodes, marks from copy A played on copy B.
+  - Done when: the share of marks placed within 5 s stands here, and what is not
+    placed falls back to the phone's own finders (a test pins it).
+- [x] **Z12 Edge tricks from MinusPod** (F): the silence snap (the nearest
+      silence within 2 s), the ad-end check (the end moves on while the next
+      lines still sell) and the per-show break sound snap. Each is tried alone
+      against the answer key.
+  - Done when: three numbers stand here. A trick is kept only when it passes
+    more breaks with no more wrong skips.
+  - Results (`/home/user/scratch-z/n`, against the dumps from before round X:
+    142/219 and 129/222): silence snap 136 and 124, not kept; the ad-end check
+    144 and 131 with no more wrong skips (limits picked on 1,170 training
+    episodes: promo code, web address, "com slash", terms apply; one line
+    bridged; reach 15 s), kept and built into the phone's finders; break sound
+    snap no change (needs other episodes' audio), not kept. After the final
+    check the cues no longer fire on a sentence's end or on "the code": still +2
+    on both keys, 6 ends moved instead of 7, no more wrong skips.
+- [ ] **Z13 Word-exact ends in the Mac's marks** (Mo's pick "All seven"; free):
+      the Mac's transcripts keep each word's time, and a mark ends at the ad's
+      last word. Today exact ends lie within 1 s of a line start 46 times in 100
+      and within 5 s 91 times, so the Mac's marks cannot reach 95 at the ends.
+      Needs Mo's double-click to write the 63 shelf episodes down again.
+  - Done when: Claude's own edges are scored against the places where two
+    downloads differ, before and after. Kept when ends within 5 s reach 95.
+- [x] **Z14 Ad harvest by repeat downloads** (Mo's pick "All seven"; free): the
+      Mac downloads a new episode 3 times over the day. What differs is an
+      inserted ad with exact edges and no Claude call, and its sound joins Z10's
+      sounds. It adds to the publishers' download counts; Mo is told.
+  - Done when: on the twice-downloaded episodes, split by week, the share of
+    inserted ads with a sound twin from earlier stands here. Built only at 50 in
+    100 or more, then held to Z10's bar.
+  - Result: 26 in 100 of inserted stretches (43 in 100 of the testable ones)
+    have a sound twin from 1 to 7 days before. Below the 50 bar: not built.
+- [x] **Z15 The ad-length ruler** (Mo's pick "All seven"; free): 41 in 100
+      inserted stretches are within 1 s of a multiple of 15 s. A skip that
+      starts at a joint or a known sound and ends near such a multiple is moved
+      to it, and a hole exactly one ad long is filled.
+  - Done when: the replay's numbers stand here. Kept by the round's bar.
+  - Result: no gain (142 to 142, 129 to 129; only 2 of 290 skips start at a
+    joint near a multiple of 15 s). Not kept.
+- [x] **Z16 The lightest copy** (Mo's pick "All seven"; free): of the Mac's
+      downloads of an episode (Z14), the shortest becomes the prepared copy,
+      because some downloads carry fewer ads. Nothing is cut out of a file.
+  - Done when: the ad seconds of the shorter and the longer copy of the
+    twice-downloaded episodes stand here. Built only when the shorter copy has
+    at least 20 in 100 fewer ad seconds.
+  - Result: the lighter download has at least 20 in 100 fewer ad seconds in 97
+    of 160 episodes, but it is the later download in 106 of 111, so it is the
+    episode's age, not chance. Not built: it needs repeat downloads (Z14
+    failed), and the map (Z19) already lets the phone play its own, later copy
+    with the Mac's marks.
+- [x] **Z17 Walk a host read back to the brand's first mention** (Mo's pick "All
+      seven"; free): when a host read is known by its code, its web address or a
+      sponsor name from the notes, its start moves back to the first earlier
+      mention of that brand within 2 minutes. It is for the host reads that
+      begin as normal talk (9 of the 77 failing breaks).
+  - Done when: the replay's numbers stand here. Kept by the round's bar.
+
+**The paid test**
+
+- Result: web addresses only, reach 90 s (picked on training): 13 skips move, no
+  break changes (142, 129). Not kept.
+- [ ] **Z18 Claude's second look at every break's start and end** (pick 3):
+      Claude reads the lines around each edge once more and may move it. Tested
+      first on the twice-downloaded episodes, where the answer key does not come
+      from Claude. Mo is told the test's spend before it runs (about $3).
+      Switched on only if it helps.
+  - Done when: edges within 5 s, before and after, stand here with the cost for
+    each episode. Kept when 5 in 100 more edges land within 5 s, none of the
+    kinds gets worse, and a week stays under $15.
+
+**Part 2 (may slip to the next round)**
+
+- [ ] **Z19 The episode map in the app** (G): the phone reads the Mac's map and
+      lines up what it plays, in the middle of an episode and on mobile data
+      too. The copy stays as the backup. Built only when the test (Z4) passed;
+      it goes into this build if time allows.
+  - Done when: Swift tests pin the lining up on a stream that arrives in pieces,
+    that no match means the phone's own finders work as before, and that the
+    player line of Z2 shows.
+- [ ] **Z20 Swap a started episode** (E): the phone finds the listener's place
+      in the Mac's copy by matching the show's own audio around it, then goes on
+      in the copy at that place. No match means no swap.
+  - Done when: tests pin the place within 1 s on the twice-downloaded episodes,
+    that an unsure match never swaps, and that the Undo list and the played time
+    move with the swap.
+- [ ] **Z21 The voice print** (Mo's pick "All seven"; free): the Mac learns the
+      voices of each show's hosts. A short stretch in a voice the show does not
+      use is likely an ad, and the change of voice is its edge. Tried on the Mac
+      first, on the shelf's audio, with a launcher for Mo. Guests are the risk.
+  - Done when: it stands here how many of the 35 pieces the finders do not know
+    are in a voice that is not a host's, and how often a guest sets it off.
+    Built (first into the Mac's marks) only when it passes at least 5 more
+    breaks and no more wrong skips.
+- [ ] **Z22 The show playbook** (Mo's pick "All seven"; about $10 to $15 once,
+      approved): Claude reads each show's marked training episodes once and
+      writes its handoff and return lines, its named sponsored pieces and the
+      hosts' own plugs. The phone uses them as cue rules. The file holds
+      transcript words, so it is published like `ad-cues.json` and never
+      committed. Mo's tap approved the cost; he is told when the run starts, and
+      it runs under its own budget with a hard stop at $15.
+  - Done when: playbooks made from the training episodes only are replayed on
+    the shelf and the numbers stand here. Kept when at least 4 more breaks pass
+    (it aims at the 9 missed breaks) and no more wrong skips.
+
+**Ship**
+
+- [ ] **Z23 Check and ship**: the Opus check against every "done when" above,
+      with a close look at what waits (Z5), what uses mobile data (Z6) and what
+      swaps (Z20); fixes test first; the whole check; one pull request; Fork CI;
+      the merge with Mo's OK; one TestFlight build through the launcher; the
+      Mac's tools copy updated, never over a copy a run is using; installers
+      left for Mo's double-click.
+  - Done when: the pull request is merged, the build is on TestFlight, Mo has
+    the launchers and knows what each costs, and the lines of Z1 and Z2 are seen
+    on his phone.
+
+Left for later: an external server in place of iCloud (held unless Mo asks);
+cutting the ads out of the file (Mo said no for now).
+
 ## Later
 
+- Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
+  lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
+  `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
+  Two `teach_words.py --no-lock` runs at once could share a `.part` file. A held
+  new episode that is still held after 2 days is forgotten, not downloaded.
 - Prepared episodes (Y, 2026-11-27), found by the Opus check or by the builders
   and left: when the ads file of a copy cannot be saved the copy stays installed
   without the Mac's marks and is not taken again (the phone's own finders then

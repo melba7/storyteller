@@ -118,6 +118,12 @@ export function Profile() {
               checked={automatic?.deletePlayed ?? null}
               onChange={(on) => changeAutomatic({ deletePlayed: on })}
             />
+            <SwitchRow
+              title="Take your Mac's copies on mobile data"
+              body="On mobile data the phone takes the Mac's copy of your next 3 episodes. On Wi-Fi it takes more."
+              checked={automatic?.copiesOnMobileData ?? null}
+              onChange={(on) => changeAutomatic({ copiesOnMobileData: on })}
+            />
             <NotifyRow />
           </SettingsGroup>
           <PlaybackSection />

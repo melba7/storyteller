@@ -14,6 +14,8 @@ import {
   getTeachingState,
 } from "@/modules/podcasts/adResultsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+import { exchangeLine } from "@/modules/podcasts/macExchange"
+import { useExchange } from "@/modules/podcasts/macExchangeStore"
 import { parseTeachingState } from "@/modules/podcasts/teaching"
 
 import { BelowBar, ScreenBar } from "./ScreenBar"
@@ -26,6 +28,7 @@ import { ROW } from "./SettingsGroup"
  */
 export function AdResults() {
   const [results, setResults] = useState<Results | null>(null)
+  const exchange = useExchange()
   const [mac, setMac] = useState<MacSection>(() =>
     macSection(parseTeachingState(null), Date.now()),
   )
@@ -115,6 +118,9 @@ export function AdResults() {
             accessibilityRole="header"
           >
             What your Mac taught
+          </Text>
+          <Text className="text-muted-foreground px-4 pb-2 text-sm">
+            {exchangeLine(exchange, Date.now())}
           </Text>
           <View className="bg-secondary rounded-3xl p-4">
             {mac.empty ? (

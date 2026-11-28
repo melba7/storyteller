@@ -79,6 +79,8 @@ export type PlaybackState = {
    * so an ad at 0:00 can be left before it is heard.
    */
   checkingStart?: boolean
+  /** The skips of the stream that plays come from the Mac's marks (see `AdsInfo.macMarks`). */
+  macMarks?: boolean
 }
 
 export type PlaybackLoadOptions = {
@@ -204,6 +206,8 @@ export type AdsInfo = {
   unchecked?: boolean
   /** The file is a copy the Mac prepared, and its ads are the Mac's marks on that very file. */
   prepared?: boolean
+  /** The Mac's marks of the night before (`ahead-ads.json`) are for this episode, so they skip on its copy. */
+  macMarks?: boolean
 }
 
 /** An episode's ad finding changed, or (state "none") went with its download. */
@@ -419,9 +423,10 @@ type PodcastsNativeModule = {
   listDownloads(): Promise<DownloadInfo[]>
   /**
    * Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never off
-   * Wi-Fi). Called when the app comes to the front and in the background refresh.
+   * Wi-Fi). Called when the app comes to the front and in the background refresh. `held` are the
+   * episodes the Mac is preparing a copy of: they are not fetched ahead.
    */
-  lookAhead(): Promise<void>
+  lookAhead(held: string[]): Promise<void>
   /** Where each downloaded episode's transcript is. */
   listTranscripts(): Promise<TranscriptInfo[]>
   /** A finished transcript as JSON (`Transcript` in PodcastTranscripts), or null. */
@@ -494,6 +499,13 @@ type PodcastsNativeModule = {
    * theirs: `{"<episode id>": {"feed": "<feed address>", "guid": "...", "title": "..."}}`.
    */
   setAheadEpisodes(json: string): Promise<void>
+  /**
+   * The Mac's map to read for the episode from the linked folder (`maps/<name>.json`, below
+   * `Podcasts/`), or null when there is none to fetch (see episodeMap.ts).
+   */
+  episodeMapWanted(episodeId: string): Promise<string | null>
+  /** Keeps the text of the Mac's map of the episode. True when it was the episode's map. */
+  installEpisodeMap(episodeId: string, text: string): Promise<boolean>
   /** What is installed from the Mac, as JSON text (see teaching.ts). */
   getTeachingState(): Promise<string>
   /**

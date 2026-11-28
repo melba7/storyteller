@@ -26,10 +26,11 @@ export async function startDownload(
 
 /**
  * Has the phone look at Up Next now and fetch the next episodes ahead, which it never does off
- * Wi-Fi. The rule is native (DownloadAhead); this only asks for a look.
+ * Wi-Fi. The rule is native (DownloadAhead); this only asks for a look. `held` are the episodes
+ * the Mac is preparing a copy of, which are not fetched ahead (coming.ts).
  */
-export async function lookAhead(): Promise<void> {
-  await Podcasts?.lookAhead()
+export async function lookAhead(held: readonly string[] = []): Promise<void> {
+  await Podcasts?.lookAhead([...held])
 }
 
 export async function cancelDownload(episodeId: string): Promise<void> {

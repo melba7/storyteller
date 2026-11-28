@@ -129,9 +129,11 @@ extension PodcastAdFinder {
     }
     // The Mac's marks of the night before (PodcastAdFinder+Ahead.swift): skips for the ads found
     // by both edges, questions for the ads found by one.
+    var marks: [FoundAd] = []
     if allowedNow, modes.level(FinderNames.ahead) != .off,
       let found = aheadFound(id, transcript: transcript, judged: collect.judged)
     {
+      marks = found.ads
       collect.add(FinderNames.ahead, found.ads)
       collect.add(FinderNames.ahead, found.asks, onlyAsk: true)
     }
@@ -158,7 +160,7 @@ extension PodcastAdFinder {
     }
     var out = snapped ?? collect.written(joints: nil, steadyToo: modes.steadyToo)
     result.moved = out.moved
-    let cued = addCueStretches(id, modes, transcript, to: &out.file)
+    let cued = addCueStretches(id, modes, transcript, to: &out.file, marks: marks)
     result.words = collect.words
     let lines = AdChunker.number(transcript.lines)
     let picked =

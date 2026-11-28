@@ -16,6 +16,8 @@ import {
   linkedFolderLabel,
   plainCredits,
 } from "@/modules/lofi-score/status"
+import { exchangeLine } from "@/modules/podcasts/macExchange"
+import { useExchange } from "@/modules/podcasts/macExchangeStore"
 
 import { LofiAtmosphereControls } from "./LofiAtmosphereControls"
 import { useLofiAtmosphere } from "./useLofiAtmosphere"
@@ -27,6 +29,7 @@ export function LofiAtmosphereSettings() {
   const [message, setMessage] = useState<string | null>(null)
   const [credits, setCredits] = useState<string | null>(null)
   const insets = useSafeAreaInsets()
+  const exchange = useExchange()
 
   if (!atmosphere.available) return null
   const { status } = atmosphere
@@ -185,6 +188,9 @@ export function LofiAtmosphereSettings() {
                   by themselves.
                 </Text>
               )}
+              <Text className={mutedNote}>
+                {exchangeLine(exchange, Date.now())}
+              </Text>
               {message && <Text className={mutedNote}>{message}</Text>}
               {status.lastError && (
                 <Text className={mutedNote}>

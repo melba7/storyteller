@@ -64,16 +64,20 @@ export const SEARCH_STOPPED = "Finding ads stopped:"
 /** What a screen says for such a failure: it is asked again by itself, so nothing is wrong. */
 export const AD_CHECK_PAUSED = "Ad check paused. Trying again soon"
 
-/** What a row says of an episode whose copy the Mac prepared (its ads are the Mac's marks). */
-export const PREPARED_BY_MAC = "Prepared by your Mac"
+/**
+ * What a row and the player say of an episode whose ads are the Mac's marks: its copy was
+ * prepared by the Mac, or the Mac's marks of the night before are found again in the phone's own
+ * copy. The screens draw a Mac symbol beside these words.
+ */
+export const MAC_MARKS = "Your Mac's marks"
 
 export function adsStatus(info: AdsInfo | undefined): string {
   if (!info) return ""
   if (
-    info.prepared === true &&
+    (info.prepared === true || info.macMarks === true) &&
     (info.state === "found" || info.state === "noAds")
   )
-    return PREPARED_BY_MAC
+    return MAC_MARKS
   switch (info.state) {
     case "waiting":
       return "Waiting to find ads"

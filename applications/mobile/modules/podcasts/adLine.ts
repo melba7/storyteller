@@ -3,7 +3,7 @@
 // The one quiet line in the player that says how ad finding is going for the episode that
 // plays. Plain rules over what Swift reports; the texts of the ads and the transcript come
 // from ads.ts and transcripts.ts.
-import { AD_CHECK_PAUSED, SEARCH_STOPPED, adsStatus } from "./ads"
+import { AD_CHECK_PAUSED, MAC_MARKS, SEARCH_STOPPED, adsStatus } from "./ads"
 import type { AdsInfo, DownloadInfo, TranscriptInfo } from "./index"
 import { isLocalEpisodeId } from "./localFiles"
 import { isPreviewId } from "./preview"
@@ -39,6 +39,8 @@ export function playerAdLine(input: {
   streamsPlain?: boolean
   /** Play is waiting a moment for the first look at the start of a stream (Swift reports it). */
   checkingStart?: boolean
+  /** The skips of the stream that plays come from the Mac's marks (Swift reports it). */
+  macMarks?: boolean
 }): string {
   const { episodeId, skipAds, download, transcript, ads } = input
   if (!skipAds) return ""
@@ -46,8 +48,12 @@ export function playerAdLine(input: {
   // Play waits for the first look at a stream's start while its download is still arriving,
   // which would read "Getting ready", so this comes first.
   if (input.checkingStart === true) return CHECKING
+  // A stream is not in the table of downloads, so the player says when its skips are the Mac's.
+  if (input.macMarks === true && download?.state !== "downloaded")
+    return MAC_MARKS
   const noFile = download === undefined || download.state === "failed"
-  if (noFile) return STREAMING
+  // The Mac's marks skip in the head of a stream too, when the phone knows them for the episode.
+  if (noFile) return ads?.macMarks === true ? MAC_MARKS : STREAMING
   // The download is being prepared, but the item that plays is not that file: nothing is
   // skipped until the episode is loaded again, so the ads found are not claimed.
   if (input.streamsPlain === true)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Double-click in Finder. Sets up a launchd job, "com.storyteller-lofi.podcast-prepare", that runs
-# teach-prepare.sh from this folder once an hour: the Mac picks the new episodes of every show you
+# teach-prepare.sh from this folder every 20 minutes (at 5, 25 and 45 minutes past the hour): the Mac picks the new episodes of every show you
 # follow, has Claude mark their ads, finds the exact borders with a second download, puts its copy
 # of the audio into the phone's iCloud folder, and tells the phone where the ads are in that very
 # file. It says what it will do first and installs only after you type yes. Double-click it again
@@ -29,8 +29,9 @@ ICLOUD_GB="${TEACH_PREPARE_GB:-10}"
 # The weekly cap, in dollars of the Claude plan's usage as Claude counts it. It is the default of
 # TEACH_PREPARE_CAP in teach-prepare.sh, and the job runs with that default.
 CAP=35
-# The minute of every hour the job starts at.
-MINUTE=5
+# The minutes of every hour the job starts at: every 20 minutes. The weekly cap, not the number of
+# runs, limits the spending: the budget is one for the whole week and is checked before every call.
+MINUTES="5 25 45"
 # The PATH the job will have (teach-prepare.sh adds the same places to whatever it is given).
 JOB_PATH="/usr/bin:/bin:/usr/sbin:/sbin:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/local"
 
@@ -60,7 +61,7 @@ PATH="$JOB_PATH" command -v claude > /dev/null || MISSING="$MISSING
 PATH="$JOB_PATH" command -v swift > /dev/null || MISSING="$MISSING
   - swift was not found. Install Xcode 26 from the App Store."
 if [ -n "$MISSING" ]; then
-  echo "The hourly job could not work yet. On the PATH it will have ($JOB_PATH):"
+  echo "The job could not work yet. On the PATH it will have ($JOB_PATH):"
   echo "$MISSING"
   finish "Nothing was changed. Fix that and double-click this file again." 1
 fi
@@ -72,16 +73,18 @@ if [ -n "$BYTES" ]; then
   FREE_TEXT="$(awk -v b="$BYTES" 'BEGIN { printf "%.1f", b / 1000000000 }')"
 fi
 
-echo "This sets up a job that runs every hour. Each time it:"
+echo "This sets up a job that runs every 20 minutes (at 5, 25 and 45 minutes past the hour). Each time it:"
+echo "  - tells the phone which episodes are coming, so it waits for the Mac's copy,"
 echo "  - picks up to 6 new episodes: first the ones the phone expects to play next, then the newest of every show you follow (the last 3 days),"
 echo "  - downloads them and writes down what is said in them,"
 echo "  - has Claude mark the ads in them,"
 echo "  - downloads each a second time to find where the ads begin and end to the frame,"
 echo "  - puts the Mac's copy of the audio into the phone's iCloud folder, so the phone plays the very file the Mac marked,"
-echo "  - tells the phone where the ads are."
+echo "  - tells the phone where the ads are,"
+echo "  - reads what you tapped on the phone (Undo, Skip ad) and gives Claude short notes about it for that show's next episodes. A tap changes no skip by itself."
 echo "The phone still skips ads by itself for every episode the Mac has not prepared."
 echo
-echo "It runs every hour and uses at most \$$CAP a week of Claude usage (about \$0.19 an episode, so about 180 episodes a week)."
+echo "It runs every 20 minutes and uses at most \$$CAP a week of Claude usage (about \$0.19 an episode, so about 180 episodes a week)."
 echo "It stops for the week before a call that could pass that cap. One call can cost more than an episode's usual share, so it keeps one dollar in reserve and marking stops at about $((CAP - 1)) dollars. Nothing else costs anything."
 echo "It keeps at most $ICLOUD_GB GB of audio in iCloud for $KEEP_DAYS days. When a copy is $KEEP_DAYS days old, or the copies pass $ICLOUD_GB GB, the oldest go."
 echo "After $KEEP_DAYS days it deletes the audio it downloaded itself, here on the Mac and in iCloud. Your other files are never touched."
@@ -91,14 +94,20 @@ else
   echo "It never fills iCloud: it stops with under 2 GB left, and with under 15 GB free on this Mac."
 fi
 echo "If the job cannot put files into iCloud, it spends nothing and says so in the log."
-echo "The Mac has to be awake and online at that time. If it was asleep, the job runs when the Mac wakes up. If it was shut down, that hour is skipped."
-echo "It replaces the nightly read-ahead: if that job is on, this turns it off."
+echo "The Mac has to be awake and online at that time. If it was asleep, the job runs when the Mac wakes up. If it was shut down, that run is skipped. A run that takes longer than 20 minutes makes the next one wait: only one runs at a time."
+echo "It replaces the nightly read-ahead: if that job is on, this turns it off. If an older hourly episode preparing job is on, this replaces it with this one."
 echo "The job runs the files in this folder: $HERE"
 echo "If you move or delete this folder, double-click this file again from its new place."
 echo "So that the job can copy into iCloud Drive (macOS keeps background jobs out of it), once:"
 echo "System Settings > Privacy & Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on."
 echo
-read -r -p "Type yes to turn it on, or just press Return to leave it off: " answer
+# TEACH_INSTALL_YES=1 stands for the typed yes, for a script that runs with nobody at the keyboard.
+if [ "$TEACH_INSTALL_YES" = 1 ]; then
+  answer=yes
+  echo "TEACH_INSTALL_YES=1 was given, so it is turned on without asking."
+else
+  read -r -p "Type yes to turn it on, or just press Return to leave it off: " answer
+fi
 case "$answer" in
   yes|YES|Yes) ;;
   *) finish "Nothing was changed. Episode preparing was not turned on." 0 ;;
@@ -110,6 +119,11 @@ X_SCRIPT="$(xml "$SCRIPT")"
 X_LOGS="$(xml "$LOGS")"
 X_HOME="$(xml "$HOME")"
 X_PATH="$(xml "$JOB_PATH")"
+INTERVALS=""
+for MINUTE in $MINUTES; do
+  INTERVALS="$INTERVALS    <dict><key>Minute</key><integer>$MINUTE</integer></dict>
+"
+done
 cat > "$NEW_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -122,9 +136,9 @@ cat > "$NEW_PLIST" <<PLIST
     <string>$X_SCRIPT</string>
   </array>
   <key>StartCalendarInterval</key>
-  <dict>
-    <key>Minute</key><integer>$MINUTE</integer>
-  </dict>
+  <array>
+$INTERVALS
+  </array>
   <key>LowPriorityIO</key><true/>
   <key>Nice</key><integer>5</integer>
   <key>EnvironmentVariables</key>
@@ -169,6 +183,6 @@ if ! launchctl bootstrap "gui/$(id -u)" "$PLIST"; then
 fi
 
 echo
-echo "Episode preparing is on: every hour, at $MINUTE minutes past."
+echo "Episode preparing is on: every 20 minutes, at 5, 25 and 45 minutes past the hour."
 echo "What it did is written to $LOGS/podcast-prepare-job.log and $LOGS/podcast-prepare.log."
 finish "Done. To turn it off, double-click \"Stop episode preparing\"."

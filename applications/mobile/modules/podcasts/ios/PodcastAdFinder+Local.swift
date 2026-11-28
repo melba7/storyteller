@@ -55,8 +55,11 @@ extension PodcastAdFinder {
   /// transcript (`coveredUntil` is how far the model got). True when the file changed.
   @discardableResult
   func addLocalToPartial(_ local: [FoundAd], ads: AdsStore, duration: Double) -> Bool {
+    // What the Mac's map gave for this very file goes in with them (PodcastEpisodeMaps.swift), so
+    // the playing episode skips those ads while its transcript is still being made.
     LocalAdsFile.addToPartial(
-      local, store: ads, detector: Self.detectorName,
+      local + PodcastEpisodeMaps.shared.known(sha256: ads.sha256), store: ads,
+      detector: Self.detectorName,
       detectorVersion: detector?.version ?? LocalAdsFile.localVersion,
       osVersion: ProcessInfo.processInfo.operatingSystemVersionString, duration: duration,
       covered: 0)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Episode preparing, the pick: which new episodes the Mac prepares for the phone this hour.
+"""Episode preparing, the pick: which new episodes the Mac prepares for the phone this run.
 
 Standard library only. teach-prepare.sh runs it first. It is the nightly read-ahead's pick
 (teach_ahead.py) for every show and not only for the phone's list:
@@ -21,7 +21,8 @@ teach_budget.py, the rule of teach_ahead.room_for) has room for, keeping --reser
 (the estimate when none is given) the way the marking does, so what is picked can be marked. A feed that cannot be read is said
 in one line and passed over.
 
-What is picked goes into ahead.json and episodes.json exactly as the nightly pick does it, so the
+What is picked is also told to the phone as "coming" in ahead-ads.json, before anything is downloaded or
+marked (teach_coming_publish.py). What is picked goes into ahead.json and episodes.json exactly as the nightly pick does it, so the
 download, the writing down and the marking run unchanged with --only-ahead.
 
 Exit codes: 0 it picked, 2 a set-up problem, 3 nothing to do, said in one plain line.
@@ -35,6 +36,7 @@ import time
 import probe_shows as probe
 import teach_ahead as night
 import teach_budget
+import teach_coming_publish
 import teach_exam
 import teach_feed
 import teach_fetch
@@ -116,7 +118,7 @@ def left_out(foreign):
         plural(foreign, "episode", "episodes"), "was" if foreign == 1 else "were")
 
 
-def choosing(folder, items, options, shows, say, now, foreign=0):
+def choosing(folder, items, options, shows, say, now, foreign=0, defaults=default_folders):
     """pick, once the candidates are read and the folder is locked."""
     entries = teach_store.load_manifest(folder)
     budget = teach_budget.Budget(folder, options.budget, options.cap)
@@ -124,7 +126,7 @@ def choosing(folder, items, options, shows, say, now, foreign=0):
     if room < 1:
         reserve = options.estimate if options.reserve is None else options.reserve
         say("The weekly cap of $%.2f leaves no room for another episode (about $%.2f each, with $%.2f "
-            "kept in reserve), so nothing is prepared this hour.%s"
+            "kept in reserve), so nothing is prepared this run.%s"
             % (options.cap, options.estimate, reserve, left_out(foreign)))
         return NOTHING
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder)) \
@@ -141,8 +143,10 @@ def choosing(folder, items, options, shows, say, now, foreign=0):
     add_picked(folder, [item["id"] for item in picked], now)
     add_ahead(folder, picked)
     teach_store.save_manifest(folder, entries + new)
+    # Before any download or marking: the phone is told these are coming (teach_coming.py).
+    teach_coming_publish.announce(folder, picked, say, defaults, lambda: now)
     say(budget.line())
-    say("This hour %s will be prepared (%d more were already known).%s"
+    say("This run %s will be prepared (%d more were already known).%s"
         % (plural(len(new), "episode", "episodes"), known, left_out(foreign)))
     for item in new:
         say("  %s: %s" % (item["show"], item["title"]))
@@ -171,9 +175,9 @@ def pick(options, say, defaults, now, load_shows, fetch, sleep):
         return NOTHING
     try:
         with teach_store.run_lock(folder):
-            return choosing(folder, items, options, shows, say, moment, foreign)
+            return choosing(folder, items, options, shows, say, moment, foreign, defaults)
     except teach_store.Busy:
-        say("Another teaching run is already working in the teaching folder, so this hour is skipped.")
+        say("Another teaching run is already working in the teaching folder, so this run is skipped.")
         return NOTHING
     except (teach_store.Problem, teach_store.ManifestError) as error:
         say(str(error))

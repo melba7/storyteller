@@ -305,8 +305,9 @@ public final class PodcastsModule: Module {
     }
     // Looks at Up Next now and fetches the next episodes ahead where the rules allow it (never
     // off Wi-Fi). The app asks when it comes to the front and in the background refresh.
-    AsyncFunction("lookAhead") { () async in
-      await MainActor.run { PodcastDownloadAhead.shared.look() }
+    // `held` are the episodes the Mac is preparing a copy of: they are not fetched ahead.
+    AsyncFunction("lookAhead") { (held: [String]) async in
+      await MainActor.run { PodcastDownloadAhead.shared.look(held: Set(held)) }
     }
     // Bytes taken by finished downloads.
     AsyncFunction("storageUsed") { () -> Double in
@@ -374,6 +375,20 @@ public final class PodcastsModule: Module {
     // new table makes the finder look at the episodes whose ads are final once more.
     AsyncFunction("setAheadEpisodes") { (json: String) in
       if PodcastTeaching.shared.setAheadEpisodes(json: json) { PodcastAdFinder.shared.lookAhead() }
+    }
+    // The Mac's map of an episode (see PodcastEpisodeMaps.swift). `episodeMapWanted` answers the
+    // file the app should read from the linked folder (`maps/<name>.json`, below `Podcasts/`), or
+    // nil when there is none to fetch; a map that is on the phone already is used for the episode
+    // then. `installEpisodeMap` keeps the file's text; true when it was the episode's map.
+    AsyncFunction("episodeMapWanted") { (episodeId: String) -> String? in
+      let path = PodcastEpisodeMaps.shared.wanted(episode: episodeId)
+      if path == nil { PodcastAdFinder.shared.mapArrived(episodeId, fresh: false) }
+      return path
+    }
+    AsyncFunction("installEpisodeMap") { (episodeId: String, text: String) -> Bool in
+      let kept = PodcastEpisodeMaps.shared.install(episode: episodeId, text: text)
+      if kept { PodcastAdFinder.shared.mapArrived(episodeId, fresh: true) }
+      return kept
     }
     // Prepared copies (see PodcastPrepared.swift). `preparedPlan` takes the candidates as JSON text
     // (`[{"id", "listPlace", "started", "showId"}]`) and answers `{"take": [...], "giveBack": [...]}`

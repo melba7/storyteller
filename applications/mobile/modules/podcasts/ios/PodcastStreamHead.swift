@@ -54,6 +54,8 @@ final class PodcastStreamHead: @unchecked Sendable {
   let memory = HeadMemory()
   /// The words the show opens with, found in the words so far (PodcastStreamHead+Opening.swift).
   let opening = HeadOpening()
+  /// What the Mac's map of the episode gives for the audio so far (PodcastStreamHead+Map.swift).
+  let map = HeadMap()
   private var task: Task<Void, Never>?
   private let feed: AsyncStream<Int64>.Continuation
   private let arrivals: AsyncStream<Int64>
@@ -204,7 +206,13 @@ final class PodcastStreamHead: @unchecked Sendable {
   }
 
   /// The file on disk is now this long.
-  func noteBytes(_ available: Int64) { feed.yield(available) }
+  func noteBytes(_ available: Int64) {
+    feed.yield(available)
+    noteBytesForMap(available)
+  }
+
+  /// The file the audio is read from now: the staging file, then the filed one.
+  var audioFile: URL? { lock.withLock { source } }
 
   /// The download is over (whole or not): no more bytes come.
   func noMoreBytes() { feed.finish() }
@@ -228,6 +236,8 @@ final class PodcastStreamHead: @unchecked Sendable {
       if let file { source = file }
     }
     persist()
+    // The file is whole: the Mac's map is lined up with all of it.
+    lookAtMap()
   }
 
   /// The ads store the player should read for this stream: the filed hash once there is one,
@@ -443,7 +453,7 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   /// Writes the partial ads file, joined with what is already in it (once the download is
   /// filed, the ad finder may have saved its own), and tells the player when the ads changed.
-  private func persist() {
+  func persist() {
     let changed = lock.withLock { () -> Bool in
       // The lock is held to the end of the write, so a stop (which deletes the folder after it)
       // never meets a write; a download that was removed meanwhile has no entry, and nothing
@@ -457,8 +467,10 @@ final class PodcastStreamHead: @unchecked Sendable {
       let before = ads.loadPartial(detector: name)
       absorbMarks(before)
       // The opening is applied last: an earlier step's longer pre-roll is on disk too.
+      // What the Mac's map gives goes in with the scan's own ads (PodcastStreamHead+Map.swift).
       let merged = opening.shorten(
-        AdHeadRules.merge(found + memory.withoutOutdated(before?.ads ?? [])))
+        AdHeadRules.merge(
+          found + map.ads + memory.withoutOutdated(map.standing(before?.ads ?? []))))
       guard !merged.isEmpty || before != nil else { return false }
       var file = AdsFile(
         sha256: key, detector: name, detectorVersion: detectorVersion,

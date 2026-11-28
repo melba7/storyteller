@@ -59,9 +59,11 @@ public enum DownloadAhead {
   /// a run of failures never works through the queue. An episode in `started` is never started
   /// again, even when its file is gone (the listener deleted it), and while it is still in Up
   /// Next it keeps its place among the two, so the third in line is not fetched in its stead.
+  /// An episode in `held` is one the Mac is preparing a copy of and the phone waits for: it is not
+  /// started, and it takes no place among the two, so the next in line is fetched instead.
   public static func plan(
     upNext: [Item], playingId: String?, entries: [DownloadEntry], started: Set<String>,
-    onWiFi: Bool, lowData: Bool, phoneFull: Bool
+    onWiFi: Bool, lowData: Bool, phoneFull: Bool, held: Set<String> = []
   ) -> Plan {
     let queued = Set(upNext.map(\.id))
     let marked = entries.filter(\.ahead)
@@ -78,7 +80,8 @@ public enum DownloadAhead {
     var room = max(0, count - taken.count)
     var have = Set(entries.map(\.episodeId))
     for item in upNext where room > 0 {
-      guard item.id != playingId, !started.contains(item.id), item.skipAds, canFetch(item),
+      guard item.id != playingId, !started.contains(item.id), !held.contains(item.id), item.skipAds,
+        canFetch(item),
         have.insert(item.id).inserted
       else { continue }
       plan.start.append(item.id)

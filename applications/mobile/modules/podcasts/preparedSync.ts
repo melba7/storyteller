@@ -2,7 +2,7 @@
 //
 // The Mac prepares new episodes and puts the audio it marked in `Podcasts/prepared/` of the linked
 // folder; `ahead-ads.json` says which file is which episode's (docs/PLAN.md, "Prepared episodes").
-// On Wi-Fi the phone asks the native side which copies to take (`preparedPlan`: the episodes of
+// On Wi-Fi (or on mobile data, for the next 3 episodes, when the listener allows it) the phone asks the native side which copies to take (`preparedPlan`: the episodes of
 // its list of next episodes and the ones it has downloaded and not started), copies each from the
 // folder into a temporary file, has the native side check and install it, and removes the copies
 // that were taken only for the list and are not on it any more. A copy iCloud has not brought yet
@@ -62,6 +62,8 @@ export type PreparedDeps = {
   hasLinkedFolder(): Promise<boolean>
   /** Whether the phone is on Wi-Fi, by the rule automatic downloads use. */
   onWiFi(): Promise<boolean>
+  /** The listener's switch "Take your Mac's copies on mobile data" (on by default). */
+  copiesOnMobileData(): Promise<boolean>
   candidates(): Promise<PreparedCandidate[]>
   /** `Podcasts.preparedPlan`: the candidates as JSON text in, the plan as JSON text out. */
   plan(candidatesJson: string): Promise<string>
@@ -89,6 +91,9 @@ export type PreparedDeps = {
 
 /** No copy is started once a run has been going this long (milliseconds). */
 export const START_BUDGET_MS = 20_000
+
+/** Off Wi-Fi, with the switch on, only this many episodes of the phone's list take copies. */
+export const MOBILE_DATA_COPIES = 3
 
 /** When a run left a copy waiting, one more pass runs this long after it (milliseconds). */
 export const SECOND_PASS_MS = 45_000
@@ -139,6 +144,19 @@ export function preparedCandidates(
   listed.forEach((episode, place) => add(episode, place))
   for (const episode of downloaded) add(episode, null)
   return found
+}
+
+/**
+ * The candidates for a run on mobile data: only the first `MOBILE_DATA_COPIES` places of the
+ * phone's list. The downloaded episodes that are not on it, and the places after, are left out, so
+ * nothing is taken for them and no copy is given back because of them.
+ */
+export function mobileDataCandidates(
+  candidates: readonly PreparedCandidate[],
+): PreparedCandidate[] {
+  return candidates.filter(
+    (one) => one.listPlace !== null && one.listPlace < MOBILE_DATA_COPIES,
+  )
 }
 
 /** The text the native plan reads; a place that is null is left out. */
@@ -222,7 +240,8 @@ const ABOUT_THE_FILE: readonly PreparedInstallAnswer[] = [
 ]
 
 /**
- * One run. Does nothing without a linked folder or off Wi-Fi. `refused` maps an episode to the
+ * One run. Does nothing without a linked folder, or off Wi-Fi with the mobile data switch off
+ * (off Wi-Fi with it on, only the first 3 episodes of the list take copies). `refused` maps an episode to the
  * SHA-256 of the file the native side refused, so that file is not copied again until the Mac
  * lists another one (it is kept for the launch). Never throws: a part that fails is told in the
  * log and the rest goes on. No copy is started after `START_BUDGET_MS`; asking iCloud for a
@@ -246,9 +265,12 @@ export async function syncPrepared(
     gaveBack: [],
   }
   try {
-    if (!(await deps.hasLinkedFolder()) || !(await deps.onWiFi())) return report
+    if (!(await deps.hasLinkedFolder())) return report
+    const onWiFi = await deps.onWiFi()
+    if (!onWiFi && !(await deps.copiesOnMobileData())) return report
     await deps.clearTemp()
-    const candidates = await deps.candidates()
+    const everyone = await deps.candidates()
+    const candidates = onWiFi ? everyone : mobileDataCandidates(everyone)
     if (candidates.length === 0) return report
     const asked = new Map(candidates.map((one) => [one.id, one]))
     const plan = parsePreparedPlan(await deps.plan(candidatesJson(candidates)))
@@ -321,6 +343,11 @@ async function takeOne(
   } finally {
     await deps.removeFile(to).catch(() => undefined)
   }
+}
+
+/** How many copies a run installed; 0 when the run was skipped (null) or nothing came. */
+export function copiesInstalled(report: PreparedReport | null): number {
+  return report?.installed.length ?? 0
 }
 
 /**

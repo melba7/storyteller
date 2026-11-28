@@ -25,6 +25,8 @@
 #                                    episode's MP3 file once and keeps them in joints.json, so the
 #                                    scorer's joint rows do not read the audio again
 #   8. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
+#                                    (left out, and said, when the score failed: the scorecard is
+#                                    then old and would make old settings)
 #   9. publish  (teach_publish.py)   copies the results to the folders the phone reads
 # A step that fails is said plainly and the later steps still run, except that the Swift steps
 # (5, 6 and 7, and the joints before 7) are left out together when podcast-teach does not build (the
@@ -63,6 +65,7 @@ trap 'rm -f "$CAPTURE"' EXIT
 CAFFEINATE=""
 command -v caffeinate > /dev/null && CAFFEINATE="caffeinate -i"
 SUMMARY=""
+SCORE_FAILED=""
 
 say() { echo "$@" | tee -a "$LOG"; }
 
@@ -76,6 +79,24 @@ fingerprint() {
 # note LABEL RESULT: adds a line to the summary at the end.
 note() { SUMMARY="$SUMMARY  $1: $2
 "; }
+
+# why_ended CODE: what an exit code means in plain words. A code of 128 and more is the signal
+# that ended the program (code minus 128).
+why_ended() {
+  local code="$1" signal name
+  if [ "$code" -le 128 ]; then echo "exit code $code"; return; fi
+  signal=$((code - 128))
+  case "$signal" in
+    4|5) name="it crashed (signal $signal), which is a crash in the Swift program" ;;
+    6) name="it aborted (signal 6), which is a crash in the Swift program" ;;
+    9) name="it was killed (signal 9), often because the Mac ran out of memory" ;;
+    11) name="it crashed (signal 11), which is a crash in the Swift program" ;;
+    15) name="it was asked to stop (signal 15)" ;;
+    2) name="it was interrupted (signal 2)" ;;
+    *) name="it was ended by signal $signal" ;;
+  esac
+  echo "exit code $code: $name"
+}
 
 # run_step LABEL OUTPUT COMMAND...: runs a tool, shows what it prints (also in the log) and notes
 # whether it worked. OUTPUT is the file the tool writes: "worked" when it is new or changed and
@@ -93,6 +114,9 @@ run_step() {
   after="$(fingerprint "$output")"
   if [ "$code" -ne 0 ]; then
     note "$label" "failed"
+    local said=""
+    [ -s "$CAPTURE" ] || said=" It printed nothing before it ended."
+    say "$label ended with $(why_ended "$code").$said"
     say "$label did not work (see above). The steps after it still run."
     return 1
   fi
@@ -188,6 +212,8 @@ if [ -z "$TEACH_TOOL" ]; then
   note "Meaning" "failed (left out because podcast-teach is not built)"
   note "Joints" "failed (left out because podcast-teach is not built)"
   note "Score" "failed (left out because podcast-teach is not built)"
+  # No new score: the settings step below must not read the scorecard of an earlier run.
+  SCORE_FAILED=1
   say "The sounds, the meaning model, the joints and the score are left out."
 else
   run_step "Sounds" "$FOLDER/ad-sounds.json" "$TEACH_TOOL" sounds "$FOLDER" $LABELS
@@ -202,15 +228,21 @@ else
   # The joints are kept in joints.json; a failure here only means the scorer reads the audio itself.
   run_step "Joints" "$FOLDER/joints.json" $CAFFEINATE "$TEACH_TOOL" joints "$FOLDER" \
     || say "No joints were saved this time (see above). The score reads the audio itself."
-  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS
+  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS || SCORE_FAILED=1
 fi
 
 # It reads scorecard.json (exit 0 also when there is none yet: nothing is written). Exit 2 is a
 # problem, said above; the settings file is optional, so the run goes on.
 say
 say "Step 8 of 9: choosing what each new finder may do on each show"
-run_step "Settings" "$FOLDER/show-settings.json" python3 -u "$TOOLS/teach_settings.py" --folder "$FOLDER" \
-  || say "No new settings this time (see above). The phone keeps the ones it has, or its built-in defaults."
+if [ -n "$SCORE_FAILED" ]; then
+  # scorecard.json is from an earlier run, so settings made from it would be old news.
+  note "Settings" "left out (the score failed)"
+  say "The score failed, so no new settings are made from the old scorecard. The phone keeps the ones it has, or its built-in defaults."
+else
+  run_step "Settings" "$FOLDER/show-settings.json" python3 -u "$TOOLS/teach_settings.py" --folder "$FOLDER" \
+    || say "No new settings this time (see above). The phone keeps the ones it has, or its built-in defaults."
+fi
 
 say
 say "Step 9 of 9: copying the results to the phone's folders"

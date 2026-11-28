@@ -58,14 +58,17 @@ from datetime import datetime
 import teach_budget
 import teach_night
 import teach_segments as seg
+import teach_taps
 from teach_ahead_set import ahead_ids
 from teach_budget import CapReached
 from teach_claude import (EXTRA_FOLDERS, SignedOut, UsageLimit, ask_claude, find_claude,
                           is_signed_out)
 from teach_failures import IN_A_ROW, Failures, given_up_line
+from teach_feed import feed_key
 from teach_label_files import (candidates, cap_text, counts_text, held_second,  # noqa: F401
                                waiting)
 from teach_store import FOLDER, Busy, Problem, require_manifest, run_lock, write_json  # noqa: F401
+from teach_words import switched_on, word_ends
 
 DEFAULT_MODEL = "claude-opus-5-5"
 NOT_CONFIRMED = 4
@@ -76,15 +79,19 @@ STOP_CODES = {"usage": 3, "cap": CAP_REACHED, "failures": FAILED_IN_A_ROW}
 
 # MARK: Marking
 
-def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time, kept=None):
+def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time, kept=None,
+                  guidance=(), ends=None):
     """The label for one episode. `ask(prompt)` returns {"text", "cost"}. An answer that cannot be
     read is asked for once more; the second failure raises ValueError. `kept` is a dict that holds
-    the answered parts, so that trying the episode again asks only for the missing ones."""
+    the answered parts, so that trying the episode again asks only for the missing ones. `guidance`
+    is the show's lines from the listener's taps, put into every prompt (see teach_taps.py). `ends`
+    is the exact end of each line when the episode has its word times (teach_words.word_ends): a
+    label then ends where its last word ends, not where the next line starts."""
     kept = {} if kept is None else kept
     segments, dropped, cost = [], 0, 0.0
     for first, last in seg.parts(lines, limit):
         if (first, last) not in kept:
-            question = seg.prompt(entry["show"], entry["title"], lines, first, last)
+            question = seg.prompt(entry["show"], entry["title"], lines, first, last, guidance)
             paid = 0.0
             for attempt in (1, 2):
                 reply = ask(question)
@@ -102,12 +109,12 @@ def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time,
         cost += paid
     return {"version": 1, "prompt": seg.PROMPT_VERSION, "model": model, "episode": entry["id"],
             "feed": entry["feed"], "show": entry["show"], "lines": len(lines),
-            "length": seg.episode_length(entry, lines), "segments": seg.with_times(seg.merge(segments), lines),
+            "length": seg.episode_length(entry, lines), "segments": seg.with_times(seg.merge(segments), lines, ends),
             "dropped": dropped, "cost": cost, "writtenAt": int(now() * 1000)}
 
 
 def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, only_exam=False,
-        waiter=None, budget=None, only=None, reserve=0.0, unknown_cost=None):
+        waiter=None, budget=None, only=None, reserve=0.0, unknown_cost=None, taps=None):
     """Marks the waiting episodes. Returns {"done", "failed", "cost", "given_up", "stop",
     "reason"}; `stop` is None, "limit", "cap", "usage" or "failures". `cost` is what every call
     cost in this run, also the calls of episodes that failed or were stopped. The cap (with a
@@ -121,7 +128,8 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
     a call whose cost is not known (it timed out, or Claude printed no cost: `cost_unknown`) is
     counted as `reserve`, the cost of one call, because it may have used the plan's allowance. With
     no `reserve` such a call counts what it printed, which is nothing. `unknown_cost` counts such a
-    call as that much instead of `reserve` (None means the reserve)."""
+    call as that much instead of `reserve` (None means the reserve). `taps` is {feed key: lines} from
+    teach_taps.guidance: an episode's show's lines go into its prompts."""
     waiter = waiter or teach_night.Waiter(say=say)
     items, given_up, empty = candidates(folder, labels, retry_failed, only_exam, only)
     for episode_id in empty:
@@ -160,6 +168,7 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
         result["stop"], result["reason"] = kind, reason
         return result
 
+    on = switched_on(folder)  # label ends at the last word only once word-ends-on is there
     in_a_row = 0
     attempted = held_second(folder, labels, only_exam)
     for number, (item, lines) in enumerate(items, 1):
@@ -173,7 +182,9 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
         try:
             while True:
                 try:
-                    made = label_episode(item, lines, model, counted, kept=kept)
+                    made = label_episode(item, lines, model, counted, kept=kept,
+                                         guidance=(taps or {}).get(feed_key(item["feed"]), ()),
+                                         ends=word_ends(folder, item["id"], lines) if on else None)
                     break
                 except UsageLimit as error:
                     if isinstance(error, SignedOut) or is_signed_out(str(error)) \
@@ -345,7 +356,8 @@ def marking(folder, options, cap, ask_person, runner, environment, say, extra_fo
 
     result = run(folder, options.labels, options.model, options.limit, cap, ask, say=say,
                  retry_failed=options.retry_failed, only_exam=options.only_exam, waiter=waiter,
-                 budget=budget, only=only, reserve=reserve, unknown_cost=unknown_cost)
+                 budget=budget, only=only, reserve=reserve, unknown_cost=unknown_cost,
+                 taps=teach_taps.guidance(folder) if options.only_ahead else None)
     say("Marked %d episodes (%d failed). Cost as Claude counts it: $%.2f."
         % (result["done"], result["failed"], result["cost"]))
     if result["reason"]:

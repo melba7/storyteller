@@ -97,9 +97,14 @@ def clock(seconds):
     return "%d:%02d:%02d" % (whole // 3600, whole % 3600 // 60, whole % 60)
 
 
-def prompt(show, title, lines, first, last):
-    """The user message for lines `first` to `last` (numbers start at 1)."""
+def prompt(show, title, lines, first, last, guidance=()):
+    """The user message for lines `first` to `last` (numbers start at 1). `guidance` is short lines
+    about what the listener's taps showed for this show (teach_taps.py): hints, never rules."""
     head = "Show: %s\nEpisode: %s\n\n" % (show, title)
+    if guidance:
+        head += ("What the listener's taps showed about earlier marks in this show. Each line is one "
+                 "tap. They are hints about where marks were wrong, not rules; mark what the "
+                 "transcript says:\n%s\n\n" % "\n".join("- " + one for one in guidance))
     if first != 1 or last != len(lines):
         head += ("These are lines %d to %d of %d. A stretch may have begun before them or carry "
                  "on after them.\n\n" % (first, last, len(lines)))
@@ -199,14 +204,20 @@ def merge(segments):
     return joined
 
 
-def with_times(segments, lines):
+def with_times(segments, lines, ends=None):
     """Copies of the segments with `start` and `end` in seconds (one decimal). The end is the time
-    of the line after the segment, or 5 seconds after the last line when it ends the transcript."""
+    of the line after the segment, or 5 seconds after the last line when it ends the transcript.
+    With `ends` (the exact end of each line, in the order of `lines`, None where it is not known:
+    see teach_words.word_ends) the end is where the segment's last line ends, that is where its last
+    word ends, whenever that is known and after the start."""
     timed = []
     for item in segments:
         item = dict(item)
         item["start"] = round(lines[item["first"] - 1][0], 1)
-        if item["last"] < len(lines):
+        exact = ends[item["last"] - 1] if ends and len(ends) == len(lines) else None
+        if exact is not None and round(exact, 1) > item["start"]:
+            item["end"] = round(exact, 1)
+        elif item["last"] < len(lines):
             item["end"] = round(lines[item["last"]][0], 1)
         else:
             item["end"] = round(lines[-1][0] + LAST_LINE_SECONDS, 1)

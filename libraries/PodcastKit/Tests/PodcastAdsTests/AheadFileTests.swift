@@ -77,6 +77,15 @@ final class AheadFileTests: XCTestCase {
     XCTAssertEqual(AheadFile(), AheadFile(episodes: []))
   }
 
+  func testAnUnknownTopLevelKeyLikeComingIsIgnored() throws {
+    // The Mac lists the episodes it is preparing in `coming` (the app's own reading is in
+    // coming.ts); an older build must read the file as before.
+    let text =
+      #"{"version": 1, "writtenAt": 1799990000, "coming": [{"feed": "f", "guid": "g9", "since": 1799990000}], "episodes": [\#(episode(marked: fresh))]}"#
+    let read = AheadFile(data: Data(text.utf8))
+    XCTAssertEqual(read.episodes.map(\.guid), ["g1"])
+  }
+
   func testAFileOfAnotherVersionReadsAsNoFile() {
     XCTAssertEqual(AheadFile(data: file([episode(marked: fresh)], version: 2)), AheadFile())
     XCTAssertEqual(AheadFile(data: Data(#"{"episodes": []}"#.utf8)), AheadFile())

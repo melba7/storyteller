@@ -128,6 +128,19 @@ describe("the wait before a stream starts", () => {
     })
   })
 
+  it("shows that a stream's skips come from the Mac's marks, until the next episode loads", async () => {
+    const { playback, state } = setup()
+    await playback.playEpisode(episode(), show)
+    expect(playback.getView().macMarks).toBe(false)
+    state(1, true, { macMarks: true })
+    expect(playback.getView().macMarks).toBe(true)
+    state(2, true)
+    expect(playback.getView().macMarks).toBe(false)
+    state(3, true, { macMarks: true })
+    await playback.playEpisode(episode({ id: "e2" }), show)
+    expect(playback.getView().macMarks).toBe(false)
+  })
+
   it("is not kept for the next episode that loads", async () => {
     const { playback, state } = setup()
     await playback.playEpisode(episode(), show)

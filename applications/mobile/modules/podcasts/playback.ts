@@ -43,6 +43,8 @@ export type PlayerView = {
   streamsPlain: boolean
   /** Play waits a moment for the first look at the start of a stream. */
   checkingStart: boolean
+  /** The skips of the stream that plays come from the Mac's marks. */
+  macMarks: boolean
   error: string | null
 }
 
@@ -57,6 +59,7 @@ export const EMPTY_VIEW: PlayerView = {
   rate: 1,
   streamsPlain: false,
   checkingStart: false,
+  macMarks: false,
   error: null,
 }
 
@@ -205,6 +208,7 @@ export function createPlayback(deps: PlaybackDeps) {
       rate: state.rate,
       streamsPlain: state.streamsPlain === true,
       checkingStart: state.checkingStart === true,
+      macMarks: state.macMarks === true,
       error: state.isPlaying ? null : view.error,
     })
     if (wasPlaying && !state.isPlaying && !state.isBuffering) {
@@ -393,6 +397,7 @@ export function createPlayback(deps: PlaybackDeps) {
       isBuffering: true,
       streamsPlain: false,
       checkingStart: false,
+      macMarks: false,
       error: null,
     })
     await run(() =>

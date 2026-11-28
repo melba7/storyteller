@@ -5,9 +5,11 @@ that later marks ads.
 Standard library only. It reads episodes.json in the teaching folder (default ~/Storyteller
 Lofi/PodcastTeaching) and, for each episode that has audio and no transcript yet, runs the Swift
 tool `podcast-transcribe` (Apple's speech recognition, on this Mac, nothing is sent anywhere) and
-saves its lines as transcripts/<id>.txt. A transcript is only saved when the tool finished, so a
-stopped run carries on where it was. Three failures in a row of episodes that had never failed
-stop the run, because then something is wrong with the tool, not with an episode.
+saves its lines as transcripts/<id>.txt and the time of each word as transcripts/<id>.words.json (a
+side file, so every reader of the plain transcript works as before; teach_words.py). A transcript
+is only saved when the tool finished, so a stopped run carries on where it was. Three failures in a
+row of episodes that had never failed stop the run, because then something is wrong with the tool,
+not with an episode.
 
 Failures are remembered in failures.json: episodes that never failed come first, an episode that
 failed three times is left out (--retry-failed asks for those again) and the closing lines say how
@@ -39,6 +41,11 @@ TIMEOUT = 3 * 60 * 60
 TAIL_LINES = 5
 
 
+def words_path(folder, identifier):
+    """Where the side file with the time of each word of an episode is: next to its transcript."""
+    return os.path.join(folder, "transcripts", identifier + ".words.json")
+
+
 def pending(folder, episodes):
     """The episodes that have an audio file on disk and no transcript yet, in list order."""
     return [entry for entry in episodes
@@ -46,15 +53,19 @@ def pending(folder, episodes):
             and not os.path.exists(os.path.join(folder, "transcripts", entry["id"] + ".txt"))]
 
 
-def transcribe_one(tool, audio, out, locale, runner=subprocess.run, timeout=TIMEOUT):
-    """Runs the tool on one audio file and saves its lines to `out`, through `out`.part. Raises
-    RuntimeError, with the last lines of what the tool said on standard error, when it fails, runs
-    too long or prints nothing; no transcript is left behind then."""
+def transcribe_one(tool, audio, out, locale, runner=subprocess.run, timeout=TIMEOUT, words=None):
+    """Runs the tool on one audio file and saves its lines to `out`, through `out`.part. With `words`
+    (a path) it also saves the time of each word there, through `words`.part (teach_words.py): a tool
+    that makes none still gives the transcript. Raises RuntimeError, with the last lines of what the
+    tool said on standard error, when it fails, runs too long or prints nothing; no transcript is left
+    behind then."""
     part = out + ".part"
+    words_part = words + ".part" if words else None
     try:
         with open(part, "w", encoding="utf-8") as handle:
             try:
-                done = runner([tool, "--locale", locale, audio], stdout=handle,
+                asked = ["--words", words_part] if words else []
+                done = runner([tool, "--locale", locale] + asked + [audio], stdout=handle,
                               stderr=subprocess.PIPE, text=True, timeout=timeout)
             except subprocess.TimeoutExpired:
                 raise RuntimeError("took more than %d hours" % (timeout // 3600))
@@ -68,9 +79,12 @@ def transcribe_one(tool, audio, out, locale, runner=subprocess.run, timeout=TIME
                                          else "the tool stopped with code %d" % done.returncode,
                                          ": " + tail if tail else ""))
         os.replace(part, out)
+        if words_part and os.path.exists(words_part):
+            os.replace(words_part, words)
     finally:
-        if os.path.exists(part):
-            os.remove(part)
+        for left in (part, words_part):
+            if left and os.path.exists(left):
+                os.remove(left)
 
 
 def how_long(seconds):
@@ -106,7 +120,8 @@ def run(folder, tool, locale, limit, runner=subprocess.run, clock=time.monotonic
         begun = clock()
         try:
             transcribe_one(tool, os.path.join(folder, entry["file"]),
-                           os.path.join(folder, "transcripts", entry["id"] + ".txt"), locale, runner=runner)
+                           os.path.join(folder, "transcripts", entry["id"] + ".txt"), locale, runner=runner,
+                           words=words_path(folder, entry["id"]))
         except RuntimeError as error:
             result["failed"] += 1
             if failures.count(entry["id"]) == 0:

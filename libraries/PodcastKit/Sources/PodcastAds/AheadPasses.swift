@@ -36,6 +36,10 @@ public struct AheadPasses: Codable, Sendable, Equatable {
     }
   }
 
+  /// Forgets that the episode was looked at, so its pass is made once more. The episode's map
+  /// came after its marks: the same marks give more with the map.
+  public mutating func forget(episode: String) { stamps[episode] = nil }
+
   /// The record saved in `folder`, or an empty one when there is none or it cannot be read.
   public static func load(from folder: URL) -> AheadPasses {
     guard let data = try? Data(contentsOf: folder.appendingPathComponent(fileName)),

@@ -203,4 +203,33 @@ final class CueAdsTests: XCTestCase {
     let second = filled(lines, skips + first)
     XCTAssertEqual(second.map(\.start), [130])
   }
+
+  // MARK: The ad-end check
+
+  func testTheHolesAlsoCarryAnEndOnWhileTheNextLinesSell() {
+    let code = "use code GARDEN at checkout"
+    // One skip and no hole: the line after it gives a promo code.
+    let one = filled([line(131, code), line(136, "plain talk")], [skip(100, 130)])
+    XCTAssertEqual(one.map(\.start), [130])
+    XCTAssertEqual(one.map(\.end), [136])
+    XCTAssertEqual(one.first?.source, "filled-holes")
+    // A filled hole first, then the end of the joined stretch.
+    var lines = fill
+    lines.insert(line(181, code), at: 4)
+    lines.insert(line(186, "plain talk"), at: 5)
+    let both = filled(lines, [skip(100, 130, .promo), skip(150, 180)])
+    XCTAssertEqual(both.map(\.start), [130, 180])
+    XCTAssertEqual(both.map(\.end), [150, 186])
+    XCTAssertEqual(both.map(\.kind), [.promo, .ad])
+    // With no cues from the Mac the finder is off, and so is the check.
+    XCTAssertTrue(
+      CueAds.holes(lines: [line(131, code)], skips: [skip(100, 130)], cues: AdCues(), show: show)
+        .isEmpty)
+    // The Mac's marks are handed on to the check: an end that is a mark's end stays.
+    XCTAssertTrue(
+      CueAds.holes(
+        lines: [line(131, code), line(136, "plain talk")], skips: [skip(100, 130)], cues: cues,
+        show: show, marks: [skip(110, 130)]
+      ).isEmpty)
+  }
 }

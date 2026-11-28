@@ -8,12 +8,14 @@ import * as FileSystem from "expo-file-system/legacy"
 
 import { LofiScore } from "@/modules/lofi-score"
 
+import { loadSettings } from "./automaticSettings"
 import { getEpisode, listEpisodesByIds, rows } from "./db"
 import { listDownloads } from "./downloadsNative"
 import { Podcasts } from "./index"
 import type { QueueEntry } from "./phoneQueue"
 import {
   type PreparedEpisode,
+  copiesInstalled,
   preparedCandidates,
   singleRun,
   syncPrepared,
@@ -72,22 +74,26 @@ async function downloadedEpisodes(): Promise<PreparedEpisode[]> {
 }
 
 /**
- * Takes the Mac's prepared copies on Wi-Fi and gives back the ones taken only for the list. Never
+ * Takes the Mac's prepared copies (on mobile data only the next 3, when the listener allows it) and gives back the ones taken only for the list. Never
  * throws. `readQueue` reads the phone's list of next episodes, as the run that called it shares it.
+ * Gives back how many copies this run installed: 0 when none, when another run was going, and
+ * on errors.
  */
 export async function runPrepared(
   readQueue: () => Promise<QueueEntry[]>,
-): Promise<void> {
+): Promise<number> {
   const podcasts = Podcasts
   const lofi = LofiScore
-  if (!podcasts || !lofi) return
+  if (!podcasts || !lofi) return 0
   try {
-    await exclusive(() =>
+    const report = await exclusive(() =>
       syncPrepared(
         {
           hasLinkedFolder: async () =>
             (await lofi.getStatus()).folder.linkedFolder !== undefined,
           onWiFi: () => podcasts.isOnWiFi(),
+          copiesOnMobileData: async () =>
+            (await loadSettings()).copiesOnMobileData,
           candidates: async () => {
             const listed = await listedEpisodes(await readQueue())
             // The whole list: all of Up Next and the episodes of the phone's list.
@@ -130,7 +136,9 @@ export async function runPrepared(
         refused,
       ),
     )
+    return copiesInstalled(report)
   } catch (cause) {
     console.warn("Couldn't take the Mac's prepared copies", cause)
+    return 0
   }
 }

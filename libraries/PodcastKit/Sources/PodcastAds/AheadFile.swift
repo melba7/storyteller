@@ -13,6 +13,14 @@ import Foundation
 //                           "startWords": "the first up to 40 words of the ad",
 //                           "endWords": "the last up to 40 words of the ad"}]}]}
 //
+// The file may also carry a top-level `coming` list, `{"feed", "guid", "since"}` for each episode
+// the Mac is preparing a copy of (since: unix seconds). The app reads it in JavaScript (coming.ts)
+// to wait for the copy; this reader ignores it, as any unknown key.
+//
+// An episode with a copy may also carry `"map": "maps/<name>.json"`: the Mac's map of that copy
+// (EpisodeMap in PodcastAudioMatch), with which a phone that plays another download of the episode
+// carries the marks over by the audio itself. A build that does not know the key ignores it.
+//
 // The marks are by WORDS and not by times: the phone's copy of an episode can carry other inserted
 // ads than the Mac's copy, so the times of the Mac's copy do not hold on the phone (the times are
 // only the length an ad had). An entry is ignored 14 days after `marked`. Anything of the wrong
@@ -76,10 +84,13 @@ public struct AheadEntry: Codable, Sendable, Equatable {
   /// The copy of the episode the Mac prepared, when it did. With a copy `start` and `end` of the
   /// ads are seconds in that very file, and an entry with no ads says the episode has none.
   public var copy: PreparedCopy?
+  /// Where the Mac's map of that copy is in the linked folder, `maps/<a plain name>.json`, when
+  /// the Mac made one.
+  public var map: String?
 
   public init(
     feed: String, guid: String, title: String, marked: Double, ads: [AheadMark],
-    copy: PreparedCopy? = nil
+    copy: PreparedCopy? = nil, map: String? = nil
   ) {
     self.feed = feed
     self.guid = guid
@@ -87,6 +98,17 @@ public struct AheadEntry: Codable, Sendable, Equatable {
     self.marked = marked
     self.ads = ads
     self.copy = copy
+    self.map = map
+  }
+
+  /// `path` when it is `maps/<name>.json` with one plain name (the rule of a copy's name), else
+  /// nil, so a damaged or hostile file can never point the phone outside the `maps` folder.
+  public static func plainMap(_ path: String) -> String? {
+    let prefix = "maps/"
+    guard path.hasPrefix(prefix), path.hasSuffix(".json"),
+      PreparedCopy.isPlain(file: PreparedCopy.folder + "/" + path.dropFirst(prefix.count))
+    else { return nil }
+    return path
   }
 }
 
@@ -115,7 +137,7 @@ public struct AheadFile: Codable, Sendable, Equatable {
   }
 
   private enum Keys: String, CodingKey { case version, writtenAt, episodes }
-  private enum EntryKeys: String, CodingKey { case feed, guid, title, marked, ads, copy }
+  private enum EntryKeys: String, CodingKey { case feed, guid, title, marked, ads, copy, map }
 
   /// An entry (or an ad) of the wrong shape is left out; the file as a whole must be an object
   /// with a list of episodes.
@@ -138,7 +160,8 @@ public struct AheadFile: Codable, Sendable, Equatable {
         title: try box.decode(String.self, forKey: .title),
         marked: try box.decode(Double.self, forKey: .marked),
         ads: try box.decode([Lossy<AheadMark>].self, forKey: .ads).compactMap(\.value),
-        copy: (try? box.decode(PreparedCopy.self, forKey: .copy)))
+        copy: (try? box.decode(PreparedCopy.self, forKey: .copy)),
+        map: (try? box.decode(String.self, forKey: .map)).flatMap(AheadEntry.plainMap))
     }
   }
 

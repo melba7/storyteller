@@ -18,6 +18,14 @@ because the phone's finder reads exactly this:
 the iCloud copy of the phone's folder now. Then "start" and "end" of its ads are seconds in that very
 file, taken from labels-snapped/<id>.json when it exists and else from labels/, and an entry with no
 ads is kept, because that says the episode has none. An entry without a copy is as it always was.
+An entry with a copy also gets "map": "maps/<id>.json" when the Mac wrote the map of that very file
+(teach_maps.py); the phone's readers ignore a key they do not know.
+
+The top-level array "coming" lists the episodes the Mac has picked and not finished
+(teach_coming.py): [{"feed": ..., "guid": ..., "since": <seconds>}]. The file stays version 1 and the
+readers of "episodes" ignore the key, so an older build reads the file as before. An episode whose
+copy is published is in "episodes" with its "copy" and is not in "coming". The key is there only
+while something is coming.
 
 The kinds are the scorecard's (AdKind(sort:) in AdLibrary.swift): sponsor is ad, network_promo is
 promo, host_ask is ownPlug. The intro and the credits are left out. Claude's confidence is passed on
@@ -29,6 +37,7 @@ Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import json
 import os
 
+import teach_coming
 import teach_exam
 import teach_prepared_file
 import teach_segments as seg
@@ -105,6 +114,8 @@ def build(folder, now, say, to=None):
     the prepared audio is looked for (None: there is none)."""
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder))
     prepared = teach_prepared_file.copies(folder, to) if to else {}
+    import teach_maps  # here and not at the top: teach_maps.py reads the labels with this module
+    mapped = teach_maps.maps(folder, to) if to else {}
     episodes = []
     for item in read_ahead(folder):
         if item["id"] in kept:
@@ -124,13 +135,17 @@ def build(folder, now, say, to=None):
                  "marked": marked, "ads": ads_of(label, lines)}
         if item["id"] in prepared:
             found["copy"] = prepared[item["id"]]
+        if item["id"] in mapped:
+            found["map"] = mapped[item["id"]]
         episodes.append(found)
     return episodes
 
 
-def encode(episodes, now):
-    return json.dumps({"version": 1, "writtenAt": now, "episodes": episodes}, separators=(",", ":"),
-                      ensure_ascii=False).encode("utf-8")
+def encode(episodes, now, coming=()):
+    found = {"version": 1, "writtenAt": now, "episodes": episodes}
+    if coming:  # no key when nothing is coming, so a file with nothing coming is as it always was
+        found["coming"] = list(coming)
+    return json.dumps(found, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
 
 
 def write(folder, now, say, limit=LIMIT, to=None):
@@ -138,11 +153,12 @@ def write(folder, now, say, limit=LIMIT, to=None):
     same, so it keeps its time), or "nothing" (there is nothing to tell and no file). `to` is as in
     build. Raises OSError."""
     episodes = build(folder, now, say, to)
-    data = encode(episodes, now)
+    coming = teach_coming.for_phone(folder, teach_prepared_file.copies(folder, to) if to else ())
+    data = encode(episodes, now, coming)
     dropped = 0
     while len(data) > limit and episodes:
         episodes, dropped = episodes[1:], dropped + 1
-        data = encode(episodes, now)
+        data = encode(episodes, now, coming)
     if dropped:
         say("The list of marked episodes was too large (over %d bytes), so the %d oldest were left out."
             % (limit, dropped))
@@ -152,9 +168,9 @@ def write(folder, now, say, limit=LIMIT, to=None):
             old = json.load(f)
     except (OSError, ValueError):
         old = None
-    if isinstance(old, dict) and old.get("episodes") == episodes:
+    if isinstance(old, dict) and old.get("episodes") == episodes and old.get("coming", []) == coming:
         return "unchanged"
-    if old is None and not episodes:
+    if old is None and not episodes and not coming:
         return "nothing"
     write_atomically(path, data)
     return "written"

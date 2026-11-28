@@ -57,19 +57,32 @@ describe("adsStatus", () => {
 
   it("says a copy the Mac prepared is prepared, with ads or without", () => {
     expect(adsStatus(info("found", { count: 3, prepared: true }))).toBe(
-      "Prepared by your Mac",
+      "Your Mac's marks",
     )
     expect(adsStatus(info("noAds", { prepared: true }))).toBe(
-      "Prepared by your Mac",
+      "Your Mac's marks",
     )
     expect(
       withAds("Downloaded", info("found", { count: 1, prepared: true })),
-    ).toBe("Downloaded · Prepared by your Mac")
+    ).toBe("Downloaded · Your Mac's marks")
     // Not prepared, or not saying: the words are the ordinary ones.
     expect(adsStatus(info("found", { count: 3, prepared: false }))).toBe(
       "3 ads found",
     )
     expect(adsStatus(info("noAds"))).toBe("No ads found")
+  })
+
+  it("says the Mac's marks when they are what skips on a publisher copy", () => {
+    expect(adsStatus(info("found", { count: 2, macMarks: true }))).toBe(
+      "Your Mac's marks",
+    )
+    expect(adsStatus(info("noAds", { macMarks: true }))).toBe(
+      "Your Mac's marks",
+    )
+    expect(adsStatus(info("finding", { macMarks: true }))).toBe("Finding ads")
+    expect(adsStatus(info("found", { count: 2, macMarks: false }))).toBe(
+      "2 ads found",
+    )
   })
 
   it("does not call a copy prepared while it is still being found or cannot be", () => {

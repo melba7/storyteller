@@ -47,10 +47,33 @@ if [ -d "$FOLDER/labels-snapped" ]; then
   echo "Scoring against the labels in labels-snapped. Episodes marked since the last \"Teach the phone again\" are not in it yet: double-click that first to include them."
   echo
 fi
-"$TOOL" score "$FOLDER" "${LABELS[@]}" --stream 2>&1 | tee -a "$LOG"
+SEEN="$(mktemp "${TMPDIR:-/tmp}/score.XXXXXX")" || finish "Could not make a temporary file." 1
+trap 'rm -f "$SEEN"' EXIT
+"$TOOL" score "$FOLDER" "${LABELS[@]}" --stream 2>&1 | tee -a "$LOG" "$SEEN"
 CODE="${PIPESTATUS[0]}"
 case "$CODE" in
   0) finish "Done. The scorecard is above, and added to $FOLDER/scorecard.json." ;;
   2) finish "The scoring is not set up (see above). Gather, transcribe and mark some episodes first." 2 ;;
-  *) finish "The scoring did not work (see above)." 1 ;;
 esac
+# Any other code is a failure: say the code in plain words, and what the tool said last. A code of
+# 128 and more is the signal that ended it (code minus 128): 9 is killed (often for memory), 6 and
+# 4 and 5 and 11 are a crash in the Swift program.
+MEANING="exit code $CODE"
+if [ "$CODE" -gt 128 ]; then
+  case $((CODE - 128)) in
+    9) MEANING="exit code $CODE: it was killed (signal 9), often because the Mac ran out of memory" ;;
+    4|5|6|11) MEANING="exit code $CODE: it crashed (signal $((CODE - 128))), which is a crash in the Swift program" ;;
+    2|15) MEANING="exit code $CODE: it was stopped (signal $((CODE - 128)))" ;;
+    *) MEANING="exit code $CODE: it was ended by signal $((CODE - 128))" ;;
+  esac
+fi
+echo
+echo "The scoring did not work. It ended with $MEANING."
+if [ -s "$SEEN" ]; then
+  echo "The last lines it printed:"
+  tail -n 8 "$SEEN" | sed 's/^/  /'
+else
+  echo "It printed nothing before it ended."
+fi
+{ echo "The scoring ended with $MEANING."; } >> "$LOG"
+finish "Send these lines (or the end of $LOG) to Claude." 1

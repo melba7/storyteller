@@ -296,3 +296,11 @@ One line per lesson.
   phone had the Mac's files. A fallback that hides a failure needs a visible
   sign, and an exchange between two devices is proven on the real devices (the
   other side's first file arriving) before anything is built on it (2026-11-28).
+- A script that starts itself again must use its own full path, not `$0`: after
+  a `cd`, a relative `$0` points nowhere and every later step fails. Its tests
+  should start it the way its launcher does, by a relative path too
+  (2026-11-28).
+- Run `tools/fork/check.sh` before opening even a draft PR: the format step
+  caught import order in five files that the narrow test runs missed. The Mac
+  tools' collect tests read the container's real free disk, so four fail when
+  under 15 GB is free; remove old worktrees first (2026-11-28).
