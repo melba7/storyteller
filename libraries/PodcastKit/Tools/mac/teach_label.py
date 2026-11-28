@@ -10,7 +10,7 @@ stopped. Each episode is one or a few `claude -p` runs, set up the way the app's
 is signed in to and shares its usage allowance. Nothing is sent anywhere else.
 
   teach_label.py [--folder F] [--labels labels] [--model NAME] [--limit N] [--cap DOLLARS]
-                 [--budget NAME] [--reserve DOLLARS] [--retry-failed] [--yes] [--only-exam]
+                 [--budget NAME] [--reserve DOLLARS] [--unknown-cost DOLLARS] [--retry-failed] [--yes] [--only-exam]
                  [--only-ahead] [--between START-END] [--wait-hours H]
 
 Without --yes it says what it is about to do and waits for you to type yes. It stops when --limit
@@ -26,6 +26,7 @@ already spent, so the run stops before a call that would pass the cap and says s
 cap is then only checked against what has been spent). A call whose cost is not known (it timed out,
 died without a result or printed no cost, though it may have used the plan's allowance) is counted
 as that much too, so it cannot pass the cap unseen; with no --reserve it counts nothing, as before.
+--unknown-cost DOLLARS is what such a call is counted as instead of the reserve (default: the reserve).
 Every call that cost something is written in the --budget file at once, not after the episode.
 --only-exam marks only the episodes in exam.json (the sealed exam, see teach_exam.py), in its order.
 --labels labels-second with --only-exam --limit 15 is how some of them are marked a second time:
@@ -106,7 +107,7 @@ def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time,
 
 
 def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, only_exam=False,
-        waiter=None, budget=None, only=None, reserve=0.0):
+        waiter=None, budget=None, only=None, reserve=0.0, unknown_cost=None):
     """Marks the waiting episodes. Returns {"done", "failed", "cost", "given_up", "stop",
     "reason"}; `stop` is None, "limit", "cap", "usage" or "failures". `cost` is what every call
     cost in this run, also the calls of episodes that failed or were stopped. The cap (with a
@@ -119,7 +120,8 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
     those episodes are marked. The cap is checked with `reserve` added to what has been spent, and
     a call whose cost is not known (it timed out, or Claude printed no cost: `cost_unknown`) is
     counted as `reserve`, the cost of one call, because it may have used the plan's allowance. With
-    no `reserve` such a call counts what it printed, which is nothing."""
+    no `reserve` such a call counts what it printed, which is nothing. `unknown_cost` counts such a
+    call as that much instead of `reserve` (None means the reserve)."""
     waiter = waiter or teach_night.Waiter(say=say)
     items, given_up, empty = candidates(folder, labels, retry_failed, only_exam, only)
     for episode_id in empty:
@@ -132,7 +134,7 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
     def charge(paid, unknown):
         """Counts what one call cost, and writes it in the budget at once."""
         if unknown:
-            paid = max(paid, reserve)
+            paid = max(paid, reserve if unknown_cost is None else unknown_cost)
         result["cost"] += paid
         if budget and paid > 0:
             budget.add(paid, 0)
@@ -234,6 +236,7 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
     parser.add_argument("--only-exam", action="store_true")
     parser.add_argument("--only-ahead", action="store_true")
     parser.add_argument("--reserve", default="0")
+    parser.add_argument("--unknown-cost")
     parser.add_argument("--between")
     parser.add_argument("--wait-hours")
     options = parser.parse_args(argv)
@@ -251,6 +254,11 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
     except ValueError:
         say("The --reserve must be a number of dollars, zero or more.")
         return 2
+    try:
+        unknown_cost = non_negative_number(options.unknown_cost) if options.unknown_cost is not None else None
+    except ValueError:
+        say("The --unknown-cost must be a number of dollars, zero or more.")
+        return 2
     if options.budget is not None and cap is None:
         say("A --budget needs a --cap: the cap is the budget's total for all the runs.")
         return 2
@@ -266,7 +274,7 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
         require_manifest(folder)
         with run_lock(folder):
             return marking(folder, options, cap, ask_person, runner, environment, say, extra_folders,
-                           waiter, reserve)
+                           waiter, reserve, unknown_cost)
     except Busy as error:
         say(str(error))
         return 2
@@ -276,7 +284,7 @@ def main(argv, ask_person=input, runner=subprocess.run, environment=None, say=pr
 
 
 def marking(folder, options, cap, ask_person, runner, environment, say, extra_folders, waiter,
-            reserve=0.0):
+            reserve=0.0, unknown_cost=None):
     """Everything main does once the folder is locked."""
     budget = teach_budget.Budget(folder, options.budget, cap) if options.budget is not None else None
     only = ahead_ids(folder) if options.only_ahead else None
@@ -337,7 +345,7 @@ def marking(folder, options, cap, ask_person, runner, environment, say, extra_fo
 
     result = run(folder, options.labels, options.model, options.limit, cap, ask, say=say,
                  retry_failed=options.retry_failed, only_exam=options.only_exam, waiter=waiter,
-                 budget=budget, only=only, reserve=reserve)
+                 budget=budget, only=only, reserve=reserve, unknown_cost=unknown_cost)
     say("Marked %d episodes (%d failed). Cost as Claude counts it: $%.2f."
         % (result["done"], result["failed"], result["cost"]))
     if result["reason"]:

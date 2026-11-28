@@ -166,7 +166,7 @@ if [ "${PIPESTATUS[0]}" -ne 3 ]; then
   fi
 
   # Exit 5 is the budget reached: the weekly cap doing its job, not a failure.
-  step "Step 4 of 7: having Claude mark the ads, under the weekly cap of about \$$CAP (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --only-ahead --limit "$MOST" --budget "$BUDGET" --cap "$CAP" --reserve "$RESERVE"
+  step "Step 4 of 7: having Claude mark the ads, under the weekly cap of about \$$CAP (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --only-ahead --limit "$MOST" --budget "$BUDGET" --cap "$CAP" --reserve "$RESERVE" --unknown-cost "$ESTIMATE"
   MARKED="$?"
   if [ "$MARKED" -eq 5 ]; then
     say "This week's cap of \$$CAP is reached, so no more episodes are marked until next week. What was marked is saved."
