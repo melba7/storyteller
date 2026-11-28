@@ -19,7 +19,9 @@
 #      --only-ahead, podcast-ads after building it), then moves the marks onto the exact borders
 #      (teach_snap.py)
 #   6. puts a copy of each marked episode's audio into the phone's iCloud folder and removes the
-#      copies that are 7 days old or over 10 GB (teach_prepared.py publish)
+#      copies that are 7 days old or over 10 GB (teach_prepared.py publish), and beside it a small
+#      map of each copy (teach_maps.py), with which a phone that plays another download of the
+#      episode carries the marks over
 #      (before step 7 the "coming" list is closed: an episode with its copy is in the file with
 #      it, one that got none is dropped, so the phone never waits for a copy that is not on its way)
 #   7. writes ahead-ads.json, with the copy of each prepared episode and the times in that very file
@@ -193,6 +195,7 @@ fi
 say
 say "Step 5 of 7: downloading the marked episodes a second time to find the exact borders of the ads"
 build podcast-ads
+ADS_TOOL="$BUILT"
 if [ -z "$BUILT" ]; then
   say "The second download was left out, so the marks are not moved onto exact borders this run. The run goes on."
   STATUS=1
@@ -218,6 +221,17 @@ PREPARED="$?"
 if [ "$PREPARED" -ne 0 ] && [ "$PREPARED" -ne 3 ]; then
   say "Not all the audio reached iCloud (see above). The run goes on."
   STATUS=1
+fi
+
+# The map of each copy, written with the program built for step 5, so a phone that plays another
+# download of the episode can carry the marks over (teach_maps.py). Exit 3 is no iCloud folder.
+if [ -n "$ADS_TOOL" ]; then
+  python3 -u "$TOOLS/teach_maps.py" publish --folder "$FOLDER" --tool "$ADS_TOOL" 2>&1 | tee -a "$LOG"
+  MAPPED="${PIPESTATUS[0]}"
+  if [ "$MAPPED" -ne 0 ] && [ "$MAPPED" -ne 3 ]; then
+    say "Not every episode map was written (see above). The run goes on."
+    STATUS=1
+  fi
 fi
 
 # The "coming" list is closed here: what has its copy is in the file with it, the rest is dropped.

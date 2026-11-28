@@ -8,6 +8,8 @@
 // dueForTeaching in teaching.ts.
 import { LofiScore } from "@/modules/lofi-score"
 
+import { MAP_LOOK_MS } from "./episodeMap"
+import { lookForEpisodeMap } from "./episodeMapRun"
 import {
   type Came,
   NOTHING_CAME,
@@ -86,14 +88,27 @@ function watchPlay(): void {
     .then(({ player }) => {
       let wasPlaying = false
       let episodeId: string | null = null
+      // The Mac's map of the playing episode is looked for once the exchange has brought the
+      // Mac's marks (see episodeMapRun.ts).
+      const lookForMap = (id: string | null) =>
+        void teachingSyncDone().then(() => lookForEpisodeMap(id))
       player.subscribe(() => {
         const view = player.getView()
         const id = view.episode?.id ?? null
-        if (view.isPlaying && (!wasPlaying || id !== episodeId))
+        if (view.isPlaying && (!wasPlaying || id !== episodeId)) {
           runTeachingSync(true)
+          lookForMap(id)
+        }
         wasPlaying = view.isPlaying
         episodeId = id
       })
+      // While an episode plays, the Mac's files are looked at again, so marks and a map the Mac
+      // finishes in the middle of the episode are used for the rest of it.
+      setInterval(() => {
+        if (!wasPlaying || episodeId === null) return
+        runTeachingSync()
+        lookForMap(episodeId)
+      }, MAP_LOOK_MS)
     })
     .catch((cause: unknown) =>
       console.warn("Couldn't watch for Play to look for the Mac's work", cause),

@@ -6,7 +6,8 @@
 // (`PodcastTeaching.aheadEntry`). Every decision is in PodcastAds; this file only runs it under the
 // finder guard: in the whole-transcript pass, in the head scan of a stream, and in a pass of its
 // own for an episode whose ads file is final already (the Mac marks at night, and the phone has
-// usually checked the episode the evening before).
+// usually checked the episode the evening before). When the Mac's map of the episode is on the
+// phone (PodcastEpisodeMaps.swift), the marks are carried over by the audio as well.
 import Foundation
 import PodcastAds
 import PodcastDownloads
@@ -23,13 +24,46 @@ extension PodcastAdFinder {
     recordPass: Bool = true
   ) -> AheadFound? {
     guard let entry = PodcastTeaching.shared.aheadEntry(episode: id) else { return nil }
+    // With the Mac's map of the episode on the phone, the marks are also carried over by the audio
+    // itself (PodcastEpisodeMaps.swift): those ads are exact and take the place of the words' ads
+    // they overlap. No map, or a copy that does not line up, gives none, and nothing changes.
     let found = PodcastFinderGuard.shared.hold([FinderNames.ahead], episode: id) { _ in
-      AheadAds.find(entry, words: transcript.words, judged: judged)
+      AheadAds.withMap(
+        AheadAds.find(entry, words: transcript.words, judged: judged),
+        carried: PodcastEpisodeMaps.shared.carried(episode: id), judged: judged)
     }
     if recordPass, found != nil {
       PodcastTeaching.shared.recordAheadPass(episode: id, marked: entry.marked)
     }
     return found
+  }
+
+  /// The episode's map is on the phone (it just came when `fresh`, or the episode is played with
+  /// one). In the background, the map's skips go into the partial ads file of a downloaded
+  /// episode at once, so a playing episode skips them before its transcript is done, and a stream
+  /// that is playing lines its audio up. With a fresh map an episode whose ads are final is
+  /// looked at once more, since the same marks give more with the map.
+  func mapArrived(_ id: String, fresh: Bool) {
+    Task { @MainActor in
+      if let loader = PodcastPlayer.shared.streamDownload, loader.episodeId == id {
+        loader.head.lookAtMap()
+      }
+    }
+    Task.detached(priority: .utility) { [self] in
+      guard let downloads = PodcastDownloader.shared.store,
+        let (ads, _) = stores(for: id, in: downloads)
+      else { return }
+      // `addLocalToPartial` adds what the map gave for this file (`PodcastEpisodeMaps.known`).
+      if let skips = PodcastEpisodeMaps.shared.skips(episode: id), !skips.isEmpty,
+        addLocalToPartial([], ads: ads, duration: skips.map(\.end).max() ?? 0)
+      {
+        PodcastTimeline.mark(id, "the Mac's map: \(skips.count) ads on this copy")
+        Task { @MainActor in PodcastPlayer.shared.adSkipping.refresh() }
+      }
+      guard fresh else { return }
+      PodcastTeaching.shared.forgetAheadPass(episode: id)
+      lookAhead()
+    }
   }
 
   // MARK: The episodes whose ads are final
@@ -116,7 +150,9 @@ extension PodcastStreamHead {
     let found = PodcastFinderGuard.shared.hold([FinderNames.ahead], episode: episodeId) { _ in
       AheadAds.find(entry, words: words).ads
     }
-    let heard = (found ?? []).filter { listener.allows($0.kind) }.map { ad -> FoundAd in
+    // An ad the Mac's map already gives exactly is left to the map (PodcastStreamHead+Map.swift).
+    let heard = (found ?? []).filter { listener.allows($0.kind) && !map.overlaps($0) }.map {
+      ad -> FoundAd in
       var one = ad
       one.source = FinderNames.ahead
       one.confidence = min(ad.confidence, .unsure)
