@@ -2,7 +2,7 @@
 //
 // Pure rules for what the app does by itself when feeds refresh: which new episodes to
 // download, which played downloads to delete, how often to refresh while the app is open, and
-// the two settings. Reading feeds and the native calls are in automaticRun.ts.
+// the settings. Reading feeds and the native calls are in automaticRun.ts.
 import type { FetchedEpisode } from "./library"
 import { isLocalEpisodeId } from "./localFiles"
 import { type AutoUpNext } from "./showSettings"
@@ -14,11 +14,14 @@ export type AutomaticSettings = {
   downloadNew: boolean
   /** Delete a played download a day after it was played. */
   deletePlayed: boolean
+  /** Take the Mac's prepared copies on mobile data too, for the next 3 episodes only. */
+  copiesOnMobileData: boolean
 }
 
 export const DEFAULT_SETTINGS: AutomaticSettings = {
   downloadNew: true,
   deletePlayed: true,
+  copiesOnMobileData: true,
 }
 
 /** The saved settings; a missing, broken or partial value falls back to the defaults. */
@@ -37,6 +40,10 @@ export function parseSettings(saved: string | null): AutomaticSettings {
         typeof record["deletePlayed"] === "boolean"
           ? record["deletePlayed"]
           : DEFAULT_SETTINGS.deletePlayed,
+      copiesOnMobileData:
+        typeof record["copiesOnMobileData"] === "boolean"
+          ? record["copiesOnMobileData"]
+          : DEFAULT_SETTINGS.copiesOnMobileData,
     }
   } catch {
     return DEFAULT_SETTINGS
@@ -47,6 +54,7 @@ export function serializeSettings(settings: AutomaticSettings): string {
   return JSON.stringify({
     downloadNew: settings.downloadNew,
     deletePlayed: settings.deletePlayed,
+    copiesOnMobileData: settings.copiesOnMobileData,
   })
 }
 

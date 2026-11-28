@@ -281,14 +281,19 @@ describe("refreshDue", () => {
 })
 
 describe("settings", () => {
-  it("are both on by default", () => {
+  it("are all on by default", () => {
     expect(parseSettings(null)).toEqual({
       downloadNew: true,
       deletePlayed: true,
+      copiesOnMobileData: true,
     })
   })
   it("round trip", () => {
-    const settings = { downloadNew: false, deletePlayed: true }
+    const settings = {
+      downloadNew: false,
+      deletePlayed: true,
+      copiesOnMobileData: false,
+    }
     expect(parseSettings(serializeSettings(settings))).toEqual(settings)
   })
   it("fall back to the defaults for broken or partial values", () => {
@@ -297,6 +302,7 @@ describe("settings", () => {
     expect(parseSettings('{"downloadNew":false}')).toEqual({
       downloadNew: false,
       deletePlayed: true,
+      copiesOnMobileData: true,
     })
     expect(parseSettings('{"downloadNew":"yes"}')).toEqual(DEFAULT_SETTINGS)
   })

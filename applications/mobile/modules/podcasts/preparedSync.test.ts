@@ -8,6 +8,7 @@ import {
   type PreparedCandidate,
   type PreparedDeps,
   type PreparedTake,
+  MOBILE_DATA_COPIES,
   PREPARED_FOLDER,
   SECOND_PASS_MS,
   START_BUDGET_MS,
@@ -47,6 +48,8 @@ function phone(
   options: {
     linked?: boolean
     wifi?: boolean
+    /** The switch for mobile data; off unless a test says so. */
+    mobileData?: boolean
     candidates?: PreparedCandidate[]
     plan?: { take?: PreparedTake[]; giveBack?: string[] }
     copy?: (path: string) => LinkedFileCopy | Promise<LinkedFileCopy>
@@ -80,6 +83,7 @@ function phone(
       calls.push("wifi")
       return options.wifi ?? true
     },
+    copiesOnMobileData: async () => options.mobileData ?? false,
     candidates: async () => {
       calls.push("candidates")
       return options.candidates ?? [candidate("e1", { listPlace: 0 })]
@@ -141,6 +145,18 @@ describe("syncPrepared: when it runs", () => {
     const run = phone({ wifi: false, plan: { take: [take("e1")] } })
     await syncPrepared(run.deps)
     expect(run.calls).toEqual(["linked", "wifi"])
+  })
+
+  it("does nothing on mobile data with the switch off", async () => {
+    const run = phone({
+      wifi: false,
+      mobileData: false,
+      candidates: [candidate("e1", { listPlace: 0 })],
+      plan: { take: [take("e1")] },
+    })
+    await syncPrepared(run.deps)
+    expect(run.planned).toEqual([])
+    expect(run.installs).toEqual([])
   })
 
   it("asks the plan for nothing when there are no candidates", async () => {
@@ -631,5 +647,60 @@ describe("preparedCandidates", () => {
       [facts("c", { address: "file:///x.mp3" })],
     )
     expect(found.map((one) => one.id)).toEqual(["b"])
+  })
+})
+
+describe("syncPrepared: on mobile data", () => {
+  const places = (count: number) =>
+    Array.from({ length: count }, (_, place) =>
+      candidate(`e${place}`, { listPlace: place }),
+    )
+  const askedIds = (json: string) =>
+    (JSON.parse(json) as { id: string }[]).map((one) => one.id)
+
+  it("takes the first 3 episodes of the list and no more", async () => {
+    const run = phone({
+      wifi: false,
+      mobileData: true,
+      candidates: [...places(12), candidate("downloaded")],
+    })
+    await syncPrepared(run.deps)
+    expect(MOBILE_DATA_COPIES).toBe(3)
+    expect(askedIds(run.planned[0] ?? "[]")).toEqual(["e0", "e1", "e2"])
+  })
+
+  it("installs a copy of the 3, as on Wi-Fi", async () => {
+    const run = phone({
+      wifi: false,
+      mobileData: true,
+      candidates: places(5),
+      plan: { take: [take("e2")] },
+    })
+    const report = await syncPrepared(run.deps)
+    expect(report.installed).toEqual(["e2"])
+  })
+
+  it("leaves the list of 12 and the downloads as they are on Wi-Fi", async () => {
+    const run = phone({
+      wifi: true,
+      mobileData: true,
+      candidates: [...places(12), candidate("downloaded")],
+    })
+    await syncPrepared(run.deps)
+    expect(askedIds(run.planned[0] ?? "[]")).toHaveLength(13)
+  })
+
+  it("still runs the 45-second second pass for a copy iCloud has not brought", async () => {
+    const run = phone({
+      wifi: false,
+      mobileData: true,
+      candidates: places(3),
+      plan: { take: [take("e1")] },
+      copy: () => ({ status: "waiting" }),
+    })
+    const report = await syncPrepared(run.deps)
+    expect(report.waiting).toEqual(["e1"])
+    expect(run.later.map((one) => one.ms)).toEqual([SECOND_PASS_MS])
+    expect(SECOND_PASS_MS).toBe(45_000)
   })
 })

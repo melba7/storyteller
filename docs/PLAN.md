@@ -2280,7 +2280,7 @@ How I read the picks (my choices, told to Mo):
     when the copy is ready or the marking failed; jest tests pin the wait, its 2
     hour end and that Play streams at once. A new installer launcher is left for
     Mo.
-- [ ] **Z6 Copies on mobile data** (D): with Mo's switch on, the phone takes the
+- [x] **Z6 Copies on mobile data** (D): with Mo's switch on, the phone takes the
       Mac's copy on mobile data too, for its next 3 episodes only.
   - Done when: jest tests pin 3 on mobile data, 12 on Wi-Fi, and nothing with
     the switch off.
