@@ -94,11 +94,25 @@ public enum CueAds {
   /// show are counted once, from the skips as they were given, so the lines of a hole that was
   /// filled still count as the show's for the holes after it. A hole with no content word is not
   /// filled. Call it with the skips plus what `openings` returned. Bad input adds nothing.
+  ///
+  /// After the holes comes the ad-end check (`AdEndCheck`): the end of each stretch, as it stands
+  /// with the filled holes, moves on while the next lines still sell. What it adds is returned
+  /// after the holes. It is here because this is the last step that changes the phone's skips with
+  /// the transcript at hand, on the phone and in the scorecard alike.
   public static func holes(
     lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String
   ) -> [FoundAd] {
+    guard !cues.isEmpty else { return [] }
+    let filled = fill(lines: lines, skips: skips, cues: cues, show: show)
+    return filled + AdEndCheck.stretches(lines: lines, skips: skips + filled)
+  }
+
+  /// The filled holes alone (see `holes`).
+  private static func fill(
+    lines: [TranscriptLine], skips: [FoundAd], cues: AdCues, show: String
+  ) -> [FoundAd] {
     let first = stretches(skips)
-    guard !cues.isEmpty, first.count >= 2 else { return [] }
+    guard first.count >= 2 else { return [] }
     let (lines, words) = read(lines)
     let content = words.map { $0.filter(cues.isContent) }
     let returning = lines.indices.filter { cues.returns(words[$0], show: show) }.map { lines[$0].start }
