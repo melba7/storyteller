@@ -80,6 +80,47 @@ final class EpisodeMapTests: XCTestCase {
     XCTAssertNil(EpisodeMap(data: Data(count: EpisodeMap.maxBytes + 1)))
   }
 
+  /// 400 frames that are all different from their neighbours.
+  private let made = (0..<400).map { UInt8(truncatingIfNeeded: $0 &* 131) }
+
+  /// A map's file with these numbers (made-up JSON, the 400 frames).
+  private func file(duration: String, frameSeconds: String, marks: String = "[]") -> Data {
+    Data(
+      """
+      {"version": 1, "feed": "f", "guid": "g", "sha256": "\(sha)", "duration": \(duration),
+       "frameSeconds": \(frameSeconds), "frames": "\(Data(made).base64EncodedString())",
+       "marks": \(marks)}
+      """.utf8)
+  }
+
+  func testAFrameLengthOrALengthOutOfRangeIsNoMap() {
+    XCTAssertNotNil(EpisodeMap(data: file(duration: "3600", frameSeconds: "0.026122")))
+    for frameSeconds in ["1e-300", "0.004", "0.21", "1e300"] {
+      XCTAssertNil(EpisodeMap(data: file(duration: "3600", frameSeconds: frameSeconds)), frameSeconds)
+    }
+    for duration in ["0", "-5", "1000001", "1e300"] {
+      XCTAssertNil(EpisodeMap(data: file(duration: duration, frameSeconds: "0.026122")), duration)
+    }
+  }
+
+  func testAMarkOutsideTheCopyIsLeftOutSoLiningUpNeverTraps() throws {
+    let marks = """
+      [{"start": 10, "end": 1e300, "kind": "ad"}, {"start": -1e300, "end": 20, "kind": "ad"},
+       {"start": 9, "end": 12, "kind": "ad"}, {"start": 2, "end": 6, "kind": "promo"},
+       {"start": 8, "end": 10.9, "kind": "ad"}]
+      """
+    let read = try XCTUnwrap(
+      EpisodeMap(data: file(duration: "10.4488", frameSeconds: "0.026122", marks: marks)))
+    // A mark may end up to a second after the copy does (rounding); that one is kept.
+    XCTAssertEqual(
+      read.marks,
+      [EpisodeMapMark(start: 2, end: 6, kind: "promo"), EpisodeMapMark(start: 8, end: 10.9, kind: "ad")])
+    let carry = EpisodeMapAligner(map: read).carry(
+      HeardFrames(hashes: made, frameSeconds: 0.026122), complete: true)
+    XCTAssertEqual(carry.marks.map(\.kind), ["promo", "ad"])
+    XCTAssertEqual(carry.marks.last?.end ?? 0, 10.4488, accuracy: 0.001)
+  }
+
   func testAnHourOfAudioIsAMapOfAbout185KB() throws {
     let frames = Int(3600 / frame)
     let hour = EpisodeMap(
