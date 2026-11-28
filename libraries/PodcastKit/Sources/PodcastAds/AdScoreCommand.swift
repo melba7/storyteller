@@ -23,10 +23,12 @@ public enum AdScoreCommand {
     public var ahead = false
     /// Also add the row "Prepared copy" (PreparedScoreRow.swift).
     public var prepared = false
+    /// Also add the row "Plus this week's ad sounds" (WeekScoreRow.swift).
+    public var week = false
   }
 
   public static let usage =
-    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]] [--ahead] [--prepared]"
+    "Usage: podcast-teach score <teaching folder> [--labels NAME] [--all] [--no-model] [--no-library] [--exam] [--dump FILE] [--stream [--speech N]] [--ahead] [--prepared] [--week]"
 
   /// The options in the arguments, or a plain sentence about what is wrong.
   public static func parse(_ arguments: [String]) -> Result<Options, TeachingFolderError> {
@@ -41,6 +43,7 @@ public enum AdScoreCommand {
       case "--stream": options.stream = true
       case "--ahead": options.ahead = true
       case "--prepared": options.prepared = true
+      case "--week": options.week = true
       case "--speech":
         index += 1
         guard index < arguments.count, let speech = Double(arguments[index]), speech.isFinite,
@@ -201,6 +204,11 @@ public enum AdScoreCommand {
     let prepared = options.prepared
       ? PreparedScoreRow.Run(folder: folder, labels: options.labels, episodes: chosen, now: now)
       : nil
+    // The row of this week's ad sounds (--week) comes after every other row, the prepared copy's
+    // too: the sounds of the episodes of the last week, found in each episode's audio, on top of the
+    // last finder row. Without the audio code or an MP3 file there is no row and the report says so.
+    let week = options.week
+      ? plan.weekScan.map { WeekScoreRow.Run(scan: $0, tuning: tuning, standingOn: finalAds) } : nil
     // The last two rows (CueScoreRows.swift): the Mac's opening lines and filled holes, after all the rest.
     let cueRun = CueScoreRows.Run(
       folder: folder, tuning: tuning, onMarks: ahead != nil, standingOn: finalAds)
@@ -218,10 +226,14 @@ public enum AdScoreCommand {
       } ?? [])
       + (ahead.map { [$0.layer] } ?? []) + cueRun.layers
     if let prepared { allLayers.append(prepared.layer) }
+    if let week { allLayers.append(week.layer) }
     let everyRow = AdScoreRun.runLayers(
       episodes: chosen, habits: habits, audio: { audio[$0.id] }, base: base, layers: allLayers)
-    // The row of the prepared copy is the last one; the rows before it are as without it.
-    let made = prepared == nil ? everyRow : Array(everyRow.dropLast())
+    // The row of this week's sounds is the very last, the one of the prepared copy just before it;
+    // the rows before them are as without them.
+    let weekCard = week == nil ? nil : everyRow.last
+    let withoutWeek = week == nil ? everyRow : Array(everyRow.dropLast())
+    let made = prepared == nil ? withoutWeek : Array(withoutWeek.dropLast())
     for (layer, card) in zip(plan.layers, made.dropFirst()) {
       cards.append(card)
       rows.append(ScorecardRow(name: layer.name, card: card))
@@ -271,10 +283,18 @@ public enum AdScoreCommand {
     var cueRows = cueShown.rows
     text += "\n\n" + cueShown.text
     var preparedRow: ScorecardRow?
-    if let prepared, let card = everyRow.last {
+    if let prepared, let card = withoutWeek.last {
       let shown = prepared.report(card, last: rows.last, scored: chosen.count)
       text += "\n\n" + shown.text
       preparedRow = shown.row
+    }
+    var weekRow: ScorecardRow?
+    if let week, let card = weekCard {
+      let shown = week.report(card, last: rows.last, scored: chosen.count)
+      text += "\n\n" + shown.text
+      weekRow = shown.row
+    } else if options.week {
+      text += "\n\n" + WeekScoreRow.leftOut
     }
     if options.stream {
       func detecting(_ more: [AdScoreLayer]) -> (TeachingEpisode, Transcript) -> [FoundAd] {
@@ -309,11 +329,24 @@ public enum AdScoreCommand {
         shown.append((cueRows[index].name, numbers))
         cueRows[index].stream = numbers
       }
+      var weekVerdict: String?
+      if let week {
+        let more = week.streamed(
+          episodes: chosen, habits: habits, tuning: tuning, speech: options.speech,
+          detect: detecting([week.layer]))
+        shown.append((WeekScoreRow.name, more))
+        weekRow?.stream = more
+        weekVerdict =
+          "Stream verdict for \(WeekScoreRow.name), against the last finder row at the same pace. "
+          + WeekScoreRow.verdict(last: streamed.finders.standard, week: more.standard).line
+      }
       let waiting = (episodes: streamed.waiting, of: chosen.count)
       text += "\n\n" + StreamReport.lines(shown, waiting: waiting).joined(separator: "\n")
+      if let weekVerdict { text += "\n" + weekVerdict }
     }
     saved += cueRows
     if let preparedRow { saved.append(preparedRow) }
+    if let weekRow { saved.append(weekRow) }
     out(text)
     history.append(
       ScorecardRun(

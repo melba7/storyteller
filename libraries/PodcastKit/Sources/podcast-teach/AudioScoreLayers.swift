@@ -48,8 +48,14 @@ final class AudioScoreBox: @unchecked Sendable {
   private var lastJoints: (path: String, joints: Joints?)?
   /// The joints the Mac found before (`podcast-teach joints`), by episode id.
   private let kept: [String: Joints]
+  /// The teaching folder and its episodes with their dates, for the row of this week's sounds
+  /// (`WeekSounds`): its banks are read when an episode is searched, not before.
+  private let folder: URL
+  private let episodes: [WeekEpisode]
 
   init(folder: URL, now: Date) {
+    self.folder = folder
+    episodes = WeekSounds.episodes(in: folder)
     self.now = now.timeIntervalSince1970
     mac = AdSoundLibrary.load(from: folder.appendingPathComponent(AdSoundLibrary.fileName))
     let loaded = JointsCache.load(from: folder.appendingPathComponent(JointsCache.fileName))
@@ -67,7 +73,17 @@ final class AudioScoreBox: @unchecked Sendable {
         snap: { [self] id, spans, steady in
           guard let joints = kept[id] else { return spans }
           return snapped(spans, joints, steady)
-        }))
+        }),
+      weekSounds: { [self] url, id in weekSounds(url, id) })
+  }
+
+  /// Where the sounds of the ads of the episodes published 1 to 7 days before this one play in its
+  /// audio. Nothing for an episode that is not in the episode list.
+  private func weekSounds(_ url: URL, _ id: String) -> [ScoreSpan] {
+    guard let target = episodes.first(where: { $0.id == id }) else { return [] }
+    return WeekSounds.spans(in: url, for: target, among: episodes, folder: folder).map {
+      ScoreSpan(start: $0.start, end: $0.end, sort: $0.sort)
+    }
   }
 
   /// The sounds the show's earlier episodes taught that play in this file, and then what this

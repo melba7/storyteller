@@ -41,6 +41,8 @@ struct ScorePlan {
   let finders = ScoreFinderAds()
   /// The rows that learn from the episodes before them: own sounds, repeated sounds, repeated words.
   var learners: [AdScoreLayer] = []
+  /// The week's sound finder of the sound kit, when there is a kit and an MP3 file (`--week`).
+  var weekScan: (@Sendable (URL, String) -> [ScoreSpan])?
 
   /// The order: the meaning model first (it skips by default, so a finder that only asks must not
   /// cut it), then own sounds, repeated sounds, repeated words, joints, joints in steady files too,
@@ -58,6 +60,7 @@ struct ScorePlan {
     if let kit, !audio.isEmpty {
       plan.layers.append(SoundScoreLayers.ownSounds(kit.ownSounds, finders: finders))
       plan.layers.append(SoundScoreLayers.repeatedSounds(kit.repeatedSounds, finders: finders))
+      plan.weekScan = kit.weekSounds
     }
     plan.layers.append(WordScoreLayers.repeatedWords(now: now, finders: finders))
     let learning = [ScoreRows.ownSounds, ScoreRows.repeatedSounds, ScoreRows.repeatedWords]

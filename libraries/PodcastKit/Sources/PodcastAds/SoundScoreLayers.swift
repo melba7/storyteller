@@ -65,17 +65,23 @@ public struct ScoreSoundKit: Sendable {
   /// The joints kept in the folder, for the episodes that have no audio there (or that need not be
   /// read again). Holds no episode by default.
   public var cachedJoints: ScoreCachedJoints
+  /// `(audio, episode)`: the stretches where the ad sounds of the episodes published 1 to 7 days
+  /// before this one play in its audio (the row "Plus this week's ad sounds", WeekScoreRow.swift).
+  /// Nothing by default.
+  public var weekSounds: @Sendable (URL, String) -> [ScoreSpan]
 
   public init(
     ownSounds: @escaping @Sendable (URL, String, String, [ScoreSpan]) -> [ScoreSpan] = { _, _, _, _ in [] },
     repeatedSounds: @escaping @Sendable (URL, String, String) -> [ScoreSpan] = { _, _, _ in [] },
     snapJoints: @escaping @Sendable (URL, [ScoreSpan], Bool) -> [ScoreSpan] = { _, spans, _ in spans },
-    cachedJoints: ScoreCachedJoints = ScoreCachedJoints()
+    cachedJoints: ScoreCachedJoints = ScoreCachedJoints(),
+    weekSounds: @escaping @Sendable (URL, String) -> [ScoreSpan] = { _, _ in [] }
   ) {
     self.ownSounds = ownSounds
     self.repeatedSounds = repeatedSounds
     self.snapJoints = snapJoints
     self.cachedJoints = cachedJoints
+    self.weekSounds = weekSounds
   }
 }
 
