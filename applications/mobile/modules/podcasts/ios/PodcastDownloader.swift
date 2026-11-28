@@ -129,6 +129,9 @@ final class PodcastDownloader: NSObject, URLSessionDownloadDelegate, @unchecked 
     // episode ahead (or has fetched it): the mark comes off before any early return below, so the
     // file is kept when the episode leaves Up Next. A new entry made below starts unmarked.
     if !automatic { try store.clearAhead(episodeId: episodeId) }
+    // Whatever asks for this download but the list's own read-ahead makes a copy taken for the
+    // list an ordinary download, so it is never given back (before the early returns below).
+    if !ahead { try store.clearCopyForList(episodeId: episodeId) }
     // https is tried first. A feed that only serves http gets its original address back once,
     // if https can't connect or its certificate is refused (see `recover`).
     let address = given.upgradedToHTTPS

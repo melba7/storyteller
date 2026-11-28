@@ -24,6 +24,8 @@ export type PreparedCandidate = {
   address: string
   /** Its place on the phone's list of next episodes, counted from 0, or null when it is not there. */
   listPlace: number | null
+  /** Anywhere in the listener's whole list of next episodes, also past the places taken. */
+  stillListed: boolean
   /** A saved position above zero, or played: its position and ads stay on the file it was started on. */
   started: boolean
   showId: string
@@ -48,6 +50,8 @@ export type PreparedReport = {
   waiting: string[]
   /** The episode was in the player or being downloaded: the next run tries again. */
   busy: string[]
+  /** The episode was started while its copy came: it is not swapped. */
+  started: string[]
   /** The native side refused the file, with its one word. Not copied again in this launch. */
   refused: Record<string, string>
   failed: string[]
@@ -63,6 +67,8 @@ export type PreparedDeps = {
   plan(candidatesJson: string): Promise<string>
   /** `LofiScore.copyLinkedFolderFile`. */
   copy(path: string, to: string): Promise<LinkedFileCopy>
+  /** Whether the episode has been started now (a saved position above zero, or played). */
+  hasStarted(episodeId: string): Promise<boolean>
   install(
     episodeId: string,
     uri: string,
@@ -104,13 +110,17 @@ function isWebAddress(address: string): boolean {
 
 /**
  * The candidates: the phone's list of next episodes in its order (its place is the index), then
- * the downloaded episodes that are not on it. An episode named twice stays at its first place. An
+ * the downloaded episodes that are not on it. `wholeList` is the ids of the whole list of next
+ * episodes, also past the places taken: a copy is given back only when its episode is in none of
+ * them. An episode named twice stays at its first place. An
  * added file and an episode with no web address are left out: the Mac prepares neither.
  */
 export function preparedCandidates(
   listed: readonly PreparedEpisode[],
   downloaded: readonly PreparedEpisode[],
+  wholeList: readonly string[] = [],
 ): PreparedCandidate[] {
+  const inWhole = new Set(wholeList)
   const found: PreparedCandidate[] = []
   const seen = new Set<string>()
   const add = (episode: PreparedEpisode, listPlace: number | null) => {
@@ -121,6 +131,7 @@ export function preparedCandidates(
       id: episode.id,
       address: episode.address,
       listPlace,
+      stillListed: listPlace !== null || inWhole.has(episode.id),
       started: episode.positionSeconds > 0 || episode.played,
       showId: episode.showId,
     })
@@ -138,6 +149,7 @@ export function candidatesJson(
     candidates.map((one) => ({
       id: one.id,
       ...(one.listPlace === null ? {} : { listPlace: one.listPlace }),
+      stillListed: one.stillListed,
       started: one.started,
       showId: one.showId,
     })),
@@ -228,6 +240,7 @@ export async function syncPrepared(
     installed: [],
     waiting: [],
     busy: [],
+    started: [],
     refused: {},
     failed: [],
     gaveBack: [],
@@ -280,6 +293,12 @@ async function takeOne(
       report.failed.push(take.id)
       return
     }
+    // The listener may have played the episode while the copy came: its position and its ads stay
+    // on the file it was started on, so nothing is swapped (and nothing is refused).
+    if (await deps.hasStarted(take.id)) {
+      report.started.push(take.id)
+      return
+    }
     const answer = await deps.install(
       take.id,
       to,
@@ -301,5 +320,22 @@ async function takeOne(
     console.warn(`Couldn't take the Mac's copy of ${take.id}`, cause)
   } finally {
     await deps.removeFile(to).catch(() => undefined)
+  }
+}
+
+/**
+ * Lets one run at a time through: a call made while another is going gives null at once and does
+ * nothing. A run that throws frees the way for the next.
+ */
+export function singleRun(): <T>(work: () => Promise<T>) => Promise<T | null> {
+  let going = false
+  return async (work) => {
+    if (going) return null
+    going = true
+    try {
+      return await work()
+    } finally {
+      going = false
+    }
   }
 }

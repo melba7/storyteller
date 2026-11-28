@@ -448,7 +448,10 @@ type PodcastsNativeModule = {
   ): Promise<PreparedInstallAnswer>
   /** Removes the download of a copy taken only for the list; false when it is not such a copy. */
   giveBackPreparedCopy(episodeId: string): Promise<boolean>
-  /** Whether the phone is on Wi-Fi now, by the test the automatic downloads use. */
+  /**
+   * Whether prepared copies may be fetched now: on Wi-Fi (the test the automatic downloads use)
+   * and not in Low Data Mode. Waits up to a second for the first report of the network.
+   */
   isOnWiFi(): Promise<boolean>
   /** Where each transcribed episode's ad finding is. */
   listAds(): Promise<AdsInfo[]>

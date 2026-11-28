@@ -8,13 +8,15 @@ import * as FileSystem from "expo-file-system/legacy"
 
 import { LofiScore } from "@/modules/lofi-score"
 
-import { listEpisodesByIds, rows } from "./db"
+import { getEpisode, listEpisodesByIds, rows } from "./db"
 import { listDownloads } from "./downloadsNative"
 import { Podcasts } from "./index"
 import type { QueueEntry } from "./phoneQueue"
+import { listUpNext } from "./upNextNative"
 import {
   type PreparedEpisode,
   preparedCandidates,
+  singleRun,
   syncPrepared,
 } from "./preparedSync"
 
@@ -22,6 +24,9 @@ import {
 const CHUNK = 200
 
 const tempFolder = () => `${FileSystem.cacheDirectory ?? ""}prepared-copies/`
+
+/** One run at a time: the second pass 45 seconds later and a new run may not overlap one that is going. */
+const exclusive = singleRun()
 
 /** The files the native side refused in this launch, by episode, with the checksum refused. */
 const refused = new Map<string, string>()
@@ -77,40 +82,53 @@ export async function runPrepared(
   const lofi = LofiScore
   if (!podcasts || !lofi) return
   try {
-    await syncPrepared(
-      {
-        hasLinkedFolder: async () =>
-          (await lofi.getStatus()).folder.linkedFolder !== undefined,
-        onWiFi: () => podcasts.isOnWiFi(),
-        candidates: async () =>
-          preparedCandidates(
-            await listedEpisodes(await readQueue()),
-            await downloadedEpisodes(),
-          ),
-        plan: (candidates) => podcasts.preparedPlan(candidates),
-        copy: (path, to) => lofi.copyLinkedFolderFile(path, to),
-        install: (id, uri, address, forListOnly) =>
-          podcasts.installPreparedCopy(id, uri, address, forListOnly),
-        giveBack: (id) => podcasts.giveBackPreparedCopy(id),
-        tempFile: (take) =>
-          `${tempFolder()}${take.id.replace(/[^A-Za-z0-9_-]/g, "_")}.${take.fileExtension}`,
-        removeFile: (uri) => FileSystem.deleteAsync(uri, { idempotent: true }),
-        now: () => Date.now(),
-        later: (ms, run) => {
-          setTimeout(() => {
-            run().catch((cause: unknown) =>
-              console.warn("Couldn't take the Mac's prepared copies", cause),
+    await exclusive(() =>
+      syncPrepared(
+        {
+          hasLinkedFolder: async () =>
+            (await lofi.getStatus()).folder.linkedFolder !== undefined,
+          onWiFi: () => podcasts.isOnWiFi(),
+          candidates: async () => {
+            const listed = await listedEpisodes(await readQueue())
+            // The whole list: all of Up Next and the episodes of the phone's list.
+            const whole = [
+              ...(await listUpNext()).map((item) => item.id),
+              ...listed.map((one) => one.id),
+            ]
+            return preparedCandidates(listed, await downloadedEpisodes(), whole)
+          },
+          hasStarted: async (id) => {
+            const episode = await getEpisode(id)
+            return (
+              episode === null || episode.positionSeconds > 0 || episode.played
             )
-          }, ms)
+          },
+          plan: (candidates) => podcasts.preparedPlan(candidates),
+          copy: (path, to) => lofi.copyLinkedFolderFile(path, to),
+          install: (id, uri, address, forListOnly) =>
+            podcasts.installPreparedCopy(id, uri, address, forListOnly),
+          giveBack: (id) => podcasts.giveBackPreparedCopy(id),
+          tempFile: (take) =>
+            `${tempFolder()}${take.id.replace(/[^A-Za-z0-9_-]/g, "_")}.${take.fileExtension}`,
+          removeFile: (uri) =>
+            FileSystem.deleteAsync(uri, { idempotent: true }),
+          now: () => Date.now(),
+          later: (ms, run) => {
+            setTimeout(() => {
+              exclusive(run).catch((cause: unknown) =>
+                console.warn("Couldn't take the Mac's prepared copies", cause),
+              )
+            }, ms)
+          },
+          clearTemp: async () => {
+            await FileSystem.deleteAsync(tempFolder(), { idempotent: true })
+            await FileSystem.makeDirectoryAsync(tempFolder(), {
+              intermediates: true,
+            })
+          },
         },
-        clearTemp: async () => {
-          await FileSystem.deleteAsync(tempFolder(), { idempotent: true })
-          await FileSystem.makeDirectoryAsync(tempFolder(), {
-            intermediates: true,
-          })
-        },
-      },
-      refused,
+        refused,
+      ),
     )
   } catch (cause) {
     console.warn("Couldn't take the Mac's prepared copies", cause)

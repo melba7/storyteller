@@ -130,6 +130,21 @@ public final class DownloadStore: @unchecked Sendable {
     }
   }
 
+  /// Takes only the mark of a copy taken for the list off an episode's entry: something other than
+  /// the list's own read-ahead asked for this download, so it is an ordinary download now. Returns
+  /// the entry as it now stands, or nil when it was not marked (or not there).
+  @discardableResult
+  public func clearCopyForList(episodeId: String) throws -> DownloadEntry? {
+    try lock.withLock {
+      guard let at = index.entries.firstIndex(where: { $0.episodeId == episodeId }),
+        index.entries[at].copyForList
+      else { return nil }
+      index.entries[at].copyForList = false
+      try save()
+      return index.entries[at]
+    }
+  }
+
   /// Moves the file URLSession finished into `.incoming`, on the same volume, so the move is
   /// a rename. Call it before the delegate method returns.
   public func stage(_ temporary: URL, episodeId: String) throws -> URL {

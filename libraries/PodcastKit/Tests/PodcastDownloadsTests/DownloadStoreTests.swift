@@ -169,6 +169,22 @@ final class DownloadStoreTests: XCTestCase {
     XCTAssertFalse(try finish(store, "b").copyForList)
   }
 
+  func testAskedForDownloadTakesOnlyTheForListMarkOff() throws {
+    let store = try DownloadStore(root: root)
+    var listed = entry("a", .queued)
+    listed.copyForList = true
+    listed.ahead = true
+    try store.put(listed)
+    try store.put(entry("b", .queued))
+    let cleared = try store.clearCopyForList(episodeId: "a")
+    XCTAssertEqual(cleared?.copyForList, false)
+    XCTAssertEqual(cleared?.ahead, true, "the ahead mark is left as it is")
+    XCTAssertEqual(try DownloadStore(root: root).entry(for: "a")?.copyForList, false)
+    XCTAssertNil(try store.clearCopyForList(episodeId: "a"))
+    XCTAssertNil(try store.clearCopyForList(episodeId: "b"))
+    XCTAssertNil(try store.clearCopyForList(episodeId: "nope"))
+  }
+
   func testClearingTheAheadMarkAlsoMakesAListCopyTheListenersOwn() throws {
     let store = try DownloadStore(root: root)
     var listed = entry("a", .queued)

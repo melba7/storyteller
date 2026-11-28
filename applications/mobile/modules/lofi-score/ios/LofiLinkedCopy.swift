@@ -59,11 +59,12 @@ enum LinkedFolderCopy {
     guard file.resolvingSymlinksInPath().path.hasPrefix(inside) else {
       return .unreadable("The file's path is not allowed.")
     }
-    // A file that shows under its own name but is only a placeholder would make the read below
-    // wait for the download: it is asked for and left for the next run.
+    // A file that shows under its own name but is not up to date on the phone (a placeholder, or
+    // still downloading) would make the read below wait for iCloud: it is asked for and left for
+    // the next run.
     let status = try? file.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
       .ubiquitousItemDownloadingStatus
-    if status == .notDownloaded {
+    if let status, status != .current {
       try? fileManager.startDownloadingUbiquitousItem(at: file)
       return .waiting
     }

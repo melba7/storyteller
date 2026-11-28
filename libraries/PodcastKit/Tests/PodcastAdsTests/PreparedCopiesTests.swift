@@ -13,11 +13,12 @@ final class PreparedCopiesTests: XCTestCase {
   private func candidate(
     _ id: String, place: Int? = nil, download: PreparedCopies.Download = .none,
     started: Bool = false, playing: Bool = false, forList: Bool = false,
-    listed: PreparedCopy? = nil
+    listed: PreparedCopy? = nil, stillListed: Bool = false
   ) -> PreparedCopies.Candidate {
     PreparedCopies.Candidate(
       id: id, listPlace: place, download: download, started: started, inPlayer: playing,
-      copyForListOnly: forList, listed: listed ?? aCopy())
+      copyForListOnly: forList, listed: listed ?? aCopy(),
+      stillListed: stillListed)
   }
 
   private func plan(_ candidates: [PreparedCopies.Candidate], most: Int = 3) -> PreparedCopies.Plan {
@@ -122,6 +123,20 @@ final class PreparedCopiesTests: XCTestCase {
     XCTAssertEqual(plan([candidate("a", download: held, forList: false)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: .none, forList: true)]).giveBack, [])
     XCTAssertEqual(plan([candidate("a", download: .moving, forList: true)]).giveBack, [])
+  }
+
+  func testACopyIsKeptWhileItsEpisodeIsStillInTheWholeList() {
+    let held = PreparedCopies.Download.downloaded(sha256: aCopy().sha256)
+    // Past the places that are taken, but still in the listener's list: not given back.
+    XCTAssertEqual(
+      plan([candidate("a", download: held, forList: true, stillListed: true)]).giveBack, [])
+    // Out of the whole list: given back.
+    XCTAssertEqual(
+      plan([candidate("a", download: held, forList: true, stillListed: false)]).giveBack, ["a"])
+  }
+
+  func testAnEpisodeOnlyStillListedIsNotTaken() {
+    XCTAssertEqual(plan([candidate("a", stillListed: true)]).take, [])
   }
 
   func testGivingBackIsNotCappedAndKeepsTheOrder() {

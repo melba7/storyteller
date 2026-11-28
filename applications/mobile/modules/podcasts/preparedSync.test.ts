@@ -14,6 +14,7 @@ import {
   candidatesJson,
   parsePreparedPlan,
   preparedCandidates,
+  singleRun,
   syncPrepared,
 } from "./preparedSync"
 
@@ -35,6 +36,7 @@ const candidate = (
   id,
   address: `https://audio.example.com/${id}.mp3`,
   listPlace: null,
+  stillListed: false,
   started: false,
   showId: "show-1",
   ...extra,
@@ -52,6 +54,8 @@ function phone(
       id: string,
     ) => PreparedInstallAnswer | Promise<PreparedInstallAnswer>
     giveBack?: (id: string) => boolean | Promise<boolean>
+    /** Whether the episode was started when it is looked at again, just before the install. */
+    started?: (id: string) => boolean | Promise<boolean>
     /** How long each copy takes on the clock, in milliseconds. */
     copyMs?: number
   } = {},
@@ -102,6 +106,10 @@ function phone(
     giveBack: async (id) => {
       calls.push(`giveBack ${id}`)
       return (await options.giveBack?.(id)) ?? true
+    },
+    hasStarted: async (id) => {
+      calls.push(`started? ${id}`)
+      return (await options.started?.(id)) ?? false
     },
     tempFile: (one) =>
       `file:///cache/prepared-copies/${one.id}.${one.fileExtension}`,
@@ -369,6 +377,69 @@ describe("syncPrepared: the time it takes", () => {
   })
 })
 
+describe("syncPrepared: an episode started while its copy came", () => {
+  it("is not swapped: no install, no refusal, the temporary file removed", async () => {
+    const refused = new Map<string, string>()
+    const run = phone({
+      plan: { take: [take("e1")] },
+      started: () => true,
+    })
+    const report = await syncPrepared(run.deps, refused)
+    expect(run.calls).toContain("started? e1")
+    expect(run.installs).toEqual([])
+    expect(report.started).toEqual(["e1"])
+    expect(report.refused).toEqual({})
+    expect(refused.size).toBe(0)
+    expect(run.files.size).toBe(0)
+    expect(run.calls).toContain("remove file:///cache/prepared-copies/e1.mp3")
+  })
+
+  it("is looked at after the copy, not before", async () => {
+    const run = phone({ plan: { take: [take("e1")] } })
+    await syncPrepared(run.deps)
+    expect(run.calls.indexOf("started? e1")).toBeGreaterThan(
+      run.calls.findIndex((call) => call.startsWith("copy ")),
+    )
+  })
+})
+
+describe("singleRun", () => {
+  it("lets a second call during a pending first copy nothing and refuse nothing", async () => {
+    const guard = singleRun()
+    let release: () => void = () => undefined
+    const first = phone({
+      plan: { take: [take("e1")] },
+      copy: () =>
+        new Promise((resolve) => {
+          release = () => resolve({ status: "copied", bytes: 1 })
+        }),
+    })
+    const second = phone({ plan: { take: [take("e1")] } })
+    const refused = new Map<string, string>()
+    const pending = guard(() => syncPrepared(first.deps, refused))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const skipped = await guard(() => syncPrepared(second.deps, refused))
+    expect(skipped).toBeNull()
+    expect(second.calls).toEqual([])
+    expect(refused.size).toBe(0)
+    release()
+    await pending
+    expect(first.installs.map((one) => one.id)).toEqual(["e1"])
+    // Once the first is over, the next call runs.
+    expect(await guard(() => syncPrepared(second.deps, refused))).not.toBeNull()
+  })
+
+  it("runs again after a run that threw", async () => {
+    const guard = singleRun()
+    await expect(
+      guard(async () => {
+        throw new Error("boom")
+      }),
+    ).rejects.toThrow("boom")
+    expect(await guard(async () => 1)).toBe(1)
+  })
+})
+
 describe("syncPrepared: refused copies", () => {
   it("does not copy the same refused file again in this launch", async () => {
     const refused = new Map<string, string>()
@@ -445,8 +516,14 @@ describe("what the native plan is asked", () => {
       candidate("e2", { started: true }),
     ])
     expect(JSON.parse(text)).toEqual([
-      { id: "e1", listPlace: 0, started: false, showId: "show-1" },
-      { id: "e2", started: true, showId: "show-1" },
+      {
+        id: "e1",
+        listPlace: 0,
+        stillListed: false,
+        started: false,
+        showId: "show-1",
+      },
+      { id: "e2", stillListed: false, started: true, showId: "show-1" },
     ])
   })
 })
@@ -530,6 +607,22 @@ describe("preparedCandidates", () => {
     )
     expect(found).toHaveLength(1)
     expect(found[0]?.listPlace).toBe(0)
+  })
+
+  it("says an episode past the places taken is still in the whole list", () => {
+    const found = preparedCandidates(
+      [facts("a")],
+      [facts("b"), facts("c"), facts("d")],
+      ["z", "b", "a"],
+    )
+    expect(
+      found.map((one) => [one.id, one.listPlace, one.stillListed]),
+    ).toEqual([
+      ["a", 0, true],
+      ["b", null, true],
+      ["c", null, false],
+      ["d", null, false],
+    ])
   })
 
   it("leaves out an added file and an episode with no web address", () => {

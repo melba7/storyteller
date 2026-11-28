@@ -29,11 +29,16 @@ public enum PreparedCopies {
     public var copyForListOnly: Bool
     /// The copy the Mac's file lists for the episode, if any.
     public var listed: PreparedCopy?
+    /// The episode is anywhere in the listener's whole list of next episodes, also past the places
+    /// that are taken. A copy is given back only when this is false and `listPlace` is nil.
+    public var stillListed: Bool
 
     public init(
       id: String, listPlace: Int? = nil, download: Download = .none, started: Bool = false,
-      inPlayer: Bool = false, copyForListOnly: Bool = false, listed: PreparedCopy? = nil
+      inPlayer: Bool = false, copyForListOnly: Bool = false, listed: PreparedCopy? = nil,
+      stillListed: Bool = false
     ) {
+      self.stillListed = stillListed
       self.id = id
       self.listPlace = listPlace
       self.download = download
@@ -87,7 +92,7 @@ public enum PreparedCopies {
   }
 
   private static func givesBack(_ one: Candidate) -> Bool {
-    guard one.copyForListOnly, one.listPlace == nil, !one.started, !one.inPlayer,
+    guard one.copyForListOnly, one.listPlace == nil, !one.stillListed, !one.started, !one.inPlayer,
       case .downloaded = one.download
     else { return false }
     return true

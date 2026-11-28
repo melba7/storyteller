@@ -18,6 +18,8 @@ enum PodcastPrepared {
     var listPlace: Int?
     var started: Bool?
     var showId: String?
+    /// Anywhere in the listener's whole list of next episodes, also past the places taken.
+    var stillListed: Bool?
   }
 
   // MARK: The plan
@@ -35,9 +37,11 @@ enum PodcastPrepared {
     var shows: [String: String] = [:]
     for one in asked where !one.id.isEmpty {
       // An episode of a show whose ad skipping is off gets no copy: the Mac's marks are not used.
+      // It still goes to the plan, with no listed copy, so a copy taken earlier is given back.
+      var skips = true
       if let show = one.showId, !show.isEmpty {
-        guard PodcastAdFinder.listenerSwitches(forShow: show).skipsAnySort else { continue }
-        shows[one.id] = show
+        skips = PodcastAdFinder.listenerSwitches(forShow: show).skipsAnySort
+        if skips { shows[one.id] = show }
       }
       let entry = downloader.store?.entry(for: one.id)
       candidates.append(
@@ -45,7 +49,8 @@ enum PodcastPrepared {
           id: one.id, listPlace: one.listPlace, download: download(of: one.id, entry),
           started: one.started ?? false, inPlayer: playing == one.id,
           copyForListOnly: entry?.copyForList ?? false,
-          listed: PodcastTeaching.shared.aheadEntry(episode: one.id)?.copy))
+          listed: skips ? PodcastTeaching.shared.aheadEntry(episode: one.id)?.copy : nil,
+          stillListed: one.stillListed ?? false))
     }
     let made = PreparedCopies.plan(candidates)
     var take: [[String: Any]] = []

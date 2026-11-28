@@ -389,8 +389,9 @@ public final class PodcastsModule: Module {
     AsyncFunction("giveBackPreparedCopy") { (episodeId: String) async -> Bool in
       await PodcastPrepared.giveBack(episodeId: episodeId)
     }
-    // Whether the phone is on Wi-Fi now, by the test the automatic downloads use.
-    AsyncFunction("isOnWiFi") { () -> Bool in PodcastNetwork.shared.onWiFi }
+    // Whether prepared copies may be fetched now: on Wi-Fi (the test the automatic downloads use)
+    // and not in Low Data Mode. Waits up to a second for the first report of the network.
+    AsyncFunction("isOnWiFi") { () async -> Bool in await PodcastNetwork.shared.allowsCopies() }
 
     // What was taught: the installed files, the model's numbers and how many ads and sounds.
     AsyncFunction("getTeachingState") { () -> String in PodcastTeaching.shared.stateJSON() }
