@@ -8,7 +8,7 @@ import Foundation
 /// caller lets it go. On Linux there is no such pool and the read is a plain read.
 public enum ChunkRead {
   /// The next chunk of at most `count` bytes, or nil at the end of the file, when it cannot be read
-  /// (a folder opens but cannot be read) or when `count` is not positive.
+  /// (on Linux a folder opens but cannot be read) or when `count` is not positive.
   public static func next(_ handle: FileHandle, upTo count: Int) -> Data? {
     guard count > 0 else { return nil }
     let chunk = pooled { try? handle.read(upToCount: count) }

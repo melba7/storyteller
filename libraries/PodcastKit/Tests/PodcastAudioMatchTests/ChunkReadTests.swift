@@ -16,10 +16,23 @@ final class ChunkReadTests: XCTestCase {
     XCTAssertNil(ChunkRead.next(handle, upTo: 4))
   }
 
-  func testAFolderGivesNoChunk() throws {
-    let handle = try FileHandle(forReadingFrom: FileManager.default.temporaryDirectory)
+  func testAFolderGivesNoChunk() {
+    // On Linux a folder opens but cannot be read; on Apple's systems it does not open at all.
+    guard let handle = try? FileHandle(forReadingFrom: FileManager.default.temporaryDirectory) else {
+      return
+    }
     defer { try? handle.close() }
     XCTAssertNil(ChunkRead.next(handle, upTo: 4))
+  }
+
+  func testNoChunkIsReadForASizeOfZero() throws {
+    let url = FileManager.default.temporaryDirectory.appendingPathComponent("chunks-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try Data([1, 2, 3]).write(to: url)
+    let handle = try FileHandle(forReadingFrom: url)
+    defer { try? handle.close() }
+    XCTAssertNil(ChunkRead.next(handle, upTo: 0))
+    XCTAssertEqual(ChunkRead.next(handle, upTo: 3).map { [UInt8]($0) }, [1, 2, 3])
   }
 
   func testTheProgressLineSaysTheEpisodesAndTheMostMemoryUsed() {
