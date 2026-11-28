@@ -412,7 +412,9 @@ number, such as 5 GB and 3 days, and passes it to the job). Nothing is copied,
 and one line says so, when iCloud Drive is missing, when the Mac's disk has
 under 15 GB free, or when `brctl quota` says iCloud has under 2 GB left after
 the file. The Mac has to be awake and online. It does not skip Sundays. Only the
-marking costs anything.
+marking costs anything. The Mac keeps at most 25 GB of the job's own audio
+(`TEACH_PREPARE_OWN_GB`); audio from earlier teaching runs is not counted, so it
+never stops the hour.
 
 **What is deleted, and what never is.** Prepared audio older than 7 days goes,
 and then the oldest first until the copies are under 10 GB; room is made before
