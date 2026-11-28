@@ -27,7 +27,9 @@ with the exact labels (was 129); X7 (one tap leaves the whole break) merged (PR
 2026-11-27): all done (PR #61 merged, TestFlight 39.1, the hourly job installed
 on Mo's Mac 2026-11-28); the phone's folder link fixed (PR #62, TestFlight 40.1;
 the phone's first files reached the Mac 2026-11-28) | After prepared episodes
-(Z1 to Z23, Mo's picks 2026-11-28): planned; part 1 is being built
+(Z1 to Z23, Mo's picks 2026-11-28): part 1, the map and the ad-end check built
+and checked three times (PR #63); the Mac's tests run by themselves after the
+merge
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -2361,7 +2363,9 @@ How I read the picks (my choices, told to Mo):
     144 and 131 with no more wrong skips (limits picked on 1,170 training
     episodes: promo code, web address, "com slash", terms apply; one line
     bridged; reach 15 s), kept and built into the phone's finders; break sound
-    snap no change (needs other episodes' audio), not kept.
+    snap no change (needs other episodes' audio), not kept. After the final
+    check the cues no longer fire on a sentence's end or on "the code": still +2
+    on both keys, 6 ends moved instead of 7, no more wrong skips.
 - [ ] **Z13 Word-exact ends in the Mac's marks** (Mo's pick "All seven"; free):
       the Mac's transcripts keep each word's time, and a mark ends at the ad's
       last word. Today exact ends lie within 1 s of a line start 46 times in 100
@@ -2467,6 +2471,11 @@ cutting the ads out of the file (Mo said no for now).
 
 ## Later
 
+- Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
+  lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
+  `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
+  Two `teach_words.py --no-lock` runs at once could share a `.part` file. A held
+  new episode that is still held after 2 days is forgotten, not downloaded.
 - Prepared episodes (Y, 2026-11-27), found by the Opus check or by the builders
   and left: when the ads file of a copy cannot be saved the copy stays installed
   without the Mac's marks and is not taken again (the phone's own finders then
