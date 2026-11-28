@@ -2350,12 +2350,18 @@ How I read the picks (my choices, told to Mo):
       twice-downloaded episodes, marks from copy A played on copy B.
   - Done when: the share of marks placed within 5 s stands here, and what is not
     placed falls back to the phone's own finders (a test pins it).
-- [ ] **Z12 Edge tricks from MinusPod** (F): the silence snap (the nearest
+- [x] **Z12 Edge tricks from MinusPod** (F): the silence snap (the nearest
       silence within 2 s), the ad-end check (the end moves on while the next
       lines still sell) and the per-show break sound snap. Each is tried alone
       against the answer key.
   - Done when: three numbers stand here. A trick is kept only when it passes
     more breaks with no more wrong skips.
+  - Results (`/home/user/scratch-z/n`, against the dumps from before round X:
+    142/219 and 129/222): silence snap 136 and 124, not kept; the ad-end check
+    144 and 131 with no more wrong skips (limits picked on 1,170 training
+    episodes: promo code, web address, "com slash", terms apply; one line
+    bridged; reach 15 s), kept and built into the phone's finders; break sound
+    snap no change (needs other episodes' audio), not kept.
 - [ ] **Z13 Word-exact ends in the Mac's marks** (Mo's pick "All seven"; free):
       the Mac's transcripts keep each word's time, and a mark ends at the ad's
       last word. Today exact ends lie within 1 s of a line start 46 times in 100
@@ -2363,13 +2369,15 @@ How I read the picks (my choices, told to Mo):
       Needs Mo's double-click to write the 63 shelf episodes down again.
   - Done when: Claude's own edges are scored against the places where two
     downloads differ, before and after. Kept when ends within 5 s reach 95.
-- [ ] **Z14 Ad harvest by repeat downloads** (Mo's pick "All seven"; free): the
+- [x] **Z14 Ad harvest by repeat downloads** (Mo's pick "All seven"; free): the
       Mac downloads a new episode 3 times over the day. What differs is an
       inserted ad with exact edges and no Claude call, and its sound joins Z10's
       sounds. It adds to the publishers' download counts; Mo is told.
   - Done when: on the twice-downloaded episodes, split by week, the share of
     inserted ads with a sound twin from earlier stands here. Built only at 50 in
     100 or more, then held to Z10's bar.
+  - Result: 26 in 100 of inserted stretches (43 in 100 of the testable ones)
+    have a sound twin from 1 to 7 days before. Below the 50 bar: not built.
 - [x] **Z15 The ad-length ruler** (Mo's pick "All seven"; free): 41 in 100
       inserted stretches are within 1 s of a multiple of 15 s. A skip that
       starts at a joint or a known sound and ends near such a multiple is moved
@@ -2377,12 +2385,17 @@ How I read the picks (my choices, told to Mo):
   - Done when: the replay's numbers stand here. Kept by the round's bar.
   - Result: no gain (142 to 142, 129 to 129; only 2 of 290 skips start at a
     joint near a multiple of 15 s). Not kept.
-- [ ] **Z16 The lightest copy** (Mo's pick "All seven"; free): of the Mac's
+- [x] **Z16 The lightest copy** (Mo's pick "All seven"; free): of the Mac's
       downloads of an episode (Z14), the shortest becomes the prepared copy,
       because some downloads carry fewer ads. Nothing is cut out of a file.
   - Done when: the ad seconds of the shorter and the longer copy of the
     twice-downloaded episodes stand here. Built only when the shorter copy has
     at least 20 in 100 fewer ad seconds.
+  - Result: the lighter download has at least 20 in 100 fewer ad seconds in 97
+    of 160 episodes, but it is the later download in 106 of 111, so it is the
+    episode's age, not chance. Not built: it needs repeat downloads (Z14
+    failed), and the map (Z19) already lets the phone play its own, later copy
+    with the Mac's marks.
 - [x] **Z17 Walk a host read back to the brand's first mention** (Mo's pick "All
       seven"; free): when a host read is known by its code, its web address or a
       sponsor name from the notes, its start moves back to the first earlier
