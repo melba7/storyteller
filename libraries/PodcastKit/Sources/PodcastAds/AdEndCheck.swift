@@ -31,12 +31,14 @@ public enum AdEndCheck {
   static let markSlack = 0.5
 
   /// The cues: a promo code, a web address, "com slash word", the terms, and "that's word dot com".
+  /// A written dot has no space on either side, so a sentence's end ("so much. AI is") is no
+  /// address.
   private static let cues = AdSignals.regexes([
-    #"\b(?:promo|discount|offer|coupon|use|enter|with|the)\s+code\b|\bcode\s+\w+\s+(?:at|for|to get)\b"#,
-    #"\b[a-z0-9][a-z0-9-]{2,}\s?(?:\.|\sdot\s)\s?(?:com|co|org|net|io|ai|app|shop|tv|fm|us)\b"#,
+    #"\b(?:promo|discount|offer|coupon|use|enter|with)\s+code\b|\b(?:use|enter)\s+the\s+code\b|\bcode\s+\w+\s+(?:at|for|to get)\b"#,
+    #"\b[a-z0-9][a-z0-9-]{2,}(?:\.|\s+dot\s+)(?:com|co|org|net|io|ai|app|shop|tv|fm|us)\b"#,
     #"\b(?:com|org|net|co|io)\s?(?:/|\sslash\s)\s?\w+"#,
     #"\bterms (?:and conditions )?apply\b|\brestrictions apply\b|\bsee (?:site|website) for details\b|\bmember fdic\b|\bexclusions apply\b"#,
-    #"\b(?:that's|that is|again,? that's)\s+[a-z0-9-]+\s?(?:\.|\sdot\s)\s?com\b"#,
+    #"\b(?:that's|that is|again,? that's)\s+[a-z0-9-]+(?:\.|\s+dot\s+)com\b"#,
   ])
 
   /// Whether a line carries one of the cues.

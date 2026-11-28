@@ -160,6 +160,16 @@ final class EpisodeMapAlignerTests: XCTestCase {
     XCTAssertTrue(carry.unmatched.isEmpty)
   }
 
+  func testAnUnmatchedStretchOverFiveMinutesIsNotGiven() {
+    // A segment the publisher added to the show itself, longer than any ad.
+    let first = Copy.audio(4, seconds: 600)
+    let second = Copy.audio(5, seconds: 600)
+    let carry = EpisodeMapAligner(map: Copy.map([first, second], marks: [])).carry(
+      Copy.heard([first, Copy.audio(60, seconds: 310), second]))
+    XCTAssertTrue(carry.lined)
+    XCTAssertTrue(carry.unmatched.isEmpty)
+  }
+
   func testAnUnmatchedEndIsNotGivenBecauseNoMatchedAudioFollowsIt() {
     let carry = EpisodeMapAligner(map: map).carry(
       Copy.heard([intro, macAd, middle, Copy.audio(60, seconds: 40)]), complete: true)

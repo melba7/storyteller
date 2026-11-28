@@ -58,6 +58,9 @@ public struct EpisodeMapAligner: Sendable {
   static let seedLimit = 16
   /// An unmatched stretch is an ad from this many seconds on.
   public static let minUnmatched = 8.0
+  /// An unmatched stretch longer than this is not an ad (the Mac's longest ad, as in teach_snap.py)
+  /// but show audio the publisher changed, so it is not given.
+  public static let longestUnmatched = 300.0
   /// A carried piece of a mark shorter than this is dropped when the copies differ.
   public static let minPiece = 5.0
   /// Over this share of the episode unmatched, there is no map.
@@ -173,7 +176,8 @@ public struct EpisodeMapAligner: Sendable {
       // The stretch before the first run is bounded only by the episode's start.
       if index == 0, first.heard.lowerBound > 0, !atStart { return nil }
       let stretch = MapStretch(start: heard.time(gap.lowerBound), end: heard.time(gap.upperBound))
-      return stretch.end - stretch.start >= Self.minUnmatched ? stretch : nil
+      let seconds = stretch.end - stretch.start
+      return seconds >= Self.minUnmatched && seconds <= Self.longestUnmatched ? stretch : nil
     }
     let differs =
       runs.count > 1 || first.heard.lowerBound > 0 || (atStart && first.map > 0)

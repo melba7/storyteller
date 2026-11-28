@@ -33,12 +33,15 @@ final class AdEndCheckTests: XCTestCase {
       "code garden for a discount", "code garden to get more", "go to zorbex.com", "zorbex dot com",
       "Zorbex dot org", "quillmat.io", "dot com slash garden", "zorbex.com/garden", "Terms apply.",
       "terms and conditions apply", "restrictions apply", "see site for details", "that's qm dot com",
+      "use the code GARDEN",
     ] {
       XCTAssertTrue(AdEndCheck.sells(text), text)
     }
     for text in [
       talk, "", "her code was hard to read", "we wrote code all night", "visit our friends",
       "ten percent off", "free shipping today", "the terms were clear", "a dot on the map",
+      "we loved it so much. AI is next", "a big day today. Us too", "the code is open source",
+      "that's it. Com in, sit down",
     ] {
       XCTAssertFalse(AdEndCheck.sells(text), text)
     }

@@ -12,10 +12,11 @@
 #   4. runs the test of Claude's second look (paid, capped at 5 dollars)
 #   5. builds the show playbook (paid, capped at 15 dollars), then replays it on the shelf (free)
 #   6. the week-before sounds row, and the ends as they are now (the "before" numbers)
-#   7. maps for the copies already prepared
-#   8. word-exact ends: writes the words of the shelf episodes down again (2 to 4 hours, so it is
+#   7. word-exact ends: writes the words of the shelf episodes down again (2 to 4 hours, so it is
 #      the last step; a stopped run goes on where it was), then measures the ends again and
 #      switches the word-exact ends on only when the bar passes
+# The maps of the copies already prepared need no step here: the first preparing run after step 2
+# writes a map for each copy that has none (teach_maps.py).
 # The preparing job runs from the tools copy and holds the teaching folder's run lock
 # (teach_store.py hold), so step 1 and every step that works in the teaching folder takes the same
 # lock first. So do the installers of step 2, which stop the old job: a preparing run is never
@@ -71,7 +72,7 @@ locked() {
   while :; do
     if python3 "$HERE/teach_store.py" busy "$F" > /dev/null 2>&1; then
       rm -f "$MARKER"
-      python3 -u "$HERE/teach_store.py" hold "$F" /bin/bash "$0" --held "$MARKER" "$@"
+      python3 -u "$HERE/teach_store.py" hold "$F" /bin/bash "$HERE/$(basename "$0")" --held "$MARKER" "$@"
       code="$?"
       # Got the lock (the marker is there), or failed in another way than "busy".
       if [ -e "$MARKER" ] || [ "$code" -ne 3 ]; then return "$code"; fi
@@ -163,12 +164,7 @@ week_before_sounds_and_ends_before() {
   step "Measure the ends before the rewrite" locked python3 -u "$TOOLS/teach_end_score.py" --folder "$F"
 }
 
-# Step 7: maps for the copies already prepared.
-maps_for_the_prepared_copies() {
-  :
-}
-
-# Step 8, the long one, so it is the last: word-exact ends.
+# Step 7, the long one, so it is the last: word-exact ends.
 word_exact_ends() {
   step "Write down the words of the shelf episodes again" python3 -u "$TOOLS/teach_words.py" --folder "$F" --tool "$(built podcast-transcribe)" --no-lock
   step "Measure the ends again and switch on if the bar passes" locked python3 -u "$TOOLS/teach_end_score.py" --folder "$F" --switch-on-pass
@@ -193,8 +189,7 @@ group "3. Score the ad skipping" score_the_ad_skipping
 group "4. Claude's second look test (paid, at most 5 dollars)" second_look_test
 group "5. The show playbook (paid, at most 15 dollars) and its replay on the shelf (free)" show_playbook
 group "6. The week-before sounds row, and the ends as they are now" week_before_sounds_and_ends_before
-group "7. Maps for the copies already prepared" maps_for_the_prepared_copies
-group "8. Word-exact ends (2 to 4 hours)" word_exact_ends
+group "7. Word-exact ends (2 to 4 hours)" word_exact_ends
 
 heading "Summary"
 while IFS="$(printf '\t')" read -r code seconds label; do

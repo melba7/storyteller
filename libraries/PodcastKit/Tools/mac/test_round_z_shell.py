@@ -154,10 +154,19 @@ class RoundTests(RoundSetup):
         self.assertEqual(self.tools(), self.order())
         headings = [line for line in done.stdout.splitlines() if line.startswith("=== ")]
         self.assertEqual([h.split(".")[0] for h in headings[1:]],
-                         ["=== %d" % n for n in range(1, 9)] + ["=== Summary ==="])
-        # The long step is the last one, after the maps.
-        self.assertIn("8. Word-exact ends", headings[-2])
+                         ["=== %d" % n for n in range(1, 8)] + ["=== Summary ==="])
+        # The long step is the last one.
+        self.assertIn("7. Word-exact ends", headings[-2])
         self.assertIn("Every step worked.", done.stdout)
+
+    def test_it_works_when_started_by_a_path_from_the_clone(self):
+        # The launcher may start it as libraries/PodcastKit/Tools/mac/round-z.sh from the clone's
+        # folder. The locked steps start the script again after it moved into the tools copy.
+        done = subprocess.run(["bash", os.path.join("Tools", "mac", "round-z.sh")], cwd=self.source,
+                              env=self.env(), capture_output=True, text=True, timeout=120,
+                              stdin=subprocess.DEVNULL)
+        self.assertEqual(done.returncode, 0, done.stdout + done.stderr)
+        self.assertEqual(self.tools(), self.order())
 
     def test_the_tools_copy_is_updated_without_build_folders_and_keeps_its_own(self):
         self.write(os.path.join(self.copy, ".build", "release", "mine"), "the copy's build\n")
@@ -240,7 +249,8 @@ class RoundTests(RoundSetup):
         self.assertNotIn("Install episode preparing", steps)
         self.assertIn("python3 teach_second_look.py test F --cap 5 --yes", self.tools())
         headings = [line for line in done.stdout.splitlines() if line.startswith("=== ")]
-        self.assertEqual(len(headings), 10)
+        # The round's first line, its 7 steps and the summary.
+        self.assertEqual(len(headings), 9)
 
     def test_a_failed_step_says_its_code_and_the_next_ones_still_run(self):
         done = self.round(FAIL="teach_second_look.py:test teach_playbook.py:build", TEACH_CODES="score=137")
@@ -281,7 +291,7 @@ class RoundTests(RoundSetup):
         with open(os.path.join(self.lofi, "logs", "round-z-steps.log")) as f:
             log = f.read()
         self.assertIn("teach_second_look.py test: pretending to fail", log)
-        self.assertIn("=== 7. Maps for the copies already prepared ===", log)
+        self.assertIn("=== 7. Word-exact ends (2 to 4 hours) ===", log)
 
     def test_nothing_waits_for_typed_input(self):
         # Standard input is a pipe that nobody writes to and nobody closes: a step that read from
