@@ -77,6 +77,21 @@ final class AheadMapAdsTests: XCTestCase {
     XCTAssertEqual(made.ads, [ad(200, 230)])
   }
 
+  func testAnAdTheMapGivesNoMoreLeavesTheFileAlsoWhenItWasJoinedSince() {
+    var own = ad(330.3, 360)
+    own.source = nil
+    // The map gave 300 to 330; the file's join made one ad of it and the scan's own next to it.
+    let gone = [ad(300, 330)]
+    let joined = AdJoin.join([gone[0], own])
+    XCTAssertEqual(joined.map(\.end), [360])
+    XCTAssertTrue(AheadAds.without(gone, from: joined).isEmpty)
+    // The ad as it was given, or shortened since, leaves too; the others stay.
+    XCTAssertEqual(
+      AheadAds.without(gone, from: [ad(100, 130), ad(300, 330), ad(310, 330), own, ad(500, 530)]),
+      [ad(100, 130), own, ad(500, 530)])
+    XCTAssertEqual(AheadAds.without([], from: joined), joined)
+  }
+
   func testNoMapAdsChangeNothing() {
     let words = AheadFound(ads: [ad(58, 93)], asks: [ad(500, 520, .unsure)])
     XCTAssertEqual(AheadAds.withMap(words, carried: []), words)

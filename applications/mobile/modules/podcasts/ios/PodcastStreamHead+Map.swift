@@ -71,9 +71,11 @@ final class HeadMap: @unchecked Sendable {
   }
 
   /// The ads of the file on disk without the ones an earlier look gave and the map gives no
-  /// more, so a copy that turns out not to line up loses what the map gave before.
+  /// more, so a copy that turns out not to line up loses what the map gave before. The file's
+  /// ads are joined when they are written, so an ad of the map is known by where it lies
+  /// (`AheadAds.without`); the scan's own ad it was joined with comes back from the scan's list.
   func standing(_ before: [FoundAd]) -> [FoundAd] {
-    lock.withLock { before.filter { !gone.contains($0) } }
+    lock.withLock { AheadAds.without(gone, from: before) }
   }
 }
 
