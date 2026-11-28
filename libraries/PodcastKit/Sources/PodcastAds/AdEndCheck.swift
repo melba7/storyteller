@@ -10,7 +10,9 @@
 // github.com/ttlequals0/MinusPod); see FORK.md.
 //
 // It is for the phone's own finders. A mark of the Mac (`ShowTuning.ahead`) is left alone, because
-// Claude read those lines already, and a prepared copy never comes here.
+// Claude read those lines already, and a prepared copy never comes here. A mark that was joined with
+// an ad of the phone has lost its finder's name (`AdJoin`), so the caller also hands over the marks
+// themselves: an end that is a mark's end stays as well.
 import Foundation
 import PodcastTranscripts
 
@@ -24,6 +26,9 @@ public enum AdEndCheck {
   /// What is added carries the name of the filled holes: on the phone it runs with them, under
   /// their mark and their level, and an Undo takes back only this stretch (`AdSkip.takenBack`).
   static let source = ShowTuning.filledHoles
+  /// A mark of the Mac ends a stretch when its end is this close to the stretch's end (the
+  /// distance `AdJoin` calls touching).
+  static let markSlack = 0.5
 
   /// The cues: a promo code, a web address, "com slash word", the terms, and "that's word dot com".
   private static let cues = AdSignals.regexes([
@@ -86,8 +91,12 @@ public enum AdEndCheck {
   /// What the check adds to `skips`: for each stretch of skips that overlap or touch, the stretch
   /// from its end to where the end moves, as an unsure ad of the kind of the skip that ends there.
   /// It never reaches into the next stretch, and nothing is added after a stretch that a mark of
-  /// the Mac ends. Lines and skips that are not finite are left out. Bad input adds nothing.
-  public static func stretches(lines: [TranscriptLine], skips: [FoundAd]) -> [FoundAd] {
+  /// the Mac ends: a skip with the Mac's name that closes it, or one of `marks` (the Mac's marks in
+  /// this copy's seconds) that lies in it and ends within `markSlack` of its end. Lines and skips
+  /// that are not finite are left out. Bad input adds nothing.
+  public static func stretches(
+    lines: [TranscriptLine], skips: [FoundAd], marks: [FoundAd] = []
+  ) -> [FoundAd] {
     let lines = lines.filter { $0.start.isFinite }.sorted { $0.start < $1.start }
     let joined = Self.joined(skips)
     guard let final = lines.last, !joined.isEmpty else { return [] }
@@ -98,7 +107,11 @@ public enum AdEndCheck {
     var added: [FoundAd] = []
     for (index, stretch) in joined.enumerated() {
       guard let closing = stretch.closing.first,
-        !stretch.closing.contains(where: { $0.source == ShowTuning.ahead })
+        !stretch.closing.contains(where: { $0.source == ShowTuning.ahead }),
+        !marks.contains(where: {
+          $0.start < stretch.end && $0.end > stretch.start
+            && abs($0.end - stretch.end) <= markSlack
+        })
       else { continue }
       var end = moved(stretch.end, starts: starts, sells: sells, last: last)
       if index + 1 < joined.count { end = min(end, joined[index + 1].start) }
