@@ -26,7 +26,8 @@ NEW_FILES = ["teach-finish.sh", "teach-weekly.sh", "Teach the phone again.comman
              "Ask Apple's model about the test episodes.command", "teach-ahead.sh",
              "Install nightly read-ahead.command", "Stop nightly read-ahead.command",
              "Back up the teaching marks.command", "Start another big run.command",
-             "Gather deeper and mark tonight.command"]
+             "Gather deeper and mark tonight.command", "teach-nightly.sh",
+             "Install nightly teaching.command", "Stop nightly teaching.command"]
 
 PYTHON = """#!/bin/bash
 # stand-in for python3: records the call and writes what the real tool would write
@@ -306,7 +307,9 @@ class FinishTests(Setup):
             open(self.calls, "w").close()
             done = self.run_script("teach-finish.sh", FAIL=failing)
             self.assertEqual(done.returncode, 0, failing)
-            self.assertEqual(self.short(), FINISH_ORDER, failing)
+            # A failed score leaves the per-show settings out (see ScoreFailedTests).
+            expected = [c for c in FINISH_ORDER if label != "Score" or c != "python3 teach_settings.py"]
+            self.assertEqual(self.short(), expected, failing)
             self.assertIn("  %s: failed" % label, done.stdout)
 
     def test_the_backup_is_the_first_step_and_costs_no_claude_usage(self):
@@ -443,6 +446,34 @@ class ExitCodeTests(Setup):
     def test_the_code_is_in_the_log_too(self):
         self.run_script("teach-finish.sh", TEACH_CODES="score=137")
         self.assertIn("exit code 137", self.log())
+
+
+class ScoreFailedTests(Setup):
+    """When the score fails, scorecard.json is the one of an earlier run, so no settings are made
+    from it and none are published as new."""
+
+    def test_a_failed_score_leaves_the_settings_out_and_says_so_in_one_line(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=137")
+        self.assertNotIn("python3 teach_settings.py", " ".join(self.short()))
+        self.assertIn("  Settings: left out (the score failed)", done.stdout)
+        self.assertEqual(done.stdout.count("The score failed, so no new settings are made"), 1)
+        self.assertIn("The score failed, so no new settings", self.log())
+
+    def test_publish_still_runs_and_the_old_settings_file_is_not_touched(self):
+        folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
+        os.makedirs(folder)
+        with open(os.path.join(folder, "show-settings.json"), "w") as f:
+            f.write("old\n")
+        done = self.run_script("teach-finish.sh", FAIL="podcast-teach-score")
+        self.assertIn("python3 teach_publish.py", " ".join(self.short()))
+        with open(os.path.join(folder, "show-settings.json")) as f:
+            self.assertEqual(f.read(), "old\n")
+        self.assertEqual(done.returncode, 0)
+
+    def test_a_score_that_worked_still_makes_the_settings(self):
+        done = self.run_script("teach-finish.sh")
+        self.assertIn("  Settings: worked", done.stdout)
+        self.assertNotIn("The score failed", done.stdout)
 
 
 class FinishLockTests(Setup):

@@ -25,6 +25,8 @@
 #                                    episode's MP3 file once and keeps them in joints.json, so the
 #                                    scorer's joint rows do not read the audio again
 #   8. settings (teach_settings.py)  what each new finder may do on each show, from the scorecard
+#                                    (left out, and said, when the score failed: the scorecard is
+#                                    then old and would make old settings)
 #   9. publish  (teach_publish.py)   copies the results to the folders the phone reads
 # A step that fails is said plainly and the later steps still run, except that the Swift steps
 # (5, 6 and 7, and the joints before 7) are left out together when podcast-teach does not build (the
@@ -63,6 +65,7 @@ trap 'rm -f "$CAPTURE"' EXIT
 CAFFEINATE=""
 command -v caffeinate > /dev/null && CAFFEINATE="caffeinate -i"
 SUMMARY=""
+SCORE_FAILED=""
 
 say() { echo "$@" | tee -a "$LOG"; }
 
@@ -223,15 +226,21 @@ else
   # The joints are kept in joints.json; a failure here only means the scorer reads the audio itself.
   run_step "Joints" "$FOLDER/joints.json" $CAFFEINATE "$TEACH_TOOL" joints "$FOLDER" \
     || say "No joints were saved this time (see above). The score reads the audio itself."
-  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS
+  run_step "Score" "$FOLDER/scorecard.json" "$TEACH_TOOL" score "$FOLDER" $LABELS || SCORE_FAILED=1
 fi
 
 # It reads scorecard.json (exit 0 also when there is none yet: nothing is written). Exit 2 is a
 # problem, said above; the settings file is optional, so the run goes on.
 say
 say "Step 8 of 9: choosing what each new finder may do on each show"
-run_step "Settings" "$FOLDER/show-settings.json" python3 -u "$TOOLS/teach_settings.py" --folder "$FOLDER" \
-  || say "No new settings this time (see above). The phone keeps the ones it has, or its built-in defaults."
+if [ -n "$SCORE_FAILED" ]; then
+  # scorecard.json is from an earlier run, so settings made from it would be old news.
+  note "Settings" "left out (the score failed)"
+  say "The score failed, so no new settings are made from the old scorecard. The phone keeps the ones it has, or its built-in defaults."
+else
+  run_step "Settings" "$FOLDER/show-settings.json" python3 -u "$TOOLS/teach_settings.py" --folder "$FOLDER" \
+    || say "No new settings this time (see above). The phone keeps the ones it has, or its built-in defaults."
+fi
 
 say
 say "Step 9 of 9: copying the results to the phone's folders"
