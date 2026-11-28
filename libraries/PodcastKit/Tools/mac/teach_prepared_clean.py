@@ -28,6 +28,7 @@ class Tidy:
         self.keep_seconds = options.keep_days * 86400
         self.max_bytes = int(options.max_gb * GB)
         self.failed = 0
+        self.all_parts = getattr(options, "all_parts", False)
 
     def protected(self):
         return set(teach_exam.read_exam(self.folder)) | set(teach_shelf.read_shelf(self.folder))
@@ -83,9 +84,11 @@ class Tidy:
 
     def leftovers(self, entries):
         """Removes <id>.<ext>.part files of the prepared folder whose id prepared.json lists, the
-        id is not of the exam or the shelf, and that are over a day old. Nothing else."""
+        id is not of the exam or the shelf, and that are over a day old. Nothing else. With
+        all_parts (the stopper) any id and any age, still never one of the exam or the shelf."""
         folder = os.path.join(self.to, SUBFOLDER, "prepared")
         listed = {one["id"] for one in entries} - self.protected()
+        everything, kept = self.all_parts, self.protected()
         try:
             names = os.listdir(folder)
         except OSError:
@@ -95,7 +98,8 @@ class Tidy:
             found = LEFTOVER.match(name)
             path = os.path.join(folder, name)
             try:
-                if found and found.group(1) in listed and self.now - os.path.getmtime(path) > PART_SECONDS:
+                if found and (found.group(1) not in kept if everything else
+                              found.group(1) in listed and self.now - os.path.getmtime(path) > PART_SECONDS):
                     os.remove(path)
                     gone += 1
             except OSError as error:

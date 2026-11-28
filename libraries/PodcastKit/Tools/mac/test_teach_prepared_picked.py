@@ -153,6 +153,28 @@ class LeftoverPartTests(CleanBase):
         self.go("clean")
         self.assertTrue(os.path.exists(path))
 
+    def test_all_parts_removes_every_part_of_that_exact_form_of_any_age_and_nothing_else(self):
+        item = self.publish_old(1, 1)
+        stranger = "%012x" % 99
+        gone = [self.part(item["id"] + ".mp3.part", 0.01), self.part(stranger + ".m4a.part", 5)]
+        keep = [self.part("notes.txt", 5), self.part(item["id"] + ".txt.part", 5),
+                self.part("ABCDEF012345.mp3.part", 5), self.part(item["id"] + ".mp3.partial", 5)]
+        self.go("clean", "--all-parts")
+        self.assertFalse(any(os.path.exists(path) for path in gone))
+        self.assertTrue(all(os.path.exists(path) for path in keep))
+        self.assertTrue(self.exists(item))  # the copy itself is only cleaned by age and size
+
+    def test_all_parts_leaves_the_part_of_an_exam_or_shelf_episode_and_other_folders_alone(self):
+        item = self.publish_old(1, 1)
+        with open(self.folder.path("shelf.json"), "w") as f:
+            json.dump({"version": 1, "episodes": [item["id"]]}, f)
+        path = self.part(item["id"] + ".mp3.part", 5)
+        elsewhere = os.path.join(self.dest, "Podcasts", "%012x.mp3.part" % 7)
+        with open(elsewhere, "wb") as f:
+            f.write(b"x")
+        self.go("clean", "--all-parts")
+        self.assertTrue(os.path.exists(path) and os.path.exists(elsewhere))
+
     def test_keep_days_zero_removes_every_listed_copy_by_the_same_rules(self):
         items = [self.publish_old(n, 0.001) for n in (1, 2)]
         self.go("clean", "--keep-days", "0")

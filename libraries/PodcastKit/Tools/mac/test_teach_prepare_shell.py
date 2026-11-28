@@ -111,8 +111,10 @@ class HourTests(Setup):
         pick, label = self.line("teach_prepare.py"), self.line("teach_label.py")
         for words in ("pick", "--cap 35", "--estimate 0.19", "--most 6"):
             self.assertIn(words, pick)
-        for words in ("--yes", "--limit 6", "--cap 35", "--reserve 0.19"):
+        for words in ("--yes", "--limit 6", "--cap 35", "--reserve 1.00"):
             self.assertIn(words, label)
+        self.assertIn("--estimate 0.19", pick)
+        self.assertNotIn("--reserve", pick)
         budget = re.search(r"--budget (\S+)", pick).group(1)
         self.assertRegex(budget, r"^prepare-\d{4}-W\d{2}$")
         self.assertIn("--budget %s " % budget, label + " ")
@@ -141,8 +143,14 @@ class HourTests(Setup):
         for words in ("--keep-days 3", "--max-gb 5"):
             self.assertIn(words, self.line("teach_prepared.py"))
         self.assertIn("--cap 20", self.line("teach_label.py"))
+        self.assertIn("--reserve 1.00", self.line("teach_label.py"))
         self.assertIn("--limit 2", self.line("teach_label.py"))
         self.assertIn("--max-gb 30", self.line("teach_collect.py"))
+
+    def test_the_reserve_can_be_changed_and_the_pick_keeps_its_estimate(self):
+        self.hour(TEACH_PREPARE_RESERVE="2.50", TEACH_PREPARE_ESTIMATE="0.30")
+        self.assertIn("--reserve 2.50", self.line("teach_label.py"))
+        self.assertIn("--estimate 0.30", self.line("teach_prepare.py"))
 
     def test_ahead_ads_are_written_after_the_audio_is_published_and_before_the_phone_is_told(self):
         self.hour()
@@ -367,6 +375,7 @@ class JobTests(Setup):
                      "$0.19 an episode"):
             self.assertIn(text, words)
         self.assertIn("the oldest go", words)
+        self.assertIn("keeps one dollar in reserve and marking stops at about 34 dollars", words)
 
     def test_the_words_follow_the_days_and_the_gigabytes_chosen(self):
         done = self.run_file(self.NAME, TEACH_PREPARE_KEEP_DAYS="14", TEACH_PREPARE_GB="20")
@@ -417,13 +426,19 @@ class JobTests(Setup):
         self.assertTrue(os.path.exists(self.plist))
         self.assertIn("nightly read-ahead was on, and is turned off", done.stdout)
 
-    def test_a_nightly_read_ahead_that_is_not_loaded_is_left_alone(self):
+    def test_a_nightly_read_ahead_job_file_that_is_not_loaded_is_removed_too_and_not_booted_out(self):
         os.makedirs(self.agents)
         with open(self.old_plist, "w") as f:
             f.write("nightly")
-        self.run_file(self.NAME)
+        done = self.run_file(self.NAME)
         self.assertNotIn("launchctl bootout gui/501/" + self.OLD, self.launchctl())
-        self.assertTrue(os.path.exists(self.old_plist))
+        self.assertFalse(os.path.exists(self.old_plist))
+        self.assertIn("job file was removed", done.stdout)
+
+    def test_no_nightly_job_file_and_nothing_loaded_changes_nothing_about_it(self):
+        done = self.run_file(self.NAME)
+        self.assertNotIn("job file was removed", done.stdout)
+        self.assertNotIn("launchctl bootout gui/501/" + self.OLD, self.launchctl())
 
     def test_a_missing_claude_or_swift_stops_it_before_anything_is_changed(self):
         for missing, words in (("claude", "Install Claude Code"), ("swift", "Install Xcode 26")):
@@ -458,6 +473,8 @@ class JobTests(Setup):
         done = self.run_file(self.NAME, BOOT_FAILS="9")
         self.assertEqual(done.returncode, 1)
         self.assertIn("Could not start the job", done.stdout)
+        self.assertIn("removed again", done.stdout)
+        self.assertFalse(os.path.exists(self.plist))
 
     def test_the_stopper_turns_the_job_off_and_keeps_everything_else(self):
         self.run_file(self.NAME)
@@ -476,9 +493,18 @@ class JobTests(Setup):
         done = self.run_file(self.STOP, answer="yes\n\n")
         self.assertEqual(done.returncode, 0, done.stdout)
         folder = os.path.join(self.home, "Storyteller Lofi", "PodcastTeaching")
-        self.assertEqual(self.cleaning(), ["python3 teach_prepared.py clean --folder %s --keep-days 0" % folder])
+        self.assertEqual(self.cleaning(), ["python3 teach_prepared.py clean --folder %s --keep-days 0 --all-parts" % folder])
         self.assertEqual(self.launchctl(), ["launchctl bootout gui/501/" + self.LABEL])
-        self.assertIn("prepared episodes from iCloud", done.stdout)
+        self.assertIn("That removed the prepared episodes from iCloud", done.stdout)
+
+    def test_the_stopper_says_what_happened_when_the_cleaning_did_not_work(self):
+        for code, words in (("3", "Nothing was removed"), ("1", "Not everything could be removed"),
+                            ("2", "Not everything could be removed")):
+            done = self.run_file(self.STOP, answer="yes\n\n", CODES="teach_prepared.py=" + code)
+            self.assertEqual(done.returncode, 0, code)
+            self.assertIn(words, done.stdout, code)
+            self.assertNotIn("That removed", done.stdout, code)
+            self.assertIn("stay", done.stdout, code)
 
     def test_the_stopper_keeps_the_copies_on_any_other_answer_and_says_they_stay(self):
         for answer in ("\n\n", "no\n\n", "y\n\n", "yes please\n\n"):

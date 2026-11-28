@@ -36,7 +36,9 @@ lists are touched, only a file named prepared/<that id>.<ext> (12 hex digits), n
 exam.json or shelf.json, and never a transcript, a label, a truth file or any other file. Also
 cleaned: the Mac's own audio of an episode the pick listed but that was never published and was
 picked --keep-days ago, and a leftover <id>.<ext>.part of a listed id that is over a day old.
---keep-days may be 0 (everything listed goes; "Stop episode preparing.command" uses it).
+--keep-days may be 0 (everything listed goes; "Stop episode preparing.command" uses it, with
+--all-parts, which also removes every <id>.<ext>.part in the prepared folder, whatever its age and
+whether it is listed, because with the job stopped nobody else would).
 
 prepared.json is read and written by teach_prepared_file.py and the cleaning is
 teach_prepared_clean.py.
@@ -223,6 +225,7 @@ def main(argv, say=print, now=time.time, run=run_command, free=disk_free, defaul
     parser.add_argument("--keep-free-gb", type=positive, default=KEEP_FREE_GB)
     parser.add_argument("--keep-days", type=not_negative, default=KEEP_DAYS)
     parser.add_argument("--max-gb", type=positive, default=MAX_GB)
+    parser.add_argument("--all-parts", action="store_true")
     try:
         options = parser.parse_args(argv)
     except SystemExit as stop:

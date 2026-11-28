@@ -9,8 +9,9 @@
 #   3. writes down what is said in them (podcast-transcribe, after building it)
 #   4. has Claude mark the ads in them (teach_label.py --only-ahead), under the budget
 #      prepare-<ISO year>-W<ISO week> with a hard stop at $35 a week: it stops before a call that
-#      would pass the cap, because each episode is expected to cost about $0.19. This is the only
-#      step that uses the Claude plan's usage allowance
+#      could pass the cap. The pick counts an episode at about $0.19, but one call can cost more,
+#      so the marking keeps a reserve of $1.00 (TEACH_PREPARE_RESERVE) and therefore stops at about
+#      $34. This is the only step that uses the Claude plan's usage allowance
 #   5. downloads each marked episode a second time and compares the two files (teach_copies.py
 #      --only-ahead, podcast-ads after building it), then moves the marks onto the exact borders
 #      (teach_snap.py)
@@ -35,7 +36,8 @@
 # Mac's bash is 3.2: plain variables only. These can be set to change the limits (the installer
 # passes the first two): TEACH_PREPARE_KEEP_DAYS (days a copy stays in iCloud, 7), TEACH_PREPARE_GB
 # (the most GB of copies kept in iCloud, 10), TEACH_PREPARE_CAP (dollars a week, 35),
-# TEACH_PREPARE_ESTIMATE (dollars one episode is expected to cost, 0.19), TEACH_PREPARE_MOST
+# TEACH_PREPARE_ESTIMATE (dollars one episode is expected to cost, 0.19, used by the pick),
+# TEACH_PREPARE_RESERVE (dollars the marking keeps below the cap, 1.00), TEACH_PREPARE_MOST
 # (episodes an hour, 6) and TEACH_MAX_GB (the most audio the teaching folder keeps, 25: the copies
 # still on this Mac count). For the tests, TEACH_TOOLS, TEACH_KIT and TEACH_FOLDER can be set too.
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -45,6 +47,7 @@ KEEP_DAYS="${TEACH_PREPARE_KEEP_DAYS:-7}"
 ICLOUD_GB="${TEACH_PREPARE_GB:-10}"
 CAP="${TEACH_PREPARE_CAP:-35}"
 ESTIMATE="${TEACH_PREPARE_ESTIMATE:-0.19}"
+RESERVE="${TEACH_PREPARE_RESERVE:-1.00}"
 MOST="${TEACH_PREPARE_MOST:-6}"
 MAX_GB="${TEACH_MAX_GB:-25}"
 LOG_FOLDER="$HOME/Storyteller Lofi/logs"
@@ -149,7 +152,7 @@ if [ "${PIPESTATUS[0]}" -ne 3 ]; then
   fi
 
   # Exit 5 is the budget reached: the weekly cap doing its job, not a failure.
-  step "Step 4 of 7: having Claude mark the ads, under the weekly cap of about \$$CAP (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --only-ahead --limit "$MOST" --budget "$BUDGET" --cap "$CAP" --reserve "$ESTIMATE"
+  step "Step 4 of 7: having Claude mark the ads, under the weekly cap of about \$$CAP (this uses your Claude usage allowance)" $CAFFEINATE python3 -u "$TOOLS/teach_label.py" --folder "$FOLDER" --yes --only-ahead --limit "$MOST" --budget "$BUDGET" --cap "$CAP" --reserve "$RESERVE"
   MARKED="$?"
   if [ "$MARKED" -eq 5 ]; then
     say "This week's cap of \$$CAP is reached, so no more episodes are marked until next week. What was marked is saved."

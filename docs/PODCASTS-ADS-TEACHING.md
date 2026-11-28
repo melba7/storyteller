@@ -315,8 +315,8 @@ $10 a week (each
 episode is expected to cost about $0.19), and publishes
 `ahead-ads.json`. `ahead.json` in the teaching folder lists those episodes: they
 join `episodes.json` with their labels, so the weekly run learns from them, but
-`teach_train.py` never puts them on the shelf and the exam never takes them.
-The hourly job of "Prepared episodes" below takes the place of this nightly one.
+`teach_train.py` never puts them on the shelf and the exam never takes them. The
+hourly job of "Prepared episodes" below takes the place of this nightly one.
 
 **Shows are named by their feed address in the Mac's files.** The phone names a
 show by its own id. The app tells the native side which feed is which show
@@ -366,9 +366,11 @@ read-ahead off when that is on. Each hour it:
 
 1. picks up to 6 episodes (`teach_prepare.py pick`): the phone's list of next
    episodes first, whatever their age, then the episodes of every followed show
-   that came out in the last 72 hours, newest first. Known episodes (marked,
-   in the teaching set, in `ahead.json`), exam and shelf episodes, and feed
-   episodes with no guid are left out. The picked ones are written to
+   that came out in the last 72 hours, newest first. A show whose feed states a
+   language other than English is left out, because the writing down listens for
+   English, and the pick says how many episodes that was. Known episodes
+   (marked, in the teaching set, in `ahead.json`), exam and shelf episodes, and
+   feed episodes with no guid are left out. The picked ones are written to
    `ahead.json`, `episodes.json` and `prepared.json` (as picked, no file yet);
 2. downloads them and writes down what is said (`--only-ahead` on the weekly
    tools);
@@ -397,14 +399,15 @@ when it has no ads, because that says the episode has none. When the Mac removes
 the audio the entry loses its `copy` and is a words-only entry again. The phone
 trusts a copy only when its size and SHA-256 match.
 
-**The limits.** At most $35 a week of Claude usage (about $0.19 an episode; the
-marking stops before the call that would pass the cap), 6 episodes an hour, at
+**The limits.** At most $35 a week of Claude usage (about 19 cents an episode;
+one call can cost more, so the marking keeps one dollar in reserve and stops at
+about 34 dollars, before a call that could pass the cap), 6 episodes an hour, at
 most 10 GB of copies in iCloud for 7 days (the installer lets you pick another
 number, such as 5 GB and 3 days, and passes it to the job). Nothing is copied,
 and one line says so, when iCloud Drive is missing, when the Mac's disk has
 under 15 GB free, or when `brctl quota` says iCloud has under 2 GB left after
-the file. The Mac has to be awake and online. It does not skip Sundays. Only
-the marking costs anything.
+the file. The Mac has to be awake and online. It does not skip Sundays. Only the
+marking costs anything.
 
 **What is deleted, and what never is.** Prepared audio older than 7 days goes,
 and then the oldest first until the copies are under 10 GB; room is made before
