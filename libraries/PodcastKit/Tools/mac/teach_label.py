@@ -66,6 +66,7 @@ from teach_failures import IN_A_ROW, Failures, given_up_line
 from teach_label_files import (candidates, cap_text, counts_text, held_second,  # noqa: F401
                                waiting)
 from teach_store import FOLDER, Busy, Problem, require_manifest, run_lock, write_json  # noqa: F401
+from teach_words import word_ends
 
 DEFAULT_MODEL = "claude-opus-5-5"
 NOT_CONFIRMED = 4
@@ -76,10 +77,12 @@ STOP_CODES = {"usage": 3, "cap": CAP_REACHED, "failures": FAILED_IN_A_ROW}
 
 # MARK: Marking
 
-def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time, kept=None):
+def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time, kept=None, ends=None):
     """The label for one episode. `ask(prompt)` returns {"text", "cost"}. An answer that cannot be
     read is asked for once more; the second failure raises ValueError. `kept` is a dict that holds
-    the answered parts, so that trying the episode again asks only for the missing ones."""
+    the answered parts, so that trying the episode again asks only for the missing ones. `ends` is
+    the exact end of each line when the episode has its word times (teach_words.word_ends): a label
+    then ends where its last word ends, not where the next line starts."""
     kept = {} if kept is None else kept
     segments, dropped, cost = [], 0, 0.0
     for first, last in seg.parts(lines, limit):
@@ -102,7 +105,7 @@ def label_episode(entry, lines, model, ask, limit=seg.PART_CHARS, now=time.time,
         cost += paid
     return {"version": 1, "prompt": seg.PROMPT_VERSION, "model": model, "episode": entry["id"],
             "feed": entry["feed"], "show": entry["show"], "lines": len(lines),
-            "length": seg.episode_length(entry, lines), "segments": seg.with_times(seg.merge(segments), lines),
+            "length": seg.episode_length(entry, lines), "segments": seg.with_times(seg.merge(segments), lines, ends),
             "dropped": dropped, "cost": cost, "writtenAt": int(now() * 1000)}
 
 
@@ -173,7 +176,8 @@ def run(folder, labels, model, limit, cap, ask, say=print, retry_failed=False, o
         try:
             while True:
                 try:
-                    made = label_episode(item, lines, model, counted, kept=kept)
+                    made = label_episode(item, lines, model, counted, kept=kept,
+                                         ends=word_ends(folder, item["id"], lines))
                     break
                 except UsageLimit as error:
                     if isinstance(error, SignedOut) or is_signed_out(str(error)) \

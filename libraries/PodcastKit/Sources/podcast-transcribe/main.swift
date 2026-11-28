@@ -1,9 +1,10 @@
 // LOFI-FORK: transcribes one audio file on a Mac with the same code the app uses (see FORK.md).
 //
-//   swift run -c release podcast-transcribe [--locale en-US] <audio file>
+//   swift run -c release podcast-transcribe [--locale en-US] [--words <file>] <audio file>
 //
 // Prints each line with its time ("[00:01:23.4] text") to the standard output and progress
-// to the standard error. Needs macOS 26. Where there is no Speech framework (Linux) it only
+// to the standard error. With --words it also saves where each word and each line starts and
+// ends, in seconds, to that file (see WordTimes), so a line's end is the end of its last word. Needs macOS 26. Where there is no Speech framework (Linux) it only
 // says so, so `swift build` and `swift test` still work there. Progress is kept in
 // the temporary folder, so a run that was stopped carries on where it was.
 import Foundation
@@ -29,7 +30,15 @@ if let at = arguments.firstIndex(of: "--locale") {
   locale = arguments[at + 1]
   arguments.removeSubrange(at...at + 1)
 }
-guard arguments.count == 1 else { fail("Usage: podcast-transcribe [--locale en-US] <audio file>") }
+var wordsFile: URL?
+if let at = arguments.firstIndex(of: "--words") {
+  guard arguments.indices.contains(at + 1) else { fail("--words needs a file name") }
+  wordsFile = URL(fileURLWithPath: arguments[at + 1])
+  arguments.removeSubrange(at...at + 1)
+}
+guard arguments.count == 1 else {
+  fail("Usage: podcast-transcribe [--locale en-US] [--words <file>] <audio file>")
+}
 let audio = URL(fileURLWithPath: arguments[0])
 guard FileManager.default.fileExists(atPath: audio.path) else { fail("No file at \(audio.path)") }
 guard let recogniser = AppleSpeech.makeRecogniser() else { fail("Needs macOS 26 (and Xcode 26 to build).") }
@@ -45,6 +54,7 @@ do {
     progress: { FileHandle.standardError.write(Data("\($0)%\n".utf8)) })
   guard case .finished(let transcript) = outcome else { fail("Stopped before the end.") }
   for line in transcript.lines { print("[\(clock(line.start))] \(line.text)") }
+  if let wordsFile { try WordTimes(transcript).write(to: wordsFile) }
   try? FileManager.default.removeItem(at: folder)
 } catch {
   fail("Could not transcribe: \(error)")
