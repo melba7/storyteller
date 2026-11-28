@@ -40,7 +40,9 @@ enum PreparedScoreRow {
         let entry = AheadEntry(
           feed: episode.feed, guid: episode.id, title: episode.title,
           marked: now.timeIntervalSince1970, ads: marks, copy: PreparedScoreRow.copy)
-        guard let file = PreparedAds.file(for: entry, duration: episode.episodeLength) else {
+        // The copy is as long as its audio, which the transcript reaches; the length stated in
+        // episodes.json can be shorter, and cutting the marks to it would lose the late ads.
+        guard let file = PreparedAds.file(for: entry, duration: episode.transcript.duration) else {
           continue
         }
         files[episode.id] = file

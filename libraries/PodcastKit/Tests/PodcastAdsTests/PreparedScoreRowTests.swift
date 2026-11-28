@@ -136,4 +136,17 @@ final class PreparedScoreRowTests: XCTestCase {
     XCTAssertEqual(with.total, without?.total)
     XCTAssertEqual(with.rows.last?.name, rowName)
   }
+
+  func testALateAdPassesWhenTheStatedLengthIsShorterThanTheRealCopy() throws {
+    // episodes.json says 200 s, but the transcript runs to 300 s: the copy is as long as its audio.
+    try folder.write(
+      "episodes.json",
+      #"{"version": 1, "episodes": [{"id": "e1", "feed": "https://one.test/rss", "show": "One", "title": "T1", "seconds": 200}]}"#
+    )
+    try folder.write("transcripts/e1.txt", transcript("a"))
+    try folder.write("labels/e1.json", labelJSON(segmentJSON(start: "250", end: "290")))
+    XCTAssertEqual(run(), 0, warned.joined())
+    XCTAssertEqual(row()?.bar?.breaks, 1)
+    XCTAssertEqual(row()?.bar?.passed, 1, "the mark is not cut to the stated length")
+  }
 }
