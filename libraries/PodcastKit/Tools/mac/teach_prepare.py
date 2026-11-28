@@ -5,18 +5,20 @@ Standard library only. teach-prepare.sh runs it first. It is the nightly read-ah
 (teach_ahead.py) for every show and not only for the phone's list:
 
   teach_prepare.py pick --budget NAME [--folder F] [--queue FILE] [--shows FILE] [--cap 35]
-                        [--most 6] [--hours 72] [--estimate 0.19]
+                        [--most 6] [--hours 72] [--estimate 0.19] [--reserve 1.00]
 
 The candidates, in this order: the episodes of the phone's list of next episodes (as teach_ahead.py
 reads it, whatever their age; a missing, empty or unusable list is said and is not a stop), then
 the episodes of every show the Mac follows that came out in the last --hours, newest first. A show
 whose feed states a language that does not start with "en" is left out (a feed with none counts as
-English), because the writing down listens for English; the pick says how many episodes that was. An
+English), because the writing down listens for English; the pick says how many episodes that was (an episode of the phone's list of such a show is left
+out too; one of a show the Mac does not follow stays). An
 episode from a feed is told to the phone with the Mac's own feed address and the feed's guid (the
 phone matches by the feed's key and the guid), so one with no guid is left out. The rule of
 teach_ahead.choose leaves out what is known (in the teaching set, in ahead.json, in the exam or on
 the shelf). At most --most are picked, and no more than the weekly budget NAME (see
-teach_budget.py, the rule of teach_ahead.room_for) has room for. A feed that cannot be read is said
+teach_budget.py, the rule of teach_ahead.room_for) has room for, keeping --reserve below the cap
+(the estimate when none is given) the way the marking does, so what is picked can be marked. A feed that cannot be read is said
 in one line and passed over.
 
 What is picked goes into ahead.json and episodes.json exactly as the nightly pick does it, so the
@@ -77,8 +79,9 @@ def not_english(language):
 def feed_items(shows, since, say, fetch, sleep):
     """(the episodes of every show that came out at or after `since`, newest first, in the shape of
     the phone's list; how many episodes of shows not in English were left out for that). A feed that
-    cannot be read is said and passed over."""
-    found, foreign = [], 0
+    cannot be read is said and passed over. The third is the feed keys of the shows that are not in
+    English."""
+    found, foreign, keys = [], 0, set()
     for index, show in enumerate(shows):
         if index:
             sleep(probe.PAUSE)
@@ -87,6 +90,8 @@ def feed_items(shows, since, say, fetch, sleep):
             episodes = teach_feed.feed_episodes(data, ALL)
             channel = teach_feed.parse_feed(data).find("channel")
             other = not_english(channel.findtext("language") if channel is not None else None)
+            if other:
+                keys.add(teach_feed.feed_key(show["feed"]))
         except Exception as error:  # a dead feed must not stop the others
             say("Skipped %s: its feed could not be read (%s)"
                 % (show["title"], str(error) or error.__class__.__name__))
@@ -100,7 +105,7 @@ def feed_items(shows, since, say, fetch, sleep):
                 found.append({"feed": show["feed"], "guid": episode["guid"], "title": episode["title"],
                               "show": show["title"], "audio": episode["address"],
                               "published": episode["published"], "rank": 0})
-    return sorted(found, key=lambda one: -one["published"]), foreign
+    return sorted(found, key=lambda one: -one["published"]), foreign, keys
 
 
 def left_out(foreign):
@@ -115,10 +120,12 @@ def choosing(folder, items, options, shows, say, now, foreign=0):
     """pick, once the candidates are read and the folder is locked."""
     entries = teach_store.load_manifest(folder)
     budget = teach_budget.Budget(folder, options.budget, options.cap)
-    room = night.room_for(budget, options.most, options.estimate)
+    room = night.room_for(budget, options.most, options.estimate, options.reserve)
     if room < 1:
-        say("The weekly cap of $%.2f leaves no room for another episode (about $%.2f each), so "
-            "nothing is prepared this hour.%s" % (options.cap, options.estimate, left_out(foreign)))
+        reserve = options.estimate if options.reserve is None else options.reserve
+        say("The weekly cap of $%.2f leaves no room for another episode (about $%.2f each, with $%.2f "
+            "kept in reserve), so nothing is prepared this hour.%s"
+            % (options.cap, options.estimate, reserve, left_out(foreign)))
         return NOTHING
     kept = set(teach_exam.read_exam(folder)) | set(teach_shelf.read_shelf(folder)) \
         | {e["id"] for e in read_ahead(folder)}
@@ -152,8 +159,12 @@ def pick(options, say, defaults, now, load_shows, fetch, sleep):
             % (str(error) or error.__class__.__name__))
         shows = []
     moment = int(now())
-    more, foreign = feed_items(shows, moment - options.hours * 3600, say, fetch, sleep)
-    items = items + more
+    more, foreign, other_keys = feed_items(shows, moment - options.hours * 3600, say, fetch, sleep)
+    # An episode of the phone's list of a followed show that is not in English is left out too. A show
+    # the Mac does not follow has no known language and stays.
+    kept = [one for one in items if teach_feed.feed_key(one["feed"]) not in other_keys]
+    foreign += len(items) - len(kept)
+    items = kept + more
     if not items:
         say("There is nothing to prepare: no episode on the phone's list and none of your shows has "
             "a new one in the last %d hours.%s" % (options.hours, left_out(foreign)))
@@ -182,6 +193,7 @@ def main(argv, say=print, defaults=default_folders, now=time.time, load_shows=pr
     parser.add_argument("--budget")
     parser.add_argument("--cap", type=night.positive, default=CAP)
     parser.add_argument("--estimate", type=night.positive, default=night.ESTIMATE)
+    parser.add_argument("--reserve", type=night.positive)
     parser.add_argument("--most", type=int, default=MOST)
     parser.add_argument("--hours", type=night.positive, default=HOURS)
     try:

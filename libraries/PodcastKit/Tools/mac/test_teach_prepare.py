@@ -158,9 +158,22 @@ class LanguageTests(Prepare):
         self.assertEqual(len(self.said), 1)
         self.assertIn("not in English", self.said[0])
 
-    def test_the_phones_list_is_not_filtered_by_language(self):
+    def test_a_phones_list_episode_of_a_followed_show_that_is_not_english_is_left_out_and_counted(self):
+        self.write_queue([queued(1, feed="http://www.mac.example/a.xml/", guid="p1"), queued(2)])
+        feeds = {SHOW["feed"]: self.feed_in("de", ("a1", "Eins", 5, "https://cdn/1.mp3"))}
+        self.assertEqual(self.run_pick(feeds=feeds), 0, self.said)
+        self.assertEqual(self.titles(), ["Episode 2"])
+        self.assertTrue(any("2 episodes" in line and "not in English" in line for line in self.said))
+
+    def test_a_phones_list_episode_of_a_show_the_mac_does_not_follow_stays(self):
         self.write_queue([queued(1)])
         self.assertEqual(self.run_pick(feeds={SHOW["feed"]: self.feed_in("de")}), 0)
+        self.assertEqual(self.titles(), ["Episode 1"])
+        self.assertFalse(any("not in English" in line for line in self.said))
+
+    def test_a_phones_list_episode_of_an_english_followed_show_stays(self):
+        self.write_queue([queued(1, feed=SHOW["feed"], guid="p1")])
+        self.run_pick(feeds={SHOW["feed"]: self.feed_in("en-GB")})
         self.assertEqual(self.titles(), ["Episode 1"])
 
 
@@ -224,6 +237,28 @@ class LimitTests(Prepare):
         self.run_pick(feeds=self.many(10))
         self.assertEqual(self.titles(), ["E0", "E1", "E2", "E3", "E4"])
         self.assertTrue(any("$1.00 left" in line for line in self.said))
+
+    def test_a_reserve_keeps_the_pick_inside_what_the_marking_will_still_do(self):
+        # Cap 35, estimate 0.19, reserve 1.00: the marking refuses a call once spent + 1.00 reaches 35.
+        for spent, expected in ((34.0, 0), (34.5, 0), (33.9, 1), (33.0, 6)):
+            self.setUp()
+            teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(spent, 180)
+            self.run_pick("--reserve", "1.00", feeds=self.many(10))
+            self.assertEqual(len(self.manifest()), expected, spent)
+
+    def test_without_a_reserve_it_is_the_estimate_and_the_old_numbers_hold(self):
+        for spent, expected in ((34.0, 5), (34.81, 0), (34.5, 2)):
+            self.setUp()
+            teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(spent, 180)
+            self.run_pick(feeds=self.many(10))
+            self.assertEqual(len(self.manifest()), expected, spent)
+
+    def test_the_no_room_sentence_is_true_with_a_reserve(self):
+        teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(34.0, 180)
+        self.assertEqual(self.run_pick("--reserve", "1.00", feeds=self.many(3)), 3)
+        self.assertEqual(len(self.said), 1)
+        self.assertIn("leaves no room", self.said[0])
+        self.assertIn("with $1.00 kept in reserve", self.said[0])
 
     def test_a_spent_budget_picks_nothing_and_says_so_in_one_line(self):
         teach_budget.Budget(self.folder, "prepare-2026-W48", 35).add(35.0, 183)

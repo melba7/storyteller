@@ -114,7 +114,7 @@ class HourTests(Setup):
         for words in ("--yes", "--limit 6", "--cap 35", "--reserve 1.00"):
             self.assertIn(words, label)
         self.assertIn("--estimate 0.19", pick)
-        self.assertNotIn("--reserve", pick)
+        self.assertIn("--reserve 1.00", pick)
         budget = re.search(r"--budget (\S+)", pick).group(1)
         self.assertRegex(budget, r"^prepare-\d{4}-W\d{2}$")
         self.assertIn("--budget %s " % budget, label + " ")
@@ -151,6 +151,15 @@ class HourTests(Setup):
         self.hour(TEACH_PREPARE_RESERVE="2.50", TEACH_PREPARE_ESTIMATE="0.30")
         self.assertIn("--reserve 2.50", self.line("teach_label.py"))
         self.assertIn("--estimate 0.30", self.line("teach_prepare.py"))
+
+    def test_the_pick_and_the_marking_get_the_same_reserve(self):
+        self.hour()
+        self.assertIn("--reserve 1.00", self.line("teach_prepare.py"))
+        self.assertIn("--reserve 1.00", self.line("teach_label.py"))
+        open(self.calls, "w").close()
+        self.hour(TEACH_PREPARE_RESERVE="3")
+        self.assertIn("--reserve 3", self.line("teach_prepare.py"))
+        self.assertIn("--reserve 3", self.line("teach_label.py"))
 
     def test_ahead_ads_are_written_after_the_audio_is_published_and_before_the_phone_is_told(self):
         self.hour()

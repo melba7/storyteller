@@ -37,7 +37,7 @@
 # passes the first two): TEACH_PREPARE_KEEP_DAYS (days a copy stays in iCloud, 7), TEACH_PREPARE_GB
 # (the most GB of copies kept in iCloud, 10), TEACH_PREPARE_CAP (dollars a week, 35),
 # TEACH_PREPARE_ESTIMATE (dollars one episode is expected to cost, 0.19, used by the pick),
-# TEACH_PREPARE_RESERVE (dollars the marking keeps below the cap, 1.00), TEACH_PREPARE_MOST
+# TEACH_PREPARE_RESERVE (dollars the pick and the marking keep below the cap, 1.00), TEACH_PREPARE_MOST
 # (episodes an hour, 6) and TEACH_MAX_GB (the most audio the teaching folder keeps, 25: the copies
 # still on this Mac count). For the tests, TEACH_TOOLS, TEACH_KIT and TEACH_FOLDER can be set too.
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -117,7 +117,7 @@ build() {
 }
 
 # Exit 3 of teach_prepare.py is "nothing to do this hour", said in one line by the tool itself.
-step "Step 1 of 7: choosing this hour's episodes" python3 -u "$TOOLS/teach_prepare.py" pick --folder "$FOLDER" --budget "$BUDGET" --cap "$CAP" --estimate "$ESTIMATE" --most "$MOST"
+step "Step 1 of 7: choosing this hour's episodes" python3 -u "$TOOLS/teach_prepare.py" pick --folder "$FOLDER" --budget "$BUDGET" --cap "$CAP" --estimate "$ESTIMATE" --reserve "$RESERVE" --most "$MOST"
 PICKED="$?"
 if [ "$PICKED" -ne 0 ] && [ "$PICKED" -ne 3 ]; then
   say "Choosing this hour's episodes did not work (see above), so nothing was prepared."
