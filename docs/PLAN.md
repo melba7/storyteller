@@ -2324,7 +2324,7 @@ How I read the picks (my choices, told to Mo):
     macOS is not to download them (EDEADLK, Apple's TN3150). The readers now let
     their process download them first (`setiopolicy_np`, in
     `teach_feedback.find_notes`). Done on the Mac once a run reads the notes.
-- [ ] **Z8 Find why the Mac's "Score" step fails**: it has failed silently since
+- [x] **Z8 Find why the Mac's "Score" step fails**: it has failed silently since
       2026-11-23, so `scorecard.json` and the per-show settings made from it are
       stale. The step logs its exit code and its last error lines. A launcher
       "Score the ad skipping and show the error" is left for Mo, and the cause
@@ -2346,6 +2346,10 @@ How I read the picks (my choices, told to Mo):
     passed). Each chunk read now has its own pool (`ChunkRead`, as `Sha256`
     already did), and the score prints its memory every 100 episodes. Done once
     a run on the Mac writes a new `scorecard.json`.
+  - Result (Mac, 2026-11-28, "Score round Z again"): the score read all 1,585
+    episodes at 1.4 GB at most and wrote a new `scorecard.json`. Ads caught 87%
+    (was 83%), ad time heard 44 min 38 s (was 61 min 05 s), show time cut 22 min
+    01 s in 31 wrong skips (was 25 min 38 s).
 - [x] **Z9 Teach the phone again every night by itself** (B): a nightly job runs
       the finish steps (habits, model, library, sounds, cues, score, settings,
       publish) on what was marked that day. It spends nothing. It comes after
@@ -2358,11 +2362,15 @@ How I read the picks (my choices, told to Mo):
 
 - Built: `teach-nightly.sh` at 3:30 AM under the shared lock, no Claude calls; a
   failed score leaves the settings out. Installed by the round's Mac script.
-- [ ] **Z10 This week's ad sounds every hour** (A): the sounds of the ads in
+- [x] **Z10 This week's ad sounds every hour** (A): the sounds of the ads in
       prepared episodes go to the phone hourly. Measured first with a scorecard
       row that gives each test episode only sounds from the week before it.
   - Done when: the row's number stands here. Kept when the stream row passes at
     least 3 more breaks and no more wrong skips.
+  - Result (Mac, 2026-11-28): as a stream at the standard pace, 104 of 242
+    breaks with this week's sounds; against the last finder row 2 more breaks
+    pass (3 are needed) with 2 more skips where there is no ad. No go, so the
+    sounds are not sent hourly.
 - [ ] **Z11 The Mac's marks on a streamed prepared episode** (C): when the phone
       streams the publisher's copy of an episode the Mac prepared, the Mac's
       marks are placed by matching words. Check that this works on the
@@ -2383,13 +2391,17 @@ How I read the picks (my choices, told to Mo):
     snap no change (needs other episodes' audio), not kept. After the final
     check the cues no longer fire on a sentence's end or on "the code": still +2
     on both keys, 6 ends moved instead of 7, no more wrong skips.
-- [ ] **Z13 Word-exact ends in the Mac's marks** (Mo's pick "All seven"; free):
+- [x] **Z13 Word-exact ends in the Mac's marks** (Mo's pick "All seven"; free):
       the Mac's transcripts keep each word's time, and a mark ends at the ad's
       last word. Today exact ends lie within 1 s of a line start 46 times in 100
       and within 5 s 91 times, so the Mac's marks cannot reach 95 at the ends.
       Needs Mo's double-click to write the 63 shelf episodes down again.
   - Done when: Claude's own edges are scored against the places where two
     downloads differ, before and after. Kept when ends within 5 s reach 95.
+  - Result (Mac, 2026-11-28): ends within 5 s 75% before, 81% after the 63 shelf
+    episodes were written down again with word times (50% within 1 s, 66% within
+    2 s). Under 95, so ends at the last word stay off. Only 64 of the 191 scored
+    episodes have word times, and intros and credits got worse.
 - [x] **Z14 Ad harvest by repeat downloads** (Mo's pick "All seven"; free): the
       Mac downloads a new episode 3 times over the day. What differs is an
       inserted ad with exact edges and no Claude call, and its sound joins Z10's
@@ -2475,7 +2487,7 @@ How I read the picks (my choices, told to Mo):
     are in a voice that is not a host's, and how often a guest sets it off.
     Built (first into the Mac's marks) only when it passes at least 5 more
     breaks and no more wrong skips.
-- [ ] **Z22 The show playbook** (Mo's pick "All seven"; about $10 to $15 once,
+- [x] **Z22 The show playbook** (Mo's pick "All seven"; about $10 to $15 once,
       approved): Claude reads each show's marked training episodes once and
       writes its handoff and return lines, its named sponsored pieces and the
       hosts' own plugs. The phone uses them as cue rules. The file holds
@@ -2485,6 +2497,11 @@ How I read the picks (my choices, told to Mo):
   - Done when: playbooks made from the training episodes only are replayed on
     the shelf and the numbers stand here. Kept when at least 4 more breaks pass
     (it aims at the 9 missed breaks) and no more wrong skips.
+  - Result (Mac, 2026-11-28): built for 62 shows for $9.64. Replayed on the 63
+    shelf episodes (a Python replay over the score dump), 123 of 226 breaks pass
+    instead of 118 (+5) with 26 skips where there is no ad instead of 27. Kept.
+    The phone does not read the playbook yet: that needs a Swift change to take
+    its cue lines, which is next round's work (see Later).
 
 **Ship**
 
@@ -2503,6 +2520,10 @@ cutting the ads out of the file (Mo said no for now).
 
 ## Later
 
+- Round Z (2026-11-28), from the Mac's results: the show playbook passed its
+  replay (+5 breaks, one fewer wrong skip) but the phone cannot use it yet. Its
+  cue lines need a Swift change in the phone's cue rules and a publish step like
+  `ad-cues.json` (never committed). Ask Mo before building it.
 - Round Z (2026-11-28), from the final check: `teach_second_look.py` is 337
   lines, and `preparedSync.ts` (368), `PodcastAdFinder.swift` (353) and
   `AdScoreCommand.swift` (408) grew past 300; split them in the next cleanup.
