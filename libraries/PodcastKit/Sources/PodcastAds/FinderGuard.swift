@@ -192,7 +192,8 @@ public struct FinderGuard: Codable, Sendable, Equatable {
   private mutating func record(_ answer: Answer, _ finder: String, _ show: String, _ now: Date) {
     let finder = Self.name(finder)
     let show = Self.name(show)
-    guard !finder.isEmpty, !show.isEmpty else { return }
+    // The Mac's prepared ads are not a finder the listener's answers can switch off.
+    guard !finder.isEmpty, !show.isEmpty, finder != PreparedAds.source else { return }
     prune(now: now)
     var entry = shows.first { $0.show == show } ?? ShowAnswers(show: show, finders: [])
     var one = entry.finders.first { $0.finder == finder } ?? FinderAnswers(finder: finder, last: [])

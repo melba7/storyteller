@@ -84,6 +84,8 @@ final class PodcastStreamHead: @unchecked Sendable {
 
   /// The staging file exists: the scan can begin.
   func begin(staged: URL) {
+    // An episode whose file is a prepared copy has the Mac's marks: the head is not scanned.
+    guard !hasPreparedFile else { return }
     let go = lock.withLock { () -> Bool in
       guard !started, !stopped else { return false }
       started = true
@@ -96,6 +98,15 @@ final class PodcastStreamHead: @unchecked Sendable {
       await run()
       scanEnded()
     }
+  }
+
+  /// Whether the episode's downloaded file is a copy the Mac prepared (PreparedAds).
+  private var hasPreparedFile: Bool {
+    guard let entry = store.entry(for: episodeId), case .downloaded(_, let sha, _, _) = entry.state,
+      let folder = try? store.folder(for: episodeId)
+    else { return false }
+    return AdsStore(folder: folder, sha256: sha)
+      .hasPrepared(detector: PodcastAdFinder.detectorName)
   }
 
   /// Runs `work` once the head scan is over (finished, stopped, failed, or never started), or
@@ -441,6 +452,8 @@ final class PodcastStreamHead: @unchecked Sendable {
       else { return false }
       let ads = AdsStore(folder: folder, sha256: key)
       let name = PodcastAdFinder.detectorName
+      // A file the download was filed as may be a prepared copy: nothing is written beside it.
+      guard !ads.hasPrepared(detector: name) else { return false }
       let before = ads.loadPartial(detector: name)
       absorbMarks(before)
       // The opening is applied last: an earlier step's longer pre-roll is on disk too.

@@ -113,16 +113,33 @@ public final class DownloadStore: @unchecked Sendable {
     }
   }
 
-  /// Takes the "ahead" mark off an episode's entry: it is being played, so it is the listener's
-  /// now. Done inside the store's lock, so it cannot undo a progress report that arrives at the
-  /// same time. Returns the entry as it now stands, or nil when it was not marked (or not there).
+  /// Takes the "ahead" mark, and the mark of a copy taken only for the list, off an episode's
+  /// entry: it is being played or the listener asked for it, so it is theirs now. Done inside the
+  /// store's lock, so it cannot undo a progress report that arrives at the same time. Returns the
+  /// entry as it now stands, or nil when it had neither mark (or was not there).
   @discardableResult
   public func clearAhead(episodeId: String) throws -> DownloadEntry? {
     try lock.withLock {
       guard let at = index.entries.firstIndex(where: { $0.episodeId == episodeId }),
-        index.entries[at].ahead
+        index.entries[at].ahead || index.entries[at].copyForList
       else { return nil }
       index.entries[at].ahead = false
+      index.entries[at].copyForList = false
+      try save()
+      return index.entries[at]
+    }
+  }
+
+  /// Takes only the mark of a copy taken for the list off an episode's entry: something other than
+  /// the list's own read-ahead asked for this download, so it is an ordinary download now. Returns
+  /// the entry as it now stands, or nil when it was not marked (or not there).
+  @discardableResult
+  public func clearCopyForList(episodeId: String) throws -> DownloadEntry? {
+    try lock.withLock {
+      guard let at = index.entries.firstIndex(where: { $0.episodeId == episodeId }),
+        index.entries[at].copyForList
+      else { return nil }
+      index.entries[at].copyForList = false
       try save()
       return index.entries[at]
     }
@@ -180,7 +197,8 @@ public final class DownloadStore: @unchecked Sendable {
       let entry = DownloadEntry(
         episodeId: episodeId, url: previous?.url ?? "", fileExtension: fileExtension,
         state: .downloaded(file: name, sha256: sha256, bytes: bytes, date: date), updatedAt: date,
-        automatic: previous?.automatic ?? false, ahead: previous?.ahead ?? false)
+        automatic: previous?.automatic ?? false, ahead: previous?.ahead ?? false,
+        copyForList: previous?.copyForList ?? false)
       replace(entry)
       try save()
       return entry

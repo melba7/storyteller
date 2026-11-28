@@ -14,7 +14,10 @@ file is not kept. The second download asks as "a second listener", the name the 
 "Compare two downloads of an episode" uses for its second copy, so the host sees another listener
 than the one that made the first copy.
 
-  teach_copies.py --tool PATH [--folder F] [--max 40] [--max-gb 3] [--retry-failed]
+  teach_copies.py --tool PATH [--folder F] [--max 40] [--max-gb 3] [--retry-failed] [--only-ahead]
+
+--only-ahead (the hourly episode preparing, teach_prepare.py) compares only the episodes of
+ahead.json that have no truth file yet.
 
 --max is the most episodes to download in one run (one that fails counts: it was asked for) and
 --max-gb the most traffic, counted from the size of each first copy, and the download itself is cut
@@ -48,6 +51,7 @@ import probe_shows as probe
 import teach_exam
 import teach_fetch as fetching
 import teach_shelf
+from teach_ahead_set import ahead_ids
 from teach_failures import GIVE_UP_AFTER, IN_A_ROW, given_up_line
 from teach_second import Failures, compare, plural, tell
 from teach_store import FOLDER, MANIFEST, Busy, ManifestError, Problem, load_manifest, run_lock
@@ -80,13 +84,16 @@ def positive_number(text):
 
 # MARK: A run
 
-def waiting(folder, entries, failures, retry_failed):
+def waiting(folder, entries, failures, retry_failed, only=None):
     """(todo, left): the episodes to download, never-failed first, and how many were left out and
-    why. An episode is wanted when it has a label, an MP3 file on disk and no truth file yet."""
+    why. An episode is wanted when it has a label, an MP3 file on disk and no truth file yet. With
+    `only` (a set of ids) every other episode is not looked at."""
     left = {"marked": 0, "not_mp3": 0, "before": 0, "given_up": 0}
     todo = []
     for entry in entries:
         name = entry["file"]
+        if only is not None and entry["id"] not in only:
+            continue
         if (not name or not os.path.exists(os.path.join(folder, name))
                 or not os.path.exists(os.path.join(folder, LABELS, entry["id"] + ".json"))):
             continue
@@ -109,10 +116,12 @@ def waiting(folder, entries, failures, retry_failed):
 
 
 def run(folder, tool, max_episodes, max_bytes, download=fetching.download, open_url=None,
-        runner=subprocess.run, sleep=time.sleep, say=print, retry_failed=False, pause=probe.PAUSE):
+        runner=subprocess.run, sleep=time.sleep, say=print, retry_failed=False, pause=probe.PAUSE,
+        only=None):
     """Compares the waiting episodes until a limit stops it. Answers {"tried", "found",
     "stretches", "agreed", "same", "no_frame", "failed", "waiting", "why", "stopped"}; `why` is
-    None, "count" or "size", and `stopped` is True when failures in a row ended the run."""
+    None, "count" or "size", and `stopped` is True when failures in a row ended the run. With `only`
+    (a set of ids) just those episodes are looked at."""
     entries = load_manifest(folder)
     copies = os.path.join(folder, COPIES)
     os.makedirs(copies, exist_ok=True)
@@ -123,7 +132,7 @@ def run(folder, tool, max_episodes, max_bytes, download=fetching.download, open_
             except OSError:
                 pass
     failures = Failures(copies)
-    todo, left = waiting(folder, entries, failures, retry_failed)
+    todo, left = waiting(folder, entries, failures, retry_failed, only)
     if left["before"]:
         say("%s compared before (to compare %s again, delete %s file in copies)." % (
             plural(left["before"], "episode was", "episodes were"), "it" if left["before"] == 1 else "them",
@@ -211,6 +220,7 @@ def main(argv=None, download=fetching.download, runner=subprocess.run, sleep=tim
     parser.add_argument("--max", type=positive_int, default=MAX_EPISODES)
     parser.add_argument("--max-gb", type=positive_number, default=MAX_GB)
     parser.add_argument("--retry-failed", action="store_true")
+    parser.add_argument("--only-ahead", action="store_true")
     args = parser.parse_args(argv)
     folder = os.path.expanduser(args.folder)
     tool = os.path.expanduser(args.tool)
@@ -226,7 +236,8 @@ def main(argv=None, download=fetching.download, runner=subprocess.run, sleep=tim
         with run_lock(folder):
             result = run(folder, tool, args.max, int(round(args.max_gb * GB)), download=download,
                          open_url=open_url, runner=runner, sleep=sleep, say=say,
-                         retry_failed=args.retry_failed)
+                         retry_failed=args.retry_failed,
+                         only=ahead_ids(folder) if args.only_ahead else None)
     except Busy as error:
         say(str(error))
         return 2

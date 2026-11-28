@@ -81,7 +81,9 @@ extension PodcastAdFinder {
   /// the next piece of transcript; the full pass runs when the transcript is done.
   private func findPartial(_ id: String) async {
     guard let downloads = PodcastDownloader.shared.store,
-      let (ads, transcripts) = stores(for: id, in: downloads)
+      let (ads, transcripts) = stores(for: id, in: downloads),
+      // The Mac's marks on a copy it prepared are final: no partial file is written beside them.
+      !ads.hasPrepared(detector: Self.detectorName)
     else { return }
     let isPlaying = lock.withLock { urgent == id }
     // The playing episode's whole transcript goes to the full pass, which asks everything.

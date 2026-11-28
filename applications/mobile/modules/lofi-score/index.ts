@@ -108,6 +108,13 @@ export type LinkedFileWrite =
   | { status: "written" | "notLinked" | "folderGone" }
   | { status: "unwritable"; message: string }
 
+/** What copying a big file out of the linked sounds folder came to. */
+export type LinkedFileCopy =
+  | { status: "copied"; bytes: number }
+  /** iCloud was asked for the file and it is not on the phone yet: ask again later. */
+  | { status: "waiting" | "missing" | "notLinked" | "folderGone" }
+  | { status: "unreadable"; message: string }
+
 export type LofiLinkedFolder = {
   name: string
   /** Seconds since 1970, when the folder was last looked at. */
@@ -258,6 +265,13 @@ type LofiScoreNativeModule = {
    * `Podcasts/phone-notes.jsonl`), replacing the one there.
    */
   writeLinkedFolderFile(path: string, text: string): Promise<LinkedFileWrite>
+  /**
+   * Copies a file below the linked sounds folder (such as `Podcasts/prepared/<name>.mp3`) to `to`,
+   * a file address or path in the app's own folders, replacing what is there. The path may not
+   * leave the folder. A file iCloud has not put on the phone yet is asked for and answers
+   * `waiting` at once. After a copy iCloud's own download of the file is given back.
+   */
+  copyLinkedFolderFile(path: string, to: string): Promise<LinkedFileCopy>
   /** Deletes the imported sounds and forgets the linked folder. */
   removeImportedSounds(): Promise<LofiStatus>
   setAtmosphereEnabled(enabled: boolean): Promise<LofiStatus>

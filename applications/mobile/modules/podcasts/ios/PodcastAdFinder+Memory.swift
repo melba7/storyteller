@@ -12,7 +12,9 @@ extension PodcastAdFinder {
   /// The ads the memory finds whole in `words` are added to the episode's partial ads file, next
   /// to what the model found. One that the listener undid is left out.
   func addRemembered(_ id: String, ads: AdsStore, words: [TranscriptWord]) {
-    guard let show = EpisodeShows.shared.show(for: id),
+    // No partial file is written beside the final file of a copy the Mac prepared.
+    guard !ads.hasPrepared(detector: Self.detectorName),
+      let show = EpisodeShows.shared.show(for: id),
       var file = ads.loadPartial(detector: Self.detectorName)
     else { return }
     let use = KnownAdUse.from(PodcastKnownAds.shared.find(in: words, show: show), words: words)

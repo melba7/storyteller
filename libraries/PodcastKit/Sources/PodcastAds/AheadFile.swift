@@ -73,13 +73,20 @@ public struct AheadEntry: Codable, Sendable, Equatable {
   /// When Claude marked the episode, in seconds since 1970.
   public var marked: Double
   public var ads: [AheadMark]
+  /// The copy of the episode the Mac prepared, when it did. With a copy `start` and `end` of the
+  /// ads are seconds in that very file, and an entry with no ads says the episode has none.
+  public var copy: PreparedCopy?
 
-  public init(feed: String, guid: String, title: String, marked: Double, ads: [AheadMark]) {
+  public init(
+    feed: String, guid: String, title: String, marked: Double, ads: [AheadMark],
+    copy: PreparedCopy? = nil
+  ) {
     self.feed = feed
     self.guid = guid
     self.title = title
     self.marked = marked
     self.ads = ads
+    self.copy = copy
   }
 }
 
@@ -108,7 +115,7 @@ public struct AheadFile: Codable, Sendable, Equatable {
   }
 
   private enum Keys: String, CodingKey { case version, writtenAt, episodes }
-  private enum EntryKeys: String, CodingKey { case feed, guid, title, marked, ads }
+  private enum EntryKeys: String, CodingKey { case feed, guid, title, marked, ads, copy }
 
   /// An entry (or an ad) of the wrong shape is left out; the file as a whole must be an object
   /// with a list of episodes.
@@ -130,7 +137,8 @@ public struct AheadFile: Codable, Sendable, Equatable {
         guid: try box.decode(String.self, forKey: .guid),
         title: try box.decode(String.self, forKey: .title),
         marked: try box.decode(Double.self, forKey: .marked),
-        ads: try box.decode([Lossy<AheadMark>].self, forKey: .ads).compactMap(\.value))
+        ads: try box.decode([Lossy<AheadMark>].self, forKey: .ads).compactMap(\.value),
+        copy: (try? box.decode(PreparedCopy.self, forKey: .copy)))
     }
   }
 
@@ -162,7 +170,8 @@ public struct AheadFile: Codable, Sendable, Equatable {
   // MARK: Finding the entry of an episode
 
   /// The entry for an episode of the app, or nil: the newest marking that is not older than
-  /// `maxAgeDays` at `now`, has at least one ad, and names the episode. An entry and an episode
+  /// `maxAgeDays` at `now`, has at least one ad (or a copy, which says the episode has none), and
+  /// names the episode. An entry and an episode
   /// that both have a guid are the same episode when the guids are equal and, when both name a
   /// feed, the feeds are the same (as feed keys), since two shows can use the same style of guid.
   /// When either has no guid, the feed (as a feed key) and the title (lower case, letters and
@@ -172,7 +181,7 @@ public struct AheadFile: Codable, Sendable, Equatable {
     let wantedFeed = FeedKey.key(feed)
     let wantedTitle = Self.plain(title)
     return episodes.filter { entry in
-      guard entry.marked >= oldest, !entry.ads.isEmpty else { return false }
+      guard entry.marked >= oldest, !entry.ads.isEmpty || entry.copy != nil else { return false }
       if !guid.isEmpty, !entry.guid.isEmpty {
         guard entry.guid == guid else { return false }
         let entryFeed = FeedKey.key(entry.feed)

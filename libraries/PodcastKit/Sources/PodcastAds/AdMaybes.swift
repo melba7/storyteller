@@ -112,8 +112,9 @@ public enum AdMaybes {
   /// over no ad of the file, no question (answered or not), no undone stretch and no "no" answer.
   /// Each is stored as a `guess`; they do not overlap each other or a confirmed maybe, which is
   /// kept; the file never holds more than `most` (the longest are kept when there are more).
-  /// Sorted by start. Nil when the list ends up empty.
+  /// Sorted by start. Nil when the list ends up empty. A prepared file is given back as it is.
   public static func setting(_ maybes: [FoundAd], in file: AdsFile) -> AdsFile {
+    guard !file.isPrepared else { return file }
     let confirmed = (file.maybes ?? []).filter { $0.confidence != .guess && AdAsking.valid($0) }
     var kept: [FoundAd] = []
     let room = max(0, most - confirmed.count)

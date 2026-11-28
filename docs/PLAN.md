@@ -23,7 +23,9 @@ run and the exam (V8) | Timing fixes and the skip tap (X1 to X6, Mo's ask
 2026-11-26): X1 to X6 done (PR #58 merged, TestFlight 37.1; Mo taught the phone
 again on 2026-11-27); on the shelf 152 of 219 breaks pass (was 142), 138 of 222
 with the exact labels (was 129); X7 (one tap leaves the whole break) built,
-waiting on Fork CI, the merge and TestFlight 38.1
+merged (PR #60), TestFlight 38.1 waits on Mo's double-click on the Mac |
+Prepared episodes (Y1 to Y8, Mo's pick 2026-11-27): Y1 to Y7 built and checked
+(PR #61), Y8 (merge, TestFlight, the installer on the Mac) next
 
 v1 is done when the sounds feel right on Mo's phone (TestFlight) for Redwood and
 "The Strength of the Few". Each milestone fits in one session. Full checks run
@@ -1943,8 +1945,271 @@ cues arrived, per-show levels for them from `teach_settings.py`, and a tap's
 carry into a maybe or an open question (the shelf labels hold no maybes, so
 nothing says how often that would take show).
 
+### Prepared episodes: the Mac prepares, the phone plays its copy (Mo's pick, 2026-11-27)
+
+Mo: "ad skipping is pretty disappointing for me. I need more ideas. Even ones
+that would cost money to have a more sure better way to skip ads. Is the work on
+the computer currently looking at all the recent shows across my podcasts? If
+not, it should." On the card "Have the Mac prepare new episodes so the phone
+plays its copy?" he picked "All new episodes, all shows" (about $32 a week of
+Claude usage and 8 GB a week through iCloud). Fable planned it, Sonnet builds,
+Opus checks, Fable checks last. One pull request and one TestFlight build.
+
+Why this is surer: a host puts other ads into every download, so marks made on
+the Mac's copy do not hold on the phone's copy. On the shelf the nightly
+read-ahead could use 260 marks and had to leave 244 out. When the phone plays
+the very file the Mac marked, the Mac's times hold to the frame. Played on the
+same copy, Claude's marks pass 190 of 242 exact breaks with no skip where there
+is no ad, before any border is moved to where two downloads differ; the phone's
+own finders pass 132 of those 242.
+
+How I read the pick (my choices, told to Mo):
+
+- A hard weekly limit of
+  $35 of Claude usage. The last 7 days had 181 new episodes over 63 feeds, and at $0.19
+  each that is about $34. The phone's list of next episodes goes first, so the
+  limit cuts what is least likely to be played.
+- Prepared audio stays in iCloud for 7 days and takes 10 GB at most (Mo is asked
+  on a card; the installer says how much iCloud space is free when macOS tells
+  it).
+- The phone takes the Mac's copy for the episodes it expects to play next (its
+  list of 12) and for episodes it has downloaded and not started, on Wi-Fi only.
+  Everything else streams and is skipped as before.
+- An episode that was started is never swapped. Its position and its ads stay on
+  the copy it was started on.
+- On a prepared copy only the Mac's marks skip by themselves. The phone's own
+  finders leave that copy alone. The listener's taps, the Undo and the Skip ad
+  button work as on any episode.
+- The hourly job takes the place of the nightly read-ahead (W7), which was never
+  installed. Nothing on the Mac spends anything before Mo double-clicks the
+  installer and types yes.
+
+**The contract** between the Mac and the phone is `ahead-ads.json`, still
+version 1, so an older build reads it as before. An entry may carry a copy:
+
+```json
+{
+  "feed": "…",
+  "guid": "…",
+  "title": "…",
+  "marked": 1700000000,
+  "ads": [],
+  "copy": {
+    "file": "prepared/0123456789ab.mp3",
+    "sha256": "<64 hex>",
+    "bytes": 48123456
+  }
+}
+```
+
+`file` is relative to `Podcasts/` in the linked folder and is always
+`prepared/<a plain name>`. With a copy, `start` and `end` of the entry's ads are
+seconds in that very file, taken from `labels-snapped` when the second download
+was compared and from `labels` when it was not. An entry with a copy is kept
+when it has no ads, because that says the episode has none. When the Mac removes
+the audio the entry loses its `copy` and is a words-only entry again. The phone
+trusts a copy only when its size and its SHA-256 match.
+
+- [x] **Y1 The Mac picks new episodes of every show** (Mac):
+      `teach_prepare.py pick --budget NAME [--cap 35] [--most 6] [--hours 72]`.
+      First the phone's list, as `teach_ahead.py pick` reads it, whatever the
+      episodes' age. Then the episodes of every followed show
+      (`probe_shows.load_shows`, `teach_feed.feed_episodes`) that came out in
+      the last 72 hours, newest first. Known episodes are left out by the rule
+      of `teach_ahead.choose`, which is used and not copied. At most `--most` a
+      run, and no more than the weekly budget `prepare-<ISO year>-W<ISO week>`
+      has room for (`teach_budget.py`, the rule of `teach_ahead.choosing`). A
+      feed that cannot be read is said in one line and passed over. What is
+      picked goes into `ahead.json` and `episodes.json` as the nightly pick's
+      does, so the download, the writing down and the marking run unchanged with
+      `--only-ahead`.
+  - Done when: tests pin the order (the phone's list, then the newest), the 72
+    hours, that known episodes are left out, the limit a run and the weekly
+    limit, a feed that fails, and exit 3 with one plain line when there is
+    nothing to do.
+  - Done 2026-11-27. Added after the check: an episode of a feed that states a
+    language other than English is passed over and counted in the pick's line,
+    because the Mac writes down in English only and the phone would trust marks
+    made on a garbled transcript.
+- [x] **Y2 The copy and its exact times** (Mac):
+  - `teach_copies.py --only-ahead` compares only the episodes of `ahead.json`
+    that have no truth file yet. `teach_snap.py` runs as it is.
+  - `teach_prepared.py publish` copies the audio of each marked episode of
+    `ahead.json` into `Podcasts/prepared/<id>.<ext>` of the iCloud copy of the
+    phone's folder (a clone with `cp -c` where the disk can, written as `.part`
+    and then renamed) and notes it in `prepared.json` in the teaching folder:
+    id, file, SHA-256, bytes and when. It publishes nothing when the iCloud
+    folder is missing, when the Mac's disk has under 15 GB free, or when macOS
+    says (`brctl quota`) that iCloud has under 2 GB left, and says which in one
+    line.
+  - `teach_ahead_ads.py` gives an entry its `copy` when `prepared.json` lists
+    the audio and the file is there, takes the times from
+    `labels-snapped/<id>.json` when there is one, and keeps an entry with a copy
+    and no ads.
+  - `teach_prepared.py clean` removes prepared audio older than `--keep-days 7`
+    and then, oldest first, what is over `--max-gb 10`, from the iCloud folder
+    and from `audio/`. It removes only files that `prepared.json` lists and
+    whose names are `<12 hex>.<ext>`, and never a transcript, a label or
+    anything else.
+  - Done when: tests pin the copy block and its hash, an entry with no ads, the
+    times from the snapped labels, the clone written as `.part` first, cleaning
+    by age and by size, that nothing outside `prepared.json` is ever removed,
+    and the three stops for low space.
+  - Done 2026-11-27. Changed while building: a copy is published only once the
+    second download is settled (a truth file, given up on, or not an MP3), so
+    the times the phone gets with a copy never change, and an episode that is
+    not settled waits for a later hour. An episode that was picked and never
+    published is listed in `prepared.json` too, so its audio on the Mac goes
+    after the keep days, and a leftover `.part` of a listed id goes after a day.
+- [x] **Y3 The hourly job and its installer** (Mac): `teach-prepare.sh`, made
+      like `teach-ahead.sh` and held under `teach_store.py hold`: pick,
+      download, write down, mark (under the weekly limit), second download and
+      compare, snap, publish the audio, write `ahead-ads.json`,
+      `teach_publish.py`, clean. A step that fails for one episode does not keep
+      the others from the phone. "Install episode preparing.command" says what
+      it does in plain words (every hour, at most $35 a week of Claude usage, at
+      most 10 GB of iCloud for 7 days, the Mac must be awake), asks for a typed
+      `yes`, removes the nightly read-ahead job when it is loaded, and loads
+      `com.storyteller-lofi.podcast-prepare` with a `StartCalendarInterval` once
+      an hour. "Stop episode preparing.command" unloads it. The README gets a
+      section.
+  - Done when: shell tests with stand-ins (as `test_teach_ahead_shell.py` has
+    them) pin the order of the steps, that an episode that failed does not stop
+    the rest, that another run in the folder makes the hour pass quietly, and
+    that nothing is installed without the typed yes.
+  - Done 2026-11-27. Changed while building and after the check: marking keeps 1
+    dollar in reserve (`TEACH_PREPARE_RESERVE`), so it stops at about 34 dollars
+    and one dear call cannot pass the limit. The installer removes the nightly
+    job's file whether the job is loaded or not, and takes its own file away
+    again when loading fails. The stopper asks whether the prepared episodes
+    should also go from iCloud (a typed yes), says so only when they did, and
+    then removes leftover `.part` files too. Found in the last read and fixed:
+    the job first checks with a real write that audio can reach iCloud and that
+    this Mac and iCloud have room (`teach_prepared.py ready`), and spends
+    nothing in an hour when it cannot; the pick knows the marking's reserve, so
+    it picks nothing the marking would refuse; the download limit counts only
+    the job's own audio (`--own-gb`), because Mo's teaching folder already holds
+    75 GB and a limit over all audio would have stopped every hour.
+- [x] **Y4 The phone's rules for a prepared copy** (PodcastKit, plain Swift):
+  - `AheadEntry.copy` (`PreparedCopy`: file, SHA-256, bytes). A copy whose file
+    is not `prepared/<plain name>` or whose hash is not 64 hex digits reads as
+    no copy, and the entry is still read.
+  - `PreparedAds.file(for:duration:)` makes the ads file of that copy: its
+    SHA-256 is the copy's, it is marked `prepared`, and its ads sit at the
+    marks' times with the source `prepared`. High and medium marks skip, a low
+    mark asks, as the ahead marks do. Marks are cut to the length and put in
+    order.
+  - `AdsFile.prepared` is an optional key, so older files still read.
+    `AdsRules.status` says finished for a prepared file. Everything that writes
+    found ads leaves a prepared file alone: the finder's scan, the new finders,
+    the ahead pass, the stream's head and a change of the teaching. What the
+    listener does still writes: the Undo, a "no", the Skip ad button.
+  - `prepared` is a source the notes carry and the tally can count. It is not a
+    finder the guard can switch off (`FinderGuard` keeps 8 a show).
+  - `PreparedCopies.plan` says which copies the phone takes and which it gives
+    back: take a listed copy when the episode is on the phone's list of next
+    episodes or has a download, was not started, is not in the player and does
+    not have that copy yet; give back a copy that was taken only for the list
+    once the episode has left the whole list (not just its first 12 places) and
+    was not started. At most 12 a run.
+  - Done when: tests pin the reading (with a copy, without, a bad one), the ads
+    file made from an entry, the status, each writer leaving it alone, the Undo
+    of a prepared ad (saved as undone, no finder blamed), and the plan's every
+    rule.
+  - Done 2026-11-27. Changed while building: 12 a run and not 3, so a day's
+    copies come in one run; a download that the listener or a rule asks for
+    takes the "only for the list" mark off (`DownloadStore.clearCopyForList`),
+    so it is never given back.
+- [x] **Y5 The phone installs the Mac's copy** (phone, native):
+  - LofiScore gets `copyLinkedFolderFile(path, to)`, made like
+    `LinkedFolderFile.fetch`: copied, waiting (iCloud is still bringing it and
+    was asked), or missing. After a copy the iCloud download is given back to
+    iCloud so the audio is not kept twice.
+  - Podcasts gets `preparedPlan(candidates)` (the entries with a copy matched to
+    the app's episodes through the ahead table, then `PreparedCopies.plan`) and
+    `installPreparedCopy(episodeId, uri)`: it checks the size and the SHA-256,
+    refuses when the episode is in the player, installs the file as the
+    episode's download (the entry keeps its address), writes the prepared ads
+    file and tells the transcriber as a download does. A download entry gets an
+    optional flag for a copy taken only for the list.
+  - Done when: Fork CI builds the app, and what can be decided without the phone
+    is decided in PodcastKit and tested there.
+  - Done 2026-11-27 (`PodcastPrepared.swift`, `LofiLinkedCopy.swift`). After the
+    check: the partial finder leaves a prepared file alone too, an episode of a
+    show with ad skipping off still reaches the plan so its copy is given back,
+    a file that iCloud has not brought up to date answers waiting, and copies
+    are taken on Wi-Fi and not in Low Data Mode (`PodcastNetwork.allowsCopies`,
+    which waits a second for the first report of the network).
+- [x] **Y6 The phone asks for the copies** (phone, TypeScript):
+      `preparedSync.ts` runs after the teaching sync in `automaticRun.ts`. It
+      hands the candidates to `preparedPlan` (the phone's list of next episodes
+      and the episodes with a download, each with whether it was started), and
+      on Wi-Fi copies and installs what the plan says, and removes what the plan
+      gives back. Where the app shows an episode's ad status it says "Prepared
+      by your Mac". Notes of a prepared ad carry `by: "prepared"`.
+  - Done when: jest tests pin Wi-Fi only, that a waiting copy is tried again on
+    the next run and a failed one does not stop the others, that nothing is
+    asked for without a linked folder, and the sign's words.
+  - Done 2026-11-27. Changed while building: the step runs in `teachingRun.ts`
+    after the teaching files and the phone's notes. No copy is started after 20
+    seconds of a run, and when a copy was left waiting one more pass runs 45
+    seconds later. After the check: one run at a time (`singleRun`), and the
+    episode's position is read again after the copy and before the install, so
+    an episode that was started meanwhile is not swapped. A miss on a prepared
+    copy carries `by: "prepared"` too.
+- [x] **Y7 How it is measured**: the scorecard gets the row "Prepared copy"
+      (`podcast-teach score --prepared`): the snapped labels of the shelf are
+      made into prepared ads files by `PreparedAds` and played on the same copy
+      against the exact labels, so the row tests the phone's own rules.
+      `teach_feedback.py` adds a summary of prepared episodes from the phone's
+      notes: ads skipped, skips taken back, and taps on Skip ad. Mo's week of
+      listening is the real exam, and that summary is its result.
+      `docs/PODCASTS-ADS-TEACHING.md` gets the section "Prepared episodes" and
+      loses the stale line that the phone does not read `ahead-ads.json`;
+      `docs/ARCHITECTURE.md` gets the decision.
+  - Done when: the row is printed for the shelf in the cloud and its number
+    stands here, and a test pins the summary.
+  - Done 2026-11-27. The row "Prepared copy" passes 222 of 222 breaks with the
+    snapped labels and 219 of 219 with Claude's own, with no skip where there is
+    no ad (the phone's finders on a stream: 138 of 222 with 15 wrong skips, and
+    152 of 219). That is the ceiling and no exam: the marks are the truth here,
+    so the row only says that the phone's rules lose none of them. The first run
+    said 159 of 222 because the row passed the feed's stated length, which is
+    short for 50 of the 63 episodes (see `docs/LESSONS.md`). The summary counts
+    skips, Undos and misses by the notes' `by: "prepared"`
+    (`teach_feedback_prepared.py`).
+- [ ] **Y8 Check and ship**: the Opus check against every "done when" above,
+      with a close look at what deletes (the Mac's clean, the phone's give-back)
+      and at the swap of a download; fixes test first; the whole check; one pull
+      request; Fork CI; the merge; one TestFlight build; the Mac's tools copy
+      updated; "Install episode preparing.command" left for Mo's double-click.
+  - Done when: the pull request is merged, the build is on TestFlight, and Mo
+    has the installer and knows what it costs.
+
+Left for later: cutting the ads out of the prepared file so that nothing has to
+be skipped; the app not downloading the publisher's copy at all when the Mac's
+copy is on its way; skipping the phone's own writing down of a prepared copy; a
+show the Mac should not prepare (an ad-free feed); learning from the Undo of a
+prepared ad.
+
 ## Later
 
+- Prepared episodes (Y, 2026-11-27), found by the Opus check or by the builders
+  and left: when the ads file of a copy cannot be saved the copy stays installed
+  without the Mac's marks and is not taken again (the phone's own finders then
+  work on it); the show's language is not noted for the transcriber when a copy
+  is installed; an automatic download that is not the list's read-ahead leaves
+  the `ahead` mark on an entry (the Up Next rules, older than this round); a
+  swap drops the old file's transcript, `plainURL` and `playThrough`; an episode
+  that is not in the phone's ahead table (its list and the newest 12 unplayed of
+  a show) never gets a copy; a feed episode with no guid is not prepared; a
+  picked episode that still waits for its second download after the keep days is
+  dropped, and its marking was paid for; a run that is killed during a call does
+  not record that call's cost; the linked folder's bookmark is not refreshed by
+  `LofiLinkedCopy`, which has no tests because it lives outside LofiScoreKit;
+  `brctl quota` and `cp -c` were tested with stand-ins only; other scorecard
+  rows may still pass the feed's stated length; `preparedSync.ts` (341 lines),
+  its test file and `AdScoreCommand.swift` are over 300 lines.
 - One tap leaves the whole break (X7, 2026-11-27), found by the Opus check and
   left: a carry or a bridge passes over an open question or a maybe that lies in
   the hole, so it is never asked; the Undo of a carried skip is not remembered,

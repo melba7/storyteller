@@ -90,6 +90,8 @@ extension PodcastAdFinder {
     modelAsks: [FoundAd] = []
   ) -> NewResult {
     var result = NewResult(file: file)
+    // The Mac's marks on a copy it prepared are final: no new finder runs for it (PreparedAds).
+    guard !store.hasPrepared(detector: Self.detectorName) else { return result }
     guard let modes = newModes(id), let fresh = store.load(detector: Self.detectorName),
       let local = PodcastDownloader.shared.localFile(for: id)
     else { return result }

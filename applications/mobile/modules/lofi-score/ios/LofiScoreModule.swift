@@ -197,6 +197,23 @@ public final class LofiScoreModule: Module {
       }
     }
 
+    // Copies one big file below the linked folder (an episode the Mac prepared) to `to`, a file
+    // address or path of the app's own. "copied" (with `bytes`), "waiting" (iCloud was asked for it
+    // and it is not on the phone yet; asking again later finds it), "missing", "notLinked",
+    // "folderGone" or "unreadable" (with `message`). After a copy iCloud's own download is given
+    // back.
+    AsyncFunction("copyLinkedFolderFile") { (path: String, to: String) async -> [String: Any] in
+      let destination = URL(string: to).flatMap { $0.isFileURL ? $0 : nil } ?? URL(fileURLWithPath: to)
+      switch await LinkedFolderCopy.copy(path, to: destination) {
+      case .copied(let bytes): return ["status": "copied", "bytes": Double(bytes)]
+      case .waiting: return ["status": "waiting"]
+      case .missing: return ["status": "missing"]
+      case .notLinked: return ["status": "notLinked"]
+      case .folderGone: return ["status": "folderGone"]
+      case .unreadable(let message): return ["status": "unreadable", "message": message]
+      }
+    }
+
     // Writes a small text file into the linked folder, replacing the one there: "written",
     // "notLinked", "folderGone" or "unwritable" (with `message`).
     AsyncFunction("writeLinkedFolderFile") { (path: String, text: String) async -> [String: Any] in

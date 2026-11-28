@@ -305,7 +305,8 @@ is above zero, otherwise the start of the last line.
   `end` are seconds, and `startWords` and `endWords` are the first and last 40
   words of the ad so the phone can find the spot in its own transcript. It holds
   the episodes marked in the last 14 days (`marked` is when) and stays under the
-  4.5 MB limit. Credits are left out. The phone does not read this file yet.
+  4.5 MB limit. Credits are left out. An entry the Mac prepared also carries a
+  `copy` (see "Prepared episodes" below).
 
 `teach-ahead.sh` (the 2:00 job) picks up to 8 unmarked episodes from the list,
 downloads and writes them down with the weekly tools, has Claude mark them under
@@ -314,7 +315,8 @@ $10 a week (each
 episode is expected to cost about $0.19), and publishes
 `ahead-ads.json`. `ahead.json` in the teaching folder lists those episodes: they
 join `episodes.json` with their labels, so the weekly run learns from them, but
-`teach_train.py` never puts them on the shelf and the exam never takes them.
+`teach_train.py` never puts them on the shelf and the exam never takes them. The
+hourly job of "Prepared episodes" below takes the place of this nightly one.
 
 **Shows are named by their feed address in the Mac's files.** The phone names a
 show by its own id. The app tells the native side which feed is which show
@@ -348,6 +350,100 @@ current), the library, the sounds, the meaning model, the joints of the audio
 its joint rows), the score, the per-show settings and the copy to the phone's
 folders. `podcast-teach meaning` exits 2 for a set-up problem (for example, no
 sentence embedding on this Mac), and that does not stop the later steps.
+
+### Prepared episodes
+
+A host puts other ads into every download, so marks made on the Mac's copy of an
+episode do not hold on the phone's copy: on the shelf the nightly read-ahead
+could use 260 marks and had to leave 244 out. When the phone plays the very file
+the Mac marked, the Mac's times hold to the frame. So the Mac also hands the
+phone its own copy of the audio.
+
+`Install episode preparing.command` sets up an hourly job
+(`com.storyteller-lofi.podcast-prepare`, `teach-prepare.sh`). It first says what
+it does and costs and asks for a typed `yes`, and it turns the nightly
+read-ahead off when that is on. Each hour it first checks that its audio can
+reach iCloud: the iCloud copy of the phone's folder is there, a small test file
+can really be written into it (macOS refuses a background job without Full Disk
+Access for `/bin/bash`), and the Mac and iCloud have room. If not, it says why
+in the log and ends the hour before anything is picked, downloaded or marked, so
+nothing is spent in an hour that cannot publish. Then it:
+
+1. picks up to 6 episodes (`teach_prepare.py pick`): the phone's list of next
+   episodes first, whatever their age, then the episodes of every followed show
+   that came out in the last 72 hours, newest first. A show whose feed states a
+   language other than English is left out, because the writing down listens for
+   English, and the pick says how many episodes that was. Known episodes
+   (marked, in the teaching set, in `ahead.json`), exam and shelf episodes, and
+   feed episodes with no guid are left out. The picked ones are written to
+   `ahead.json`, `episodes.json` and `prepared.json` (as picked, no file yet);
+2. downloads them and writes down what is said (`--only-ahead` on the weekly
+   tools);
+3. has Claude mark the ads, under the budget `prepare-<ISO year>-W<ISO week>`;
+4. downloads each marked episode a second time, compares the two files
+   (`teach_copies.py --only-ahead`) and moves the marks onto the exact borders
+   (`teach_snap.py`);
+5. once the second download of an episode is settled (compared, given up on
+   after three failures, or not an MP3), copies its audio into
+   `Podcasts/prepared/<id>.<ext>` of the iCloud copy of the phone's folder
+   (`teach_prepared.py publish`): a clone with `cp -c` where the disk can,
+   written as `.part` and renamed, noted with its SHA-256 in `prepared.json`.
+   Waiting for the second download means the times the phone gets with a copy
+   never change;
+6. writes `ahead-ads.json` and copies it to the phone's folders
+   (`teach_ahead.py write`, `teach_publish.py`).
+
+**The contract.** `ahead-ads.json` stays version 1, so an older build reads it
+as before. An entry may carry a copy:
+`"copy": {"file": "prepared/<id>.<ext>", "sha256": "<64 hex>", "bytes": <int>}`.
+`file` is relative to `Podcasts/` in the linked folder and is always
+`prepared/<a plain name>`. With a copy, the `start` and `end` of the entry's ads
+are seconds in that very file, taken from `labels-snapped` when there is a
+snapped label and from `labels` when there is not. An entry with a copy is kept
+when it has no ads, because that says the episode has none. When the Mac removes
+the audio the entry loses its `copy` and is a words-only entry again. The phone
+trusts a copy only when its size and SHA-256 match.
+
+**The limits.** At most $35 a week of Claude usage (about 19 cents an episode;
+one call can cost more, so the marking keeps one dollar in reserve and stops at
+about 34 dollars, before a call that could pass the cap), 6 episodes an hour, at
+most 10 GB of copies in iCloud for 7 days (the installer lets you pick another
+number, such as 5 GB and 3 days, and passes it to the job). Nothing is copied,
+and one line says so, when iCloud Drive is missing, when the Mac's disk has
+under 15 GB free, or when `brctl quota` says iCloud has under 2 GB left after
+the file. The Mac has to be awake and online. It does not skip Sundays. Only the
+marking costs anything. The Mac keeps at most 25 GB of the job's own audio
+(`TEACH_PREPARE_OWN_GB`); audio from earlier teaching runs is not counted, so it
+never stops the hour.
+
+**What is deleted, and what never is.** Prepared audio older than 7 days goes,
+and then the oldest first until the copies are under 10 GB; room is made before
+a new file is copied, and `ahead-ads.json` is written after the cleaning, so it
+never lists a file that is gone. With a copy, the Mac's own `audio/<id>.<ext>`
+goes too and its `episodes.json` entry is put right, so it is never downloaded
+again. The Mac's audio of a picked episode that never reached iCloud goes after
+the same days, and so does a leftover `.part` of a listed episode over a day
+old. Only ids that `prepared.json` lists are touched, only names of the form
+`<12 hex>.<ext>`, never an episode of the exam or the shelf, and never a
+transcript, a label, a truth file or any other file. Episodes the nightly
+read-ahead picked are not listed there and are not touched.
+
+**Start and stop.** Double-click `Install episode preparing.command` and type
+`yes`. `Stop episode preparing.command` turns the job off and asks whether to
+also remove the prepared episodes from iCloud now; anything but `yes` keeps
+them, and they take space until the job runs again or they are removed by hand.
+The log is `~/Storyteller Lofi/logs/podcast-prepare.log` (what launchd saw is in
+`podcast-prepare-job.log`).
+
+**How it is measured.** On the same copy, Claude's marks passed 190 of 242 exact
+breaks with no skip where there is no ad, before any border was moved to where
+two downloads differ; the phone's own finders passed 132 of those 242. Mo's week
+of listening is the real test: `teach_feedback.py` prints, from the phone's
+notes, how many ads the phone skipped by the Mac's marks, how many of those
+skips were taken back, and how many times Skip ad was pressed on the Mac's copy
+where its marks had no ad. Each is counted by a note that says `by: "prepared"`
+(the phone writes it on a skip, an Undo or a "missed" note when it was playing
+the Mac's copy), so a press on the stream does not count.
 
 ## From the phone back to the Mac
 

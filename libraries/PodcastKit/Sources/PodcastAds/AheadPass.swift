@@ -42,7 +42,8 @@ public enum AheadPass {
     _ found: AheadFound, into file: AdsFile, show: String, listener: AdSkipSettings,
     tuning: ShowTuning, level: FinderMode
   ) -> Made {
-    guard level != .off else { return Made(file: file, skips: 0, questions: 0) }
+    // A prepared file holds the Mac's marks on that very copy; no word match adds to it.
+    guard level != .off, !file.isPrepared else { return Made(file: file, skips: 0, questions: 0) }
     let whole = candidates(found.ads, in: file, listener: listener, blockers: file.ads)
     let placed = tuning.apply(to: whole, show: show)
     var skips: [FoundAd] = []

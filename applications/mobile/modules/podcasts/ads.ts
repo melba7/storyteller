@@ -64,8 +64,16 @@ export const SEARCH_STOPPED = "Finding ads stopped:"
 /** What a screen says for such a failure: it is asked again by itself, so nothing is wrong. */
 export const AD_CHECK_PAUSED = "Ad check paused. Trying again soon"
 
+/** What a row says of an episode whose copy the Mac prepared (its ads are the Mac's marks). */
+export const PREPARED_BY_MAC = "Prepared by your Mac"
+
 export function adsStatus(info: AdsInfo | undefined): string {
   if (!info) return ""
+  if (
+    info.prepared === true &&
+    (info.state === "found" || info.state === "noAds")
+  )
+    return PREPARED_BY_MAC
   switch (info.state) {
     case "waiting":
       return "Waiting to find ads"
@@ -139,6 +147,8 @@ export type FoundAd = {
 }
 
 export type AdsFile = {
+  /** The file is the Mac's prepared one (`PreparedAds` in PodcastAds). */
+  prepared?: boolean
   /** The ads as they are skipped: already cut short by the listener's trims. */
   ads: FoundAd[]
   /** The ads whose skip the listener took back. */
@@ -301,7 +311,9 @@ export function parseAdsFile(json: string): AdsFile | null {
           : []
       })
     : []
-  return { ads, undone }
+  return file["prepared"] === true
+    ? { ads, undone, prepared: true }
+    : { ads, undone }
 }
 
 /** "1:05" or, from an hour on, "1:02:03". */

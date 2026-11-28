@@ -21,6 +21,8 @@ final class PodcastAdFinder: @unchecked Sendable {
   let lock = NSLock()
   private var sink: ((String, [String: Any]) -> Void)?
   private var statuses: [String: AdsStatus] = [:]
+  /// The episodes whose final ads file is the Mac's prepared one (the app says so on the row).
+  private var preparedIds: Set<String> = []
   var waiting: [String] = []
   /// The episode that is loaded in the player: it goes first, and the one at work makes way.
   var urgent: String?
@@ -81,6 +83,7 @@ final class PodcastAdFinder: @unchecked Sendable {
       failures[episodeId] = nil
       failureCounts[episodeId] = nil
       partialFailures[episodeId] = nil
+      preparedIds.remove(episodeId)
       guard statuses.removeValue(forKey: episodeId) != nil else { return nil }
       return sink
     }
@@ -94,7 +97,8 @@ final class PodcastAdFinder: @unchecked Sendable {
 
   /// Every episode's state, for the app to read at start.
   func all() -> [[String: Any]] {
-    lock.withLock { statuses }.map { AdsJSON.object($0.key, $0.value) }
+    let (known, prepared) = lock.withLock { (statuses, preparedIds) }
+    return known.map { AdsJSON.object($0.key, $0.value, prepared: prepared.contains($0.key)) }
   }
 
   /// An episode's saved ads as JSON (`AdsFile` in PodcastAds), or nil when there are none. While
@@ -125,6 +129,17 @@ final class PodcastAdFinder: @unchecked Sendable {
     for entry in downloads.entries() {
       let id = entry.episodeId
       guard let (ads, transcripts) = stores(for: id, in: downloads) else { continue }
+      // The Mac's marks on a copy it prepared are final: nothing is found again for it, and no
+      // transcript is waited for to say what it holds (PreparedAds).
+      let preparedFile = ads.load(detector: Self.detectorName).flatMap {
+        $0.isPrepared ? $0 : nil
+      }
+      notePrepared(id, preparedFile != nil)
+      if let preparedFile {
+        present.insert(id)
+        set(id, AdsRules.finished(preparedFile))
+        continue
+      }
       guard transcripts.hasTranscript else {
         // The transcript is still being made: the ads found in it so far, or why they cannot be
         // found, are shown, and the episode is not queued until the transcript is whole.
@@ -195,12 +210,29 @@ final class PodcastAdFinder: @unchecked Sendable {
   }
 
   func set(_ id: String, _ status: AdsStatus) {
-    let send = lock.withLock { () -> ((String, [String: Any]) -> Void)? in
+    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), Bool)? in
       guard statuses[id] != status else { return nil }
       statuses[id] = status
-      return sink
+      guard let sink else { return nil }
+      return (sink, preparedIds.contains(id))
     }
-    send?("onAdsChange", AdsJSON.object(id, status))
+    if let (sink, prepared) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: prepared))
+    }
+  }
+
+  /// Notes whether the episode's final ads file is the Mac's prepared one, and tells the app
+  /// again when that changed for a status it already has.
+  func notePrepared(_ id: String, _ on: Bool) {
+    let send = lock.withLock { () -> (((String, [String: Any]) -> Void), AdsStatus)? in
+      guard preparedIds.contains(id) != on else { return nil }
+      if on { preparedIds.insert(id) } else { preparedIds.remove(id) }
+      guard let sink, let status = statuses[id] else { return nil }
+      return (sink, status)
+    }
+    if let (sink, status) = send {
+      sink("onAdsChange", AdsJSON.object(id, status, prepared: on))
+    }
   }
 
   // MARK: Working

@@ -35,6 +35,17 @@ final class PodcastNetwork: @unchecked Sendable {
     }
   }
 
+  /// Whether prepared copies may be fetched now: on Wi-Fi and not in Low Data Mode. The first
+  /// report of the path monitor is waited for, for one second at most, so a run right after the
+  /// launch is not skipped.
+  func allowsCopies() async -> Bool {
+    for _ in 0..<10 {
+      if lock.withLock({ path != nil }) { break }
+      try? await Task.sleep(nanoseconds: 100_000_000)
+    }
+    return onWiFi && !isConstrained
+  }
+
   /// Whether the network is in Low Data Mode (the listener turned it on for this Wi-Fi network or
   /// for mobile data, to save data). True until the monitor has reported once, so nothing that
   /// keeps out of Low Data Mode starts before the network is known.

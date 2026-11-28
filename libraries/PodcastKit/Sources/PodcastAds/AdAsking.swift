@@ -108,8 +108,9 @@ public enum AdAsking {
   /// many are added as there is room for. A question with no real time, or over an ad, an
   /// undone or denied stretch or a question already in the file, is left out. Every question is
   /// kept as a `guess` (a question cannot be handed in as answered), and the list is kept by
-  /// start.
+  /// start. A prepared file takes none (its own questions are made with it).
   public static func adding(_ asks: [FoundAd], to file: AdsFile) -> AdsFile {
+    guard !file.isPrepared else { return file }
     var stored = file.asks ?? []
     for ask in asks where stored.count < AdAsks.most {
       guard valid(ask), !covered(ask, by: file), !stored.contains(where: { AdAsks.overlap($0, ask) })

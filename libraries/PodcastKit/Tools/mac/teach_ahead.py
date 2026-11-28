@@ -17,7 +17,7 @@ ones the model was taught on (teach_exam.pick_new).
   teach_ahead.py pick  --budget NAME [--folder F] [--queue FILE] [--shows FILE] [--cap 10]
                        [--most 8] [--estimate 0.19]
   teach_ahead.py ready [--folder F]
-  teach_ahead.py write [--folder F]
+  teach_ahead.py write [--folder F] [--prepared-to ICLOUD_COPY]
 
 pick reads the queue (the iCloud copy first, then the Mac's own, or --queue) and takes the first
 --most episodes, in the phone's order, that are not marked yet: not in the teaching set (by id, or
@@ -29,7 +29,9 @@ would still make the call. They are
 put in ahead.json (teach_ahead_set.py) and then in episodes.json, waiting for a download. The Mac's
 own spelling of a feed is used for the id when the show is one the Mac follows (--shows).
 ready says whether any of those episodes has audio and no label yet. write makes ahead-ads.json
-(teach_ahead_ads.py), which teach_publish.py then copies to the phone's folders.
+(teach_ahead_ads.py), which teach_publish.py then copies to the phone's folders. An episode whose audio
+teach_prepared.py put in the iCloud copy of the phone's folder (--prepared-to, by default the one
+teach_publish.py writes last) gets a "copy" in that file.
 
 Exit codes: 0 it worked, 2 a set-up problem (a damaged file, a folder that cannot be used, macOS
 refusing to let this read the phone's folder), 3 nothing to do tonight, said in one plain line: no
@@ -156,14 +158,21 @@ def plural(count, one, many):
     return "%d %s" % (count, one if count == 1 else many)
 
 
+def room_for(budget, most, estimate, reserve=None):
+    """How many more episodes may be picked: at most `most`, and one more fits while what is spent
+    plus its estimate plus the `reserve` less one estimate stays under the cap. The reserve is what
+    teach_label.py --reserve keeps below the cap before each call (the estimate when none is given),
+    so what is picked can be marked."""
+    reserve = estimate if reserve is None else reserve
+    return min(most, max(math.ceil((budget.left() - reserve) / estimate - 1e-9), 0))
+
+
 def choosing(folder, items, options, shows, say, now):
     """pick, once the queue is read and the folder is locked."""
     entries = teach_store.load_manifest(folder)
     budget = teach_budget.Budget(folder, options.budget, options.cap)
     say(budget.line())
-    # One more episode fits while what is spent plus its estimate stays under the cap: the same rule
-    # teach_label.py --reserve uses before each call, so what is picked can be marked.
-    room = min(options.most, max(math.ceil(budget.left() / options.estimate - 1e-9) - 1, 0))
+    room = room_for(budget, options.most, options.estimate)
     if room < 1:
         say("The weekly cap of $%.2f leaves no room for another episode (about $%.2f each), so "
             "nothing is read ahead tonight." % (options.cap, options.estimate))
@@ -244,8 +253,8 @@ def ready(folder, say):
     return 0
 
 
-def write(folder, say, now):
-    outcome = teach_ahead_ads.write(folder, int(now()), say)
+def write(folder, say, now, to=None):
+    outcome = teach_ahead_ads.write(folder, int(now()), say, to=to)
     say("%s: %s." % (teach_ahead_ads.FILE, {"nothing": "nothing to tell the phone yet, no file",
                                             "unchanged": "unchanged"}.get(outcome, outcome)))
     return 0
@@ -270,6 +279,7 @@ def main(argv, say=print, defaults=default_folders, now=time.time, load_shows=pr
     parser.add_argument("--cap", type=positive, default=CAP)
     parser.add_argument("--estimate", type=positive, default=ESTIMATE)
     parser.add_argument("--most", type=int, default=MOST)
+    parser.add_argument("--prepared-to")
     try:
         options = parser.parse_args(argv)
     except SystemExit as stop:
@@ -283,7 +293,8 @@ def main(argv, say=print, defaults=default_folders, now=time.time, load_shows=pr
             return pick(options, say, defaults, now, load_shows)
         if options.command == "ready":
             return ready(folder, say)
-        return write(folder, say, now)
+        return write(folder, say, now, os.path.expanduser(options.prepared_to) if options.prepared_to
+                     else defaults()[-1])
     except (teach_store.Problem, teach_store.ManifestError) as error:
         say(str(error))
         return 2

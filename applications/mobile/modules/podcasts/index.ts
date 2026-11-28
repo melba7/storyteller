@@ -178,6 +178,18 @@ export type TranscriptChange =
   | TranscriptInfo
   | { episodeId: string; state: "none" }
 
+/** What installing a prepared copy answered: "installed", or why not in one word. */
+export type PreparedInstallAnswer =
+  | "installed"
+  | "noCopy"
+  | "playing"
+  | "downloading"
+  | "size"
+  | "hash"
+  | "unreadable"
+  | "adsNotSaved"
+  | "failed"
+
 /** Where an episode's ad finding is, as the Swift side reports it (once its transcript is ready). */
 export type AdsInfo = {
   episodeId: string
@@ -190,6 +202,8 @@ export type AdsInfo = {
   reason?: string
   /** The model refused some parts of the transcript, so they were not checked for ads. */
   unchecked?: boolean
+  /** The file is a copy the Mac prepared, and its ads are the Mac's marks on that very file. */
+  prepared?: boolean
 }
 
 /** An episode's ad finding changed, or (state "none") went with its download. */
@@ -416,6 +430,29 @@ type PodcastsNativeModule = {
   getPartialTranscript(episodeId: string): Promise<string | null>
   /** Where the words are said in the finished transcripts (see transcriptSearch.ts). */
   searchTranscripts(query: string): Promise<SpokenHit[]>
+  /**
+   * Which of the Mac's prepared copies to take and which to give back, for the candidates as JSON
+   * text (see `PreparedCandidate` in preparedSync.ts); answers JSON text (`PreparedPlan`).
+   */
+  preparedPlan(candidates: string): Promise<string>
+  /**
+   * Installs the file at `uri` as the download of the episode when it is the copy the Mac lists for
+   * it (the size and the SHA-256 are checked natively). `address` is the episode's audio address,
+   * kept as the download's address when it has none. Answers "installed" or why not in one word.
+   */
+  installPreparedCopy(
+    episodeId: string,
+    uri: string,
+    address: string,
+    forListOnly: boolean,
+  ): Promise<PreparedInstallAnswer>
+  /** Removes the download of a copy taken only for the list; false when it is not such a copy. */
+  giveBackPreparedCopy(episodeId: string): Promise<boolean>
+  /**
+   * Whether prepared copies may be fetched now: on Wi-Fi (the test the automatic downloads use)
+   * and not in Low Data Mode. Waits up to a second for the first report of the network.
+   */
+  isOnWiFi(): Promise<boolean>
   /** Where each transcribed episode's ad finding is. */
   listAds(): Promise<AdsInfo[]>
   /** An episode's saved ads as JSON (`AdsFile` in PodcastAds), or null. */
