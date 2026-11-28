@@ -101,7 +101,13 @@ echo "If you move or delete this folder, double-click this file again from its n
 echo "So that the job can copy into iCloud Drive (macOS keeps background jobs out of it), once:"
 echo "System Settings > Privacy & Security > Full Disk Access > +, press Cmd-Shift-G, type /bin/bash, add it and switch it on."
 echo
-read -r -p "Type yes to turn it on, or just press Return to leave it off: " answer
+# TEACH_INSTALL_YES=1 stands for the typed yes, for a script that runs with nobody at the keyboard.
+if [ "$TEACH_INSTALL_YES" = 1 ]; then
+  answer=yes
+  echo "TEACH_INSTALL_YES=1 was given, so it is turned on without asking."
+else
+  read -r -p "Type yes to turn it on, or just press Return to leave it off: " answer
+fi
 case "$answer" in
   yes|YES|Yes) ;;
   *) finish "Nothing was changed. Episode preparing was not turned on." 0 ;;
