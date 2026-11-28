@@ -9,13 +9,13 @@ import {
   macSection,
   resultsFor,
 } from "@/modules/podcasts/adResults"
-import { exchangeLine } from "@/modules/podcasts/macExchange"
-import { useExchange } from "@/modules/podcasts/macExchangeStore"
 import {
   getAdResults,
   getTeachingState,
 } from "@/modules/podcasts/adResultsNative"
 import { Podcasts } from "@/modules/podcasts/index"
+import { exchangeLine } from "@/modules/podcasts/macExchange"
+import { useExchange } from "@/modules/podcasts/macExchangeStore"
 import { parseTeachingState } from "@/modules/podcasts/teaching"
 
 import { BelowBar, ScreenBar } from "./ScreenBar"

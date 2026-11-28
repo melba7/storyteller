@@ -10,6 +10,7 @@ import { LofiScore } from "@/modules/lofi-score"
 
 import { MAP_LOOK_MS } from "./episodeMap"
 import { lookForEpisodeMap } from "./episodeMapRun"
+import { Podcasts } from "./index"
 import {
   type Came,
   NOTHING_CAME,
@@ -17,7 +18,6 @@ import {
   countAheadMarks,
 } from "./macExchange"
 import { recordExchange } from "./macExchangeStore"
-import { Podcasts } from "./index"
 import { DIARY_FILE, NOTES_FILE } from "./phoneNotes"
 import { currentQueue, syncPhoneNotes } from "./phoneNotesSync"
 import { QUEUE_FILE } from "./phoneQueue"
