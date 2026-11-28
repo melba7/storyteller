@@ -233,4 +233,44 @@ final class EpisodeMapAlignerTests: XCTestCase {
     XCTAssertEqual(carry.unmatched.count, 11)  // the last one has no matched audio after it
     XCTAssertTrue(carry.marks.isEmpty)
   }
+
+  // MARK: The same ad in another slot
+
+  /// The Mac's copy: 300 s of show, an ad, 600 s of show, another ad, 300 s of show.
+  private func moved() -> (show: [[UInt8]], ad: [UInt8], other: [UInt8]) {
+    let show = [1, 2, 3].map { Copy.audio(UInt64(40 + $0), seconds: $0 == 2 ? 600 : 300) }
+    return (show, Copy.audio(50, seconds: 30), Copy.audio(51, seconds: 30))
+  }
+
+  func testAMarkThatEndsLateDoesNotSpanTheShowUpToItsAdsNewSlot() {
+    let (show, ad, other) = moved()
+    let start = Copy.seconds(show[0])
+    let late = Copy.map(
+      [show[0], ad, show[1], other, show[2]],
+      marks: [EpisodeMapMark(start: start, end: start + 31, kind: "ad")])
+    // The phone got another ad in the first slot and the Mac's first ad in the second.
+    let carry = EpisodeMapAligner(map: late).carry(
+      Copy.heard([show[0], Copy.audio(52, seconds: 30), show[1], ad, show[2]]), complete: true)
+    XCTAssertTrue(carry.lined)
+    XCTAssertEqual(carry.marks.count, 1)
+    guard let mark = carry.marks.first else { return }
+    assertStretch((mark.start, mark.end), 930, 960)
+  }
+
+  func testAMarkThatStartsEarlyDoesNotSpanTheShowAfterItsAdsNewSlot() {
+    let (show, ad, other) = moved()
+    let start = Copy.seconds(show[0])
+    let early = Copy.map(
+      [show[0], ad, show[1], other, show[2]],
+      marks: [EpisodeMapMark(start: start - 1, end: start + 30, kind: "ad")])
+    // The phone got the Mac's first ad before the show and ads of its own in both slots.
+    let carry = EpisodeMapAligner(map: early).carry(
+      Copy.heard([
+        ad, show[0], Copy.audio(52, seconds: 30), show[1], Copy.audio(53, seconds: 30), show[2],
+      ]), complete: true)
+    XCTAssertTrue(carry.lined)
+    XCTAssertEqual(carry.marks.count, 1)
+    guard let mark = carry.marks.first else { return }
+    assertStretch((mark.start, mark.end), 0, 30)
+  }
 }

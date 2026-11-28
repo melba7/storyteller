@@ -185,26 +185,32 @@ public struct EpisodeMapAligner: Sendable {
   }
 
   /// Each mark's pieces in the phone's seconds, by start. Pieces of one mark in runs that follow
-  /// each other are one piece: what the phone has between them stands where the Mac's copy had
-  /// only that mark's audio.
+  /// each other in the phone's copy and in the map are one piece when the mark reaches from the
+  /// one run's last frame to the other's first: what the phone has between them then stands
+  /// where the Mac's copy had only that mark's audio. Runs that follow each other only in the
+  /// phone's copy (an ad that sits in another slot there) have the show between them.
   private func pieces(of runs: [MapRun], in heard: HeardFrames) -> [CarriedMark] {
     var found: [CarriedMark] = []
     for mark in map.marks {
       let low = Int((mark.start / map.frameSeconds).rounded())
       let high = Int((mark.end / map.frameSeconds).rounded())
       var lastRun: Int?
+      var lastEnd = 0  // the map's frame where the last piece ended
       for (number, run) in runs.enumerated() {
         let begin = max(low, run.map)
         let end = min(high, run.map + run.heard.count)
         guard begin < end else { continue }
         let start = heard.time(run.heard.lowerBound + begin - run.map)
         let finish = heard.time(run.heard.lowerBound + end - run.map)
-        if let lastRun, lastRun == number - 1 {
+        if let lastRun, lastRun == number - 1, begin == run.map,
+          lastEnd == runs[lastRun].map + runs[lastRun].heard.count, run.map >= lastEnd
+        {
           found[found.count - 1].end = finish
         } else {
           found.append(CarriedMark(start: start, end: finish, kind: mark.kind, from: mark.start))
         }
         lastRun = number
+        lastEnd = end
       }
     }
     return found.sorted { $0.start < $1.start }
