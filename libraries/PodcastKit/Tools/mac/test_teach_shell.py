@@ -407,6 +407,44 @@ class FinishTests(Setup):
         self.assertEqual(done.returncode, 0)
 
 
+class ExitCodeTests(Setup):
+    """A tool that ends with a non-zero code is said with that code, and a code of 128 and more with
+    the signal that ended it. The Mac's score step once failed with nothing printed at all."""
+
+    def test_a_plain_exit_code_is_named(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=2")
+        self.assertIn("Score ended with exit code 2.", done.stdout)
+
+    def test_a_killed_tool_says_signal_9_and_memory(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=137")
+        self.assertIn("exit code 137: it was killed (signal 9), often because the Mac ran out of memory",
+                      done.stdout)
+
+    def test_a_swift_crash_says_abort(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=134")
+        self.assertIn("exit code 134: it aborted (signal 6), which is a crash in the Swift program", done.stdout)
+
+    def test_a_signal_without_a_name_here_is_still_numbered(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=170")
+        self.assertIn("exit code 170: it was ended by signal 42", done.stdout)
+
+    def test_a_tool_that_printed_nothing_says_so(self):
+        silent = TEACH.replace('echo "podcast-teach $1: ending with ${pair#*=}"; ', "")
+        self.program("podcast-teach", silent)
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=137")
+        self.assertIn("It printed nothing before it ended.", done.stdout)
+        done = self.run_script("teach-finish.sh", TEACH_CODES="meaning=2")
+        self.assertIn("It printed nothing before it ended.", done.stdout)
+
+    def test_a_tool_that_printed_something_does_not_say_it_printed_nothing(self):
+        done = self.run_script("teach-finish.sh", TEACH_CODES="score=2")
+        self.assertNotIn("printed nothing", done.stdout)
+
+    def test_the_code_is_in_the_log_too(self):
+        self.run_script("teach-finish.sh", TEACH_CODES="score=137")
+        self.assertIn("exit code 137", self.log())
+
+
 class FinishLockTests(Setup):
     def test_it_runs_under_the_lock_for_its_whole_length(self):
         self.run_script("teach-finish.sh")

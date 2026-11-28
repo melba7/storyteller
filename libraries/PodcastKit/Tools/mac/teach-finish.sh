@@ -77,6 +77,24 @@ fingerprint() {
 note() { SUMMARY="$SUMMARY  $1: $2
 "; }
 
+# why_ended CODE: what an exit code means in plain words. A code of 128 and more is the signal
+# that ended the program (code minus 128).
+why_ended() {
+  local code="$1" signal name
+  if [ "$code" -le 128 ]; then echo "exit code $code"; return; fi
+  signal=$((code - 128))
+  case "$signal" in
+    4|5) name="it crashed (signal $signal), which is a crash in the Swift program" ;;
+    6) name="it aborted (signal 6), which is a crash in the Swift program" ;;
+    9) name="it was killed (signal 9), often because the Mac ran out of memory" ;;
+    11) name="it crashed (signal 11), which is a crash in the Swift program" ;;
+    15) name="it was asked to stop (signal 15)" ;;
+    2) name="it was interrupted (signal 2)" ;;
+    *) name="it was ended by signal $signal" ;;
+  esac
+  echo "exit code $code: $name"
+}
+
 # run_step LABEL OUTPUT COMMAND...: runs a tool, shows what it prints (also in the log) and notes
 # whether it worked. OUTPUT is the file the tool writes: "worked" when it is new or changed and
 # "nothing to do" when it is not there or the same as before. With OUTPUT "-" the tool worked when
@@ -93,6 +111,9 @@ run_step() {
   after="$(fingerprint "$output")"
   if [ "$code" -ne 0 ]; then
     note "$label" "failed"
+    local said=""
+    [ -s "$CAPTURE" ] || said=" It printed nothing before it ended."
+    say "$label ended with $(why_ended "$code").$said"
     say "$label did not work (see above). The steps after it still run."
     return 1
   fi
