@@ -19,11 +19,30 @@ public enum FolderBookmark {
         #if os(macOS)
         return try folder.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil)
         #else
-        return try folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        // On an iPhone a folder from the document picker (in iCloud Drive, say) can be
+        // bookmarked only while its security scope is open; without it the bookmark fails and
+        // the folder is copied once instead of kept linked.
+        return try insideScope(
+            of: folder,
+            start: { $0.startAccessingSecurityScopedResource() },
+            stop: { $0.stopAccessingSecurityScopedResource() }
+        ) {
+            try folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+        }
         #endif
         #else
         return Data(folder.path.utf8)
         #endif
+    }
+
+    /// Runs `work` with the folder's security scope open (`start`), and closes it afterwards
+    /// (`stop`) when it opened, also when `work` throws.
+    static func insideScope<T>(
+        of folder: URL, start: (URL) -> Bool, stop: (URL) -> Void, _ work: () throws -> T
+    ) rethrows -> T {
+        let scoped = start(folder)
+        defer { if scoped { stop(folder) } }
+        return try work()
     }
 
     public static func resolve(_ bookmark: Data) throws -> URL {

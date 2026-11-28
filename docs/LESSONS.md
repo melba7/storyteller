@@ -289,3 +289,10 @@ One line per lesson.
   put the audio into iCloud. A job that spends money checks first, in the same
   run and with a real write, that its result can be delivered, and spends
   nothing when it cannot (2026-11-28).
+- Nothing from the Mac ever reached the phone, and nothing from the phone
+  reached the Mac. On an iPhone, a folder picked in iCloud Drive can be
+  bookmarked only inside its security scope, so keeping the link failed and the
+  app quietly copied the folder once instead. Every Mac-side score assumed the
+  phone had the Mac's files. A fallback that hides a failure needs a visible
+  sign, and an exchange between two devices is proven on the real devices (the
+  other side's first file arriving) before anything is built on it (2026-11-28).
