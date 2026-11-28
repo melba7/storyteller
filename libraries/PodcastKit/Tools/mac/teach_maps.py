@@ -9,10 +9,18 @@ audio up against it: what matches carries the marks over exactly, and what match
 only the phone got. The map is written by the Swift tool `podcast-ads --map` (EpisodeMapCommand in
 PodcastKit), so the Mac and the phone cut frames with the same code.
 
+The tool reads and writes nothing in iCloud Drive: it makes the map of the Mac's own copy of the
+audio in the teaching folder (the very file that was published, by its SHA-256) into a temporary
+folder, and this script copies the map into iCloud as the other files are copied there. Run by the
+preparing job on the copy in iCloud Drive and told to write there, the tool printed nothing for five
+minutes and was stopped, for every copy (2026-11-28), while it made the same map on Linux in a
+twentieth of a second, and in the same job it read the Mac's own copies fine.
+
   teach_maps.py publish --tool PATH [--folder F] [--to ICLOUD_COPY]
 
 publish makes <to>/Podcasts/maps/<id>.json for each prepared copy that is an MP3 file, is in the
-iCloud copy now (teach_prepared_file.copies) and has no map of that very file yet. The marks are
+iCloud copy now (teach_prepared_file.copies), has no map of that very file yet and whose own copy
+the Mac still has. The marks are
 the ones ahead-ads.json tells with the copy (the snapped label when there is one), those Claude was
 sure of ("high" and "medium"); the others stay questions the phone finds by their words. It also
 removes the maps of copies that are gone: only files named <12 hex>.json in that folder.
@@ -27,6 +35,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -36,7 +45,8 @@ import teach_prepared_file
 import teach_store
 from apple_podcasts_export import default_folders
 from teach_ahead_set import read_ahead
-from teach_publish import SUBFOLDER
+from teach_prepared import sha256_of
+from teach_publish import SUBFOLDER, write_atomically
 
 FOLDER_NAME = "maps"
 NAME = re.compile(r"^([0-9a-f]{12})\.json$")
@@ -104,44 +114,65 @@ def clean(to, keep, say):
     return failed
 
 
-def make_one(folder, to, tool, item, copy, run, say):
-    """Writes the map of one copy. Returns None when it worked, else the reason."""
+def own_copy(folder, files, identifier, sha256):
+    """The Mac's own copy of the episode's audio in the teaching folder (`files` is {id: its file in
+    episodes.json}), when it is the very file that was published; else None."""
+    if not files.get(identifier):
+        return None
+    path = os.path.join(folder, files[identifier])
+    try:
+        return path if os.path.isfile(path) and sha256_of(path) == sha256 else None
+    except OSError:
+        return None
+
+
+def make_one(folder, to, tool, item, copy, audio, run, say):
+    """Writes the map of one copy, made of `audio` (the Mac's own copy of that file). Returns None
+    when it worked, else the reason."""
     try:
         marks = marks_of(folder, item["id"], say)
     except (OSError, ValueError) as error:
         return "its label or transcript cannot be used (%s)" % error
-    handle, marks_file = tempfile.mkstemp(prefix="map-marks-", suffix=".json")
+    work = tempfile.mkdtemp(prefix="map-")
     try:
-        with os.fdopen(handle, "w", encoding="utf-8") as f:
+        marks_file, made = os.path.join(work, "marks.json"), os.path.join(work, "map.json")
+        with open(marks_file, "w", encoding="utf-8") as f:
             json.dump(marks, f)
-        os.makedirs(os.path.dirname(map_of(to, item["id"])), exist_ok=True)
         try:
-            code, text = run([tool, "--map", os.path.join(to, SUBFOLDER, copy["file"]),
-                              "--out", map_of(to, item["id"]), "--marks", marks_file,
+            code, text = run([tool, "--map", audio, "--out", made, "--marks", marks_file,
                               "--sha256", copy["sha256"], "--feed", item["feed"], "--guid", item["guid"]])
         except (OSError, subprocess.SubprocessError) as error:
             code, text = 1, str(error)
         if code != 0:
             return (text.strip().splitlines() or ["the map tool failed"])[-1]
-        if made_for(map_of(to, item["id"])) != copy["sha256"]:
+        if made_for(made) != copy["sha256"]:
             return "the map tool wrote no map of this file"
+        with open(made, "rb") as f:
+            data = f.read()
+        os.makedirs(os.path.dirname(map_of(to, item["id"])), exist_ok=True)
+        write_atomically(map_of(to, item["id"]), data)
         return None
     except OSError as error:
         return str(error)
     finally:
-        os.remove(marks_file)
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def publish(folder, to, tool, say, run=run_command):
     copies = teach_prepared_file.copies(folder, to)
     failed = clean(to, set(copies), say)
+    files = {one["id"]: one["file"] for one in teach_store.load_manifest(folder)}
     for item in read_ahead(folder):
         copy = copies.get(item["id"])
         if not copy or not copy["file"].lower().endswith(".mp3"):
             continue
         if made_for(map_of(to, item["id"])) == copy["sha256"]:
             continue
-        reason = make_one(folder, to, tool, item, copy, run, say)
+        audio = own_copy(folder, files, item["id"], copy["sha256"])
+        if audio:
+            reason = make_one(folder, to, tool, item, copy, audio, run, say)
+        else:
+            reason = "the Mac has no own copy of that very file any more"
         if reason:
             say("No map of %s: %s." % (item["id"], reason))
             failed += 1
@@ -168,7 +199,7 @@ def main(argv, say=print, run=run_command, defaults=default_folders):
         return STOPPED
     try:
         return publish(folder, to, options.tool, say, run)
-    except teach_store.Problem as error:
+    except (teach_store.Problem, teach_store.ManifestError) as error:
         say(str(error))
         return 2
     except OSError as error:
