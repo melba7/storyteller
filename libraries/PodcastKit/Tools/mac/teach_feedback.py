@@ -31,6 +31,7 @@ Exit code: 0 it worked (also with no notes), 2 a set-up problem.
 
 Run the tests: python3 -m unittest discover -s libraries/PodcastKit/Tools/mac"""
 import argparse
+import ctypes
 import json
 import math
 import os
@@ -50,6 +51,9 @@ WHAT = ("skipped", "undone", "trimmed", "missed", "confirmed", "denied")
 WANTED_AS = {"missed": "missed", "confirmed": "missed", "undone": "undone", "denied": "undone"}
 LINE_LIMIT = 64 * 1024
 FILE_LIMIT = 8 * 1024 * 1024
+# setiopolicy_np(IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS,
+# IOPOL_MATERIALIZE_DATALESS_FILES_ON), from macOS's sys/resource.h.
+DOWNLOAD_POLICY = (3, 0, 2)
 
 
 # MARK: Reading
@@ -116,10 +120,26 @@ def read_notes(path):
     return notes, bad
 
 
+def allow_icloud_downloads(platform=sys.platform, load=lambda: ctypes.CDLL(None)):
+    """Lets this process download a file iCloud Drive has not downloaded yet when it reads it, and
+    says whether that could be set (macOS only). The phone's files reach the Mac that way, and a
+    program's default is not to download them: a read fails with EDEADLK ("Resource deadlock
+    avoided"; Apple's TN3150). The read then waits for the download, which is quick for these
+    small files."""
+    if platform != "darwin":
+        return False
+    try:
+        return load().setiopolicy_np(*DOWNLOAD_POLICY) == 0
+    except (OSError, AttributeError):
+        return False
+
+
 def find_notes(defaults, denied=None, name=NOTES):
     """The path of the notes (or of another file the phone writes into Podcasts/, named by `name`):
     the iCloud copy first (the last folder), then the Mac's own. A copy that macOS does not let
-    this read (permissions) is added to the list `denied`, when given, and the next one is tried."""
+    this read (permissions) is added to the list `denied`, when given, and the next one is tried.
+    First lets this process download the file from iCloud (allow_icloud_downloads)."""
+    allow_icloud_downloads()
     for folder in reversed(defaults()):
         path = os.path.join(folder, name)
         try:

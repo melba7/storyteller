@@ -317,3 +317,8 @@ One line per lesson.
   local files: `podcast-ads --map`, run on a file in iCloud Drive and told to
   write there, hung, while Python's plain copies into iCloud worked. Make the
   file locally and let the Python script copy it in (2026-11-28).
+- A file the phone writes reaches the Mac's iCloud Drive as a placeholder, and a
+  Mac program's default is not to download it: reading it fails with "Resource
+  deadlock avoided". Readers of the phone's files call `setiopolicy_np` first
+  (`teach_feedback.allow_icloud_downloads`), and a log line that says "could not
+  be read" every run is a bug to chase, not noise (2026-11-28).

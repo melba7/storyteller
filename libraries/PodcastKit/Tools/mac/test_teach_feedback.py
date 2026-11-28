@@ -294,5 +294,52 @@ class AnsweredQuestionTests(Setup):
         self.assertEqual(row.split()[-3:], ["1", "0", "0"])
 
 
+class ICloudDownloadTests(unittest.TestCase):
+    """The phone's files reach the Mac as files iCloud Drive has not downloaded yet. A program's
+    default on macOS is not to download one when it reads it: the read fails with EDEADLK
+    ("Resource deadlock avoided"), which every preparing run said for the phone's notes and list
+    of next episodes (2026-11-28). So the readers first let the process download them."""
+
+    class FakeLibc:
+        def __init__(self, answer=0):
+            self.calls, self.answer = [], answer
+
+        def setiopolicy_np(self, *values):
+            self.calls.append(values)
+            return self.answer
+
+    def test_on_macos_the_process_is_let_download_dataless_files(self):
+        libc = self.FakeLibc()
+        self.assertTrue(feedback.allow_icloud_downloads(platform="darwin", load=lambda: libc))
+        # IOPOL_TYPE_VFS_MATERIALIZE_DATALESS_FILES, IOPOL_SCOPE_PROCESS, ..._FILES_ON (sys/resource.h)
+        self.assertEqual(libc.calls, [(3, 0, 2)])
+
+    def test_elsewhere_or_when_it_cannot_be_set_nothing_breaks(self):
+        libc = self.FakeLibc()
+        self.assertFalse(feedback.allow_icloud_downloads(platform="linux", load=lambda: libc))
+        self.assertEqual(libc.calls, [])
+        self.assertFalse(feedback.allow_icloud_downloads(platform="darwin", load=lambda: self.FakeLibc(-1)))
+
+        def missing():
+            raise OSError("no such library")
+        self.assertFalse(feedback.allow_icloud_downloads(platform="darwin", load=missing))
+        self.assertFalse(feedback.allow_icloud_downloads(platform="darwin", load=lambda: object()))
+
+    def test_finding_a_phone_file_lets_the_process_download_it_first(self):
+        root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, root, ignore_errors=True)
+        os.makedirs(os.path.join(root, "Podcasts"))
+        with open(os.path.join(root, feedback.NOTES), "w") as f:
+            f.write("")
+        asked = []
+        real = feedback.allow_icloud_downloads
+        feedback.allow_icloud_downloads = lambda: asked.append(True) or True
+        try:
+            self.assertEqual(feedback.find_notes(lambda: [root]), os.path.join(root, feedback.NOTES))
+        finally:
+            feedback.allow_icloud_downloads = real
+        self.assertEqual(asked, [True])
+
+
 if __name__ == "__main__":
     unittest.main()

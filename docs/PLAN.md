@@ -2317,6 +2317,13 @@ How I read the picks (my choices, told to Mo):
   - Done when: Python tests pin how a note becomes a per-show line, that a show
     gets 20 lines at most, and that the folder is in `.gitignore`; the Mac's log
     names the notes it read.
+  - Found on the Mac (2026-11-28): every preparing run since the phone's first
+    files arrived said the phone's notes and its list of next episodes "could
+    not be read ([Errno 11] Resource deadlock avoided)". The phone's files reach
+    the Mac as files iCloud has not downloaded yet, and a program's default on
+    macOS is not to download them (EDEADLK, Apple's TN3150). The readers now let
+    their process download them first (`setiopolicy_np`, in
+    `teach_feedback.find_notes`). Done on the Mac once a run reads the notes.
 - [ ] **Z8 Find why the Mac's "Score" step fails**: it has failed silently since
       2026-11-23, so `scorecard.json` and the per-show settings made from it are
       stale. The step logs its exit code and its last error lines. A launcher
@@ -2452,7 +2459,8 @@ How I read the picks (my choices, told to Mo):
     those very files on Linux in 0.04 s. So the map is now made of the Mac's own
     copy of the audio (checked by its SHA-256) into a temporary folder, and
     `teach_maps.py` copies it into iCloud as the other files are copied there.
-    Done on the Mac once a run says "Map of" for each copy.
+    Done on the Mac: the 7:25 AM run (2026-11-28) wrote 31 maps in about a
+    minute, none failed, and `ahead-ads.json` names all 31.
 - [ ] **Z20 Swap a started episode** (E): the phone finds the listener's place
       in the Mac's copy by matching the show's own audio around it, then goes on
       in the copy at that place. No match means no swap.
