@@ -38,6 +38,7 @@ extension PodcastAdFinder {
   /// have marks from the Mac the finder has not used yet. Returns at once; asking again while a
   /// pass runs makes it look once more when it is done.
   func lookAhead() {
+    refreshMacMarks()
     lock.withLock {
       guard aheadWorker == nil else {
         aheadAgain = true

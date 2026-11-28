@@ -209,11 +209,11 @@ describe("playerAdLine", () => {
         ads: adsInfo,
       })
     expect(line(ads("found", { count: 2, prepared: true }))).toBe(
-      "Prepared by your Mac",
+      "Your Mac's marks",
     )
     expect(
       line(ads("noAds", { prepared: true }), transcript("transcribing")),
-    ).toBe("Prepared by your Mac")
+    ).toBe("Your Mac's marks")
     expect(
       adsToShow(
         true,
@@ -221,6 +221,32 @@ describe("playerAdLine", () => {
         ads("found", { count: 2, prepared: true }),
       ),
     ).toEqual(ads("found", { count: 2, prepared: true }))
+  })
+
+  it("shows the Mac's marks line only for an episode that has them", () => {
+    const line = (adsInfo: AdsInfo | undefined, state: DownloadInfo["state"]) =>
+      playerAdLine({
+        ...base,
+        download: download(state),
+        transcript: transcript("done"),
+        ads: adsInfo,
+      })
+    expect(line(ads("found", { count: 2, macMarks: true }), "downloaded")).toBe(
+      "Your Mac's marks",
+    )
+    // A stream whose episode has the marks says so instead of "without ad skipping".
+    expect(
+      playerAdLine({
+        ...base,
+        download: undefined,
+        ads: ads("waiting", { macMarks: true }),
+      }),
+    ).toBe("Your Mac's marks")
+    // Nothing new without the marks.
+    expect(line(ads("found", { count: 2 }), "downloaded")).toBe("2 ads found")
+    expect(playerAdLine({ ...base, download: undefined })).toBe(
+      "Streaming without ad skipping",
+    )
   })
 
   it("counts the ads found, and says when there are none", () => {
