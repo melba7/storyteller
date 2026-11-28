@@ -102,6 +102,10 @@ final class AudioScoreBox: @unchecked Sendable {
     lock.lock()
     defer { lock.unlock() }
     scanned += 1
+    if ChunkRead.saysProgress(after: Int(scanned)) {
+      let line = ChunkRead.progressLine(episodes: Int(scanned), peakBytes: Self.peakBytes())
+      FileHandle.standardError.write(Data((line + "\n").utf8))
+    }
     let result = ScoreSounds.scanRepeats(
       in: url, older: prints[show]?.prints ?? [], episode: episode, date: scanned)
     if let print = result.print { prints[show] = (prints[show] ?? ShowPrints()).adding(print) }
@@ -122,6 +126,19 @@ final class AudioScoreBox: @unchecked Sendable {
     }
     guard let joints else { return spans }
     return snapped(spans, joints, steady)
+  }
+
+  /// The most memory this program has used so far, in bytes (macOS counts it in bytes, Linux in
+  /// kilobytes).
+  private static func peakBytes() -> Int {
+    var usage = rusage()
+    #if canImport(Darwin)
+      guard getrusage(RUSAGE_SELF, &usage) == 0 else { return 0 }
+      return Int(usage.ru_maxrss)
+    #else
+      guard getrusage(__rusage_who_t(RUSAGE_SELF.rawValue), &usage) == 0 else { return 0 }
+      return Int(usage.ru_maxrss) * 1024
+    #endif
   }
 
   private func snapped(_ spans: [ScoreSpan], _ joints: Joints, _ steady: Bool) -> [ScoreSpan] {

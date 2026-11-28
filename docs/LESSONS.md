@@ -304,3 +304,8 @@ One line per lesson.
   caught import order in five files that the narrow test runs missed. The Mac
   tools' collect tests read the container's real free disk, so four fail when
   under 15 GB is free; remove old worktrees first (2026-11-28).
+- On macOS a long-running Swift command that reads files in chunks with
+  `FileHandle` must give each read its own autorelease pool (`ChunkRead`):
+  without one every chunk can stay in memory until macOS kills the program
+  (signal 9, nothing printed). Linux has no such pool, so cloud runs never show
+  it (2026-11-28).

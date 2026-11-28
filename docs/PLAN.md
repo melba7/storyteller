@@ -2329,6 +2329,16 @@ How I read the picks (my choices, told to Mo):
     without audio; every non-zero exit in it prints a line, so the Mac's silent
     failure is a signal (killed or a crash) in the audio steps. The next Mac run
     shows the code.
+  - Found (round Z on the Mac, 2026-11-28): exit code 137, killed by macOS
+    (signal 9) before it printed anything. The score has read every teaching
+    episode's audio since the sound rows came in (PR #55, 2026-11-23, the day it
+    started failing): 1,585 files, 76 GB, some read several times. On Apple's
+    systems each chunk a FileHandle reads is also held by the thread's
+    autorelease pool, which a command-line program never empties, so all of it
+    can stay in memory (Linux has no such pool, which is why the cloud runs
+    passed). Each chunk read now has its own pool (`ChunkRead`, as `Sha256`
+    already did), and the score prints its memory every 100 episodes. Done once
+    a run on the Mac writes a new `scorecard.json`.
 - [x] **Z9 Teach the phone again every night by itself** (B): a nightly job runs
       the finish steps (habits, model, library, sounds, cues, score, settings,
       publish) on what was marked that day. It spends nothing. It comes after
@@ -2411,7 +2421,7 @@ How I read the picks (my choices, told to Mo):
 
 - Result: web addresses only, reach 90 s (picked on training): 13 skips move, no
   break changes (142, 129). Not kept.
-- [ ] **Z18 Claude's second look at every break's start and end** (pick 3):
+- [x] **Z18 Claude's second look at every break's start and end** (pick 3):
       Claude reads the lines around each edge once more and may move it. Tested
       first on the twice-downloaded episodes, where the answer key does not come
       from Claude. Mo is told the test's spend before it runs (about $3).
@@ -2419,6 +2429,11 @@ How I read the picks (my choices, told to Mo):
   - Done when: edges within 5 s, before and after, stand here with the cost for
     each episode. Kept when 5 in 100 more edges land within 5 s, none of the
     kinds gets worse, and a week stays under $15.
+  - Result (Mac, 2026-11-28, 112 twice-downloaded episodes until the
+    $5 cap,
+    $4.80, $0.04 an episode): within 5 s of the exact edge 300 of 454
+    before and 294 after (within 1 s 192 and 189); sponsor edges got worse. Not
+    kept, so it stays off.
 
 **Part 2 (may slip to the next round)**
 

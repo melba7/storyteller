@@ -18,7 +18,7 @@ public enum AdSoundFile {
     var scanner = AdSoundScanner(library: library)
     var found: [AdSoundHit] = []
     // A folder opens but cannot be read: that ends the loop at once, like the end of a file.
-    while let chunk = try? handle.read(upToCount: chunkSize), !chunk.isEmpty {
+    while let chunk = ChunkRead.next(handle, upTo: chunkSize) {
       found += scanner.feed(reader.feed([UInt8](chunk)))
     }
     return ordered(found + scanner.finish())
